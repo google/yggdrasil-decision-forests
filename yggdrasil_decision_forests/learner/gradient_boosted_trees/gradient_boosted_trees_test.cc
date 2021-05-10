@@ -1336,6 +1336,21 @@ TEST(GradientBoostedTrees, SetHyperParameters) {
   GradientBoostedTreesLearner learner{model::proto::TrainingConfig()};
   const auto hparam_spec =
       learner.GetGenericHyperParameterSpecification().value();
+  const auto& gbdt_config =
+      *learner.mutable_training_config()->MutableExtension(
+          gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  const float epsilon = 0.0001f;
+
+  // Defaults
+  EXPECT_EQ(gbdt_config.num_trees(), 300);
+  EXPECT_FALSE(
+      learner.training_config().has_maximum_training_duration_seconds());
+  EXPECT_NEAR(gbdt_config.validation_set_ratio(), 0.1f, epsilon);
+  EXPECT_EQ(gbdt_config.early_stopping_num_trees_look_ahead(), 30);
+  EXPECT_EQ(
+      gbdt_config.early_stopping(),
+      proto::GradientBoostedTreesTrainingConfig::VALIDATION_LOSS_INCREASE);
+
   EXPECT_OK(learner.SetHyperParameters(PARSE_TEST_PROTO(R"pb(
     fields {
       name: "num_trees"
@@ -1344,12 +1359,29 @@ TEST(GradientBoostedTrees, SetHyperParameters) {
     fields {
       name: "maximum_training_duration_seconds"
       value { real: 10 }
-    })pb")));
-  const auto& gbdt_config = learner.training_config().GetExtension(
-      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+    }
+    fields {
+      name: "validation_ratio"
+      value { real: 0.2 }
+    }
+    fields {
+      name: "early_stopping_num_trees_look_ahead"
+      value { integer: 10 }
+    }
+    fields {
+      name: "early_stopping"
+      value { categorical: "NONE" }
+    }
+  )pb")));
+
+  // Set
   EXPECT_EQ(gbdt_config.num_trees(), 10);
   EXPECT_NEAR(learner.training_config().maximum_training_duration_seconds(),
               10., 0.001);
+  EXPECT_NEAR(gbdt_config.validation_set_ratio(), 0.2, epsilon);
+  EXPECT_EQ(gbdt_config.early_stopping_num_trees_look_ahead(), 10);
+  EXPECT_EQ(gbdt_config.early_stopping(),
+            proto::GradientBoostedTreesTrainingConfig::NONE);
 }
 
 TEST(DartPredictionAccumulator, Base) {

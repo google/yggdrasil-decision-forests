@@ -90,7 +90,7 @@ absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
 }
 
 absl::Status FileInputByteStream::Open(absl::string_view path) {
-  file_ = std::fopen(std::string(path).c_str(), "r");
+  file_ = std::fopen(std::string(path).c_str(), "rb");
   if (!file_) {
     return absl::Status(absl::StatusCode::kUnknown,
                         absl::StrCat("Failed to open ", path));
@@ -123,7 +123,7 @@ absl::Status FileInputByteStream::Close() {
 }
 
 absl::Status FileOutputByteStream::Open(absl::string_view path) {
-  file_ = std::fopen(std::string(path).c_str(), "w");
+  file_ = std::fopen(std::string(path).c_str(), "wb");
   if (!file_) {
     return absl::Status(absl::StatusCode::kUnknown,
                         absl::StrCat("Failed to open ", path));

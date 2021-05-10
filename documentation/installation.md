@@ -12,11 +12,13 @@ interfaces.
     *   [Table of Contents](#table-of-contents)
     *   [Installation pre-compiled command-line-interface](#installation-pre-compiled-command-line-interface)
     *   [Compile command-line-interface from source](#compile-command-line-interface-from-source)
+        *   [Linux](#linux)
+        *   [Windows](#windows)
     *   [Running a minimal example](#running-a-minimal-example)
     *   [Using the C++ library](#using-the-c-library)
     *   [Troubleshooting](#troubleshooting)
 
-<!-- Added by: gbm, at: Fri 07 May 2021 06:22:52 PM CEST -->
+<!-- Added by: gbm, at: Mon 10 May 2021 03:50:42 PM CEST -->
 
 <!--te-->
 
@@ -29,43 +31,75 @@ Pre-compiled binaries are available as
 
 **Requirements**
 
--   MSVC>=2019 (Windows) or GCC>=7.3 (Linux).
--   Bazel 3.7.2
--   Python 3.x
+-   Microsoft Visual Studio >= 2019 (Windows)
+-   GCC >= 8 (>=9 Recommended) or Clang (Linux)
+-   Bazel >= 3.7.2
+-   Python >= 3
 -   Git
 -   Python's numpy
 -   MSYS2 (Windows only)
 
-First install Bazel. Currently, the version
-[3.7 of Bazel](https://docs.bazel.build/versions/3.7.0/getting-started.html) is
-required:
+First install [Bazel](https://docs.bazel.build). Versions 3.7.2 and 4.0.0 are
+supported:
 
--   On linux: `sudo apt update && sudo apt install bazel-3.7.2`
+-   On linux: `sudo apt update && sudo apt install bazel`
 
 -   On windows: Follow
-    [the guide](https://docs.bazel.build/versions/3.7.0/install-windows.html).
+    [the guide](https://docs.bazel.build/versions/4.0.0/install-windows.html).
 
 For more details (and troubleshooting), see the
-[Bazel installation guide](https://docs.bazel.build/versions/3.7.0/install.html).
+[Bazel installation guide](https://docs.bazel.build/versions/4.0.0/install.html).
 
 Once Bazel is installed, clone the github repository and start the compilation:
 
 ```shell
 git clone https://github.com/google/yggdrasil-decision-forests.git
 cd yggdrasil_decision_forests
-bazel-3.7.2 build //yggdrasil_decision_forests/...:all --config=<platform>
+
+bazel build //yggdrasil_decision_forests/...:all --config=<platform config>
 ```
 
 For example:
 
+### Linux
+
 ```shell
-bazel-3.7.2 build //yggdrasil_decision_forests/cli/...:all --config=linux_cpp17 --config=linux_avx2
+git clone https://github.com/google/yggdrasil-decision-forests.git
+cd yggdrasil_decision_forests
+
+bazel build //yggdrasil_decision_forests/cli/...:all --config=linux_cpp17 --config=linux_avx2
 ```
 
-or
+*Note:* You can specify the compiler with `--repo_env=CC`. For example:
 
 ```shell
-bazel-3.7.2 build //yggdrasil_decision_forests/cli/...:all --config=windows_cpp17
+# Compile with GCC9
+... --repo_env=CC=gcc-9
+
+# Compile with Clang
+... --repo_env=CC=clang
+```
+
+### Windows
+
+```shell
+
+# Note: The python path should not contain spaces.
+set PYTHON_BIN_PATH=C:\Python38\python.exe
+
+git clone https://github.com/google/yggdrasil-decision-forests.git
+cd yggdrasil_decision_forests
+
+bazel build //yggdrasil_decision_forests/cli/...:all --config=windows_cpp17 --config=windows_avx2
+```
+
+*Note:* If multiple version of visual studio are installed, use
+`BAZEL_VC_FULL_VERSION`. For example:
+
+```shell
+# Set a specific version of visual studio.
+# The exact version can be found in `Program Files (x86)` e.g. C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910.
+set BAZEL_VC_FULL_VERSION=14.28.29910
 ```
 
 **Important remarks**
@@ -173,6 +207,9 @@ void f() {
 }
 ```
 
+An example is available at [examples/beginner.cc](../examples/beginner.cc) and
+[examples/BUILD](../examples/BUILD).
+
 ## Troubleshooting
 
 **`Time out` during building**
@@ -215,3 +252,15 @@ make sure to use a recent version.
 Bazel calls `python` during the compilation. Check which version of python you
 have available and create an alias `sudo ln -s /usr/bin/python3
 /usr/bin/python`.
+
+**[Windows] `fatal error LNK1120: 6 unresolved externals` +
+`yggdrasil_decision_forests::serving::decision_forest::Idendity`**
+
+You are using a non supported version of Visual Studio. Install VS>=2019
+(VS>=14). If multiple version of VS are installed, specify the one used by Bazel
+with `BAZEL_VC_FULL_VERSION`.
+
+**Segmentation fault when any program starts on `std::filesystem::~path()`**
+
+`lstdc++fs` is not linked. You are likely using GCC8 without TensorFlow. Update
+to GCC>=9 or use TensorFlow for IO (`--config=use_tensorflow_io`).

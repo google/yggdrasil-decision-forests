@@ -19,11 +19,7 @@
 set -x
 set -e
 
-# A specific version of GCC or Clang can be set as follow:
-# export CC=gcc-9
-# export CXX=g++-9
-
-BAZEL=bazel-3.7.2
+BAZEL=bazel
 FLAGS="--config=linux_cpp17 --config=linux_avx2"
 
 ${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
@@ -36,6 +32,7 @@ for dir in "${subdirs[@]}"
 do
   targets="$targets //yggdrasil_decision_forests/${dir}/...:all"
 done
+targets="$targets //examples:beginner_cc"
 
 # Note: use_tensorflow_io is required for some of the unit test.
 ${BAZEL} test ${targets} ${FLAGS} --config=use_tensorflow_io

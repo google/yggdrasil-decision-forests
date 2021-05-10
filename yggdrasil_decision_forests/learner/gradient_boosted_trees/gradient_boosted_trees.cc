@@ -98,6 +98,15 @@ constexpr char GradientBoostedTreesLearner::kHParamForestExtraction[];
 constexpr char GradientBoostedTreesLearner::kHParamForestExtractionMart[];
 constexpr char GradientBoostedTreesLearner::kHParamForestExtractionDart[];
 
+constexpr char GradientBoostedTreesLearner::kHParamValidationSetRatio[];
+constexpr char GradientBoostedTreesLearner::kHParamEarlyStopping[];
+constexpr char GradientBoostedTreesLearner::kHParamEarlyStoppingNone[];
+constexpr char
+    GradientBoostedTreesLearner::kHParamEarlyStoppingMinLossFullModel[];
+constexpr char GradientBoostedTreesLearner::kHParamEarlyStoppingLossIncrease[];
+constexpr char
+    GradientBoostedTreesLearner::kHParamEarlyStoppingNumTreesLookAhead[];
+
 using dataset::VerticalDataset;
 using CategoricalColumn = VerticalDataset::CategoricalColumn;
 
@@ -1554,6 +1563,41 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamValidationSetRatio);
+    if (hparam.has_value()) {
+      gbt_config->set_validation_set_ratio(hparam.value().value().real());
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamEarlyStoppingNumTreesLookAhead);
+    if (hparam.has_value()) {
+      gbt_config->set_early_stopping_num_trees_look_ahead(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamEarlyStopping);
+    if (hparam.has_value()) {
+      const auto early_stopping = hparam.value().value().categorical();
+      if (early_stopping == kHParamEarlyStoppingNone) {
+        gbt_config->set_early_stopping(
+            proto::GradientBoostedTreesTrainingConfig::NONE);
+      } else if (early_stopping == kHParamEarlyStoppingMinLossFullModel) {
+        gbt_config->set_early_stopping(
+            proto::GradientBoostedTreesTrainingConfig::
+                MIN_VALIDATION_LOSS_ON_FULL_MODEL);
+      } else if (early_stopping == kHParamEarlyStoppingLossIncrease) {
+        gbt_config->set_early_stopping(
+            proto::GradientBoostedTreesTrainingConfig::
+                VALIDATION_LOSS_INCREASE);
+      }
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -1915,6 +1959,45 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_proto_field("ratio");
     param.mutable_documentation()->set_description(
         R"(Ratio of the dataset used to train individual tree for the selective Gradient Boosting (Selective Gradient Boosting for Effective Learning to Rank; Lucchese et al; http://quickrank.isti.cnr.it/selective-data/selective-SIGIR2018.pdf) sampling method.)");
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamValidationSetRatio);
+    param.mutable_real()->set_minimum(0.f);
+    param.mutable_real()->set_maximum(1.f);
+    param.mutable_real()->set_default_value(gbt_config.validation_set_ratio());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Ratio of the training dataset used to monitor the training. Require to be >0 if early stopping is enabled.)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamEarlyStoppingNumTreesLookAhead);
+    param.mutable_integer()->set_minimum(1);
+    param.mutable_integer()->set_default_value(
+        gbt_config.early_stopping_num_trees_look_ahead());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Rolling number of trees used to detect validation loss increase and trigger early stopping.)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](kHParamEarlyStopping);
+    param.mutable_categorical()->set_default_value(
+        kHParamEarlyStoppingLossIncrease);
+    param.mutable_categorical()->add_possible_values(kHParamEarlyStoppingNone);
+    param.mutable_categorical()->add_possible_values(
+        kHParamEarlyStoppingMinLossFullModel);
+    param.mutable_categorical()->add_possible_values(
+        kHParamEarlyStoppingLossIncrease);
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Early stopping detects the overfitting of the model and halts it training using the validation dataset controlled by `validation_ratio`.
+- `NONE`: No early stopping. The model is trained entirely.
+- `MIN_LOSS_FINAL`: No early stopping. However, the model is then truncated to maximize the validation loss.
+- `LOSS_INCREASE`: Stop the training when the validation does not decrease for `early_stopping_num_trees_look_ahead` trees.)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(

@@ -104,7 +104,7 @@ std::string ResultsToString(const RunOptions& options,
 
   absl::StrAppendFormat(&report, "batch_size : %d  num_runs : %d\n",
                         options.batch_size, options.num_runs);
-  absl::StrAppendFormat(&report, "time/example(µs)  time/batch(µs)  method\n");
+  absl::StrAppendFormat(&report, "time/example(us)  time/batch(us)  method\n");
   absl::StrAppendFormat(&report, "----------------------------------------\n");
   for (const auto& result : results) {
     absl::StrAppendFormat(

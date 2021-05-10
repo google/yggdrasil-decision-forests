@@ -17,8 +17,10 @@ tensorflow()
 farmhash()
 boost()
 
-# TensorFlow cannot anymore be injected from a sub-module.
-# Note: TensorFlow is used to read and write TFRecord and IO if
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+protobuf_deps()
+
+# TensorFlow is used to read and write TFRecord and IO if
 # use_tensorflow_io=1. Only a small fraction of TF will be compiled.
 load("@org_tensorflow//tensorflow:workspace3.bzl", tf1="workspace")
 tf1()

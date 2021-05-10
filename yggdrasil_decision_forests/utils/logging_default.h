@@ -133,13 +133,23 @@ enum Severity { INFO, WARNING, FATAL };
 
 namespace internal {
 
+// Extraction the filename from a path.
+inline absl::string_view ExtractFilename(absl::string_view path) {
+  auto last_sep = path.find_last_of("/\\");
+  if (last_sep == std::string::npos) {
+    // Start of filename no found.
+    return path;
+  }
+  return path.substr(last_sep + 1);
+}
+
 class LogMessage {
  public:
   LogMessage(Severity sev, absl::string_view file, int line) : sev_(sev) {
     if (!absl::GetFlag(FLAGS_alsologtostderr)) {
       return;
     }
-    std::clog << " [";
+    std::clog << "[";
     switch (sev) {
       case INFO:
         std::clog << "INFO";
@@ -154,7 +164,7 @@ class LogMessage {
         std::clog << "UNDEF";
         break;
     }
-    std::clog << " " << file << ":" << line << "] ";
+    std::clog << " " << ExtractFilename(file) << ":" << line << "] ";
   }
 
   virtual ~LogMessage() {
@@ -185,7 +195,6 @@ class FatalLogMessage : public LogMessage {
   [[noreturn]] ~FatalLogMessage() {
     if (absl::GetFlag(FLAGS_alsologtostderr)) {
       std::clog << std::endl;
-      std::clog << "============================" << std::endl;
       std::clog.flush();
     }
     std::exit(1);

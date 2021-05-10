@@ -14,7 +14,7 @@
 
 :: Compile and runs the unit tests.
 
-set BAZEL=bazel-3.7.2-windows-x86_64.exe
+set BAZEL=bazel-4.0.0-windows-x86_64.exe
 set FLAGS_WO_TF=--config=windows_cpp17
 set FLAGS_W_TF=--config=windows_cpp14 --config=use_tensorflow_io
 

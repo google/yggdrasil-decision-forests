@@ -17,8 +17,8 @@ the gradient of the loss relative to the model output).
 ### Training configuration
 
 -   <a href="../yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
+-   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto">learner/gradient_boosted_trees/gradient_boosted_trees.proto</a>
--   <a href="../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto">model/decision_tree/decision_tree.proto</a>
 
 ### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
 
@@ -31,21 +31,21 @@ the gradient of the loss relative to the model output).
     datasets used train individual trees are adapted dynamically so that all the
     trees are trained in time.
 
-#### [allow_na_conditions](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:allow_na_conditions)
+#### [allow_na_conditions](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:allow_na_conditions)
 
 -   **Type:** Categorical **Default:** false **Possible values:** true, false
 
 -   If true, the tree training evaluates conditions of the type `X is NA` i.e.
     `X is missing`.
 
-#### [categorical_algorithm](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:categorical_algorithm)
+#### [categorical_algorithm](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:categorical_algorithm)
 
 -   **Type:** Categorical **Default:** CART **Possible values:** CART, ONE_HOT,
     RANDOM
 
 -   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
 
-#### [categorical_set_split_greedy_sampling](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:categorical_set_greedy_forward)
+#### [categorical_set_split_greedy_sampling](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:categorical_set_greedy_forward)
 
 -   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
 
@@ -53,7 +53,7 @@ the gradient of the loss relative to the model output).
     to be a candidate for the positive set. The sampling is applied once per
     node (i.e. not at every step of the greedy optimization).
 
-#### [categorical_set_split_max_num_items](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:max_num_items)
+#### [categorical_set_split_max_num_items](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_num_items)
 
 -   **Type:** Integer **Default:** -1 **Possible values:** min:-1
 
@@ -64,7 +64,7 @@ the gradient of the loss relative to the model output).
     `max_vocab_count`, all the remaining items are grouped in a special
     Out-of-vocabulary item. With `max_num_items`, this is not the case.
 
-#### [categorical_set_split_min_item_frequency](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:min_item_frequency)
+#### [categorical_set_split_min_item_frequency](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:min_item_frequency)
 
 -   **Type:** Integer **Default:** 1 **Possible values:** min:1
 
@@ -76,6 +76,20 @@ the gradient of the loss relative to the model output).
 -   **Type:** Real **Default:** 0.01 **Possible values:** min:0 max:1
 
 -   Dropout rate applied when using the DART i.e. when forest_extraction=DART.
+
+#### [early_stopping](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:early_stopping)
+
+-   **Type:** Categorical **Default:** LOSS_INCREASE **Possible values:** NONE,
+    MIN_LOSS_FINAL, LOSS_INCREASE
+
+-   Early stopping detects the overfitting of the model and halts it training using the validation dataset controlled by `validation_ratio`.<br>- `NONE`: No early stopping. The model is trained entirely.<br>- `MIN_LOSS_FINAL`: No early stopping. However, the model is then truncated to maximize the validation loss.<br>- `LOSS_INCREASE`: Stop the training when the validation does not decrease for `early_stopping_num_trees_look_ahead` trees.
+
+#### [early_stopping_num_trees_look_ahead](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:early_stopping_num_trees_look_ahead)
+
+-   **Type:** Integer **Default:** 30 **Possible values:** min:1
+
+-   Rolling number of trees used to detect validation loss increase and trigger
+    early stopping.
 
 #### [forest_extraction](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:forest_extraction)
 
@@ -98,14 +112,14 @@ the gradient of the loss relative to the model output).
 -   Beta parameter for the GOSS (Gradient-based One-Side Sampling) sampling
     method.
 
-#### [growing_strategy](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:growing_strategy)
+#### [growing_strategy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:growing_strategy)
 
 -   **Type:** Categorical **Default:** LOCAL **Possible values:** LOCAL,
     BEST_FIRST_GLOBAL
 
 -   How to grow the tree.<br>- `LOCAL`: Each node is split independently of the other nodes. In other words, as long as a node satisfy the splits "constraints (e.g. maximum depth, minimum number of observations), the node will be split. This is the "classical" way to grow decision trees.<br>- `BEST_FIRST_GLOBAL`: The node with the best loss reduction among all the nodes of the tree is selected for splitting. This method is also called "best first" or "leaf-wise growth". See "Best-first decision tree learning", Shi and "Additive logistic regression : A statistical view of boosting", Friedman for more details.
 
-#### [in_split_min_examples_check](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
+#### [in_split_min_examples_check](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
 
 -   **Type:** Categorical **Default:** true **Possible values:** true, false
 
@@ -143,14 +157,14 @@ the gradient of the loss relative to the model output).
 -   Lambda regularization applied to certain training loss functions. Only for
     NDCG loss.
 
-#### [max_depth](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:max_depth)
+#### [max_depth](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_depth)
 
 -   **Type:** Integer **Default:** 6 **Possible values:** min:-1
 
 -   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
     Negative values are ignored.
 
-#### [max_num_nodes](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:max_num_nodes)
+#### [max_num_nodes](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_num_nodes)
 
 -   **Type:** Integer **Default:** 31 **Possible values:** min:-1
 
@@ -165,20 +179,20 @@ the gradient of the loss relative to the model output).
     algorithm is free to use this parameter at it sees fit. Enabling maximum
     training duration makes the model training non-deterministic.
 
-#### [min_examples](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:min_examples)
+#### [min_examples](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:min_examples)
 
 -   **Type:** Integer **Default:** 5 **Possible values:** min:1
 
 -   Minimum number of examples in a node.
 
-#### [missing_value_policy](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:missing_value_policy)
+#### [missing_value_policy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:missing_value_policy)
 
 -   **Type:** Categorical **Default:** GLOBAL_IMPUTATION **Possible values:**
     GLOBAL_IMPUTATION, LOCAL_IMPUTATION, RANDOM_LOCAL_IMPUTATION
 
 -   Method used to handle missing attribute values.<br>- `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean (in case of numerical attribute) or the most-frequent-item (in case of categorical attribute) computed on the entire dataset (i.e. the information contained in the data spec).<br>- `LOCAL_IMPUTATION`: Missing attribute values are imputed with the mean (numerical attribute) or most-frequent-item (in the case of categorical attribute) evaluated on the training examples in the current node.<br>- `RANDOM_LOCAL_IMPUTATION`: Missing attribute values are imputed from randomly sampled values from the training examples in the current node. This method was proposed by Clinic et al. in "Random Survival Forests" (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
 
-#### [num_candidate_attributes](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes)
+#### [num_candidate_attributes](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes)
 
 -   **Type:** Integer **Default:** -1 **Possible values:** min:-1
 
@@ -189,7 +203,7 @@ the gradient of the loss relative to the model output).
     `number_of_input_attributes / 3` in case of regression. If
     `num_candidate_attributes=-1`, all the attributes are tested.
 
-#### [num_candidate_attributes_ratio](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes_ratio)
+#### [num_candidate_attributes_ratio](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes_ratio)
 
 -   **Type:** Real **Default:** -1 **Possible values:** min:-1 max:1
 
@@ -231,14 +245,14 @@ the gradient of the loss relative to the model output).
     give more accurate results (assuming enough trees are trained), but results
     in larger models. Analogous to neural network learning rate.
 
-#### [sparse_oblique_normalization](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_split)
+#### [sparse_oblique_normalization](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_split)
 
 -   **Type:** Categorical **Default:** NONE **Possible values:** NONE,
     STANDARD_DEVIATION, MIN_MAX
 
 -   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before applying the sparse oblique projections.<br>- `NONE`: No normalization.<br>- `STANDARD_DEVIATION`: Normalize the feature by the estimated standard deviation on the entire train dataset. Also known as Z-Score normalization.<br>- `MIN_MAX`: Normalize the feature by the range (i.e. max-min) estimated on the entire train dataset.
 
-#### [sparse_oblique_num_projections_exponent](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:num_projections_exponent)
+#### [sparse_oblique_num_projections_exponent](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_projections_exponent)
 
 -   **Type:** Real **Default:** 2 **Possible values:** min:0
 
@@ -246,7 +260,7 @@ the gradient of the loss relative to the model output).
     number of random projections to test at each node as
     `num_features^num_projections_exponent`.
 
-#### [sparse_oblique_projection_density_factor](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:projection_density_factor)
+#### [sparse_oblique_projection_density_factor](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:projection_density_factor)
 
 -   **Type:** Real **Default:** 2 **Possible values:** min:0
 
@@ -254,7 +268,7 @@ the gradient of the loss relative to the model output).
     number of random projections to test at each node as
     `num_features^num_projections_exponent`.
 
-#### [split_axis](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:split_axis)
+#### [split_axis](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:split_axis)
 
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
     AXIS_ALIGNED, SPARSE_OBLIQUE
@@ -281,6 +295,13 @@ the gradient of the loss relative to the model output).
     optimizes the splits to minimize the variance of "gradient / hessian.
     Available for all losses except regression.
 
+#### [validation_ratio](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:validation_ratio)
+
+-   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
+
+-   Ratio of the training dataset used to monitor the training. Require to be >0
+    if early stopping is enabled.
+
 </font>
 
 ## RANDOM_FOREST
@@ -300,8 +321,8 @@ It is probably the most well-known of the Decision Forest training algorithms.
 ### Training configuration
 
 -   <a href="../yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
+-   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/random_forest/random_forest.proto">learner/random_forest/random_forest.proto</a>
--   <a href="../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto">model/decision_tree/decision_tree.proto</a>
 
 ### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
 
@@ -315,21 +336,21 @@ It is probably the most well-known of the Decision Forest training algorithms.
     `maximum_training_duration`. Has no effect if there is no maximum training
     duration specified.
 
-#### [allow_na_conditions](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:allow_na_conditions)
+#### [allow_na_conditions](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:allow_na_conditions)
 
 -   **Type:** Categorical **Default:** false **Possible values:** true, false
 
 -   If true, the tree training evaluates conditions of the type `X is NA` i.e.
     `X is missing`.
 
-#### [categorical_algorithm](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:categorical_algorithm)
+#### [categorical_algorithm](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:categorical_algorithm)
 
 -   **Type:** Categorical **Default:** CART **Possible values:** CART, ONE_HOT,
     RANDOM
 
 -   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
 
-#### [categorical_set_split_greedy_sampling](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:categorical_set_greedy_forward)
+#### [categorical_set_split_greedy_sampling](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:categorical_set_greedy_forward)
 
 -   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
 
@@ -337,7 +358,7 @@ It is probably the most well-known of the Decision Forest training algorithms.
     to be a candidate for the positive set. The sampling is applied once per
     node (i.e. not at every step of the greedy optimization).
 
-#### [categorical_set_split_max_num_items](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:max_num_items)
+#### [categorical_set_split_max_num_items](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_num_items)
 
 -   **Type:** Integer **Default:** -1 **Possible values:** min:-1
 
@@ -348,7 +369,7 @@ It is probably the most well-known of the Decision Forest training algorithms.
     `max_vocab_count`, all the remaining items are grouped in a special
     Out-of-vocabulary item. With `max_num_items`, this is not the case.
 
-#### [categorical_set_split_min_item_frequency](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:min_item_frequency)
+#### [categorical_set_split_min_item_frequency](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:min_item_frequency)
 
 -   **Type:** Integer **Default:** 1 **Possible values:** min:1
 
@@ -371,14 +392,14 @@ It is probably the most well-known of the Decision Forest training algorithms.
     summary and model inspector). Note that the OOB feature importance can be
     expensive to compute.
 
-#### [growing_strategy](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:growing_strategy)
+#### [growing_strategy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:growing_strategy)
 
 -   **Type:** Categorical **Default:** LOCAL **Possible values:** LOCAL,
     BEST_FIRST_GLOBAL
 
 -   How to grow the tree.<br>- `LOCAL`: Each node is split independently of the other nodes. In other words, as long as a node satisfy the splits "constraints (e.g. maximum depth, minimum number of observations), the node will be split. This is the "classical" way to grow decision trees.<br>- `BEST_FIRST_GLOBAL`: The node with the best loss reduction among all the nodes of the tree is selected for splitting. This method is also called "best first" or "leaf-wise growth". See "Best-first decision tree learning", Shi and "Additive logistic regression : A statistical view of boosting", Friedman for more details.
 
-#### [in_split_min_examples_check](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
+#### [in_split_min_examples_check](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
 
 -   **Type:** Categorical **Default:** true **Possible values:** true, false
 
@@ -388,14 +409,14 @@ It is probably the most well-known of the Decision Forest training algorithms.
     only if it contains more than `min_examples` examples). If false, there can
     be nodes with less than `min_examples` training examples.
 
-#### [max_depth](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:max_depth)
+#### [max_depth](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_depth)
 
 -   **Type:** Integer **Default:** 16 **Possible values:** min:-1
 
 -   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
     Negative values are ignored.
 
-#### [max_num_nodes](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:max_num_nodes)
+#### [max_num_nodes](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_num_nodes)
 
 -   **Type:** Integer **Default:** 31 **Possible values:** min:-1
 
@@ -410,20 +431,20 @@ It is probably the most well-known of the Decision Forest training algorithms.
     algorithm is free to use this parameter at it sees fit. Enabling maximum
     training duration makes the model training non-deterministic.
 
-#### [min_examples](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:min_examples)
+#### [min_examples](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:min_examples)
 
 -   **Type:** Integer **Default:** 5 **Possible values:** min:1
 
 -   Minimum number of examples in a node.
 
-#### [missing_value_policy](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:missing_value_policy)
+#### [missing_value_policy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:missing_value_policy)
 
 -   **Type:** Categorical **Default:** GLOBAL_IMPUTATION **Possible values:**
     GLOBAL_IMPUTATION, LOCAL_IMPUTATION, RANDOM_LOCAL_IMPUTATION
 
 -   Method used to handle missing attribute values.<br>- `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean (in case of numerical attribute) or the most-frequent-item (in case of categorical attribute) computed on the entire dataset (i.e. the information contained in the data spec).<br>- `LOCAL_IMPUTATION`: Missing attribute values are imputed with the mean (numerical attribute) or most-frequent-item (in the case of categorical attribute) evaluated on the training examples in the current node.<br>- `RANDOM_LOCAL_IMPUTATION`: Missing attribute values are imputed from randomly sampled values from the training examples in the current node. This method was proposed by Clinic et al. in "Random Survival Forests" (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
 
-#### [num_candidate_attributes](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes)
+#### [num_candidate_attributes](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes)
 
 -   **Type:** Integer **Default:** 0 **Possible values:** min:-1
 
@@ -434,7 +455,7 @@ It is probably the most well-known of the Decision Forest training algorithms.
     `number_of_input_attributes / 3` in case of regression. If
     `num_candidate_attributes=-1`, all the attributes are tested.
 
-#### [num_candidate_attributes_ratio](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes_ratio)
+#### [num_candidate_attributes_ratio](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes_ratio)
 
 -   **Type:** Real **Default:** -1 **Possible values:** min:-1 max:1
 
@@ -452,14 +473,14 @@ It is probably the most well-known of the Decision Forest training algorithms.
     increase the quality of the model at the expense of size, training speed,
     and inference latency.
 
-#### [sparse_oblique_normalization](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_split)
+#### [sparse_oblique_normalization](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_split)
 
 -   **Type:** Categorical **Default:** NONE **Possible values:** NONE,
     STANDARD_DEVIATION, MIN_MAX
 
 -   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before applying the sparse oblique projections.<br>- `NONE`: No normalization.<br>- `STANDARD_DEVIATION`: Normalize the feature by the estimated standard deviation on the entire train dataset. Also known as Z-Score normalization.<br>- `MIN_MAX`: Normalize the feature by the range (i.e. max-min) estimated on the entire train dataset.
 
-#### [sparse_oblique_num_projections_exponent](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:num_projections_exponent)
+#### [sparse_oblique_num_projections_exponent](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_projections_exponent)
 
 -   **Type:** Real **Default:** 2 **Possible values:** min:0
 
@@ -467,7 +488,7 @@ It is probably the most well-known of the Decision Forest training algorithms.
     number of random projections to test at each node as
     `num_features^num_projections_exponent`.
 
-#### [sparse_oblique_projection_density_factor](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:projection_density_factor)
+#### [sparse_oblique_projection_density_factor](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:projection_density_factor)
 
 -   **Type:** Real **Default:** 2 **Possible values:** min:0
 
@@ -475,7 +496,7 @@ It is probably the most well-known of the Decision Forest training algorithms.
     number of random projections to test at each node as
     `num_features^num_projections_exponent`.
 
-#### [split_axis](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:split_axis)
+#### [split_axis](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:split_axis)
 
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
     AXIS_ALIGNED, SPARSE_OBLIQUE
@@ -505,25 +526,25 @@ used to grow the tree while the second is used to prune the tree.
 
 -   <a href="../yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/cart/cart.proto">learner/cart/cart.proto</a>
--   <a href="../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto">model/decision_tree/decision_tree.proto</a>
+-   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 
 ### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
 
-#### [allow_na_conditions](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:allow_na_conditions)
+#### [allow_na_conditions](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:allow_na_conditions)
 
 -   **Type:** Categorical **Default:** false **Possible values:** true, false
 
 -   If true, the tree training evaluates conditions of the type `X is NA` i.e.
     `X is missing`.
 
-#### [categorical_algorithm](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:categorical_algorithm)
+#### [categorical_algorithm](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:categorical_algorithm)
 
 -   **Type:** Categorical **Default:** CART **Possible values:** CART, ONE_HOT,
     RANDOM
 
 -   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
 
-#### [categorical_set_split_greedy_sampling](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:categorical_set_greedy_forward)
+#### [categorical_set_split_greedy_sampling](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:categorical_set_greedy_forward)
 
 -   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
 
@@ -531,7 +552,7 @@ used to grow the tree while the second is used to prune the tree.
     to be a candidate for the positive set. The sampling is applied once per
     node (i.e. not at every step of the greedy optimization).
 
-#### [categorical_set_split_max_num_items](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:max_num_items)
+#### [categorical_set_split_max_num_items](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_num_items)
 
 -   **Type:** Integer **Default:** -1 **Possible values:** min:-1
 
@@ -542,21 +563,21 @@ used to grow the tree while the second is used to prune the tree.
     `max_vocab_count`, all the remaining items are grouped in a special
     Out-of-vocabulary item. With `max_num_items`, this is not the case.
 
-#### [categorical_set_split_min_item_frequency](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:min_item_frequency)
+#### [categorical_set_split_min_item_frequency](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:min_item_frequency)
 
 -   **Type:** Integer **Default:** 1 **Possible values:** min:1
 
 -   For categorical set splits e.g. texts. Minimum number of occurrences of an
     item to be considered.
 
-#### [growing_strategy](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:growing_strategy)
+#### [growing_strategy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:growing_strategy)
 
 -   **Type:** Categorical **Default:** LOCAL **Possible values:** LOCAL,
     BEST_FIRST_GLOBAL
 
 -   How to grow the tree.<br>- `LOCAL`: Each node is split independently of the other nodes. In other words, as long as a node satisfy the splits "constraints (e.g. maximum depth, minimum number of observations), the node will be split. This is the "classical" way to grow decision trees.<br>- `BEST_FIRST_GLOBAL`: The node with the best loss reduction among all the nodes of the tree is selected for splitting. This method is also called "best first" or "leaf-wise growth". See "Best-first decision tree learning", Shi and "Additive logistic regression : A statistical view of boosting", Friedman for more details.
 
-#### [in_split_min_examples_check](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
+#### [in_split_min_examples_check](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
 
 -   **Type:** Categorical **Default:** true **Possible values:** true, false
 
@@ -566,14 +587,14 @@ used to grow the tree while the second is used to prune the tree.
     only if it contains more than `min_examples` examples). If false, there can
     be nodes with less than `min_examples` training examples.
 
-#### [max_depth](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:max_depth)
+#### [max_depth](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_depth)
 
 -   **Type:** Integer **Default:** 16 **Possible values:** min:-1
 
 -   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
     Negative values are ignored.
 
-#### [max_num_nodes](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:max_num_nodes)
+#### [max_num_nodes](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_num_nodes)
 
 -   **Type:** Integer **Default:** 31 **Possible values:** min:-1
 
@@ -588,20 +609,20 @@ used to grow the tree while the second is used to prune the tree.
     algorithm is free to use this parameter at it sees fit. Enabling maximum
     training duration makes the model training non-deterministic.
 
-#### [min_examples](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:min_examples)
+#### [min_examples](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:min_examples)
 
 -   **Type:** Integer **Default:** 5 **Possible values:** min:1
 
 -   Minimum number of examples in a node.
 
-#### [missing_value_policy](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:missing_value_policy)
+#### [missing_value_policy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:missing_value_policy)
 
 -   **Type:** Categorical **Default:** GLOBAL_IMPUTATION **Possible values:**
     GLOBAL_IMPUTATION, LOCAL_IMPUTATION, RANDOM_LOCAL_IMPUTATION
 
 -   Method used to handle missing attribute values.<br>- `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean (in case of numerical attribute) or the most-frequent-item (in case of categorical attribute) computed on the entire dataset (i.e. the information contained in the data spec).<br>- `LOCAL_IMPUTATION`: Missing attribute values are imputed with the mean (numerical attribute) or most-frequent-item (in the case of categorical attribute) evaluated on the training examples in the current node.<br>- `RANDOM_LOCAL_IMPUTATION`: Missing attribute values are imputed from randomly sampled values from the training examples in the current node. This method was proposed by Clinic et al. in "Random Survival Forests" (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
 
-#### [num_candidate_attributes](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes)
+#### [num_candidate_attributes](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes)
 
 -   **Type:** Integer **Default:** 0 **Possible values:** min:-1
 
@@ -612,7 +633,7 @@ used to grow the tree while the second is used to prune the tree.
     `number_of_input_attributes / 3` in case of regression. If
     `num_candidate_attributes=-1`, all the attributes are tested.
 
-#### [num_candidate_attributes_ratio](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes_ratio)
+#### [num_candidate_attributes_ratio](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes_ratio)
 
 -   **Type:** Real **Default:** -1 **Possible values:** min:-1 max:1
 
@@ -622,14 +643,14 @@ used to grow the tree while the second is used to prune the tree.
     as well as -1. If not set or equal to -1, the `num_candidate_attributes` is
     used.
 
-#### [sparse_oblique_normalization](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_split)
+#### [sparse_oblique_normalization](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_split)
 
 -   **Type:** Categorical **Default:** NONE **Possible values:** NONE,
     STANDARD_DEVIATION, MIN_MAX
 
 -   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before applying the sparse oblique projections.<br>- `NONE`: No normalization.<br>- `STANDARD_DEVIATION`: Normalize the feature by the estimated standard deviation on the entire train dataset. Also known as Z-Score normalization.<br>- `MIN_MAX`: Normalize the feature by the range (i.e. max-min) estimated on the entire train dataset.
 
-#### [sparse_oblique_num_projections_exponent](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:num_projections_exponent)
+#### [sparse_oblique_num_projections_exponent](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_projections_exponent)
 
 -   **Type:** Real **Default:** 2 **Possible values:** min:0
 
@@ -637,7 +658,7 @@ used to grow the tree while the second is used to prune the tree.
     number of random projections to test at each node as
     `num_features^num_projections_exponent`.
 
-#### [sparse_oblique_projection_density_factor](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:projection_density_factor)
+#### [sparse_oblique_projection_density_factor](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:projection_density_factor)
 
 -   **Type:** Real **Default:** 2 **Possible values:** min:0
 
@@ -645,7 +666,7 @@ used to grow the tree while the second is used to prune the tree.
     number of random projections to test at each node as
     `num_features^num_projections_exponent`.
 
-#### [split_axis](../yggdrasil_decision_forests/model/decision_tree/decision_tree.proto?q=symbol:split_axis)
+#### [split_axis](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:split_axis)
 
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
     AXIS_ALIGNED, SPARSE_OBLIQUE
