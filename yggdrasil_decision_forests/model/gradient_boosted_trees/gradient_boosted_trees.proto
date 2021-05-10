@@ -1,0 +1,101 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.gradient_boosted_trees.proto;
+
+// Header for the gradient boosted trees model.
+message Header {
+  // Next ID: 9
+
+  // Number of shards used to store the nodes.
+  optional int32 num_node_shards = 1;
+  // Number of trees.
+  optional int64 num_trees = 2;
+  // Loss used to train the model.
+  optional Loss loss = 3;
+  // Initial predictions of the model (before any tree is applied). The semantic
+  // of the prediction depend on the "loss".
+  repeated float initial_predictions = 4;
+  // Number of trees extracted at each gradient boosting operation.
+  optional int32 num_trees_per_iter = 5 [default = 1];
+  // Loss evaluated on the validation dataset. Only available is a validation
+  // dataset was provided during training.
+  optional float validation_loss = 6;
+  // Container used to store the trees' nodes.
+  optional string node_format = 7 [default = "TFE_RECORDIO"];
+  // Evaluation metrics and other meta-data computed during training.
+  optional TrainingLogs training_logs = 8;
+}
+
+enum Loss {
+  // Selects the most adapted loss according to the nature of the task and the
+  // statistics of the label.
+  // - Binary classification -> BINOMIAL_LOG_LIKELIHOOD.
+  DEFAULT = 0;
+  // Binomial log likelihood. Only valid for binary classification.
+  BINOMIAL_LOG_LIKELIHOOD = 1;
+  // Least square loss. Only valid for regression.
+  SQUARED_ERROR = 2;
+  // Multinomial log likelihood i.e. cross-entropy.
+  MULTINOMIAL_LOG_LIKELIHOOD = 3;
+  // LambdaMART with NDCG5
+  LAMBDA_MART_NDCG5 = 4;
+  // XE_NDCG_MART [arxiv.org/abs/1911.09798]
+  XE_NDCG_MART = 5;
+}
+
+// Log of the training. This proto is generated during the training of the
+// model and optionally exported (as a plot) in the training logs directory.
+message TrainingLogs {
+  // Measurements the model size and performances during the training.
+  repeated Entry entries = 1;
+
+  // Names of the metrics stored in "secondary_metrics" field. The secondary
+  // metrics depends on the task (e.g. classification) and is accessible with
+  // "SecondaryMetricNames()". The i-th metric name of "secondary_metric_names"
+  // correspond to the i-th metric value in "training_secondary_metrics" and
+  // "validation_secondary_metrics".
+  repeated string secondary_metric_names = 2;
+
+  // Number of trees in the final model. Without early stopping,
+  // "number_of_trees_in_final_model" is equal to the "number_of_trees" of the
+  // last "entries".
+  optional int32 number_of_trees_in_final_model = 3;
+
+  message Entry {
+    // Number of trees. In the case of multi-dimensional gradients,
+    // "number_of_trees" is the number of training step.
+    optional int32 number_of_trees = 1;
+    // Performance of the model on the training dataset.
+    optional float training_loss = 2;
+    repeated float training_secondary_metrics = 3;
+    // Performance of the model on the validation dataset.
+    optional float validation_loss = 4;
+    repeated float validation_secondary_metrics = 5;
+    // Average of the absolute value of the new tree predictions estimated on
+    // the training dataset. See Dart paper
+    // (http://proceedings.mlr.press/v38/korlakaivinayak15.pdf) for details on
+    // how to interpret it.
+    optional double mean_abs_prediction = 6;
+    // Sub-sampling factor applied during training on top of the "sampling"
+    // hyper-parameter. Currently, the "subsample_factor" is only controlled by
+    // the "adapt_subsample_for_maximum_training_duration" field i.e. the
+    // "subsample_factor" factor (default to 1) is reduced so the training
+    // finishes in "maximum_training_duration".
+    optional float subsample_factor = 7 [default = 1.];
+  }
+}

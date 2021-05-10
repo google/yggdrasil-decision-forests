@@ -1,0 +1,142 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: CLASSIFICATION
+Label: "class"
+
+Input Features (4):
+	Sepal.Length
+	Sepal.Width
+	Petal.Length
+	Petal.Width
+
+No weights
+
+Variable Importance: NUM_NODES:
+    1. "Petal.Length" 2362.000000 ################
+    2. "Sepal.Length" 1750.000000 ######
+    3.  "Sepal.Width" 1684.000000 #####
+    4.  "Petal.Width" 1348.000000 
+
+Variable Importance: NUM_AS_ROOT:
+    1. "Petal.Length" 235.000000 ################
+    2.  "Sepal.Width" 142.000000 #######
+    3. "Sepal.Length" 116.000000 ####
+    4.  "Petal.Width" 68.000000 
+
+Variable Importance: SUM_SCORE:
+    1. "Petal.Length" 214.362789 ################
+    2.  "Petal.Width" 84.622424 ######
+    3.  "Sepal.Width"  0.936365 
+    4. "Sepal.Length"  0.906272 
+
+Variable Importance: MEAN_MIN_DEPTH:
+    1.        "class"  5.111419 ################
+    2. "Sepal.Length"  2.874205 #######
+    3.  "Petal.Width"  2.742267 ######
+    4.  "Sepal.Width"  1.405987 #
+    5. "Petal.Length"  1.126531 
+
+
+
+Loss: MULTINOMIAL_LOG_LIKELIHOOD
+Validation loss value: 5.21568e-05
+Number of trees per iteration: 3
+Number of trees: 561
+Total number of nodes: 14849
+
+Number of nodes by tree:
+Count: 561 Average: 26.4688 StdDev: 5.04343
+Min: 5 Max: 33 Ignored: 0
+----------------------------------------------
+[  5,  6)   1   0.18%   0.18%
+[  6,  7)   0   0.00%   0.18%
+[  7,  9)   4   0.71%   0.89%
+[  9, 10)  13   2.32%   3.21% #
+[ 10, 12)   6   1.07%   4.28%
+[ 12, 13)   0   0.00%   4.28%
+[ 13, 15)   7   1.25%   5.53% #
+[ 15, 16)   3   0.53%   6.06%
+[ 16, 18)   3   0.53%   6.60%
+[ 18, 19)   0   0.00%   6.60%
+[ 19, 20)   3   0.53%   7.13%
+[ 20, 22)   3   0.53%   7.66%
+[ 22, 23)   0   0.00%   7.66%
+[ 23, 25)  72  12.83%  20.50% ######
+[ 25, 26)  81  14.44%  34.94% ######
+[ 26, 28) 108  19.25%  54.19% ########
+[ 28, 29)   0   0.00%  54.19%
+[ 29, 31) 123  21.93%  76.11% #########
+[ 31, 32) 130  23.17%  99.29% ##########
+[ 32, 33]   4   0.71% 100.00%
+
+Depth by leafs:
+Count: 7705 Average: 5.24179 StdDev: 2.36727
+Min: 1 Max: 13 Ignored: 0
+----------------------------------------------
+[  1,  2)  211   2.74%   2.74% #
+[  2,  3)  776  10.07%  12.81% #####
+[  3,  4) 1017  13.20%  26.01% #######
+[  4,  5)  959  12.45%  38.46% #######
+[  5,  6) 1474  19.13%  57.59% ##########
+[  6,  7) 1230  15.96%  73.55% ########
+[  7,  8)  850  11.03%  84.58% ######
+[  8,  9)  394   5.11%  89.70% ###
+[  9, 10)  318   4.13%  93.82% ##
+[ 10, 11)  285   3.70%  97.52% ##
+[ 11, 12)  132   1.71%  99.23% #
+[ 12, 13)   45   0.58%  99.82%
+[ 13, 13]   14   0.18% 100.00%
+
+Number of training obs by leaf:
+Count: 7705 Average: 0 StdDev: 0
+Min: 0 Max: 0 Ignored: 0
+----------------------------------------------
+[ 0, 0] 7705 100.00% 100.00% ##########
+
+Attribute in nodes:
+	2362 : Petal.Length [NUMERICAL]
+	1750 : Sepal.Length [NUMERICAL]
+	1684 : Sepal.Width [NUMERICAL]
+	1348 : Petal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 0:
+	235 : Petal.Length [NUMERICAL]
+	142 : Sepal.Width [NUMERICAL]
+	116 : Sepal.Length [NUMERICAL]
+	68 : Petal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	524 : Sepal.Width [NUMERICAL]
+	474 : Petal.Length [NUMERICAL]
+	282 : Petal.Width [NUMERICAL]
+	192 : Sepal.Length [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	1087 : Petal.Length [NUMERICAL]
+	610 : Sepal.Width [NUMERICAL]
+	430 : Petal.Width [NUMERICAL]
+	391 : Sepal.Length [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	1486 : Petal.Length [NUMERICAL]
+	837 : Sepal.Width [NUMERICAL]
+	686 : Petal.Width [NUMERICAL]
+	584 : Sepal.Length [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	2066 : Petal.Length [NUMERICAL]
+	1255 : Sepal.Width [NUMERICAL]
+	1246 : Sepal.Length [NUMERICAL]
+	1125 : Petal.Width [NUMERICAL]
+
+Condition type in nodes:
+	7144 : HigherCondition
+Condition type in nodes with depth <= 0:
+	561 : HigherCondition
+Condition type in nodes with depth <= 1:
+	1472 : HigherCondition
+Condition type in nodes with depth <= 2:
+	2518 : HigherCondition
+Condition type in nodes with depth <= 3:
+	3593 : HigherCondition
+Condition type in nodes with depth <= 5:
+	5692 : HigherCondition

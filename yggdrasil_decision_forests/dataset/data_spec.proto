@@ -1,0 +1,395 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// A dataspec is a definition of the columns of a dataset (e.g. A
+// NUMERICAL column named "age" and a CATEGORICAL column named "CITY"). Dataspec
+// also contains various information needed to feed a dataset to a model. For
+// example: The dictionary "string->integer" for categorical attributes stored
+// as strings, or the tokenizer configuration for categorical list attributes
+// also stored as strings. Finally, the dataspec contains various useful
+// information such as the fraction of NA ("not available", or "missing")
+// values, the mean value of numerical attributes, etc.
+//
+// While the dataspec can be defined by the user, it is better to use the
+// automatic dataspec builder. This program scans a dataset and generate the
+// most likely dataspec. The user can give indications to the dataspec builder
+// using a DataSpecificationGuide proto.
+//
+// Currently supported formats to compute automatically dataspec are: Csv,
+// tensorflow.Example+recordIO and tensorflow.Example+sstable. In a future
+// version, dataspecs will support ColumnIO and Proto (using reflexion).
+// Computing the dataspec can be done locally or using flume.
+//
+// Naming convention (in the code and in the protos):
+//  "cat" : Categorical (for categorical attribute).
+//  "num": Numerical (for numerical attribute).
+//  "col:" Column.
+//  "idx": Index. "example_idx" or "sample_idx" are index of example/sample in
+//    the dataset. "column_idx" is a column index (as defined in the dataspec).
+//  "local_idx": Local index. Index different from the main "index". For
+//    example "local_col_idxs" is a list of column index. However, the indexing
+//    is different from the dataspec index (e.g. in this case, this is probably
+//    a dense index of the column loaded in memory for a given computation).
+syntax = "proto2";
+
+package yggdrasil_decision_forests.dataset.proto;
+
+// Specification of the columns of a dataset. List the available columns (
+// including their name, type, and extra information e.g. dictionaries).
+message DataSpecification {
+  // The columns.
+  repeated Column columns = 1;
+  // The number of rows of the dataset used to create this dataset (if a
+  // dataset was used).
+  optional int64 created_num_rows = 2;
+  // Meta-data about features that were unstacked e.g. with the
+  // "unstack_numerical_set_as_numericals" control field.
+  repeated Unstacked unstackeds = 3;
+}
+
+// Type of dataset columns.
+enum ColumnType {
+  UNKNOWN = 0;
+  NUMERICAL = 1;
+  NUMERICAL_SET = 2;
+  NUMERICAL_LIST = 3;
+  CATEGORICAL = 4;
+  CATEGORICAL_SET = 5;
+  CATEGORICAL_LIST = 6;
+  BOOLEAN = 7;
+  STRING = 8;
+  DISCRETIZED_NUMERICAL = 9;
+  HASH = 10;
+}
+
+// Definition of a column in a dataset.
+message Column {
+  // Type of data.
+  optional ColumnType type = 1 [default = UNKNOWN];
+  // Column unique name.
+  optional string name = 2;
+  // If true, the type is set manually by the user (instead of been
+  // automatically detected). This field is purely used for debugging purpose
+  // and has no impact on the computation.
+  optional bool is_manual_type = 3 [default = false];
+  // Tokenization. For non-integerized list or sets columns (numerical or
+  // categorical).
+  optional Tokenizer tokenizer = 4;
+  // Data for numerical (simple, list or set) attribute types.
+  optional NumericalSpec numerical = 5;
+  // Data for categorical (simple, list or set) attribute types.
+  optional CategoricalSpec categorical = 6;
+  // Number of NAs (i.e. not available) record when building the dataspec.
+  optional int64 count_nas = 7 [default = 0];
+  // Numerical value stored as an index + a dictionary.
+  optional DiscretizedNumericalSpec discretized_numerical = 8;
+  // Data for boolean attribute types.
+  optional BooleanSpec boolean = 9;
+  // For all the types defined as a collection of multiple values.
+  optional MultiValuesSpec multi_values = 10;
+  // Is the feature derived from unstacking a multi-dimensional dimension?
+  optional bool is_unstacked = 11 [default = false];
+}
+
+// Specification of a categorical column.
+message CategoricalSpec {
+  // The most frequent value.
+  optional int64 most_frequent_value = 1;
+  // The number of unique values (including the reserved OOD(=0) value).
+  // All the values should be 0 <= value < number_of_unique_values.
+  //
+  // The value "0" is reserved for the out-of-dictionary value. Therefore, in
+  // the case of a categorical column with two possible values "X" and "Y", the
+  // proto will be:
+  //
+  //   number_of_unique_values = 3
+  //   is_already_integerized=false
+  //   items { key: "OOD" value { index: 0 }}
+  //   items { key: "X" value { index: 1 }}
+  //   items { key: "Y" value { index: 2 }}
+  //
+  // Missing values are implicit and take index=-1. They don't need to be
+  // specified in "items".
+  optional int64 number_of_unique_values = 2;
+  // Minimum frequency of a value not to be replaced by the <OOD> special
+  // value. Used when computing value dictionary.
+  optional int32 min_value_count = 3 [default = 5];
+  // Maximum number of unique categorical values. If more values are present,
+  // the less frequent values are considered <OOD>. Used when computing value
+  // dictionary. If "max_number_of_unique_values" == -1, the items are not
+  // pruned.
+  optional int32 max_number_of_unique_values = 4 [default = 2000];
+  // If true, values are interpreted directed as an integer. If false, values
+  // are indexed in the "items" dictionary.
+  optional bool is_already_integerized = 5;
+  // Dictionary of values. Only available if is_already_integerized=false. In
+  // this case, items.size() is equal to number_of_unique_values.
+  map<string, VocabValue> items = 7;
+  // Possible value of a non integerized categorical, categorical set, or
+  // categorical list attribute.
+  message VocabValue {
+    // Index of the value.
+    optional int64 index = 1;
+    // Frequency of the value.
+    optional int64 count = 2;
+  }
+}
+
+// Specification of a numerical column.
+message NumericalSpec {
+  // Mean value (excluding the NaN).
+  optional double mean = 1 [default = 0];
+  optional float min_value = 2;
+  optional float max_value = 3;
+  optional double standard_deviation = 4;
+}
+
+// Specification for types with multiple values.
+message MultiValuesSpec {
+  // Maximum number of observed items.
+  optional int32 max_observed_size = 1;
+  // Minimum number of observed items.
+  optional int32 min_observed_size = 2;
+  // Note: Depending on the type of the column, observations with more values
+  // than "max_observed_size" or less values than "min_observed_size" might
+  // still be valid.
+}
+
+// Specification of a boolean column.
+message BooleanSpec {
+  // Number of true values.
+  optional int64 count_true = 1;
+  // Number of false values.
+  optional int64 count_false = 2;
+}
+
+// Specification of a discretized numerical column.
+//
+// A "discretized numerical" value "i" is encoded as index (integer) between -1
+// (inclusive) and "n = boundaries.size()" (also inclusive).
+//   If i==-1, the value is missing.
+//   If i==0, the original numerical value is lower (strictly) than
+//   "boundaries.front()". If i==boundaries.size(), the original value is higher
+//   (non strictly) to "boundaries.back()". If i \in [1, boundaries.size()[, the
+//   original value is in between "boundaries[i-1]" and "boundaries[i]".
+//
+// Because encoding a numericla value into a discretized numerical value is
+// loosely, the original numerical value cannot be recovered. In this case, the
+// following logic is applied:
+//   If i==-1, the numercal value is "std::nan" (this is now simpleML represent
+//   missing numerical values). If i==0, the numercal value is
+//   "boundaries.front()-1". If i==boundaries.size(), the numercal value is
+//   "boundaries.back()+1". If i \in [1, boundaries.size()[, the numerical value
+//   is "(boundaries[i-1]+boundaries[i])/2".
+message DiscretizedNumericalSpec {
+  // Boundaries in between the bins.
+  // The number of bins is boundaries.size() + 1.
+  repeated float boundaries = 1 [packed = true];
+  // Number of unique numerical values before the discretization.
+  optional int64 original_num_unique_values = 2;
+  // Maximum number of bins (at construction time).
+  // // Defaults to 255 bins, that is 254 boundaries.
+  optional int64 maximum_num_bins = 3 [default = 255];
+  // Minimum number of examples in a bin.
+  optional int32 min_obs_in_bins = 4 [default = 3];
+}
+
+// Tokenization parameters.
+message Tokenizer {
+  // How to convert a string into a list/set of symbols.
+  optional Splitter splitter = 1 [default = SEPARATOR];
+  // Separator characters. Used if splitter=SEPARATOR.
+  optional string separator = 2 [default = " ;,"];
+  // Splitting regular expression. Used if splitter=REGEX_MATCH.
+  optional string regex = 3 [default = "([\\S]+)"];
+  // Cast strings to lower case before tokenization.
+  optional bool to_lower_case = 4 [default = true];
+  // Grouping of the tokens.
+  optional Grouping grouping = 5;
+
+  // Possible string tokenization algorithms.
+  enum Splitter {
+    INVALID = 0;
+    // Split a string according to the user specified separator.
+    SEPARATOR = 1;
+    // Split a string by extracting token using the user specified regular
+    // expression.
+    REGEX_MATCH = 2;
+    // Split a string into individual characters. Does not remove spaces and
+    // non-printable characters.
+    CHARACTER = 3;
+  }
+
+  message Grouping {
+    optional bool unigrams = 1 [default = true];
+    optional bool bigrams = 2 [default = false];
+    optional bool trigrams = 3 [default = false];
+  }
+}
+
+// Information about unstacked column. An unstacked column is a
+// multi-dimensional column (e.g. an embedding) that has been split into
+// multiple scalar columns.
+message Unstacked {
+  // Name of the column that was unstacked.
+  optional string original_name = 1;
+  // Index of the first column containing the unstacked feature.
+  optional int32 begin_column_idx = 2;
+  // Number of unstacked elements.
+  optional int32 size = 3;
+  // Type of the columns.
+  optional ColumnType type = 4 [default = UNKNOWN];
+}
+
+// Configuration for the automated "inference" logic of the data specification
+// (see header for the definition of data specification).
+// For example, the DataSpecificationGuide allows to express the following:
+//   - The column called "feature_1" is NUMERICAL.
+//   - The columns matching the regex "num_feature_.*" are NUMERICAL.
+//   - Ignore the column called "feature_1".
+//   - Ignore the columns matching the regex "num_feature_.*".
+//   - Ignore the columns matching none of the set rules.
+//   - The column called "feature_1" is a CATEGORICAL_SET and should be
+//     tokenized by commas.
+//   - The column called "feature_1" is a CATEGORICAL and the categorical
+//     values seen less than 50 times should be ignored (considered out-of-bag).
+//   - The size of the CATEGORICAL and CATEGORICAL_SET column dictionaries
+//     should not have more than 1000 items.
+//   - Column that look BOOLEAN should be interpreted as NUMERICAL.
+//   - Use the first 100'000 record in the dataset to best infer the semantic of
+//     the columns.
+message DataSpecificationGuide {
+  // Guide applied to one or a sub-set of columns according to a regular
+  // expression match.
+  repeated ColumnGuide column_guides = 1;
+  // Default guide for all columns.
+  // Also apply to columns matched with "column_guides", but with a lower
+  // priority. For example, if an configuration option is set both in
+  // "default_column_guide" and "column_guides", the value is "column_guides"
+  // will be used.
+  optional ColumnGuide default_column_guide = 2;
+  // If true, columns that don't match any "column_guides" regular expression
+  // are ignored.
+  optional bool ignore_columns_without_guides = 3 [default = false];
+  // Maximum number of rows to scan to infer the column types.
+  // Set the value "-1" to use all rows (i.e. use the entire dataset).
+  // Note: The type inference logic is only used if the user does not specify
+  // the type manually.
+  optional int64 max_num_scanned_rows_to_guess_type = 4 [default = 1000];
+  // If true, columns initially detected as BOOLEAN (i.e. only containing "0"
+  // and "1" values) will be detected as NUMERICAL.
+  optional bool detect_boolean_as_numerical = 5 [default = false];
+  // Detects numerical values (i.e. NUMERICAL) as DISCRETIZED_NUMERICAL.
+  // DISCRETIZED_NUMERICAL values are discretized at loading time. Some
+  // algorithms (e.g. the simpleML decision forest algorithms) will handle
+  // NUMERICAL and DISCRETIZED_NUMERICAL types differently. Generally,
+  // discretized columns are faster to train but can lead to sub-optimal models.
+  optional bool detect_numerical_as_discretized_numerical = 6 [default = false];
+  // Maximum number of rows to scan to compute column statistics (e.g.
+  // dictionary, ratio of missing values, mean value).
+  // Set the value "-1" to use all rows (i.e. use the entire dataset).
+  optional int64 max_num_scanned_rows_to_accumulate_statistics = 7
+      [default = -1];
+  // If true, unstack numerical sets are multiple numerical features. This
+  // operation is useful to consume multi-dimensional numerical vectors i.e.
+  // list of numerical values with always the same size and semantic per
+  // dimension.
+  optional bool unstack_numerical_set_as_numericals = 8 [default = true];
+}
+
+message ColumnGuide {
+  // Regular expression on the column name.
+  optional string column_name_pattern = 1;
+  // Type of the column.
+  optional ColumnType type = 2;
+  optional CategoricalGuide categorial = 3;
+  optional NumericalGuide numerical = 4;
+  // If "tokenizer" is specified, and if the dataset container can represent a
+  // list of token natively (i.e. list of strings e.g. tf.Example), the first
+  // string entry (if any) will be tokenized. If the attribute contains more
+  // than one entry, an error will be raised.
+  optional TokenizerGuide tokenizer = 5;
+  // If false, a column matched to this guide won't be tested against other
+  // guides. If true, other guides will be tried.
+  optional bool allow_multi_match = 6 [default = false];
+  optional DiscretizedNumericalGuide discretized_numerical = 7;
+  // If true, matching columns are ignored and won't be in the dataspec.
+  optional bool ignore_column = 8 [default = false];
+}
+
+message CategoricalGuide {
+  // Minimum frequency of an categorical value not to be replaced by the <RARE>
+  // special value.
+  optional int32 min_vocab_frequency = 1 [default = 5];
+  // Maximum number of unique categorical values. If more values are present,
+  // the less frequent values are considered <RARE>.
+  optional int32 max_vocab_count = 2 [default = 2000];
+  // If is_already_integerized=false, a dictionary is build for the feature.
+  // Even if the feature is an integer or a float. If
+  // is_already_integerized=true, the value is directly interpreted as an
+  // index and should follow the following convention:
+  //   - The value should be greater or equal to -1.
+  //   - The value -1 is the "missing value".
+  //   - The value 0 is the "out-of-dictionary value".
+  //   - Several simpleML algorithms assume this is a "dense index" i.e. if the
+  //     column is an input feature, it is best to have it being dense.
+  optional bool is_already_integerized = 3;
+
+  // If "is_already_integerized=true" and if
+  // "number_of_already_integerized_values" is set,
+  // "number_of_already_integerized_values" is the number of unique values. Such
+  // attribute accepts values in [-1, number_of_already_integerized_values).
+  // Values outside of this range will be considered "out-of-vocabulary".
+  //
+  // Note that if the dataset used to infer the dataspec contains an example
+  // with a value > number_of_already_integerized_values, the example value will
+  // be used instead of "number_of_already_integerized_values".
+  optional int64 number_of_already_integerized_values = 4;
+}
+
+message NumericalGuide {}
+
+message TokenizerGuide {
+  optional Tokenizer tokenizer = 1;
+}
+
+message DiscretizedNumericalGuide {
+  optional int64 maximum_num_bins = 1 [default = 255];
+  // Minimum number of examples in a bin.
+  optional int32 min_obs_in_bins = 2 [default = 3];
+}
+
+// Structure containing intermediary information for the computation of
+// a DataSpecification.
+message DataSpecificationAccumulator {
+  message Column {
+    // Sum and sum of error for the Kahan summation. Used for numerical columns.
+    optional double kahan_sum = 1;
+    optional double kahan_sum_error = 2;
+    optional double min_value = 3;
+    optional double max_value = 4;
+
+    optional double kahan_sum_of_square = 6;
+    optional double kahan_sum_of_square_error = 7;
+
+    // Mapping between float values (represented as an uint32) and the number of
+    // times this value was saw.
+    //
+    // Note: Map don't allow float indexed maps.
+    map<fixed32, int32> discretized_numerical = 5;
+  }
+
+  repeated Column columns = 1;
+}

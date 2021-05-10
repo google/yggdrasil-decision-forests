@@ -1,0 +1,103 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: CLASSIFICATION
+Label: "label"
+
+Input Features (1):
+	sentence
+
+No weights
+
+Variable Importance: NUM_NODES:
+    1. "sentence" 3000.000000 
+
+Variable Importance: NUM_AS_ROOT:
+    1. "sentence" 100.000000 
+
+Variable Importance: SUM_SCORE:
+    1. "sentence" 56246.881691 
+
+Variable Importance: MEAN_MIN_DEPTH:
+    1.    "label"  9.003548 ################
+    2. "sentence"  0.000000 
+
+
+
+Loss: BINOMIAL_LOG_LIKELIHOOD
+Validation loss value: 0.596351
+Number of trees per iteration: 1
+Number of trees: 100
+Total number of nodes: 6100
+
+Number of nodes by tree:
+Count: 100 Average: 61 StdDev: 0
+Min: 61 Max: 61 Ignored: 0
+----------------------------------------------
+[ 61, 61] 100 100.00% 100.00% ##########
+
+Depth by leafs:
+Count: 3100 Average: 9.00355 StdDev: 4.73017
+Min: 1 Max: 26 Ignored: 0
+----------------------------------------------
+[  1,  2)  31   1.00%   1.00% #
+[  2,  3) 125   4.03%   5.03% ###
+[  3,  4) 179   5.77%  10.81% ####
+[  4,  6) 491  15.84%  26.65% ##########
+[  6,  7) 277   8.94%  35.58% ######
+[  7,  8) 235   7.58%  43.16% #####
+[  8, 10) 493  15.90%  59.06% ##########
+[ 10, 11) 216   6.97%  66.03% ####
+[ 11, 12) 177   5.71%  71.74% ####
+[ 12, 14) 299   9.65%  81.39% ######
+[ 14, 15) 132   4.26%  85.65% ###
+[ 15, 16) 112   3.61%  89.26% ##
+[ 16, 17) 103   3.32%  92.58% ##
+[ 17, 19) 106   3.42%  96.00% ##
+[ 19, 20)  48   1.55%  97.55% #
+[ 20, 21)  29   0.94%  98.48% #
+[ 21, 23)  32   1.03%  99.52% #
+[ 23, 24)   7   0.23%  99.74%
+[ 24, 25)   5   0.16%  99.90%
+[ 25, 26]   3   0.10% 100.00%
+
+Number of training obs by leaf:
+Count: 3100 Average: 0 StdDev: 0
+Min: 0 Max: 0 Ignored: 0
+----------------------------------------------
+[ 0, 0] 3100 100.00% 100.00% ##########
+
+Attribute in nodes:
+	3000 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 0:
+	100 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 1:
+	269 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 2:
+	482 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 3:
+	729 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 5:
+	1238 : sentence [CATEGORICAL_SET]
+
+Condition type in nodes:
+	2782 : ContainsCondition
+	218 : ContainsBitmapCondition
+Condition type in nodes with depth <= 0:
+	86 : ContainsCondition
+	14 : ContainsBitmapCondition
+Condition type in nodes with depth <= 1:
+	236 : ContainsCondition
+	33 : ContainsBitmapCondition
+Condition type in nodes with depth <= 2:
+	424 : ContainsCondition
+	58 : ContainsBitmapCondition
+Condition type in nodes with depth <= 3:
+	643 : ContainsCondition
+	86 : ContainsBitmapCondition
+Condition type in nodes with depth <= 5:
+	1109 : ContainsCondition
+	129 : ContainsBitmapCondition

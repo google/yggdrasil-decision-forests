@@ -1,0 +1,155 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: RANKING
+Label: "LABEL"
+Rank group: "GROUP"
+
+Input Features (8):
+	cat_int_0
+	cat_int_1
+	cat_str_0
+	cat_str_1
+	num_0
+	num_1
+	num_2
+	num_3
+
+No weights
+
+Variable Importance: NUM_NODES:
+    1. "cat_str_1" 128.000000 ################
+    2. "cat_str_0" 101.000000 ############
+    3.     "num_0" 65.000000 #######
+    4.     "num_2" 64.000000 #######
+    5.     "num_1" 26.000000 ##
+    6. "cat_int_0" 15.000000 
+    7. "cat_int_1" 11.000000 
+    8.     "num_3" 10.000000 
+
+Variable Importance: NUM_AS_ROOT:
+    1. "cat_str_0" 11.000000 ################
+    2.     "num_0"  2.000000 #
+    3.     "num_2"  1.000000 
+
+Variable Importance: SUM_SCORE:
+    1. "cat_str_0" 357.579744 ################
+    2.     "num_0" 290.911841 ############
+    3. "cat_str_1" 225.411358 #########
+    4.     "num_2" 183.180187 ########
+    5.     "num_1" 37.171571 #
+    6. "cat_int_0" 19.275285 
+    7. "cat_int_1" 10.371429 
+    8.     "num_3"  8.130909 
+
+Variable Importance: MEAN_MIN_DEPTH:
+    1.     "GROUP"  5.610599 ################
+    2.     "LABEL"  5.610599 ################
+    3. "cat_int_1"  5.449309 ###############
+    4.     "num_3"  5.391705 ###############
+    5. "cat_int_0"  5.322581 ###############
+    6.     "num_1"  5.025346 ##############
+    7. "cat_str_1"  3.154378 ########
+    8.     "num_2"  1.953917 #####
+    9.     "num_0"  1.933180 #####
+   10. "cat_str_0"  0.214286 
+
+
+
+Loss: LAMBDA_MART_NDCG5
+Validation loss value: -0.775528
+Number of trees per iteration: 1
+Number of trees: 14
+Total number of nodes: 854
+
+Number of nodes by tree:
+Count: 14 Average: 61 StdDev: 0
+Min: 61 Max: 61 Ignored: 0
+----------------------------------------------
+[ 61, 61] 14 100.00% 100.00% ##########
+
+Depth by leafs:
+Count: 434 Average: 5.6106 StdDev: 1.55631
+Min: 2 Max: 12 Ignored: 0
+----------------------------------------------
+[  2,  3)   1   0.23%   0.23%
+[  3,  4)  25   5.76%   5.99% ##
+[  4,  5)  67  15.44%  21.43% #####
+[  5,  6) 133  30.65%  52.07% ##########
+[  6,  7) 112  25.81%  77.88% ########
+[  7,  8)  53  12.21%  90.09% ####
+[  8,  9)  24   5.53%  95.62% ##
+[  9, 10)   9   2.07%  97.70% #
+[ 10, 11)   3   0.69%  98.39%
+[ 11, 12)   5   1.15%  99.54%
+[ 12, 12]   2   0.46% 100.00%
+
+Number of training obs by leaf:
+Count: 434 Average: 0 StdDev: 0
+Min: 0 Max: 0 Ignored: 0
+----------------------------------------------
+[ 0, 0] 434 100.00% 100.00% ##########
+
+Attribute in nodes:
+	128 : cat_str_1 [CATEGORICAL]
+	101 : cat_str_0 [CATEGORICAL]
+	65 : num_0 [NUMERICAL]
+	64 : num_2 [NUMERICAL]
+	26 : num_1 [NUMERICAL]
+	15 : cat_int_0 [NUMERICAL]
+	11 : cat_int_1 [NUMERICAL]
+	10 : num_3 [NUMERICAL]
+
+Attribute in nodes with depth <= 0:
+	11 : cat_str_0 [CATEGORICAL]
+	2 : num_0 [NUMERICAL]
+	1 : num_2 [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	17 : cat_str_0 [CATEGORICAL]
+	13 : num_0 [NUMERICAL]
+	12 : num_2 [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	30 : num_2 [NUMERICAL]
+	30 : num_0 [NUMERICAL]
+	19 : cat_str_0 [CATEGORICAL]
+	17 : cat_str_1 [CATEGORICAL]
+	1 : num_1 [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	47 : num_0 [NUMERICAL]
+	43 : num_2 [NUMERICAL]
+	42 : cat_str_1 [CATEGORICAL]
+	39 : cat_str_0 [CATEGORICAL]
+	4 : cat_int_0 [NUMERICAL]
+	3 : num_1 [NUMERICAL]
+	3 : cat_int_1 [NUMERICAL]
+	1 : num_3 [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	114 : cat_str_1 [CATEGORICAL]
+	80 : cat_str_0 [CATEGORICAL]
+	61 : num_2 [NUMERICAL]
+	58 : num_0 [NUMERICAL]
+	15 : num_1 [NUMERICAL]
+	13 : cat_int_0 [NUMERICAL]
+	10 : cat_int_1 [NUMERICAL]
+	7 : num_3 [NUMERICAL]
+
+Condition type in nodes:
+	229 : ContainsBitmapCondition
+	191 : HigherCondition
+Condition type in nodes with depth <= 0:
+	11 : ContainsBitmapCondition
+	3 : HigherCondition
+Condition type in nodes with depth <= 1:
+	25 : HigherCondition
+	17 : ContainsBitmapCondition
+Condition type in nodes with depth <= 2:
+	61 : HigherCondition
+	36 : ContainsBitmapCondition
+Condition type in nodes with depth <= 3:
+	101 : HigherCondition
+	81 : ContainsBitmapCondition
+Condition type in nodes with depth <= 5:
+	194 : ContainsBitmapCondition
+	164 : HigherCondition

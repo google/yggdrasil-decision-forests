@@ -1,0 +1,101 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.utils.proto;
+
+// Configuration for the generation of training and testing folds.
+message FoldGenerator {
+  oneof generator {
+    TrainTest train_test = 1;
+    CrossValidation cross_validation = 2;
+    TestOnOtherDataset test_on_other_dataset = 4;
+    NoTraining no_training = 5;
+    PrecomputedCrossValidation precomputed_cross_validation = 6;
+  }
+
+  // Seed used to control the fold generation. A same seed is guarantied to
+  // generate same folds for a given dataset.
+  optional int64 seed = 3 [default = 1234];
+
+  // Next ID: 6
+
+  // Specify the "fold group" of each example. If specified, all the examples of
+  // the same group will appear in the same fold. In other words, each group
+  // will either be entirely used for training or for testing.
+  //
+  // There should be at least as much groups as there are folds.
+  message FoldGroup {
+    // Name of a categorical attribute that defines the "group" membership of
+    // each example.
+    optional string group_attribute = 1;
+    // Next ID: 2
+  }
+
+  // Split the dataset in two folds. The first part will be used for training.
+  // The second part will be used for evaluation. This method is commonly called
+  // "Train and test" evaluation.
+  //
+  // This method is fast (only one model is trained) but the results are noisy
+  // (both with training noise and testing noise).
+  message TrainTest {
+    // Ratio of the dataset used for testing. The remaining examples are used
+    // for training.
+    optional float test_ratio = 1 [default = 0.33];
+    // Next ID: 2
+  }
+
+  // Split the dataset into n folds (n=10 by default). Then, for each subset of
+  // n-1 folds, train a model and evaluate it on the remaining folds. This
+  // methods is called "cross-validation".
+  //
+  // Cross-validation is more expensive (n models need to be trained) than
+  // "train and test" but the results are more precise.
+  message CrossValidation {
+    // If num_folds=0, a leave-one-out cross-validation is executed
+    // (i.e. "num_folds" is set to the number of examples in the dataset).
+    optional int32 num_folds = 1 [default = 10];
+
+    // "fold_group_attribute" an attribute name that defines the "group"
+    // appurtenance of each example. If "fold_group_attribute" is specified, all
+    // the examples of the same group will appear in the same fold. In other
+    // words, each group will either be entirely used for training or for
+    // testing.
+    optional FoldGroup fold_group = 2;
+    // Next ID: 3
+  }
+
+  // Evaluate the candidate model on a separate dataset. The entire dataset
+  // specified in "TrainEvaluateCompareOptions" will be used for training. The
+  // entire dataset specified in "TestOnOtherDataset" will be used for testing.
+  message TestOnOtherDataset {
+    // Path ([type]:[path]) to the test dataset.
+    optional string dataset_path = 1;
+  }
+
+  // Does not train the model and evaluate on the entire dataset. This solution
+  // only make sense when the candidate method are all defined as pre-computed
+  // predictions or pre-computed models.
+  message NoTraining {}
+
+  // Cross-validation of folds computed externally.
+  message PrecomputedCrossValidation {
+    // Path ([type]:[path]) to a dataset containing numerical column called
+    // "fold_idx". "fold_idx[i]" in an integer in [0, num_folds) defining the
+    // folds of the i-th example.
+    optional string fold_path = 1;
+  }
+}

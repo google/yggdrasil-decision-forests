@@ -1,0 +1,118 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.random_forest.proto;
+
+import "yggdrasil_decision_forests/learner/abstract_learner.proto";
+import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
+
+// Training configuration for the Random Forest algorithm.
+message RandomForestTrainingConfig {
+  // Next ID: 15
+
+  // Basic parameters.
+
+  // Number of trees in the random forest.
+  optional int32 num_trees = 1 [default = 300];
+
+  // Decision tree specific parameters.
+  optional decision_tree.proto.DecisionTreeTrainingConfig decision_tree = 2;
+
+  // Advanced parameters.
+
+  // Whether the vote of individual trees are distributions or winner-take-all.
+  //
+  // With winner_take_all_inference=true, each tree cast a vote for a single
+  // label value. With winner_take_all_inference=false, each tree cast a
+  // weighted vote for each label values.
+  //
+  // The original random forest implementation uses
+  // winner_take_all_inference=true (default value). However,
+  // "winner_take_all_inference=false" often leads to better results and smaller
+  // models.
+  optional bool winner_take_all_inference = 3 [default = true];
+
+  // Computes and report the OOB performances of the model during training. The
+  // added computing cost is relatively small.
+  optional bool compute_oob_performances = 4 [default = true];
+
+  // Computes the importance of each variable (i.e. each input feature) during
+  // training. Computing the variable importance is expensive and can
+  // significantly slow down the training.
+  optional bool compute_oob_variable_importances = 5 [default = false];
+
+  // Number of time the dataset is shuffled for each tree when computing the
+  // variable importances. Increasing this number can increase significantly the
+  // training time (if "compute_oob_variable_importances:true") and increase the
+  // stability of the oob variable importance metrics.
+  optional int32 num_oob_variable_importances_permutations = 6 [default = 1];
+
+  // The Out-of-bag evaluation is computed if one of the condition is true:
+  //   - This is the last tree of the model.
+  //   - The last OOB was computed more than
+  //     "oob_evaluation_interval_in_seconds" ago.
+  //   - This last OOB was computed more than "oob_evaluation_interval_in_trees"
+  //     trees ago.
+  optional float oob_evaluation_interval_in_seconds = 7 [default = 10];
+  optional float oob_evaluation_interval_in_trees = 14 [default = 10];
+
+  // If true, each tree is trained on a separate dataset sampled with
+  // replacement from the original dataset. If false, all the trees are trained
+  // on the same dataset.
+  //
+  // Note: If bootstrap_training_dataset:false, OOB metrics are not available.
+  //
+  // bootstrap_training_dataset:true is the default value for Random Forest.
+  // bootstrap_training_dataset:false can be used to simulate related decision
+  // forest algorithms (e.g. "Extremely randomized trees"
+  // https://link.springer.com/content/pdf/10.1007%2Fs10994-006-6226-1.pdf).
+  optional bool bootstrap_training_dataset = 8 [default = true];
+
+  // Number of example in each bootstrap expressed as a ratio of the training
+  // dataset size.
+  optional float bootstrap_size_ratio = 9 [default = 1.0];
+
+  // If true, the "bootstrap_size_ratio" parameter will be adapted dynamically
+  // such that the "num_trees" will be trained in the
+  // "maximum_training_duration" time. "bootstrap_size_ratio" can only be
+  // reduced i.e. enabling this feature can only reduce the training time.
+  optional bool adapt_bootstrap_size_ratio_for_maximum_training_duration = 11
+      [default = false];
+
+  // Maximum impact of the
+  // "adapt_bootstrap_size_ratio_for_maximum_training_duration"
+  // parameter.
+  optional float min_adapted_subsample = 12 [default = 0.01];
+
+  // Total maximum of nodes in the model. If specified, and if the total number
+  // of nodes is exceeded, the training stops and the forest is truncated.
+  optional int64 total_max_num_nodes = 13 [default = -1];
+
+  // Fields used for low level and/or internal API. In most cases, the user
+  // should not care about this field.
+  optional Internal internal = 10;
+}
+
+message Internal {
+  // Individual random seeds user to train the trees. Is specified, the number
+  // of seeds should be equal to "num_trees".
+  repeated int64 individual_tree_seeds = 1;
+}
+
+extend model.proto.TrainingConfig {
+  optional RandomForestTrainingConfig random_forest_config = 1000;
+}

@@ -1,0 +1,5 @@
+-   [Return to the home page](../README.md)
+-   [User manual](user_manual.md)
+-   [CLI one pager](cli.txt)
+-   [Developer manual](developer_manual.md)
+-   [List of learning algorithms](learners.md)

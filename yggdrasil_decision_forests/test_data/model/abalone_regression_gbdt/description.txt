@@ -1,0 +1,171 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: REGRESSION
+Label: "Rings"
+
+Input Features (8):
+	Type
+	LongestShell
+	Diameter
+	Height
+	WholeWeight
+	ShuckedWeight
+	VisceraWeight
+	ShellWeight
+
+No weights
+
+Variable Importance: NUM_NODES:
+    1.   "ShellWeight" 251.000000 ################
+    2. "ShuckedWeight" 232.000000 ##############
+    3.   "WholeWeight" 195.000000 ###########
+    4. "VisceraWeight" 132.000000 ######
+    5.        "Height" 110.000000 ####
+    6.      "Diameter" 102.000000 ####
+    7.  "LongestShell" 66.000000 #
+    8.          "Type" 52.000000 
+
+Variable Importance: NUM_AS_ROOT:
+    1.  "ShellWeight" 20.000000 ################
+    2.       "Height" 10.000000 #######
+    3.         "Type"  4.000000 ##
+    4.     "Diameter"  3.000000 #
+    5. "LongestShell"  1.000000 
+
+Variable Importance: SUM_SCORE:
+    1.   "ShellWeight" 66150.504812 ################
+    2. "ShuckedWeight" 17307.484197 ###
+    3.   "WholeWeight" 7321.509651 #
+    4.        "Height" 7003.560979 #
+    5.      "Diameter" 5245.887837 
+    6. "VisceraWeight" 4202.336341 
+    7.          "Type" 3674.484340 
+    8.  "LongestShell" 2645.225903 
+
+Variable Importance: MEAN_MIN_DEPTH:
+    1.         "Rings"  6.876061 ################
+    2.          "Type"  5.859083 #############
+    3. "VisceraWeight"  5.709677 ############
+    4.  "LongestShell"  5.554329 ############
+    5.      "Diameter"  5.418506 ###########
+    6.   "WholeWeight"  4.907470 ##########
+    7.        "Height"  3.520374 ######
+    8. "ShuckedWeight"  2.629881 ###
+    9.   "ShellWeight"  1.438031 
+
+
+
+Loss: SQUARED_ERROR
+Validation loss value: 2.15276
+Number of trees per iteration: 1
+Number of trees: 38
+Total number of nodes: 2318
+
+Number of nodes by tree:
+Count: 38 Average: 61 StdDev: 0
+Min: 61 Max: 61 Ignored: 0
+----------------------------------------------
+[ 61, 61] 38 100.00% 100.00% ##########
+
+Depth by leafs:
+Count: 1178 Average: 6.87606 StdDev: 2.89603
+Min: 1 Max: 17 Ignored: 0
+----------------------------------------------
+[  1,  2)   5   0.42%   0.42%
+[  2,  3)  25   2.12%   2.55% ##
+[  3,  4)  80   6.79%   9.34% #####
+[  4,  5) 154  13.07%  22.41% #########
+[  5,  6) 164  13.92%  36.33% ##########
+[  6,  7) 159  13.50%  49.83% ##########
+[  7,  8) 154  13.07%  62.90% #########
+[  8,  9) 127  10.78%  73.68% ########
+[  9, 10) 107   9.08%  82.77% #######
+[ 10, 11)  71   6.03%  88.79% ####
+[ 11, 12)  61   5.18%  93.97% ####
+[ 12, 13)  21   1.78%  95.76% #
+[ 13, 14)  16   1.36%  97.11% #
+[ 14, 15)  15   1.27%  98.39% #
+[ 15, 16)   5   0.42%  98.81%
+[ 16, 17)   6   0.51%  99.32%
+[ 17, 17]   8   0.68% 100.00%
+
+Number of training obs by leaf:
+Count: 1178 Average: 0 StdDev: 0
+Min: 0 Max: 0 Ignored: 0
+----------------------------------------------
+[ 0, 0] 1178 100.00% 100.00% ##########
+
+Attribute in nodes:
+	251 : ShellWeight [NUMERICAL]
+	232 : ShuckedWeight [NUMERICAL]
+	195 : WholeWeight [NUMERICAL]
+	132 : VisceraWeight [NUMERICAL]
+	110 : Height [NUMERICAL]
+	102 : Diameter [NUMERICAL]
+	66 : LongestShell [NUMERICAL]
+	52 : Type [CATEGORICAL]
+
+Attribute in nodes with depth <= 0:
+	20 : ShellWeight [NUMERICAL]
+	10 : Height [NUMERICAL]
+	4 : Type [CATEGORICAL]
+	3 : Diameter [NUMERICAL]
+	1 : LongestShell [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	51 : ShellWeight [NUMERICAL]
+	22 : Height [NUMERICAL]
+	13 : Diameter [NUMERICAL]
+	7 : WholeWeight [NUMERICAL]
+	5 : LongestShell [NUMERICAL]
+	4 : ShuckedWeight [NUMERICAL]
+	4 : Type [CATEGORICAL]
+	3 : VisceraWeight [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	68 : ShellWeight [NUMERICAL]
+	55 : ShuckedWeight [NUMERICAL]
+	32 : Height [NUMERICAL]
+	18 : Diameter [NUMERICAL]
+	18 : Type [CATEGORICAL]
+	15 : LongestShell [NUMERICAL]
+	12 : WholeWeight [NUMERICAL]
+	8 : VisceraWeight [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	132 : ShellWeight [NUMERICAL]
+	81 : ShuckedWeight [NUMERICAL]
+	38 : Height [NUMERICAL]
+	37 : WholeWeight [NUMERICAL]
+	27 : Diameter [NUMERICAL]
+	25 : Type [CATEGORICAL]
+	23 : LongestShell [NUMERICAL]
+	17 : VisceraWeight [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	191 : ShellWeight [NUMERICAL]
+	164 : ShuckedWeight [NUMERICAL]
+	86 : WholeWeight [NUMERICAL]
+	65 : Height [NUMERICAL]
+	50 : VisceraWeight [NUMERICAL]
+	50 : Diameter [NUMERICAL]
+	39 : LongestShell [NUMERICAL]
+	33 : Type [CATEGORICAL]
+
+Condition type in nodes:
+	1088 : HigherCondition
+	52 : ContainsBitmapCondition
+Condition type in nodes with depth <= 0:
+	34 : HigherCondition
+	4 : ContainsBitmapCondition
+Condition type in nodes with depth <= 1:
+	105 : HigherCondition
+	4 : ContainsBitmapCondition
+Condition type in nodes with depth <= 2:
+	208 : HigherCondition
+	18 : ContainsBitmapCondition
+Condition type in nodes with depth <= 3:
+	355 : HigherCondition
+	25 : ContainsBitmapCondition
+Condition type in nodes with depth <= 5:
+	645 : HigherCondition
+	33 : ContainsBitmapCondition

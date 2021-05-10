@@ -1,0 +1,78 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.proto;
+
+import "yggdrasil_decision_forests/dataset/data_spec.proto";
+import "yggdrasil_decision_forests/dataset/weight.proto";
+
+// Modeling task.
+enum Task {
+  UNDEFINED = 0;
+  CLASSIFICATION = 1;
+  REGRESSION = 2;
+
+  // In case of ranking, the label is expected to be between 0 and 4, and to
+  // have the NDCG semantic:
+  // 0: Completely unrelated.
+  // 4: Perfect match.
+  RANKING = 3;
+}
+
+// Contains the same information as a model::AbstractModel (without the
+// data_spec field).
+message AbstractModel {
+  // Name of the model. Should match one of the registered models in the
+  // :model_library.
+  optional string name = 1;
+
+  // Task solved by the model e.g. classification, regression.
+  optional Task task = 2;
+
+  // Index of the label column in the dataspec.
+  optional int32 label_col_idx = 3;
+
+  // Training example weights.
+  optional dataset.proto.LinkedWeightDefinition weights = 4;
+
+  // List of indices (in the dataspec) of the model input features.
+  repeated int32 input_features = 5;
+
+  // Index of the "grouping" attribute in the dataspec for ranking problems e.g.
+  // the query in a <query,document> ranking problem.
+  optional int32 ranking_group_col_idx = 6 [default = -1];
+
+  // Pre-computed variable importances (VI). The VIs of the model are composed
+  // of the pre-computed VIs (this field) and the "model specific VIs" (i.e.
+  // variable importance computed on the fly based on the models structure).
+  map<string, VariableImportanceSet> precomputed_variable_importances = 7;
+}
+
+// Description of the importance of a given attribute. The semantic of
+// "importance" is variable.
+message VariableImportance {
+  // Next ID: 3
+
+  optional int32 attribute_idx = 1;
+  optional double importance = 2;
+}
+
+message VariableImportanceSet {
+  // Next ID: 2
+
+  repeated VariableImportance variable_importances = 1;
+}

@@ -1,0 +1,167 @@
+Type: "RANDOM_FOREST"
+Task: CLASSIFICATION
+Label: "label"
+
+Input Features (1):
+	sentence
+
+No weights
+
+Variable Importance: NUM_NODES:
+    1. "sentence" 72537.000000 
+
+Variable Importance: NUM_AS_ROOT:
+    1. "sentence" 100.000000 
+
+Variable Importance: SUM_SCORE:
+    1. "sentence" 2116467.781380 
+
+Variable Importance: MEAN_MIN_DEPTH:
+    1.    "label" 12.365895 ################
+    2. "sentence"  0.000000 
+
+
+
+Winner take all: false
+Out-of-bag evaluation: accuracy:0.851336 logloss:0.382063
+Number of trees: 100
+Total number of nodes: 145174
+
+Number of nodes by tree:
+Count: 100 Average: 1451.74 StdDev: 116.806
+Min: 1193 Max: 1715 Ignored: 0
+----------------------------------------------
+[ 1193, 1219)  1   1.00%   1.00% #
+[ 1219, 1245)  0   0.00%   1.00%
+[ 1245, 1271)  2   2.00%   3.00% ##
+[ 1271, 1297)  4   4.00%   7.00% ###
+[ 1297, 1323)  3   3.00%  10.00% ###
+[ 1323, 1349) 11  11.00%  21.00% #########
+[ 1349, 1376)  9   9.00%  30.00% ########
+[ 1376, 1402) 10  10.00%  40.00% ########
+[ 1402, 1428)  5   5.00%  45.00% ####
+[ 1428, 1454) 12  12.00%  57.00% ##########
+[ 1454, 1480)  7   7.00%  64.00% ######
+[ 1480, 1506)  9   9.00%  73.00% ########
+[ 1506, 1532)  6   6.00%  79.00% #####
+[ 1532, 1559)  1   1.00%  80.00% #
+[ 1559, 1585)  2   2.00%  82.00% ##
+[ 1585, 1611)  5   5.00%  87.00% ####
+[ 1611, 1637)  5   5.00%  92.00% ####
+[ 1637, 1663)  2   2.00%  94.00% ##
+[ 1663, 1689)  1   1.00%  95.00% #
+[ 1689, 1715]  5   5.00% 100.00% ####
+
+Depth by leafs:
+Count: 72637 Average: 12.3684 StdDev: 2.58668
+Min: 3 Max: 15 Ignored: 0
+----------------------------------------------
+[  3,  4)    35   0.05%   0.05%
+[  4,  5)   174   0.24%   0.29%
+[  5,  6)   534   0.74%   1.02%
+[  6,  7)  1150   1.58%   2.61% #
+[  7,  8)  2016   2.78%   5.38% #
+[  8,  9)  3173   4.37%   9.75% #
+[  9, 10)  4409   6.07%  15.82% ##
+[ 10, 11)  5756   7.92%  23.74% ###
+[ 11, 12)  7024   9.67%  33.41% ###
+[ 12, 13)  7933  10.92%  44.34% ####
+[ 13, 14)  8921  12.28%  56.62% ####
+[ 14, 15)  9820  13.52%  70.14% #####
+[ 15, 15] 21692  29.86% 100.00% ##########
+
+Number of training obs by leaf:
+Count: 72637 Average: 93.9205 StdDev: 855.079
+Min: 1 Max: 31827 Ignored: 0
+----------------------------------------------
+[     1,  1592) 72043  99.18%  99.18% ##########
+[  1592,  3183)   327   0.45%  99.63%
+[  3183,  4775)    63   0.09%  99.72%
+[  4775,  6366)    47   0.06%  99.78%
+[  6366,  7957)    30   0.04%  99.83%
+[  7957,  9549)    17   0.02%  99.85%
+[  9549, 11140)    10   0.01%  99.86%
+[ 11140, 12731)     0   0.00%  99.86%
+[ 12731, 14323)     5   0.01%  99.87%
+[ 14323, 15914)     6   0.01%  99.88%
+[ 15914, 17505)    17   0.02%  99.90%
+[ 17505, 19097)    16   0.02%  99.92%
+[ 19097, 20688)     9   0.01%  99.94%
+[ 20688, 22279)    14   0.02%  99.95%
+[ 22279, 23871)    11   0.02%  99.97%
+[ 23871, 25462)     7   0.01%  99.98%
+[ 25462, 27053)     8   0.01%  99.99%
+[ 27053, 28645)     3   0.00%  99.99%
+[ 28645, 30236)     3   0.00% 100.00%
+[ 30236, 31827]     1   0.00% 100.00%
+
+Attribute in nodes:
+	72537 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 0:
+	100 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 1:
+	300 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 2:
+	700 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 3:
+	1465 : sentence [CATEGORICAL_SET]
+
+Attribute in nodes with depth <= 5:
+	4999 : sentence [CATEGORICAL_SET]
+
+Condition type in nodes:
+	72030 : ContainsCondition
+	507 : ContainsBitmapCondition
+Condition type in nodes with depth <= 0:
+	79 : ContainsCondition
+	21 : ContainsBitmapCondition
+Condition type in nodes with depth <= 1:
+	248 : ContainsCondition
+	52 : ContainsBitmapCondition
+Condition type in nodes with depth <= 2:
+	613 : ContainsCondition
+	87 : ContainsBitmapCondition
+Condition type in nodes with depth <= 3:
+	1351 : ContainsCondition
+	114 : ContainsBitmapCondition
+Condition type in nodes with depth <= 5:
+	4816 : ContainsCondition
+	183 : ContainsBitmapCondition
+
+Training OOB:
+	trees: 1, Out-of-bag evaluation: accuracy:0.761606 logloss:1.11904
+	trees: 7, Out-of-bag evaluation: accuracy:0.797525 logloss:0.555864
+	trees: 13, Out-of-bag evaluation: accuracy:0.823117 logloss:0.428095
+	trees: 18, Out-of-bag evaluation: accuracy:0.833197 logloss:0.398502
+	trees: 19, Out-of-bag evaluation: accuracy:0.835095 logloss:0.394968
+	trees: 24, Out-of-bag evaluation: accuracy:0.838965 logloss:0.389016
+	trees: 26, Out-of-bag evaluation: accuracy:0.8398 logloss:0.387789
+	trees: 30, Out-of-bag evaluation: accuracy:0.841926 logloss:0.386516
+	trees: 31, Out-of-bag evaluation: accuracy:0.842263 logloss:0.386188
+	trees: 36, Out-of-bag evaluation: accuracy:0.844095 logloss:0.385674
+	trees: 37, Out-of-bag evaluation: accuracy:0.844329 logloss:0.385695
+	trees: 42, Out-of-bag evaluation: accuracy:0.846176 logloss:0.384581
+	trees: 43, Out-of-bag evaluation: accuracy:0.84622 logloss:0.384285
+	trees: 48, Out-of-bag evaluation: accuracy:0.846909 logloss:0.384384
+	trees: 49, Out-of-bag evaluation: accuracy:0.84666 logloss:0.38412
+	trees: 53, Out-of-bag evaluation: accuracy:0.847701 logloss:0.384069
+	trees: 55, Out-of-bag evaluation: accuracy:0.847935 logloss:0.383722
+	trees: 59, Out-of-bag evaluation: accuracy:0.848492 logloss:0.383748
+	trees: 61, Out-of-bag evaluation: accuracy:0.848771 logloss:0.383724
+	trees: 65, Out-of-bag evaluation: accuracy:0.849489 logloss:0.383376
+	trees: 67, Out-of-bag evaluation: accuracy:0.849504 logloss:0.383262
+	trees: 71, Out-of-bag evaluation: accuracy:0.850237 logloss:0.382955
+	trees: 73, Out-of-bag evaluation: accuracy:0.850618 logloss:0.383043
+	trees: 77, Out-of-bag evaluation: accuracy:0.850691 logloss:0.382713
+	trees: 82, Out-of-bag evaluation: accuracy:0.85072 logloss:0.382759
+	trees: 83, Out-of-bag evaluation: accuracy:0.850676 logloss:0.38261
+	trees: 87, Out-of-bag evaluation: accuracy:0.850911 logloss:0.382678
+	trees: 89, Out-of-bag evaluation: accuracy:0.850896 logloss:0.382723
+	trees: 93, Out-of-bag evaluation: accuracy:0.850647 logloss:0.382512
+	trees: 95, Out-of-bag evaluation: accuracy:0.850706 logloss:0.382363
+	trees: 99, Out-of-bag evaluation: accuracy:0.851058 logloss:0.382129
+	trees: 100, Out-of-bag evaluation: accuracy:0.851336 logloss:0.382063

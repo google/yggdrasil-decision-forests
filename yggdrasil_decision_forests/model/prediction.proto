@@ -1,0 +1,59 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.proto;
+
+import "yggdrasil_decision_forests/utils/distribution.proto";
+
+// Generic model output.
+message Prediction {
+  message Classification {
+    // Predicted class as indexed in the dataspec.
+    optional int32 value = 1;
+    // Predicted distribution over the possible classes. If specified, the
+    // following relation holds: "value == argmax_i(distribution[i])".
+    optional utils.proto.IntegerDistributionFloat distribution = 2;
+    optional int32 ground_truth = 3;
+  }
+
+  message Regression {
+    optional float value = 1;
+    optional float ground_truth = 2;
+  }
+
+  message Ranking {
+    // Predicted relevance (the higher, the most likely to be selected).
+    optional float relevance = 1;
+    optional float ground_truth_relevance = 2;
+    // Group of the predictions. Predictions with a same group are competing.
+    optional int32 deprecated_group = 3 [deprecated = true];
+    // Group of the predictions. Can be a categorical or a hash value.
+    optional uint64 group_id = 4;
+  }
+
+  oneof type {
+    Classification classification = 1;
+    Regression regression = 2;
+    Ranking ranking = 5;
+  }
+  optional float weight = 3 [default = 1];
+
+  // Identifier about the example.
+  optional string example_key = 4;
+
+  // Next ID: 6
+}

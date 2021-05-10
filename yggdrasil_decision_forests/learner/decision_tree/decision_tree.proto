@@ -1,0 +1,364 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.decision_tree.proto;
+
+// Training configuration for the Random Forest algorithm.
+message DecisionTreeTrainingConfig {
+  // Next ID: 22
+
+  // Basic parameters.
+
+  // Maximum depth of the tree. max_depth=1 means that all trees will be roots.
+  // If max_depth=-1, the depth of the tree is not limited.
+  optional int32 max_depth = 1 [default = 16];
+  // Minimum number of examples in a node.
+  optional int32 min_examples = 2 [default = 5];
+
+  oneof control_num_candidate_attributes {
+    // Number of unique valid attributes tested for each node. An attribute is
+    // valid if it has at least a valid split. If
+    // "num_candidate_attributes=0" the value is set to the classical default
+    // value for Random Forest: "sqrt(number of input attributes)" in case of
+    // classification and "number of input attributes/3" in case of regression.
+    // If "num_candidate_attributes=-1", all the attributes are tested.
+    int32 num_candidate_attributes = 6 [default = 0];
+
+    // If set, replaces "num_candidate_attributes" with the
+    // "number_of_input_features x num_candidate_attributes_ratio". The possible
+    // values are between ]0, and 1] as well as -1. If not set or equal to -1,
+    // the "num_candidate_attributes" is used.
+    float num_candidate_attributes_ratio = 17 [default = -1];
+  }
+
+  // Advanced parameters.
+
+  // Whether to check the "min_examples" constraint in the split search (i.e.
+  // splits leading to one child having less than "min_examples" examples are
+  // considered invalid) or before the split search (i.e. a node can be
+  // derived only if it contains more than "min_examples" examples). If false,
+  // there can be nodes with less than "min_examples" training examples.
+  optional bool in_split_min_examples_check = 3 [default = true];
+
+  // Whether to store the full distribution (e.g. the distribution of all
+  // the possible label values in case of classification) or only the top label
+  // (e.g. the most representative class). This information is used for model
+  // interpretation as well as in case of "winner_take_all_inference=false".
+  // In the worst case, this information can account for a significant part of
+  // the model size.
+  optional bool store_detailed_label_distribution = 4 [default = true];
+
+  // Whether to keep the node value (i.e. the distribution of the labels of the
+  // training examples) of non-leaf nodes. This information is not used during
+  // serving, however it can be used for model interpretation as well as hyper
+  // parameter tuning. In the worst case, this can account for half of the model
+  // size.
+  optional bool keep_non_leaf_label_distribution = 5 [default = true];
+
+  // Method used to handle missing attribute values.
+  enum MissingValuePolicy {
+    // Missing attribute values are imputed, with the mean (in case of numerical
+    // attribute) or the most-frequent-item (in case of categorical attribute)
+    // computed on the entire dataset (i.e. the information contained in the
+    // data spec).
+    GLOBAL_IMPUTATION = 0;
+
+    // Missing attribute values are imputed with the mean (numerical attribute)
+    // or most-frequent-item (in the case of categorical attribute) evaluated on
+    // the training examples in the current node.
+    LOCAL_IMPUTATION = 1;
+
+    // Missing attribute values are imputed from randomly sampled values from
+    // the training examples in the current node. This method was proposed by
+    // Clinic et al. in "Random Survival Forests"
+    // (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
+    RANDOM_LOCAL_IMPUTATION = 2;
+  }
+  optional MissingValuePolicy missing_value_policy = 7
+      [default = GLOBAL_IMPUTATION];
+
+  // If true, the tree training evaluates conditions of the type "X is NA" i.e.
+  // "X is missing".
+  optional bool allow_na_conditions = 8 [default = false];
+
+  optional GreedyForwardCategoricalSet categorical_set_greedy_forward = 12;
+
+  // How to grow the tree.
+  oneof growing_strategy {
+    // [Default strategy] Each node is split independently of the other nodes.
+    // In other words, as long as a node satisfy the splits constraints (e.g.
+    // maximum depth, minimum number of observations), the node will be split.
+    //
+    // This is the "classical" way to grow decision trees.
+    GrowingStrategyLocalBest growing_strategy_local = 13;
+
+    // The node with the best loss reduction among all the nodes of the tree is
+    // selected for splitting.
+    //
+    // This method is also called "best first" or "leaf-wise growth".
+    // See "Best-first decision tree learning", Shi
+    // (http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.149.2862&rep=rep1&type=pdf)
+    // and "Additive logistic regression : A statistical view of boosting",
+    // Friedman et al. (https://projecteuclid.org/euclid.aos/1016218223) for
+    // more details.
+    GrowingStrategyGlobalBest growing_strategy_best_first_global = 14;
+  }
+
+  optional NumericalSplit numerical_split = 15;
+
+  // Options related to the learning of categorical splits.
+  optional Categorical categorical = 16;
+
+  // Generate an error (if true) or a warning (if false) when the statistics
+  // exported by splitters don't match the observed statistics.
+  //
+  // This fields is used in the unit tests.
+  optional bool internal_error_on_wrong_splitter_statistics = 18
+      [default = false];
+
+  // What structure of split to consider.
+  oneof split_axis {
+    // Axis aligned splits (i.e. one condition at a time). This is the
+    // "classical" way to train a tree. Default value.
+    AxisAlignedSplit axis_aligned_split = 19;
+
+    // Sparse oblique splits (i.e. splits one a small number of features) from
+    // "Sparse Projection Oblique Random Forests", Tomita et al., 2020. These
+    // splits are tested iif. "sparse_oblique_split" is set.
+    SparseObliqueSplit sparse_oblique_split = 20;
+  }
+
+  // See "split_axis".
+  message AxisAlignedSplit {}
+
+  // See "split_axis".
+  message SparseObliqueSplit {
+    // Controls of the number of random projections to test at each node.
+    //
+    // The effective number of projections noted "d" in the paper is
+    // "num_features^num_projections_exponent".
+    //
+    // The Sparse Oblique paper is recommending values in [1/4, 2].
+    //
+    // Increasing this value increase likely improve the quality of the model,
+    // increases importantly the training time, and don't impact the inference
+    // time (or slightly reduce).
+    //
+    // More precisely, the training time increases in
+    // O(p^num_projections_exponent) with "p" the number of numerical features.
+    // "num_projections_exponent=0.5" is the time complexity of the Random
+    // Forest algorithm, while "num_projections_exponent=1.0" is the time
+    // complexity of the GBDT algorithm. "num_projections_exponent=2" will
+    // crease potentially very good but very slow to train model if you have a
+    // lot (e.g. 1k) features.
+    optional float num_projections_exponent = 1 [default = 2];
+
+    // Maximum number of projections (applied after the
+    // "num_projections_exponent").
+    //
+    // The method described in the paper does not have this logic.
+    //
+    // Same as for "num_projections_exponent", increasing "max_num_projections"
+    // increase the training time but not the inference time. In late stage
+    // model development, if every bit of accuracy if important, increase this
+    // value.
+    optional int32 max_num_projections = 2 [default = 6000];
+
+    // Density of the projections as an exponent of the number of features.
+    // Each feature has a probability "projection_density_factor /
+    // num_features" (noted lambda in the paper) to be in each projection
+    // (independent).
+    //
+    // The Sparse Oblique paper is recommending values in [1, 5].
+    //
+    // Increasing this value increase averagely the training and inference
+    // time. This value is best tuned for each dataset.
+    optional float projection_density_factor = 3 [default = 2];
+
+    // If true, the weight will be sampled in {-1,1} (default from the paper).
+    // If false, the weight will be sampled in [-1,1].
+    optional bool binary_weight = 4 [default = true];
+
+    // Normalization applied on the features, before applying the sparse oblique
+    // projections.
+    optional Normalization normalization = 5 [default = NONE];
+
+    enum Normalization {
+      // No normalization. Logic used in the paper.
+      NONE = 0;
+
+      // Normalize the feature by the estimated standard deviation on the entire
+      // train dataset. Also known as Z-Score normalization.
+      STANDARD_DEVIATION = 1;
+
+      // Normalize the feature by the range (i.e. max-min) estimated on the
+      // entire train dataset.
+      MIN_MAX = 2;
+    }
+  }
+
+  // Internal knobs of the algorithm that don't impact the final model.
+  optional Internal internal = 21;
+
+  message Internal {
+    // How the computation of sorted values (non discretized numerical values)
+    // are obtained.
+    enum SortingStrategy {
+      // Values are sorted within each node.
+      IN_NODE = 0;
+
+      // Values are pre-sorted into an index to speed-up training. The index
+      // will be automatically ignored When using the index is slower than
+      // sorting in-node or if the algorithm does not benefit from pre-sorting.
+      // This method can increase significantly the amount of memory required
+      // for training.
+      PRESORTED = 1;
+    }
+    optional SortingStrategy sorting_strategy = 21 [default = PRESORTED];
+  }
+
+  // Deprecated tag numbers.
+  reserved 9, 10, 11;
+}
+
+// How to find numerical splits.
+message NumericalSplit {
+  enum Type {
+    // Original/CART splitting. Slow but gives good (small, high accuracy)
+    // models. Equivalent to XGBoost Exact.
+    EXACT = 0;
+
+    // Note: The histogram splitters are implemented as simply as possible,
+    // and mainly for comparison purpose. The speed would be significantly
+    // improved (especially for deep trees), but the learned  models would
+    // remain the same.
+
+    // Select candidate splits randomly between the min and max values.
+    // Similar to the ExtraTrees algorithm:
+    // https://link.springer.com/content/pdf/10.1007%2Fs10994-006-6226-1.pdf
+    HISTOGRAM_RANDOM = 1;
+
+    // Select the candidate splits uniformly (in the feature space) between the
+    // min and max value.
+    HISTOGRAM_EQUAL_WIDTH = 2;
+
+    reserved 3;
+  }
+
+  optional Type type = 1 [default = EXACT];
+
+  // Number of candidate thresholds. Ignored for EXACT.
+  // Default:
+  // HISTOGRAM_RANDOM => 1
+  // HISTOGRAM_EQUAL_WIDTH => 255
+  optional int32 num_candidates = 2;
+}
+
+message GreedyForwardCategoricalSet {
+  // Probability for a categorical value to be a candidate for the positive set
+  // in the extraction of a categorical set split. The sampling is applied
+  // once per node (i.e. not at every step of the greedy optimization).
+  optional float sampling = 1 [default = 0.1];
+
+  // Maximum number of items (prior to the sampling). If more items are
+  // available, the least frequent items are ignored. Changing this value is
+  // similar to change the "max_vocab_count" before loading the dataset, with
+  // the following exception: With "max_vocab_count", all the remaining items
+  // are grouped in a special Out-of-vocabulary item. With "max_num_items", this
+  // is not the case.
+  optional int32 max_num_items = 2 [default = -1];
+
+  // Minimum number of occurrences of an item to be considered.
+  optional int32 min_item_frequency = 3 [default = 1];
+
+  // Maximum number of items selected in the condition.
+  // Note: max_selected_items=1 is equivalent to one-hot encoding.
+  optional int32 max_selected_items = 4 [default = -1];
+}
+
+// How to handle categorical input features.
+message Categorical {
+  oneof algorithm {
+    // CART algorithm (default).
+    //
+    // Find the a categorical split of the form "value \in mask". The solution
+    // is exact for binary classification, regression and ranking. It is
+    // approximated for multi-class classification.
+    //
+    // This is a good first algorithm to use. In case of overfitting (very small
+    // dataset, large dictionary), the "random" algorithm is a good alternative.
+    CART cart = 1;
+
+    // One-hot encoding.
+    //
+    // Find the optimal categorical split of the form "attribute == param".
+    // This method is similar (but more efficient) than converting converting
+    // each possible categorical value into a boolean feature.
+    //
+    // This method is available for comparison purpose and generally performs
+    // worst than other alternatives.
+    OneHot one_hot = 2;
+
+    // Best splits among a set of random candidate.
+    //
+    // Find the a categorical split of the form "value \in mask" using a random
+    // search. This solution can be seen as an approximation of the CART
+    // algorithm.
+    //
+    // This method is a strong alternative to CART.
+    //
+    // This algorithm is inspired from section "5.1 Categorical Variables" of
+    // "Random Forest", 2001
+    // (https://www.stat.berkeley.edu/users/breiman/randomforest2001.pdf).
+    //
+    Random random = 3;
+  }
+
+  // If the dictionary size of the attribute is greater or equal to
+  // "arity_limit_for_random", the "random" algorithm is be used (instead of
+  // the algorithm specified in "algorithm");
+  optional int32 arity_limit_for_random = 4 [default = 300];
+
+  message CART {}
+
+  message OneHot {
+    // Sampling of the item tested. 1. means that all the items will be tested.
+    optional float sampling = 1 [default = 1.];
+  }
+
+  message Random {
+    // Controls the number of random splits to evaluated.
+    //
+    // The effective number of splits is "min(max_num_trials, num_trial_offset +
+    // {vocab size}^num_trial_exponent"), with "vocab size" the number of unique
+    // categorical values in the node.
+    optional float num_trial_exponent = 1 [default = 2];
+    optional float num_trial_offset = 2 [default = 32];
+
+    // Maximum number of candidates.
+    optional int32 max_num_trials = 3 [default = 5000];
+  }
+}
+
+// Specifies the local best growing strategy. No extra configuration needed.
+message GrowingStrategyLocalBest {}
+
+// Specifies the global best growing strategy.
+message GrowingStrategyGlobalBest {
+  // Maximum number of nodes in the tree. Set to "-1" to disable this limit.
+  optional int32 max_num_nodes = 1 [default = 31];
+}

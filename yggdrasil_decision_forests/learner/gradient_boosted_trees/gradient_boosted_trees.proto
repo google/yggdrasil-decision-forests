@@ -1,0 +1,339 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.gradient_boosted_trees.proto;
+
+import "yggdrasil_decision_forests/learner/abstract_learner.proto";
+import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
+import "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.proto";
+
+// Training configuration for the Gradient Boosted Trees algorithm.
+message GradientBoostedTreesTrainingConfig {
+  // Next ID: 32
+
+  // Basic parameters.
+
+  // Number of trees.
+  optional int32 num_trees = 1 [default = 300];
+
+  // Decision tree specific parameters.
+  // The default maximum depth of the trees is: 6.
+  optional decision_tree.proto.DecisionTreeTrainingConfig decision_tree = 2;
+
+  // Shrinkage parameters.
+  // Default values:
+  //   forest_extraction : MART => 0.1
+  //   forest_extraction : DART => 1.0
+  optional float shrinkage = 3 [default = 0.1];
+
+  // Fraction of examples used to train each tree. If =1, all the examples are
+  // used to train each tree. If <1, a random subset of examples is sampled for
+  // each tree. Deprecated. Use "stochastic_gradient_boosting" instead.
+  //
+  // Deprecated. Use "stochastic_gradient_boosting" instead.
+  //
+  // Note: This parameter is ignored if another sampling strategy
+  // ("sampling_methods") is set.
+  optional float subsample = 4 [default = 1, deprecated = true];
+
+  // How is the sampling ("subsample" or "sampling_methods") is implemented.
+  oneof sampling_implementation {
+    // The entire dataset is loaded in memory, and the subsampling ("subsample"
+    // parameter) and extraction of the validation dataset
+    // ("validation_set_ratio" parameter) are done at the example-level.
+    //
+    // This method is fast, accurate but comsume a lot of memory is the dataset
+    // is large (e.g. >10B values).
+    SampleInMemory sample_in_memory = 32;
+
+    // The entire dataset is NOT loaded in memory, and "subsample" and
+    // "validation_set_ratio" are applied at the shard level. This method
+    // consumes less memory (great if your dataset does not fit in memory) but
+    // requires more IO and CPU operations and the final model might (or not)
+    // require more trees to reach the same quality as the first method. For the
+    // sampling to be of high quality (and the model to train well), the number
+    // of shards should be large enough (>=1000 shards is good situation).
+    //
+    // In the logs:
+    //   - "loader-blocking" indicates how much of the time the training
+    //     is stopped to wait for IO. A good value is 0%. This value can be
+    //     optimized by locating the dataset "near" the job, using appropriate
+    //     amount of sharding (i.e. not too much; 100 shards per sample works
+    //     well) and compression (is uncompressing the dataset is too
+    //     expensive), increasing the sample size (i.e. making the training more
+    //     complex) or recycling the samples (with "num_recycling").
+    //  - "preprocessing-load" indicates how much of the preparation time (IO +
+    //    preprocessing) is spent preprocessing the data. High value are not an
+    //    issue as long as "loader-blocking" is small.
+    //
+    // Constraints:
+    //  - The code raise an error is the number of shards is <10.
+    //  - No support (yet) for ranking or dart.
+    //
+    // In details, each tree is trained on a random subset of shards (controlled
+    // by "subsample"). Once the tree is trained, the random subset of shards is
+    // discarded and the training continue. A same shard can be used multiple
+    // times for different trees. The loading of the next shard and the training
+    // of the current tree are done in parallel. Ideally, both should run at the
+    // same speed. The amount of time without training and waiting for the shard
+    // loading and preparation is displayed in the logs as "loader-blocking").
+    SampleWithShards sample_with_shards = 31;
+  }
+
+  message SampleInMemory {}
+
+  message SampleWithShards {
+    // Number of times a sample is re-used before being discaded.
+    // Increasing this value will speed-up the training speed if IO is the
+    // bottle-neck (
+    optional int32 num_recycling = 1 [default = 0];
+  }
+
+  // Loss minimized by the model. The value "DEFAULT" selects the likely most
+  // adapted loss according to the nature of the task and the statistics of the
+  // label.
+  optional Loss loss = 5 [default = DEFAULT];
+
+  // Ratio of the training dataset used to monitor the training. If >0, the
+  // validation set is used to select the actual number of trees (<=num_trees).
+  optional float validation_set_ratio = 6 [default = 0.1];
+
+  // If set, define the name of the feature to use in the splitting of the
+  // validation dataset. In other words, if set, the validation dataset and the
+  // sub-training dataset cannot share examples with the same "group feature"
+  // value.
+  optional string validation_set_group_feature = 11;
+
+  // Evaluate the model on the validation set every
+  // "validation_interval_in_trees" trees.
+  //
+  // Impact the early stopping policy.
+  optional int32 validation_interval_in_trees = 7 [default = 1];
+
+  // Decision Trees are trained sequentially. Training too many trees leads to
+  // training dataset overfitting. The "early stopping" policy controls the
+  // detection of training overfitting and halts the training (before
+  // "num_trees" trees have be trained). The overfitting is estimated using the
+  // validation dataset. Therefore, "validation_set_ratio" should be >0 if the
+  // early stopping is enabled.
+  //
+  // The early stopping policy runs every "validation_interval_in_trees" trees:
+  // The number of trees of the final model will be a multiple of
+  // "validation_interval_in_trees".
+  //
+  enum EarlyStopping {
+    // No early stopping. Train all the "num_trees" trees.
+    NONE = 0;
+
+    // Trains all the "num_trees", and then select the subset of trees that
+    // minimize the validation loss.
+    MIN_VALIDATION_LOSS_ON_FULL_MODEL = 1;
+
+    // Stops the training training when the validation loss stops decreasing.
+    //
+    // More precisely, stops the training when the set of trees with the best
+    // validation loss has less than "early_stopping_num_trees_look_ahead" trees
+    // than the current model.
+    //
+    // "VALIDATION_LOSS_INCREASE" is more efficient than
+    // "MIN_VALIDATION_LOSS_ON_FULL_MODEL" but can lead to worst models.
+    VALIDATION_LOSS_INCREASE = 2;
+  }
+  optional EarlyStopping early_stopping = 8
+      [default = VALIDATION_LOSS_INCREASE];
+  optional int32 early_stopping_num_trees_look_ahead = 9 [default = 30];
+
+  oneof loss_options {
+    LambdaMartNdcg lambda_mart_ndcg = 12;
+    XeNdcg xe_ndcg = 26;
+  }
+
+  message LambdaMartNdcg {
+    // If false, the gradient is computed using NDCG i.e. normalized-DCG. If
+    // false, the gradient is computed using DCG.
+    optional bool gradient_use_non_normalized_dcg = 1 [default = false];
+  }
+
+  message XeNdcg {
+    enum Gamma {
+      // For the time being, defaults to UNIFORM.
+      AUTO = 0;
+      // Gammas are sampled from a uniform distribution on [0, 1].
+      UNIFORM = 1;
+      // Gammas are set to 1 across the board. This is more appropriate for
+      // click datasets with a large number of documents per query.
+      ONE = 2;
+    }
+    optional Gamma gamma = 1 [default = UNIFORM];
+  }
+
+  // L2 regularization on the tree predictions i.e. on the value of the leaf.
+  // See the equation 2 of the XGBoost paper for the definition
+  // (https://arxiv.org/pdf/1603.02754.pdf).
+  //
+  // This term is not integrated in the reported loss of the model i.e. the loss
+  // of models trained with and without l2 regularization can be compared.
+  //
+  // Used for the following losses: BINOMIAL_LOG_LIKELIHOOD, SQUARED_ERROR,
+  // MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG5, or if use_hessian_gain is
+  // true.
+  //
+  // Note: In the case of RMSE loss for regression, the L2 regularization play
+  // the same role as the "shrinkage" parameter.
+  optional float l2_regularization = 13 [default = 0.0];
+
+  // L2 regularization for the categorical features with the hessian loss.
+  optional float l2_regularization_categorical = 22 [default = 1.0];
+
+  // L1 regularization on the tree predictions i.e. on the value of the leaf.
+  //
+  // Used for the following losses: LAMBDA_MART_NDCG5, or if use_hessian_gain is
+  // true.
+  optional float l1_regularization = 19 [default = 0.0];
+
+  // Maximum absolute value of the leaf representing a logit (for binary and
+  // multi-class classification). This parameter has generally not impact on the
+  // quality of the model.
+  //
+  // This parameter prevents the apparition of large values, and then infinity
+  // and then NaN during training in the computation of logistic and soft-max.
+  // The value is selected such that log(clamp_leaf_logit) can be comfortably
+  // represented as a float.
+  optional float clamp_leaf_logit = 30 [default = 5];
+
+  // The "lambda" constant available in some loss formulations. Does not impact
+  // the optimal solution, but provides a smoothing of the loss that can be
+  // beneficial.
+  //
+  // Currently only used for the losses:
+  //   - LAMBDA_MART_NDCG5
+  optional float lambda_loss = 14 [default = 1.0];
+
+  // How is the forest of tree built.  Defaults to "mart".
+  oneof forest_extraction {
+    // MART (Multiple Additive Regression Trees): The "classical" way to build a
+    // GBDT i.e. each tree tries to "correct" the mistakes of the previous
+    // trees.
+    MART mart = 15;
+
+    // DART (Dropout Additive Regression Trees), a modification of MART proposed
+    // in http://proceedings.mlr.press/v38/korlakaivinayak15.pdf. Here, each
+    // tree tries to "correct" the mistakes of a random subset of the previous
+    // trees.
+    DART dart = 16;
+  }
+
+  message MART {}
+
+  message DART {
+    // Rate of tree that are randomly masked. "dropout_rate=1" indicates that
+    // all trees will be masked i.e. the algorithm is somehow equivalent to
+    // Random Forest. "dropout_rate=0" means that one tree will be masked i.e.
+    // the algorithm is almost equivalent to MART.
+    optional float dropout_rate = 1 [default = 0.01];
+  }
+
+  // If true, the "subsample" parameter will be adapted dynamically such that
+  // the model  trains in the "maximum_training_duration" time. "subsample" can
+  // only be reduced i.e. enabling this feature can only reduce the training
+  // time likely at the expense of quality.
+  optional bool adapt_subsample_for_maximum_training_duration = 17
+      [default = false];
+
+  // Maximum impact of the "adapt_subsample_for_maximum_training_duration"
+  // parameter.
+  optional float min_adapted_subsample = 18 [default = 0.01];
+
+  // Use true, uses a formulation of split gain with the hessian i.e. optimize
+  // the splits to minimize the variance of "gradient / hessian".
+  //
+  // Hessian gain is available for the losses: BINOMIAL_LOG_LIKELIHOOD,
+  // SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG5.
+  optional bool use_hessian_gain = 20 [default = false];
+
+  // Minimum value of the sum of the hessians in the leafs. Splits that would
+  // violate this constraint are ignored. Only used when "use_hessian_gain" is
+  // true.
+  optional float min_sum_hessian_in_leaf = 21 [default = 0.001];
+
+  // Deprecated: Use GradientOneSideSampling in the "sampling_methods" below.
+  optional bool use_goss = 23 [default = false, deprecated = true];
+  optional float goss_alpha = 24 [default = 0.2, deprecated = true];
+  optional float goss_beta = 25 [default = 0.1, deprecated = true];
+
+  oneof sampling_methods {
+    SelectiveGradientBoosting selective_gradient_boosting = 27;
+    GradientOneSideSampling gradient_one_side_sampling = 28;  // aka GOSS
+    // StochasticGradientBoosting is the default and classical approach.
+    StochasticGradientBoosting stochastic_gradient_boosting = 29;
+  }
+
+  // Selective Gradient Boosting (SelGB) is a method proposed in the SIGIR 2018
+  // paper entitled "Selective Gradient Boosting for Effective Learning to Rank"
+  // by Lucchese et al.
+  //
+  // The algorithm always selects all positive examples, but selects only those
+  // negative training examples that are more difficult (i.e., those with larger
+  // scores).
+  //
+  // Note: Selective Gradient Boosting is only available for ranking tasks.
+  // This method is disabled for all other tasks.
+  message SelectiveGradientBoosting {
+    // The ratio of negative examples to keep. Negative examples are sorted by
+    // their score and the top examples are added to the selected set.
+    optional float ratio = 1 [default = 0.01];
+  }
+
+  // "Gradient-based One-Side Sampling" (GOSS) is a sampling algorithm proposed
+  // in the following paper: "LightGBM: A Highly Efficient Gradient Boosting
+  // Decision Tree.' The paper claims that GOSS speeds up training without
+  // hurting quality by way of a clever sub-sampling methodology.
+  //
+  // Briefly, at the start of every iteration, the algorithm selects a subset of
+  // examples for training. It does so by sorting examples in decreasing
+  // order of absolute gradients, placing the top \alpha percent into the
+  // subset, and finally sampling \beta percent of the remaining examples.
+  message GradientOneSideSampling {
+    // Fraction of examples with the largest absolute gradient to keep in the
+    // sampled training set. Its value is expected to be in [0, 1].
+    //
+    // As an example, setting alpha to .2 means that 20% of the examples with
+    // the largest absolute gradient will be placed into the sampled set.
+    optional float alpha = 1 [default = 0.2];
+
+    // Sampling ratio in [0, 1] used to select remaining examples that did not
+    // make the cut for goss_alpha above.
+    //
+    // For example, if goss_alpha is 0.2 and goss_beta is 0.1, then first 20% of
+    // examples with the largest gradient will be placed into the set. Then, of
+    // the remaining examples, 10% are selected randomly and placed into the
+    // set.
+    optional float beta = 2 [default = 0.1];
+  }
+
+  // Stochastic Gradient Boosting samples examples uniformly randomly.
+  message StochasticGradientBoosting {
+    // Relative size of the dataset sampled for each tree. A value of 1
+    // indicates that the sample has the same size as the original dataset.
+    optional float ratio = 1 [default = 1];
+  }
+}
+
+extend model.proto.TrainingConfig {
+  optional GradientBoostedTreesTrainingConfig gradient_boosted_trees_config =
+      1004;
+}

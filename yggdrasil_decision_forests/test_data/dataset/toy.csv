@@ -1,0 +1,5 @@
+Num_1,Num_2,Cat_1,Cat_2,Cat_set_1,Cat_set_2,Bool_1,Bool_2,Cat_3
+1,NA,A,A,X,,0,0,1
+2,2,B,,X Y,X,1,NA,2
+3,NA,A,B,Y X Z,X Y,0,1,1
+4,4,C,,X Y Z,Z X Y,1,NA,3

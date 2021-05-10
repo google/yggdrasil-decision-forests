@@ -1,0 +1,124 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.dataset.proto;
+
+// Options for the synthetic generation of dataset.
+message SyntheticDatasetOptions {
+  // Next ID: 21
+
+  // Number of examples in the dataset.
+  optional int32 num_examples = 1 [default = 5000];
+
+  // Name of the label column.
+  optional string label_name = 2 [default = "LABEL"];
+
+  // Name of the feature columns, with "{type}" being the short feature type
+  // (e.g. "num(erical)", "cat(egorical)")  and "{index}" being the feature
+  // index (among other features of the same type).
+  optional string feature_name = 3 [default = "{type}_{index}"];
+
+  // Number of features by semantic.
+  //
+  // "num_categorical" and "num_categorical_set" are used each twice for the
+  // string and integer representations e.g. categorical_string,
+  // categorical_int.
+  optional int32 num_numerical = 4 [default = 2];
+  optional int32 num_categorical = 5 [default = 2];
+  optional int32 num_categorical_set = 6 [default = 2];
+  optional int32 num_boolean = 7 [default = 2];
+  optional int32 num_multidimensional_numerical = 18 [default = 0];
+
+  // Dictionary sizes.
+  optional int32 categorical_vocab_size = 8 [default = 30];
+  optional int32 categorical_set_vocab_size = 9 [default = 30];
+
+  // Number of dimensions of "multidimensional_numerical" features.
+  optional int32 multidimensional_numerical_dim = 19 [default = 5];
+
+  // If false, numerical values represented as float. If true, they are
+  // represented as integers.
+  optional bool represent_numerical_as_integer = 20 [default = false];
+
+  // If true, the value zero (0) of categorical and categorical set values (both
+  // for features and labels) is used to represent a out-of-vocabulary value
+  // (and the first real value is 1). If false, zero (0) is a categorical value
+  // like others.
+  optional bool zero_categorical_int_value_is_oov = 17 [default = true];
+
+  // Average number of items in a categorical set feature.
+  optional int32 categorical_set_mean_size = 10 [default = 3];
+
+  // Probability for a feature value to be missing.
+  optional float missing_ratio = 11 [default = 0.05];
+
+  // How much noise to inject in the label.
+  //
+  // The problem can be perfectly solved with "label_noise_ratio=0", and not be
+  // solved better than random for "label_noise_ratio=1" (is there are not other
+  // sources of noise).
+  optional float label_noise_ratio = 12 [default = 0.05];
+
+  // Seed used to initialize the random generator used to generate the dataset.
+  // If set to -1, the random generator is initialized using std::random_device.
+  optional int32 seed = 13 [default = 12345];
+
+  // Number of accumulators. Accumulator are internal structures used to
+  // generate the dataset.
+  //
+  // Increasing the value will increase the "conditional independence" of the
+  // dataset i.e. having more tuples <FS1, FS2, X> such that
+  // "Label ⊥ FS1 | FS2=X" with FS1 and FS2 two sets of features.
+  //
+  // Decreasing the value will make the dataset more "naive independent" i.e.
+  // increasing the tendency of "P(Label Fi | Fj) == P(Label Fi) if j!=i".
+  //
+  // The value should be odd and in between 1 and the total number of features
+  // (i.e. sum "num_{numerical, categorical, ...}"). Even values will be rounded
+  // down.
+  //
+  // The exact use of the accumulators is described in "synthetic_dataset.h".
+  optional int32 num_accumulators = 14 [default = 5];
+
+  // The task represented by the labels.
+  oneof task {
+    Classification classification = 15;  // Default.
+    Regression regression = 16;
+    Ranking ranking = 21;
+  }
+
+  message Classification {
+    // Number of label classes. 2 => binary classification.
+    optional int32 num_classes = 1 [default = 2];
+
+    // Is the label stored a string or an integer.
+    optional bool store_label_as_str = 2 [default = true];
+  }
+
+  message Regression {}
+
+  message Ranking {
+    // Name of the column containing the group index. In document/query scoring,
+    // the group would be the queries.
+    optional string group_name = 1 [default = "GROUP"];
+
+    // Number of examples in each group.
+    // The last group might have less examples if num_examples % group_size !=
+    // 0.
+    optional int32 group_size = 2 [default = 10];
+  }
+}

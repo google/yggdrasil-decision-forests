@@ -1,0 +1,135 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.decision_tree.proto;
+
+import "yggdrasil_decision_forests/utils/distribution.proto";
+
+// Output of a node in a classification tree.
+message NodeClassifierOutput {
+  // Next ID: 3
+  // Label value.
+  optional int32 top_value = 1;
+  // Distribution of label values. The most frequent value is "top_value".
+  optional utils.proto.IntegerDistributionDouble distribution = 2;
+}
+
+// Output of a node in a regression tree.
+message NodeRegressorOutput {
+  // Next ID: 6
+  // Label value.
+  optional float top_value = 1;
+  // Distribution of label values. The mean is "top_value".
+  optional utils.proto.NormalDistributionDouble distribution = 2;
+  // Statistics of hessian splits.
+  optional double sum_gradients = 3;
+  optional double sum_hessians = 4;
+  optional double sum_weights = 5;
+}
+
+// The sub-messages of "ConditionParams" are the different types of condition
+// that can be attached to a node.
+message Condition {
+  // Next ID: 6
+  // Condition of the type: value == NA (i.e. missing).
+  message NA {}
+  // Condition of the type: value == True.
+  message TrueValue {}
+  // Condition of the type: value >= threshold.
+  message Higher {
+    // [Required]
+    optional float threshold = 1;
+  }
+  // Condition of the type: (value \intersect elements) != empty_set.
+  message ContainsVector {
+    // Next ID: 2
+    repeated int32 elements = 1 [packed = true];
+  }
+  // Condition of the type: (value \intersect elements) != empty_set where
+  // elements is stored as a bitmap over the possible values.
+  message ContainsBitmap {
+    // Next ID: 2
+    // [Required]
+    optional bytes elements_bitmap = 1;
+  }
+  // Condition of the type: indexed_value >= indexed_threshold.
+  message DiscretizedHigher {
+    // [Required]
+    optional int32 threshold = 1;
+  }
+  message Oblique {
+    // True iff. \sum_i examples[attribute_i] * weight_i >= threshold.
+    // The "attribute" field in "NodeCondition" should be one of the
+    // "attributes" in this message. If any of the attributes is missing, the
+    // conditions evaluates to missing and returns "na_value".
+    repeated int32 attributes = 1 [packed = true];
+    repeated float weights = 2 [packed = true];
+    optional float threshold = 3;
+  }
+
+  // Type of condition.
+  oneof type {
+    NA na_condition = 1;
+    Higher higher_condition = 2;
+    TrueValue true_value_condition = 3;
+    ContainsVector contains_condition = 4;
+    ContainsBitmap contains_bitmap_condition = 5;
+    DiscretizedHigher discretized_higher_condition = 6;
+    Oblique oblique_condition = 7;
+    // Make sure to update "kNumConditionTypes" in "decision_tree.h"
+    // accordingly.
+  }
+}
+
+// Binary condition attached to a non-leaf node.
+message NodeCondition {
+  // Next ID: 9
+  // Evaluation value of this condition in case of a NA (i.e. missing) value.
+  optional bool na_value = 1;
+  // Attribute on which the condition applies.
+  optional int32 attribute = 2;
+  // If the condition is not set, this node is a leaf node.
+  optional Condition condition = 3;
+  // Number of examples (non-weighted) that reached this node during training.
+  optional int64 num_training_examples_without_weight = 4;
+  // Number of examples (weighted) that reached this node during training.
+  optional double num_training_examples_with_weight = 5;
+  // Score attached to the split.
+  optional float split_score = 6 [default = 0];
+  // Number of positive examples (non-weighted) that reached this node during
+  // training.
+  optional int64 num_pos_training_examples_without_weight = 7;
+  // Number of positive examples (weighted) that reached this node during
+  // training.
+  optional double num_pos_training_examples_with_weight = 8;
+}
+
+// Node in a decision tree (without the information about the children).
+message Node {
+  // Next ID: 5
+  // Label value. Might be unspecified for non-leaf nodes.
+  oneof output {
+    NodeClassifierOutput classifier = 1;
+    NodeRegressorOutput regressor = 2;
+  }
+  // Branching condition to the children. If not specified, this node is a leaf.
+  optional NodeCondition condition = 3;
+
+  // Number of positive examples (non-weighted) that reached this node during
+  // training.
+  optional int64 num_pos_training_examples_without_weight = 4;
+}

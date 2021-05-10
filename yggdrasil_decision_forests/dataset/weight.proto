@@ -1,0 +1,78 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Definition of the weights of the examples. A weight definition is
+// essentially a mapping from an example to a integer value. Weighting is used
+// training and evaluation.
+//
+// "WeightDefinition" is a weight definition provided by the user.
+// "LinkedWeightDefinition" is a pre-processed version of "WeightDefinition"
+// that is only used internally in the code.
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.dataset.proto;
+
+message WeightDefinition {
+  // [Required] Name of the attribute that controls the weights of the examples.
+  optional string attribute = 1;
+
+  oneof type {
+    // The attribute is interpreted as a numerical value.
+    NumericalWeight numerical = 2;
+    // The attribute is interpreted as a categorical attribute. A weight is
+    // defined for each possible value.
+    CategoricalWeight categorical = 3;
+  }
+
+  // The weight is directly the numerical value.
+  message NumericalWeight {}
+
+  // Solve the following mapping to get the weight.
+  message CategoricalWeight {
+    // Pair of categorical value and weight.
+    repeated Item items = 1;
+    message Item {
+      // [Required] A value to map to a corresponding weight.
+      optional string value = 1;
+      // [Required] The weight.
+      optional float weight = 3;
+    }
+  }
+}
+
+// Internal linked version of the weight definition. The attributes and values
+// are indexed according to the dataspec.
+message LinkedWeightDefinition {
+  // Attribute index used to compute the weight.
+  optional int32 attribute_idx = 1;
+
+  oneof type {
+    // Weight definition if the controlling attribute is a numerical attribute.
+    NumericalWeight numerical = 2;
+    // Weight definition if the controlling attribute is a categorical
+    // attribute.
+    CategoricalWeight categorical = 3;
+  }
+
+  message NumericalWeight {}
+
+  message CategoricalWeight {
+    // Index of "categorical_mapping". Maps a weight value for each categorical
+    // attribute value. See the dataspec for the mapping attribute value string
+    // to attribute value index.
+    repeated float categorical_value_idx_2_weight = 1 [packed = true];
+  }
+}

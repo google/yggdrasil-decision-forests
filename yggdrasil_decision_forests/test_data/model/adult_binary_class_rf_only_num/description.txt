@@ -1,0 +1,169 @@
+Type: "RANDOM_FOREST"
+Task: CLASSIFICATION
+Label: "income"
+
+Input Features (5):
+	age
+	fnlwgt
+	capital_gain
+	capital_loss
+	hours_per_week
+
+No weights
+
+Variable Importance: NUM_NODES:
+    1.         "fnlwgt" 23903.000000 ################
+    2.            "age" 9151.000000 ####
+    3. "hours_per_week" 6155.000000 ##
+    4.   "capital_gain" 2873.000000 
+    5.   "capital_loss" 2598.000000 
+
+Variable Importance: NUM_AS_ROOT:
+    1. "capital_gain" 78.000000 ################
+    2.          "age" 22.000000 
+
+Variable Importance: SUM_SCORE:
+    1.            "age" 154848.150893 ################
+    2.   "capital_gain" 152184.389435 ###############
+    3.         "fnlwgt" 82073.482870 ###
+    4. "hours_per_week" 67506.309911 
+    5.   "capital_loss" 64169.554797 
+
+Variable Importance: MEAN_MIN_DEPTH:
+    1.         "income" 12.315075 ################
+    2.         "fnlwgt"  7.114806 #########
+    3.   "capital_loss"  3.612301 ####
+    4. "hours_per_week"  2.533586 ##
+    5.            "age"  0.973799 
+    6.   "capital_gain"  0.311610 
+
+
+
+Winner take all: false
+Out-of-bag evaluation: accuracy:0.823535 logloss:0.404205
+Number of trees: 100
+Total number of nodes: 89460
+
+Number of nodes by tree:
+Count: 100 Average: 894.6 StdDev: 105.571
+Min: 671 Max: 1171 Ignored: 0
+----------------------------------------------
+[  671,  696)  1   1.00%   1.00% #
+[  696,  721)  1   1.00%   2.00% #
+[  721,  746)  4   4.00%   6.00% ###
+[  746,  771)  6   6.00%  12.00% #####
+[  771,  796)  9   9.00%  21.00% ########
+[  796,  821)  7   7.00%  28.00% ######
+[  821,  846)  7   7.00%  35.00% ######
+[  846,  871)  8   8.00%  43.00% #######
+[  871,  896) 10  10.00%  53.00% ########
+[  896,  921) 12  12.00%  65.00% ##########
+[  921,  946)  3   3.00%  68.00% ###
+[  946,  971)  7   7.00%  75.00% ######
+[  971,  996)  9   9.00%  84.00% ########
+[  996, 1021)  4   4.00%  88.00% ###
+[ 1021, 1046)  4   4.00%  92.00% ###
+[ 1046, 1071)  1   1.00%  93.00% #
+[ 1071, 1096)  2   2.00%  95.00% ##
+[ 1096, 1121)  3   3.00%  98.00% ###
+[ 1121, 1146)  1   1.00%  99.00% #
+[ 1146, 1171]  1   1.00% 100.00% #
+
+Depth by leafs:
+Count: 44780 Average: 12.3333 StdDev: 2.79388
+Min: 2 Max: 15 Ignored: 0
+----------------------------------------------
+[  2,  3)    31   0.07%   0.07%
+[  3,  4)   107   0.24%   0.31%
+[  4,  5)   288   0.64%   0.95%
+[  5,  6)   446   1.00%   1.95%
+[  6,  7)   932   2.08%   4.03% #
+[  7,  8)  1575   3.52%   7.55% #
+[  8,  9)  2002   4.47%  12.02% #
+[  9, 10)  2525   5.64%  17.66% ##
+[ 10, 11)  3046   6.80%  24.46% ##
+[ 11, 12)  3680   8.22%  32.68% ###
+[ 12, 13)  4523  10.10%  42.78% ###
+[ 13, 14)  5218  11.65%  54.43% ####
+[ 14, 15)  5993  13.38%  67.81% ####
+[ 15, 15] 14414  32.19% 100.00% ##########
+
+Number of training obs by leaf:
+Count: 44780 Average: 50.8977 StdDev: 199.141
+Min: 5 Max: 4751 Ignored: 0
+----------------------------------------------
+[    5,  242) 43151  96.36%  96.36% ##########
+[  242,  479)   714   1.59%  97.96%
+[  479,  717)   306   0.68%  98.64%
+[  717,  954)   208   0.46%  99.10%
+[  954, 1191)    82   0.18%  99.29%
+[ 1191, 1429)    67   0.15%  99.44%
+[ 1429, 1666)    52   0.12%  99.55%
+[ 1666, 1903)    31   0.07%  99.62%
+[ 1903, 2141)    54   0.12%  99.74%
+[ 2141, 2378)    57   0.13%  99.87%
+[ 2378, 2615)    17   0.04%  99.91%
+[ 2615, 2853)    13   0.03%  99.94%
+[ 2853, 3090)     7   0.02%  99.95%
+[ 3090, 3327)     5   0.01%  99.96%
+[ 3327, 3565)     5   0.01%  99.98%
+[ 3565, 3802)     3   0.01%  99.98%
+[ 3802, 4039)     2   0.00%  99.99%
+[ 4039, 4277)     4   0.01% 100.00%
+[ 4277, 4514)     1   0.00% 100.00%
+[ 4514, 4751]     1   0.00% 100.00%
+
+Attribute in nodes:
+	23903 : fnlwgt [NUMERICAL]
+	9151 : age [NUMERICAL]
+	6155 : hours_per_week [NUMERICAL]
+	2873 : capital_gain [NUMERICAL]
+	2598 : capital_loss [NUMERICAL]
+
+Attribute in nodes with depth <= 0:
+	78 : capital_gain [NUMERICAL]
+	22 : age [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	138 : age [NUMERICAL]
+	120 : capital_gain [NUMERICAL]
+	28 : hours_per_week [NUMERICAL]
+	14 : fnlwgt [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	287 : age [NUMERICAL]
+	179 : capital_gain [NUMERICAL]
+	105 : hours_per_week [NUMERICAL]
+	53 : fnlwgt [NUMERICAL]
+	45 : capital_loss [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	465 : age [NUMERICAL]
+	251 : capital_gain [NUMERICAL]
+	235 : hours_per_week [NUMERICAL]
+	231 : capital_loss [NUMERICAL]
+	118 : fnlwgt [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	1069 : age [NUMERICAL]
+	981 : capital_loss [NUMERICAL]
+	674 : hours_per_week [NUMERICAL]
+	561 : fnlwgt [NUMERICAL]
+	491 : capital_gain [NUMERICAL]
+
+Condition type in nodes:
+	44680 : HigherCondition
+Condition type in nodes with depth <= 0:
+	100 : HigherCondition
+Condition type in nodes with depth <= 1:
+	300 : HigherCondition
+Condition type in nodes with depth <= 2:
+	669 : HigherCondition
+Condition type in nodes with depth <= 3:
+	1300 : HigherCondition
+Condition type in nodes with depth <= 5:
+	3776 : HigherCondition
+
+Training OOB:
+	trees: 1, Out-of-bag evaluation: accuracy:0.812294 logloss:1.12355
+	trees: 100, Out-of-bag evaluation: accuracy:0.823535 logloss:0.404205

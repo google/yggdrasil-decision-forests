@@ -1,0 +1,74 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Proto version of the C++ distribution classes.
+//
+// These protos are used for workers network communication and model storage.
+//
+// Note: Unless specified otherwise (i.e. sparse), "Integer distribution" always
+// assume dense positive integers.
+// See the documentation of the corresponding classes in distribution.h.
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.utils.proto;
+
+// Represents the (discrete) probability distribution of a random variable with
+// natural (i.e. integer greater of equal to zero) support: counts[i]/sum is the
+// probability of observation of i.
+message IntegerDistributionDouble {
+  // [required]
+  repeated double counts = 1 [packed = true];
+  // [required]
+  optional double sum = 2;
+}
+
+message IntegerDistributionFloat {
+  // [required]
+  repeated float counts = 1 [packed = true];
+  // [required]
+  optional float sum = 2;
+}
+
+message IntegerDistributionInt64 {
+  // [required]
+  repeated int64 counts = 1 [packed = true];
+  // [required]
+  optional int64 sum = 2;
+}
+
+// Describe a 1d normal distribution.
+message NormalDistributionDouble {
+  // [required]
+  optional double sum = 1;
+  // [required]
+  optional double sum_squares = 2;
+  // [required]
+  optional double count = 3;
+}
+
+// Confusion matrix between two integer distributions.
+message IntegersConfusionMatrixDouble {
+  // Contains nrow x ncol elements. Low column indexed i.e. the second element
+  // is counts[1,0].
+  // [required]
+  repeated double counts = 1 [packed = true];
+  // [required]
+  optional double sum = 2;
+  // [required]
+  optional int32 nrow = 3;
+  // [required]
+  optional int32 ncol = 4;
+}

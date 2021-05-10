@@ -1,0 +1,51 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.random_forest.proto;
+
+import "yggdrasil_decision_forests/metric/metric.proto";
+import "yggdrasil_decision_forests/model/abstract_model.proto";
+
+// Header for the random forest model.
+message Header {
+  // Next ID: 7
+
+  // Number of shards used to store the nodes.
+  optional int32 num_node_shards = 1;
+  // Number of trees.
+  optional int64 num_trees = 2;
+  // Whether the vote of individual trees are distributions or winner-take-all.
+  optional bool winner_take_all_inference = 3 [default = true];
+  // Evaluation of the model, on the out-of-bag examples, during the training.
+  repeated OutOfBagTrainingEvaluations out_of_bag_evaluations = 4;
+
+  // Variable importance measures.
+  repeated model.proto.VariableImportance mean_decrease_in_accuracy = 5;
+  repeated model.proto.VariableImportance mean_increase_in_rmse = 6;
+
+  // Container used to store the trees' nodes.
+  optional string node_format = 7 [default = "TFE_RECORDIO"];
+}
+
+message OutOfBagTrainingEvaluations {
+  // Next ID: 3
+
+  // Number of trees available in the model when evaluated.
+  optional int32 number_of_trees = 1;
+
+  optional metric.proto.EvaluationResults evaluation = 2;
+}

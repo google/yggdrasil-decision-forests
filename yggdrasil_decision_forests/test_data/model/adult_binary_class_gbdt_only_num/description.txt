@@ -1,0 +1,141 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: CLASSIFICATION
+Label: "income"
+
+Input Features (5):
+	age
+	fnlwgt
+	capital_gain
+	capital_loss
+	hours_per_week
+
+No weights
+
+Variable Importance: NUM_NODES:
+    1.         "fnlwgt" 891.000000 ################
+    2.   "capital_loss" 695.000000 ##########
+    3.   "capital_gain" 670.000000 #########
+    4.            "age" 409.000000 ##
+    5. "hours_per_week" 305.000000 
+
+Variable Importance: NUM_AS_ROOT:
+    1.            "age" 55.000000 ################
+    2.   "capital_gain" 38.000000 ##########
+    3.         "fnlwgt"  2.000000 
+    4.   "capital_loss"  2.000000 
+    5. "hours_per_week"  2.000000 
+
+Variable Importance: SUM_SCORE:
+    1.            "age" 373452541.437205 ################
+    2.   "capital_gain" 337750846.498178 ##############
+    3.   "capital_loss" 140555379.860609 ###
+    4. "hours_per_week" 115698328.848511 #
+    5.         "fnlwgt" 79304612.769549 
+
+Variable Importance: MEAN_MIN_DEPTH:
+    1.         "income" 12.726621 ################
+    2. "hours_per_week"  9.093842 ##########
+    3.         "fnlwgt"  8.529488 #########
+    4.   "capital_loss"  7.230694 #######
+    5.            "age"  2.837080 #
+    6.   "capital_gain"  1.943630 
+
+
+
+Loss: BINOMIAL_LOG_LIKELIHOOD
+Validation loss value: 0.78621
+Number of trees per iteration: 1
+Number of trees: 99
+Total number of nodes: 6039
+
+Number of nodes by tree:
+Count: 99 Average: 61 StdDev: 0
+Min: 61 Max: 61 Ignored: 0
+----------------------------------------------
+[ 61, 61] 99 100.00% 100.00% ##########
+
+Depth by leafs:
+Count: 3069 Average: 12.7266 StdDev: 8.10299
+Min: 1 Max: 30 Ignored: 0
+----------------------------------------------
+[  1,  2)  60   1.96%   1.96% ##
+[  2,  4) 256   8.34%  10.30% #######
+[  4,  5) 176   5.73%  16.03% #####
+[  5,  7) 387  12.61%  28.64% ##########
+[  7,  8) 169   5.51%  34.15% ####
+[  8, 10) 307  10.00%  44.15% ########
+[ 10, 11) 130   4.24%  48.39% ###
+[ 11, 13) 243   7.92%  56.30% ######
+[ 13, 14) 102   3.32%  59.63% ###
+[ 14, 16) 189   6.16%  65.79% #####
+[ 16, 17)  91   2.97%  68.75% ##
+[ 17, 19) 159   5.18%  73.93% ####
+[ 19, 20)  79   2.57%  76.51% ##
+[ 20, 22) 147   4.79%  81.30% ####
+[ 22, 23)  78   2.54%  83.84% ##
+[ 23, 25) 143   4.66%  88.50% ####
+[ 25, 26)  57   1.86%  90.36% #
+[ 26, 28) 113   3.68%  94.04% ###
+[ 28, 29)  51   1.66%  95.70% #
+[ 29, 30] 132   4.30% 100.00% ###
+
+Number of training obs by leaf:
+Count: 3069 Average: 0 StdDev: 0
+Min: 0 Max: 0 Ignored: 0
+----------------------------------------------
+[ 0, 0] 3069 100.00% 100.00% ##########
+
+Attribute in nodes:
+	891 : fnlwgt [NUMERICAL]
+	695 : capital_loss [NUMERICAL]
+	670 : capital_gain [NUMERICAL]
+	409 : age [NUMERICAL]
+	305 : hours_per_week [NUMERICAL]
+
+Attribute in nodes with depth <= 0:
+	55 : age [NUMERICAL]
+	38 : capital_gain [NUMERICAL]
+	2 : hours_per_week [NUMERICAL]
+	2 : capital_loss [NUMERICAL]
+	2 : fnlwgt [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	140 : capital_gain [NUMERICAL]
+	78 : age [NUMERICAL]
+	8 : hours_per_week [NUMERICAL]
+	6 : capital_loss [NUMERICAL]
+	5 : fnlwgt [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	206 : capital_gain [NUMERICAL]
+	119 : age [NUMERICAL]
+	38 : hours_per_week [NUMERICAL]
+	22 : capital_loss [NUMERICAL]
+	13 : fnlwgt [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	250 : capital_gain [NUMERICAL]
+	147 : age [NUMERICAL]
+	93 : capital_loss [NUMERICAL]
+	52 : hours_per_week [NUMERICAL]
+	37 : fnlwgt [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	320 : capital_gain [NUMERICAL]
+	228 : age [NUMERICAL]
+	178 : capital_loss [NUMERICAL]
+	119 : hours_per_week [NUMERICAL]
+	94 : fnlwgt [NUMERICAL]
+
+Condition type in nodes:
+	2970 : HigherCondition
+Condition type in nodes with depth <= 0:
+	99 : HigherCondition
+Condition type in nodes with depth <= 1:
+	237 : HigherCondition
+Condition type in nodes with depth <= 2:
+	398 : HigherCondition
+Condition type in nodes with depth <= 3:
+	579 : HigherCondition
+Condition type in nodes with depth <= 5:
+	939 : HigherCondition

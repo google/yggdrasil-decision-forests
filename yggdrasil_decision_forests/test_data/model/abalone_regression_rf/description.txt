@@ -1,0 +1,203 @@
+Type: "RANDOM_FOREST"
+Task: REGRESSION
+Label: "Rings"
+
+Input Features (8):
+	Type
+	LongestShell
+	Diameter
+	Height
+	WholeWeight
+	ShuckedWeight
+	VisceraWeight
+	ShellWeight
+
+No weights
+
+Variable Importance: NUM_NODES:
+    1. "ShuckedWeight" 7847.000000 ################
+    2.   "ShellWeight" 7144.000000 ##############
+    3.   "WholeWeight" 7006.000000 #############
+    4. "VisceraWeight" 6915.000000 #############
+    5.  "LongestShell" 4889.000000 ########
+    6.      "Diameter" 4517.000000 #######
+    7.        "Height" 4139.000000 ######
+    8.          "Type" 1740.000000 
+
+Variable Importance: NUM_AS_ROOT:
+    1.   "ShellWeight" 55.000000 ################
+    2.        "Height" 24.000000 ######
+    3.   "WholeWeight" 10.000000 ##
+    4. "VisceraWeight"  8.000000 #
+    5.      "Diameter"  3.000000 
+
+Variable Importance: SUM_SCORE:
+    1.   "ShellWeight" 989130.330390 ################
+    2.        "Height" 368923.027573 #####
+    3. "ShuckedWeight" 341734.425391 ####
+    4.   "WholeWeight" 286540.690588 ###
+    5. "VisceraWeight" 223236.141790 ##
+    6.      "Diameter" 173409.955091 #
+    7.  "LongestShell" 119321.459670 
+    8.          "Type" 78965.664264 
+
+Variable Importance: MEAN_MIN_DEPTH:
+    1.         "Rings" 10.753948 ################
+    2.  "LongestShell"  7.666922 ##########
+    3.          "Type"  7.568576 ##########
+    4. "VisceraWeight"  7.032948 #########
+    5.      "Diameter"  6.644990 #########
+    6.   "WholeWeight"  5.867306 #######
+    7. "ShuckedWeight"  4.650469 #####
+    8.        "Height"  4.052422 ####
+    9.   "ShellWeight"  1.029672 
+
+
+
+Out-of-bag evaluation: rmse:2.13434
+Number of trees: 100
+Total number of nodes: 88494
+
+Number of nodes by tree:
+Count: 100 Average: 884.94 StdDev: 19.8765
+Min: 831 Max: 937 Ignored: 0
+----------------------------------------------
+[ 831, 836)  1   1.00%   1.00% #
+[ 836, 841)  0   0.00%   1.00%
+[ 841, 847)  1   1.00%   2.00% #
+[ 847, 852)  4   4.00%   6.00% ###
+[ 852, 857)  3   3.00%   9.00% ###
+[ 857, 863)  5   5.00%  14.00% ####
+[ 863, 868)  5   5.00%  19.00% ####
+[ 868, 873)  7   7.00%  26.00% ######
+[ 873, 879)  9   9.00%  35.00% ########
+[ 879, 884) 11  11.00%  46.00% #########
+[ 884, 889)  8   8.00%  54.00% #######
+[ 889, 895) 10  10.00%  64.00% ########
+[ 895, 900) 12  12.00%  76.00% ##########
+[ 900, 905)  6   6.00%  82.00% #####
+[ 905, 911) 10  10.00%  92.00% ########
+[ 911, 916)  4   4.00%  96.00% ###
+[ 916, 921)  0   0.00%  96.00%
+[ 921, 927)  3   3.00%  99.00% ###
+[ 927, 932)  0   0.00%  99.00%
+[ 932, 937]  1   1.00% 100.00% #
+
+Depth by leafs:
+Count: 44297 Average: 10.7537 StdDev: 2.46854
+Min: 3 Max: 15 Ignored: 0
+----------------------------------------------
+[  3,  4)    2   0.00%   0.00%
+[  4,  5)   95   0.21%   0.22%
+[  5,  6)  455   1.03%   1.25% #
+[  6,  7) 1318   2.98%   4.22% ##
+[  7,  8) 2611   5.89%  10.12% ####
+[  8,  9) 4076   9.20%  19.32% ######
+[  9, 10) 5731  12.94%  32.26% #########
+[ 10, 11) 6250  14.11%  46.36% ##########
+[ 11, 12) 6281  14.18%  60.54% ##########
+[ 12, 13) 5822  13.14%  73.69% #########
+[ 13, 14) 4683  10.57%  84.26% #######
+[ 14, 15) 3607   8.14%  92.40% ######
+[ 15, 15] 3366   7.60% 100.00% #####
+
+Number of training obs by leaf:
+Count: 44297 Average: 6.63702 StdDev: 3.08157
+Min: 5 Max: 144 Ignored: 0
+----------------------------------------------
+[   5,  12) 43424  98.03%  98.03% ##########
+[  12,  19)   549   1.24%  99.27%
+[  19,  26)   150   0.34%  99.61%
+[  26,  33)    69   0.16%  99.76%
+[  33,  40)    34   0.08%  99.84%
+[  40,  47)    28   0.06%  99.90%
+[  47,  54)    10   0.02%  99.93%
+[  54,  61)    16   0.04%  99.96%
+[  61,  68)     5   0.01%  99.97%
+[  68,  75)     3   0.01%  99.98%
+[  75,  82)     3   0.01%  99.99%
+[  82,  89)     1   0.00%  99.99%
+[  89,  96)     1   0.00%  99.99%
+[  96, 103)     1   0.00%  99.99%
+[ 103, 110)     0   0.00%  99.99%
+[ 110, 117)     2   0.00% 100.00%
+[ 117, 124)     0   0.00% 100.00%
+[ 124, 131)     0   0.00% 100.00%
+[ 131, 138)     0   0.00% 100.00%
+[ 138, 144]     1   0.00% 100.00%
+
+Attribute in nodes:
+	7847 : ShuckedWeight [NUMERICAL]
+	7144 : ShellWeight [NUMERICAL]
+	7006 : WholeWeight [NUMERICAL]
+	6915 : VisceraWeight [NUMERICAL]
+	4889 : LongestShell [NUMERICAL]
+	4517 : Diameter [NUMERICAL]
+	4139 : Height [NUMERICAL]
+	1740 : Type [CATEGORICAL]
+
+Attribute in nodes with depth <= 0:
+	55 : ShellWeight [NUMERICAL]
+	24 : Height [NUMERICAL]
+	10 : WholeWeight [NUMERICAL]
+	8 : VisceraWeight [NUMERICAL]
+	3 : Diameter [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	153 : ShellWeight [NUMERICAL]
+	55 : Height [NUMERICAL]
+	42 : Diameter [NUMERICAL]
+	27 : WholeWeight [NUMERICAL]
+	17 : VisceraWeight [NUMERICAL]
+	6 : LongestShell [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	286 : ShellWeight [NUMERICAL]
+	109 : Height [NUMERICAL]
+	74 : Diameter [NUMERICAL]
+	57 : ShuckedWeight [NUMERICAL]
+	50 : Type [CATEGORICAL]
+	45 : LongestShell [NUMERICAL]
+	43 : WholeWeight [NUMERICAL]
+	36 : VisceraWeight [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	465 : ShellWeight [NUMERICAL]
+	232 : ShuckedWeight [NUMERICAL]
+	176 : Height [NUMERICAL]
+	148 : Diameter [NUMERICAL]
+	128 : WholeWeight [NUMERICAL]
+	123 : Type [CATEGORICAL]
+	114 : LongestShell [NUMERICAL]
+	112 : VisceraWeight [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	1248 : ShellWeight [NUMERICAL]
+	1108 : ShuckedWeight [NUMERICAL]
+	686 : WholeWeight [NUMERICAL]
+	599 : VisceraWeight [NUMERICAL]
+	564 : Height [NUMERICAL]
+	543 : Diameter [NUMERICAL]
+	488 : LongestShell [NUMERICAL]
+	310 : Type [CATEGORICAL]
+
+Condition type in nodes:
+	42457 : HigherCondition
+	1740 : ContainsBitmapCondition
+Condition type in nodes with depth <= 0:
+	100 : HigherCondition
+Condition type in nodes with depth <= 1:
+	300 : HigherCondition
+Condition type in nodes with depth <= 2:
+	650 : HigherCondition
+	50 : ContainsBitmapCondition
+Condition type in nodes with depth <= 3:
+	1375 : HigherCondition
+	123 : ContainsBitmapCondition
+Condition type in nodes with depth <= 5:
+	5236 : HigherCondition
+	310 : ContainsBitmapCondition
+
+Training OOB:
+	trees: 1, Out-of-bag evaluation: rmse:2.64146
+	trees: 100, Out-of-bag evaluation: rmse:2.13434
