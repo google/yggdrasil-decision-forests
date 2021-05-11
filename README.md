@@ -85,6 +85,7 @@ The following resources are available:
 -   [Developer manual](documentation/developer_manual.md)
 -   [List of learning algorithms](documentation/learners.md)
 -   [Issue tracker](https://github.com/google/yggdrasil-decision-forests/issues)
+-   [Known issues](documentation/known_issues.md)
 -   [Changelog](CHANGELOG.md)
 -   [TensorFlow Decision Forest](https://github.com/tensorflow/decision-forests)
 
@@ -94,19 +95,18 @@ Download one of the build, and then run `examples/beginner.{sh,bat}`.
 
 Target  | Version | Link
 ------- | ------- | ----
-Linux   | 0.1.0   | TODO
-Windows | 0.1.0   | TODO
+Linux   | 0.1.0   | [CLI](https://github.com/google/yggdrasil-decision-forests/releases/download/0.1.0/cli_linux.zip)
+Windows | 0.1.0   | [CLI](https://github.com/google/yggdrasil-decision-forests/releases/download/0.1.0/cli_windows.zip)
 
 ## Installation from Source
 
-Install
-[Bazel 3.7](https://docs.bazel.build/versions/3.7.0/getting-started.html) and
-run:
+Install [Bazel](https://docs.bazel.build/versions/4.0.0/getting-started.html)
+and run:
 
 ```shell
 git clone https://github.com/google/yggdrasil-decision-forests.git
 cd yggdrasil_decision_forests
-bazel-3.7.2 build //yggdrasil_decision_forests/cli:all --config=linux_cpp17 # Or --config=windows_cpp17
+bazel build //yggdrasil_decision_forests/cli:all --config=linux_cpp17 --config=linux_avx2
 
 # Then, run the example:
 examples/beginner.sh

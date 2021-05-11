@@ -114,7 +114,7 @@ ygg::utils::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
   if (read_count < 0) {
     return absl::Status(absl::StatusCode::kUnknown, "Failed to read chunk");
   }
-  return read_count == 1;
+  return read_count == 1 || num_read == 0;
 }
 
 absl::Status FileInputByteStream::Close() {

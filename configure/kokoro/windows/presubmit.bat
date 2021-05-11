@@ -19,6 +19,7 @@ mkdir output
 
 :: Install gcc
 choco install -y mingw --no-progress
+choco install -y wget --no-progress
 
 :: Install Python 3.8
 choco install -y python --version=3.8.3 --no-progress
@@ -29,13 +30,16 @@ SET PIP_EXE=C:\Python38\Scripts\pip.exe
 %PIP_EXE% install numpy --upgrade
 
 :: Setup Bazel
-set BAZEL=%KOKORO_GFILE_DIR%\bazel_dependencies_for_kokoro\bazel-3.7.2-windows-x86_64.exe
-set FLAGS=--distdir=%KOKORO_GFILE_DIR%\bazel_dependencies_for_kokoro --test_output=streamed
+wget https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-windows-x86_64.exe
+
+set BAZEL=bazel-4.0.0-windows-x86_64.exe
+set FLAGS=--test_output=streamed
 set FLAGS_WO_TF=--config=windows_cpp17
-set FLAGS_W_TF=--config=windows_cpp14 --config=use_tensorflow_io
+:: We actually only use cpp14 functionalities.
+set FLAGS_W_TF=--config=windows_cpp17 --config=use_tensorflow_io
 
 
-%BAZEL% build %FLAGS_WO_TF% //yggdrasil_decision_forests/cli/...:all || goto :error
+:: %BAZEL% build %FLAGS_WO_TF% //yggdrasil_decision_forests/cli/...:all || goto :error
 
 %BAZEL% build %FLAGS_W_TF% //yggdrasil_decision_forests/cli/...:all || goto :error
 
@@ -63,6 +67,7 @@ learner
 metric
 model
 serving
+utils
   ) do (
   %BAZEL% test %FLAGS% %FLAGS_W_TF% --test_output=all //yggdrasil_decision_forests/%%x/...:all || goto :error
   )
@@ -78,5 +83,5 @@ SET errorflag=1
 
 xcopy /s %KOKORO_ARTIFACTS_DIR%\git\yggdrasil_decision_forests\bazel-testlogs\*.log %KOKORO_ARTIFACTS_DIR%\git\yggdrasil_decision_forests\output
 
-:: Windows build is broken for TF2.5.rc1.
+:: Windows build is broken. VS studio version in Kokoro is too old.
 :: exit /b %errorflag%

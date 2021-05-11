@@ -80,7 +80,7 @@ build:windows_cpp17 --config=windows
 
 # Instruction set optimizations
 build:linux_avx2 --copt=-mavx2
-build:windows_avx2 --copt=/arch=AVX2
+build:windows_avx2 --copt=/arch:AVX2
 
 # Misc build options we need for windows.
 build:windows --copt=/D_USE_MATH_DEFINES
@@ -89,8 +89,8 @@ build:windows --copt=-DWIN32_LEAN_AND_MEAN
 build:windows --host_copt=-DWIN32_LEAN_AND_MEAN
 build:windows --copt=-DNOGDI
 build:windows --host_copt=-DNOGDI
-build:windows --linkopt=/DEBUG
-build:windows --host_linkopt=/DEBUG
+build:windows --linkopt=/NDEBUG
+build:windows --host_linkopt=/NDEBUG
 build:windows --linkopt=/OPT:REF
 build:windows --host_linkopt=/OPT:REF
 build:windows --linkopt=/OPT:ICF
@@ -101,6 +101,11 @@ build:windows --host_copt=/experimental:preprocessor
 build:windows --materialize_param_files
 build:windows --features=compiler_param_file
 build:windows --verbose_failures
+build:windows --copt=/Oi
+build:windows --host_copt=/Oi
+build:windows --copt=/GL
+build:windows --host_copt=/GL
+
 
 # TensorFlow specific.
 build:use_tensorflow_io --define=use_tensorflow_io=1

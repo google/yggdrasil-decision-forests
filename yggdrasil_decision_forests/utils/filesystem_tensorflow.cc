@@ -81,9 +81,11 @@ bool GenerateShardedFilenames(absl::string_view spec,
 
 absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
                    const int options) {
-  return yggdrasil_decision_forests::utils::ToUtilStatus(
+  RETURN_IF_ERROR(yggdrasil_decision_forests::utils::ToUtilStatus(
       tensorflow::Env::Default()->GetMatchingPaths(std::string(pattern),
-                                                   results));
+                                                   results)));
+  std::sort(results->begin(), results->end());
+  return absl::OkStatus();
 }
 
 absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
@@ -125,7 +127,7 @@ FileInputByteStream::ReadExactly(char* buffer, int num_read) {
   const auto tf_status =
       file_->item()->Read(offset_, num_read, &result, &scrath_[0]);
   if (!tf_status.ok()) {
-    if (tf_status.code() != tensorflow::error::OUT_OF_RANGE && result.empty() &&
+    if (tf_status.code() == tensorflow::error::OUT_OF_RANGE && result.empty() &&
         num_read > 0) {
       return false;
     }

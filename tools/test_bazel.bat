@@ -20,7 +20,8 @@ set FLAGS_W_TF=--config=windows_cpp14 --config=use_tensorflow_io
 
 %BAZEL% version
 
-%BAZEL% build %FLAGS_WO_TF% //yggdrasil_decision_forests/cli/...:all || goto :error
+:: Skip the compilation without tensorflow.
+:: %BAZEL% build %FLAGS_WO_TF% //yggdrasil_decision_forests/cli/...:all || goto :error
 
 %BAZEL% build %FLAGS_W_TF% //yggdrasil_decision_forests/cli/...:all || goto :error
 
@@ -32,6 +33,7 @@ learner
 metric
 model
 serving
+utils
   ) do (
   %BAZEL% test %FLAGS_W_TF% --config=use_tensorflow_io //yggdrasil_decision_forests/%%x/...:all || goto :error
   )

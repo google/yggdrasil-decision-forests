@@ -178,21 +178,22 @@ TEST(SpecializedRandomForestTest,
   flat_model.root_offsets.push_back(0);
 
   dataset::proto::DataSpecification data_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns {
           type: NUMERICAL
           name: "test"
           numerical { mean: 1.0 }
         }
-      )");
+      )pb");
   EXPECT_OK(flat_model.mutable_features()->Initialize({0}, data_spec));
 
-  flat_model.nodes.push_back(OneDimensionOutputNumericalFeatureNode{
-      .right_idx = 2, .feature_idx = 0, .threshold = 2});
-  flat_model.nodes.push_back(OneDimensionOutputNumericalFeatureNode{
-      .right_idx = 0, .feature_idx = 0, .label = 1});
-  flat_model.nodes.push_back(OneDimensionOutputNumericalFeatureNode{
-      .right_idx = 0, .feature_idx = 0, .label = 0});
+  flat_model.nodes.push_back(OneDimensionOutputNumericalFeatureNode::Leaf(
+      /*.right_idx =*/2, /*.feature_idx =*/0,
+      /*.label (same as threshold) =*/2));
+  flat_model.nodes.push_back(OneDimensionOutputNumericalFeatureNode::Leaf(
+      /*.right_idx =*/0, /*.feature_idx =*/0, /*.label =*/1));
+  flat_model.nodes.push_back(OneDimensionOutputNumericalFeatureNode::Leaf(
+      /*.right_idx =*/0, /*.feature_idx =*/0, /*.label =*/0));
 
   std::vector<float> flat_examples = {1.f, 3.f};
   std::vector<float> predictions;

@@ -23,7 +23,7 @@ copy configure\cli_readme.txt dist\README
  .\dist\README^
  LICENSE^
  CHANGELOG.md^
- .\doc\cli.txt^
+ .\documentation\cli.txt^
  .\%CLI%\train.exe^
  .\%CLI%\show_model.exe^
  .\%CLI%\show_dataspec.exe^

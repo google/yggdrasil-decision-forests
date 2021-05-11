@@ -20,14 +20,14 @@ set -x
 set -e
 
 BAZEL=bazel
-FLAGS="--config=linux_cpp17 --config=linux_avx2"
+FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link"
 
 ${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
 
 ${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS} --config=use_tensorflow_io
 
 targets=""
-subdirs=(cli dataset learner metric model serving)
+subdirs=(cli dataset learner metric model serving utils)
 for dir in "${subdirs[@]}"
 do
   targets="$targets //yggdrasil_decision_forests/${dir}/...:all"

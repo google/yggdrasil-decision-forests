@@ -47,6 +47,27 @@ namespace {
 // Maximum stack size used by the model during inference
 constexpr size_t kMaxStackUsageInBytes = 16 * 1024;
 
+namespace portable {
+#ifdef __AVX2__
+void* aligned_alloc(std::size_t alignment, std::size_t size) {
+#if defined(_WIN32)
+  // Visual Studio
+  return _aligned_malloc(/*size=*/size, /*alignment=*/alignment);
+#else
+  return ::aligned_alloc(/*alignment=*/alignment, /*size=*/size);
+#endif
+}
+
+void aligned_free(void* mem) {
+#if defined(_WIN32)
+  _aligned_free(mem);
+#else
+  free(mem);
+#endif
+}
+#endif
+}  // namespace portable
+
 // Returns the number of trailing 0-bits in x, starting at the least significant
 // bit position. If x is 0, the result is undefined.
 int FindLSBSetNonZero64(uint64_t n) {
@@ -530,13 +551,13 @@ void PredictQuickScorerMajorFeatureOffset(
 
   const size_t active_leaf_buffer_size =
       model.num_trees * kNumParallelExamples * sizeof(LeafMask);
-  const size_t alignement = 32 * 8;
+  const size_t alignment = 32 * 8;
 
-  // Make sure the allocated chunk of memory is a multiple of "alignement".
+  // Make sure the allocated chunk of memory is a multiple of "alignment".
   size_t rounded_up_active_leaf_buffer_size = active_leaf_buffer_size;
-  if ((rounded_up_active_leaf_buffer_size % alignement) != 0) {
+  if ((rounded_up_active_leaf_buffer_size % alignment) != 0) {
     rounded_up_active_leaf_buffer_size +=
-        alignement - rounded_up_active_leaf_buffer_size % alignement;
+        alignment - rounded_up_active_leaf_buffer_size % alignment;
   }
 
   // Note: Alloca was measured to be faster and more consistent (in terms of
@@ -550,9 +571,17 @@ void PredictQuickScorerMajorFeatureOffset(
 
   if (active_leaf_buffer_uses_stack) {
 #ifdef __AVX2__
-    active_leaf_buffer =
-        reinterpret_cast<LeafMask*>(__builtin_alloca_with_align(
-            rounded_up_active_leaf_buffer_size, alignement));
+
+#if defined(_WIN32)
+    void* non_aligned = alloca(rounded_up_active_leaf_buffer_size + alignment);
+    std::size_t space = rounded_up_active_leaf_buffer_size + alignment;
+    void* aligned = std::align(alignment, 1, non_aligned, space);
+#else
+    void* aligned = __builtin_alloca_with_align(
+        rounded_up_active_leaf_buffer_size, alignment);
+#endif
+    active_leaf_buffer = reinterpret_cast<LeafMask*>(aligned);
+
 #else
     active_leaf_buffer =
         reinterpret_cast<LeafMask*>(alloca(rounded_up_active_leaf_buffer_size));
@@ -560,7 +589,7 @@ void PredictQuickScorerMajorFeatureOffset(
   } else {
 #ifdef __AVX2__
     active_leaf_buffer = reinterpret_cast<LeafMask*>(
-        aligned_alloc(alignement, rounded_up_active_leaf_buffer_size));
+        portable::aligned_alloc(alignment, rounded_up_active_leaf_buffer_size));
 #else
     active_leaf_buffer = reinterpret_cast<LeafMask*>(
         std::malloc(rounded_up_active_leaf_buffer_size));
@@ -702,7 +731,11 @@ void PredictQuickScorerMajorFeatureOffset(
       predictions, active_leaf_buffer);
 
   if (!active_leaf_buffer_uses_stack) {
+#ifdef __AVX2__
+    portable::aligned_free(active_leaf_buffer);
+#else
     free(active_leaf_buffer);
+#endif
   }
 }
 
@@ -760,7 +793,13 @@ template <typename AbstractModel, typename CompiledModel>
 absl::Status BaseGenericToSpecializedModel(const AbstractModel& src,
                                            CompiledModel* dst) {
 #ifdef __AVX2__
+#if ABSL_HAVE_BUILTIN(__builtin_cpu_supports)
   dst->cpu_supports_avx2 = __builtin_cpu_supports("avx2");
+#else
+  // We cannot detect if the CPU supports AVX2 instructions. If it does not,
+  // a fatal error will be raised.
+  dst->cpu_supports_avx2 = true;
+#endif
 #elif ABSL_HAVE_BUILTIN(__builtin_cpu_supports)
   if (__builtin_cpu_supports("avx2")) {
     LOG(INFO) << "The binary was compiled without AVX2 support, but your CPU"

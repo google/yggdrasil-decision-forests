@@ -16,10 +16,10 @@
 :: It will create a directory %userprofile%\yggdrasil_decision_forests_beginner
 :: with the trained models.
 
-IF EXIST infer_dataspec (
+IF EXIST infer_dataspec.exe (
     ECHO "Using Yggdrasil Decision Forest from the PATH"
-    SET CLI=
-    SET DATASET_DIR=yggdrasil_decision_forests\test_data\datase
+    SET CLI=.
+    SET DATASET_DIR=yggdrasil_decision_forests\test_data\dataset
 ) ELSE (
     IF exist bazel-bin\yggdrasil_decision_forests\cli\infer_dataspec.exe (
         ECHO "Using Yggdrasil Decision Forest from the root directory."
@@ -30,7 +30,7 @@ IF EXIST infer_dataspec (
         ECHO "bazel-bin\yggdrasil_decision_forests\cli directory to the PATH, or run this"
         ECHO "command from the Yggdrasil's example directory (i.e. the directory containing"
         ECHO "this file)."
-        EXIT
+        GOTO :eof
     )
 )
 

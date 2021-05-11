@@ -32,7 +32,7 @@ Pre-compiled binaries are available as
 **Requirements**
 
 -   Microsoft Visual Studio >= 2019 (Windows)
--   GCC >= 8 (>=9 Recommended) or Clang (Linux)
+-   GCC >= 8 (>=9 without TF) or Clang (Linux)
 -   Bazel >= 3.7.2
 -   Python >= 3
 -   Git
@@ -114,10 +114,11 @@ set BAZEL_VC_FULL_VERSION=14.28.29910
 
 ## Running a minimal example
 
-The CLI binaries should now be available in the
+The CLI binaries are now be available in the
 `bazel-bin/yggdrasil_decision_forests/cli` directory. For example,
-`bazel-bin/yggdrasil_decision_forests/cli/train` can train a model. To run an
-end-to-end example, and ensure the correct execution of YDF, run:
+`bazel-bin/yggdrasil_decision_forests/cli/train` trains a model. Alternatively,
+if you downloaded the binaries, extract them to the project root. Then, to run
+the end-to-end example::
 
 **On linux:**
 
@@ -128,7 +129,7 @@ end-to-end example, and ensure the correct execution of YDF, run:
 **On windows:**
 
 ```shell
-/examples/beginner.bat
+examples\beginner.bat
 ```
 
 Optionally add the `bazel-bin/yggdrasil_decision_forests/cli` directory to your

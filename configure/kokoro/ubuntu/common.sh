@@ -77,7 +77,7 @@ which ${BAZEL}
 ${BAZEL} version
 
 # Compilation flags
-FLAGS="--distdir=${KOKORO_GFILE_DIR}/bazel_dependencies_for_kokoro  --config=linux_cpp17 --config=linux_avx2"
+FLAGS="--config=linux_cpp17 --config=linux_avx2 --config=use_tensorflow_io"
 
 # Build the CLI binaries
 ${BAZEL} build ${FLAGS} //yggdrasil_decision_forests/cli/...:all
@@ -92,11 +92,11 @@ fi
 # Run the unit tests
 if [ "${RUN_TESTS}" = 1 ]; then
   TARGET=
-  for D in cli dataset learner metric model serving
+  for D in cli dataset learner metric model serving utils
   do
     TARGET="${TARGET} //yggdrasil_decision_forests/${D}/...:all"
   done
-  ${BAZEL} test ${FLAGS} --config=use_tensorflow_io ${TARGET}
+  ${BAZEL} test ${FLAGS} ${TARGET}
 fi
 
 echo "Files before capturing logs"

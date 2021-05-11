@@ -28,9 +28,9 @@ set -x
 set -e
 
 # Find Yggdrasil Decision Forests
-if command -v infer_dataspec &> /dev/null; then
+if command -v ./infer_dataspec &> /dev/null; then
   echo "Using Yggdrasil Decision Forest from the PATH"
-  CLI=
+  CLI=.
   DATASET_DIR=yggdrasil_decision_forests/test_data/dataset
 
 elif command -v ../bazel-bin/yggdrasil_decision_forests/cli/infer_dataspec  &> /dev/null ;then
