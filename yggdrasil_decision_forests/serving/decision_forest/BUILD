@@ -16,7 +16,6 @@ cc_library(
     ],
     deps = [
         ":decision_forest",
-        ":quick_scorer",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/serving:example_set_model_wrapper",
@@ -46,28 +45,6 @@ cc_library(
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
-        "//yggdrasil_decision_forests/utils:usage",
-    ],
-)
-
-cc_library(
-    name = "quick_scorer",
-    srcs = [
-        "quick_scorer.cc",
-    ],
-    hdrs = [
-        "quick_scorer.h",
-    ],
-    deps = [
-        ":utils",
-        "@com_google_absl//absl/base:config",
-        "@com_google_absl//absl/status",
-        "//yggdrasil_decision_forests/model/decision_tree",
-        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
-        "//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
-        "//yggdrasil_decision_forests/serving:example_set",
-        "//yggdrasil_decision_forests/utils:bitmap",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:usage",
     ],
 )
@@ -107,7 +84,6 @@ cc_test(
     shard_count = 10,
     deps = [
         ":decision_forest",
-        ":quick_scorer",
         ":register_engines",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/flags:flag",
@@ -130,17 +106,5 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
-    ],
-)
-
-cc_test(
-    name = "quick_scorer_test",
-    srcs = ["quick_scorer_test.cc"],
-    deps = [
-        ":quick_scorer",
-        "@com_google_googletest//:gtest_main",
-        "//yggdrasil_decision_forests/model/decision_tree",
-        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
-        "//yggdrasil_decision_forests/utils:test",
     ],
 )

@@ -25,15 +25,15 @@
 //
 //   // Initialize.
 //   std::unique_ptr<AbstractModel> abstract_model = ...;
-//   QuickScorerModel model;
+//   GradientBoostedTreesBinaryClassificationNumericalAndCategorical model;
 //   GenericToSpecializedModel(abstract_model, &model);
 //   auto feature_1 = model.GetNumericalFeatureId("feature_1");
 //   auto feature_2 = model.GetCategoricalFeatureId("feature_2");
 //   auto feature_3 = model.GetNumericalFeatureId("feature_3");
 //
 //   // Allocate 5 examples.
-//   QuickScorerModel::ExampleSet examples(5);
-//   examples.FillMissing(model);
+//   GradientBoostedTreesBinaryClassificationNumericalAndCategorical::ExampleSet
+//   examples(5); examples.FillMissing(model);
 //
 //   // Set one examples and run the model.
 //   int example_idx = 0;

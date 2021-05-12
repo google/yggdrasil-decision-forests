@@ -10,4 +10,3 @@ Initial release of Yggdrasil Decision Forests.
     convert_dataset benchmark_inference utils/synthetic_dataset)
 -   Learners: Gradient Boosted Trees (and derivatives), Random Forest (and
     derivatives), Cart.
--   Inference engine: Pred, QuickScorer.

@@ -26,7 +26,6 @@ namespace serving {
 
 namespace gradient_boosted_trees {
 constexpr char kGeneric[] = "GradientBoostedTreesGeneric";
-constexpr char kQuickScorer[] = "GradientBoostedTreesQuickScorer";
 }  // namespace gradient_boosted_trees
 
 namespace random_forest {

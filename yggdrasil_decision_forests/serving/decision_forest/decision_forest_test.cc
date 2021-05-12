@@ -38,7 +38,6 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
-#include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -257,49 +256,6 @@ TEST(AdultBinaryClassGBDT, ManualGeneric) {
   auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
   GradientBoostedTreesBinaryClassification engine;
   CHECK_OK(GenericToSpecializedModel(*gbt_model, &engine));
-
-  utils::ExpectEqualPredictionsTemplate<decltype(engine), Predict>(
-      dataset, *model, engine);
-}
-
-TEST(AdultBinaryClassGBDT, ManualQuickScorer) {
-  const auto model = LoadModel("adult_binary_class_gbdt");
-  const auto dataset = LoadDataset(model->data_spec(), "adult_test.csv", "csv");
-
-  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
-  GradientBoostedTreesBinaryClassificationQuickScorer engine;
-  CHECK_OK(GenericToSpecializedModel(*gbt_model, &engine));
-  LOG(INFO) << "Compiled model:\n"
-            << DescribeQuickScorer(engine, /*detailed=*/false);
-
-  utils::ExpectEqualPredictionsTemplate<decltype(engine), Predict>(
-      dataset, *model, engine);
-}
-
-TEST(AbaloneRegressionGBDT, ManualQuickScorer) {
-  const auto model = LoadModel("abalone_regression_gbdt");
-  const auto dataset = LoadDataset(model->data_spec(), "abalone.csv", "csv");
-
-  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
-  GradientBoostedTreesRegressionQuickScorer engine;
-  CHECK_OK(GenericToSpecializedModel(*gbt_model, &engine));
-  LOG(INFO) << "Compiled model:\n"
-            << DescribeQuickScorer(engine, /*detailed=*/false);
-
-  utils::ExpectEqualPredictionsTemplate<decltype(engine), Predict>(
-      dataset, *model, engine);
-}
-
-TEST(SstBinaryClassGBDT, ManualQuickScorer) {
-  const auto model = LoadModel("sst_binary_class_gbdt");
-  const auto dataset =
-      LoadDataset(model->data_spec(), "sst_binary_test.csv", "csv");
-
-  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
-  GradientBoostedTreesBinaryClassificationQuickScorer engine;
-  CHECK_OK(GenericToSpecializedModel(*gbt_model, &engine));
-  LOG(INFO) << "Compiled model:\n"
-            << DescribeQuickScorer(engine, /*detailed=*/false);
 
   utils::ExpectEqualPredictionsTemplate<decltype(engine), Predict>(
       dataset, *model, engine);
