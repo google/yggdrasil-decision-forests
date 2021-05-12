@@ -12,7 +12,7 @@ interfaces.
     *   [Table of Contents](#table-of-contents)
     *   [Installation pre-compiled command-line-interface](#installation-pre-compiled-command-line-interface)
     *   [Compile command-line-interface from source](#compile-command-line-interface-from-source)
-        *   [Linux](#linux)
+        *   [Linux / MacOS](#linux-macos)
         *   [Windows](#windows)
     *   [Running a minimal example](#running-a-minimal-example)
     *   [Using the C++ library](#using-the-c-library)
@@ -47,6 +47,12 @@ supported:
 -   On windows: Follow
     [the guide](https://docs.bazel.build/versions/4.0.0/install-windows.html).
 
+-   On Mac: Follow
+    [the guide](https://docs.bazel.build/versions/master/install-os-x.html#install-with-installer-mac-os-x)
+    or install bazel / bazelisk with [homebrew](https://brew.sh/): `brew
+    install bazel` or `brew install bazelisk`. We recommend bazelisk, as it will
+    select an appropriate version of bazel for the project automatically.
+
 For more details (and troubleshooting), see the
 [Bazel installation guide](https://docs.bazel.build/versions/4.0.0/install.html).
 
@@ -61,7 +67,7 @@ bazel build //yggdrasil_decision_forests/...:all --config=<platform config>
 
 For example:
 
-### Linux
+### Linux / MacOS
 
 ```shell
 git clone https://github.com/google/yggdrasil-decision-forests.git
@@ -79,6 +85,9 @@ bazel build //yggdrasil_decision_forests/cli/...:all --config=linux_cpp17 --conf
 # Compile with Clang
 ... --repo_env=CC=clang
 ```
+
+*Note:* On MacOS you may need to `brew install numpy` if a version installed via
+pip is not available on the paths used by bazel.
 
 ### Windows
 
@@ -120,7 +129,7 @@ The CLI binaries are now be available in the
 if you downloaded the binaries, extract them to the project root. Then, to run
 the end-to-end example::
 
-**On linux:**
+**On linux / MacOS:**
 
 ```shell
 ./examples/beginner.sh
@@ -135,7 +144,7 @@ examples\beginner.bat
 Optionally add the `bazel-bin/yggdrasil_decision_forests/cli` directory to your
 `PATH`, to make all YDF binaries readily available.
 
-**On linux:**
+**On linux/MacOS:**
 
 -   Run the following commands:
 
@@ -144,7 +153,7 @@ echo "export PATH=\"$(pwd)/bazel-bin/yggdrasil_decision_forests/cli:\$PATH\"" >>
 source ~/.bashrc
 ```
 
-**On window:**
+**On Windows:**
 
 -   Run the command `echo %cd%\bazel-bin\yggdrasil_decision_forests\cli`
 -   Go to *Advanced System Settings (Win+Pause) > Environment Variables > path
