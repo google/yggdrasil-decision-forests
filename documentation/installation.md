@@ -60,7 +60,7 @@ Once Bazel is installed, clone the github repository and start the compilation:
 
 ```shell
 git clone https://github.com/google/yggdrasil-decision-forests.git
-cd yggdrasil_decision_forests
+cd yggdrasil-decision-forests
 
 bazel build //yggdrasil_decision_forests/...:all --config=<platform config>
 ```
@@ -71,7 +71,7 @@ For example:
 
 ```shell
 git clone https://github.com/google/yggdrasil-decision-forests.git
-cd yggdrasil_decision_forests
+cd yggdrasil-decision-forests
 
 bazel build //yggdrasil_decision_forests/cli/...:all --config=linux_cpp17 --config=linux_avx2
 ```
@@ -97,7 +97,7 @@ pip is not available on the paths used by bazel.
 set PYTHON_BIN_PATH=C:\Python38\python.exe
 
 git clone https://github.com/google/yggdrasil-decision-forests.git
-cd yggdrasil_decision_forests
+cd yggdrasil-decision-forests
 
 bazel build //yggdrasil_decision_forests/cli/...:all --config=windows_cpp17 --config=windows_avx2
 ```

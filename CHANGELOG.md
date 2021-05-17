@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 - 2021-05-17
+
+### Features
+
+-   Migration to TensorFlow 2.5.0.
+
 ## 0.1.0 - 2021-05-11
 
 Initial release of Yggdrasil Decision Forests.
