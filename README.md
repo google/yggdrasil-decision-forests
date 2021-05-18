@@ -95,8 +95,8 @@ Download one of the build, and then run `examples/beginner.{sh,bat}`.
 
 Target  | Version | Link
 ------- | ------- | ----
-Linux   | 0.1.0   | [CLI](https://github.com/google/yggdrasil-decision-forests/releases/download/0.1.0/cli_linux.zip)
-Windows | 0.1.0   | [CLI](https://github.com/google/yggdrasil-decision-forests/releases/download/0.1.0/cli_windows.zip)
+Linux   | 0.1.2   | [CLI](https://github.com/google/yggdrasil-decision-forests/releases/download/0.1.2/cli_linux.zip)
+Windows | 0.1.2   | [CLI](https://github.com/google/yggdrasil-decision-forests/releases/download/0.1.2/cli_windows.zip)
 
 ## Installation from Source
 
