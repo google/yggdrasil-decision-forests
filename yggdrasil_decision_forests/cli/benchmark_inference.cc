@@ -45,8 +45,9 @@
 //   batch_size : 100  num_runs : 20
 //   time/example(µs)  time/batch(µs)  method
 //   ----------------------------------------
-//   interface] 9.179           917.9  GradientBoostedTreesGeneric [virtual
-//   interface] 21.547          2154.8  Generic slow engine
+//   0.79025         79.025  GradientBoostedTreesQuickScorerExtended
+//   9.179           917.9   GradientBoostedTreesGeneric
+//   21.547          2154.8  Generic slow engine
 //   ----------------------------------------
 //
 #include "absl/flags/flag.h"

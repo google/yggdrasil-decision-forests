@@ -214,6 +214,10 @@ struct FlatNodeModel {
   using NodeType = Node;
   using FeaturesDefinition = FeaturesDefinitionNumericalOrCategoricalFlat;
 
+  using ExampleSet =
+      ExampleSetNumericalOrCategoricalFlat<FlatNodeModel<Node, Value>,
+                                           ExampleFormat::FORMAT_EXAMPLE_MAJOR>;
+
   const FeaturesDefinition& features() const { return internal_features; }
 
   FeaturesDefinition* mutable_features() { return &internal_features; }
@@ -554,6 +558,14 @@ void Predict(const GradientBoostedTreesRankingNumericalOnly& model,
 void Predict(const GradientBoostedTreesRankingNumericalAndCategorical& model,
              const std::vector<NumericalOrCategoricalValue>& examples,
              int num_examples, std::vector<float>* predictions);
+
+template <typename Model>
+void PredictWithExampleSet(const Model& model,
+                           const typename Model::ExampleSet& examples,
+                           int num_examples, std::vector<float>* predictions) {
+  Predict(model, examples.InternalCategoricalAndNumericalValues(), num_examples,
+          predictions);
+}
 
 // Note: Requires for the number of trees to be a multiple of 8.
 void PredictOptimizedV1(

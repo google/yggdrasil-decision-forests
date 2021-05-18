@@ -24,7 +24,6 @@
 #include "yggdrasil_decision_forests/serving/example_set_model_wrapper.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 
-
 namespace yggdrasil_decision_forests {
 namespace model {
 

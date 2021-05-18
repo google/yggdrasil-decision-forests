@@ -721,6 +721,28 @@ TEST_F(GradientBoostedTreesOnAdult, RandomCategorical) {
   EXPECT_TRUE(gbt_model->IsMissingValueConditionResultFollowGlobalImputation());
 }
 
+// Train and test a model on the adult dataset with too much nodes for the
+// QuickScorer serving algorithm.
+TEST_F(GradientBoostedTreesOnAdult, BaseNoQuickScorer) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(10);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->set_subsample(0.9f);
+  TrainAndEvaluateModel();
+
+  // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
+  // is significantly better (which is expected as, unlike RF,  GBT is
+  // calibrated).
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8549, 0.015);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+
+  auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
+  EXPECT_TRUE(gbt_model->IsMissingValueConditionResultFollowGlobalImputation());
+}
+
 // Train and test a model on the adult dataset.
 TEST_F(GradientBoostedTreesOnAdult, BaseConcurrentDeprecated) {
   auto* gbt_config = train_config_.MutableExtension(
