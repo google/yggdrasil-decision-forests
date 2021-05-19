@@ -13,6 +13,13 @@
  * limitations under the License.
  */
 
+// Gradient Boosted Trees algorithms tests.
+//
+// Notice time checks are disabled from tests with config=tsan, because it can
+// slow things down up to 100 times. Yet we still want to run those tests with
+// --config=tsan. More in
+// https://documentation.corp.google.com/testing/tsan/documentation/index.md?cl=head
+
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 
 #include <algorithm>
@@ -965,11 +972,14 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDuration) {
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
+#ifndef THREAD_SANITIZER
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 15);
+#endif
   EXPECT_GE(metric::Accuracy(evaluation_), 0.840);
 }
 
-TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeLocalGroth) {
+
+TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeLocalGrowth) {
   dataset_sampling_ = 1.0f;
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -981,15 +991,21 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeLocalGroth) {
   gbt_config->mutable_decision_tree()
       ->mutable_sparse_oblique_split()
       ->set_num_projections_exponent(10);
-  train_config_.set_maximum_training_duration_seconds(10);
+
+  const double kMaximumGrowthDurationSec = 10;
+  train_config_.set_maximum_training_duration_seconds(
+      kMaximumGrowthDurationSec);
 
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
-  EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 10 + 10);
+#ifndef THREAD_SANITIZER
+  EXPECT_LE(absl::ToDoubleSeconds(training_duration_),
+            2 * kMaximumGrowthDurationSec);
+#endif
 }
 
-TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeGlobalGroth) {
+TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeGlobalGrowth) {
   dataset_sampling_ = 1.0f;
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1003,12 +1019,18 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeGlobalGroth) {
   gbt_config->mutable_decision_tree()
       ->mutable_sparse_oblique_split()
       ->set_num_projections_exponent(10);
-  train_config_.set_maximum_training_duration_seconds(10);
+
+  const double kMaximumGrowthDurationSec = 10;
+  train_config_.set_maximum_training_duration_seconds(
+      kMaximumGrowthDurationSec);
 
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
-  EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 10 + 15);
+#ifndef THREAD_SANITIZER
+  EXPECT_LE(absl::ToDoubleSeconds(training_duration_),
+            3 * kMaximumGrowthDurationSec);
+#endif
 }
 
 TEST_F(GradientBoostedTreesOnAdult, MaximumDurationAdaptSubsample) {
@@ -1024,7 +1046,9 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDurationAdaptSubsample) {
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
+#ifndef THREAD_SANITIZER
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 20);
+#endif
   EXPECT_GE(metric::Accuracy(evaluation_), 0.80);
 }
 
