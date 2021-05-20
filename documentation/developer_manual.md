@@ -94,7 +94,7 @@ be tested using the end-to-end testing utility `utils/test_utils.h`.
 ## Models and Learners
 
 The training logic of a learner is contained in the
-[C++ Abstract Learner](yggdrasil_decision_forests/learner/abstract_learner.h)
+[C++ Abstract Learner](../yggdrasil_decision_forests/learner/abstract_learner.h)
 class. A minimal learner should have a "Train" function returning a model (see
 next section).
 
@@ -104,14 +104,15 @@ Optionally, learners can implement the following logics:
 -   Export of training logs
 -   Generic hyper-parameters and default search space for tuning
 
-The [CART learner](yggdrasil_decision_forests/learner/cart) is an example of an
-basic learner. The
-[Gradient Boosted Tree learner](yggdrasil_decision_forests/learner/gradient_boosted_trees)
+The
+[CART learner](../yggdrasil_decision_forests/learner/cart)
+is an example of an basic learner. The
+[Gradient Boosted Tree learner](../yggdrasil_decision_forests/learner/gradient_boosted_trees)
 is an example of an advanced learner.
 
 A **model** is a class that extends the
-[abstract model class](yggdrasil_decision_forests/model/abstract_model.h). A
-minimal model overrides the 1) name, 2) load/save, and 3) predict functions.
+[abstract model class](../yggdrasil_decision_forests/model/abstract_model.h).
+A minimal model overrides the 1) name, 2) load/save, and 3) predict functions.
 
 Optional, models can implements the following logics:
 
