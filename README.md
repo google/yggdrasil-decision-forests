@@ -91,12 +91,9 @@ The following resources are available:
 
 ## Installation from pre-compiled binaries
 
-Download one of the build, and then run `examples/beginner.{sh,bat}`.
-
-Target  | Version | Link
-------- | ------- | ----
-Linux   | 0.1.0   | [CLI](https://github.com/google/yggdrasil-decision-forests/releases/download/0.1.0/cli_linux.zip)
-Windows | 0.1.0   | [CLI](https://github.com/google/yggdrasil-decision-forests/releases/download/0.1.0/cli_windows.zip)
+Download one of the
+[build releases](https://github.com/google/yggdrasil-decision-forests/releases),
+and then run `examples/beginner.{sh,bat}`.
 
 ## Installation from Source
 
