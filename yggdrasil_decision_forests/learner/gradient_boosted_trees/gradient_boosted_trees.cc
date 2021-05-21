@@ -1158,6 +1158,12 @@ GradientBoostedTreesLearner::TrainWithStatus(
   }
   for (int iter_idx = 0; iter_idx < config.gbt_config->num_trees();
        iter_idx++) {
+    // The user interrupted the training.
+    if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
+      LOG(INFO) << "Training interrupted per request.";
+      break;
+    }
+
     const auto begin_iter_training = absl::Now();
     std::vector<int> dropout_trees_idxs;
     if (dart_extraction) {

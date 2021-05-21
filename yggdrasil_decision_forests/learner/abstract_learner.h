@@ -131,6 +131,18 @@ class AbstractLearner {
   // Checks if the training config is compatible with the learner capabilities.
   absl::Status CheckCapabilities() const;
 
+  // Register a trigger to stop the training. Later if a trigger is set to true
+  // at any time during training (e.g. durint an interrupt caused by user
+  // control+C one may want to set it to true), the training algorithm will
+  // gracefully interrupt. This is done by polling, so expect a little latency
+  // to respond to the trigger setting.
+  // If the training is interrupted, the output model is valid but partially (or
+  // not at all) trained. If trigger==nullptr (default behavior), the training
+  // cannot be stopped, and will continue until finished.
+  void set_stop_training_trigger(std::atomic<bool>* trigger) {
+    stop_training_trigger_ = trigger;
+  }
+
  protected:
   // Training configuration. Contains the hyper parameters of the learner.
   proto::TrainingConfig training_config_;
@@ -145,6 +157,12 @@ class AbstractLearner {
   // the responsibility of the learner to create this directory if it does not
   // exist.
   std::string log_directory_;
+
+  // If set, the training should stop is "*stop_training_trigger_" is true.
+  // If the training is interrupted, the output model is valid but partially (or
+  // not at all) trained. If flag==nullptr (default behavior), the flag is
+  // ignored.
+  std::atomic<bool>* stop_training_trigger_ = nullptr;
 };
 
 REGISTRATION_CREATE_POOL(AbstractLearner, const proto::TrainingConfig&);

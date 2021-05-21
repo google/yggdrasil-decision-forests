@@ -50,6 +50,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -69,7 +70,8 @@ class TrainAndTestTester : public ::testing::Test {
   // contains the result of the evaluation.
   void TrainAndEvaluateModel(
       absl::optional<absl::string_view> numerical_weight_attribute = {},
-      bool emulate_weight_with_duplication = false);
+      bool emulate_weight_with_duplication = false,
+      std::function<void(void)> callback_training_about_to_start = nullptr);
 
   // Configure the test to run on the synthetic dataset generator.
   void ConfigureForSyntheticDataset();
@@ -105,6 +107,8 @@ class TrainAndTestTester : public ::testing::Test {
   model::proto::DeploymentConfig deployment_config_;
 
   metric::proto::EvaluationResults evaluation_;
+
+  std::unique_ptr<model::AbstractLearner> learner_;
 
   // Configure the evaluation.
   metric::proto::EvaluationOptions eval_options_;
@@ -272,8 +276,8 @@ void TestPredefinedHyperParameters(
 
 // Runs "TestPredefinedHyperParameters" on the adult dataset.
 void TestPredefinedHyperParametersAdultDataset(
-     model::proto::TrainingConfig train_config,
-     const int expected_num_preconfigured_parameters,
+    model::proto::TrainingConfig train_config,
+    const int expected_num_preconfigured_parameters,
     std::optional<float> min_accuracy);
 
 }  // namespace utils

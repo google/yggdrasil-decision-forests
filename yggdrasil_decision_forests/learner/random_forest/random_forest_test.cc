@@ -53,6 +53,7 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -467,6 +468,33 @@ TEST_F(RandomForestOnAdult, MaximumDurationInTree) {
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 10 + 20);
+}
+
+TEST_F(RandomForestOnAdult, InterruptTraining) {
+  dataset_sampling_ = 1.0f;
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_num_trees(100000);  // Would take a very long time.
+  rf_config->set_winner_take_all_inference(false);
+
+  std::atomic<bool> stop_training = false;
+  std::unique_ptr<utils::concurrency::Thread> killer_thread;
+
+  TrainAndEvaluateModel({}, false, /*callback_training_about_to_start*/ [&]() {
+    learner_->set_stop_training_trigger(&stop_training);
+    killer_thread = absl::make_unique<utils::concurrency::Thread>([&]() {
+      absl::SleepFor(absl::Seconds(5));
+      stop_training = true;
+    });
+  });
+
+  // Note: The "TrainAndEvaluateModel" function last a bit more because it is
+  // also preparing the dataset and evaluating the final model.
+#ifndef THREAD_SANITIZER
+  EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 10 + 20);
+#endif
+
+  EXPECT_GT(metric::Accuracy(evaluation_), 0.840);
 }
 
 // Train and test a model on the adult dataset for a maximum given duration.

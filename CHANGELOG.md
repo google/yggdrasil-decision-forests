@@ -1,6 +1,10 @@
 # Changelog
 
+## 0.1.4 - ????
 
+### Features
+
+-   Add training interruption in the abstract learner API.
 
 ## 0.1.3 - 2021-05-19
 

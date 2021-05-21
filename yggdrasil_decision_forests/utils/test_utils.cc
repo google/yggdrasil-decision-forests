@@ -89,7 +89,8 @@ std::string TrainAndTestTester::EffectiveDatasetRootDirectory() {
 
 void TrainAndTestTester::TrainAndEvaluateModel(
     absl::optional<absl::string_view> numerical_weight_attribute,
-    const bool emulate_weight_with_duplication) {
+    const bool emulate_weight_with_duplication,
+    std::function<void(void)> callback_training_about_to_start) {
   // Path to dataset(s).
   std::string dataset_path;
   std::string test_dataset_path;
@@ -111,15 +112,19 @@ void TrainAndTestTester::TrainAndEvaluateModel(
                             max_numerical_weight_value);
 
   // Configure the learner.
-  std::unique_ptr<model::AbstractLearner> learner;
-  CHECK_OK(model::GetLearner(train_config_, &learner, deployment_config_));
+  CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
   if (generic_parameters_.has_value()) {
-    CHECK_OK(learner->SetHyperParameters(generic_parameters_.value()));
+    CHECK_OK(learner_->SetHyperParameters(generic_parameters_.value()));
   }
   const std::string log_dir =
       file::JoinPath(test::TmpDirectory(), test_dir_, "logs");
   LOG(INFO) << "Set log directory: " << log_dir;
-  learner->set_log_directory(log_dir);
+  learner_->set_log_directory(log_dir);
+
+  if (callback_training_about_to_start) {
+    callback_training_about_to_start();
+  }
+
   const auto begin_training = absl::Now();
 
   // Train the model.
@@ -131,9 +136,9 @@ void TrainAndTestTester::TrainAndEvaluateModel(
                                     absl::StrCat("train@", num_shards)));
     CHECK_OK(SaveVerticalDataset(train_dataset_, train_dataset_path,
                                  train_dataset_.nrow() / num_shards));
-    model_ = learner->TrainWithStatus(train_dataset_path, data_spec).value();
+    model_ = learner_->TrainWithStatus(train_dataset_path, data_spec).value();
   } else {
-    model_ = learner->TrainWithStatus(train_dataset_).value();
+    model_ = learner_->TrainWithStatus(train_dataset_).value();
   }
 
   const auto end_training = absl::Now();

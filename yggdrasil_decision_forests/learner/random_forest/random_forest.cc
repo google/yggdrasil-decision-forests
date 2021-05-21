@@ -391,7 +391,8 @@ RandomForestLearner::TrainWithStatus(
     }
   }
 
-  bool training_stopped_by_maximum_training_duration = false;
+  // If true, only a subset of trees will have been trained.
+  bool training_stopped_early = false;
 
   std::unique_ptr<utils::AdaptativeWork> adaptative_work;
   if (rf_config.adapt_bootstrap_size_ratio_for_maximum_training_duration()) {
@@ -429,6 +430,15 @@ RandomForestLearner::TrainWithStatus(
     pool.StartWorkers();
     for (int tree_idx = 0; tree_idx < rf_config.num_trees(); tree_idx++) {
       pool.Schedule([&, tree_idx]() {
+        // The user interrupted the training.
+        if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
+          if (!training_stopped_early) {
+            training_stopped_early = true;
+            LOG(INFO) << "Training interrupted per request";
+          }
+          return;
+        }
+
         float bootstrap_size_ratio_factor = 1.f;
         if (adaptative_work) {
           bootstrap_size_ratio_factor =
@@ -440,8 +450,8 @@ RandomForestLearner::TrainWithStatus(
           if ((absl::Now() - begin_training) >
               absl::Seconds(
                   training_config().maximum_training_duration_seconds())) {
-            if (!training_stopped_by_maximum_training_duration) {
-              training_stopped_by_maximum_training_duration = true;
+            if (!training_stopped_early) {
+              training_stopped_early = true;
               LOG(INFO) << "Stop training because of the maximum training "
                            "duration.";
             }
@@ -593,7 +603,7 @@ RandomForestLearner::TrainWithStatus(
     }
   }
 
-  if (training_stopped_by_maximum_training_duration) {
+  if (training_stopped_early) {
     // Remove the non-trained trees.
     auto& trees = *mdl->mutable_decision_trees();
     trees.erase(std::remove_if(
