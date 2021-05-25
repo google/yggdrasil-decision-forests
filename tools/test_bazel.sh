@@ -19,20 +19,12 @@
 set -x
 set -e
 
-BAZEL=bazel
+# Without TensorFlow IO.
 FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link"
+bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+bazel test //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc ${FLAGS}
 
-${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
-
-${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS} --config=use_tensorflow_io
-
-targets=""
-subdirs=(cli dataset learner metric model serving utils)
-for dir in "${subdirs[@]}"
-do
-  targets="$targets //yggdrasil_decision_forests/${dir}/...:all"
-done
-targets="$targets //examples:beginner_cc"
-
-# Note: use_tensorflow_io is required for some of the unit test.
-${BAZEL} test ${targets} ${FLAGS} --config=use_tensorflow_io
+# With TensorFlow IO.
+FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io"
+bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+bazel test //yggdrasil_decision_forests/...:all //examples:beginner_cc ${FLAGS}

@@ -76,27 +76,27 @@ BAZEL=bazel
 which ${BAZEL}
 ${BAZEL} version
 
-# Compilation flags
-FLAGS="--config=linux_cpp17 --config=linux_avx2 --config=use_tensorflow_io"
+# Without TensorFlow IO.
+FLAGS="--config=linux_cpp17 --config=linux_avx2"
+bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
 
-# Build the CLI binaries
-${BAZEL} build ${FLAGS} //yggdrasil_decision_forests/cli/...:all
+if [ "${RUN_TESTS}" = 1 ]; then
+  bazel test //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc ${FLAGS}
+fi
+
+# With TensorFlow IO.
+FLAGS="--config=linux_cpp17 --config=linux_avx2 --config=use_tensorflow_io"
+bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+
+if [ "${RUN_TESTS}" = 1 ]; then
+  bazel test //yggdrasil_decision_forests/...:all //examples:beginner_cc ${FLAGS}
+fi
 
 # Export back the binary
 if [ "${EXPORT_BINARIES}" = 1 ]; then
   cp bazel-bin/yggdrasil_decision_forests/cli/{show_dataspec,benchmark_inference,convert_dataset,evaluate,infer_dataspec,predict,show_dataspec,show_model,train} output/
   # Output files should not be executables.
   chmod a-x output/*
-fi
-
-# Run the unit tests
-if [ "${RUN_TESTS}" = 1 ]; then
-  TARGET=
-  for D in cli dataset learner metric model serving utils
-  do
-    TARGET="${TARGET} //yggdrasil_decision_forests/${D}/...:all"
-  done
-  ${BAZEL} test ${FLAGS} ${TARGET}
 fi
 
 echo "Files before capturing logs"

@@ -13,21 +13,25 @@
  * limitations under the License.
  */
 
+// clang-format off
+#ifdef YDF_EVAL_TFRECORD
 #include "yggdrasil_decision_forests/utils/sharded_io_tfrecord.h"
+#endif
+// clang-format on
+
+#include "yggdrasil_decision_forests/utils/evaluation.h"
 
 #include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/dataset/example_reader.h"
-#include "yggdrasil_decision_forests/utils/evaluation.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
 namespace {
-using ::yggdrasil_decision_forests::utils::TFRecordShardedReader;
 
 using test::EqualsProto;
 using testing::ElementsAre;
@@ -40,10 +44,10 @@ TEST(Evaluation, PredictionToExampleClassification) {
       categorical { is_already_integerized: true number_of_unique_values: 3 }
     }
   )pb");
-  dataset::proto::DataSpecification expected_dataspec = PARSE_TEST_PROTO(R"(
+  dataset::proto::DataSpecification expected_dataspec = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "1" }
     columns { type: NUMERICAL name: "2" }
-  )");
+  )pb");
   EXPECT_THAT(PredictionDataspec(model::proto::Task::CLASSIFICATION,
                                  dataspec.columns(0))
                   .value(),
@@ -61,10 +65,10 @@ TEST(Evaluation, PredictionToExampleClassification) {
                                 dataspec.columns(0), prediction,
                                 &prediction_as_example));
   dataset::proto::Example expected_prediction_as_example = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes { numerical: 0.8 }
         attributes { numerical: 0.2 }
-      )");
+      )pb");
   EXPECT_THAT(prediction_as_example,
               EqualsProto(expected_prediction_as_example));
 }
@@ -73,9 +77,9 @@ TEST(Evaluation, PredictionToExampleRegression) {
   dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "label" }
   )pb");
-  dataset::proto::DataSpecification expected_dataspec = PARSE_TEST_PROTO(R"(
+  dataset::proto::DataSpecification expected_dataspec = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "label" }
-  )");
+  )pb");
   EXPECT_THAT(
       PredictionDataspec(model::proto::Task::REGRESSION, dataspec.columns(0))
           .value(),
@@ -89,9 +93,9 @@ TEST(Evaluation, PredictionToExampleRegression) {
                                 dataspec.columns(0), prediction,
                                 &prediction_as_example));
   dataset::proto::Example expected_prediction_as_example = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes { numerical: 5 }
-      )");
+      )pb");
   EXPECT_THAT(prediction_as_example,
               EqualsProto(expected_prediction_as_example));
 }
@@ -116,6 +120,7 @@ TEST(Evaluation, ExportPredictionsToDataset) {
   EXPECT_EQ(csv_content, "label\n1\n2\n3\n");
 }
 
+#ifdef YDF_EVAL_TFRECORD
 TEST(Evaluation, ExportPredictionsToTFRecord) {
   std::vector<model::proto::Prediction> predictions;
   predictions.push_back(PARSE_TEST_PROTO("regression { value: 1 }"));
@@ -148,6 +153,7 @@ TEST(Evaluation, ExportPredictionsToTFRecord) {
   EXPECT_THAT(prediction, EqualsProto(tmp));
   EXPECT_FALSE(reader->Next(&prediction).value());
 }
+#endif
 
 }  // namespace
 }  // namespace utils

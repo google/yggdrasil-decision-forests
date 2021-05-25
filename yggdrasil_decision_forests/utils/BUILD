@@ -859,16 +859,22 @@ cc_test(
 cc_test(
     name = "evaluation_test",
     srcs = ["evaluation_test.cc"],
+    defines = select({
+        "//yggdrasil_decision_forests:use_tensorflow_io": ["YDF_EVAL_TFRECORD"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":evaluation",
         ":filesystem",
-        ":sharded_io_tfrecord",
         ":test",
         "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:csv_example_writer",
         "//yggdrasil_decision_forests/dataset:example_reader",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:use_tensorflow_io": [":sharded_io_tfrecord"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_test(

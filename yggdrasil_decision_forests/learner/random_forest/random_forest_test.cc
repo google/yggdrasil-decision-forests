@@ -487,6 +487,7 @@ TEST_F(RandomForestOnAdult, InterruptTraining) {
       stop_training = true;
     });
   });
+  killer_thread->Join();
 
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.

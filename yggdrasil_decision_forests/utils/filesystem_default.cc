@@ -109,12 +109,12 @@ yggdrasil_decision_forests::utils::StatusOr<int> FileInputByteStream::ReadUpTo(
 
 ygg::utils::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
                                                             int num_read) {
-  const int read_count = std::fread(buffer, num_read, sizeof(char), file_);
-  // read_count: -1=Error, 0=EOF, 1=Success.
-  if (read_count < 0) {
+  const int read_count = std::fread(buffer, sizeof(char), num_read, file_);
+  // read_count: -1=Error, 0=EOF, >0 & <num_read=Partial read, num_read=Success.
+  if (read_count < 0 || (read_count > 0 && read_count < num_read)) {
     return absl::Status(absl::StatusCode::kUnknown, "Failed to read chunk");
   }
-  return read_count == 1 || num_read == 0;
+  return read_count > 0 || num_read == 0;
 }
 
 absl::Status FileInputByteStream::Close() {

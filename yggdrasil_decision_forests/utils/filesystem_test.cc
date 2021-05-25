@@ -71,6 +71,27 @@ TEST(Filesystem, FileIO) {
   EXPECT_EQ(content, read_content);
 }
 
+TEST(Filesystem, Override) {
+  auto file_path =
+      JoinPath(yggdrasil_decision_forests::test::TmpDirectory(), "file.txt");
+  EXPECT_OK(SetContent(file_path, "a"));
+  EXPECT_EQ(GetContent(file_path).value(), "a");
+
+  EXPECT_OK(SetContent(file_path, "b"));
+  EXPECT_EQ(GetContent(file_path).value(), "b");
+}
+
+TEST(Filesystem, LargeContent) {
+  auto file_path =
+      JoinPath(yggdrasil_decision_forests::test::TmpDirectory(), "file.txt");
+  std::string content(1024 * 10 + 512 + 64, 0);
+  for (int i = 0; i < content.size(); i++) {
+    content[i] = i % 255;
+  }
+  EXPECT_OK(SetContent(file_path, content));
+  EXPECT_EQ(GetContent(file_path).value(), content);
+}
+
 TEST(Filesystem, ReadExactly) {
   auto tmp_dir = yggdrasil_decision_forests::test::TmpDirectory();
   auto file_path = JoinPath(tmp_dir, "my_file.txt");

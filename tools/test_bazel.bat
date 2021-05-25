@@ -15,31 +15,19 @@
 :: Compile and runs the unit tests.
 
 set BAZEL=bazel-4.0.0-windows-x86_64.exe
-set FLAGS_WO_TF=--config=windows_cpp17
-set FLAGS_W_TF=--config=windows_cpp14 --config=use_tensorflow_io
-
 %BAZEL% version
 
-:: Skip the compilation without tensorflow.
-:: %BAZEL% build %FLAGS_WO_TF% //yggdrasil_decision_forests/cli/...:all || goto :error
+# Without TensorFlow IO.
+set FLAGS=--config=windows_cpp17
+%BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli/...:all || goto :error
+%BAZEL% test %FLAGS% //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc || goto :error
 
-%BAZEL% build %FLAGS_W_TF% //yggdrasil_decision_forests/cli/...:all || goto :error
-
-setlocal enabledelayedexpansion
-for %%x in (
-cli
-dataset
-learner
-metric
-model
-serving
-utils
-  ) do (
-  %BAZEL% test %FLAGS_W_TF% --config=use_tensorflow_io //yggdrasil_decision_forests/%%x/...:all || goto :error
-  )
+# With TensorFlow IO.
+set FLAGS=--config=windows_cpp14 --config=use_tensorflow_io
+%BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli/...:all || goto :error
+%BAZEL% test %FLAGS% //yggdrasil_decision_forests/...: //examples:beginner_cc || goto :error
 
 goto :EOF
-
 :error
 echo Failed with error #%errorlevel%.
 exit /b %ERRORLEVEL%
