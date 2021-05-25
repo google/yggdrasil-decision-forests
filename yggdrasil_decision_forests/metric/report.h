@@ -24,6 +24,7 @@ namespace yggdrasil_decision_forests {
 namespace metric {
 
 // Append a textual report of the evaluation.
+std::string TextReport(const proto::EvaluationResults& eval);
 void AppendTextReport(const proto::EvaluationResults& eval,
                       std::string* report);
 

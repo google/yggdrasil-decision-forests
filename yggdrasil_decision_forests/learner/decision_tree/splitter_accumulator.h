@@ -153,11 +153,7 @@ struct FeatureNumericalBucket {
     void SetConditionFinalFromThresholds(
         const float threshold_1, const float threshold_2,
         proto::NodeCondition* condition) const {
-      float threshold = (threshold_1 + threshold_2) / 2.f;
-
-      if (threshold <= threshold_1) {
-        threshold = threshold_2;
-      }
+      const float threshold = MidThreshold(threshold_1, threshold_2);
       condition->mutable_condition()->mutable_higher_condition()->set_threshold(
           threshold);
       condition->set_na_value(na_replacement_ >= threshold);

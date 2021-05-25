@@ -197,9 +197,12 @@ void FinalizeComputeSpecColumnNumerical(
 
     AccurateSum kahanSquareAcc(col_acc.kahan_sum_of_square(),
                                col_acc.kahan_sum_of_square_error());
-    const double sd =
-        std::sqrt(kahanSquareAcc.Sum() / count_valid_records - mean * mean);
-    col->mutable_numerical()->set_standard_deviation(sd);
+    double var = kahanSquareAcc.Sum() / count_valid_records - mean * mean;
+    if (var < 0) {
+      // Possible with rounding error.
+      var = 0;
+    }
+    col->mutable_numerical()->set_standard_deviation(std::sqrt(var));
 
     col->mutable_numerical()->set_min_value(col_acc.min_value());
     col->mutable_numerical()->set_max_value(col_acc.max_value());

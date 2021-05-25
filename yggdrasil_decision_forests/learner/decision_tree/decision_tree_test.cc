@@ -2049,6 +2049,30 @@ TEST(DecisionTree, GenericHyperParameterCategorical) {
   EXPECT_TRUE(dt_config.categorical().has_random());
 }
 
+TEST(DecisionTree, MidThreshold) {
+  const auto test = [](float a, float b) {
+    CHECK_GT(b, a);
+    const float r = MidThreshold(a, b);
+    CHECK(std::isfinite(r));
+    CHECK_GT(r, a);
+    CHECK_LE(r, b);
+  };
+  using nl = std::numeric_limits<float>;
+
+  test(1.f, 2.f);
+  test(-10.f, -5.f);
+
+  test(0.f, nl::max());
+  test(nl::min(), nl::max());
+
+  test(1.f, std::nextafter(1.f, 2.f));
+  test(std::nextafter(1.f, 0.f), 1.f);
+  test(std::nextafter(1.f, 0.f), std::nextafter(1.f, 2.f));
+
+  test(std::nextafter(nl::max(), 0.f), nl::max());
+  test(nl::lowest(), std::nextafter(nl::lowest(), 0.f));
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

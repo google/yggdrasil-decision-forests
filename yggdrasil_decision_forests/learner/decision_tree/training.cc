@@ -3277,10 +3277,17 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
            examples.size() -
                condition.num_pos_training_examples_without_weight()))) {
     const std::string message = absl::Substitute(
-        "Unexpected num_pos_training_examples_without_weight\nexamples: $0 "
-        "positive_examples: $1 negative_examples: $2 cond: $3",
-        examples.size(), positive_examples->size(), negative_examples->size(),
-        condition.DebugString());
+        "The number of positive/negative examples predicted by the splitter "
+        "are different from the observations ($1!=$4) for the attribute "
+        "\"$5\". This problem is generally caused by extreme floating point "
+        "values (e.g. value>=10e30) and might prevent the model from training. "
+        "Make sure to check the dataspec Details: eval:examples:$0 "
+        "eval:positive_examples:$1 eval:negative_examples:$2 splitter:cond:$3",
+        /*$0*/ examples.size(), /*$1*/ positive_examples->size(),
+        /*$2*/ negative_examples->size(),
+        /*$3*/ condition.DebugString(),
+        /*$4*/ condition.num_pos_training_examples_without_weight(),
+        /*$5*/ dataset.data_spec().columns(condition.attribute()).name());
     if (error_on_wrong_splitter_statistics) {
       return absl::InternalError(message);
     } else {

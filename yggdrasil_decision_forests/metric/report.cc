@@ -38,6 +38,12 @@ std::string PairToString(const std::pair<T, T>& p) {
 
 }  // namespace
 
+std::string TextReport(const proto::EvaluationResults& eval) {
+  std::string report;
+  AppendTextReport(eval, &report);
+  return report;
+}
+
 void AppendTextReport(const proto::EvaluationResults& eval,
                       std::string* report) {
   absl::StrAppend(report, "Number of predictions (without weights): ",
