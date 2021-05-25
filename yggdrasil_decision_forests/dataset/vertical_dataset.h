@@ -24,6 +24,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <string>
@@ -132,6 +133,9 @@ class VerticalDataset {
       return casted_column;
     }
 
+    // Used and reserved memory expressed in bytes.
+    virtual std::pair<uint64_t, uint64_t> memory_usage() const = 0;
+
    private:
     // Unique column name.
     std::string name_;
@@ -156,6 +160,11 @@ class VerticalDataset {
 
     void ExtractAndAppend(const std::vector<row_t>& indices,
                           AbstractColumn* dst) const override;
+
+    std::pair<uint64_t, uint64_t> memory_usage() const override {
+      return std::pair<uint64_t, uint64_t>(values_.size() * sizeof(T),
+                                           values_.capacity() * sizeof(T));
+    }
 
    private:
     std::vector<T> values_;
@@ -219,6 +228,14 @@ class VerticalDataset {
         return bank_.begin() + values_[row].first;
       }
       return bank_.begin() + values_[row].second;
+    }
+
+    std::pair<uint64_t, uint64_t> memory_usage() const override {
+      return std::pair<uint64_t, uint64_t>(
+          bank_.size() * sizeof(T) +
+              values_.size() * sizeof(std::pair<size_t, size_t>),
+          bank_.capacity() * sizeof(T) +
+              values_.capacity() * sizeof(std::pair<size_t, size_t>));
     }
 
    private:
@@ -659,7 +676,9 @@ class VerticalDataset {
   bool OwnsColumn(int col) const;
 
   // Append a new example to the dataset.
-  void AppendExample(const proto::Example& example);
+  // If "load_columns" is set, only the columns specified in it will be loaded.
+  void AppendExample(const proto::Example& example,
+                     const std::optional<std::vector<int>> load_columns = {});
   void AppendExample(
       const std::unordered_map<std::string, std::string>& example);
 
@@ -676,8 +695,12 @@ class VerticalDataset {
 
   // Reserves the memory for "num_rows" examples on each existing columns.
   // It is not required to reserve the memory, but it can speed-up the code
-  // (similarly to std::vector:reserve).
-  void Reserve(const row_t num_rows);
+  // (similarly to std::vector:reserve).m
+  void Reserve(const row_t num_rows,
+               const std::optional<std::vector<int>>& load_columns = {});
+
+  // Generates a human readable summary of the memory.
+  std::string MemorySummary() const;
 
  private:
   struct ColumnContainer {

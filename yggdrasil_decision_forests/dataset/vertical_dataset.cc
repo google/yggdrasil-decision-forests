@@ -129,10 +129,18 @@ int VerticalDataset::ColumnNameToColumnIdx(absl::string_view name) const {
   return -1;
 }
 
-void VerticalDataset::AppendExample(const proto::Example& example) {
+void VerticalDataset::AppendExample(
+    const proto::Example& example,
+    const std::optional<std::vector<int>> load_columns) {
   CHECK_EQ(columns_.size(), example.attributes_size());
-  for (int col_idx = 0; col_idx < columns_.size(); col_idx++) {
-    mutable_column(col_idx)->AddFromExample(example.attributes(col_idx));
+  if (load_columns.has_value()) {
+    for (int col_idx : load_columns.value()) {
+      mutable_column(col_idx)->AddFromExample(example.attributes(col_idx));
+    }
+  } else {
+    for (int col_idx = 0; col_idx < columns_.size(); col_idx++) {
+      mutable_column(col_idx)->AddFromExample(example.attributes(col_idx));
+    }
   }
   nrow_++;
 }
@@ -814,7 +822,9 @@ utils::StatusOr<VerticalDataset> VerticalDataset::Extract(
   dst.nrow_ = indices.size();
   RETURN_IF_ERROR(dst.CreateColumnsFromDataspec());
   for (int col_idx = 0; col_idx < ncol(); col_idx++) {
-    column(col_idx)->ExtractAndAppend(indices, dst.mutable_column(col_idx));
+    if (column(col_idx)->nrows() > 0) {
+      column(col_idx)->ExtractAndAppend(indices, dst.mutable_column(col_idx));
+    }
   }
   return std::move(dst);
 }
@@ -923,10 +933,30 @@ void VerticalDataset::Set(const row_t row, const int col,
   mutable_column(col)->Set(row, value);
 }
 
-void VerticalDataset::Reserve(const row_t num_rows) {
-  for (int col_idx = 0; col_idx < columns_.size(); col_idx++) {
-    mutable_column(col_idx)->Reserve(num_rows);
+void VerticalDataset::Reserve(
+    const row_t num_rows, const std::optional<std::vector<int>>& load_columns) {
+  if (load_columns.has_value()) {
+    for (int col_idx : load_columns.value()) {
+      mutable_column(col_idx)->Reserve(num_rows);
+    }
+  } else {
+    for (int col_idx = 0; col_idx < columns_.size(); col_idx++) {
+      mutable_column(col_idx)->Reserve(num_rows);
+    }
   }
+}
+
+std::string VerticalDataset::MemorySummary() const {
+  uint64_t usage = 0;
+  uint64_t reserved = 0;
+  for (int col_idx = 0; col_idx < ncol(); col_idx++) {
+    const auto col_mem = column(col_idx)->memory_usage();
+    usage += col_mem.first;
+    reserved += col_mem.second;
+  }
+  const uint64_t scale = 1e6;
+  return absl::StrFormat("usage:%dMB allocated:%dMB", usage / scale,
+                         reserved / scale);
 }
 
 }  // namespace dataset

@@ -116,8 +116,11 @@ absl::optional<int> GetOptionalColumnIdxFromName(
 bool HasColumn(absl::string_view name,
                const proto::DataSpecification& data_spec);
 
-// Test if a particular attribute value is NA.
-bool IsNa(const proto::Example::Attribute& value);
+// Test if a particular attribute value is NA -- "Not Available", also
+// referred as "missing".
+inline bool IsNa(const proto::Example::Attribute& value) {
+  return value.type_case() == proto::Example::Attribute::TypeCase::TYPE_NOT_SET;
+}
 
 // Returns a human readable representation of the dataspec. Easier to read and
 // more informative than proto's DebugString() method.

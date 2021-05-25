@@ -26,6 +26,7 @@
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -215,6 +216,11 @@ void InitializeModelWithAbstractTrainingConfig(
 // compatible or contradictory.
 absl::Status CopyProblemDefinition(const proto::TrainingConfig& src,
                                    proto::TrainingConfig* dst);
+
+// Create a dataset loading configuration adapted to the training configuration
+// link. Skill unused features and examples with zero weights.
+dataset::LoadConfig OptimalDatasetLoadingConfig(
+    const proto::TrainingConfigLinking& link_config);
 
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

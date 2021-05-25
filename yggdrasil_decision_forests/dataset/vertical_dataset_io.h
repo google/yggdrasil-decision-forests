@@ -52,12 +52,24 @@ namespace dataset {
 //     "ensure_non_missing".
 //   num_threads: Number of reading threads. Only used for multi-sharded
 //     datasets. num_threads=1 is more memory efficient than num_threads>1.
+//   load_columns: If specified, only load this subset of columns.
+//   load_example: If specified, only load the examples that evaluate to true.
 //
+struct LoadConfig {
+  // Number of reading threads. Only used for multi-sharded datasets.
+  // num_threads=1 is more memory efficient than num_threads>1.
+  int num_threads = 10;
+  // If specified, only load this subset of columns.
+  std::optional<std::vector<int>> load_columns;
+  // If specified, only load the examples that evaluate to true.
+  std::optional<std::function<bool(const proto::Example&)>> load_example;
+};
+
 absl::Status LoadVerticalDataset(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec, VerticalDataset* dataset,
     absl::optional<std::vector<int>> ensure_non_missing = {},
-    int num_threads = 10);
+    const LoadConfig& config = {});
 
 // Save the dataset to a file (or a set of files). If
 // num_records_by_shard==-1, all the examples will be written in the first

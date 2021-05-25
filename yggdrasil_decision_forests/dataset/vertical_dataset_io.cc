@@ -47,7 +47,8 @@ namespace {
 absl::Status LoadVerticalDatasetSingleThread(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec, VerticalDataset* dataset,
-    absl::optional<std::vector<int>> ensure_non_missing) {
+    absl::optional<std::vector<int>> ensure_non_missing,
+    const LoadConfig& config) {
   // Initialize dataset.
   dataset->set_data_spec(data_spec);
   RETURN_IF_ERROR(dataset->CreateColumnsFromDataspec());
@@ -58,8 +59,14 @@ absl::Status LoadVerticalDatasetSingleThread(
   proto::Example example;
   utils::StatusOr<bool> status;
   while ((status = reader->Next(&example)).ok() && status.value()) {
-    dataset->AppendExample(example);
-    LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples scanned.");
+    if (config.load_example.has_value() &&
+        !config.load_example.value()(example)) {
+      continue;
+    }
+    dataset->AppendExample(example, config.load_columns);
+    if ((dataset->nrow() % 100) == 0) {
+      LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples scanned.");
+    }
   }
   return status.status();
 }
@@ -95,17 +102,17 @@ absl::Status LoadVerticalDataset(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec, VerticalDataset* dataset,
     absl::optional<std::vector<int>> ensure_non_missing,
-    const int num_threads) {
+    const LoadConfig& config) {
   // Extract the shards from the dataset path.
   std::string path, prefix;
   ASSIGN_OR_RETURN(std::tie(prefix, path), SplitTypeAndPath(typed_path));
   std::vector<std::string> shards;
   CHECK_OK(utils::ExpandInputShards(path, &shards));
 
-  if (shards.size() <= 1 || num_threads <= 1) {
+  if (shards.size() <= 1 || config.num_threads <= 1) {
     // Loading in a single thread.
     return LoadVerticalDatasetSingleThread(typed_path, data_spec, dataset,
-                                           ensure_non_missing);
+                                           ensure_non_missing, config);
   }
 
   // Initialize dataset.
@@ -120,8 +127,8 @@ absl::Status LoadVerticalDataset(
 
   utils::concurrency::StreamProcessor<
       std::string, utils::StatusOr<std::unique_ptr<BlockOfExamples>>>
-      processor("DatasetLoader", std::min<int>(shards.size(), num_threads),
-                load_shard,
+      processor("DatasetLoader",
+                std::min<int>(shards.size(), config.num_threads), load_shard,
                 /*result_in_order=*/true);
 
   // Configure the shard loading jobs.
@@ -130,6 +137,9 @@ absl::Status LoadVerticalDataset(
     processor.Submit(shard);
   }
   processor.CloseSubmits();
+
+  // Number of skipped example because of "config.load_example".
+  std::size_t skipped_examples = 0;
 
   // Ingest the examples in the vertical dataset.
   int loaded_shards = 0;
@@ -145,13 +155,46 @@ absl::Status LoadVerticalDataset(
     if (loaded_shards == 0) {
       // Reserve the vertical dataset memory by assuming that all the shards
       // have ~ the same number of examples.
-      dataset->Reserve(block->examples.size() * shards.size());
-    }
 
-    for (const auto* example : block->examples) {
-      dataset->AppendExample(*example);
-      LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples scanned.");
+      // Count the number of examples in the first shard.
+      std::size_t num_examples_in_shard;
+      if (config.load_example.has_value()) {
+        num_examples_in_shard = 0;
+        for (const auto* example : block->examples) {
+          if (config.load_example.value()(*example)) {
+            num_examples_in_shard++;
+          }
+        }
+      } else {
+        num_examples_in_shard = block->examples.size();
+      }
+
+      if (num_examples_in_shard > 100) {
+        // The number of examples in the first shard is representative.
+        const auto reserved_examples = num_examples_in_shard * shards.size();
+        const auto num_features = config.load_columns.has_value()
+                                      ? config.load_columns->size()
+                                      : data_spec.columns_size();
+        const auto approx_memory_usage_mb =
+            4 * num_features * reserved_examples / 1000000;
+        if (approx_memory_usage_mb > 100) {
+          LOG_INFO_EVERY_N_SEC(30, _ << "Reserving " << reserved_examples
+                                     << " examples and " << num_features
+                                     << " features for ~"
+                                     << approx_memory_usage_mb << "MB");
+        }
+        dataset->Reserve(reserved_examples);
+      }
     }
+    for (const auto* example : block->examples) {
+      if (config.load_example.has_value() &&
+          !config.load_example.value()(*example)) {
+        skipped_examples++;
+        continue;
+      }
+      dataset->AppendExample(*example, config.load_columns);
+    }
+    LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples scanned.");
     loaded_shards++;
   }
 
@@ -160,8 +203,12 @@ absl::Status LoadVerticalDataset(
   }
 
   processor.JoinAllAndStopThreads();
-  LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples and "
-                             << loaded_shards << " shards scanned in total.");
+  LOG_INFO_EVERY_N_SEC(
+      30, _ << dataset->nrow() << " examples and " << loaded_shards
+            << " shards scanned in total. Memory: " << dataset->MemorySummary()
+            << ". " << skipped_examples << " ("
+            << 100 * skipped_examples / (dataset->nrow() + skipped_examples)
+            << "%) examples have been skipped.");
   return absl::OkStatus();
 }
 

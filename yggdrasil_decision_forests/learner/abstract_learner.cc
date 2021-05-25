@@ -193,8 +193,17 @@ utils::StatusOr<std::unique_ptr<AbstractModel>>
 AbstractLearner::TrainWithStatus(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec) const {
+  // List the columns used for the training.
+  // Only these columns will be loaded.
+  proto::TrainingConfigLinking link_config;
+  RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(training_config_,
+                                                      data_spec, &link_config));
+  const auto dataset_loading_config = OptimalDatasetLoadingConfig(link_config);
+
   dataset::VerticalDataset train_dataset;
-  RETURN_IF_ERROR(LoadVerticalDataset(typed_path, data_spec, &train_dataset));
+  RETURN_IF_ERROR(LoadVerticalDataset(typed_path, data_spec, &train_dataset,
+                                      /*ensure_non_missing=*/{},
+                                      dataset_loading_config));
   return TrainWithStatus(train_dataset);
 }
 
@@ -580,6 +589,38 @@ absl::Status CopyProblemDefinition(const proto::TrainingConfig& src,
   }
 
   return absl::OkStatus();
+}
+
+dataset::LoadConfig OptimalDatasetLoadingConfig(
+    const proto::TrainingConfigLinking& link_config) {
+  dataset::LoadConfig load_config;
+  load_config.load_columns = {link_config.features().begin(),
+                              link_config.features().end()};
+  if (link_config.has_label() && link_config.label() >= 0) {
+    load_config.load_columns->push_back(link_config.label());
+  }
+  if (link_config.has_cv_group() && link_config.cv_group() >= 0) {
+    load_config.load_columns->push_back(link_config.cv_group());
+  }
+  if (link_config.has_ranking_group() && link_config.ranking_group() >= 0) {
+    load_config.load_columns->push_back(link_config.ranking_group());
+  }
+  if (link_config.has_weight_definition()) {
+    load_config.load_columns->push_back(
+        link_config.weight_definition().attribute_idx());
+  }
+
+  // Filter the examples with zero weight.
+  if (link_config.has_weight_definition() &&
+      link_config.weight_definition().has_numerical()) {
+    const auto weight_attribute =
+        link_config.weight_definition().attribute_idx();
+    load_config.load_example =
+        [weight_attribute](const dataset::proto::Example& example) {
+          return example.attributes(weight_attribute).numerical() > 0.f;
+        };
+  }
+  return load_config;
 }
 
 }  // namespace model

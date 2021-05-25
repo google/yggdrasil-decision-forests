@@ -348,9 +348,6 @@ bool HasColumn(absl::string_view name,
   return false;
 }
 
-bool IsNa(const proto::Example::Attribute& value) {
-  return value.type_case() == proto::Example::Attribute::TypeCase::TYPE_NOT_SET;
-}
 
 absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
                              const proto::DataSpecification& data_spec,
