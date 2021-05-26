@@ -60,9 +60,9 @@ struct LoadConfig {
   // num_threads=1 is more memory efficient than num_threads>1.
   int num_threads = 10;
   // If specified, only load this subset of columns.
-  std::optional<std::vector<int>> load_columns;
+  absl::optional<std::vector<int>> load_columns;
   // If specified, only load the examples that evaluate to true.
-  std::optional<std::function<bool(const proto::Example&)>> load_example;
+  absl::optional<std::function<bool(const proto::Example&)>> load_example;
 };
 
 absl::Status LoadVerticalDataset(

@@ -678,7 +678,7 @@ class VerticalDataset {
   // Append a new example to the dataset.
   // If "load_columns" is set, only the columns specified in it will be loaded.
   void AppendExample(const proto::Example& example,
-                     const std::optional<std::vector<int>> load_columns = {});
+                     const absl::optional<std::vector<int>> load_columns = {});
   void AppendExample(
       const std::unordered_map<std::string, std::string>& example);
 
@@ -697,7 +697,7 @@ class VerticalDataset {
   // It is not required to reserve the memory, but it can speed-up the code
   // (similarly to std::vector:reserve).m
   void Reserve(const row_t num_rows,
-               const std::optional<std::vector<int>>& load_columns = {});
+               const absl::optional<std::vector<int>>& load_columns = {});
 
   // Generates a human readable summary of the memory.
   std::string MemorySummary() const;

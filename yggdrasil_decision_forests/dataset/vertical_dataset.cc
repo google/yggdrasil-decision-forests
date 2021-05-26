@@ -131,7 +131,7 @@ int VerticalDataset::ColumnNameToColumnIdx(absl::string_view name) const {
 
 void VerticalDataset::AppendExample(
     const proto::Example& example,
-    const std::optional<std::vector<int>> load_columns) {
+    const absl::optional<std::vector<int>> load_columns) {
   CHECK_EQ(columns_.size(), example.attributes_size());
   if (load_columns.has_value()) {
     for (int col_idx : load_columns.value()) {
@@ -934,7 +934,8 @@ void VerticalDataset::Set(const row_t row, const int col,
 }
 
 void VerticalDataset::Reserve(
-    const row_t num_rows, const std::optional<std::vector<int>>& load_columns) {
+    const row_t num_rows,
+    const absl::optional<std::vector<int>>& load_columns) {
   if (load_columns.has_value()) {
     for (int col_idx : load_columns.value()) {
       mutable_column(col_idx)->Reserve(num_rows);

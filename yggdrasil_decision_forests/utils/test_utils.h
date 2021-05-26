@@ -272,13 +272,13 @@ void TestPredefinedHyperParameters(
     absl::string_view train_ds_path, absl::string_view test_ds_path,
     const model::proto::TrainingConfig& train_config,
     const int expected_num_preconfigured_parameters,
-    std::optional<float> min_accuracy);
+    absl::optional<float> min_accuracy);
 
 // Runs "TestPredefinedHyperParameters" on the adult dataset.
 void TestPredefinedHyperParametersAdultDataset(
     model::proto::TrainingConfig train_config,
     const int expected_num_preconfigured_parameters,
-    std::optional<float> min_accuracy);
+    absl::optional<float> min_accuracy);
 
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
