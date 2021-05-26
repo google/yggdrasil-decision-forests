@@ -17,6 +17,7 @@
 //
 #include "yggdrasil_decision_forests/serving/decision_forest/register_engines.h"
 
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
@@ -38,6 +39,104 @@ int64_t MaxNumberOfNodesPerTree(
     max_num_nodes = std::max(max_num_nodes, tree->NumNodes());
   }
   return max_num_nodes;
+}
+
+// Checks that all the features return true through "check_feature".
+bool CheckAllFeatures(
+    const AbstractModel* const model,
+    const std::function<bool(const dataset::proto::Column&)>& check_feature) {
+  for (const auto feature_idx : model->input_features()) {
+    const auto& feature = model->data_spec().columns(feature_idx);
+    if (!check_feature(feature)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Checks that all the features are compatible for a "Opt" type model. Those
+// models only support numerical and categorical features with arity<32.
+bool CheckAllFeatureForOptModel(const AbstractModel* const model) {
+  const auto check_feature = [](const dataset::proto::Column& feature) {
+    switch (feature.type()) {
+      case dataset::proto::ColumnType::NUMERICAL:
+        break;
+      case dataset::proto::ColumnType::CATEGORICAL:
+        if (feature.categorical().number_of_unique_values() > 32) {
+          return false;
+        }
+        break;
+      default:
+        return false;
+    }
+    return true;
+  };
+
+  return CheckAllFeatures(model, check_feature);
+}
+
+// Checks that all the conditions return true through "check_condition".
+bool CheckAllConditions(
+    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
+        decision_trees,
+    std::function<bool(const model::decision_tree::proto::Condition&)>
+        check_condition) {
+  for (const auto& tree : decision_trees) {
+    bool valid = true;
+    tree->IterateOnNodes([&](const model::decision_tree::NodeWithChildren& node,
+                             const int depth) {
+      if (!node.IsLeaf()) {
+        valid &= check_condition(node.node().condition().condition());
+      }
+    });
+    if (!valid) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Checks that all the conditions are compatible for "Opt" type models.
+bool CheckAllConditionsForOptModels(
+    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
+        decision_trees) {
+  // Follow "SetNonLeafNode" in serving/decision_forest/decision_forest.cc.
+  const auto check_condition =
+      [](const model::decision_tree::proto::Condition& condition) {
+        switch (condition.type_case()) {
+          case model::decision_tree::proto::Condition::kHigherCondition:
+          case model::decision_tree::proto::Condition::kTrueValueCondition:
+          case model::decision_tree::proto::Condition::kContainsBitmapCondition:
+          case model::decision_tree::proto::Condition::kContainsCondition:
+            return true;
+          default:
+            return false;
+        }
+      };
+  return CheckAllConditions(decision_trees, check_condition);
+}
+
+// Checks that all the conditions are compatible for "QuickScorerExtended" type
+// models.
+bool AllConditionsCompatibleQuickScorerExtendedModels(
+    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
+        decision_trees) {
+  // Follow "FillQuickScorerNode" in
+  // serving/decision_forest/quick_scorer_extended.cc.
+  const auto check_condition = [](const model::decision_tree::proto::Condition&
+                                      condition) {
+    switch (condition.type_case()) {
+      case model::decision_tree::proto::Condition::kHigherCondition:
+      case model::decision_tree::proto::Condition::kDiscretizedHigherCondition:
+      case model::decision_tree::proto::Condition::kTrueValueCondition:
+      case model::decision_tree::proto::Condition::kContainsCondition:
+      case model::decision_tree::proto::Condition::kContainsBitmapCondition:
+        return true;
+      default:
+        return false;
+    }
+  };
+  return CheckAllConditions(decision_trees, check_condition);
 }
 
 }  // namespace
@@ -162,6 +261,11 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
       }
     }
 
+    if (!AllConditionsCompatibleQuickScorerExtendedModels(
+            gbt_model->decision_trees())) {
+      return false;
+    }
+
     switch (gbt_model->task()) {
       case proto::CLASSIFICATION:
         return gbt_model->label_col_spec()
@@ -255,19 +359,12 @@ class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
       }
     }
 
-    for (const auto feature_idx : gbt_model->input_features()) {
-      const auto& feature = gbt_model->data_spec().columns(feature_idx);
-      switch (feature.type()) {
-        case dataset::proto::ColumnType::NUMERICAL:
-          break;
-        case dataset::proto::ColumnType::CATEGORICAL:
-          if (feature.categorical().number_of_unique_values() > 32) {
-            return false;
-          }
-          break;
-        default:
-          return false;
-      }
+    if (!CheckAllFeatureForOptModel(model)) {
+      return false;
+    }
+
+    if (!CheckAllConditionsForOptModels(gbt_model->decision_trees())) {
+      return false;
     }
 
     switch (gbt_model->task()) {
@@ -451,19 +548,12 @@ class RandomForestOptPredFastEngineFactory : public model::FastEngineFactory {
       }
     }
 
-    for (const auto feature_idx : rf_model->input_features()) {
-      const auto& feature = rf_model->data_spec().columns(feature_idx);
-      switch (feature.type()) {
-        case dataset::proto::ColumnType::NUMERICAL:
-          break;
-        case dataset::proto::ColumnType::CATEGORICAL:
-          if (feature.categorical().number_of_unique_values() > 32) {
-            return false;
-          }
-          break;
-        default:
-          return false;
-      }
+    if (!CheckAllFeatureForOptModel(model)) {
+      return false;
+    }
+
+    if (!CheckAllConditionsForOptModels(rf_model->decision_trees())) {
+      return false;
     }
 
     switch (rf_model->task()) {
