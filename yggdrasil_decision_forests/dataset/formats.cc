@@ -51,6 +51,11 @@ bool IsTypedPath(const absl::string_view maybe_typed_path) {
 
 std::pair<std::string, proto::DatasetFormat> GetDatasetPathAndType(
     const absl::string_view typed_path) {
+  return GetDatasetPathAndTypeOrStatus(typed_path).value();
+}
+
+utils::StatusOr<std::pair<std::string, proto::DatasetFormat>>
+GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path) {
   std::string path, prefix;
   std::tie(prefix, path) = SplitTypeAndPath(typed_path).value();
 
@@ -67,8 +72,8 @@ std::pair<std::string, proto::DatasetFormat> GetDatasetPathAndType(
       return std::make_pair(std::string(path), format);
     }
   }
-  LOG(FATAL) << "Unknown format \"" << prefix << "\" in \"" << typed_path
-             << "\"";
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unknown format \"", prefix, "\" in \"", typed_path, "\""));
 }
 
 std::string FormatToRecommendedExtension(proto::DatasetFormat format) {

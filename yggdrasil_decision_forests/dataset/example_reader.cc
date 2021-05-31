@@ -56,5 +56,14 @@ utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
   return std::move(reader);
 }
 
+utils::StatusOr<bool> IsFormatSupported(absl::string_view typed_path) {
+  std::string sharded_path;
+  proto::DatasetFormat format;
+  ASSIGN_OR_RETURN(std::tie(sharded_path, format),
+                   GetDatasetPathAndTypeOrStatus(typed_path));
+  const std::string& format_name = proto::DatasetFormat_Name(format);
+  return ExampleReaderInterfaceRegisterer::IsName(format_name);
+}
+
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

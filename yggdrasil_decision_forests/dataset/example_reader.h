@@ -66,6 +66,12 @@ utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
     absl::optional<std::vector<int>> ensure_non_missing = {});
 
+// Checks if the format of a typed dataset is supported i.e. a dataset reader is
+// registered for this format. Returns true, if the format is supported. Returns
+// false if the format is not supported. Returns an error if the typed path
+// cannot be parsed. Note: This function does not read the target file.
+utils::StatusOr<bool> IsFormatSupported(absl::string_view typed_path);
+
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
 

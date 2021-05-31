@@ -40,7 +40,7 @@ std::string DatasetDir() {
                         "test_data/dataset");
 }
 
-TEST(DataSpecUtil, ExampleReader) {
+TEST(ExampleReader, CreateExampleReader) {
   for (const auto& dataset_path :
        {absl::StrCat("tfrecord+tfe:",
                      file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
@@ -82,6 +82,12 @@ TEST(DataSpecUtil, ExampleReader) {
 
     EXPECT_EQ(num_rows, 4);
   }
+}
+
+TEST(ExampleReader, IsFormatSupported) {
+  EXPECT_TRUE(IsFormatSupported("csv:/path/to/ds").value());
+  EXPECT_TRUE(IsFormatSupported("capacitor:/path/to/ds").value());
+  EXPECT_FALSE(IsFormatSupported("non-existing-format:/path/to/ds").ok());
 }
 
 }  // namespace dataset

@@ -43,6 +43,10 @@ const char* const FORMAT_TFE_TFRECORD = "tfrecord+tfe";
 std::pair<std::string, proto::DatasetFormat> GetDatasetPathAndType(
     absl::string_view typed_path);
 
+// Same as "GetDatasetPathAndType", but return a status in case of error.
+utils::StatusOr<std::pair<std::string, proto::DatasetFormat>>
+GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path);
+
 // Tests if a string is a typed path.
 bool IsTypedPath(absl::string_view maybe_typed_path);
 
