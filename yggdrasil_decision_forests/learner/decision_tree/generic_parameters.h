@@ -73,6 +73,10 @@ constexpr char kHParamSplitAxisSparseObliqueNormalizationStandardDeviation[] =
     "STANDARD_DEVIATION";
 constexpr char kHParamSplitAxisSparseObliqueNormalizationMinMax[] = "MIN_MAX";
 
+constexpr char kHParamSortingStrategy[] = "sorting_strategy";
+constexpr char kHParamSortingStrategyInNode[] = "IN_NODE";
+constexpr char kHParamSortingStrategyPresort[] = "PRESORT";
+
 // Fill decision tree specific generic hyper parameter specifications.
 // This function is designed to be called by the learners using decision trees
 // learning.

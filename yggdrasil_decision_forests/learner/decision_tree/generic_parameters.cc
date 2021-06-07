@@ -258,6 +258,31 @@ absl::Status GetGenericHyperParameterSpecification(
 - `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.)");
   }
 
+  {
+    ASSIGN_OR_RETURN(auto param, get_params(kHParamSortingStrategy));
+    switch (config.internal().sorting_strategy()) {
+      case proto::DecisionTreeTrainingConfig::Internal::IN_NODE:
+        param->mutable_categorical()->set_default_value(
+            kHParamSortingStrategyInNode);
+        break;
+      case proto::DecisionTreeTrainingConfig::Internal::PRESORTED:
+        param->mutable_categorical()->set_default_value(
+            kHParamSortingStrategyPresort);
+        break;
+      default:
+        return absl::InvalidArgumentError("Non implemented sorting strategy");
+    }
+    param->mutable_categorical()->add_possible_values(
+        kHParamSortingStrategyInNode);
+    param->mutable_categorical()->add_possible_values(
+        kHParamSortingStrategyPresort);
+    param->mutable_documentation()->set_description(
+        R"(How are sorted the numerical features in order to find the splits
+- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.
+- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.
+.)");
+  }
+
   return absl::OkStatus();
 }
 
@@ -478,6 +503,24 @@ absl::Status SetHyperParameters(
         return absl::InvalidArgumentError(
             absl::StrFormat(R"(Unknown value "%s" for parameter "%s")", value,
                             kHParamCategoricalAlgorithm));
+      }
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamSortingStrategy);
+    if (hparam.has_value()) {
+      const auto value = hparam.value().value().categorical();
+      if (value == kHParamSortingStrategyInNode) {
+        dt_config->mutable_internal()->set_sorting_strategy(
+            proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+      } else if (value == kHParamSortingStrategyPresort) {
+        dt_config->mutable_internal()->set_sorting_strategy(
+            proto::DecisionTreeTrainingConfig::Internal::PRESORTED);
+      } else {
+        return absl::InvalidArgumentError(
+            absl::StrFormat(R"(Unknown value "%s" for parameter "%s")", value,
+                            kHParamSortingStrategy));
       }
     }
   }
