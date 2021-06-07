@@ -59,11 +59,6 @@ absl::Status GetInputFeatures(
     input_features_idxs->push_back(feature.first);
   }
 
-  if (input_features_idxs->empty()) {
-    return absl::InvalidArgumentError(
-        "The models does not contain any input features.");
-  }
-
   std::sort(input_features_idxs->begin(), input_features_idxs->end());
 
   for (int node_feature_idx = 0; node_feature_idx < input_features_idxs->size();
