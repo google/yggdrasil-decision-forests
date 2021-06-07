@@ -208,4 +208,17 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
   return absl::OkStatus();
 }
 
+yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
+    absl::string_view path) {
+  const auto exist_status =
+      tensorflow::Env::Default()->FileExists(std::string(path));
+  if (exist_status.ok()) {
+    return true;
+  }
+  if (exist_status.code() == tensorflow::error::NOT_FOUND) {
+    return false;
+  }
+  return ToUtilStatus(exist_status);
+}
+
 }  // namespace file

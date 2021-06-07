@@ -57,10 +57,13 @@ utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
 }
 
 utils::StatusOr<bool> IsFormatSupported(absl::string_view typed_path) {
+  const auto path_format_or = GetDatasetPathAndTypeOrStatus(typed_path);
+  if (!path_format_or.ok()) {
+    return false;
+  }
   std::string sharded_path;
   proto::DatasetFormat format;
-  ASSIGN_OR_RETURN(std::tie(sharded_path, format),
-                   GetDatasetPathAndTypeOrStatus(typed_path));
+  std::tie(sharded_path, format) = path_format_or.value();
   const std::string& format_name = proto::DatasetFormat_Name(format);
   return ExampleReaderInterfaceRegisterer::IsName(format_name);
 }

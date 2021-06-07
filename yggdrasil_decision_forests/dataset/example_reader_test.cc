@@ -86,8 +86,8 @@ TEST(ExampleReader, CreateExampleReader) {
 
 TEST(ExampleReader, IsFormatSupported) {
   EXPECT_TRUE(IsFormatSupported("csv:/path/to/ds").value());
-  EXPECT_TRUE(IsFormatSupported("capacitor:/path/to/ds").value());
-  EXPECT_FALSE(IsFormatSupported("non-existing-format:/path/to/ds").ok());
+  EXPECT_FALSE(IsFormatSupported("capacitor:/path/to/ds").value());
+  EXPECT_FALSE(IsFormatSupported("non-existing-format:/path/to/ds").value());
 }
 
 }  // namespace dataset

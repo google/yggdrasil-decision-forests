@@ -95,6 +95,9 @@ class ParseProtoHelper {
 
 #define PARSE_TEST_PROTO(str) test::ParseProtoHelper(str)
 
+// Returns a free TCP port.
+int PickUnusedPortOrDie();
+
 }  // namespace test
 }  // namespace yggdrasil_decision_forests
 

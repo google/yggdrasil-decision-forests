@@ -74,6 +74,7 @@ cc_library(
     features = ["-use_header_modules"],  # Incompatible with -fexceptions.
     deps = [
         ":bytestream",
+        ":compatibility",
         ":logging_default",
         ":protobuf",
         ":status_macros",
@@ -101,6 +102,7 @@ cc_library(
     ],
     features = ["-use_header_modules"],  # Incompatible with -fexceptions.
     deps = [
+        ":compatibility",
         ":bytestream",
         ":status_macros",
         ":tensorflow",

@@ -134,6 +134,10 @@ absl::Status SetTextProto(absl::string_view path,
 absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* message,
                           int unused);
 
+// Tests if a file exist.
+yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
+    absl::string_view path);
+
 }  // namespace file
 
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_DEFAULT_H_

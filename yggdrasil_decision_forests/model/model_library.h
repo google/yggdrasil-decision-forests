@@ -44,6 +44,10 @@ absl::Status SaveModel(absl::string_view directory,
 absl::Status LoadModel(absl::string_view directory,
                        std::unique_ptr<AbstractModel>* model);
 
+// Checks if a model exist i.e. if the "done" file (see kModelDoneFileName) is
+// present.
+utils::StatusOr<bool> ModelExist(absl::string_view directory);
+
 }  // namespace model
 }  // namespace yggdrasil_decision_forests
 

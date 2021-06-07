@@ -93,5 +93,9 @@ absl::Status LoadModel(absl::string_view directory,
   return model->get()->Validate();
 }
 
+utils::StatusOr<bool> ModelExist(absl::string_view directory) {
+  return file::FileExists(file::JoinPath(directory, kModelDoneFileName));
+}
+
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

@@ -139,6 +139,9 @@ class TrainAndTestTester : public ::testing::Test {
   // dataset is passed to the learner as a VerticalDataset.
   bool pass_training_dataset_as_path_ = false;
 
+  // Number of shards to use if "pass_training_dataset_as_path_" is set to true.
+  int num_shards = 3;
+
  private:
   std::pair<std::string, std::string> GetTrainAndTestDatasetPaths();
 
@@ -279,6 +282,11 @@ void TestPredefinedHyperParametersAdultDataset(
     model::proto::TrainingConfig train_config,
     const int expected_num_preconfigured_parameters,
     absl::optional<float> min_accuracy);
+
+// Randomly shards a dataset. Returns the sharded path in the temp directory.
+std::string ShardDataset(const dataset::VerticalDataset& dataset,
+                         int num_shards, float sampling,
+                         absl::string_view format);
 
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

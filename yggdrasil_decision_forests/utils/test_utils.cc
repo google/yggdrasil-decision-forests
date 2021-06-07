@@ -129,13 +129,8 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   // Train the model.
   if (pass_training_dataset_as_path_) {
-    const int num_shards = 3;
-    const std::string train_dataset_path =
-        absl::StrCat(preferred_format_type, ":",
-                     file::JoinPath(test::TmpDirectory(), test_dir_,
-                                    absl::StrCat("train@", num_shards)));
-    CHECK_OK(SaveVerticalDataset(train_dataset_, train_dataset_path,
-                                 train_dataset_.nrow() / num_shards));
+    const auto train_dataset_path =
+        ShardDataset(train_dataset_, num_shards, 1.f, preferred_format_type);
     model_ = learner_->TrainWithStatus(train_dataset_path, data_spec).value();
   } else {
     model_ = learner_->TrainWithStatus(train_dataset_).value();
@@ -563,6 +558,36 @@ void TestPredefinedHyperParametersAdultDataset(
   TestPredefinedHyperParameters(train_ds_path, test_ds_path, train_config,
                                 expected_num_preconfigured_parameters,
                                 min_accuracy);
+}
+
+std::string ShardDataset(const dataset::VerticalDataset& dataset,
+                         const int num_shards, const float sampling,
+                         const absl::string_view format) {
+  const auto sharded_dir = file::JoinPath(test::TmpDirectory(), "sharded");
+  const auto sharded_path =
+      file::JoinPath(sharded_dir, absl::StrCat("dataset@", num_shards));
+  const auto typed_sharded_path = absl::StrCat(format, ":", sharded_path);
+  CHECK_OK(file::RecursivelyCreateDir(sharded_dir, file::Defaults()));
+  std::vector<std::string> shards;
+  CHECK_OK(utils::ExpandOutputShards(sharded_path, &shards));
+
+  // Down-sample the number of examples.
+  std::vector<dataset::VerticalDataset::row_t> examples(dataset.nrow());
+  std::iota(examples.begin(), examples.end(), 0);
+  std::mt19937 rnd;
+  std::shuffle(examples.begin(), examples.end(), rnd);
+  examples.resize(std::lround(sampling * dataset.nrow()));
+
+  for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
+    std::vector<dataset::VerticalDataset::row_t> idxs;
+    for (int i = shard_idx; i < examples.size(); i += num_shards) {
+      idxs.push_back(examples[i]);
+    }
+    CHECK_OK(dataset::SaveVerticalDataset(
+        dataset.Extract(idxs).value(),
+        absl::StrCat(format, ":", shards[shard_idx])));
+  }
+  return typed_sharded_path;
 }
 
 }  // namespace utils

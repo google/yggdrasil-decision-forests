@@ -190,4 +190,8 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
   return absl::OkStatus();
 }
 
+yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(absl::string_view path) {
+return std::filesystem::exists(path);
+}
+
 }  // namespace file
