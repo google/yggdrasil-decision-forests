@@ -12,13 +12,13 @@ interfaces.
     *   [Table of Contents](#table-of-contents)
     *   [Installation pre-compiled command-line-interface](#installation-pre-compiled-command-line-interface)
     *   [Compile command-line-interface from source](#compile-command-line-interface-from-source)
-        *   [Linux / MacOS](#linux-macos)
+        *   [Linux / MacOS](#linux--macos)
         *   [Windows](#windows)
     *   [Running a minimal example](#running-a-minimal-example)
     *   [Using the C++ library](#using-the-c-library)
     *   [Troubleshooting](#troubleshooting)
 
-<!-- Added by: gbm, at: Mon 10 May 2021 03:50:42 PM CEST -->
+<!-- Added by: gbm, at: Mon 31 May 2021 06:16:20 PM CEST -->
 
 <!--te-->
 

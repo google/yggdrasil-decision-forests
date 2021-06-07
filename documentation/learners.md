@@ -245,6 +245,13 @@ the gradient of the loss relative to the model output).
     give more accurate results (assuming enough trees are trained), but results
     in larger models. Analogous to neural network learning rate.
 
+#### [sorting_strategy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sorting_strategy)
+
+-   **Type:** Categorical **Default:** PRESORT **Possible values:** IN_NODE,
+    PRESORT
+
+-   How are sorted the numerical features in order to find the splits<br>- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>.
+
 #### [sparse_oblique_normalization](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_split)
 
 -   **Type:** Categorical **Default:** NONE **Possible values:** NONE,
@@ -473,6 +480,13 @@ It is probably the most well-known of the Decision Forest training algorithms.
     increase the quality of the model at the expense of size, training speed,
     and inference latency.
 
+#### [sorting_strategy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sorting_strategy)
+
+-   **Type:** Categorical **Default:** PRESORT **Possible values:** IN_NODE,
+    PRESORT
+
+-   How are sorted the numerical features in order to find the splits<br>- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>.
+
 #### [sparse_oblique_normalization](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_split)
 
 -   **Type:** Categorical **Default:** NONE **Possible values:** NONE,
@@ -642,6 +656,13 @@ used to grow the tree while the second is used to prune the tree.
     num_candidate_attributes_ratio`. The possible values are between ]0, and 1]
     as well as -1. If not set or equal to -1, the `num_candidate_attributes` is
     used.
+
+#### [sorting_strategy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sorting_strategy)
+
+-   **Type:** Categorical **Default:** PRESORT **Possible values:** IN_NODE,
+    PRESORT
+
+-   How are sorted the numerical features in order to find the splits<br>- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>.
 
 #### [sparse_oblique_normalization](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_split)
 
