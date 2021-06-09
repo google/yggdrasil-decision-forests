@@ -69,8 +69,15 @@ constexpr char RandomForestModel::kVariableImportanceMeanIncreaseInRmse[];
 
 absl::Status RandomForestModel::Save(absl::string_view directory) const {
   RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
-  ASSIGN_OR_RETURN(const auto format,
-                   decision_tree::RecommendedSerializationFormat());
+
+  // Format used to store the nodes.
+  std::string format;
+  if (node_format_.has_value()) {
+    format = node_format_.value();
+  } else {
+    ASSIGN_OR_RETURN(format, decision_tree::RecommendedSerializationFormat());
+  }
+
   int num_shards;
   RETURN_IF_ERROR(decision_tree::SaveTreesToDisk(
       directory, kNodeBaseFilename, decision_trees_, format, &num_shards));
@@ -100,6 +107,7 @@ absl::Status RandomForestModel::Load(absl::string_view directory) {
       directory, kNodeBaseFilename, header.num_node_shards(),
       header.num_trees(), header.node_format(), &decision_trees_));
 
+  node_format_ = header.node_format();
   winner_take_all_inference_ = header.winner_take_all_inference();
   out_of_bag_evaluations_.assign(header.out_of_bag_evaluations().begin(),
                                  header.out_of_bag_evaluations().end());
@@ -321,6 +329,9 @@ void RandomForestModel::AppendDescriptionAndStatistics(
 
   StrAppendForestStructureStatistics(data_spec(), decision_trees(),
                                      description);
+
+  absl::StrAppend(description,
+                  "Node format: ", node_format_.value_or("NOT_SET"), "\n");
 
   if (!out_of_bag_evaluations_.empty()) {
     absl::StrAppend(description, "\nTraining OOB:\n");

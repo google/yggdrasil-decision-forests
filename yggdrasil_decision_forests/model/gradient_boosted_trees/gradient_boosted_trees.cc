@@ -69,8 +69,15 @@ constexpr char kHeaderFilename[] = "gradient_boosted_trees_header.pb";
 absl::Status GradientBoostedTreesModel::Save(
     absl::string_view directory) const {
   RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
-  ASSIGN_OR_RETURN(const auto format,
-                   decision_tree::RecommendedSerializationFormat());
+
+  // Format used to store the nodes.
+  std::string format;
+  if (node_format_.has_value()) {
+    format = node_format_.value();
+  } else {
+    ASSIGN_OR_RETURN(format, decision_tree::RecommendedSerializationFormat());
+  }
+
   int num_shards;
   RETURN_IF_ERROR(decision_tree::SaveTreesToDisk(
       directory, kNodeBaseFilename, decision_trees_, format, &num_shards));
@@ -96,6 +103,7 @@ absl::Status GradientBoostedTreesModel::Load(absl::string_view directory) {
   RETURN_IF_ERROR(decision_tree::LoadTreesFromDisk(
       directory, kNodeBaseFilename, header.num_node_shards(),
       header.num_trees(), header.node_format(), &decision_trees_));
+  node_format_ = header.node_format();
   loss_ = header.loss();
   initial_predictions_.assign(header.initial_predictions().begin(),
                               header.initial_predictions().end());
@@ -441,6 +449,9 @@ void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
   }
   absl::StrAppend(description,
                   "Number of trees per iteration: ", num_trees_per_iter_, "\n");
+
+  absl::StrAppend(description,
+                  "Node format: ", node_format_.value_or("NOT_SET"), "\n");
 
   StrAppendForestStructureStatistics(data_spec(), decision_trees(),
                                      description);

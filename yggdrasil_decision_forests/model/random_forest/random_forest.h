@@ -173,6 +173,12 @@ class RandomForestModel : public AbstractModel {
   // Minimum number of training observations in a node.
   int MinNumberObs() const;
 
+  // Updates the format used to save the model on disk. If not specified, the
+  // recommended format `RecommendedSerializationFormat` is used.
+  void set_node_format(const std::optional<std::string>& format) {
+    node_format_ = format;
+  }
+
  private:
   // The decision trees.
   std::vector<std::unique_ptr<decision_tree::DecisionTree>> decision_trees_;
@@ -187,6 +193,12 @@ class RandomForestModel : public AbstractModel {
   // Variable importance.
   std::vector<model::proto::VariableImportance> mean_decrease_in_accuracy_;
   std::vector<model::proto::VariableImportance> mean_increase_in_rmse_;
+
+  // Format used to stored the node on disk.
+  // If not specified, the format `RecommendedSerializationFormat()` will be
+  // used. When loading a model from disk, this field is populated with the
+  // format.
+  std::optional<std::string> node_format_;
 };
 
 namespace internal {

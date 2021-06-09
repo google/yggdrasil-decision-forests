@@ -129,6 +129,12 @@ class GradientBoostedTreesModel : public AbstractModel {
   float validation_loss() const { return validation_loss_; }
   void set_validation_loss(const float loss) { validation_loss_ = loss; }
 
+  // Updates the format used to save the model on disk. If not specified, the
+  // recommended format `RecommendedSerializationFormat` is used.
+  void set_node_format(const std::optional<std::string>& format) {
+    node_format_ = format;
+  }
+
  private:
   void PredictClassification(const dataset::VerticalDataset& dataset,
                              dataset::VerticalDataset::row_t row_idx,
@@ -194,6 +200,12 @@ class GradientBoostedTreesModel : public AbstractModel {
 
   // Evaluation metrics and other meta-data computed during training.
   proto::TrainingLogs training_logs_;
+
+  // Format used to stored the node on disk.
+  // If not specified, the format `RecommendedSerializationFormat()` will be
+  // used. When loading a model from disk, this field is populated with the
+  // format.
+  std::optional<std::string> node_format_;
 
   friend GradientBoostedTreesLearner;
 };
