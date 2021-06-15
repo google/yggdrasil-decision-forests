@@ -948,7 +948,7 @@ TEST_P(FindBestNumericalSplitCartNumericalLabelBasePresortedTest,
     }
     model::proto::TrainingConfigLinking config_link;
     config_link.add_features(0);
-    CHECK_OK(PresortNumericalFeatures(dataset, config_link, &preprocessing));
+    CHECK_OK(PresortNumericalFeatures(dataset, config_link, 6, &preprocessing));
     preprocessing.set_num_examples(dataset.nrow());
   }
 

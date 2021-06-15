@@ -47,11 +47,11 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/cast.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
-
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
@@ -3074,14 +3074,14 @@ utils::StatusOr<Preprocessing> PreprocessTrainingDataset(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
-    const proto::DecisionTreeTrainingConfig& dt_config) {
+    const proto::DecisionTreeTrainingConfig& dt_config, const int num_threads) {
   Preprocessing preprocessing;
   preprocessing.set_num_examples(train_dataset.nrow());
 
   if (dt_config.internal().sorting_strategy() ==
       proto::DecisionTreeTrainingConfig::Internal::PRESORTED) {
-    RETURN_IF_ERROR(
-        PresortNumericalFeatures(train_dataset, config_link, &preprocessing));
+    RETURN_IF_ERROR(PresortNumericalFeatures(train_dataset, config_link,
+                                             num_threads, &preprocessing));
   }
 
   return preprocessing;
@@ -3090,18 +3090,22 @@ utils::StatusOr<Preprocessing> PreprocessTrainingDataset(
 absl::Status PresortNumericalFeatures(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfigLinking& config_link,
-    Preprocessing* preprocessing) {
+    const int num_threads, Preprocessing* preprocessing) {
   // Check number of examples.
-  const auto max_num_examples =
-      std::numeric_limits<SparseItem::ExampleIdx>::max();
-  if (train_dataset.nrow() >= max_num_examples) {
+  if (train_dataset.nrow() >= SparseItem::kMaxNumExamples) {
     return absl::InvalidArgumentError(absl::StrCat(
         "Presort numerical features don't support datasets with more than ",
-        max_num_examples, " examples. Use sorting_strategy=IN_NODE instead."));
+        SparseItem::kMaxNumExamples,
+        " examples. Use sorting_strategy=IN_NODE instead."));
   }
 
   preprocessing->mutable_presorted_numerical_features()->resize(
       train_dataset.data_spec().columns_size());
+
+  utils::concurrency::ThreadPool pool(
+      "presort_numerical_features",
+      std::min(num_threads, config_link.features().size()));
+  pool.StartWorkers();
 
   // For all the input features in the model.
   for (const auto feature_idx : config_link.features()) {
@@ -3111,42 +3115,51 @@ absl::Status PresortNumericalFeatures(
       continue;
     }
 
-    const auto& values =
-        train_dataset
-            .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                feature_idx)
-            ->values();
+    pool.Schedule([feature_idx, &train_dataset, preprocessing]() {
+      const dataset::VerticalDataset::row_t num_examples = train_dataset.nrow();
+      const auto& values =
+          train_dataset
+              .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+                  feature_idx)
+              ->values();
+      CHECK_EQ(num_examples, values.size());
 
-    // Global imputation replacement.
-    const float na_replacement_value =
-        train_dataset.data_spec().columns(feature_idx).numerical().mean();
+      // Global imputation replacement.
+      const float na_replacement_value =
+          train_dataset.data_spec().columns(feature_idx).numerical().mean();
 
-    auto& sorted_values =
-        (*preprocessing->mutable_presorted_numerical_features())[feature_idx];
-    sorted_values.items.resize(values.size());
-
-    for (SparseItem::ExampleIdx example_idx = 0;
-         example_idx < train_dataset.nrow(); example_idx++) {
-      const auto value = values[example_idx];
-      if (!std::isnan(value)) {
-        sorted_values.items[example_idx] = {/*.value =*/value,
-                                            /*.example_idx =*/example_idx};
-      } else {
-        sorted_values.items[example_idx] = {/*.value =*/na_replacement_value,
-                                            /*.example_idx =*/example_idx};
+      std::vector<std::pair<float, SparseItem::ExampleIdx>> items(
+          values.size());
+      for (dataset::VerticalDataset::row_t example_idx = 0;
+           example_idx < num_examples; example_idx++) {
+        auto value = values[example_idx];
+        if (std::isnan(value)) {
+          value = na_replacement_value;
+        }
+        items[example_idx] = {value, example_idx};
       }
-    }
 
-    std::sort(sorted_values.items.begin(), sorted_values.items.end(),
-              [](const auto& a, const auto& b) -> bool {
-                if (a.value != b.value) {
-                  return a.value < b.value;
-                } else {
-                  return a.example_idx < b.example_idx;
-                }
-              });
+      // Sort by feature value and example index.
+      std::sort(items.begin(), items.end());
 
-    sorted_values.items.shrink_to_fit();
+      auto& sorted_values =
+          (*preprocessing->mutable_presorted_numerical_features())[feature_idx];
+      sorted_values.items.resize(values.size());
+
+      for (dataset::VerticalDataset::row_t sorted_example_idx = 0;
+           sorted_example_idx < num_examples; sorted_example_idx++) {
+        SparseItem::ExampleIdx example_idx = items[sorted_example_idx].second;
+        const bool change_value =
+            sorted_example_idx > 0 && (items[sorted_example_idx].first !=
+                                       items[sorted_example_idx - 1].first);
+        if (change_value) {
+          example_idx |= ((SparseItem::ExampleIdx)1)
+                         << (sizeof(SparseItem::ExampleIdx) * 8 - 1);
+        }
+        sorted_values.items[sorted_example_idx].example_idx_and_extra =
+            example_idx;
+      }
+    });
   }
   return absl::OkStatus();
 }

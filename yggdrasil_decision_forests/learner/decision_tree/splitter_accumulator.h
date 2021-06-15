@@ -43,6 +43,7 @@
 
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -146,8 +147,12 @@ struct FeatureNumericalBucket {
 
     void ConsumeExample(const row_t example_idx,
                         FeatureNumericalBucket* acc) const {
+      acc->value = GetValue(example_idx);
+    }
+
+    float GetValue(const row_t example_idx) const {
       const float attribute = attributes_[example_idx];
-      acc->value = std::isnan(attribute) ? na_replacement_ : attribute;
+      return std::isnan(attribute) ? na_replacement_ : attribute;
     }
 
     void SetConditionFinalFromThresholds(

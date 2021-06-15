@@ -555,7 +555,7 @@ class RandomForestOnAbalone : public utils::TrainAndTestTester {
 
 TEST_F(RandomForestOnAbalone, Base) {
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::RMSE(evaluation_), 2.096, 0.01);
+  EXPECT_NEAR(metric::RMSE(evaluation_), 2.0825, 0.01);
 }
 
 TEST_F(RandomForestOnAbalone, ExtremelyRandomizeTrees) {
@@ -945,8 +945,8 @@ TEST_F(RandomForestOnDNA, BooleanAsNumerical) {
   guide_filename_ = "dna_guide.pbtxt";
   TrainAndEvaluateModel();
   // For comparison, the RF model learned in R yields an accuracy of 0.909.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9466, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2973, 0.04);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.91462, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.3984, 0.04);
 }
 
 class RandomForestOnSyntheticClassification : public utils::TrainAndTestTester {

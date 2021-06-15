@@ -315,7 +315,7 @@ RandomForestLearner::TrainWithStatus(
   ASSIGN_OR_RETURN(const auto preprocessing,
                    decision_tree::PreprocessTrainingDataset(
                        train_dataset, config_with_default, config_link,
-                       rf_config.decision_tree()));
+                       rf_config.decision_tree(),deployment_.num_threads()));
 
   utils::RandomEngine global_random(config_with_default.random_seed());
   // Individual seeds for each tree.

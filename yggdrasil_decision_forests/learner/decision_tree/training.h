@@ -814,13 +814,13 @@ utils::StatusOr<Preprocessing> PreprocessTrainingDataset(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
-    const proto::DecisionTreeTrainingConfig& dt_config);
+    const proto::DecisionTreeTrainingConfig& dt_config, int num_threads);
 
 // Component of "PreprocessTrainingDataset". Computes pre-sorted numerical
 // features.
 absl::Status PresortNumericalFeatures(
     const dataset::VerticalDataset& train_dataset,
-    const model::proto::TrainingConfigLinking& config_link,
+    const model::proto::TrainingConfigLinking& config_link, int num_threads,
     Preprocessing* preprocessing);
 
 // Set the default values of the hyper-parameters.

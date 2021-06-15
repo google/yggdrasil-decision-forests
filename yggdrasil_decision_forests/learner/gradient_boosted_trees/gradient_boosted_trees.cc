@@ -1144,7 +1144,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
       const auto preprocessing,
       decision_tree::PreprocessTrainingDataset(
           gradient_sub_train_dataset, config.train_config,
-          config.train_config_link, config.gbt_config->decision_tree()));
+          config.train_config_link, config.gbt_config->decision_tree(),
+          deployment_.num_threads()));
 
   // Train the trees one by one.
   std::vector<row_t> selected_examples;

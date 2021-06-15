@@ -62,6 +62,7 @@
 #include "absl/base/attributes.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -593,21 +594,6 @@ SplitSearchResult ScanSplitsCustomOrder(
   }
 }
 
-// Item used to pass the sorted numerical attribute values to the
-// "ScanSplitsPresortedSparseDuplicateExampleTemplate" function below.
-struct SparseItem {
-  // For efficiency reasons, this structure should be as small as possible.
-  // Indexing examples with uint32_t will covert most of simpleML cases. If the
-  // number of examples is larger than 4B, the user can disable pre-sorting.
-  using ExampleIdx = uint32_t;
-  // Value of a numerical attribute.
-  // "ScanSplitsPresortedSparseDuplicateExampleTemplate" assumes this value to
-  // be finite, but other methods could relax this constraints.
-  float value;
-  // Index of the example in the training dataset.
-  ExampleIdx example_idx;
-};
-
 // Scans the buckets (similarly to "ScanSplits") from a pre-sorted sparse
 // collection of buckets. This method is used for features with ordering (e.g.
 // numerical features) that are pre-sorted. When applicable, this method is
@@ -691,51 +677,41 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
 
   // Statistics of the best split found so far.
   double best_score = condition->split_score();
-  float best_previous_feature_value;
-  float best_feature_value;
   int64_t best_num_pos_training_examples_without_weight;
   int64_t best_num_pos_training_examples_with_weight;
+  int64_t best_sorted_example_idx = -1;
 
-  // Previously observed attribute value.
-  float next_previous_feature_value =
-      sorted_attributes.empty()
-          ? -1
-          : std::nextafter(sorted_attributes.back().value,
-                           std::numeric_limits<float>::max());
+  constexpr auto new_value_mask = ((SparseItem::ExampleIdx)1)
+                                  << (sizeof(SparseItem::ExampleIdx) * 8 - 1);
+  constexpr auto example_idx_mask = new_value_mask - 1;
 
   // Iterate over the attribute values in increasing order.
   // Note: For some reasons, the iterator for-loop is faster than the
   // for(auto:sorted_attributes) for loop (test on 10 different compiled
   // binaries).
-  for (auto it = sorted_attributes.begin(); it != sorted_attributes.end();
-       it++) {
-    const auto& sorted_attribute = *it;
+  for (size_t sorted_example_idx = 0;
+       sorted_example_idx < sorted_attributes.size(); sorted_example_idx++) {
+    const auto& sorted_attribute = sorted_attributes[sorted_example_idx];
+
+    auto example_idx =
+        sorted_attribute.example_idx_and_extra & example_idx_mask;
 
     // Skip non selected examples.
     if constexpr (duplicate_examples) {
-      if (selected_examples_mask[sorted_attribute.example_idx] == 0) {
+      if (selected_examples_mask[example_idx] == 0) {
         continue;
       }
     } else {
-      if (!selected_examples_mask[sorted_attribute.example_idx]) {
+      if (!selected_examples_mask[example_idx]) {
         continue;
       }
     }
 
     // Prefetch the label information needed at the end of the loop body.
-    label_filler.Prefetch(sorted_attribute.example_idx);
-
-    const auto feature_value = sorted_attribute.value;
-    const auto previous_feature_value = next_previous_feature_value;
-    // Only during the first iteration, the "previous value" can be greater than
-    // the current one.
-    DCHECK(next_previous_feature_value > sorted_attributes.back().value ||
-           previous_feature_value <= feature_value);
-    next_previous_feature_value = feature_value;
+    label_filler.Prefetch(example_idx);
 
     // Test Split
-    if (previous_feature_value < feature_value) {
-      DCHECK_GT(feature_value, previous_feature_value);
+    if (sorted_attribute.example_idx_and_extra & new_value_mask) {
       if (num_pos_examples >= min_num_obs &&
           num_pos_examples <= max_num_pos_examples) {
         // Compute the split's score.
@@ -745,8 +721,7 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
 
         if (score > best_score) {
           // A better split was found. Memorize the split.
-          best_previous_feature_value = previous_feature_value;
-          best_feature_value = feature_value;
+          best_sorted_example_idx = sorted_example_idx;
           best_score = score;
           best_num_pos_training_examples_without_weight = num_pos_examples;
           best_num_pos_training_examples_with_weight =
@@ -760,21 +735,26 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
     // Remove the bucket from the positive accumulator and add it to the
     // negative accumulator.
     if constexpr (duplicate_examples) {
-      const int count = selected_examples_mask[sorted_attribute.example_idx];
-      label_filler.AddDirectToScoreAccWithDuplicates(
-          sorted_attribute.example_idx, count, &neg);
-      label_filler.SubDirectToScoreAccWithDuplicates(
-          sorted_attribute.example_idx, count, &pos);
+      const int count = selected_examples_mask[example_idx];
+      label_filler.AddDirectToScoreAccWithDuplicates(example_idx, count, &neg);
+      label_filler.SubDirectToScoreAccWithDuplicates(example_idx, count, &pos);
       num_pos_examples -= count;
     } else {
-      label_filler.AddDirectToScoreAcc(sorted_attribute.example_idx, &neg);
-      label_filler.SubDirectToScoreAcc(sorted_attribute.example_idx, &pos);
+      label_filler.AddDirectToScoreAcc(example_idx, &neg);
+      label_filler.SubDirectToScoreAcc(example_idx, &pos);
       num_pos_examples--;
     }
   }
 
   if (found_split) {
     // Finalize the best found split.
+    const auto best_previous_feature_value = feature_filler.GetValue(
+        sorted_attributes[best_sorted_example_idx - 1].example_idx_and_extra &
+        example_idx_mask);
+    const auto best_feature_value = feature_filler.GetValue(
+        sorted_attributes[best_sorted_example_idx].example_idx_and_extra &
+        example_idx_mask);
+
     feature_filler.SetConditionFinalFromThresholds(
         best_previous_feature_value, best_feature_value, condition);
     condition->set_attribute(attribute_idx);

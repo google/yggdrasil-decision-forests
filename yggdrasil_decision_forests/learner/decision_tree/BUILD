@@ -18,6 +18,7 @@ cc_library(
         "sparse_oblique.h",
         "splitter_accumulator.h",
         "splitter_scanner.h",
+        "splitter_structure.h",
         "training.h",
     ],
     deps = [
