@@ -1,12 +1,14 @@
+load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
 # Collections
-# ========
+# ===========
 
-cc_library(
+cc_library_ydf(
     name = "all_file_systems",
     deps = [],
     alwayslink = 1,

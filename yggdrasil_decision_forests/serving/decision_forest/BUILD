@@ -1,3 +1,5 @@
+load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
@@ -6,7 +8,7 @@ package(
 # Libraries
 # =========
 
-cc_library(
+cc_library_ydf(
     name = "register_engines",
     srcs = [
         "register_engines.cc",
@@ -27,7 +29,7 @@ cc_library(
     alwayslink = 1,
 )
 
-cc_library(
+cc_library_ydf(
     name = "decision_forest",
     srcs = [
         "decision_forest.cc",
@@ -51,7 +53,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "quick_scorer_extended",
     srcs = [
         "quick_scorer_extended.cc",
@@ -73,7 +75,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "utils",
     srcs = [
         "utils.cc",

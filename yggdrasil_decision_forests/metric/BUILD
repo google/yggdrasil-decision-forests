@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -8,7 +8,7 @@ package(
 # Libraries
 # =========================================================
 
-cc_library(
+cc_library_ydf(
     name = "metric",
     srcs = [
         "metric.cc",
@@ -35,17 +35,20 @@ cc_library(
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
-    ],
+    ] + select({
+        "//conditions:default": [
+        ],
+    }),
 )
 
-cc_library(
+cc_library_ydf(
     name = "ranking_utils",
     hdrs = [
         "ranking_utils.h",
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "ranking",
     srcs = [
         "ranking_mrr.cc",
@@ -61,7 +64,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "comparison",
     srcs = [
         "comparison.cc",
@@ -85,7 +88,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "report",
     srcs = [
         "report.cc",

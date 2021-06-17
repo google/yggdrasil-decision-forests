@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -9,7 +9,7 @@ package(
 # ==============
 
 # Add new models here.
-cc_library(
+cc_library_ydf(
     name = "all_models",
     deps = [
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
@@ -21,7 +21,7 @@ cc_library(
 # Libraries
 # =========
 
-cc_library(
+cc_library_ydf(
     name = "abstract_model",
     srcs = [
         "abstract_model.cc",
@@ -58,9 +58,9 @@ cc_library(
     ],
 )
 
-# Note: The hyper parameter optimizer and the model library are in the same cc_library because they
+# Note: The hyper parameter optimizer and the model library are in the same cc_library_ydf because they
 # co-depend on each others.
-cc_library(
+cc_library_ydf(
     name = "model_library",
     srcs = [
         "model_library.cc",
@@ -79,7 +79,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "model_engine_wrapper",
     srcs = [
         "model_engine_wrapper.cc",

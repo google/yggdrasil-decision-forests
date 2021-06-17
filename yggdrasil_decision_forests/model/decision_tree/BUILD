@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -8,7 +8,7 @@ package(
 # Libraries
 # =========================================================
 
-cc_library(
+cc_library_ydf(
     name = "decision_tree",
     srcs = [
         "decision_tree.cc",
@@ -42,10 +42,13 @@ cc_library(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
-    ],
+    ] + select({
+        "//conditions:default": [
+        ],
+    }),
 )
 
-cc_library(
+cc_library_ydf(
     name = "decision_tree_io_interface",
     hdrs = [
         "decision_tree_io_interface.h",
@@ -60,7 +63,7 @@ cc_library(
 )
 
 # Storage of nodes in TFRecord.
-cc_library(
+cc_library_ydf(
     name = "decision_tree_io_tfrecord",
     srcs = [
         "decision_tree_io_tfrecord.cc",
@@ -76,7 +79,7 @@ cc_library(
 )
 
 # Storage of nodes in BlobSequence.
-cc_library(
+cc_library_ydf(
     name = "decision_tree_io_blob_sequence",
     srcs = ["decision_tree_io_blob_sequence.cc"],
     deps = [

@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -8,7 +8,7 @@ package(
 # Library
 # =======
 
-cc_library(
+cc_library_ydf(
     name = "gradient_boosted_trees",
     srcs = [
         "gradient_boosted_trees.cc",
@@ -59,7 +59,10 @@ cc_library(
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:usage",
-    ],
+    ] + select({
+        "//conditions:default": [
+        ],
+    }),
     alwayslink = 1,
 )
 

@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -24,7 +24,7 @@ cc_binary(
 # ==============
 
 # Add new learners here.
-cc_library(
+cc_library_ydf(
     name = "all_learners_except_hparam_optimizer",
     deps = [
         "//yggdrasil_decision_forests/learner/cart",
@@ -33,7 +33,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "all_learners",
     deps = [
         ":all_learners_except_hparam_optimizer",
@@ -43,7 +43,7 @@ cc_library(
 # Library
 # =======
 
-cc_library(
+cc_library_ydf(
     name = "abstract_learner",
     srcs = [
         "abstract_learner.cc",
@@ -75,9 +75,9 @@ cc_library(
     ],
 )
 
-# Note: The hyper parameter optimizer and the model library are in the same cc_library because they
+# Note: The hyper parameter optimizer and the model library are in the same cc_library_ydf because they
 # co-depend on each others.
-cc_library(
+cc_library_ydf(
     name = "learner_library",
     srcs = [
         "learner_library.cc",
@@ -90,10 +90,13 @@ cc_library(
         ":abstract_learner_cc_proto",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-    ],
+    ] + select({
+        "//conditions:default": [
+        ],
+    }),
 )
 
-cc_library(
+cc_library_ydf(
     name = "export_doc",
     srcs = [
         "export_doc.cc",

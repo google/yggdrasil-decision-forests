@@ -1,6 +1,6 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -16,7 +16,7 @@ alias(
 )
 
 # Default logging.
-cc_library(
+cc_library_ydf(
     name = "logging_default",
     srcs = [
         "logging_default.cc",
@@ -39,7 +39,7 @@ alias(
 )
 
 # Default macros.
-cc_library(
+cc_library_ydf(
     name = "status_macros_default",
     hdrs = [
         "status_macros.h",
@@ -59,7 +59,7 @@ alias(
 )
 
 # Default filesystem.
-cc_library(
+cc_library_ydf(
     name = "filesystem_default",
     srcs = [
         "filesystem.cc",
@@ -85,7 +85,7 @@ cc_library(
 )
 
 # TensorFlow::io based filesystem.
-cc_library(
+cc_library_ydf(
     name = "filesystem_tensorflow",
     srcs = [
         "filesystem.cc",
@@ -120,7 +120,7 @@ cc_library(
     }),
 )
 
-cc_library(
+cc_library_ydf(
     name = "test",
     testonly = 1,
     srcs = [
@@ -138,7 +138,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "sharded_io",
     srcs = [
         "sharded_io.cc",
@@ -156,7 +156,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "sharded_io_tfrecord",
     hdrs = [
         "sharded_io_tfrecord.h",
@@ -173,7 +173,7 @@ cc_library(
     }),
 )
 
-cc_library(
+cc_library_ydf(
     name = "regex",
     srcs = [
         "regex.cc",
@@ -186,7 +186,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "protobuf",
     srcs = [
         "protobuf.cc",
@@ -203,7 +203,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "registration",
     srcs = [
         "registration.cc",
@@ -220,7 +220,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "bytestream",
     srcs = [
         "bytestream.cc",
@@ -235,7 +235,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "csv",
     srcs = [
         "csv.cc",
@@ -253,7 +253,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "accurate_sum",
     hdrs = [
         "accurate_sum.h",
@@ -268,7 +268,7 @@ alias(
 )
 
 # Default logging.
-cc_library(
+cc_library_ydf(
     name = "concurrency_default",
     srcs = [
         "concurrency_default.cc",
@@ -287,7 +287,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "html",
     srcs = [
         "html.cc",
@@ -302,7 +302,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "distribution",
     srcs = [
         "distribution.cc",
@@ -322,7 +322,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "fold_generator",
     srcs = [
         "fold_generator.cc",
@@ -346,7 +346,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "hyper_parameters",
     srcs = [
         "hyper_parameters.cc",
@@ -366,7 +366,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "bitmap",
     srcs = [
         "bitmap.cc",
@@ -387,7 +387,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "histogram",
     hdrs = ["histogram.h"],
     deps = [
@@ -397,7 +397,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "adaptive_work",
     srcs = [
         "adaptive_work.cc",
@@ -418,7 +418,7 @@ alias(
     actual = ":usage_default",
 )
 
-cc_library(
+cc_library_ydf(
     name = "usage_default",
     srcs = [
         "usage_default.cc",
@@ -434,7 +434,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "feature_importance",
     srcs = [
         "feature_importance.cc",
@@ -457,7 +457,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "test_utils",
     testonly = 1,
     srcs = [
@@ -504,7 +504,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "evaluation",
     srcs = ["evaluation.cc"],
     hdrs = ["evaluation.h"],
@@ -532,7 +532,7 @@ cc_library(
     }),
 )
 
-cc_library(
+cc_library_ydf(
     name = "circular_buffer",
     hdrs = ["circular_buffer.h"],
     deps = [
@@ -540,17 +540,17 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "cast",
     hdrs = ["cast.h"],
 )
 
-cc_library(
+cc_library_ydf(
     name = "random",
     hdrs = ["random.h"],
 )
 
-cc_library(
+cc_library_ydf(
     name = "tensorflow",
     hdrs = ["tensorflow.h"],
     deps = [
@@ -560,7 +560,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "compatibility",
     hdrs = ["compatibility.h"],
     defines = select({
@@ -577,7 +577,7 @@ cc_library(
     }),
 )
 
-cc_library(
+cc_library_ydf(
     name = "blob_sequence",
     srcs = ["blob_sequence.cc"],
     hdrs = ["blob_sequence.h"],
@@ -589,7 +589,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "sharded_io_blob_sequence",
     hdrs = [
         "sharded_io_blob_sequence.h",

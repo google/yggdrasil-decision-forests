@@ -1,17 +1,20 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-cc_library(
+cc_library_ydf(
     name = "all_dataset_formats",
     deps = [
         ":csv_example_reader",
         ":csv_example_writer",
     ] + select({
         "//yggdrasil_decision_forests:use_tensorflow_io": [":tf_example_io_tfrecord"],
+        "//conditions:default": [
+        ],
+    }) + select({
         "//conditions:default": [
         ],
     }),
@@ -21,7 +24,7 @@ cc_library(
 # Libraries
 # ========
 
-cc_library(
+cc_library_ydf(
     name = "formats",
     srcs = [
         "formats.cc",
@@ -39,7 +42,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "data_spec",
     srcs = [
         "data_spec.cc",
@@ -61,7 +64,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "example_reader",
     srcs = [
         "example_reader.cc",
@@ -82,7 +85,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "example_reader_interface",
     hdrs = ["example_reader_interface.h"],
     deps = [
@@ -95,7 +98,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "csv_example_reader",
     srcs = [
         "csv_example_reader.cc",
@@ -122,7 +125,7 @@ cc_library(
     alwayslink = 1,
 )
 
-cc_library(
+cc_library_ydf(
     name = "vertical_dataset",
     srcs = [
         "vertical_dataset.cc",
@@ -145,7 +148,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "vertical_dataset_html",
     srcs = [
         "vertical_dataset_html.cc",
@@ -160,7 +163,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "vertical_dataset_io",
     srcs = ["vertical_dataset_io.cc"],
     hdrs = ["vertical_dataset_io.h"],
@@ -184,7 +187,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "example_writer",
     srcs = [
         "example_writer.cc",
@@ -210,7 +213,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "example_writer_interface",
     hdrs = ["example_writer_interface.h"],
     deps = [
@@ -222,7 +225,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "csv_example_writer",
     srcs = [
         "csv_example_writer.cc",
@@ -247,7 +250,7 @@ cc_library(
     alwayslink = 1,
 )
 
-cc_library(
+cc_library_ydf(
     name = "data_spec_inference",
     srcs = [
         "data_spec_inference.cc",
@@ -273,7 +276,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "tf_example_io_interface",
     srcs = [
         "tf_example_io_interface.cc",
@@ -302,7 +305,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "tf_example_io_tfrecord",
     srcs = [
         "tf_example_io_tfrecord.cc",
@@ -329,7 +332,7 @@ cc_library(
     alwayslink = 1,
 )
 
-cc_library(
+cc_library_ydf(
     name = "weight",
     srcs = [
         "weight.cc",
@@ -351,7 +354,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "synthetic_dataset",
     srcs = [
         "synthetic_dataset.cc",

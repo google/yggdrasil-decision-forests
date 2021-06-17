@@ -4,6 +4,9 @@ load("@rules_proto//proto:defs.bzl", "proto_library")
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_proto_library")
 
+def cc_library_ydf(**attrs):
+    native.cc_library(**attrs)
+
 def all_proto_library(
         name = None,
         deps = [],
@@ -15,7 +18,7 @@ def all_proto_library(
     Usage example:
         all_proto_library(name="toy_proto",srcs=[...])
 
-        cc_library(deps=[":toy_cc_proto"], ...)
+        cc_library_ydf(deps=[":toy_cc_proto"], ...)
         py_library(deps=[":toy_py_proto"], ...)
 
     Args:

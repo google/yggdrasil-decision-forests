@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -8,7 +8,7 @@ package(
 # Libraries
 # =========================================================
 
-cc_library(
+cc_library_ydf(
     name = "training",
     srcs = [
         "sparse_oblique.cc",
@@ -43,11 +43,14 @@ cc_library(
         "//yggdrasil_decision_forests/utils:distribution_cc_proto",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:random",
-    ],
+    ] + select({
+        "//conditions:default": [
+        ],
+    }),
     alwayslink = 1,
 )
 
-cc_library(
+cc_library_ydf(
     name = "utils",
     srcs = [
         "utils.cc",
@@ -62,7 +65,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "generic_parameters",
     srcs = ["generic_parameters.cc"],
     hdrs = ["generic_parameters.h"],

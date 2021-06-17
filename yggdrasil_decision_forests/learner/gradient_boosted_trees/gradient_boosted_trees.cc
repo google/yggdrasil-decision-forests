@@ -2350,7 +2350,7 @@ absl::Status SampleTrainingExamplesWithSelGB(
 
 void ExportTrainingLogs(const proto::TrainingLogs& training_logs,
                         absl::string_view directory) {
-  // Add methods to plot training logs here.
+// Add methods to plot training logs here.
 }
 
 void InitializeModelWithTrainingConfig(

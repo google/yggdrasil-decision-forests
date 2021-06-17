@@ -52,6 +52,7 @@
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {

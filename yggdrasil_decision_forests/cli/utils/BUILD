@@ -1,3 +1,5 @@
+load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
@@ -11,7 +13,7 @@ cc_binary(
     deps = [":synthetic_dataset_lib_with_main"],
 )
 
-cc_library(
+cc_library_ydf(
     name = "synthetic_dataset_lib_with_main",
     srcs = ["synthetic_dataset.cc"],
     deps = [

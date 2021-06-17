@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -9,7 +9,7 @@ package(
 # ==============
 
 # All the canonical inference engines.
-cc_library(
+cc_library_ydf(
     name = "all_inference_engines",
     deps = ["//yggdrasil_decision_forests/serving/decision_forest:register_engines"],
 )
@@ -17,7 +17,7 @@ cc_library(
 # Libraries
 # =========
 
-cc_library(
+cc_library_ydf(
     name = "fast_engine",
     hdrs = [
         "fast_engine.h",
@@ -27,7 +27,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "example_set",
     srcs = [
         "example_set.cc",
@@ -47,7 +47,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "example_set_model_wrapper",
     hdrs = [
         "example_set_model_wrapper.h",
@@ -60,7 +60,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "utils",
     srcs = [
         "utils.cc",
