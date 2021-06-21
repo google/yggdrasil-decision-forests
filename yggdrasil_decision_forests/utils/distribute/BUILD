@@ -15,6 +15,7 @@ package(
 cc_library(
     name = "all_implementations",
     deps = [
+        "//yggdrasil_decision_forests/utils/distribute/implementations/grpc",
         "//yggdrasil_decision_forests/utils/distribute/implementations/single_thread",
     ],
     alwayslink = 1,
