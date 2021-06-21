@@ -26,6 +26,7 @@ cc_library(
     name = "all_workers",
     deps = [
         ":toy_worker",
+        "//yggdrasil_decision_forests/learner/generic_worker",
     ],
     alwayslink = 1,
 )

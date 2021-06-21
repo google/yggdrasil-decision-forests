@@ -1,0 +1,76 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.generic_worker.proto;
+
+import "yggdrasil_decision_forests/dataset/data_spec.proto";
+import "yggdrasil_decision_forests/learner/abstract_learner.proto";
+import "yggdrasil_decision_forests/metric/metric.proto";
+
+message Welcome {
+  optional string temporary_directory = 1;
+}
+
+message Request {
+  // Free identifier.
+  optional string request_id = 1;
+
+  oneof type {
+    // Train a model.
+    TrainModel train_model = 2;
+    // Evaluate a model.
+    EvaluateModel evaluate_model = 3;
+  }
+
+  message TrainModel {
+    // Follow the signature of cli/train.cc.
+    optional model.proto.TrainingConfig train_config = 1;
+    optional model.proto.DeploymentConfig deployment_config = 2;
+    optional string dataset_path = 3;
+    optional dataset.proto.DataSpecification dataspec = 4;
+    optional string model_path = 5;
+    optional string log_directory = 6;
+    optional model.proto.GenericHyperParameters generic_hyper_parameters = 7;
+    // If true, will override the model if it exist already.
+    // If false, the model will not be overridden. If the model already exist,
+    // the model training will be skipped.
+    optional bool override_model = 8 [default = true];
+  }
+
+  message EvaluateModel {
+    // Follow the signature of cli/evaluate.cc.
+    optional string dataset_path = 1;
+    optional string model_path = 2;
+    optional metric.proto.EvaluationOptions options = 3;
+  }
+}
+
+message Result {
+  optional string request_id = 1;
+
+  oneof type {
+    TrainModel train_model = 2;
+    EvaluateModel evaluate_model = 3;
+  }
+
+  message TrainModel {
+  }
+
+  message EvaluateModel {
+    optional metric.proto.EvaluationResults evaluation = 1;
+  }
+}
