@@ -1,0 +1,73 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.distribute.proto;
+
+import "yggdrasil_decision_forests/utils/distribute/distribute.proto";
+
+// Computation distribution over multiple jobs communicating over GRPC. A worker
+// in an instance of ":grpc_worker_main"/
+message GRPCImp {
+  oneof worker_address {
+    SocketAddresses socket_addresses = 1;
+    Bns bns = 2;
+  }
+
+  optional bool use_loas = 3 [default = false];
+}
+
+extend Config {
+  optional GRPCImp grpc = 1001;
+}
+
+// Configuration of the workers.
+message WorkerConfig {
+  // Welcome message.
+  optional bytes welcome_blob = 1;
+  // Addresses of the workers.
+  repeated string worker_addresses = 2;
+  // Unique ID of the manager.
+  optional uint64 manager_uid = 3;
+  // Job done by the worker.
+  optional string worker_name = 4;
+}
+
+// GRPC service.
+service Server {
+  rpc Run(Query) returns (Answer);
+  rpc Shutdown(ShutdownQuery) returns (Empty);
+  rpc Ping(Empty) returns (Empty);
+}
+
+message Query {
+  optional bytes blob = 1;
+  optional string config_path = 2;
+  optional uint64 manager_uid = 3;
+  optional int32 worker_idx = 4;
+  // TODO(gbm): Send the configuration directly if necessary?
+}
+
+message Answer {
+  optional bytes blob = 1;
+  optional string error = 2;
+}
+
+message ShutdownQuery {
+  optional bool kill_worker_manager = 1;
+}
+
+message Empty {}

@@ -6,6 +6,7 @@ load("//third_party/zlib:workspace.bzl", zlib = "deps")
 load("//third_party/tensorflow:workspace.bzl", tensorflow = "deps")
 load("//third_party/farmhash:workspace.bzl", farmhash = "deps")
 load("//third_party/boost:workspace.bzl", boost = "deps")
+load("//third_party/grpc:workspace.bzl", grpc = "deps")
 
 def load_dependencies(repo_name = "", exclude_repo = []):
     if "gtest" not in exclude_repo:
@@ -28,6 +29,9 @@ def load_dependencies(repo_name = "", exclude_repo = []):
 
     if "boost" not in exclude_repo:
         boost(prefix = repo_name)
+
+    if "grpc" not in exclude_repo:
+        grpc()
 
     # Inject transitive dependencies
     # Note: Bazel does not automatically inject transitive dependencies.
