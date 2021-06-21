@@ -20,6 +20,7 @@ package yggdrasil_decision_forests.model.proto;
 import "yggdrasil_decision_forests/dataset/data_spec.proto";
 import "yggdrasil_decision_forests/dataset/weight.proto";
 import "yggdrasil_decision_forests/model/abstract_model.proto";
+import "yggdrasil_decision_forests/utils/distribute/distribute.proto";
 
 // Specification of the computing resources used to perform an action (e.g.
 // train a model, run a cross-validation, generate predictions). The deployment
@@ -36,10 +37,20 @@ message DeploymentConfig {
   // Number of threads.
   optional int32 num_threads = 2 [default = 6];
 
+  // If true, try to resume interrupted training using snapshots stored in the
+  // "cache_path" or execution specific storages.
+  optional bool try_resume_training = 6 [default = false];
+
   // Computation distribution engine.
   oneof execution {
     // Local execution.
     Local local = 3;
+
+    // Distribution using the Distribute interface.
+    // Note that the selected distribution strategy implementation (selected in
+    // "distribute") needs to be linked with the binary if you are using the C++
+    // API.
+    yggdrasil_decision_forests.distribute.proto.Config distribute = 5;
   }
   reserved 4;
 
@@ -198,7 +209,7 @@ message PredefinedHyperParameterTemplate {
 
   // Effective hyper-parameters.
   optional GenericHyperParameters parameters = 4;
-};
+}
 
 // Definition of the type, possible values and default values of the generic
 // hyper parameters of a learner. Also contains some documentation (free text +
@@ -286,7 +297,7 @@ message GenericHyperParameterSpecification {
   message LearnerDocumentation {
     // Free text description of the learning algorithm.
     optional string description = 1;
-  };
+  }
 }
 
 // Set of hyper-parameter-sets aka. hyper-parameter search space.

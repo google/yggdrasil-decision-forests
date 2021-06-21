@@ -20,6 +20,9 @@ package yggdrasil_decision_forests.distribute.proto;
 // Configuration for the distribution manager and workers.
 message Config {
   // Identifier of the distribution strategy.
+  //
+  // If you use the C++ API, make sure to link the implementation if the
+  // distribution strategy.
   optional string implementation_key = 1;
 
   // If true, the manager displays logs about the scheduled tasks.
