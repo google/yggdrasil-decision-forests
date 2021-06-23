@@ -264,6 +264,19 @@ void SetDefaultHyperParameters(model::proto::TrainingConfig* config) {
     // Clear deprecated fields.
     gbt_config->clear_subsample();
   }
+
+  if (gbt_config->early_stopping() !=
+          proto::GradientBoostedTreesTrainingConfig::NONE &&
+      gbt_config->validation_set_ratio() == 0) {
+    LOG(WARNING)
+        << "early_stopping != \"NONE\" requires validation_set_ratio>0. "
+           "Setting early_stopping=\"NONE\" (was \""
+        << proto::GradientBoostedTreesTrainingConfig::EarlyStopping_Name(
+               gbt_config->early_stopping())
+        << "\") i.e. sabling early stopping.";
+    gbt_config->set_early_stopping(
+        proto::GradientBoostedTreesTrainingConfig::NONE);
+  }
 }
 
 // Splits the training shards between effective training and validation.
@@ -414,15 +427,6 @@ absl::Status GradientBoostedTreesLearner::CheckConfiguration(
     const model::proto::DeploymentConfig& deployment) {
   RETURN_IF_ERROR(AbstractLearner::CheckConfiguration(data_spec, config,
                                                       config_link, deployment));
-
-  if (gbt_config.early_stopping() !=
-          proto::GradientBoostedTreesTrainingConfig::NONE &&
-      gbt_config.validation_set_ratio() == 0) {
-    return absl::InvalidArgumentError(
-        "Early stopping requires a validation set. Either set "
-        "\"validation_set_ratio\" to be greater than 0, or disable "
-        "early stopping.");
-  }
 
   if ((gbt_config.has_subsample() && gbt_config.subsample() < 1) &&
       gbt_config.sampling_methods_case() !=

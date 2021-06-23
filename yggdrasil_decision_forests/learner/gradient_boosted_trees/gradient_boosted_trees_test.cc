@@ -978,7 +978,6 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDuration) {
   EXPECT_GE(metric::Accuracy(evaluation_), 0.840);
 }
 
-
 TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeLocalGrowth) {
   dataset_sampling_ = 1.0f;
   auto* gbt_config = train_config_.MutableExtension(
@@ -1050,6 +1049,15 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDurationAdaptSubsample) {
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 20);
 #endif
   EXPECT_GE(metric::Accuracy(evaluation_), 0.80);
+}
+
+TEST_F(GradientBoostedTreesOnAdult,
+       DisableEarlyStoppingBecauseOfZeroValidationRatio) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  gbt_config->set_validation_set_ratio(0.f);
+  TrainAndEvaluateModel();
 }
 
 // Train and test a model on the adult dataset.

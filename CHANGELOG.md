@@ -7,6 +7,7 @@
 -   Add training interruption in the abstract learner API.
 -   Reduce the memory usage of the pre-sorted feature index.
 -   Multi-threaded computation of the pre-sorted feature index.
+-   Disable GBT's early stopping if the validation dataset ratio is zero.
 
 ## 0.1.3 - 2021-05-19
 

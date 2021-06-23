@@ -482,7 +482,7 @@ early_stopping: NONE
 **Generic hyper-parameter:**
 
 ```python
-{ validation_ratio = 0.0 }
+{ validation_ratio = 0.0, early_stopping = "NONE" }
 ```
 
 ### Disabling winner take all for RF
