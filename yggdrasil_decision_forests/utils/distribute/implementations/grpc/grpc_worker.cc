@@ -86,6 +86,8 @@ class WorkerService final : public proto::Server::Service {
     if (worker_ && manager_uid_ != manager_uid) {
       // The manager has changed.
       LOG(INFO) << "The manager has changed.";
+      RETURN_IF_ERROR(AbslStatusToGrpcStatus(worker_->Done()));
+      old_workers_.push_back(std::move(worker_));
       worker_.reset();
     }
     manager_uid_ = manager_uid;
