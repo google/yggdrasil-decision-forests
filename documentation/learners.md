@@ -38,6 +38,12 @@ the gradient of the loss relative to the model output).
 -   If true, the tree training evaluates conditions of the type `X is NA` i.e.
     `X is missing`.
 
+#### [apply_link_function](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:apply_link_function)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   If true, applies the link function (a.k.a. activation function), if any, before returning the model prediction. If false, returns the pre-link function model output.<br>For example, in the case of binary classification, the pre-link function output is a logic while the post-link function is a probability.
+
 #### [categorical_algorithm](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:categorical_algorithm)
 
 -   **Type:** Categorical **Default:** CART **Possible values:** CART, ONE_HOT,
