@@ -88,6 +88,7 @@ absl::Status GradientBoostedTreesModel::Save(
   header.set_loss(loss_);
   header.set_num_trees_per_iter(num_trees_per_iter_);
   header.set_validation_loss(validation_loss_);
+  header.set_output_logits(output_logits_);
   *header.mutable_initial_predictions() = google::protobuf::RepeatedField<float>(
       initial_predictions_.begin(), initial_predictions_.end());
   *header.mutable_training_logs() = training_logs_;
@@ -110,6 +111,7 @@ absl::Status GradientBoostedTreesModel::Load(absl::string_view directory) {
   num_trees_per_iter_ = header.num_trees_per_iter();
   validation_loss_ = header.validation_loss();
   training_logs_ = header.training_logs();
+  output_logits_ = header.output_logits();
   return absl::OkStatus();
 }
 
@@ -205,12 +207,19 @@ void GradientBoostedTreesModel::Predict(
                      [&accumulator](const decision_tree::proto::Node& node) {
                        accumulator += node.regressor().top_value();
                      });
-      const float proba_true = 1.f / (1.f + std::exp(-accumulator));
-      prediction->mutable_classification()->set_value(proba_true > 0.5f ? 2
+
+      prediction->mutable_classification()->set_value(accumulator > 0.f ? 2
                                                                         : 1);
       auto* dist = prediction->mutable_classification()->mutable_distribution();
       dist->mutable_counts()->Resize(3, 0.f);
       dist->set_sum(1.f);
+
+      float proba_true;
+      if (output_logits_) {
+        proba_true = accumulator;
+      } else {
+        proba_true = 1.f / (1.f + std::exp(-accumulator));
+      }
       dist->set_counts(1, 1.f - proba_true);
       dist->set_counts(2, proba_true);
     } break;
@@ -236,31 +245,50 @@ void GradientBoostedTreesModel::Predict(
       auto* dist = prediction->mutable_classification()->mutable_distribution();
       dist->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
 
-      float sum_exp = 0;
-      for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
-           accumulator_idx++) {
-        const float exp_val = std::exp(accumulator[accumulator_idx]);
-        sum_exp += exp_val;
-        // The offset of 1 between the class idx and the accumulator_idx is to
-        // skill the special OOD value with index 0.
-        dist->set_counts(accumulator_idx + 1, exp_val);
-      }
-      const float normalization = (sum_exp > 0) ? (1.f / sum_exp) : 0.f;
-
-      float highest_cell_value = 0;
-      int highest_cell_idx = 0;
-
-      for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
-           accumulator_idx++) {
-        const float value = dist->counts(accumulator_idx + 1);
-        if (value > highest_cell_value) {
-          highest_cell_value = value;
-          highest_cell_idx = accumulator_idx;
+      // Top class.
+      if (output_logits_) {
+        float sum_logit = 0;
+        int highest_cell_idx = 0;
+        float highest_cell_value = 0;
+        for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+             accumulator_idx++) {
+          auto value = accumulator[accumulator_idx];
+          sum_logit += value;
+          dist->set_counts(accumulator_idx + 1, value);
+          if (value > highest_cell_value) {
+            highest_cell_value = value;
+            highest_cell_idx = accumulator_idx;
+          }
         }
-        dist->set_counts(accumulator_idx + 1, value * normalization);
+        prediction->mutable_classification()->set_value(highest_cell_idx + 1);
+        dist->set_sum(sum_logit);
+      } else {
+        // Sum logits.
+        float sum_exp = 0;
+        for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+             accumulator_idx++) {
+          const float exp_val = std::exp(accumulator[accumulator_idx]);
+          sum_exp += exp_val;
+          // The offset of 1 between the class idx and the accumulator_idx is to
+          // skill the special OOD value with index 0.
+          dist->set_counts(accumulator_idx + 1, exp_val);
+        }
+        // Softmax
+        int highest_cell_idx = 0;
+        float highest_cell_value = 0;
+        const float normalization = (sum_exp > 0) ? (1.f / sum_exp) : 0.f;
+        for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+             accumulator_idx++) {
+          const float value = dist->counts(accumulator_idx + 1);
+          dist->set_counts(accumulator_idx + 1, value * normalization);
+          if (value > highest_cell_value) {
+            highest_cell_value = value;
+            highest_cell_idx = accumulator_idx;
+          }
+        }
+        prediction->mutable_classification()->set_value(highest_cell_idx + 1);
+        dist->set_sum(1.f);
       }
-      dist->set_sum(1.f);
-      prediction->mutable_classification()->set_value(highest_cell_idx + 1);
     } break;
     case proto::Loss::SQUARED_ERROR: {
       double accumulator = initial_predictions_[0];

@@ -630,6 +630,10 @@ void ActivationGradientBoostedTreesMultinomialLogLikelihood(
   }
 }
 
+template <typename SpecializedModel>
+void ActivationMultiDimIdentity(const SpecializedModel& model,
+                                float* const values, const int num_values) {}
+
 // Templated version of "GenericToSpecializedModel".
 template <typename GenericModel, typename SpecializedModel>
 absl::Status GenericToSpecializedModelHelper(
@@ -921,6 +925,7 @@ absl::Status GenericToSpecializedModel(
         "The Gradient Boosted Tree is not trained for binary classification.");
   }
   dst->initial_predictions = src.initial_predictions()[0];
+  dst->output_logits = src.output_logits();
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
   return GenericToSpecializedModelHelper2(
@@ -939,6 +944,7 @@ absl::Status GenericToSpecializedModel(
   dst->num_classes =
       src.label_col_spec().categorical().number_of_unique_values() - 1;
   dst->initial_predictions = src.initial_predictions();
+  dst->output_logits = src.output_logits();
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
   return GenericToSpecializedModelHelper2(
@@ -1691,9 +1697,14 @@ void Predict(
     const typename GenericGradientBoostedTreesBinaryClassification<
         uint32_t>::ExampleSet& examples,
     int num_examples, std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type,
-                ActivationGradientBoostedTreesBinomialLogLikelihood>(
-      model, examples, num_examples, predictions);
+  if (ABSL_PREDICT_FALSE(model.output_logits)) {
+    PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
+        model, examples, num_examples, predictions);
+  } else {
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationGradientBoostedTreesBinomialLogLikelihood>(
+        model, examples, num_examples, predictions);
+  }
 }
 
 template <>
@@ -1702,10 +1713,16 @@ void Predict(
     const typename GradientBoostedTreesMulticlassClassification::ExampleSet&
         examples,
     int num_examples, std::vector<float>* predictions) {
-  PredictHelperMultiDimensionFromSingleDimensionTrees<
-      std::remove_reference<decltype(model)>::type,
-      ActivationGradientBoostedTreesMultinomialLogLikelihood>(
-      model, examples, num_examples, predictions);
+  if (ABSL_PREDICT_FALSE(model.output_logits)) {
+    PredictHelperMultiDimensionFromSingleDimensionTrees<
+        std::remove_reference<decltype(model)>::type,
+        ActivationMultiDimIdentity>(model, examples, num_examples, predictions);
+  } else {
+    PredictHelperMultiDimensionFromSingleDimensionTrees<
+        std::remove_reference<decltype(model)>::type,
+        ActivationGradientBoostedTreesMultinomialLogLikelihood>(
+        model, examples, num_examples, predictions);
+  }
 }
 
 template <>

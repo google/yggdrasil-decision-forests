@@ -118,7 +118,7 @@ std::string ShardDataset(const dataset::VerticalDataset& dataset,
 
   for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
     std::vector<dataset::VerticalDataset::row_t> idxs;
-    for (int i = 0; i < examples.size(); i += num_shards) {
+    for (int i = shard_idx; i < examples.size(); i += num_shards) {
       idxs.push_back(examples[i]);
     }
     CHECK_OK(
@@ -620,12 +620,7 @@ class PerShardSamplingOnAdult : public ::testing::Test {
 };
 
 // Training a model with the shard sampler algorithm, but with all the shards
-// used for each tree. This model is expected to be similar at the
-// classical/non-sharded algorithm. The two models might not have the exact same
-// structure of the reasons:
-// - Sampling of the validation dataset from shards instead of datasets.
-// - Even if the sample contains the entire dataset, the examples will be seen
-//   in possibly different order.
+// used for each tree.
 TEST_F(PerShardSamplingOnAdult, PerShardSamplingExact) {
   auto learner = BuildBaseLearner();
   auto* gbt_config = learner->mutable_training_config()->MutableExtension(
@@ -634,30 +629,19 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingExact) {
   // Shard the training dataset.
   const auto sharded_path = ShardDataset(train_ds_, 20, 0.3);
 
-  LOG(INFO) << "Train reference model";
-  // Training with the classical algorithm.
-  // Both models should be exactly the same structure and evaluation.
-  const auto reference_model =
-      learner->TrainWithStatus(sharded_path, data_spec_).value();
-
   LOG(INFO) << "Train sharded model";
   gbt_config->mutable_sample_with_shards();
-  const auto sharded_model =
-      learner->TrainWithStatus(sharded_path, data_spec_).value();
+
+  const auto model = learner->TrainWithStatus(sharded_path, data_spec_).value();
 
   LOG(INFO) << "Evaluate models";
   // Evaluate the models.
   utils::RandomEngine rnd(1234);
-  const auto sharded_evaluation = sharded_model->Evaluate(test_ds_, {}, &rnd);
-  const auto reference_evaluation =
-      reference_model->Evaluate(test_ds_, {}, &rnd);
+  const auto evaluation = model->Evaluate(test_ds_, {}, &rnd);
+  LOG(INFO) << "Evaluation:" << metric::TextReport(evaluation);
 
   // Sharded model is "good".
-  EXPECT_NEAR(metric::Accuracy(sharded_evaluation), 0.8239, 0.015);
-
-  // Sharded model is equivalent to reference model.
-  EXPECT_NEAR(metric::Accuracy(sharded_evaluation),
-              metric::Accuracy(reference_evaluation), 0.008);
+  EXPECT_NEAR(metric::Accuracy(evaluation), 0.8665, 0.008);
 }
 
 // Model trained with the sharded algorithm and sampling.
@@ -667,7 +651,7 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingSampling) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
 
   // Shard the training dataset.
-  const auto sharded_path = ShardDataset(train_ds_, 20, 0.5);
+  const auto sharded_path = ShardDataset(train_ds_, 20, 1.0);
 
   // Model trained with the sharded algorithm and sampling.
   gbt_config->mutable_sample_with_shards();
@@ -680,7 +664,7 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingSampling) {
   const auto sharded_sampled_evaluation =
       sharded_sampled_model->Evaluate(test_ds_, {}, &rnd);
 
-  EXPECT_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.82700, 0.008);
+  EXPECT_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.86180, 0.005);
 }
 
 // Model trained with the sharded algorithm and sampling.
@@ -690,11 +674,11 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingSamplingRecycle) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
 
   // Shard the training dataset.
-  const auto sharded_path = ShardDataset(train_ds_, 20, 0.5);
+  const auto sharded_path = ShardDataset(train_ds_, 20, 1.0);
 
   // Model trained with the sharded algorithm and sampling.
   gbt_config->set_subsample(0.1f);
-  gbt_config->mutable_sample_with_shards()->set_num_recycling(3);
+  gbt_config->mutable_sample_with_shards()->set_num_recycling(5);
   const auto sharded_sampled_model =
       learner->TrainWithStatus(sharded_path, data_spec_).value();
 
@@ -703,7 +687,7 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingSamplingRecycle) {
   const auto sharded_sampled_evaluation =
       sharded_sampled_model->Evaluate(test_ds_, {}, &rnd);
 
-  EXPECT_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.82700, 0.008);
+  EXPECT_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.86088, 0.005);
 }
 
 // Train and test a model on the adult dataset using random categorical splits.

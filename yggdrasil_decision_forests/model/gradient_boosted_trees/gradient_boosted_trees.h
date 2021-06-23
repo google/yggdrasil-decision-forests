@@ -129,6 +129,9 @@ class GradientBoostedTreesModel : public AbstractModel {
   float validation_loss() const { return validation_loss_; }
   void set_validation_loss(const float loss) { validation_loss_ = loss; }
 
+  bool output_logits() const { return output_logits_; }
+  void set_output_logits(bool value) { output_logits_ = value; }
+
   // Updates the format used to save the model on disk. If not specified, the
   // recommended format `RecommendedSerializationFormat` is used.
   void set_node_format(const std::optional<std::string>& format) {
@@ -200,6 +203,9 @@ class GradientBoostedTreesModel : public AbstractModel {
 
   // Evaluation metrics and other meta-data computed during training.
   proto::TrainingLogs training_logs_;
+  // If true, call to predict methods return logits (e.g. instead of probability
+  // in the case of classification).
+  bool output_logits_ = false;
 
   // Format used to stored the node on disk.
   // If not specified, the format `RecommendedSerializationFormat()` will be

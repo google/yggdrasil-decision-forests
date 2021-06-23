@@ -154,6 +154,9 @@ struct QuickScorerExtendedModel {
   // Initial prediction / bias of the model.
   float initial_prediction = 0.f;
 
+  // If true, do not apply the activation function of the model (if any).
+  bool output_logits = false;
+
 #ifdef __AVX2__
   // This flag is set during the compilation of the model and indicates if the
   // CPU supports AVX2 instructions

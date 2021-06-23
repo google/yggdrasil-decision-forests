@@ -396,6 +396,7 @@ absl::Status FillQuickScorer(
   RETURN_IF_ERROR(InitializeAccumulator(src, *dst, accumulator));
 
   dst->initial_prediction = src.initial_predictions()[0];
+  dst->output_logits = src.output_logits();
   dst->num_trees = src.NumTrees();
   if (dst->num_trees > internal::QuickScorerExtendedModel::kMaxTrees) {
     return absl::InvalidArgumentError(
@@ -787,13 +788,22 @@ void Predict(
     const GradientBoostedTreesBinaryClassificationQuickScorerExtended::
         ExampleSet& examples,
     const int num_examples, std::vector<float>* predictions) {
-  PredictQuickScorerMajorFeatureOffset<
-      GradientBoostedTreesBinaryClassificationQuickScorerExtended,
-      ActivationBinomialLogLikelihood>(
-      model, examples.InternalCategoricalAndNumericalValues(),
-      examples.InternalCategoricalSetBeginAndEnds(),
-      examples.InternalCategoricalItemBuffer(), num_examples,
-      examples.NumberOfExamples(), predictions);
+  if (model.output_logits) {
+    PredictQuickScorerMajorFeatureOffset<
+        GradientBoostedTreesBinaryClassificationQuickScorerExtended>(
+        model, examples.InternalCategoricalAndNumericalValues(),
+        examples.InternalCategoricalSetBeginAndEnds(),
+        examples.InternalCategoricalItemBuffer(), num_examples,
+        examples.NumberOfExamples(), predictions);
+  } else {
+    PredictQuickScorerMajorFeatureOffset<
+        GradientBoostedTreesBinaryClassificationQuickScorerExtended,
+        ActivationBinomialLogLikelihood>(
+        model, examples.InternalCategoricalAndNumericalValues(),
+        examples.InternalCategoricalSetBeginAndEnds(),
+        examples.InternalCategoricalItemBuffer(), num_examples,
+        examples.NumberOfExamples(), predictions);
+  }
 }
 
 template <typename AbstractModel, typename CompiledModel>
@@ -809,8 +819,9 @@ absl::Status BaseGenericToSpecializedModel(const AbstractModel& src,
 #endif
 #elif ABSL_HAVE_BUILTIN(__builtin_cpu_supports)
   if (__builtin_cpu_supports("avx2")) {
-    LOG(INFO) << "The binary was compiled without AVX2 support, but your CPU"
-                 "supports it. Enable it for faster model inference.";
+    LOG_INFO_EVERY_N_SEC(
+        30, _ << "The binary was compiled without AVX2 support, but your CPU "
+                 "supports it. Enable it for faster model inference.");
   }
 #endif
 

@@ -390,6 +390,7 @@ struct GenericGradientBoostedTreesBinaryClassification
   // Output of the model before any tree is applied, and before the final
   // activation function.
   float initial_predictions = 0.f;
+  bool output_logits = false;
 };
 using GradientBoostedTreesBinaryClassification =
     GenericGradientBoostedTreesBinaryClassification<>;
@@ -402,6 +403,7 @@ struct GenericGradientBoostedTreesMulticlassClassification
       model::proto::Task::CLASSIFICATION;
   int num_classes;
   std::vector<float> initial_predictions;
+  bool output_logits = false;
 };
 using GradientBoostedTreesMulticlassClassification =
     GenericGradientBoostedTreesMulticlassClassification<>;

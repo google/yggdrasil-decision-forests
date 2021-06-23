@@ -19,7 +19,7 @@ package yggdrasil_decision_forests.model.gradient_boosted_trees.proto;
 
 // Header for the gradient boosted trees model.
 message Header {
-  // Next ID: 9
+  // Next ID: 10
 
   // Number of shards used to store the nodes.
   optional int32 num_node_shards = 1;
@@ -39,6 +39,9 @@ message Header {
   optional string node_format = 7 [default = "TFE_RECORDIO"];
   // Evaluation metrics and other meta-data computed during training.
   optional TrainingLogs training_logs = 8;
+  // If true, call to predict methods return logits (e.g. instead of probability
+  // in the case of classification).
+  optional bool output_logits = 9 [default = false];
 }
 
 enum Loss {

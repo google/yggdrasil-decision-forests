@@ -23,7 +23,7 @@ import "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted
 
 // Training configuration for the Gradient Boosted Trees algorithm.
 message GradientBoostedTreesTrainingConfig {
-  // Next ID: 32
+  // Next ID: 34
 
   // Basic parameters.
 
@@ -97,7 +97,7 @@ message GradientBoostedTreesTrainingConfig {
   message SampleInMemory {}
 
   message SampleWithShards {
-    // Number of times a sample is re-used before being discaded.
+    // Number of times a sample is re-used before being discarded.
     // Increasing this value will speed-up the training speed if IO is the
     // bottle-neck (
     optional int32 num_recycling = 1 [default = 0];
@@ -123,6 +123,10 @@ message GradientBoostedTreesTrainingConfig {
   //
   // Impact the early stopping policy.
   optional int32 validation_interval_in_trees = 7 [default = 1];
+
+  // If set and >0, export the training logs every
+  // "export_logs_during_training_in_trees" trees.
+  optional int32 export_logs_during_training_in_trees = 33 [default = -1];
 
   // Decision Trees are trained sequentially. Training too many trees leads to
   // training dataset overfitting. The "early stopping" policy controls the

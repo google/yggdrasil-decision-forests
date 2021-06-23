@@ -57,6 +57,7 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/adaptive_work.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -209,7 +210,8 @@ void SetDefaultHyperParameters(model::proto::TrainingConfig* config) {
       gbt_config->mutable_decision_tree()->set_max_depth(6);
     }
   }
-  if (!gbt_config->decision_tree().has_num_candidate_attributes()) {
+  if (!gbt_config->decision_tree().has_num_candidate_attributes() &&
+      !gbt_config->decision_tree().has_num_candidate_attributes_ratio()) {
     // The basic definition of GBT does not have any attribute sampling.
     gbt_config->mutable_decision_tree()->set_num_candidate_attributes(-1);
   }
@@ -362,14 +364,20 @@ absl::Status FinalizeModelWithValidationDataset(
   return absl::OkStatus();
 }
 
+absl::Status MaybeExportTrainingLogs(const absl::string_view log_directory,
+                                     GradientBoostedTreesModel* mdl) {
+  if (!log_directory.empty()) {
+    RETURN_IF_ERROR(
+        internal::ExportTrainingLogs(mdl->training_logs(), log_directory));
+  }
+  return absl::OkStatus();
+}
+
 absl::Status FinalizeModel(const absl::string_view log_directory,
                            GradientBoostedTreesModel* mdl) {
   mdl->mutable_training_logs()->set_number_of_trees_in_final_model(
       mdl->NumTrees() / mdl->num_trees_per_iter());
-  if (!log_directory.empty()) {
-    internal::ExportTrainingLogs(mdl->training_logs(), log_directory);
-  }
-  return absl::OkStatus();
+  return MaybeExportTrainingLogs(log_directory, mdl);
 }
 
 // Returns a non owning vector of tree pointers from a vector of tree
@@ -552,6 +560,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   // - No support for the DART algorithm.
   // - No support for Ranking.
 
+  // TODO(gbm): Splitting method.
+
   const auto begin_training = absl::Now();
 
   // Initialize the configuration.
@@ -574,8 +584,10 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 
   std::vector<std::string> all_shards;
   RETURN_IF_ERROR(utils::ExpandInputShards(dataset_path, &all_shards));
-  LOG(INFO) << "Found " << all_shards.size()
-            << " shards in entire training dataset";
+
+  LOG(INFO) << "Training gradient boosted tree on " << all_shards.size()
+            << " shard(s) and " << config.train_config_link.features().size()
+            << " feature(s).";
   if (all_shards.size() < 10) {
     return absl::InvalidArgumentError(absl::Substitute(
         "The number of shards in $0 is too small $1<10. For best "
@@ -650,6 +662,11 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     absl::Duration sum_duration_preprocess ABSL_GUARDED_BY(mutex_sum_duration);
   } time_accumulators;
 
+  // Fast version of the model. The fast engine is cheaper to run but more
+  // expensive to construct.
+  std::unique_ptr<serving::FastEngine> last_engine;
+  int num_trees_in_last_engine = 0;
+
   // Load a random sample of training data, prepare it for the weak learner
   // training, and compute the cached predictions with "trees".
   utils::RandomEngine shard_random(random());
@@ -657,7 +674,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   auto load_and_prepare_next_sample =
       [&training_shards, num_sample_train_shards, &shard_random,
        &shard_random_mutex, &dataset_prefix, &data_spec, &config, &mdl,
-       &time_accumulators](std::vector<decision_tree::DecisionTree*> trees)
+       &time_accumulators, &last_engine, &num_trees_in_last_engine](
+          const std::vector<decision_tree::DecisionTree*>& trees)
       -> utils::StatusOr<
           std::unique_ptr<internal::CompleteTrainingDatasetForWeakLearner>> {
     auto time_begin_load = absl::Now();
@@ -674,9 +692,11 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
                          /*allocate_gradient=*/true, mdl.get()));
 
     auto time_begin_predict = absl::Now();
-    RETURN_IF_ERROR(internal::ComputePredictions(mdl.get(), trees, config,
-                                                 &dataset->gradient_dataset,
-                                                 &dataset->predictions));
+    RETURN_IF_ERROR(internal::ComputePredictions(
+        mdl.get(), last_engine.get(), trees, config, dataset->gradient_dataset,
+        &dataset->predictions));
+    dataset->predictions_from_num_trees =
+        num_trees_in_last_engine + trees.size();
 
     auto time_end_all = absl::Now();
     {
@@ -754,19 +774,34 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         // Note: At this point, the pre-computed predictions do not take into
         // account the trees added in the last iteration.
 
-        // Add the predictions of the trees learned in the last iteration.
-        std::vector<const decision_tree::DecisionTree*> last_trees;
-        last_trees.reserve(mdl->num_trees_per_iter());
-        for (int i = 0; i < mdl->num_trees_per_iter(); i++) {
-          const int tree_idx = mdl->NumTrees() + i - mdl->num_trees_per_iter();
-          last_trees.push_back(mdl->decision_trees()[tree_idx].get());
-        }
+        // Add the predictions of the trees learned in the last iteration(s).
+        const int num_redo_iters =
+            1 + config.gbt_config->sample_with_shards().num_recycling();
+        DCHECK_EQ(mdl->NumTrees(),
+                  next_train_dataset->predictions_from_num_trees +
+                      num_redo_iters * mdl->num_trees_per_iter());
+        for (int redo_iter_idx = 0; redo_iter_idx < num_redo_iters;
+             redo_iter_idx++) {
+          std::vector<const decision_tree::DecisionTree*> last_trees;
+          last_trees.reserve(mdl->num_trees_per_iter());
+          const auto begin_tree_idx =
+              mdl->NumTrees() -
+              (num_redo_iters - redo_iter_idx) * mdl->num_trees_per_iter();
+          for (int tree_idx_in_iter = 0;
+               tree_idx_in_iter < mdl->num_trees_per_iter();
+               tree_idx_in_iter++) {
+            last_trees.push_back(
+                mdl->decision_trees()[begin_tree_idx + tree_idx_in_iter].get());
+          }
 
-        // Caches the predictions of the trees.
-        RETURN_IF_ERROR(config.loss->UpdatePredictions(
-            last_trees, next_train_dataset->gradient_dataset,
-            &next_train_dataset->predictions,
-            /*mean_abs_prediction=*/nullptr));
+          // Caches the predictions of the trees.
+          RETURN_IF_ERROR(config.loss->UpdatePredictions(
+              last_trees, next_train_dataset->gradient_dataset,
+              &next_train_dataset->predictions,
+              /*mean_abs_prediction=*/nullptr));
+          next_train_dataset->predictions_from_num_trees +=
+              mdl->num_trees_per_iter();
+        }
 
         current_train_dataset = std::move(next_train_dataset);
       }
@@ -775,14 +810,24 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
       //
       // Note: We don't need to do it for the last tree.
       if (iter_idx < config.gbt_config->num_trees() - 1) {
+        // Compile the trees into an engine.
+        mdl->set_output_logits(true);
+        auto engine_or = mdl->BuildFastEngine();
+        mdl->set_output_logits(false);
+        if (engine_or.ok()) {
+          last_engine = std::move(engine_or.value());
+          num_trees_in_last_engine = mdl->NumTrees();
+        }
+
+        // Extract the trees of the current model.
+        std::vector<decision_tree::DecisionTree*> trees;
+        for (int tree_idx = num_trees_in_last_engine;
+             tree_idx < mdl->NumTrees(); tree_idx++) {
+          trees.push_back(&*mdl->decision_trees()[tree_idx]);
+        }
+
         thread_load_next_shards = absl::make_unique<utils::concurrency::Thread>(
-            [&mdl, &load_and_prepare_next_sample, &next_train_dataset]() {
-              // Extract the trees of the current model.
-              std::vector<decision_tree::DecisionTree*> trees;
-              trees.reserve(mdl->NumTrees());
-              for (const auto& tree : mdl->decision_trees()) {
-                trees.push_back(&*tree);
-              }
+            [&load_and_prepare_next_sample, &next_train_dataset, trees]() {
               next_train_dataset = load_and_prepare_next_sample(trees).value();
             });
       }
@@ -825,6 +870,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         nullptr, &current_train_dataset->gradients, &random));
 
     // Train a tree on the gradient.
+    DCHECK_EQ(current_train_dataset->predictions_from_num_trees,
+              mdl->NumTrees());
     std::vector<std::unique_ptr<decision_tree::DecisionTree>> new_trees;
     new_trees.reserve(mdl->num_trees_per_iter());
     for (int grad_idx = 0; grad_idx < mdl->num_trees_per_iter(); grad_idx++) {
@@ -851,6 +898,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           RemoveUniquePtr(new_trees), validation->gradient_dataset,
           &validation->predictions,
           /*mean_abs_prediction=*/nullptr));
+      validation->predictions_from_num_trees += new_trees.size();
     }
 
     if (recycle_next) {
@@ -859,6 +907,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           RemoveUniquePtr(new_trees), current_train_dataset->gradient_dataset,
           &current_train_dataset->predictions,
           /*mean_abs_prediction=*/nullptr));
+      current_train_dataset->predictions_from_num_trees += new_trees.size();
     }
 
     // Add the tree to the model.
@@ -871,6 +920,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         0) {
       float training_loss;
       std::vector<float> train_secondary_metrics;
+      DCHECK_EQ(validation->predictions_from_num_trees, mdl->NumTrees());
       RETURN_IF_ERROR(config.loss->Loss(
           current_train_dataset->gradient_dataset,
           config.train_config_link.label(), current_train_dataset->predictions,
@@ -951,6 +1001,13 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         break;
       }
     }  // End of training loss.
+
+    // Export intermediate training logs.
+    if (config.gbt_config->export_logs_during_training_in_trees() > 0 &&
+        (((iter_idx + 1) %
+          config.gbt_config->export_logs_during_training_in_trees()) == 0)) {
+      RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
+    }
   }
 
   // Wait for the loader to stop. This is possible if the training was stopping
@@ -1000,6 +1057,10 @@ GradientBoostedTreesLearner::TrainWithStatus(
   internal::AllTrainingConfiguration config;
   RETURN_IF_ERROR(
       BuildAllTrainingConfiguration(train_dataset.data_spec(), &config));
+
+  LOG(INFO) << "Training gradient boosted tree on " << train_dataset.nrow()
+            << " example(s) and " << config.train_config_link.features().size()
+            << " feature(s).";
 
   utils::usage::OnTrainingStart(train_dataset.data_spec(), config.train_config,
                                 config.train_config_link, train_dataset.nrow());
@@ -1373,7 +1434,14 @@ GradientBoostedTreesLearner::TrainWithStatus(
         break;
       }
     }  // End of training loss.
-  }    // End of training iteration.
+
+    // Export intermediate training logs.
+    if (config.gbt_config->export_logs_during_training_in_trees() > 0 &&
+        (((iter_idx + 1) %
+          config.gbt_config->export_logs_during_training_in_trees()) == 0)) {
+      RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
+    }
+  }  // End of training iteration.
 
   if (has_validation_dataset) {
     RETURN_IF_ERROR(
@@ -2028,9 +2096,12 @@ LoadCompleteDatasetForWeakLearner(
   auto complete_dataset =
       absl::make_unique<CompleteTrainingDatasetForWeakLearner>();
 
+  const auto dataset_loading_config =
+      OptimalDatasetLoadingConfig(config.train_config_link);
+
   RETURN_IF_ERROR(dataset::LoadVerticalDataset(
       absl::StrCat(format_prefix, ":", absl::StrJoin(shards, ",")), data_spec,
-      &complete_dataset->dataset));
+      &complete_dataset->dataset, {}, dataset_loading_config));
 
   RETURN_IF_ERROR(dataset::GetWeights(complete_dataset->dataset,
                                       config.train_config_link,
@@ -2205,14 +2276,31 @@ void SetInitialPredictions(const std::vector<float>& initial_predictions,
 
 absl::Status ComputePredictions(
     const GradientBoostedTreesModel* mdl,
+    const serving::FastEngine* optional_engine,
     const std::vector<decision_tree::DecisionTree*>& trees,
     const internal::AllTrainingConfiguration& config,
-    dataset::VerticalDataset* gradient_dataset,
+    const dataset::VerticalDataset& gradient_dataset,
     std::vector<float>* predictions) {
-  SetInitialPredictions(mdl->initial_predictions(), gradient_dataset->nrow(),
-                        predictions);
-  const int num_iterations = trees.size() / mdl->num_trees_per_iter();
+  if (optional_engine) {
+    // Prediction using the engine (fast).
+    auto examples = optional_engine->AllocateExamples(gradient_dataset.nrow());
+    RETURN_IF_ERROR(serving::CopyVerticalDatasetToAbstractExampleSet(
+        gradient_dataset,
+        /*begin_example_idx=*/0,
+        /*end_example_idx=*/gradient_dataset.nrow(),
+        optional_engine->features(), examples.get()));
+    if (optional_engine->NumPredictionDimension() !=
+        mdl->initial_predictions().size()) {
+      return absl::InternalError("Unexpected number of prediction dimensions");
+    }
+    optional_engine->Predict(*examples, gradient_dataset.nrow(), predictions);
+  } else {
+    SetInitialPredictions(mdl->initial_predictions(), gradient_dataset.nrow(),
+                          predictions);
+  }
 
+  // Predictions using the trees (slow).
+  const int num_iterations = trees.size() / mdl->num_trees_per_iter();
   std::vector<const decision_tree::DecisionTree*> selected_trees(
       mdl->num_trees_per_iter());
   for (int iter_idx = 0; iter_idx < num_iterations; iter_idx++) {
@@ -2220,9 +2308,8 @@ absl::Status ComputePredictions(
       selected_trees[tree_idx] =
           trees[iter_idx * mdl->num_trees_per_iter() + tree_idx];
     }
-
     RETURN_IF_ERROR(config.loss->UpdatePredictions(
-        selected_trees, *gradient_dataset, predictions, nullptr));
+        selected_trees, gradient_dataset, predictions, nullptr));
   }
   return absl::OkStatus();
 }
@@ -2352,9 +2439,33 @@ absl::Status SampleTrainingExamplesWithSelGB(
   return absl::OkStatus();
 }
 
-void ExportTrainingLogs(const proto::TrainingLogs& training_logs,
-                        absl::string_view directory) {
-// Add methods to plot training logs here.
+absl::Status ExportTrainingLogs(const proto::TrainingLogs& training_logs,
+                                absl::string_view directory) {
+  // Add methods to plot training logs here.
+  CHECK_OK(file::RecursivelyCreateDir(directory, file::Defaults()));
+
+  // Export the logs in a .csv file.
+  ASSIGN_OR_RETURN(auto file_handle, file::OpenOutputFile(file::JoinPath(
+                                         directory, "training_logs.csv")));
+  file::OutputFileCloser file(std::move(file_handle));
+
+  utils::csv::Writer writer(file.stream());
+  std::vector<std::string> fields = {"num_trees", "valid_loss"};
+  for (const auto& metric : training_logs.secondary_metric_names()) {
+    fields.push_back(absl::StrCat("valid_", metric));
+  }
+  RETURN_IF_ERROR(writer.WriteRowStrings(fields));
+  for (const auto& entry : training_logs.entries()) {
+    std::vector<std::string> row;
+    row.push_back(absl::StrCat(entry.number_of_trees()));
+    row.push_back(absl::StrCat(entry.validation_loss()));
+    for (const auto metric : entry.validation_secondary_metrics()) {
+      row.push_back(absl::StrCat(metric));
+    }
+    RETURN_IF_ERROR(writer.WriteRowStrings(row));
+  }
+
+  return absl::OkStatus();
 }
 
 void InitializeModelWithTrainingConfig(

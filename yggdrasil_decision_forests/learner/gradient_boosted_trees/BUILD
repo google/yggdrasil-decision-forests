@@ -53,6 +53,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/serving/decision_forest:register_engines",
         "//yggdrasil_decision_forests/utils:adaptive_work",
         "//yggdrasil_decision_forests/utils:compatibility",
+        "//yggdrasil_decision_forests/utils:csv",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:hyper_parameters",
         "//yggdrasil_decision_forests/utils:logging",

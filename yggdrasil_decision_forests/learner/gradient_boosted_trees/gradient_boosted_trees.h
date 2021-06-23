@@ -215,11 +215,15 @@ void SetInitialPredictions(const std::vector<float>& initial_predictions,
 
 // Computes the predictions and gradient of the model without relying on
 // existing predictions or gradient buffers.
+//
+// Only the meta-data are used from "mdl". If "optional_engine" is non-null, it
+// will be used in conjunction with "trees".
 absl::Status ComputePredictions(
     const GradientBoostedTreesModel* mdl,
+    const serving::FastEngine* optional_engine,
     const std::vector<decision_tree::DecisionTree*>& trees,
     const internal::AllTrainingConfiguration& config,
-    dataset::VerticalDataset* gradient_dataset,
+    const dataset::VerticalDataset& gradient_dataset,
     std::vector<float>* predictions);
 
 // Sample (without replacement) a set of example indices.
@@ -250,8 +254,8 @@ absl::Status SampleTrainingExamplesWithSelGB(
 // - A static plot (.svg) of the training/validation loss/secondary metric
 //   according to the number of trees.
 // - An interactive plot of the same type.
-void ExportTrainingLogs(const proto::TrainingLogs& training_logs,
-                        absl::string_view directory);
+absl::Status ExportTrainingLogs(const proto::TrainingLogs& training_logs,
+                                absl::string_view directory);
 
 void InitializeModelWithTrainingConfig(
     const model::proto::TrainingConfig& training_config,
@@ -370,7 +374,11 @@ struct CompleteTrainingDatasetForWeakLearner {
   // Training weights.
   std::vector<float> weights;
 
+  // Predictions of the model.
   std::vector<float> predictions;
+
+  // Number of trees used to compute "predictions".
+  int predictions_from_num_trees = 0;
 };
 
 // Loads a dataset for a weak learner.
