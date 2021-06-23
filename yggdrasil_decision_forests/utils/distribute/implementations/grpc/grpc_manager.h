@@ -15,8 +15,8 @@
 
 // Distribution over a set of processed communicating through GRPC.
 
-#ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_H_
-#define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_H_
+#ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
+#define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
 
 #include "grpcpp/channel.h"
 #include "grpcpp/server.h"
@@ -105,10 +105,7 @@ class GRPCManager : public AbstractManager {
 
 REGISTER_Distribution_Manager(GRPCManager, GRPCManager::kKey);
 
-// "main" function for a worker.
-absl::Status GRPCWorkerMainWorkerMain(int port, bool use_loas = false);
-
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests
 
-#endif  // THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_H_
+#endif  // THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_

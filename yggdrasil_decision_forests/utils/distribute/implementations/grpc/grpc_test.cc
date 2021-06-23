@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.h"
-
+#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_manager.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_worker.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"

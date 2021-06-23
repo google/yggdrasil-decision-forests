@@ -13,30 +13,19 @@
  * limitations under the License.
  */
 
-// A worker waiting for jobs sent by the GRPC manager.
+#ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_WORKER_H_
+#define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_WORKER_H_
 
-#include "absl/flags/flag.h"
-#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_worker.h"
-#include "yggdrasil_decision_forests/utils/logging.h"
-
-ABSL_FLAG(int, port, -1, "Port");
-ABSL_FLAG(bool, use_loas, false, "Use LOAS.");
+#include "absl/status/status.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
-void GRPCWorker() {
-  const auto port = absl::GetFlag(FLAGS_port);
-  LOG(INFO) << "Start GRPC worker on port " << port;
-  QCHECK_OK(GRPCWorkerMainWorkerMain(port, absl::GetFlag(FLAGS_use_loas)));
-  LOG(INFO) << "Stop GRPC worker";
-}
+// Runs the a worker. The function is blocking until the manager stops the
+// worker.
+absl::Status GRPCWorkerMainWorkerMain(int port, bool use_loas = false);
 
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests
 
-int main(int argc, char** argv) {
-  InitLogging(argv[0], &argc, &argv, true);
-  yggdrasil_decision_forests::distribute::GRPCWorker();
-  return 0;
-}
+#endif  // THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_WORKER_H_

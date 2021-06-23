@@ -22,7 +22,7 @@ cc_binary(
     name = "grpc_worker_main",
     srcs = ["grpc_worker_main.cc"],
     deps = [
-        ":grpc",
+        ":grpc_worker",
         "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils/distribute:all_workers",
@@ -32,16 +32,43 @@ cc_binary(
 # Library
 # =======
 
-cc_library(
+alias(
     name = "grpc",
-    srcs = ["grpc.cc"],
-    hdrs = ["grpc.h"],
+    actual = ":grpc_manager",
+)
+
+cc_library(
+    name = "grpc_manager",
+    srcs = ["grpc_manager.cc"],
+    hdrs = ["grpc_manager.h"],
     deps = [
         ":grpc_cc_proto",
         ":grpc_grpc_proto",
         "@com_github_grpc_grpc//:grpc",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/synchronization",
+        "//yggdrasil_decision_forests/utils:concurrency",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "//yggdrasil_decision_forests/utils/distribute:core",
+        "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "grpc_worker",
+    srcs = ["grpc_worker.cc"],
+    hdrs = ["grpc_worker.h"],
+    deps = [
+        ":grpc_cc_proto",
+        ":grpc_grpc_proto",
+        "@com_github_grpc_grpc//:grpc",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/synchronization",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:filesystem",
@@ -60,8 +87,9 @@ cc_test(
     name = "grpc_test",
     srcs = ["grpc_test.cc"],
     deps = [
-        ":grpc",
         ":grpc_cc_proto",
+        ":grpc_manager",
+        ":grpc_worker",
         "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:filesystem",
