@@ -29,17 +29,30 @@ import "yggdrasil_decision_forests/utils/distribute/distribute.proto";
 // If not specified, more consumer will assume local computation with multiple
 // threads.
 message DeploymentConfig {
-  // Next ID: 5
+  // Next ID: 7
 
-  // Path to temporary directory.
+  // Path to temporary directory available to the training algorithm.
+  // Currently cache_path is only used (and required) by the
+  // distributed algorithms or if "try_resume_training=True" (for the
+  // snapshots).
+  //
+  // In case of distributed training, the "cache_path" should be available by
+  // the manager and the workers (unless specified otherwise) -- so local
+  // machine/memory partition won't work.
   optional string cache_path = 1;
 
   // Number of threads.
   optional int32 num_threads = 2 [default = 6];
 
-  // If true, try to resume interrupted training using snapshots stored in the
-  // "cache_path" or execution specific storages.
+  // If true, try to resume an interrupted training using snapshots stored in
+  // the "cache_path". Not supported by all learning algorithms. Resuming
+  // training after changing the hyper-parameters might lead to failure when
+  // training is resumed.
   optional bool try_resume_training = 6 [default = false];
+
+  // Indicative number of seconds in between snapshots when
+  // "try_resume_training=True". Might be ignored by some algorithms.
+  optional int64 resume_training_snapshot_interval_seconds = 7 [default = 1800];
 
   // Computation distribution engine.
   oneof execution {
@@ -342,4 +355,8 @@ message LearnerCapabilities {
   // Does the learner support the "maximum_training_duration_seconds" parameter
   // in the TrainingConfig.
   optional bool support_max_training_duration = 1 [default = false];
+
+  // The learner can resume training of the model from the "cache_path" given in
+  // the deployment configuration.
+  optional bool resume_training = 2 [default = false];
 }

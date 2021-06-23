@@ -13,11 +13,13 @@
  * limitations under the License.
  */
 
-// In process, non-parallelized implementation. For debugging and pipeline
-// development.
+// In process implementation. For debugging and pipeline development.
+//
+// For efficient multi-threading, use a "ThreadPool" or a "StreamProcessor".
+//
 
-#ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_SINGLE_THREAD_H_
-#define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_SINGLE_THREAD_H_
+#ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_MULTI_THREAD_H_
+#define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_MULTI_THREAD_H_
 
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
@@ -25,9 +27,9 @@
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
-class SingleThreadManager : public AbstractManager {
+class MultiThreadManager : public AbstractManager {
  public:
-  static constexpr char kKey[] = "SINGLE_THREAD";
+  static constexpr char kKey[] = "MULTI_THREAD";
 
   utils::StatusOr<Blob> BlockingRequest(Blob blob, int worker_idx) override;
 
@@ -50,12 +52,16 @@ class SingleThreadManager : public AbstractManager {
   // Next worker that will solve the next request.
   std::atomic<int> next_worker_ = 0;
 
-  utils::concurrency::Channel<Blob> async_pending_answers_;
+  utils::concurrency::Channel<utils::StatusOr<Blob>> async_pending_answers_;
+
+  std::unique_ptr<utils::concurrency::ThreadPool> thread_pool_;
+
+  std::atomic<bool> done_was_called_{false};
 };
 
-REGISTER_Distribution_Manager(SingleThreadManager, SingleThreadManager::kKey);
+REGISTER_Distribution_Manager(MultiThreadManager, MultiThreadManager::kKey);
 
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests
 
-#endif  // YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_SINGLE_THREAD_H_
+#endif  // YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_MULTI_THREAD_H_

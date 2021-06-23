@@ -273,7 +273,8 @@ void GRPCManager::WorkerRun(Blob blob, Worker* worker) {
         LOG(WARNING) << "GRPC call to worker #" << worker->worker_idx
                      << " failed with error: " << status.error_message();
       }
-      if (status.error_message() == "Socket closed") {
+      if (status.error_message() == "Socket closed" ||
+          status.error_message() == "Connection reset by peer") {
         // The worker died during the execution (e.g. rescheduling).
         // Let's try again.
         if (verbose_) {
@@ -369,7 +370,8 @@ utils::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
         LOG(WARNING) << "GRPC to worker #" << worker_idx
                      << " failed with error: " << status.error_message();
       }
-      if (status.error_message() == "Socket closed") {
+      if (status.error_message() == "Socket closed" ||
+          status.error_message() == "Connection reset by peer") {
         // The worker died during the execution (e.g. rescheduling).
         // Let's try again.
         continue;
@@ -407,7 +409,7 @@ absl::Status GRPCManager::AsynchronousRequest(Blob blob, int worker_idx) {
 utils::StatusOr<Blob> GRPCManager::NextAsynchronousAnswer() {
   auto answer_or = async_pending_answers_.Pop();
   if (!answer_or.has_value()) {
-    return absl::InvalidArgumentError("No more results available");
+    return absl::OutOfRangeError("No more results available");
   }
   if (answer_or.value().has_error()) {
     return absl::InvalidArgumentError(answer_or.value().error());
@@ -434,6 +436,9 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
   }
 
   JoinWorkers();
+  if (verbose_) {
+    LOG(INFO) << "Worked joined";
+  }
 
   proto::ShutdownQuery query;
   if (kill_worker_manager.has_value()) {
@@ -445,6 +450,9 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
   // TODO: Run in parallel.
   for (auto& worker : workers_) {
     grpc::ClientContext context;
+    context.set_wait_for_ready(false);
+    context.set_deadline(std::chrono::system_clock::now() +
+                         std::chrono::minutes(2));
     proto::Empty ignored;
     auto worker_shutdown = worker->stub->Shutdown(&context, query, &ignored);
     if (!worker_shutdown.ok()) {

@@ -51,6 +51,7 @@
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -116,13 +117,25 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   if (generic_parameters_.has_value()) {
     CHECK_OK(learner_->SetHyperParameters(generic_parameters_.value()));
   }
-  const std::string log_dir =
-      file::JoinPath(test::TmpDirectory(), test_dir_, "logs");
+  const auto log_dir = file::JoinPath(test::TmpDirectory(), test_dir_, "logs");
+
   LOG(INFO) << "Set log directory: " << log_dir;
   learner_->set_log_directory(log_dir);
 
   if (callback_training_about_to_start) {
     callback_training_about_to_start();
+  }
+
+  std::atomic<bool> stop_training{false};
+  std::unique_ptr<utils::concurrency::Thread> interrupter_thread;
+  if (interrupt_training_after.has_value()) {
+    learner_->set_stop_training_trigger(&stop_training);
+    interrupter_thread = absl::make_unique<utils::concurrency::Thread>([&]() {
+      absl::SleepFor(interrupt_training_after.value());
+      LOG(INFO) << "Interrupt the training. Waiting for the learner to return "
+                   "a model.";
+      stop_training = true;
+    });
   }
 
   const auto begin_training = absl::Now();
@@ -138,12 +151,13 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   const auto end_training = absl::Now();
   training_duration_ = end_training - begin_training;
-  LOG(INFO) << "Training duration: " << training_duration_;
 
-  // Export the model to drive.
-  const std::string model_path =
-      file::JoinPath(test::TmpDirectory(), test_dir_, "model");
-  EXPECT_OK(SaveModel(model_path, model_.get()));
+  if (interrupter_thread) {
+    interrupter_thread->Join();
+    interrupter_thread.reset();
+  }
+
+  LOG(INFO) << "Training duration: " << training_duration_;
 
   // Evaluate the model.
   utils::RandomEngine rnd(1234);
@@ -152,9 +166,16 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   metric::AppendTextReport(evaluation_, &evaluation_description);
   LOG(INFO) << "Evaluation:\n" << evaluation_description;
 
-  std::string model_description;
-  model_->AppendDescriptionAndStatistics(false, &model_description);
-  LOG(INFO) << "Description:\n" << model_description;
+  if (!check_model) {
+    return;
+  }
+
+  // Export the model to drive.
+  const std::string model_path =
+      file::JoinPath(test::TmpDirectory(), test_dir_, "model");
+  EXPECT_OK(SaveModel(model_path, model_.get()));
+
+  LOG(INFO) << "Description:\n" << model_->DescriptionAndStatistics(false);
 
   const auto check_evaluation_is_equal =
       [this](const metric::proto::EvaluationResults& e1,
@@ -179,8 +200,8 @@ void TrainAndTestTester::TrainAndEvaluateModel(
         }
       };
 
-  // Evaluate the saved model.
-  LOG(INFO) << "Evaluate model";
+  // Evaluate the exported model.
+  LOG(INFO) << "Evaluate the exported model";
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_OK(LoadModel(model_path, &loaded_model));
   rnd.seed(1234);

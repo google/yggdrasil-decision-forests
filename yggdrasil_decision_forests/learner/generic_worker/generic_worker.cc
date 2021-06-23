@@ -24,6 +24,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -40,15 +41,8 @@ absl::Status GenericWorker::TrainModel(
   LOG(INFO) << "Deployment:\n" << request.deployment_config().DebugString();
   LOG(INFO) << "Dataset: " << request.dataset_path();
 
-  if (!request.override_model()) {
-    ASSIGN_OR_RETURN(const auto model_already_exist,
-                     model::ModelExist(request.model_path()));
-    if (model_already_exist) {
-      LOG(INFO) << "Already existing model and override_model=false. Skipping "
-                   "training";
-      return absl::OkStatus();
-    }
-  }
+  result->set_model_path(
+      file::JoinPath(request.model_base_path(), utils::GenUniqueId()));
 
   std::unique_ptr<model::AbstractLearner> learner;
   RETURN_IF_ERROR(model::GetLearner(request.train_config(), &learner));
@@ -69,18 +63,8 @@ absl::Status GenericWorker::TrainModel(
   ASSIGN_OR_RETURN(auto model, learner->TrainWithStatus(request.dataset_path(),
                                                         request.dataspec()));
 
-  if (!request.override_model()) {
-    ASSIGN_OR_RETURN(const auto model_already_exist,
-                     model::ModelExist(request.model_path()));
-    if (model_already_exist) {
-      LOG(INFO) << "Already existing model and override_model=false. Skipping "
-                   "model export";
-      return absl::OkStatus();
-    }
-  }
-
-  LOG(INFO) << "Save model to " << request.model_path();
-  RETURN_IF_ERROR(model::SaveModel(request.model_path(), model.get()));
+  LOG(INFO) << "Save model to " << result->model_path();
+  RETURN_IF_ERROR(model::SaveModel(result->model_path(), model.get()));
   return absl::OkStatus();
 }
 

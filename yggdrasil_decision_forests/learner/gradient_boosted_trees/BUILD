@@ -58,6 +58,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:hyper_parameters",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:snapshot",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:usage",
     ] + select({
@@ -116,6 +117,7 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
+        "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:csv",
         "//yggdrasil_decision_forests/utils:distribution_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",

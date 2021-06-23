@@ -58,6 +58,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -1500,10 +1501,51 @@ TEST(DartPredictionAccumulator, Base) {
   EXPECT_NEAR(scaling[1], 0.5f, 0.0001f);
 }
 
-TEST(RandomForest, PredefinedHyperParameters) {
+TEST(GradientBoostedTrees, PredefinedHyperParameters) {
   model::proto::TrainingConfig train_config;
   train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
   utils::TestPredefinedHyperParametersAdultDataset(train_config, 2, 0.86);
+}
+
+TEST_F(GradientBoostedTreesOnAdult, InterruptAndResumeTraining) {
+  // Train a model for a few seconds, interrupt its training, and resume it.
+
+  deployment_config_.set_cache_path(
+      file::JoinPath(test::TmpDirectory(), "cache"));
+  deployment_config_.set_try_resume_training(true);
+  deployment_config_.set_resume_training_snapshot_interval_seconds(1);
+
+  // Configure a training that would take a long time.
+  // Note: The quality of this model will be poor as it will overfit strongly
+  // the training dataset.
+  auto* gbt_config =
+      train_config_.MutableExtension(proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100000);
+  gbt_config->set_early_stopping(
+      proto::GradientBoostedTreesTrainingConfig::NONE);
+
+  // Train for 5 seconds.
+  interrupt_training_after = absl::Seconds(10);
+  check_model = false;
+  TrainAndEvaluateModel();
+  auto interrupted_model = std::move(model_);
+
+  // Resume the training with 100 extra trees.
+  gbt_config->set_num_trees(
+      dynamic_cast<const GradientBoostedTreesModel*>(interrupted_model.get())
+          ->NumTrees() +
+      100);
+  interrupt_training_after = {};
+  check_model = true;
+  TrainAndEvaluateModel();
+  auto resumed_model = std::move(model_);
+
+  EXPECT_EQ(
+      dynamic_cast<const GradientBoostedTreesModel*>(interrupted_model.get())
+              ->NumTrees() +
+          100,
+      dynamic_cast<const GradientBoostedTreesModel*>(resumed_model.get())
+          ->NumTrees());
 }
 
 }  // namespace

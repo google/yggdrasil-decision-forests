@@ -356,6 +356,11 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
   };
 
   for (const auto& feature : features.input_features()) {
+    if (num_examples > 0 && dataset.column(feature.spec_idx)->nrows() == 0) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Feature \"", feature.name, "\" is empty. Cannot extract it."));
+    }
+
     switch (feature.type) {
       case dataset::proto::ColumnType::NUMERICAL:
         RETURN_IF_ERROR(CopyNumericalFeature(feature.spec_idx));

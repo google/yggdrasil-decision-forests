@@ -468,6 +468,7 @@ cc_library_ydf(
     ],
     deps = [
         ":compatibility",
+        ":concurrency",
         ":distribution_cc_proto",
         ":filesystem",
         ":logging",
@@ -614,6 +615,15 @@ cc_library(
         ":status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "uid",
+    hdrs = ["uid.h"],
+    deps = [
+        "@com_google_absl//absl/random",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )
 

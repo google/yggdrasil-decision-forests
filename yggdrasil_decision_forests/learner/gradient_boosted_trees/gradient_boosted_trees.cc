@@ -62,6 +62,7 @@
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/snapshot.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
@@ -349,16 +350,21 @@ absl::Status FinalizeModelWithValidationDataset(
 
   // Final snippet
   std::string snippet;
-  absl::StrAppendFormat(&snippet, "Final model valid-loss:%f",
-                        mdl->validation_loss());
-  for (int secondary_metric_idx = 0;
-       secondary_metric_idx <
-       mdl->training_logs().secondary_metric_names().size();
-       secondary_metric_idx++) {
-    absl::StrAppendFormat(
-        &snippet, " valid-%s:%f",
-        mdl->training_logs().secondary_metric_names(secondary_metric_idx),
-        final_secondary_metrics[secondary_metric_idx]);
+  absl::StrAppendFormat(
+      &snippet, "Final model num-trees:%d valid-loss:%f",
+      early_stopping.best_num_trees() / mdl->num_trees_per_iter(),
+      mdl->validation_loss());
+
+  if (!final_secondary_metrics.empty()) {
+    for (int secondary_metric_idx = 0;
+         secondary_metric_idx <
+         mdl->training_logs().secondary_metric_names().size();
+         secondary_metric_idx++) {
+      absl::StrAppendFormat(
+          &snippet, " valid-%s:%f",
+          mdl->training_logs().secondary_metric_names(secondary_metric_idx),
+          final_secondary_metrics[secondary_metric_idx]);
+    }
   }
   LOG(INFO) << snippet;
   return absl::OkStatus();
@@ -1212,6 +1218,58 @@ GradientBoostedTreesLearner::TrainWithStatus(
           config.train_config_link, config.gbt_config->decision_tree(),
           deployment_.num_threads()));
 
+  // Time of the next snapshot if training resume is enabled.
+  auto next_snapshot =
+      absl::Now() +
+      absl::Seconds(deployment_.resume_training_snapshot_interval_seconds());
+
+  // Path to the root snapshot directory used to resume interrupted training.
+  // Empty if resuming training is disabled.
+  std::string snapshot_directory;
+
+  // Try to resume training.
+  int iter_idx = 0;
+  if (deployment_.try_resume_training()) {
+    if (deployment_.cache_path().empty()) {
+      return absl::InvalidArgumentError(
+          "\"try_resume_training=True\" requires a \"cache_path\" in the "
+          "deployment configuration.");
+    }
+    snapshot_directory = file::JoinPath(deployment_.cache_path(), "snapshot");
+
+    const auto snapshot_idx_or = utils::GetGreatestSnapshot(snapshot_directory);
+    if (snapshot_idx_or.ok()) {
+      // Load the snapshot.
+      LOG(INFO) << "Resume the GBT training from tree #"
+                << snapshot_idx_or.value();
+      const auto model_path =
+          file::JoinPath(deployment_.cache_path(),
+                         absl::StrCat("model_", snapshot_idx_or.value()));
+      // Load the model structure.
+      RETURN_IF_ERROR(mdl->Load(model_path));
+      iter_idx = mdl->NumTrees();
+
+      // Recompute the prediction caches.
+      auto time_begin_recompute_accumulators = absl::Now();
+      mdl->set_output_logits(true);
+      ASSIGN_OR_RETURN(auto engine, mdl->BuildFastEngine());
+      mdl->set_output_logits(false);
+
+      RETURN_IF_ERROR(internal::ComputePredictions(
+          mdl.get(), engine.get(), {}, config, gradient_sub_train_dataset,
+          &sub_train_predictions));
+
+      if (has_validation_dataset) {
+        RETURN_IF_ERROR(internal::ComputePredictions(
+            mdl.get(), engine.get(), {}, config, gradient_validation_dataset,
+            &validation_predictions));
+      }
+      LOG(INFO) << "Re-compute the prediction accumulators in "
+                << absl::FormatDuration(absl::Now() -
+                                        time_begin_recompute_accumulators);
+    }
+  }
+
   // Train the trees one by one.
   std::vector<row_t> selected_examples;
 
@@ -1222,8 +1280,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
     goss_weights = weights;
     tree_weights = &goss_weights;
   }
-  for (int iter_idx = 0; iter_idx < config.gbt_config->num_trees();
-       iter_idx++) {
+  for (; iter_idx < config.gbt_config->num_trees(); iter_idx++) {
     // The user interrupted the training.
     if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
       LOG(INFO) << "Training interrupted per request.";
@@ -1440,6 +1497,24 @@ GradientBoostedTreesLearner::TrainWithStatus(
         (((iter_idx + 1) %
           config.gbt_config->export_logs_during_training_in_trees()) == 0)) {
       RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
+    }
+
+    // Export a snapshot
+    if (deployment_.try_resume_training() && next_snapshot < absl::Now()) {
+      LOG(INFO) << "Create a snapshot of the model at iteration " << iter_idx;
+      const auto model_path = file::JoinPath(deployment_.cache_path(),
+                                             absl::StrCat("model_", iter_idx));
+
+      // Save the model structure.
+      RETURN_IF_ERROR(mdl->Save(model_path));
+
+      // Record the snapshot.
+      RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
+
+      next_snapshot =
+          absl::Now() +
+          absl::Seconds(
+              deployment_.resume_training_snapshot_interval_seconds());
     }
   }  // End of training iteration.
 
@@ -2283,17 +2358,37 @@ absl::Status ComputePredictions(
     std::vector<float>* predictions) {
   if (optional_engine) {
     // Prediction using the engine (fast).
-    auto examples = optional_engine->AllocateExamples(gradient_dataset.nrow());
-    RETURN_IF_ERROR(serving::CopyVerticalDatasetToAbstractExampleSet(
-        gradient_dataset,
-        /*begin_example_idx=*/0,
-        /*end_example_idx=*/gradient_dataset.nrow(),
-        optional_engine->features(), examples.get()));
+
     if (optional_engine->NumPredictionDimension() !=
         mdl->initial_predictions().size()) {
       return absl::InternalError("Unexpected number of prediction dimensions");
     }
-    optional_engine->Predict(*examples, gradient_dataset.nrow(), predictions);
+
+    const size_t batch_size = 1000;
+    const size_t num_examples = gradient_dataset.nrow();
+    auto examples =
+        optional_engine->AllocateExamples(std::min(batch_size, num_examples));
+    const size_t num_batches = (num_examples + batch_size - 1) / batch_size;
+    std::vector<float> batch_predictions;
+
+    predictions->resize(num_examples * mdl->initial_predictions().size());
+
+    for (size_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
+      const size_t begin_example_idx = batch_idx * batch_size;
+      const size_t end_example_idx =
+          std::min(begin_example_idx + batch_size, num_examples);
+      RETURN_IF_ERROR(serving::CopyVerticalDatasetToAbstractExampleSet(
+          gradient_dataset,
+          /*begin_example_idx=*/begin_example_idx,
+          /*end_example_idx=*/end_example_idx, optional_engine->features(),
+          examples.get()));
+      optional_engine->Predict(*examples, end_example_idx - begin_example_idx,
+                               &batch_predictions);
+      std::copy(batch_predictions.begin(), batch_predictions.end(),
+                predictions->begin() +
+                    begin_example_idx * mdl->initial_predictions().size());
+    }
+
   } else {
     SetInitialPredictions(mdl->initial_predictions(), gradient_dataset.nrow(),
                           predictions);

@@ -22,7 +22,7 @@
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.h"
-#include "yggdrasil_decision_forests/utils/distribute/implementations/single_thread/single_thread.pb.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
@@ -34,8 +34,8 @@ namespace {
 // Create a single thread manager with 5 workers.
 std::unique_ptr<distribute::AbstractManager> CreateSingleThreadManager() {
   distribute::proto::Config config;
-  config.set_implementation_key("SINGLE_THREAD");
-  config.MutableExtension(distribute::proto::single_thread)->set_num_workers(5);
+  config.set_implementation_key("MULTI_THREAD");
+  config.MutableExtension(distribute::proto::multi_thread)->set_num_workers(5);
   config.set_verbose(true);
   proto::Welcome welcome;
   welcome.set_temporary_directory(test::TmpDirectory());
@@ -69,7 +69,7 @@ TEST(TrainAndEvaluateModel, Base) {
 
     dataset::CreateDataSpec(train_model.dataset_path(), false, {},
                             train_model.mutable_dataspec());
-    train_model.set_model_path(
+    train_model.set_model_base_path(
         file::JoinPath(test::TmpDirectory(), "my_model"));
   }
 
@@ -79,7 +79,7 @@ TEST(TrainAndEvaluateModel, Base) {
   proto::Request evaluate_request;
   {
     auto& evaluate_model = *evaluate_request.mutable_evaluate_model();
-    evaluate_model.set_model_path(train_request.train_model().model_path());
+    evaluate_model.set_model_path(train_result.train_model().model_path());
     evaluate_model.set_dataset_path(absl::StrCat(
         "csv:", file::JoinPath(
                     test::DataRootDirectory(),

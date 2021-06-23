@@ -17,7 +17,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "yggdrasil_decision_forests/utils/distribute/implementations/single_thread/single_thread.pb.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute/test_utils.h"
 #include "yggdrasil_decision_forests/utils/distribute/toy_worker.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -31,8 +31,8 @@ namespace {
 ManagerAndWorkers CreateSingleThreadManager() {
   ManagerAndWorkers manager_and_workers;
   proto::Config config;
-  config.set_implementation_key("SINGLE_THREAD");
-  config.MutableExtension(proto::single_thread)->set_num_workers(5);
+  config.set_implementation_key("MULTI_THREAD");
+  config.MutableExtension(proto::multi_thread)->set_num_workers(5);
   config.set_verbose(false);
   manager_and_workers.manager =
       CreateManager(config, /*worker_name=*/kToyWorkerKey,
@@ -50,7 +50,7 @@ TEST(MultiThread, InitializationError) {
                   .status(),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
 
-  config.set_implementation_key("SINGLE_THREAD");
+  config.set_implementation_key("MULTI_THREAD");
   EXPECT_THAT(CreateManager(config, /*worker_name=*/"unknown worker key",
                             /*welcome_blob=*/"hello")
                   .status(),

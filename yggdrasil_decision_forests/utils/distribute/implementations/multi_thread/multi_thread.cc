@@ -13,18 +13,18 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/utils/distribute/implementations/single_thread/single_thread.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.h"
 
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
-#include "yggdrasil_decision_forests/utils/distribute/implementations/single_thread/single_thread.pb.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
-utils::StatusOr<Blob> SingleThreadManager::BlockingRequest(Blob blob,
-                                                           int worker_idx) {
+utils::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
+                                                          int worker_idx) {
   if (verbose_) {
     LOG(INFO) << "Incoming blocking request with " << blob.size() << " bytes";
   }
@@ -43,8 +43,8 @@ utils::StatusOr<Blob> SingleThreadManager::BlockingRequest(Blob blob,
   return answer;
 }
 
-absl::Status SingleThreadManager::AsynchronousRequest(Blob blob,
-                                                      int worker_idx) {
+absl::Status MultiThreadManager::AsynchronousRequest(Blob blob,
+                                                     int worker_idx) {
   if (verbose_) {
     LOG(INFO) << "Incoming asynchronous request with " << blob.size()
               << " bytes";
@@ -52,46 +52,56 @@ absl::Status SingleThreadManager::AsynchronousRequest(Blob blob,
   if (worker_idx < 0) {
     worker_idx = next_worker_.fetch_add(1) % workers_.size();
   }
-  ASSIGN_OR_RETURN(Blob answer, workers_[worker_idx]->RunRequest(blob),
-                   _ << "Error emitted by worker #" << worker_idx);
-  async_pending_answers_.Push(std::move(answer));
+  thread_pool_->Schedule([worker_idx, blob, this]() {
+    if (done_was_called_) {
+      return;
+    }
+    async_pending_answers_.Push(workers_[worker_idx]->RunRequest(blob));
+  });
   return absl::OkStatus();
 }
 
-utils::StatusOr<Blob> SingleThreadManager::NextAsynchronousAnswer() {
+utils::StatusOr<Blob> MultiThreadManager::NextAsynchronousAnswer() {
   if (verbose_) {
     LOG(INFO) << "Wait for next result";
   }
   auto answer = async_pending_answers_.Pop();
   if (!answer.has_value()) {
-    return absl::InternalError("Closed channel");
+    return absl::OutOfRangeError("No more results available");
   }
-  if (verbose_) {
-    LOG(INFO) << "Return asynchronous result with " << answer.value().size()
-              << " bytes";
+  if (verbose_ && answer.value().ok()) {
+    LOG(INFO) << "Return asynchronous result with "
+              << answer.value().value().size() << " bytes";
   }
   return std::move(answer.value());
 }
 
-int SingleThreadManager::NumWorkers() { return workers_.size(); }
+int MultiThreadManager::NumWorkers() { return workers_.size(); }
 
-absl::Status SingleThreadManager::Done(
+absl::Status MultiThreadManager::Done(
     absl::optional<bool> kill_worker_manager) {
   if (verbose_) {
     LOG(INFO) << "Release workers";
   }
+  if (done_was_called_) {
+    LOG(WARNING) << "Calling done twice";
+    return absl::OkStatus();
+  }
+  done_was_called_ = true;
+  async_pending_answers_.Close();
+
   for (auto& worker : workers_) {
     RETURN_IF_ERROR(worker->Done());
   }
+  thread_pool_.reset();
   return absl::OkStatus();
 }
 
-absl::Status SingleThreadManager::Initialize(
-    const proto::Config& config, const absl::string_view worker_name,
-    Blob welcome_blob) {
-  const auto& imp_config = config.GetExtension(proto::single_thread);
+absl::Status MultiThreadManager::Initialize(const proto::Config& config,
+                                            const absl::string_view worker_name,
+                                            Blob welcome_blob) {
+  const auto& imp_config = config.GetExtension(proto::multi_thread);
   const auto num_workers = imp_config.num_workers();
-
   verbose_ = config.verbose();
   if (verbose_) {
     LOG(INFO) << "Initialize manager with " << welcome_blob.size()
@@ -101,6 +111,11 @@ absl::Status SingleThreadManager::Initialize(
     return absl::InvalidArgumentError(
         "The number of workers should greater than zero");
   }
+
+  thread_pool_ = absl::make_unique<utils::concurrency::ThreadPool>(
+      "distributed", num_workers);
+  thread_pool_->StartWorkers();
+
   for (int worker_idx = 0; worker_idx < num_workers; worker_idx++) {
     ASSIGN_OR_RETURN(auto worker,
                      AbstractWorkerRegisterer::Create(worker_name));

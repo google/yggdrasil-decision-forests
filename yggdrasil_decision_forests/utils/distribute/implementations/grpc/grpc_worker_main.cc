@@ -20,6 +20,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 ABSL_FLAG(int, port, -1, "Port");
+ABSL_FLAG(bool, use_loas, false, "Use LOAS.");
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -27,7 +28,7 @@ namespace distribute {
 void GRPCWorker() {
   const auto port = absl::GetFlag(FLAGS_port);
   LOG(INFO) << "Start GRPC worker on port " << port;
-  QCHECK_OK(GRPCWorkerMainWorkerMain(port));
+  QCHECK_OK(GRPCWorkerMainWorkerMain(port, absl::GetFlag(FLAGS_use_loas)));
   LOG(INFO) << "Stop GRPC worker";
 }
 

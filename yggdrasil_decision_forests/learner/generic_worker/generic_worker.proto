@@ -42,13 +42,11 @@ message Request {
     optional model.proto.DeploymentConfig deployment_config = 2;
     optional string dataset_path = 3;
     optional dataset.proto.DataSpecification dataspec = 4;
-    optional string model_path = 5;
+    // Base directory for the output model. The effective directory is returned
+    // in the answer Result::TrainModel.
+    optional string model_base_path = 5;
     optional string log_directory = 6;
     optional model.proto.GenericHyperParameters generic_hyper_parameters = 7;
-    // If true, will override the model if it exist already.
-    // If false, the model will not be overridden. If the model already exist,
-    // the model training will be skipped.
-    optional bool override_model = 8 [default = true];
   }
 
   message EvaluateModel {
@@ -68,6 +66,7 @@ message Result {
   }
 
   message TrainModel {
+    optional string model_path = 1;
   }
 
   message EvaluateModel {

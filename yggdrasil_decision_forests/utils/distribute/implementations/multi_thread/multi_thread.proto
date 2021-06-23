@@ -21,12 +21,11 @@ import "yggdrasil_decision_forests/utils/distribute/distribute.proto";
 
 // In process, non-parallelized distribution. For debugging and pipeline
 // development.
-message SingleThreadImp {
-  // Number of workers.
-  // Note: All the workers are running on the same thread.
+message MultiThreadImp {
+  // Number of workers / threads.
   optional int32 num_workers = 1 [default = 10];
 }
 
 extend Config {
-  optional SingleThreadImp single_thread = 1000;
+  optional MultiThreadImp multi_thread = 1000;
 }

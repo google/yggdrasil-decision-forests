@@ -16,7 +16,7 @@ cc_library(
     name = "all_implementations",
     deps = [
         "//yggdrasil_decision_forests/utils/distribute/implementations/grpc",
-        "//yggdrasil_decision_forests/utils/distribute/implementations/single_thread",
+        "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",
     ],
     alwayslink = 1,
 )
@@ -113,6 +113,6 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
-        "//yggdrasil_decision_forests/utils/distribute/implementations/single_thread:single_thread_cc_proto",
+        "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_cc_proto",
     ],
 )

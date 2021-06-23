@@ -28,9 +28,12 @@ message Config {
   // If true, the manager displays logs about the scheduled tasks.
   optional bool verbose = 5 [default = true];
 
-  // Working directory accessible by the manager and workers.
-  // Can be required by some distribution implementations (currently only
-  // GRPCImp) and some algorithms.
+  // Working directory accessible by the manager and workers. Can be used for
+  // communication by distribution implementations.
+  //
+  // If you are training a model with distributed training, do not specify this
+  // path directly. Instead, specify the "cache_path" of the deployment
+  // configuration (and this path will be set automatically).
   optional string working_directory = 6;
 
   // Implementation specific configuration.

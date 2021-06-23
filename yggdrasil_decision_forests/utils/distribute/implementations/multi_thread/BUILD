@@ -9,8 +9,8 @@ package(
 # ========
 
 all_proto_library(
-    name = "single_thread_proto",
-    srcs = ["single_thread.proto"],
+    name = "multi_thread_proto",
+    srcs = ["multi_thread.proto"],
     deps = ["//yggdrasil_decision_forests/utils/distribute:distribute_proto"],
 )
 
@@ -18,11 +18,11 @@ all_proto_library(
 # =======
 
 cc_library(
-    name = "single_thread",
-    srcs = ["single_thread.cc"],
-    hdrs = ["single_thread.h"],
+    name = "multi_thread",
+    srcs = ["multi_thread.cc"],
+    hdrs = ["multi_thread.h"],
     deps = [
-        ":single_thread_cc_proto",
+        ":multi_thread_cc_proto",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",

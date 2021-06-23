@@ -3076,6 +3076,7 @@ utils::StatusOr<Preprocessing> PreprocessTrainingDataset(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config, const int num_threads) {
+  const auto time_begin = absl::Now();
   Preprocessing preprocessing;
   preprocessing.set_num_examples(train_dataset.nrow());
 
@@ -3085,6 +3086,10 @@ utils::StatusOr<Preprocessing> PreprocessTrainingDataset(
                                              num_threads, &preprocessing));
   }
 
+  const auto duration = absl::Now() - time_begin;
+  if (duration > absl::Seconds(10)) {
+    LOG(INFO) << "Feature index computed in " << absl::FormatDuration(duration);
+  }
   return preprocessing;
 }
 

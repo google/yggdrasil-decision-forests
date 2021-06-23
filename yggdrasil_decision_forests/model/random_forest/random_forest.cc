@@ -101,6 +101,7 @@ absl::Status RandomForestModel::Save(absl::string_view directory) const {
 
 absl::Status RandomForestModel::Load(absl::string_view directory) {
   proto::Header header;
+  decision_trees_.clear();
   RETURN_IF_ERROR(file::GetBinaryProto(
       file::JoinPath(directory, kHeaderFilename), &header, file::Defaults()));
   RETURN_IF_ERROR(decision_tree::LoadTreesFromDisk(

@@ -47,6 +47,7 @@ cc_library(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
+        "//yggdrasil_decision_forests/utils:uid",
     ],
     alwayslink = 1,
 )
@@ -70,6 +71,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils/distribute",
         "//yggdrasil_decision_forests/utils/distribute:distribute_without_implementations",
-        "//yggdrasil_decision_forests/utils/distribute/implementations/single_thread:single_thread_cc_proto",
+        "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_cc_proto",
     ],
 )

@@ -967,14 +967,15 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
 
  private:
   // Index of a fixed-length feature in the fixed-length example buffer.
-  int FixedLengthIndex(const int example_idx,
-                       const int fixed_length_feature_idx,
-                       const FeaturesDefinition& features) const {
+  size_t FixedLengthIndex(const int example_idx,
+                          const int fixed_length_feature_idx,
+                          const FeaturesDefinition& features) const {
     if constexpr (format == ExampleFormat::FORMAT_EXAMPLE_MAJOR) {
       return fixed_length_feature_idx +
              example_idx * features.fixed_length_features().size();
     } else if constexpr (format == ExampleFormat::FORMAT_FEATURE_MAJOR) {
-      return example_idx + fixed_length_feature_idx * num_examples_;
+      return example_idx +
+             fixed_length_feature_idx * static_cast<size_t>(num_examples_);
     } else {
       static_assert(!utils::is_same_v<Model, Model>, "Unsupported format.");
     }
@@ -1377,7 +1378,7 @@ ExampleSetNumericalOrCategoricalFlat<Model, format>::ExtractProtoExample(
 
   // Extract the value of "fixed length" features.
   for (const auto& feature_id : features.fixed_length_features()) {
-    const int buffer_idx =
+    const auto buffer_idx =
         FixedLengthIndex(example_idx, feature_id.internal_idx, features);
     const auto& src_value = fixed_length_features_[buffer_idx];
     const auto na_value =

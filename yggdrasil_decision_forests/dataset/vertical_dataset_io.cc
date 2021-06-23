@@ -183,7 +183,7 @@ absl::Status LoadVerticalDataset(
                                      << " features for ~"
                                      << approx_memory_usage_mb << "MB");
         }
-        dataset->Reserve(reserved_examples);
+        dataset->Reserve(reserved_examples, config.load_columns);
       }
     }
     for (const auto* example : block->examples) {
