@@ -604,6 +604,19 @@ cc_library_ydf(
     ],
 )
 
+cc_library(
+    name = "snapshot",
+    srcs = ["snapshot.cc"],
+    hdrs = ["snapshot.h"],
+    deps = [
+        ":compatibility",
+        ":filesystem",
+        ":status_macros",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
 # Bzl Libraries
 # =============
 
@@ -894,6 +907,17 @@ cc_test(
     deps = [
         ":blob_sequence",
         ":filesystem",
+        ":test",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "snapshot_test",
+    srcs = ["snapshot_test.cc"],
+    deps = [
+        ":filesystem",
+        ":snapshot",
         ":test",
         "@com_google_googletest//:gtest_main",
     ],
