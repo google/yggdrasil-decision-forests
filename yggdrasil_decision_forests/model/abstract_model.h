@@ -175,6 +175,20 @@ class AbstractModel {
       const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
       std::vector<model::proto::Prediction>* predictions = nullptr) const;
 
+  // Evaluates the model on a dataset stored in disk. `typed_path` defines
+  // the type and the path pattern of the files, as described in
+  // `yggdrasil_decision_forests/datasets/format.h` file.
+  // This method is preferable when the number of examples is large since they
+  // do not have to be all first loaded into memory.
+  // Returns a finalized EvaluationResults.
+  // Evaluates the model on a dataset. Returns a finalized EvaluationResults.
+  // The random generator "rnd" is used boostrapping of confidence intervals and
+  // sub-sampling evaluation (if configured in "option").
+  metric::proto::EvaluationResults Evaluate(
+      const absl::string_view typed_path,
+      const metric::proto::EvaluationOptions& option,
+      utils::RandomEngine* rnd) const;
+
   // Similar to "Evaluate", but allow to override the evaluation objective.
   metric::proto::EvaluationResults EvaluateOverrideType(
       const dataset::VerticalDataset& dataset,
@@ -192,6 +206,14 @@ class AbstractModel {
       const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
       metric::proto::EvaluationResults* eval,
       std::vector<model::proto::Prediction>* predictions = nullptr) const;
+
+  // Similar as "AppendEvaluation" above. But operate on dataset stored on disk.
+  // This method is preferable when the number of examples is large since they
+  // do not have to be all loaded in memory as the same time.
+  void AppendEvaluation(const absl::string_view typed_path,
+                        const metric::proto::EvaluationOptions& option,
+                        utils::RandomEngine* rnd,
+                        metric::proto::EvaluationResults* eval) const;
 
   // Similar to "AppendEvaluation", but allow to override the evaluation
   // objective.
@@ -296,6 +318,14 @@ class AbstractModel {
 
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
+
+  void AppendEvaluationWithEngine(
+      const dataset::VerticalDataset& dataset,
+      const metric::proto::EvaluationOptions& option,
+      const dataset::proto::LinkedWeightDefinition& weight_links,
+      const serving::FastEngine& engine, utils::RandomEngine* rnd,
+      std::vector<model::proto::Prediction>* predictions,
+      metric::proto::EvaluationResults* eval) const;
 
   // A string uniquely identifying the model type . Used to determine
   // model types during serialization. This should match the registered names in

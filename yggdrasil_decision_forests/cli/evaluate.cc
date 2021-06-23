@@ -76,16 +76,11 @@ void Evaluate() {
             .value();
   }
 
-  // Load dataset.
-  dataset::VerticalDataset dataset;
-  QCHECK_OK(LoadVerticalDataset(absl::GetFlag(FLAGS_dataset),
-                                model->data_spec(), &dataset));
-
   if (!options.has_task()) {
     options.set_task(model->task());
   }
   // evaluate model.
-  evaluation = model->Evaluate(dataset, options, &rnd);
+  evaluation = model->Evaluate(absl::GetFlag(FLAGS_dataset), options, &rnd);
 
   std::string text_report;
   metric::AppendTextReport(evaluation, &text_report);

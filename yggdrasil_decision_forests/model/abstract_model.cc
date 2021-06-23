@@ -37,7 +37,9 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -48,10 +50,12 @@
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/sharded_io.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -97,6 +101,19 @@ metric::proto::EvaluationResults AbstractModel::Evaluate(
   metric::proto::EvaluationResults eval;
   metric::InitializeEvaluation(option, LabelColumnSpec(), &eval);
   AppendEvaluation(dataset, option, rnd, &eval, predictions);
+  metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval);
+  return eval;
+}
+
+metric::proto::EvaluationResults AbstractModel::Evaluate(
+    const absl::string_view typed_path,
+    const metric::proto::EvaluationOptions& option,
+    utils::RandomEngine* rnd) const {
+  CHECK_EQ(option.task(), task())
+      << "The evaluation and the model tasks differ.";
+  metric::proto::EvaluationResults eval;
+  metric::InitializeEvaluation(option, LabelColumnSpec(), &eval);
+  AppendEvaluation(typed_path, option, rnd, &eval);
   metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval);
   return eval;
 }
@@ -187,6 +204,55 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
   }
 }
 
+void AbstractModel::AppendEvaluationWithEngine(
+    const dataset::VerticalDataset& dataset,
+    const metric::proto::EvaluationOptions& option,
+    const dataset::proto::LinkedWeightDefinition& weight_links,
+    const serving::FastEngine& engine, utils::RandomEngine* rnd,
+    std::vector<model::proto::Prediction>* predictions,
+    metric::proto::EvaluationResults* eval) const {
+  const auto& engine_features = engine.features();
+  const int num_prediction_dimensions = engine.NumPredictionDimension();
+
+  // Evaluate using the semi-fast generic engine.
+  const int64_t total_num_examples = dataset.nrow();
+  const int64_t batch_size =
+      std::min(static_cast<int64_t>(100), total_num_examples);
+
+  auto batch_of_examples = engine.AllocateExamples(batch_size);
+  const int64_t num_batches =
+      (total_num_examples + batch_size - 1) / batch_size;
+
+  std::vector<float> batch_of_predictions;
+  proto::Prediction prediction;
+  for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
+    const int64_t begin_example_idx = batch_idx * batch_size;
+    const int64_t end_example_idx =
+        std::min(begin_example_idx + batch_size, total_num_examples);
+    const int effective_batch_size = end_example_idx - begin_example_idx;
+    CHECK_OK(CopyVerticalDatasetToAbstractExampleSet(
+        dataset, begin_example_idx, end_example_idx, engine_features,
+        batch_of_examples.get()));
+    engine.Predict(*batch_of_examples, effective_batch_size,
+                   &batch_of_predictions);
+    for (int sub_example_idx = 0; sub_example_idx < effective_batch_size;
+         sub_example_idx++) {
+      FloatToProtoPrediction(batch_of_predictions, sub_example_idx, task(),
+                             num_prediction_dimensions, &prediction);
+      SetGroundTruth(dataset, begin_example_idx + sub_example_idx, &prediction);
+      if (option.has_weights()) {
+        const float weight = dataset::GetWeight(
+            dataset, begin_example_idx + sub_example_idx, weight_links);
+        prediction.set_weight(weight);
+      }
+      metric::AddPrediction(option, prediction, rnd, eval);
+      if (predictions) {
+        predictions->push_back(prediction);
+      }
+    }
+  }
+}
+
 void AbstractModel::AppendEvaluation(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
@@ -200,49 +266,9 @@ void AbstractModel::AppendEvaluation(
 
   auto engine_or_status = BuildFastEngine();
   if (engine_or_status.ok()) {
-    const auto engine = std::move(engine_or_status.value());
-    const auto& engine_features = engine->features();
-    const int num_prediction_dimensions = engine->NumPredictionDimension();
-
-    // Evaluate using the semi-fast generic engine.
-    const int64_t total_num_examples = dataset.nrow();
-    const int64_t batch_size =
-        std::min(static_cast<int64_t>(100), total_num_examples);
-
-    auto batch_of_examples = engine->AllocateExamples(batch_size);
-    const int64_t num_batches =
-        (total_num_examples + batch_size - 1) / batch_size;
-
-    std::vector<float> batch_of_predictions;
-    proto::Prediction prediction;
-    for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
-      const int64_t begin_example_idx = batch_idx * batch_size;
-      const int64_t end_example_idx =
-          std::min(begin_example_idx + batch_size, total_num_examples);
-      const int effective_batch_size = end_example_idx - begin_example_idx;
-      CHECK_OK(CopyVerticalDatasetToAbstractExampleSet(
-          dataset, begin_example_idx, end_example_idx, engine_features,
-          batch_of_examples.get()));
-      engine->Predict(*batch_of_examples, effective_batch_size,
-                      &batch_of_predictions);
-      for (int sub_example_idx = 0; sub_example_idx < effective_batch_size;
-           sub_example_idx++) {
-        FloatToProtoPrediction(batch_of_predictions, sub_example_idx, task(),
-                               num_prediction_dimensions, &prediction);
-        SetGroundTruth(dataset, begin_example_idx + sub_example_idx,
-                       &prediction);
-        if (option.has_weights()) {
-          const float weight = dataset::GetWeight(
-              dataset, begin_example_idx + sub_example_idx, weight_links);
-          prediction.set_weight(weight);
-        }
-        metric::AddPrediction(option, prediction, rnd, eval);
-        if (predictions) {
-          predictions->push_back(prediction);
-        }
-      }
-    }
-
+    AppendEvaluationWithEngine(dataset, option, weight_links,
+                               *engine_or_status.value(), rnd, predictions,
+                               eval);
   } else {
     // Evaluate using the (slow) generic inference.
 
@@ -263,6 +289,71 @@ void AbstractModel::AppendEvaluation(
         predictions->push_back(prediction);
       }
     }
+  }
+
+  eval->set_num_folds(eval->num_folds() + 1);
+}
+
+void AbstractModel::AppendEvaluation(
+    const absl::string_view typed_path,
+    const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
+    metric::proto::EvaluationResults* eval) const {
+  dataset::proto::LinkedWeightDefinition weight_links;
+  if (option.has_weights()) {
+    CHECK_OK(dataset::GetLinkedWeightDefinition(option.weights(), data_spec_,
+                                                &weight_links));
+  }
+
+  auto engine_or_status = BuildFastEngine();
+  if (engine_or_status.ok()) {
+    const auto engine = std::move(engine_or_status.value());
+    // Extract the shards from the dataset path.
+    std::string path, prefix;
+    std::tie(prefix, path) = dataset::SplitTypeAndPath(typed_path).ValueOrDie();
+    std::vector<std::string> shards;
+    CHECK_OK(utils::ExpandInputShards(path, &shards));
+
+    // Evaluate each shard in a separate thread.
+    {
+      absl::Mutex mutex;  // Guards "num_evaluated_shards" and "eval".
+      int num_evaluated_shards = 0;
+
+      const int num_threads = std::min<int>(shards.size(), 20);
+      utils::concurrency::ThreadPool thread_pool("evaluation", num_threads);
+      thread_pool.StartWorkers();
+      for (const auto& shard : shards) {
+        thread_pool.Schedule([&option, eval, &mutex, &shard, &prefix, &engine,
+                              &weight_links, sub_rnd_seed = (*rnd)(),
+                              &num_evaluated_shards, &shards, this]() {
+          utils::RandomEngine sub_rnd(sub_rnd_seed);
+
+          dataset::VerticalDataset dataset;
+          CHECK_OK(dataset::LoadVerticalDataset(
+              absl::StrCat(prefix, ":", shard), data_spec_, &dataset));
+
+          metric::proto::EvaluationResults sub_evaluation;
+          metric::InitializeEvaluation(option, LabelColumnSpec(),
+                                       &sub_evaluation);
+
+          AppendEvaluationWithEngine(dataset, option, weight_links, *engine,
+                                     &sub_rnd, nullptr, &sub_evaluation);
+
+          absl::MutexLock lock(&mutex);
+          metric::MergeEvaluation(option, sub_evaluation, eval);
+          num_evaluated_shards++;
+          LOG_INFO_EVERY_N_SEC(30, _ << num_evaluated_shards << "/"
+                                     << shards.size() << " shards evaluated");
+        });
+      }
+    }
+  } else {
+    // Evaluate using the (slow) generic inference.
+    LOG(WARNING)
+        << "Evaluation with the slow generic engine without distribution";
+    dataset::VerticalDataset dataset;
+    CHECK_OK(dataset::LoadVerticalDataset(typed_path, data_spec_, &dataset));
+    AppendEvaluation(dataset, option, rnd, eval);
+    return;
   }
 
   eval->set_num_folds(eval->num_folds() + 1);

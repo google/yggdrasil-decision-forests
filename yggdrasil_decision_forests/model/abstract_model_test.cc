@@ -25,12 +25,16 @@
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
+#include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -42,6 +46,11 @@ namespace {
 using test::EqualsProto;
 using test::StatusIs;
 using testing::ElementsAre;
+
+std::string TestDataDir() {
+  return file::JoinPath(test::DataRootDirectory(),
+                        "yggdrasil_decision_forests/test_data");
+}
 
 class FakeModelWithEngine : public AbstractModel {
  public:
@@ -225,7 +234,7 @@ TEST(AbstractLearner, MergeVariableImportance) {
 }
 
 TEST(AbstractLearner, MergeAddPredictionsRegression) {
-  proto::Prediction src = PARSE_TEST_PROTO(R"(regression { value: 1 })");
+  proto::Prediction src = PARSE_TEST_PROTO(R"pb(regression { value: 1 })pb");
   proto::Prediction dst;
   PredictionMerger merger(&dst);
 
@@ -247,7 +256,7 @@ TEST(AbstractLearner, MergeAddPredictionsRegression) {
 
 TEST(AbstractLearner, MergeAddPredictionsClassification) {
   proto::Prediction src = PARSE_TEST_PROTO(
-      R"(classification { distribution { counts: 1 counts: 3 sum: 4 } })");
+      R"pb(classification { distribution { counts: 1 counts: 3 sum: 4 } })pb");
   proto::Prediction dst;
   PredictionMerger merger(&dst);
 
@@ -299,9 +308,9 @@ TEST(AbstractModel, BuildFastEngine) {
 TEST(ChangePredictionType, ClassificationToRanking) {
   {
     const proto::Prediction src_pred = PARSE_TEST_PROTO(
-        R"(classification {
-             distribution { counts: 0 counts: 1 counts: 3 sum: 4 }
-           })");
+        R"pb(classification {
+               distribution { counts: 0 counts: 1 counts: 3 sum: 4 }
+             })pb");
     proto::Prediction dst_pred;
     ChangePredictionType(proto::Task::CLASSIFICATION, proto::Task::RANKING,
                          src_pred, &dst_pred);
@@ -312,7 +321,7 @@ TEST(ChangePredictionType, ClassificationToRanking) {
 
   {
     const proto::Prediction src_pred =
-        PARSE_TEST_PROTO(R"(regression { value: 5 })");
+        PARSE_TEST_PROTO(R"pb(regression { value: 5 })pb");
     proto::Prediction dst_pred;
     ChangePredictionType(proto::Task::REGRESSION, proto::Task::RANKING,
                          src_pred, &dst_pred);
@@ -323,7 +332,7 @@ TEST(ChangePredictionType, ClassificationToRanking) {
 
   {
     const proto::Prediction src_pred =
-        PARSE_TEST_PROTO(R"(ranking { relevance: 5 })");
+        PARSE_TEST_PROTO(R"pb(ranking { relevance: 5 })pb");
     proto::Prediction dst_pred;
     ChangePredictionType(proto::Task::RANKING, proto::Task::REGRESSION,
                          src_pred, &dst_pred);
@@ -334,7 +343,7 @@ TEST(ChangePredictionType, ClassificationToRanking) {
 
   {
     const proto::Prediction src_pred =
-        PARSE_TEST_PROTO(R"(regression { value: 5 })");
+        PARSE_TEST_PROTO(R"pb(regression { value: 5 })pb");
     proto::Prediction dst_pred;
     ChangePredictionType(proto::Task::REGRESSION, proto::Task::REGRESSION,
                          src_pred, &dst_pred);
@@ -418,6 +427,37 @@ TEST(FloatToProtoPrediction, Base) {
   EXPECT_THAT(prediction, EqualsProto(utils::ParseTextProto<proto::Prediction>(
                                           R"(ranking { relevance: 0.2 })")
                                           .value()));
+}
+
+TEST(Evaluate, FromVerticalDataset) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &model));
+
+  dataset::VerticalDataset dataset;
+  EXPECT_OK(LoadVerticalDataset(
+      absl::StrCat("csv:",
+                   file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
+      model->data_spec(), &dataset));
+
+  utils::RandomEngine rnd;
+  const auto evaluation = model->Evaluate(dataset, {}, &rnd);
+  EXPECT_NEAR(metric::Accuracy(evaluation), 0.8723513, 0.000001);
+}
+
+TEST(Evaluate, FromDisk) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &model));
+
+  utils::RandomEngine rnd;
+  const auto evaluation = model->Evaluate(
+      absl::StrCat("csv:",
+                   file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
+      {}, &rnd);
+  EXPECT_NEAR(metric::Accuracy(evaluation), 0.8723513, 0.000001);
 }
 
 }  // namespace
