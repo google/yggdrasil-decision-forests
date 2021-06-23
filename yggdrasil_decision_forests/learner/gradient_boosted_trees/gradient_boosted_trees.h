@@ -116,6 +116,7 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamEarlyStoppingLossIncrease[] = "LOSS_INCREASE";
   static constexpr char kHParamEarlyStoppingNumTreesLookAhead[] =
       "early_stopping_num_trees_look_ahead";
+  static constexpr char kHParamApplyLinkFunction[] = "apply_link_function";
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset) const override;

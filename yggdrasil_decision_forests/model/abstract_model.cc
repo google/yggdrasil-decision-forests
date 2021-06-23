@@ -74,6 +74,8 @@ void AbstractModel::ExportProto(const AbstractModel& model,
   proto->mutable_precomputed_variable_importances()->insert(
       model.precomputed_variable_importances_.begin(),
       model.precomputed_variable_importances_.end());
+  proto->set_classification_outputs_probabilities(
+      model.classification_outputs_probabilities_);
 }
 
 void AbstractModel::ImportProto(const proto::AbstractModel& proto,
@@ -90,6 +92,8 @@ void AbstractModel::ImportProto(const proto::AbstractModel& proto,
   model->precomputed_variable_importances_.insert(
       proto.precomputed_variable_importances().begin(),
       proto.precomputed_variable_importances().end());
+  model->classification_outputs_probabilities_ =
+      proto.classification_outputs_probabilities();
 }
 
 metric::proto::EvaluationResults AbstractModel::Evaluate(
@@ -841,6 +845,8 @@ void AbstractModel::CopyAbstractModelMetaData(AbstractModel* dst) const {
   }
   *dst->mutable_input_features() = input_features();
   dst->precomputed_variable_importances_ = precomputed_variable_importances_;
+  dst->classification_outputs_probabilities_ =
+      classification_outputs_probabilities_;
 }
 
 absl::Status AbstractModel::Validate() const {

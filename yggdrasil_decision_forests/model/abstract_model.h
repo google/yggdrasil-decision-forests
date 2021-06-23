@@ -316,6 +316,14 @@ class AbstractModel {
     return precomputed_variable_importances_;
   }
 
+  bool classification_outputs_probabilities() const {
+    return classification_outputs_probabilities_;
+  }
+
+  void set_classification_outputs_probabilities(bool value) {
+    classification_outputs_probabilities_ = value;
+  }
+
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 
@@ -356,6 +364,11 @@ class AbstractModel {
 
   // Allow for fast engine to run.
   bool allow_fast_engine_ = true;
+
+  // If true, the output of a task=CLASSIFICATION model is a probability and can
+  // be used accordingly (e.g. averaged, clamped to [0,1]). If false, the output
+  // of the task=CLASSIFICATION model might not be a probability.
+  bool classification_outputs_probabilities_ = true;
 
   // Note: New fields should be registered in:
   // - The proto serialization functions.

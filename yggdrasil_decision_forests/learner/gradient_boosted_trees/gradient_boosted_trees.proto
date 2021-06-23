@@ -335,6 +335,14 @@ message GradientBoostedTreesTrainingConfig {
     // indicates that the sample has the same size as the original dataset.
     optional float ratio = 1 [default = 1];
   }
+
+  // If true, applies the link function (a.k.a. activation function), if any,
+  // before returning the model prediction. If false, returns the pre-link
+  // function model output.
+  //
+  // For example, in the case of binary classification, the pre-link function
+  // output is a logic while the post-link function is a probability.
+  optional bool apply_link_function = 34 [default = true];
 }
 
 extend model.proto.TrainingConfig {

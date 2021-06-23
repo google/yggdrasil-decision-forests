@@ -60,6 +60,11 @@ message AbstractModel {
   // of the pre-computed VIs (this field) and the "model specific VIs" (i.e.
   // variable importance computed on the fly based on the models structure).
   map<string, VariableImportanceSet> precomputed_variable_importances = 7;
+
+  // If true, the output of a task=CLASSIFICATION model is a probability and can
+  // be used accordingly (e.g. averaged, clamped to [0,1]). If false, the output
+  // of the task=CLASSIFICATION model might not be a probability.
+  optional bool classification_outputs_probabilities = 8 [default = true];
 }
 
 // Description of the importance of a given attribute. The semantic of

@@ -108,6 +108,7 @@ constexpr char
 constexpr char GradientBoostedTreesLearner::kHParamEarlyStoppingLossIncrease[];
 constexpr char
     GradientBoostedTreesLearner::kHParamEarlyStoppingNumTreesLookAhead[];
+constexpr char GradientBoostedTreesLearner::kHParamApplyLinkFunction[];
 
 using dataset::VerticalDataset;
 using CategoricalColumn = VerticalDataset::CategoricalColumn;
@@ -537,6 +538,13 @@ GradientBoostedTreesLearner::InitializeModel(
   const auto secondary_metric_names = config.loss->SecondaryMetricNames();
   *mdl->training_logs_.mutable_secondary_metric_names() = {
       secondary_metric_names.begin(), secondary_metric_names.end()};
+
+  if (mdl->task() == model::proto::Task::CLASSIFICATION &&
+      !config.gbt_config->apply_link_function()) {
+    // The model output might not be a probability.
+    mdl->set_classification_outputs_probabilities(false);
+  }
+  mdl->set_output_logits(!config.gbt_config->apply_link_function());
   return mdl;
 }
 
@@ -1752,6 +1760,14 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamApplyLinkFunction);
+    if (hparam.has_value()) {
+      gbt_config->set_apply_link_function(
+          hparam.value().value().categorical() == "true");
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -2152,6 +2168,19 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
 - `NONE`: No early stopping. The model is trained entirely.
 - `MIN_LOSS_FINAL`: No early stopping. However, the model is then truncated to maximize the validation loss.
 - `LOSS_INCREASE`: Stop the training when the validation does not decrease for `early_stopping_num_trees_look_ahead` trees.)");
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamApplyLinkFunction);
+    param.mutable_categorical()->set_default_value(
+        gbt_config.apply_link_function() ? "true" : "false");
+    param.mutable_categorical()->add_possible_values("true");
+    param.mutable_categorical()->add_possible_values("false");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(If true, applies the link function (a.k.a. activation function), if any, before returning the model prediction. If false, returns the pre-link function model output.
+For example, in the case of binary classification, the pre-link function output is a logic while the post-link function is a probability.)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
