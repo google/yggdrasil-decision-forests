@@ -50,7 +50,7 @@ class MultiThreadManager : public AbstractManager {
   std::vector<std::unique_ptr<AbstractWorker>> workers_;
 
   // Next worker that will solve the next request.
-  std::atomic<int> next_worker_ = 0;
+  std::atomic<int> next_worker_ = {0};
 
   utils::concurrency::Channel<utils::StatusOr<Blob>> async_pending_answers_;
 

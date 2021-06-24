@@ -423,7 +423,7 @@ RandomForestLearner::TrainWithStatus(
 
   // Note: "num_trained_trees" is defined outside of the following brackets so
   // to make use it is not released before "pool".
-  std::atomic<int> num_trained_trees(0);
+  std::atomic<int> num_trained_trees{0};
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         "TrainRF", deployment().num_threads());

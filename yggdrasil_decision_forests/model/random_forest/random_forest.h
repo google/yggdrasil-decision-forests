@@ -175,7 +175,7 @@ class RandomForestModel : public AbstractModel {
 
   // Updates the format used to save the model on disk. If not specified, the
   // recommended format `RecommendedSerializationFormat` is used.
-  void set_node_format(const std::optional<std::string>& format) {
+  void set_node_format(const absl::optional<std::string>& format) {
     node_format_ = format;
   }
 
@@ -198,7 +198,7 @@ class RandomForestModel : public AbstractModel {
   // If not specified, the format `RecommendedSerializationFormat()` will be
   // used. When loading a model from disk, this field is populated with the
   // format.
-  std::optional<std::string> node_format_;
+  absl::optional<std::string> node_format_;
 };
 
 namespace internal {

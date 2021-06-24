@@ -1697,7 +1697,7 @@ void Predict(
     const typename GenericGradientBoostedTreesBinaryClassification<
         uint32_t>::ExampleSet& examples,
     int num_examples, std::vector<float>* predictions) {
-  if (ABSL_PREDICT_FALSE(model.output_logits)) {
+  if (model.output_logits) {
     PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
         model, examples, num_examples, predictions);
   } else {
@@ -1713,7 +1713,7 @@ void Predict(
     const typename GradientBoostedTreesMulticlassClassification::ExampleSet&
         examples,
     int num_examples, std::vector<float>* predictions) {
-  if (ABSL_PREDICT_FALSE(model.output_logits)) {
+  if (model.output_logits) {
     PredictHelperMultiDimensionFromSingleDimensionTrees<
         std::remove_reference<decltype(model)>::type,
         ActivationMultiDimIdentity>(model, examples, num_examples, predictions);

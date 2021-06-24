@@ -143,7 +143,7 @@ class TrainAndTestTester : public ::testing::Test {
   int num_shards = 3;
 
   // If set, interrupts the training after "interrupt_training_after".
-  std::optional<absl::Duration> interrupt_training_after;
+  absl::optional<absl::Duration> interrupt_training_after;
 
   // If true, the model is checked and the implementation is checked for
   // potential issues e.g. serializing+deserializing, creation of serving

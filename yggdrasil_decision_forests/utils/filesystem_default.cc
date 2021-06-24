@@ -70,23 +70,31 @@ bool GenerateShardedFilenames(absl::string_view spec,
 
 absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
                    const int options) {
-  const auto search_dir = std::filesystem::path(pattern).parent_path();
-  const auto filename = std::filesystem::path(pattern).filename().string();
-  std::string regexp_filename =
-      absl::StrReplaceAll(filename, {{".", "\\."}, {"*", ".*"}, {"?", "."}});
-  std::regex regexp_pattern(regexp_filename);
-  for (auto& path : std::filesystem::directory_iterator(search_dir)) {
-    if (std::regex_match(path.path().filename().string(), regexp_pattern)) {
-      results->push_back(path.path().string());
+  try {
+    const auto search_dir = std::filesystem::path(pattern).parent_path();
+    const auto filename = std::filesystem::path(pattern).filename().string();
+    std::string regexp_filename =
+        absl::StrReplaceAll(filename, {{".", "\\."}, {"*", ".*"}, {"?", "."}});
+    std::regex regexp_pattern(regexp_filename);
+    for (auto& path : std::filesystem::directory_iterator(search_dir)) {
+      if (std::regex_match(path.path().filename().string(), regexp_pattern)) {
+        results->push_back(path.path().string());
+      }
     }
+    std::sort(results->begin(), results->end());
+    return absl::OkStatus();
+  } catch (const std::exception& e) {
+    return absl::InvalidArgumentError(e.what());
   }
-  std::sort(results->begin(), results->end());
-  return absl::OkStatus();
 }
 
 absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
-  std::filesystem::create_directories(path);
-  return absl::OkStatus();
+  try {
+    std::filesystem::create_directories(path);
+    return absl::OkStatus();
+  } catch (const std::exception& e) {
+    return absl::InvalidArgumentError(e.what());
+  }
 }
 
 absl::Status FileInputByteStream::Open(absl::string_view path) {
@@ -190,8 +198,9 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
   return absl::OkStatus();
 }
 
-yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(absl::string_view path) {
-return std::filesystem::exists(path);
+yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
+    absl::string_view path) {
+  return std::filesystem::exists(path);
 }
 
 }  // namespace file

@@ -23,6 +23,8 @@
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
+constexpr char MultiThreadManager::kKey[];
+
 utils::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
                                                           int worker_idx) {
   if (verbose_) {

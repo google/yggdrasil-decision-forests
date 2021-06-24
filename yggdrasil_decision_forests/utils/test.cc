@@ -20,6 +20,7 @@
 #include "gtest/gtest.h"
 
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
 namespace test {
@@ -33,7 +34,7 @@ std::string TmpDirectory() {
   CHECK(test != nullptr);
   const auto test_name = absl::StrCat(
       test->test_suite_name(), "-", test->test_case_name(), "-",
-      test->name());
+      test->name(), "-", utils::GenUniqueId());
   std::string path =
       file::JoinPath(testing::TempDir(), "yggdrasil_unittest", test_name);
   CHECK_OK(file::RecursivelyCreateDir(path, file::Defaults()));

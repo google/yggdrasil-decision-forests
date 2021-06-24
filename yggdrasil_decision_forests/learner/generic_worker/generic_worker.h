@@ -43,7 +43,6 @@ class GenericWorker : public distribute::AbstractWorker {
   }
 
  private:
-
   absl::Status TrainModel(const proto::Request::TrainModel& request,
                           proto::Result::TrainModel* result);
 
@@ -53,7 +52,7 @@ class GenericWorker : public distribute::AbstractWorker {
   proto::Welcome welcome_;
 
   // Set to true when Done is called on the "GenericWorker".
-  std::atomic<bool> done_was_called_ = false;
+  std::atomic<bool> done_was_called_ =  {false};
 };
 
 }  // namespace generic_worker

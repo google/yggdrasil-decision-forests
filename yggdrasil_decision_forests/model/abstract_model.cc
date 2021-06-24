@@ -313,7 +313,7 @@ void AbstractModel::AppendEvaluation(
     const auto engine = std::move(engine_or_status.value());
     // Extract the shards from the dataset path.
     std::string path, prefix;
-    std::tie(prefix, path) = dataset::SplitTypeAndPath(typed_path).ValueOrDie();
+    std::tie(prefix, path) = dataset::SplitTypeAndPath(typed_path).value();
     std::vector<std::string> shards;
     CHECK_OK(utils::ExpandInputShards(path, &shards));
 

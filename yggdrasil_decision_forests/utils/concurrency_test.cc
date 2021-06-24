@@ -28,7 +28,7 @@ TEST(ThreadPool, Empty) {
 }
 
 TEST(ThreadPool, Simple) {
-  std::atomic<int> counter = 0;
+  std::atomic<int> counter = {0};
   int n = 100;
   {
     ThreadPool pool("MyPool", 1);

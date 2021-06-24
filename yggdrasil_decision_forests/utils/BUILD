@@ -132,6 +132,7 @@ cc_library_ydf(
     deps = [
         ":filesystem",
         ":logging",
+        ":uid",
         "@com_google_protobuf//:protobuf",
         "@com_google_googletest//:gtest",
         "@com_google_absl//absl/strings",

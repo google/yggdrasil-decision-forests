@@ -42,6 +42,8 @@ absl::Status GrpcStatusToAbslStatus(const grpc::Status& src) {
 
 }  // namespace
 
+constexpr char GRPCManager::kKey[];
+
 absl::Status GRPCManager::InitializeWorkers(const proto::Config& config) {
   const auto& imp_config = config.GetExtension(proto::grpc);
 
