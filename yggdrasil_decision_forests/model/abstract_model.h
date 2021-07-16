@@ -324,6 +324,14 @@ class AbstractModel {
     classification_outputs_probabilities_ = value;
   }
 
+  // Computes a set of variable importances available in
+  // "AvailableVariableImportances", and store the result in the model. Querying
+  // those variable importances will return the cached values (instead of
+  // possibly re-computing those variables from the model structure).
+  // If the variable is already cached, it will be ignored.
+  absl::Status PrecomputeVariableImportances(
+      const std::vector<std::string>& variable_importances);
+
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 

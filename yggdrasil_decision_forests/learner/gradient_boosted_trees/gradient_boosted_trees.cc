@@ -382,6 +382,10 @@ absl::Status MaybeExportTrainingLogs(const absl::string_view log_directory,
 
 absl::Status FinalizeModel(const absl::string_view log_directory,
                            GradientBoostedTreesModel* mdl) {
+  // Cache the structural variable importance in the model data.
+  RETURN_IF_ERROR(mdl->PrecomputeVariableImportances(
+      mdl->AvailableStructuralVariableImportances()));
+
   mdl->mutable_training_logs()->set_number_of_trees_in_final_model(
       mdl->NumTrees() / mdl->num_trees_per_iter());
   return MaybeExportTrainingLogs(log_directory, mdl);

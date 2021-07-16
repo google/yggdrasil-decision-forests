@@ -487,8 +487,8 @@ void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
 
   if (full_definition) {
     absl::StrAppend(description, "\nModel Structure:\n");
-    absl::StrAppend(description, "Initial predictions: $0\n",
-                    absl::StrJoin(initial_predictions_, ","));
+    absl::SubstituteAndAppend(description, "Initial predictions: $0\n",
+                              absl::StrJoin(initial_predictions_, ","));
     absl::StrAppend(description, "\n");
     AppendModelStructure(description);
   }
@@ -497,6 +497,22 @@ void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
 std::vector<std::string>
 GradientBoostedTreesModel::AvailableVariableImportances() const {
   auto variable_importances = AbstractModel::AvailableVariableImportances();
+  const auto structual = AvailableStructuralVariableImportances();
+  variable_importances.insert(variable_importances.end(), structual.begin(),
+                              structual.end());
+
+  // Remove possible duplicates.
+  std::sort(variable_importances.begin(), variable_importances.end());
+  variable_importances.erase(
+      std::unique(variable_importances.begin(), variable_importances.end()),
+      variable_importances.end());
+
+  return variable_importances;
+}
+
+std::vector<std::string>
+GradientBoostedTreesModel::AvailableStructuralVariableImportances() const {
+  std::vector<std::string> variable_importances;
   variable_importances.push_back(
       decision_tree::kVariableImportanceNumberOfNodes);
   variable_importances.push_back(
@@ -509,19 +525,24 @@ GradientBoostedTreesModel::AvailableVariableImportances() const {
 
 utils::StatusOr<std::vector<model::proto::VariableImportance>>
 GradientBoostedTreesModel::GetVariableImportance(absl::string_view key) const {
-  // Tree structure variable importances.
-  if (key == decision_tree::kVariableImportanceNumberOfNodes) {
-    return decision_tree::StructureNumberOfTimesInNode(decision_trees());
-  } else if (key == decision_tree::kVariableImportanceNumberOfTimesAsRoot) {
-    return decision_tree::StructureNumberOfTimesAsRoot(decision_trees());
-  } else if (key == decision_tree::kVariableImportanceSumScore) {
-    return decision_tree::StructureSumScore(decision_trees());
-  } else if (key == decision_tree::kVariableImportanceMeanMinDepth) {
-    return decision_tree::StructureMeanMinDepth(decision_trees(),
-                                                data_spec().columns_size());
-  } else {
-    return AbstractModel::GetVariableImportance(key);
+  const auto general_vi = AbstractModel::GetVariableImportance(key);
+  if (general_vi.ok()) {
+    return std::move(general_vi.value());
+  } else if (general_vi.status().code() == absl::StatusCode::kNotFound) {
+    // Tree structure variable importances.
+    if (key == decision_tree::kVariableImportanceNumberOfNodes) {
+      return decision_tree::StructureNumberOfTimesInNode(decision_trees());
+    } else if (key == decision_tree::kVariableImportanceNumberOfTimesAsRoot) {
+      return decision_tree::StructureNumberOfTimesAsRoot(decision_trees());
+    } else if (key == decision_tree::kVariableImportanceSumScore) {
+      return decision_tree::StructureSumScore(decision_trees());
+    } else if (key == decision_tree::kVariableImportanceMeanMinDepth) {
+      return decision_tree::StructureMeanMinDepth(decision_trees(),
+                                                  data_spec().columns_size());
+    }
   }
+
+  return general_vi;
 }
 
 REGISTER_AbstractModel(GradientBoostedTreesModel,

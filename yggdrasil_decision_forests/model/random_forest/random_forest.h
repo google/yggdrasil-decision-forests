@@ -161,6 +161,10 @@ class RandomForestModel : public AbstractModel {
 
   std::vector<std::string> AvailableVariableImportances() const override;
 
+  // List the variable importances that can be computed from the model
+  // structure.
+  std::vector<std::string> AvailableStructuralVariableImportances() const;
+
   utils::StatusOr<std::vector<model::proto::VariableImportance>>
   GetVariableImportance(absl::string_view key) const override;
 

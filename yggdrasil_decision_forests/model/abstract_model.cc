@@ -625,6 +625,26 @@ std::vector<std::string> AbstractModel::AvailableVariableImportances() const {
   return keys;
 }
 
+absl::Status AbstractModel::PrecomputeVariableImportances(
+    const std::vector<std::string>& variable_importances) {
+  for (const auto& vi_key : variable_importances) {
+    if (precomputed_variable_importances_.find(vi_key) !=
+        precomputed_variable_importances_.end()) {
+      // VI already cached.
+      continue;
+    }
+    ASSIGN_OR_RETURN(const auto src_vi_values, GetVariableImportance(vi_key));
+    auto& dst_vi_values = precomputed_variable_importances_[vi_key];
+    for (const auto& src_vi_value : src_vi_values) {
+      auto* dst_vi_value = dst_vi_values.add_variable_importances();
+      dst_vi_value->set_attribute_idx(src_vi_value.attribute_idx());
+      dst_vi_value->set_importance(src_vi_value.importance());
+    }
+  }
+
+  return absl::OkStatus();
+}
+
 utils::StatusOr<std::vector<proto::VariableImportance>>
 AbstractModel::GetVariableImportance(absl::string_view key) const {
   const auto vi_it = precomputed_variable_importances_.find(key);

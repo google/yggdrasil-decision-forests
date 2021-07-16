@@ -206,6 +206,11 @@ utils::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
   utils::usage::OnTrainingEnd(train_dataset.data_spec(), config, config_link,
                               train_dataset.nrow(), *mdl,
                               absl::Now() - begin_training);
+
+  // Cache the structural variable importance in the model data.
+  RETURN_IF_ERROR(mdl->PrecomputeVariableImportances(
+      mdl->AvailableStructuralVariableImportances()));
+
   return std::move(mdl);
 }
 

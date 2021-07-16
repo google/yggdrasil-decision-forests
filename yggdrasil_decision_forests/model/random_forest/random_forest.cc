@@ -390,6 +390,22 @@ std::vector<std::string> RandomForestModel::AvailableVariableImportances()
       LOG(FATAL) << "RandomForest for task " << model::proto::Task_Name(task())
                  << " does not implement VariableImportances.";
   }
+  const auto structual = AvailableStructuralVariableImportances();
+  variable_importances.insert(variable_importances.end(), structual.begin(),
+                              structual.end());
+
+  // Remove possible duplicates.
+  std::sort(variable_importances.begin(), variable_importances.end());
+  variable_importances.erase(
+      std::unique(variable_importances.begin(), variable_importances.end()),
+      variable_importances.end());
+
+  return variable_importances;
+}
+
+std::vector<std::string>
+RandomForestModel::AvailableStructuralVariableImportances() const {
+  std::vector<std::string> variable_importances;
   variable_importances.push_back(
       decision_tree::kVariableImportanceNumberOfNodes);
   variable_importances.push_back(
@@ -402,24 +418,28 @@ std::vector<std::string> RandomForestModel::AvailableVariableImportances()
 
 utils::StatusOr<std::vector<model::proto::VariableImportance>>
 RandomForestModel::GetVariableImportance(absl::string_view key) const {
-  if (key == kVariableImportanceMeanDecreaseInAccuracy &&
-      !mean_decrease_in_accuracy_.empty()) {
-    return mean_decrease_in_accuracy_;
-  } else if (key == kVariableImportanceMeanIncreaseInRmse &&
-             !mean_increase_in_rmse_.empty()) {
-    return mean_increase_in_rmse_;
-  } else if (key == decision_tree::kVariableImportanceNumberOfNodes) {
-    return decision_tree::StructureNumberOfTimesInNode(decision_trees());
-  } else if (key == decision_tree::kVariableImportanceNumberOfTimesAsRoot) {
-    return decision_tree::StructureNumberOfTimesAsRoot(decision_trees());
-  } else if (key == decision_tree::kVariableImportanceSumScore) {
-    return decision_tree::StructureSumScore(decision_trees());
-  } else if (key == decision_tree::kVariableImportanceMeanMinDepth) {
-    return decision_tree::StructureMeanMinDepth(decision_trees(),
-                                                data_spec().columns_size());
-  } else {
-    return AbstractModel::GetVariableImportance(key);
+  const auto general_vi = AbstractModel::GetVariableImportance(key);
+  if (general_vi.ok()) {
+    return std::move(general_vi.value());
+  } else if (general_vi.status().code() == absl::StatusCode::kNotFound) {
+    if (key == kVariableImportanceMeanDecreaseInAccuracy &&
+        !mean_decrease_in_accuracy_.empty()) {
+      return mean_decrease_in_accuracy_;
+    } else if (key == kVariableImportanceMeanIncreaseInRmse &&
+               !mean_increase_in_rmse_.empty()) {
+      return mean_increase_in_rmse_;
+    } else if (key == decision_tree::kVariableImportanceNumberOfNodes) {
+      return decision_tree::StructureNumberOfTimesInNode(decision_trees());
+    } else if (key == decision_tree::kVariableImportanceNumberOfTimesAsRoot) {
+      return decision_tree::StructureNumberOfTimesAsRoot(decision_trees());
+    } else if (key == decision_tree::kVariableImportanceSumScore) {
+      return decision_tree::StructureSumScore(decision_trees());
+    } else if (key == decision_tree::kVariableImportanceMeanMinDepth) {
+      return decision_tree::StructureMeanMinDepth(decision_trees(),
+                                                  data_spec().columns_size());
+    }
   }
+  return general_vi;
 }
 
 metric::proto::EvaluationResults RandomForestModel::ValidationEvaluation()

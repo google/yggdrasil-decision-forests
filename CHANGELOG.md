@@ -8,6 +8,7 @@
 -   Reduce the memory usage of the pre-sorted feature index.
 -   Multi-threaded computation of the pre-sorted feature index.
 -   Disable GBT's early stopping if the validation dataset ratio is zero.
+-   Pre-computed and cache the structural variable importances.
 
 ## 0.1.3 - 2021-05-19
 
