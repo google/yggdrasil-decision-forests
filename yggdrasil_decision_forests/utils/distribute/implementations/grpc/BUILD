@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -37,7 +37,7 @@ alias(
     actual = ":grpc_manager",
 )
 
-cc_library(
+cc_library_ydf(
     name = "grpc_manager",
     srcs = ["grpc_manager.cc"],
     hdrs = ["grpc_manager.h"],
@@ -58,7 +58,7 @@ cc_library(
     alwayslink = 1,
 )
 
-cc_library(
+cc_library_ydf(
     name = "grpc_worker",
     srcs = ["grpc_worker.cc"],
     hdrs = ["grpc_worker.h"],

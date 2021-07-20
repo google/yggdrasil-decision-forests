@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -17,7 +17,7 @@ all_proto_library(
 # Library
 # =======
 
-cc_library(
+cc_library_ydf(
     name = "multi_thread",
     srcs = ["multi_thread.cc"],
     hdrs = ["multi_thread.h"],

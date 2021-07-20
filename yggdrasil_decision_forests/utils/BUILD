@@ -606,7 +606,7 @@ cc_library_ydf(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "snapshot",
     srcs = ["snapshot.cc"],
     hdrs = ["snapshot.h"],
@@ -619,7 +619,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "uid",
     hdrs = ["uid.h"],
     deps = [

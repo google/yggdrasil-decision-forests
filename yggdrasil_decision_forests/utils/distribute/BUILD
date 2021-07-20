@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,7 +12,7 @@ package(
 # All the available distribution implementations.
 # This can be *very* large, and most pipelines should only depends on the one
 # needed.
-cc_library(
+cc_library_ydf(
     name = "all_implementations",
     deps = [
         "//yggdrasil_decision_forests/utils/distribute/implementations/grpc",
@@ -22,7 +22,7 @@ cc_library(
 )
 
 # All worker logic implementations.
-cc_library(
+cc_library_ydf(
     name = "all_workers",
     deps = [
         ":toy_worker",
@@ -42,7 +42,7 @@ all_proto_library(
 # Library
 # =======
 
-cc_library(
+cc_library_ydf(
     name = "distribute",
     visibility = ["//visibility:public"],
     deps = [
@@ -51,7 +51,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "distribute_without_implementations",
     srcs = ["distribute.cc"],
     hdrs = ["distribute.h"],
@@ -62,7 +62,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "core",
     srcs = ["core.cc"],
     hdrs = ["core.h"],
@@ -76,7 +76,7 @@ cc_library(
     ],
 )
 
-cc_library(
+cc_library_ydf(
     name = "test_utils",
     testonly = 1,
     srcs = ["test_utils.cc"],
@@ -91,7 +91,7 @@ cc_library(
 # Tests
 # =====
 
-cc_library(
+cc_library_ydf(
     name = "toy_worker",
     srcs = ["toy_worker.cc"],
     hdrs = ["toy_worker.h"],
