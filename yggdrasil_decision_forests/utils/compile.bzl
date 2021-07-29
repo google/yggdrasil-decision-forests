@@ -8,6 +8,9 @@ load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 def cc_library_ydf(**attrs):
     native.cc_library(**attrs)
 
+def cc_binary_ydf(**attrs):
+    native.cc_binary(**attrs)
+
 def all_proto_library(
         name = None,
         deps = [],

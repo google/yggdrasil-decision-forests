@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_binary_ydf", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -17,7 +17,7 @@ cc_library_ydf(
 # Binaries
 # ========
 
-cc_binary(
+cc_binary_ydf(
     name = "benchmark_inference",
     srcs = ["benchmark_inference.cc"],
     deps = [
@@ -33,7 +33,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_binary_ydf(
     name = "infer_dataspec",
     srcs = ["infer_dataspec.cc"],
     deps = [
@@ -48,7 +48,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_binary_ydf(
     name = "show_dataspec",
     srcs = ["show_dataspec.cc"],
     deps = [
@@ -61,7 +61,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_binary_ydf(
     name = "train",
     srcs = ["train.cc"],
     deps = [
@@ -77,7 +77,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_binary_ydf(
     name = "show_model",
     srcs = ["show_model.cc"],
     deps = [
@@ -90,7 +90,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_binary_ydf(
     name = "convert_dataset",
     srcs = ["convert_dataset.cc"],
     deps = [
@@ -107,7 +107,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_binary_ydf(
     name = "predict",
     srcs = ["predict.cc"],
     deps = [
@@ -127,7 +127,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_binary_ydf(
     name = "evaluate",
     srcs = ["evaluate.cc"],
     deps = [

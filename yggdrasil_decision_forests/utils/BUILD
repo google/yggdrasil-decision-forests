@@ -414,19 +414,23 @@ cc_library_ydf(
     ],
 )
 
-alias(
+cc_library_ydf(
     name = "usage",
-    actual = ":usage_default",
+    hdrs = ["usage.h"],
+    deps = select({
+        "//conditions:default": [":usage_default"],
+    }) + [
+        "@com_google_absl//absl/time",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
+        "//yggdrasil_decision_forests/model:abstract_model",
+    ],
 )
 
 cc_library_ydf(
     name = "usage_default",
-    srcs = [
-        "usage_default.cc",
-    ],
-    hdrs = [
-        "usage.h",
-    ],
+    srcs = ["usage_default.cc"],
+    hdrs = ["usage.h"],
     deps = [
         "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",

@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_binary_ydf", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -8,7 +8,7 @@ package(
 # Binaries
 # ========
 
-cc_binary(
+cc_binary_ydf(
     name = "export_doc_main",
     srcs = ["export_doc_main.cc"],
     deps = [

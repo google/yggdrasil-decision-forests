@@ -37,7 +37,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:weight",
         "//yggdrasil_decision_forests/learner:abstract_learner",
-        "//yggdrasil_decision_forests/learner:all_learners",
         "//yggdrasil_decision_forests/learner:learner_library",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",
         "//yggdrasil_decision_forests/model:model_library",
@@ -48,7 +47,9 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils/distribute:core",
         "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
         "//yggdrasil_decision_forests/utils:uid",
-    ],
+    ] + select({
+        "//conditions:default": ["//yggdrasil_decision_forests/learner:all_learners"],
+    }),
     alwayslink = 1,
 )
 

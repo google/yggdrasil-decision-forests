@@ -1,4 +1,4 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_binary_ydf", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -18,7 +18,7 @@ all_proto_library(
 # Worker binaries
 # ===============
 
-cc_binary(
+cc_binary_ydf(
     name = "grpc_worker_main",
     srcs = ["grpc_worker_main.cc"],
     deps = [
