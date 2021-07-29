@@ -1261,18 +1261,19 @@ inline void PredictHelper(
     const Model& model, const std::vector<typename Model::ValueType>& examples,
     int num_examples, std::vector<float>* predictions) {
   utils::usage::OnInference(num_examples);
+  const int num_features = model.features().fixed_length_features().size();
   predictions->resize(num_examples);
   for (int example_idx = 0; example_idx < num_examples; ++example_idx) {
     float output = 0.f;
-    const auto* sample =
-        &examples[example_idx *
-                  model.features().fixed_length_features().size()];
-    for (const auto root_node_idx : model.root_offsets) {
-      const auto* node = &model.nodes[root_node_idx];
-      while (node->right_idx) {
-        node += EvalCondition(node, sample) ? node->right_idx : 1;
+    if (num_features > 0) {
+      const auto* sample = &examples[example_idx * num_features];
+      for (const auto root_node_idx : model.root_offsets) {
+        const auto* node = &model.nodes[root_node_idx];
+        while (node->right_idx) {
+          node += EvalCondition(node, sample) ? node->right_idx : 1;
+        }
+        output += node->label;
       }
-      output += node->label;
     }
     (*predictions)[example_idx] = FinalTransform(model, output);
   }
