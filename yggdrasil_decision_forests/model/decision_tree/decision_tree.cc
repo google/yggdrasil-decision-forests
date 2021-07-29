@@ -908,7 +908,8 @@ absl::Status NodeWithChildren::Validate(
         }
         if (condition.contains_bitmap_condition().elements_bitmap().size() * 8 <
             attribute_spec.categorical().number_of_unique_values()) {
-          return absl::InvalidArgumentError("Invalid bitmap to small");
+          return absl::InvalidArgumentError(
+              "Condition bitmap does not contain enough elements");
         }
         break;
       case proto::Condition::TypeCase::kObliqueCondition:
