@@ -481,11 +481,11 @@ TEST_F(RandomForestOnAdult, InterruptTraining) {
 
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
-#ifndef THREAD_SANITIZER
+#if !defined(THREAD_SANITIZER) && !defined(ADDRESS_SANITIZER)
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 10 + 20);
-#endif
-
+  // Note: the model trained with a sanitizer might be small / poor.
   EXPECT_GT(metric::Accuracy(evaluation_), 0.840);
+#endif
 }
 
 // Train and test a model on the adult dataset for a maximum given duration.
@@ -500,8 +500,10 @@ TEST_F(RandomForestOnAdult, MaximumDurationAdaptSampling) {
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
+#if !defined(THREAD_SANITIZER) && !defined(ADDRESS_SANITIZER)
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 10 + 20);
   EXPECT_GE(metric::Accuracy(evaluation_), 0.84);
+#endif
 }
 
 TEST_F(RandomForestOnAdult, MaxNumNodes) {
