@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5 - 2021-08-11
+
+### Fixes
+
+-   Fix incorrect handling of CART pruning when validation set is empty.
+    Previously, the whole tree would be erroneously pruned. Now, pruning is
+    disabled if the validation set is not specified.
+
 ## 0.1.4 - ????
 
 ### Features

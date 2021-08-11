@@ -115,7 +115,65 @@ TEST(Cart, SetHyperParameters) {
   EXPECT_NEAR(cart_config.validation_ratio(), 0.5, 0.001);
 }
 
-TEST(Cart, PruneTree) {
+class CartPruningTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    *dataset_.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
+      columns { type: NUMERICAL name: "a" }
+      columns {
+        type: CATEGORICAL
+        name: "l"
+        categorical { number_of_unique_values: 3 is_already_integerized: true }
+      }
+    )pb");
+    EXPECT_OK(dataset_.CreateColumnsFromDataspec());
+    dataset_.AppendExample({{"a", "0"}, {"l", "1"}});
+    dataset_.AppendExample({{"a", "1"}, {"l", "2"}});
+    dataset_.AppendExample({{"a", "2"}, {"l", "2"}});
+
+    config_link_.set_label(1);
+
+    tree_.CreateRoot();
+    tree_.mutable_root()->CreateChildren();
+    tree_.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree_.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_higher_condition()
+        ->set_threshold(0.5);
+
+    auto* neg_child = tree_.mutable_root()->mutable_neg_child();
+    auto* pos_child = tree_.mutable_root()->mutable_pos_child();
+
+    neg_child->mutable_node()->mutable_classifier()->set_top_value(1);
+    pos_child->mutable_node()->mutable_classifier()->set_top_value(2);
+
+    pos_child->CreateChildren();
+    pos_child->mutable_node()->mutable_condition()->set_attribute(0);
+    pos_child->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_higher_condition()
+        ->set_threshold(1.5);
+
+    pos_child->mutable_neg_child()
+        ->mutable_node()
+        ->mutable_classifier()
+        ->set_top_value(1);
+    pos_child->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_classifier()
+        ->set_top_value(2);
+  }
+
+  dataset::VerticalDataset dataset_;
+  model::decision_tree::DecisionTree tree_;
+  model::proto::TrainingConfig config_;
+  model::proto::TrainingConfigLinking config_link_;
+};
+
+TEST_F(CartPruningTest, PruneTree) {
   // The classification tree is as follow:
   // (a>0.5; pred=1)
   //   │
@@ -133,67 +191,24 @@ TEST(Cart, PruneTree) {
   //
   // The node "a>1.5" should be pruned.
 
-  dataset::VerticalDataset dataset;
-  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
-    columns { type: NUMERICAL name: "a" }
-    columns {
-      type: CATEGORICAL
-      name: "l"
-      categorical { number_of_unique_values: 3 is_already_integerized: true }
-    }
-  )pb");
-  EXPECT_OK(dataset.CreateColumnsFromDataspec());
-  dataset.AppendExample({{"a", "0"}, {"l", "1"}});
-  dataset.AppendExample({{"a", "1"}, {"l", "2"}});
-  dataset.AppendExample({{"a", "2"}, {"l", "2"}});
+  EXPECT_EQ(tree_.NumNodes(), 5);
 
   std::vector<float> weights = {1.f, 1.f, 1.f};
   std::vector<dataset::VerticalDataset::row_t> example_idxs = {0, 1, 2};
-  model::proto::TrainingConfig config;
-  model::proto::TrainingConfigLinking config_link;
-  config_link.set_label(1);
-
-  model::decision_tree::DecisionTree tree;
-  tree.CreateRoot();
-  tree.mutable_root()->CreateChildren();
-  tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
-  tree.mutable_root()
-      ->mutable_node()
-      ->mutable_condition()
-      ->mutable_condition()
-      ->mutable_higher_condition()
-      ->set_threshold(0.5);
-
-  auto* neg_child = tree.mutable_root()->mutable_neg_child();
-  auto* pos_child = tree.mutable_root()->mutable_pos_child();
-
-  neg_child->mutable_node()->mutable_classifier()->set_top_value(1);
-  pos_child->mutable_node()->mutable_classifier()->set_top_value(2);
-
-  pos_child->CreateChildren();
-  pos_child->mutable_node()->mutable_condition()->set_attribute(0);
-  pos_child->mutable_node()
-      ->mutable_condition()
-      ->mutable_condition()
-      ->mutable_higher_condition()
-      ->set_threshold(1.5);
-
-  pos_child->mutable_neg_child()
-      ->mutable_node()
-      ->mutable_classifier()
-      ->set_top_value(1);
-  pos_child->mutable_pos_child()
-      ->mutable_node()
-      ->mutable_classifier()
-      ->set_top_value(2);
-
-  EXPECT_EQ(tree.NumNodes(), 5);
-
-  EXPECT_OK(internal::PruneTree(dataset, weights, example_idxs, config,
-                                config_link, &tree));
+  EXPECT_OK(internal::PruneTree(dataset_, weights, example_idxs, config_,
+                                config_link_, &tree_));
 
   // Note: There is only one way to prune the tree and make it having 3 nodes.
-  EXPECT_EQ(tree.NumNodes(), 3);
+  EXPECT_EQ(tree_.NumNodes(), 3);
+}
+
+TEST_F(CartPruningTest, NoValidationIndexes) {
+  // Without validation indexes specified, the tree should not be pruned.
+
+  EXPECT_EQ(tree_.NumNodes(), 5);
+  EXPECT_OK(internal::PruneTree(dataset_, /*weights=*/{}, /*example_idxs=*/{},
+                                config_, config_link_, &tree_));
+  EXPECT_EQ(tree_.NumNodes(), 5);
 }
 
 }  // namespace
