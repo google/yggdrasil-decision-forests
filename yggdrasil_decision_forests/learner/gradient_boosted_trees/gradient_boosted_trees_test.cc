@@ -14,11 +14,6 @@
  */
 
 // Gradient Boosted Trees algorithms tests.
-//
-// Notice time checks are disabled from tests with config=tsan, because it can
-// slow things down up to 100 times. Yet we still want to run those tests with
-// --config=tsan. More in
-// https://documentation.corp.google.com/testing/tsan/documentation/index.md?cl=head
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 
@@ -554,7 +549,7 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.002);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 
   auto* gbt_model =
@@ -575,7 +570,7 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.002);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 
   auto* gbt_model =
@@ -749,7 +744,7 @@ TEST_F(GradientBoostedTreesOnAdult, BaseConcurrentDeprecated) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.002);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
@@ -767,7 +762,7 @@ TEST_F(GradientBoostedTreesOnAdult, BaseConcurrent) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.002);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
@@ -1196,8 +1191,8 @@ TEST_F(GradientBoostedTreesOnIris, Dart) {
   gbt_config->mutable_dart()->set_dropout_rate(0.1f);
   gbt_config->mutable_decision_tree()->set_num_candidate_attributes(8);
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.02);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1618, 0.04);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.03);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1618, 0.05);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 
