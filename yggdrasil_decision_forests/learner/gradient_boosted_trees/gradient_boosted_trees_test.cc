@@ -952,7 +952,8 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDuration) {
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
-#if !defined(THREAD_SANITIZER) && !defined(ADDRESS_SANITIZER)
+#if !defined(MEMORY_SANITIZER) && !defined(THREAD_SANITIZER) && \
+    !defined(ADDRESS_SANITIZER)
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 15);
   EXPECT_GE(metric::Accuracy(evaluation_), 0.840);
 #endif
@@ -978,7 +979,8 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeLocalGrowth) {
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
-#if !defined(THREAD_SANITIZER) && !defined(ADDRESS_SANITIZER)
+#if !defined(MEMORY_SANITIZER) && !defined(THREAD_SANITIZER) && \
+    !defined(ADDRESS_SANITIZER)
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_),
             2 * kMaximumGrowthDurationSec);
 #endif
@@ -1006,7 +1008,8 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeGlobalGrowth) {
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
-#if !defined(THREAD_SANITIZER) && !defined(ADDRESS_SANITIZER)
+#if !defined(MEMORY_SANITIZER) && !defined(THREAD_SANITIZER) && \
+    !defined(ADDRESS_SANITIZER)
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_),
             3 * kMaximumGrowthDurationSec);
 #endif
@@ -1025,7 +1028,8 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDurationAdaptSubsample) {
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
-#if !defined(THREAD_SANITIZER) && !defined(ADDRESS_SANITIZER)
+#if !defined(MEMORY_SANITIZER) && !defined(THREAD_SANITIZER) && \
+    !defined(ADDRESS_SANITIZER)
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 20);
   EXPECT_GE(metric::Accuracy(evaluation_), 0.80);
 #endif
