@@ -202,15 +202,6 @@ TEST_F(CartPruningTest, PruneTree) {
   EXPECT_EQ(tree_.NumNodes(), 3);
 }
 
-TEST_F(CartPruningTest, NoValidationIndexes) {
-  // Without validation indexes specified, the tree should not be pruned.
-
-  EXPECT_EQ(tree_.NumNodes(), 5);
-  EXPECT_OK(internal::PruneTree(dataset_, /*weights=*/{}, /*example_idxs=*/{},
-                                config_, config_link_, &tree_));
-  EXPECT_EQ(tree_.NumNodes(), 5);
-}
-
 }  // namespace
 }  // namespace cart
 }  // namespace model

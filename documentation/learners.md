@@ -705,6 +705,7 @@ used to grow the tree while the second is used to prune the tree.
 -   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
 
 -   Ratio of the training dataset used to create the validation dataset used to
-    prune the tree.
+    prune the tree. If set to 0, the entire dataset is used for training, and
+    the tree is not pruned.
 
 </font>

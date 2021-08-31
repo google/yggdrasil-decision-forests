@@ -125,7 +125,7 @@ CartLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_real()->set_default_value(cart_config.validation_ratio());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Ratio of the training dataset used to create the validation dataset used to prune the tree.)");
+        R"(Ratio of the training dataset used to create the validation dataset used to prune the tree. If set to 0, the entire dataset is used for training, and the tree is not pruned.)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
@@ -199,9 +199,11 @@ utils::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
                                        deployment(), weights, &random,
                                        decision_tree, internal_config));
 
-  // Prune the tree.
-  RETURN_IF_ERROR(internal::PruneTree(train_dataset, weights, valid_examples,
-                                      config, config_link, decision_tree));
+  if (!valid_examples.empty()) {
+    // Prune the tree.
+    RETURN_IF_ERROR(internal::PruneTree(train_dataset, weights, valid_examples,
+                                        config, config_link, decision_tree));
+  }
 
   utils::usage::OnTrainingEnd(train_dataset.data_spec(), config, config_link,
                               train_dataset.nrow(), *mdl,
@@ -357,12 +359,6 @@ absl::Status PruneTree(const dataset::VerticalDataset& dataset,
                        const model::proto::TrainingConfig& config,
                        const model::proto::TrainingConfigLinking& config_link,
                        model::decision_tree::DecisionTree* tree) {
-  if (example_idxs.empty()) {
-    LOG(WARNING) << "Validation set is empty, not pruning decision tree. This "
-                    "will likely result in lower quality (and larger) trees "
-                    "than usual, consider setting validation_set_ratio > 0.0.";
-    return absl::OkStatus();
-  }
   const auto num_nodes_pre_pruning = tree->NumNodes();
   if (config.task() == model::proto::Task::CLASSIFICATION) {
     RETURN_IF_ERROR(PruneTreeClassification(dataset, weights, example_idxs,
