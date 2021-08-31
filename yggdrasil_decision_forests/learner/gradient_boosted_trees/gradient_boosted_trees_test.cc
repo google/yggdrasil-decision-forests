@@ -1192,7 +1192,7 @@ TEST_F(GradientBoostedTreesOnIris, Dart) {
   gbt_config->mutable_decision_tree()->set_num_candidate_attributes(8);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.03);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1618, 0.05);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1618, 0.06);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 

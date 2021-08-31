@@ -23,15 +23,18 @@
 // Usage example:
 //   LOG_INFO_EVERY_N_SEC(5, _ << "Hello world");
 //
-#define LOG_INFO_EVERY_N_SEC(INTERVAL, MESSAGE)          \
-  {                                                      \
-    static absl::Time last_time;                         \
-    const auto time = absl::Now();                       \
-    if ((time - last_time) >= absl::Seconds(INTERVAL)) { \
-      last_time = time;                                  \
-      std::string _;                                     \
-      LOG(INFO) << MESSAGE;                              \
-    }                                                    \
+#define LOG_INFO_EVERY_N_SEC(INTERVAL, MESSAGE)               \
+  {                                                           \
+    static std::atomic<int64_t> next_log_time_atomic{0};      \
+    const auto now_time = absl::GetCurrentTimeNanos();        \
+    const auto next_log_time =                                \
+        next_log_time_atomic.load(std::memory_order_relaxed); \
+    if (now_time > next_log_time) {                           \
+      next_log_time_atomic.store(now_time + INTERVAL * 1e9,   \
+                                 std::memory_order_relaxed);  \
+      std::string _;                                          \
+      LOG(INFO) << MESSAGE;                                   \
+    }                                                         \
   }
 
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_LOGGING_H_

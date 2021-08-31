@@ -465,7 +465,9 @@ TEST_F(RandomForestOnAdult, MaximumDurationInTree) {
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
+#if !defined(THREAD_SANITIZER) && !defined(ADDRESS_SANITIZER)
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 10 + 20);
+#endif
 }
 
 TEST_F(RandomForestOnAdult, InterruptTraining) {
