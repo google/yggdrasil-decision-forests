@@ -144,9 +144,9 @@ Terminology:
 ```
 
 The representation of an attribute is not always sufficient to determine its
-semantic type. For example, csv files stores all attribute types (including numerical
-ones) as strings. Another example, integer values are often interpreted as
-numerical or categorical (i.e. enum) values.
+semantic type. For example, csv files stores all attribute types (including
+numerical ones) as strings. Another example, integer values are often
+interpreted as numerical or categorical (i.e. enum) values.
 
 Dataspecs are created automatically by the dataspec inference tool (e.g.
 `cli/infer_dataspec`). If an automatically-inferred dataspec is incorrect (e.g.
@@ -349,6 +349,63 @@ any learner (see section on learner).
 
 Importantly, learners and meta-learners can be combined. For example, an
 ensembler on top of a hyper-parameter tuner on top of a calibrator.
+
+## Model Analysis
+
+The
+[show_model](../yggdrasil_decision_forests/cli/show_model.cc)
+tool shows the following information about a model:
+
+-   The input features and labels of the model.
+-   The variable importance of each features.
+-   The detailed or summarized structure of the model (e.g. number of nodes).
+-   The compatible serving engine.
+-   The training logs.
+
+Alternatively, models can be visualized and analysed programmatically directly
+using the
+[TensorFlow Decision Forests python inspector](https://www.tensorflow.org/decision_forests/api_docs/python/tfdf/inspector/make_inspector).
+See the
+[Inspect and debug](https://www.tensorflow.org/decision_forests/tutorials/advanced_colab)
+colab for more details. An Yggdrasil model can be converted into a Tensorflow
+Decision Forests model using the
+[tfdf.keras.core.yggdrasil_model_to_keras_model](https://www.tensorflow.org/decision_forests/api_docs/python/tfdf/keras/core/yggdrasil_model_to_keras_model)
+function. Calling `model.summary()` shows the same information as the
+`show_model` CLI.
+
+### Variable Importances
+
+Variable importances can be obtained with CLI (`show_model`), the C++ API
+(`model.GetVariableImportance()`) and the Python API
+(`tfdf.inspector.make_inspector(path).variable_importances()`).
+
+The available variable importances are:
+
+#### Model agnostic
+
+`MEAN_{INCREASE,DECREASE}_IN_{metric}`: Estimated metric change from removing a
+feature using
+[permutation importance](https://christophm.github.io/interpretable-ml-book/feature-importance.html).
+Depending on the learning algorithm and hyper-parameters, the VIs can be
+computed with validation, cross-validation or out-of-bag. For example, the
+`MEAN_DECREASE_IN_ACCURACY` of a feature is the drop in accuracy (the larger,
+the most important the feature) caused by shuffling the values of a features.
+For example, `MEAN_DECREASE_IN_AUC_3_VS_OTHERS` is the expected drop in AUC when
+comparing the label class "3" to the others.
+
+#### Decision Forests specific
+
+`SUM_SCORE`: Sum of the split scores using a specific feature. The larger, the
+most important.
+
+`NUM_AS_ROOT`: Number of root nodes using a specific feature. The larger, the
+most important.
+
+`NUM_NODES`: Number of nodes using a specific feature. The larger, the most
+important.
+
+`MEAN_MIN_DEPTH`: Average minimum depth of the first occurence of a feature
+across all the tree paths. The smaller, the most important.
 
 ## Manual Tuning of Hyper-parameters
 
