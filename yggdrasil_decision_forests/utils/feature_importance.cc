@@ -71,7 +71,7 @@ void ComputePermutationFeatureImportance(
     const std::function<
         absl::optional<metric::proto::EvaluationResults>(const int feature_idx)>
         get_permutation_evaluation,
-    model::AbstractModel* model) {
+    model::AbstractModel* model, int num_rounds) {
   const auto metrics =
       metric::DefaultMetrics(model->task(), model->label_col_spec());
 
@@ -87,8 +87,16 @@ void ComputePermutationFeatureImportance(
   // Evaluate the impact of permuting each feature on each metric.
   for (int feature_idx = 0; feature_idx < model->data_spec().columns_size();
        feature_idx++) {
-    const auto permuted_evaluation = get_permutation_evaluation(feature_idx);
-    if (!permuted_evaluation.has_value()) {
+    std::vector<metric::proto::EvaluationResults> permuted_evaluations;
+    for (int round_idx = 0; round_idx < num_rounds; round_idx++) {
+      auto permuted_evaluation = get_permutation_evaluation(feature_idx);
+      if (!permuted_evaluation.has_value()) {
+        continue;
+      }
+      permuted_evaluations.push_back(std::move(permuted_evaluation).value());
+    }
+
+    if (permuted_evaluations.empty()) {
       // The feature is not used by the model.
       continue;
     }
@@ -97,8 +105,15 @@ void ComputePermutationFeatureImportance(
       const auto metric = metrics[metric_idx];
       const auto baseline_metric_value =
           metric::GetMetric(base_evaluation, metric.accessor);
+
+      double sum_permuted_metric_value = 0;
+      for (const auto& permuted_evaluation : permuted_evaluations) {
+        sum_permuted_metric_value +=
+            metric::GetMetric(permuted_evaluation, metric.accessor);
+      }
       const auto permuted_metric_value =
-          metric::GetMetric(permuted_evaluation.value(), metric.accessor);
+          sum_permuted_metric_value / permuted_evaluations.size();
+
       auto& feature_importance =
           (*model->mutable_precomputed_variable_importances())
               [importance_names[metric_idx]];
@@ -123,6 +138,38 @@ void ComputePermutationFeatureImportance(
               feature_importance.mutable_variable_importances()->end(),
               var_importance_comparer);
   }
+}
+
+absl::Status ComputePermutationFeatureImportance(
+    const dataset::VerticalDataset& dataset, model::AbstractModel* model,
+    int num_rounds) {
+  utils::RandomEngine rnd_permutation_vi;
+
+  // Setup the evaluation configuration.
+  metric::proto::EvaluationOptions eval_options;
+  eval_options.set_bootstrapping_samples(0);
+  eval_options.set_task(model->task());
+
+  const auto base_evaluation =
+      model->Evaluate(dataset, eval_options, &rnd_permutation_vi);
+
+  const auto permutation_evaluation = [&](const int feature_idx)
+      -> absl::optional<metric::proto::EvaluationResults> {
+    const auto it_input_feature =
+        std::find(model->input_features().begin(),
+                  model->input_features().end(), feature_idx);
+    if (it_input_feature == model->input_features().end()) {
+      return {};
+    }
+    const auto perturbed_dataset = utils::ShuffleDatasetColumns(
+        dataset, {feature_idx}, &rnd_permutation_vi);
+    return model->Evaluate(perturbed_dataset, eval_options,
+                           &rnd_permutation_vi);
+  };
+
+  utils::ComputePermutationFeatureImportance(
+      base_evaluation, permutation_evaluation, model, num_rounds);
+  return absl::OkStatus();
 }
 
 }  // namespace utils

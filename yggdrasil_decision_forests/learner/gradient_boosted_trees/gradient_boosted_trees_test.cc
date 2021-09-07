@@ -578,6 +578,21 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
   EXPECT_TRUE(gbt_model->IsMissingValueConditionResultFollowGlobalImputation());
 }
 
+TEST_F(GradientBoostedTreesOnAdult, VariableImportance) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_compute_permutation_variable_importance(true);
+
+  TrainAndEvaluateModel();
+  EXPECT_THAT(
+      model_->AvailableVariableImportances(),
+      ElementsAre("MEAN_DECREASE_IN_ACCURACY",
+                  "MEAN_DECREASE_IN_AP_>50K_VS_OTHERS",
+                  "MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS",
+                  "MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS", "MEAN_MIN_DEPTH",
+                  "NUM_AS_ROOT", "NUM_NODES", "SUM_SCORE"));
+}
+
 class PerShardSamplingOnAdult : public ::testing::Test {
  public:
   void SetUp() override {

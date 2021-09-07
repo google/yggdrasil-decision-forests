@@ -34,7 +34,12 @@ void ComputePermutationFeatureImportance(
     const std::function<
         absl::optional<metric::proto::EvaluationResults>(const int feature_idx)>
         get_permutation_evaluation,
-    model::AbstractModel* model);
+    model::AbstractModel* model, int num_rounds = 1);
+
+// Computes and adds to the model permutation feature importances.
+absl::Status ComputePermutationFeatureImportance(
+    const dataset::VerticalDataset& dataset, model::AbstractModel* model,
+    int num_rounds = 1);
 
 // Builds a copy of the dataset with the values of the columns in
 // "shuffle_column_idxs" are shuffled randomly.

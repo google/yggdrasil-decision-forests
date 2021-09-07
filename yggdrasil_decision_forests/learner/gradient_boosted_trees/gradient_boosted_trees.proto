@@ -23,7 +23,7 @@ import "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted
 
 // Training configuration for the Gradient Boosted Trees algorithm.
 message GradientBoostedTreesTrainingConfig {
-  // Next ID: 34
+  // Next ID: 36
 
   // Basic parameters.
 
@@ -343,6 +343,11 @@ message GradientBoostedTreesTrainingConfig {
   // For example, in the case of binary classification, the pre-link function
   // output is a logic while the post-link function is a probability.
   optional bool apply_link_function = 34 [default = true];
+
+  // If true, compute the permutation variable importance of the model at the
+  // end of the training using the validation dataset. Enabling this feature can
+  // increase the training time significantly.
+  optional bool compute_permutation_variable_importance = 35 [default = false];
 }
 
 extend model.proto.TrainingConfig {

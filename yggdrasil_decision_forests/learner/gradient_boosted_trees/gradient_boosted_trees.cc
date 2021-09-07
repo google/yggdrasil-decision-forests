@@ -58,6 +58,7 @@
 #include "yggdrasil_decision_forests/utils/adaptive_work.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
+#include "yggdrasil_decision_forests/utils/feature_importance.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -109,6 +110,8 @@ constexpr char GradientBoostedTreesLearner::kHParamEarlyStoppingLossIncrease[];
 constexpr char
     GradientBoostedTreesLearner::kHParamEarlyStoppingNumTreesLookAhead[];
 constexpr char GradientBoostedTreesLearner::kHParamApplyLinkFunction[];
+constexpr char
+    GradientBoostedTreesLearner::kHParamComputePermutationVariableImportance[];
 
 using dataset::VerticalDataset;
 using CategoricalColumn = VerticalDataset::CategoricalColumn;
@@ -326,6 +329,7 @@ std::vector<std::string> SampleTrainingShards(
 absl::Status FinalizeModelWithValidationDataset(
     const internal::AllTrainingConfiguration& config,
     const internal::EarlyStopping& early_stopping,
+    const dataset::VerticalDataset& validation_dataset,
     GradientBoostedTreesModel* mdl) {
   std::vector<float> final_secondary_metrics;
   if (config.gbt_config->early_stopping() ==
@@ -368,6 +372,13 @@ absl::Status FinalizeModelWithValidationDataset(
     }
   }
   LOG(INFO) << snippet;
+
+  if (config.gbt_config->compute_permutation_variable_importance()) {
+    LOG(INFO) << "Compute permutation variable importances";
+    RETURN_IF_ERROR(
+        utils::ComputePermutationFeatureImportance(validation_dataset, mdl));
+  }
+
   return absl::OkStatus();
 }
 
@@ -1036,8 +1047,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   }
 
   if (has_validation_dataset) {
-    RETURN_IF_ERROR(
-        FinalizeModelWithValidationDataset(config, early_stopping, mdl.get()));
+    RETURN_IF_ERROR(FinalizeModelWithValidationDataset(
+        config, early_stopping, validation->dataset, mdl.get()));
   }
 
   RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
@@ -1531,8 +1542,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
   }  // End of training iteration.
 
   if (has_validation_dataset) {
-    RETURN_IF_ERROR(
-        FinalizeModelWithValidationDataset(config, early_stopping, mdl.get()));
+    RETURN_IF_ERROR(FinalizeModelWithValidationDataset(
+        config, early_stopping, validation_dataset, mdl.get()));
   }
 
   if (dart_extraction) {
@@ -1768,6 +1779,15 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     const auto hparam = generic_hyper_params->Get(kHParamApplyLinkFunction);
     if (hparam.has_value()) {
       gbt_config->set_apply_link_function(
+          hparam.value().value().categorical() == "true");
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamComputePermutationVariableImportance);
+    if (hparam.has_value()) {
+      gbt_config->set_compute_permutation_variable_importance(
           hparam.value().value().categorical() == "true");
     }
   }
@@ -2185,6 +2205,19 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_description(
         R"(If true, applies the link function (a.k.a. activation function), if any, before returning the model prediction. If false, returns the pre-link function model output.
 For example, in the case of binary classification, the pre-link function output is a logic while the post-link function is a probability.)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamComputePermutationVariableImportance);
+    param.mutable_categorical()->set_default_value(
+        gbt_config.compute_permutation_variable_importance() ? "true"
+                                                             : "false");
+    param.mutable_categorical()->add_possible_values("true");
+    param.mutable_categorical()->add_possible_values("false");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(If true, compute the permutation variable importance of the model at the end of the training using the validation dataset. Enabling this feature can increase the training time significantly.)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(

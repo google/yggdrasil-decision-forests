@@ -61,6 +61,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:snapshot",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:usage",
+        "//yggdrasil_decision_forests/utils:feature_importance",
     ] + select({
         "//conditions:default": [
         ],
