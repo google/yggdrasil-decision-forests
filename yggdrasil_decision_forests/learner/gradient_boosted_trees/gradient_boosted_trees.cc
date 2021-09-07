@@ -373,6 +373,8 @@ absl::Status FinalizeModelWithValidationDataset(
 
 absl::Status MaybeExportTrainingLogs(const absl::string_view log_directory,
                                      GradientBoostedTreesModel* mdl) {
+  mdl->mutable_training_logs()->set_number_of_trees_in_final_model(
+      mdl->NumTrees() / mdl->num_trees_per_iter());
   if (!log_directory.empty()) {
     RETURN_IF_ERROR(
         internal::ExportTrainingLogs(mdl->training_logs(), log_directory));
@@ -386,8 +388,6 @@ absl::Status FinalizeModel(const absl::string_view log_directory,
   RETURN_IF_ERROR(mdl->PrecomputeVariableImportances(
       mdl->AvailableStructuralVariableImportances()));
 
-  mdl->mutable_training_logs()->set_number_of_trees_in_final_model(
-      mdl->NumTrees() / mdl->num_trees_per_iter());
   return MaybeExportTrainingLogs(log_directory, mdl);
 }
 
@@ -1024,7 +1024,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     if (config.gbt_config->export_logs_during_training_in_trees() > 0 &&
         (((iter_idx + 1) %
           config.gbt_config->export_logs_during_training_in_trees()) == 0)) {
-      RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
+      RETURN_IF_ERROR(MaybeExportTrainingLogs(log_directory_, mdl.get()));
     }
   }
 
@@ -1508,7 +1508,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
     if (config.gbt_config->export_logs_during_training_in_trees() > 0 &&
         (((iter_idx + 1) %
           config.gbt_config->export_logs_during_training_in_trees()) == 0)) {
-      RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
+      RETURN_IF_ERROR(MaybeExportTrainingLogs(log_directory_, mdl.get()));
     }
 
     // Export a snapshot
