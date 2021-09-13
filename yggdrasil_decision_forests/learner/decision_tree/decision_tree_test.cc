@@ -954,10 +954,9 @@ TEST_P(FindBestNumericalSplitCartNumericalLabelBasePresortedTest,
 
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_internal()->set_sorting_strategy(
-      proto::DecisionTreeTrainingConfig::Internal::PRESORTED);
+      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
   utils::NormalDistributionDouble label_distribution;
-  for (int example_idx = 0; example_idx < selected_examples.size();
-       example_idx++) {
+  for (const auto example_idx : selected_examples) {
     label_distribution.Add(labels[example_idx], weights[example_idx]);
   }
   proto::NodeCondition best_condition;
@@ -990,6 +989,65 @@ TEST_P(FindBestNumericalSplitCartNumericalLabelBasePresortedTest,
 INSTANTIATE_TEST_SUITE_P(
     DuplicatedSelectedExamples,
     FindBestNumericalSplitCartNumericalLabelBasePresortedTest, testing::Bool());
+
+TEST(FindBestNumericalSplitCartNumericalLabelBasePresortedTestManual, Base) {
+  const std::vector<row_t> selected_examples = {0, 1, 3, 4, 9};
+  const std::vector<float> weights(11, 1.f);
+  std::vector<float> attributes = {0, 0, 1, 1, 1, 1, 2, 2, 5, 5, 5};
+  const std::vector<float> labels = {0, 0, 1, 1, 1, 1, 1, 1, 1000, 1000, 1000};
+  const float na_replacement = 2;
+  const row_t min_num_obs = 1;
+
+  // Computes the preprocessing.
+  Preprocessing preprocessing;
+  {
+    dataset::VerticalDataset dataset;
+    dataset.set_data_spec(PARSE_TEST_PROTO(
+        R"pb(
+          columns {
+            type: NUMERICAL
+            name: "a"
+            numerical { mean: 2 }
+          }
+        )pb"));
+    CHECK_OK(dataset.CreateColumnsFromDataspec());
+    for (const auto attribute : attributes) {
+      dataset::proto::Example example;
+      example.add_attributes()->set_numerical(attribute);
+      dataset.AppendExample(example);
+    }
+    model::proto::TrainingConfigLinking config_link;
+    config_link.add_features(0);
+    CHECK_OK(PresortNumericalFeatures(dataset, config_link, 6, &preprocessing));
+    preprocessing.set_num_examples(dataset.nrow());
+  }
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
+  utils::NormalDistributionDouble label_distribution;
+  for (const auto example_idx : selected_examples) {
+    label_distribution.Add(labels[example_idx], weights[example_idx]);
+  }
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  InternalTrainConfig internal_config;
+  internal_config.preprocessing = &preprocessing;
+  internal_config.duplicated_selected_examples = false;
+  EXPECT_EQ(FindSplitLabelRegressionFeatureNumericalCart(
+                selected_examples, weights, attributes, labels, na_replacement,
+                min_num_obs, dt_config, label_distribution, 0, internal_config,
+                &best_condition, &cache),
+            SplitSearchResult::kBetterSplitFound);
+
+  LOG(INFO) << "Condition: " << best_condition.condition().DebugString();
+
+  EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 3.0f);
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 5);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 5);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 1);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 1);
+}
 
 TEST(DecisionTree, FindBestCategoricalSplitCartNumericalLabels) {
   // Small basic dataset.

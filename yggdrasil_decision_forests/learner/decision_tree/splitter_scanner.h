@@ -680,21 +680,34 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   int64_t best_num_pos_training_examples_without_weight;
   int64_t best_num_pos_training_examples_with_weight;
   int64_t best_sorted_example_idx = -1;
+  int64_t best_previous_sorted_example_idx = -1;
 
   constexpr auto new_value_mask = ((SparseItem::ExampleIdx)1)
                                   << (sizeof(SparseItem::ExampleIdx) * 8 - 1);
   constexpr auto example_idx_mask = new_value_mask - 1;
 
+  // A new (i.e. different) attribute value was observed in the scan since the
+  // last score test.
+  bool new_attribute_value = false;
+
+  // Index of the nearest previous example with a  value different from the
+  // current example (i.e. the "sorted_example_idx" example).
+  SparseItem::ExampleIdx previous_sorted_example_idx = 0;
+
   // Iterate over the attribute values in increasing order.
   // Note: For some reasons, the iterator for-loop is faster than the
   // for(auto:sorted_attributes) for loop (test on 10 different compiled
   // binaries).
-  for (size_t sorted_example_idx = 0;
+  for (SparseItem::ExampleIdx sorted_example_idx = 0;
        sorted_example_idx < sorted_attributes.size(); sorted_example_idx++) {
     const auto& sorted_attribute = sorted_attributes[sorted_example_idx];
 
     auto example_idx =
         sorted_attribute.example_idx_and_extra & example_idx_mask;
+
+    const bool is_new_value =
+        sorted_attribute.example_idx_and_extra & new_value_mask;
+    new_attribute_value |= is_new_value;
 
     // Skip non selected examples.
     if constexpr (duplicate_examples) {
@@ -711,7 +724,7 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
     label_filler.Prefetch(example_idx);
 
     // Test Split
-    if (sorted_attribute.example_idx_and_extra & new_value_mask) {
+    if (new_attribute_value) {
       if (num_pos_examples >= min_num_obs &&
           num_pos_examples <= max_num_pos_examples) {
         // Compute the split's score.
@@ -722,6 +735,7 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
         if (score > best_score) {
           // A better split was found. Memorize the split.
           best_sorted_example_idx = sorted_example_idx;
+          best_previous_sorted_example_idx = previous_sorted_example_idx;
           best_score = score;
           best_num_pos_training_examples_without_weight = num_pos_examples;
           best_num_pos_training_examples_with_weight =
@@ -729,6 +743,8 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
           found_split = true;
         }
       }
+      previous_sorted_example_idx = sorted_example_idx;
+      new_attribute_value = 0;
     }
 
     // Update positive and negative accumulators.
@@ -749,11 +765,14 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   if (found_split) {
     // Finalize the best found split.
     const auto best_previous_feature_value = feature_filler.GetValue(
-        sorted_attributes[best_sorted_example_idx - 1].example_idx_and_extra &
+        sorted_attributes[best_previous_sorted_example_idx]
+            .example_idx_and_extra &
         example_idx_mask);
     const auto best_feature_value = feature_filler.GetValue(
         sorted_attributes[best_sorted_example_idx].example_idx_and_extra &
         example_idx_mask);
+    // TODO(gbm): Experiment with random splits in ]best_previous_feature_value,
+    // best_feature_value[.
 
     feature_filler.SetConditionFinalFromThresholds(
         best_previous_feature_value, best_feature_value, condition);

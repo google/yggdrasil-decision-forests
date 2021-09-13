@@ -227,6 +227,10 @@ message DecisionTreeTrainingConfig {
       // This method can increase significantly the amount of memory required
       // for training.
       PRESORTED = 1;
+
+      // Always use the presorted index, even if the result would be slower.
+      // For testing only.
+      FORCE_PRESORTED = 2;
     }
     optional SortingStrategy sorting_strategy = 21 [default = PRESORTED];
   }

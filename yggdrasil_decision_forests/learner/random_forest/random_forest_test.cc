@@ -942,8 +942,8 @@ TEST_F(RandomForestOnDNA, BooleanAsNumerical) {
   guide_filename_ = "dna_guide.pbtxt";
   TrainAndEvaluateModel();
   // For comparison, the RF model learned in R yields an accuracy of 0.909.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.91462, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.3984, 0.04);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.946641, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2973, 0.04);
 }
 
 class RandomForestOnSyntheticClassification : public utils::TrainAndTestTester {

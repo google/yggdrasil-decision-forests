@@ -1410,6 +1410,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
   FeatureNumericalBucket::Filler feature_filler(selected_examples.size(),
                                                 na_replacement, attributes);
 
+  const auto sorting_strategy = dt_config.internal().sorting_strategy();
+
   // "Why ==3" ?
   // Categorical attributes always have one class reserved for
   // "out-of-vocabulary" items. The "num_label_classes" takes into account this
@@ -1420,13 +1422,17 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
     LabelBinaryCategoricalOneValueBucket::Filler label_filler(
         labels, weights, label_distribution);
 
-    if (dt_config.internal().sorting_strategy() ==
-        proto::DecisionTreeTrainingConfig::Internal::PRESORTED) {
+    if (sorting_strategy ==
+            proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+        sorting_strategy ==
+            proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
       if (!internal_config.preprocessing) {
         LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
                       "strategy";
       }
-      if (IsPresortingOnNumericalSplitMoreEfficient(
+      if (sorting_strategy ==
+              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
+          IsPresortingOnNumericalSplitMoreEfficient(
               selected_examples.size(),
               internal_config.preprocessing->num_examples())) {
         const auto& sorted_attributes =
@@ -1450,13 +1456,17 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
     LabelCategoricalOneValueBucket::Filler label_filler(labels, weights,
                                                         label_distribution);
 
-    if (dt_config.internal().sorting_strategy() ==
-        proto::DecisionTreeTrainingConfig::Internal::PRESORTED) {
+    if (sorting_strategy ==
+            proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+        sorting_strategy ==
+            proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
       if (!internal_config.preprocessing) {
         LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
                       "strategy";
       }
-      if (IsPresortingOnNumericalSplitMoreEfficient(
+      if (sorting_strategy ==
+              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
+          IsPresortingOnNumericalSplitMoreEfficient(
               selected_examples.size(),
               internal_config.preprocessing->num_examples())) {
         const auto& sorted_attributes =
@@ -1660,12 +1670,16 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
       internal_config.hessian_l1, internal_config.hessian_l2_numerical);
 
   if (dt_config.internal().sorting_strategy() ==
-      proto::DecisionTreeTrainingConfig::Internal::PRESORTED) {
+          proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+      dt_config.internal().sorting_strategy() ==
+          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
     if (!internal_config.preprocessing) {
       LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
                     "strategy";
     }
-    if (IsPresortingOnNumericalSplitMoreEfficient(
+    if (dt_config.internal().sorting_strategy() ==
+            proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
+        IsPresortingOnNumericalSplitMoreEfficient(
             selected_examples.size(),
             internal_config.preprocessing->num_examples())) {
       const auto& sorted_attributes =
@@ -1730,15 +1744,19 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
 
   LabelNumericalOneValueBucket::Filler label_filler(labels, weights,
                                                     label_distribution);
-
-  if (dt_config.internal().sorting_strategy() ==
-      proto::DecisionTreeTrainingConfig::Internal::PRESORTED) {
+  const auto sorting_strategy = dt_config.internal().sorting_strategy();
+  if (sorting_strategy ==
+          proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+      sorting_strategy ==
+          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
     if (!internal_config.preprocessing) {
       LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
                     "strategy";
     }
 
-    if (IsPresortingOnNumericalSplitMoreEfficient(
+    if (sorting_strategy ==
+            proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
+        IsPresortingOnNumericalSplitMoreEfficient(
             selected_examples.size(),
             internal_config.preprocessing->num_examples())) {
       const auto& sorted_attributes =
@@ -2742,7 +2760,9 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
 
   // Disable pre-sorting if not supported by the splitters.
   if (config->internal().sorting_strategy() ==
-      proto::DecisionTreeTrainingConfig::Internal::PRESORTED) {
+          proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+      config->internal().sorting_strategy() ==
+          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
     if (config->has_sparse_oblique_split() ||
         config->missing_value_policy() !=
             proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION) {
@@ -3081,7 +3101,9 @@ utils::StatusOr<Preprocessing> PreprocessTrainingDataset(
   preprocessing.set_num_examples(train_dataset.nrow());
 
   if (dt_config.internal().sorting_strategy() ==
-      proto::DecisionTreeTrainingConfig::Internal::PRESORTED) {
+          proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+      dt_config.internal().sorting_strategy() ==
+          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
     RETURN_IF_ERROR(PresortNumericalFeatures(train_dataset, config_link,
                                              num_threads, &preprocessing));
   }

@@ -1161,7 +1161,7 @@ TEST_F(GradientBoostedTreesOnAbalone, L2Regularization) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_l2_regularization(0.1f);
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::RMSE(evaluation_), 2.1197, 0.01);
+  EXPECT_NEAR(metric::RMSE(evaluation_), 2.1339, 0.01);
 }
 
 TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
@@ -1190,7 +1190,7 @@ class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {
 TEST_F(GradientBoostedTreesOnIris, Base) {
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.02);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1669, 0.04);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.22079, 0.04);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 
