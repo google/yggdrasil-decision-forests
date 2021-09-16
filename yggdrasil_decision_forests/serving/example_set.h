@@ -642,17 +642,20 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   void SetCategorical(const int example_idx,
                       const CategoricalFeatureId feature_id, const int value,
                       const FeaturesDefinition& features) override {
-#ifdef NDEBUG
+#ifndef NDEBUG
     const auto* feature = FindFeatureDefFromInternalIndex(
         features.fixed_length_features(), feature_id.index);
     DCHECK(feature != nullptr);
     const auto& spec =
         features.data_spec().columns(feature->spec_idx).categorical();
-    DCHECK(spec.is_already_integerized())
-        << "The categorical feature \"" << feature->name
-        << "\" should be passed as a string";
-    DCHECK_GE(value, -1);
-    DCHECK_LT(value, spec.number_of_unique_values());
+    DCHECK_GE(value, -1) << "The categorical integer feature \""
+                         << feature->name << "\" should be in [-1,"
+                         << spec.number_of_unique_values() << "). Got "
+                         << value;
+    DCHECK_LT(value, spec.number_of_unique_values())
+        << "The categorical integer feature \"" << feature->name
+        << "\" should be in [-1," << spec.number_of_unique_values() << "). Got "
+        << value;
 #endif
 
     fixed_length_features_[FixedLengthIndex(example_idx, feature_id.index,
