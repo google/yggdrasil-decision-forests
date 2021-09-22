@@ -42,7 +42,7 @@ class AbstractLearner {
   explicit AbstractLearner(const proto::TrainingConfig& training_config)
       : training_config_(training_config) {}
 
-  virtual ~AbstractLearner() {}
+  virtual ~AbstractLearner() = default;
 
   // Trains a model using the dataset stored on disk at the path "typed_path".
   //

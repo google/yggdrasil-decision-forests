@@ -41,6 +41,7 @@
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -205,6 +206,8 @@ AbstractLearner::TrainWithStatus(
   RETURN_IF_ERROR(LoadVerticalDataset(typed_path, data_spec, &train_dataset,
                                       /*ensure_non_missing=*/{},
                                       dataset_loading_config));
+
+  RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
 
   dataset::VerticalDataset valid_dataset_data;
   absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>

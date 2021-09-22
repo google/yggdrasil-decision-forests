@@ -44,6 +44,21 @@ cc_library_ydf(
 # =======
 
 cc_library_ydf(
+    name = "types",
+    srcs = ["types.cc"],
+    hdrs = ["types.h"],
+    defines = select({
+        "//yggdrasil_decision_forests:example_idx_32bits": ["YGGDRASIL_EXAMPLE_IDX_32_BITS"],
+        "//yggdrasil_decision_forests:example_idx_64bits": ["YGGDRASIL_EXAMPLE_IDX_64_BITS"],
+        "//conditions:default": ["YGGDRASIL_EXAMPLE_IDX_32_BITS"],
+    }),
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library_ydf(
     name = "abstract_learner",
     srcs = [
         "abstract_learner.cc",
@@ -53,6 +68,7 @@ cc_library_ydf(
     ],
     deps = [
         ":abstract_learner_cc_proto",
+        ":types",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",

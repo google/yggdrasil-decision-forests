@@ -28,3 +28,31 @@ config_setting(
     name = "no_absl_statusor",
     values = {"define": "no_absl_statusor=1"},
 )
+
+# Number of bits required to represent the number of examples in a training
+# dataset for "{Unsigned,Signed}ExampleIdx" in "learner/types.h".
+#
+# Learning algorithms are not required to depend on this type. In such case,
+# this parameter has no effects.
+#
+# For learning algorithm that depend on this type, a smaller value can reduce
+# the RAM usage and increase the speed of training speed. If the number of
+# training examples exceed this value, the training with fail with a
+# "absl::InvalidArgumentError" error. In some cases, a learning algorithm that
+# depends on {}ExampleIdx can support more (but not less) training examples
+# (e.g. if the algorithm use some sampling, or if the training algorithm
+# contains zero-weighted examples).
+#
+# Possible values:
+#   (default) --define=example_idx_num_bits=32 => Up to 2'147'483'647 training
+#     examples.
+#   --define=example_idx_num_bits=64 => Up to 10^19 training examples.
+config_setting(
+    name = "example_idx_32bits",
+    values = {"define": "example_idx_num_bits=32"},
+)
+
+config_setting(
+    name = "example_idx_64bits",
+    values = {"define": "example_idx_num_bits=64"},
+)
