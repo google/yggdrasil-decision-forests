@@ -52,18 +52,34 @@ class NormalDistributionDouble {
   void Load(const proto::NormalDistributionDouble& proto);
 
   // Add one observation.
-  inline void Add(const double value, const double weight = 1.) {
-    const double value_weight = value * weight;
+  template <typename Value>
+  inline void Add(const Value value, const Value weight) {
+    const auto value_weight = value * weight;
     sum_ += value_weight;
     sum_squares_ += value_weight * value;
     count_ += weight;
   }
 
-  inline void Add(const float value, const float weight = 1.f) {
-    const float value_weight = value * weight;
-    sum_ += value_weight;
-    sum_squares_ += value_weight * value;
-    count_ += weight;
+  template <typename Value>
+  inline void Add(const Value value) {
+    sum_ += value;
+    sum_squares_ += value * value;
+    count_ += Value{1};
+  }
+
+  template <typename Value>
+  inline void Sub(const Value value, const Value weight) {
+    const auto value_weight = value * weight;
+    sum_ -= value_weight;
+    sum_squares_ -= value_weight * value;
+    count_ -= weight;
+  }
+
+  template <typename Value>
+  inline void Sub(const Value value) {
+    sum_ -= value;
+    sum_squares_ -= value * value;
+    count_ -= Value{1};
   }
 
   // Add "src" to "this" without normalization i.e. the result will be weighted
@@ -110,6 +126,15 @@ class NormalDistributionDouble {
   double sum_squares_ = 0;
   double count_ = 0;
 };
+
+// Mean of a normal distribution proto. This function is analog to
+// NormalDistributionDouble::Mean on a proto.
+inline double Mean(const proto::NormalDistributionDouble& dist) {
+  if (dist.count() == 0) {
+    return 0.;
+  }
+  return dist.sum() / dist.count();
+}
 
 // Confusion matrix between a binary attribute and a normal distribution.
 class BinaryToNormalDistributionDouble {
@@ -199,7 +224,12 @@ class IntegerDistribution {
   }
 
   // Add one observation.
-  void Add(int v, const T weight = 1);
+  void Add(int v);
+  void Add(int v, T weight);
+
+  // Subtract one observation.
+  void Sub(int v);
+  void Sub(int v, T weight);
 
   // Add the content of another IntegerDistribution.
   void Add(const IntegerDistribution<T>& v);
@@ -375,6 +405,7 @@ class IntegersConfusionMatrix {
 // Gets the index of the class with highest probability.
 // Equivalent to IntegerDistribution::TopClass.
 int TopClass(const proto::IntegerDistributionFloat& dist);
+int TopClass(const proto::IntegerDistributionDouble& dist);
 
 using IntegersConfusionMatrixDouble = IntegersConfusionMatrix<double>;
 using IntegersConfusionMatrixInt64 = IntegersConfusionMatrix<int64_t>;
@@ -677,11 +708,35 @@ void IntegerDistribution<T>::SetNumClasses(const int c) {
 }
 
 template <typename T>
+void IntegerDistribution<T>::Add(const int v) {
+  DCHECK_GE(v, 0);
+  DCHECK_LT(v, counts_.size());
+  sum_ += T{1};
+  counts_[v] += T{1};
+}
+
+template <typename T>
 void IntegerDistribution<T>::Add(const int v, const T weight) {
   DCHECK_GE(v, 0);
   DCHECK_LT(v, counts_.size());
   sum_ += weight;
   counts_[v] += weight;
+}
+
+template <typename T>
+void IntegerDistribution<T>::Sub(const int v) {
+  DCHECK_GE(v, 0);
+  DCHECK_LT(v, counts_.size());
+  sum_ -= T{1};
+  counts_[v] -= T{1};
+}
+
+template <typename T>
+void IntegerDistribution<T>::Sub(const int v, const T weight) {
+  DCHECK_GE(v, 0);
+  DCHECK_LT(v, counts_.size());
+  sum_ -= weight;
+  counts_[v] -= weight;
 }
 
 template <typename T>

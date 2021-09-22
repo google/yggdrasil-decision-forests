@@ -170,15 +170,39 @@ TEST(Distribution, IntegerDistributionDoubleNormalizedAddition) {
   EXPECT_EQ(dist2.count(3), 7.5 / 13);
 }
 
+TEST(Distribution, IntegerDistributionIntMerge) {
+  IntegerDistributionInt64 counter1;
+  counter1.SetNumClasses(4);
+  counter1.Add(1);
+  counter1.Add(2);
+
+  IntegerDistributionInt64 counter2;
+  counter2.SetNumClasses(4);
+  counter2.Add(2);
+  counter2.Add(3);
+
+  counter1.Add(counter2);
+  EXPECT_EQ(counter1.count(0), 0);
+  EXPECT_EQ(counter1.count(1), 1);
+  EXPECT_EQ(counter1.count(2), 2);
+  EXPECT_EQ(counter1.count(3), 1);
+
+  counter1.Sub(counter2);
+  EXPECT_EQ(counter1.count(0), 0);
+  EXPECT_EQ(counter1.count(1), 1);
+  EXPECT_EQ(counter1.count(2), 1);
+  EXPECT_EQ(counter1.count(3), 0);
+}
+
 TEST(Distribution, AddNormalizedToIntegerDistributionProto) {
   const proto::IntegerDistributionDouble src =
-      PARSE_TEST_PROTO(R"(
+      PARSE_TEST_PROTO(R"pb(
         counts: 1.5 counts: 3.75 counts: 2.25 sum: 7.5
-      )");
+      )pb");
   proto::IntegerDistributionDouble dst =
-      PARSE_TEST_PROTO(R"(
+      PARSE_TEST_PROTO(R"pb(
         counts: 0.0 counts: 0.5 counts: 0.5 sum: 1.0
-      )");
+      )pb");
   AddNormalizedToIntegerDistributionProto(src, 0.2, &dst);
   EXPECT_NEAR(dst.counts(0), 0.04, 0.00001);
   EXPECT_NEAR(dst.counts(1), 0.6, 0.00001);
@@ -191,9 +215,9 @@ TEST(Distribution, SubNormalizedProto) {
   counter.SetNumClasses(2);
   counter.Add(0, 1);
   proto::IntegerDistributionDouble src =
-      PARSE_TEST_PROTO(R"(
+      PARSE_TEST_PROTO(R"pb(
         counts: 0 counts: 2 sum: 2
-      )");
+      )pb");
   counter.SubNormalizedProto(src);
   EXPECT_NEAR(counter.count(0), 1, 0.00001);
   EXPECT_NEAR(counter.count(1), -1, 0.00001);
@@ -399,19 +423,37 @@ TEST(BinaryDistributionEntropy, Base) {
 
 TEST(Distribution, IntegersConfusionMatrix_AddToConfusionMatrixProto) {
   const proto::IntegersConfusionMatrixDouble src = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         nrow: 2 ncol: 2 sum: 10 counts: 1 counts: 2 counts: 3 counts: 4
-      )");
+      )pb");
   proto::IntegersConfusionMatrixDouble dst = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         nrow: 2 ncol: 2 sum: 100 counts: 10 counts: 20 counts: 30 counts: 40
-      )");
+      )pb");
   AddToConfusionMatrixProto(src, &dst);
   proto::IntegersConfusionMatrixDouble expected_dst = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         nrow: 2 ncol: 2 sum: 110 counts: 11 counts: 22 counts: 33 counts: 44
-      )");
+      )pb");
   EXPECT_THAT(dst, EqualsProto(expected_dst));
+}
+
+TEST(Distribution, IntegerDistributionFloatTopClass) {
+  proto::IntegerDistributionFloat proto;
+  proto.add_counts(1);
+  proto.add_counts(3);
+  proto.add_counts(2);
+  proto.set_sum(1 + 2 + 3);
+  EXPECT_EQ(TopClass(proto), 1);
+}
+
+TEST(Distribution, IntegerDistributionDoubleTopClass) {
+  proto::IntegerDistributionDouble proto;
+  proto.add_counts(1);
+  proto.add_counts(3);
+  proto.add_counts(2);
+  proto.set_sum(1 + 2 + 3);
+  EXPECT_EQ(TopClass(proto), 1);
 }
 
 }  // namespace

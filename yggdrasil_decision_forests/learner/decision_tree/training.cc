@@ -2393,9 +2393,9 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
         split_label_distribution.mutable_neg()->Add(labels[example_idx],
                                                     -weights[example_idx]);
         split_label_distribution_no_weights.mutable_pos()->Add(
-            labels[example_idx], 1);
-        split_label_distribution_no_weights.mutable_neg()->Add(
-            labels[example_idx], -1);
+            labels[example_idx]);
+        split_label_distribution_no_weights.mutable_neg()->Sub(
+            labels[example_idx]);
       }
     }
   }

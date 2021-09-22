@@ -103,5 +103,17 @@ int TopClass(const proto::IntegerDistributionFloat& dist) {
   return top_index;
 }
 
+int TopClass(const proto::IntegerDistributionDouble& dist) {
+  int top_index = 0;
+  float top_value = 0.;
+  for (int i = 0; i < dist.counts_size(); i++) {
+    if (dist.counts(i) > top_value) {
+      top_value = dist.counts(i);
+      top_index = i;
+    }
+  }
+  return top_index;
+}
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
