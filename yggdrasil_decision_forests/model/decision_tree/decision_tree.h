@@ -321,6 +321,10 @@ bool DoSortedRangesIntersect(Iter1 begin1, Iter1 end1, Iter2 begin2,
   return false;
 }
 
+// Extracts the list of positive elements from a "contains" type conditions.
+std::vector<int32_t> ExactElementsFromContainsCondition(
+    int vocab_size, const proto::Condition& condition);
+
 }  // namespace decision_tree
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

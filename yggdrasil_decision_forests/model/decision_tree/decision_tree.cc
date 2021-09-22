@@ -64,32 +64,43 @@ void AppendMargin(const int num_tabs, std::string* dst,
 void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
                             const int label_col_idx, const proto::Node& node,
                             std::string* description) {
-  absl::StrAppend(description, "Value: ");
+  absl::StrAppend(description, "Value:: ");
   switch (node.output_case()) {
     case proto::Node::OUTPUT_NOT_SET:
       LOG(FATAL) << "Not supported";
       break;
+
     case proto::Node::OutputCase::kClassifier: {
-      const bool use_quotes = !data_spec.columns(label_col_idx)
-                                   .categorical()
-                                   .is_already_integerized();
+      const auto& col_spec = data_spec.columns(label_col_idx);
+
+      // Should the label values be quoted?
+      const bool use_quotes = !col_spec.categorical().is_already_integerized();
       const std::string optional_quote = use_quotes ? "\"" : "";
-      absl::StrAppend(
-          description, optional_quote,
-          dataset::CategoricalIdxToRepresentation(
-              data_spec.columns(label_col_idx), node.classifier().top_value()),
-          optional_quote);
+
+      absl::StrAppend(description, "top:", optional_quote,
+                      dataset::CategoricalIdxToRepresentation(
+                          col_spec, node.classifier().top_value()),
+                      optional_quote);
+
       if (node.classifier().has_distribution()) {
-        absl::StrAppend(description, " [");
-        for (const auto count : node.classifier().distribution().counts()) {
-          absl::StrAppend(description, " ",
-                          count / node.classifier().distribution().sum());
+        absl::StrAppend(description, " proba:[");
+        const auto& distrib = node.classifier().distribution();
+        for (int count_idx = 0; count_idx < distrib.counts_size();
+             count_idx++) {
+          if (count_idx > 0) {
+            absl::StrAppend(description, ", ");
+          }
+          absl::StrAppend(description,
+                          distrib.counts(count_idx) / distrib.sum());
         }
-        absl::StrAppend(description, " ]");
+        absl::StrAppend(description, "]");
+        absl::StrAppend(description, " sum:", distrib.sum());
       }
     } break;
+
     case proto::Node::OutputCase::kRegressor:
-      absl::StrAppend(description, node.regressor().top_value());
+      absl::StrAppend(description, "mean:", node.regressor().top_value(),
+                      " sum:", node.regressor().sum_weights());
       break;
   }
 }
@@ -155,10 +166,33 @@ void AddMininumDepthPerPath(const NodeWithChildren& node, const int depth,
 
 }  // namespace
 
+std::vector<int32_t> ExactElementsFromContainsCondition(
+    int vocab_size, const proto::Condition& condition) {
+  switch (condition.type_case()) {
+    case proto::Condition::TypeCase::kContainsCondition:
+      return {condition.contains_condition().elements().begin(),
+              condition.contains_condition().elements().end()};
+
+    case proto::Condition::TypeCase::kContainsBitmapCondition: {
+      const std::string& bitmap =
+          condition.contains_bitmap_condition().elements_bitmap();
+      std::vector<int32_t> elements;
+      for (int value = 0; value < vocab_size; value++) {
+        if (utils::bitmap::GetValueBit(bitmap, value)) {
+          elements.push_back(value);
+        }
+      }
+      return elements;
+    }
+    default:
+      LOG(FATAL) << "Not a \"contains\" type condition";
+  }
+}
+
 void AppendConditionDescription(
     const dataset::proto::DataSpecification& data_spec,
     const proto::NodeCondition& node, std::string* description) {
-  absl::StrAppend(description, "Condition:");
+  absl::StrAppend(description, "Condition:: ");
 
   if (node.condition().type_case() !=
       proto::Condition::TypeCase::kObliqueCondition) {
@@ -193,17 +227,11 @@ void AppendConditionDescription(
     }
 
     case proto::Condition::TypeCase::kContainsBitmapCondition: {
-      const std::string& bitmap =
-          node.condition().contains_bitmap_condition().elements_bitmap();
-      std::vector<int32_t> elements;
       const auto num_possible_values = data_spec.columns(node.attribute())
                                            .categorical()
                                            .number_of_unique_values();
-      for (int value = 0; value < num_possible_values; value++) {
-        if (utils::bitmap::GetValueBit(bitmap, value)) {
-          elements.push_back(value);
-        }
-      }
+      const auto elements = ExactElementsFromContainsCondition(
+          num_possible_values, node.condition());
       absl::StrAppend(description, " is in [BITMAP] {",
                       dataset::CategoricalIdxsToRepresentation(
                           data_spec.columns(node.attribute()), elements, 10),
@@ -233,9 +261,11 @@ void AppendConditionDescription(
       break;
   }
   absl::StrAppendFormat(
-      description, " score:%f training_examples:%i na_value:%i",
+      description,
+      " score:%f training_examples:%i positive_training_examples:%i "
+      "missing_value_evaluation:%i",
       node.split_score(), node.num_training_examples_without_weight(),
-      node.na_value());
+      node.num_pos_training_examples_without_weight(), node.na_value());
 }
 
 size_t DecisionTree::EstimateModelSizeInByte() const {
@@ -967,8 +997,6 @@ void NodeWithChildren::AppendModelStructure(
   if (node().output_case() != proto::Node::OUTPUT_NOT_SET) {
     AppendMargin(depth, description);
     AppendValueDescription(data_spec, label_col_idx, node(), description);
-    absl::StrAppend(description, " training_examples:",
-                    node().num_pos_training_examples_without_weight());
     absl::StrAppend(description, "\n");
   }
 
@@ -980,11 +1008,11 @@ void NodeWithChildren::AppendModelStructure(
 
     // The children.
     AppendMargin(depth, description);
-    absl::StrAppend(description, "Pos child\n");
+    absl::StrAppend(description, "Positive child\n");
     pos_child()->AppendModelStructure(data_spec, label_col_idx, depth + 1,
                                       description);
     AppendMargin(depth, description);
-    absl::StrAppend(description, "Neg child\n");
+    absl::StrAppend(description, "Negative child\n");
     neg_child()->AppendModelStructure(data_spec, label_col_idx, depth + 1,
                                       description);
   }

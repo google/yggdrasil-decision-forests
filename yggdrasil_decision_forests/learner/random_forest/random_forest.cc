@@ -43,6 +43,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.pb.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -276,6 +277,7 @@ RandomForestLearner::TrainWithStatus(
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   const auto begin_training = absl::Now();
+  RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
 
   if (training_config().task() != model::proto::Task::CLASSIFICATION &&
       training_config().task() != model::proto::Task::REGRESSION) {

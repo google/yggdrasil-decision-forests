@@ -264,20 +264,20 @@ TEST(DecisionTree, AppendModelStructure) {
                              &dataset);
   std::string description;
   model.AppendModelStructure(&description);
-  CHECK_EQ(description, R"(Number of trees:2
+  EXPECT_EQ(description, R"(Number of trees:2
 Tree #0
-Condition:"a">=1 score:0.000000 training_examples:0 na_value:0
-Pos child
-  Value: 0 training_examples:8
-Neg child
-  Value: 1 training_examples:2
+Condition:: "a">=1 score:0.000000 training_examples:0 positive_training_examples:0 missing_value_evaluation:0
+Positive child
+  Value:: top:0
+Negative child
+  Value:: top:1
 
 Tree #1
-Condition:"a">=3 score:0.000000 training_examples:0 na_value:0
-Pos child
-  Value: 2 training_examples:8
-Neg child
-  Value: 1 training_examples:2
+Condition:: "a">=3 score:0.000000 training_examples:0 positive_training_examples:0 missing_value_evaluation:0
+Positive child
+  Value:: top:2
+Negative child
+  Value:: top:1
 
 )");
 }
