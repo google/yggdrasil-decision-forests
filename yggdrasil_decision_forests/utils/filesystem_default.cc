@@ -203,4 +203,13 @@ yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
   return std::filesystem::exists(path);
 }
 
+absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
+  try {
+    std::filesystem::rename(from, to);
+  } catch (const std::exception& e) {
+    return absl::InvalidArgumentError(e.what());
+  }
+  return absl::OkStatus();
+}
+
 }  // namespace file

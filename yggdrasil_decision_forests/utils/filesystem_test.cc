@@ -145,5 +145,16 @@ TEST(Filesystem, RecursivelyCreateDir) {
   EXPECT_OK(SetContent(JoinPath(tmp_dir, "a", "b", "c", "d.txt"), "hello"));
 }
 
+TEST(Filesystem, Rename) {
+  auto tmp_dir = yggdrasil_decision_forests::test::TmpDirectory();
+  auto file_a = JoinPath(tmp_dir, "a.txt");
+  auto file_b = JoinPath(tmp_dir, "b.txt");
+  const std::string content = "hello world";
+  EXPECT_OK(SetContent(file_a, content));
+  EXPECT_OK(Rename(file_a, file_b, Defaults()));
+  auto read_content = GetContent(file_b).value();
+  EXPECT_EQ(content, read_content);
+}
+
 }  // namespace
 }  // namespace file

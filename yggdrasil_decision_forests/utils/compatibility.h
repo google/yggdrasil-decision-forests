@@ -242,6 +242,63 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE inline int CountTrailingZeroesNonzero64(
 #endif
 }
 
+// Same as absl's CountLeadingZeroes64.
+// Remove when Absl release a new TLS version, and when TensorFlow supports it.
+//
+// This code was copied from: absl/numeric/internal/bits.h
+ABSL_ATTRIBUTE_ALWAYS_INLINE
+inline int CountLeadingZeroes64(uint64_t x) {
+#if ABSL_NUMERIC_INTERNAL_HAVE_BUILTIN_OR_GCC(__builtin_clzll)
+  // Use __builtin_clzll, which uses the following instructions:
+  //  x86: bsr, lzcnt
+  //  ARM64: clz
+  //  PPC: cntlzd
+  static_assert(sizeof(unsigned long long) == sizeof(x),  // NOLINT(runtime/int)
+                "__builtin_clzll does not take 64-bit arg");
+
+  // Handle 0 as a special case because __builtin_clzll(0) is undefined.
+  return x == 0 ? 64 : __builtin_clzll(x);
+#elif defined(_MSC_VER) && !defined(__clang__) && \
+    (defined(_M_X64) || defined(_M_ARM64))
+  // MSVC does not have __buitin_clzll. Use _BitScanReverse64.
+  unsigned long result = 0;  // NOLINT(runtime/int)
+  if (_BitScanReverse64(&result, x)) {
+    return 63 - result;
+  }
+  return 64;
+#elif defined(_MSC_VER) && !defined(__clang__)
+  // MSVC does not have __buitin_clzll. Compose two calls to _BitScanReverse
+  unsigned long result = 0;  // NOLINT(runtime/int)
+  if ((x >> 32) &&
+      _BitScanReverse(&result, static_cast<unsigned long>(x >> 32))) {
+    return 31 - result;
+  }
+  if (_BitScanReverse(&result, static_cast<unsigned long>(x))) {
+    return 63 - result;
+  }
+  return 64;
+#else
+  int zeroes = 60;
+  if (x >> 32) {
+    zeroes -= 32;
+    x >>= 32;
+  }
+  if (x >> 16) {
+    zeroes -= 16;
+    x >>= 16;
+  }
+  if (x >> 8) {
+    zeroes -= 8;
+    x >>= 8;
+  }
+  if (x >> 4) {
+    zeroes -= 4;
+    x >>= 4;
+  }
+  return "\4\3\2\2\1\1\1\1\0\0\0\0\0\0\0"[x] + zeroes;
+#endif
+}
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
 

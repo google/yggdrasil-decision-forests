@@ -165,6 +165,9 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
 yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
     absl::string_view path);
 
+// Renames a file or a directory.
+absl::Status Rename(absl::string_view from, absl::string_view to, int options);
+
 }  // namespace file
 
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_TENSORFLOW_H_

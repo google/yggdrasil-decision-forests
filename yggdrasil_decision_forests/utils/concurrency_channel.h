@@ -42,6 +42,13 @@ class Channel {
     cond_var_.SignalAll();
   }
 
+  // Re-open a previously closed channel.
+  void Reopen() {
+    absl::MutexLock results_lock(&mutex_);
+    close_channel_ = false;
+    cond_var_.SignalAll();
+  }
+
   // Push an item in the channel.
   void Push(Input item) {
     if (close_channel_) {

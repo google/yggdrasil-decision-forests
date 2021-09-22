@@ -86,6 +86,24 @@ TEST(Bitmap, SetValueBit) {
   }
 }
 
+TEST(Bitmap, BitReader) {
+  std::string map;
+  std::vector<bool> check_map;
+  const int size = 40;
+  AllocateAndZeroBitMap(size, &map);
+  check_map.assign(size, false);
+  BitReader reader;
+  for (int index : {0, 5, 6, 7, 16, 34}) {
+    check_map[index] = true;
+    SetValueBit(index, &map);
+
+    reader.Open(map.data(), size);
+    for (int check_index = 0; check_index < size; check_index++) {
+      EXPECT_EQ(check_map[check_index], reader.Read());
+    }
+  }
+}
+
 TEST(Bitmap, SetGetValueMultiBit) {
   std::string map;
   int bits_by_elements = 3;
@@ -184,19 +202,6 @@ TEST(Bitmap, BitWriter) {
     }
   };
   for (int size = 0; size < 1024; size++) test(size);
-}
-
-TEST(BitmapDeathTest, BitWriterMissingFinish) {
-  EXPECT_DEATH(
-      {
-        std::string bitmap;
-        BitWriter writer(10, &bitmap);
-        writer.AllocateAndZeroBitMap();
-        writer.Write(false);
-        writer.Write(true);
-        // We don't call "writer.Finish()"!
-      },
-      "");
 }
 
 TEST(Bitmap, MultibitWriter) {

@@ -51,6 +51,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -59,7 +60,8 @@ namespace bitmap {
 // Allocate and set to 0 a (single) bitmap.
 void AllocateAndZeroBitMap(const uint64_t size, std::string* bitmap);
 // Get the i-th value in a bitmap.
-bool GetValueBit(const std::string& bitmap, const uint64_t index);
+template <typename T>
+bool GetValueBit(const std::string& bitmap, const T index);
 // Set to 1 the index-th value of the bitmap.
 void SetValueBit(const uint64_t index, std::string* bitmap);
 // Create a user readable string representation of a (single) bitmap.
@@ -96,25 +98,75 @@ uint64_t NextAlignedIndex(const int32_t bits_by_elements, const uint64_t index);
 // Internal block unit used to write multibitmaps.
 typedef uint16_t multibitmap_buffertype;
 
-// Utility class to write a (single) bitmap in order. Not thread safe.
+// Utility class to read a sequence of bit values stored in a char*. Not thread
+// safe.
+class BitReader {
+ public:
+  typedef uint64_t BufferItem;
+
+  // Open a bitmap containing "size" bits. "bitmap" should contain at least
+  // ceil(size/8) bytes.
+  inline void Open(const char* bitmap, size_t size) {
+    bitmap_ = bitmap - sizeof(BufferItem);
+    size_ = size;
+    remaining_items_ = 0;
+#ifndef NDEBUG
+    num_read_ = 0;
+#endif
+  }
+
+  // Reads and returns the next bit.
+  inline bool Read() {
+#ifndef NDEBUG
+    DCHECK_LT(num_read_, size_);
+    num_read_++;
+#endif
+    if (ABSL_PREDICT_FALSE(!remaining_items_)) {
+      bitmap_ += sizeof(BufferItem);
+      buffer_ = *reinterpret_cast<const BufferItem*>(bitmap_);
+      remaining_items_ = sizeof(BufferItem) * 8 - 1;
+      return buffer_ & 0x1;
+    }
+    remaining_items_--;
+    buffer_ >>= 1;
+    return buffer_ & 0x1;
+  }
+
+  void Finish() {
+#ifndef NDEBUG
+    DCHECK_EQ(num_read_, size_);
+#endif
+  }
+
+ private:
+  const char* bitmap_;
+  BufferItem buffer_;
+  int remaining_items_;
+  size_t size_;
+#ifndef NDEBUG
+  size_t num_read_;
+#endif
+};
+
+// Utility class to write a sequent of bits. Not thread safe.
 class BitWriter {
  public:
-  BitWriter(const uint64_t size, std::string* bitmap);
-  ~BitWriter();
+  // "size" is the maximum number of elements to write.
+  BitWriter(size_t size, std::string* bitmap);
 
   // Allocate the memory of the bitmap.
   void AllocateAndZeroBitMap();
   // Write a new value.
   void Write(bool value);
-  // Finish the writing. If this function is not called, the last value
+  // Finish the writing. If this function is not called, the last values
   // passed with "Write" might not be written.
   void Finish();
 
  private:
   // Buffer block.
-  typedef uint64_t buffertype;
+  typedef uint64_t BufferType;
   // Number of elements (i.e. bits) in the buffer.
-  uint64_t size_;
+  size_t size_;
   // Output bitmap.
   std::string& bitmap_;
   // Current index in bitmap_.
@@ -122,9 +174,10 @@ class BitWriter {
   // Current bit index in bitmap_.
   int sub_cur_ = 0;
   // Buffer to store written value before being written in "bitmap_".
-  buffertype buffer_ = 0;
-  // Was "Finish" called?
-  bool finish_called_ = false;
+  BufferType buffer_ = 0;
+#ifndef NDEBUG
+  size_t num_written_ = 0;
+#endif
 };
 
 // Utility class to write a multibitmap in order. This is equivalent but more
@@ -255,6 +308,15 @@ class ShardedMultiBitmap {
   // The multi-bitmaps of each shard.
   std::vector<std::string> shards_;
 };
+
+template <typename T>
+bool GetValueBit(const std::string& bitmap, const T index) {
+  const T byte_index = index / 8;
+  DCHECK_GE(index, T{0});
+  DCHECK_LT(byte_index, static_cast<T>(bitmap.size()));
+  const auto byte_value = static_cast<uint8_t>(bitmap[byte_index]);
+  return (byte_value & (1 << (index & 7))) != 0;
+}
 
 }  // namespace bitmap
 }  // namespace utils

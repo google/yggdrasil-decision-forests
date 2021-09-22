@@ -46,14 +46,12 @@ MATCHER_P(StatusIs, type, "Status is " + testing::PrintToString(type)) {
 }
 
 MATCHER_P(EqualsProto, expected,
-          "Proto is equal to " +
-              testing::PrintToString(expected.DebugString())) {
+          "Proto is equal to:\n" + expected.DebugString()) {
   return google::protobuf::util::MessageDifferencer::Equivalent(arg, expected);
 }
 
 MATCHER_P(ApproximatelyEqualsProto, expected,
-          "Proto is approximately equal to " +
-              testing::PrintToString(expected.DebugString())) {
+          "Proto is approximately equal to:\n" + expected.DebugString()) {
   return google::protobuf::util::MessageDifferencer::ApproximatelyEquivalent(arg,
                                                                    expected);
 }

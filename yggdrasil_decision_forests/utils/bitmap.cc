@@ -30,7 +30,6 @@
 #include "yggdrasil_decision_forests/utils/bitmap.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
-#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -63,14 +62,6 @@ uint8_t& SafeGetPtrRef(std::string* bitmap, T index) {
 }
 
 }  // namespace
-
-bool GetValueBit(const std::string& bitmap, const uint64_t index) {
-  const int64_t byte_index = index / 8;
-  DCHECK_GE(index, 0);
-  DCHECK_LT(byte_index, bitmap.size());
-  const uint8_t byte_value = SafeGet(bitmap, byte_index);
-  return (byte_value & (1 << (index & 7))) != 0;
-}
 
 void AllocateAndZeroBitMap(const uint64_t size, std::string* bitmap) {
   bitmap->assign((size + 7) / 8, 0);
@@ -207,24 +198,28 @@ uint64_t NextAlignedIndex(const int32_t bits_by_elements,
 BitWriter::BitWriter(const uint64_t size, std::string* bitmap)
     : size_(size), bitmap_(*bitmap) {}
 
-BitWriter::~BitWriter() { CHECK(finish_called_); }
-
 void BitWriter::AllocateAndZeroBitMap() { bitmap_.resize((size_ + 7) / 8); }
 
 void BitWriter::Write(bool value) {
+#ifndef NDEBUG
+  DCHECK_LT(num_written_, size_);
+  num_written_++;
+#endif
   buffer_ |= static_cast<uint64_t>(value) << sub_cur_;
-  if ((sub_cur_++) == sizeof(buffertype) * 8 - 1) {
-    SafeGetRefBufferType<buffertype>(bitmap_, cur_) = buffer_;
+  if ((sub_cur_++) == sizeof(BufferType) * 8 - 1) {
+    DCHECK_LT(cur_, bitmap_.size());
+    SafeGetRefBufferType<BufferType>(bitmap_, cur_) = buffer_;
     sub_cur_ = 0;
-    cur_ += sizeof(buffertype);
+    cur_ += sizeof(BufferType);
     buffer_ = 0;
   }
 }
 
 void BitWriter::Finish() {
-  CHECK(!finish_called_);
-  finish_called_ = true;
-  if (sub_cur_ > 0 && sub_cur_ < sizeof(buffertype) * 8) {
+#ifndef NDEBUG
+  DCHECK_EQ(num_written_, size_);
+#endif
+  if (sub_cur_ > 0 && sub_cur_ < sizeof(BufferType) * 8) {
     const int num_tails = (sub_cur_ + 7) / 8;
     for (int tail = 0; tail < num_tails; tail++) {
       const uint8_t tailvalue = buffer_ & 0xFF;

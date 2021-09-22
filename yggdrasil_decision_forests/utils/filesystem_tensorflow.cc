@@ -221,4 +221,9 @@ yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
   return ToUtilStatus(exist_status);
 }
 
+absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
+  return ToUtilStatus(tensorflow::Env::Default()->RenameFile(std::string(from),
+                                                             std::string(to)));
+}
+
 }  // namespace file

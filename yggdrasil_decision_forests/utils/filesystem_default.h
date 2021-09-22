@@ -90,6 +90,9 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
 // Creates the directory "path" as well as all its missing parents.
 absl::Status RecursivelyCreateDir(absl::string_view path, int options);
 
+// Renames a file or a directory.
+absl::Status Rename(absl::string_view from, absl::string_view to, int options);
+
 // Placeholder empty function used in the "options" argument of some functions.
 constexpr int Defaults() { return 0; }
 
