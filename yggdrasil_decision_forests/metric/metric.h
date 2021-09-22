@@ -255,6 +255,8 @@ std::vector<MetricDefinition> DefaultMetrics(
 double RMSE(const std::vector<float>& labels,
             const std::vector<float>& predictions,
             const std::vector<float>& weights);
+double RMSE(const std::vector<float>& labels,
+            const std::vector<float>& predictions);
 
 // Gets the threshold on a binary classifier output that maximize accuracy.
 float ComputeThresholdForMaxAccuracy(

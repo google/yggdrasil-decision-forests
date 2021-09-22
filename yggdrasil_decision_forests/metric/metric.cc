@@ -1600,5 +1600,26 @@ double RMSE(const std::vector<float>& labels,
   }
 }
 
+double RMSE(const std::vector<float>& labels,
+            const std::vector<float>& predictions) {
+  CHECK_EQ(labels.size(), predictions.size());
+
+  double sum_loss = 0;
+  for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
+    const float label = labels[example_idx];
+    const float prediction = predictions[example_idx];
+    // Loss:
+    //   (label - prediction)^2
+    sum_loss += (label - prediction) * (label - prediction);
+  }
+  const auto sum_weights = labels.size();
+
+  if (sum_weights > 0) {
+    return sqrt(sum_loss / sum_weights);
+  } else {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+}
+
 }  // namespace metric
 }  // namespace yggdrasil_decision_forests

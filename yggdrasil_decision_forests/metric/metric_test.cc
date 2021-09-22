@@ -1313,6 +1313,15 @@ TEST(Metric, RMSE) {
   EXPECT_NEAR(RMSE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
                    /*weights=*/{1, 1, 1}),
               0.8164966, 0.0001);
+
+  // R> sqrt(mean((c(1,2,2,3,3,3)-c(1,3,3,4,4,4))^2))
+  // 0.9128709
+  EXPECT_NEAR(RMSE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
+                   /*weights=*/{1, 2, 3}),
+              0.9128709, 0.0001);
+
+  EXPECT_NEAR(RMSE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4}), 0.8164966,
+              0.0001);
 }
 
 TEST(DefaultMetrics, Classification) {
