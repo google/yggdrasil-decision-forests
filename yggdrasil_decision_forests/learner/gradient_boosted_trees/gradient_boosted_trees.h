@@ -154,6 +154,7 @@ class GradientBoostedTreesLearner : public AbstractLearner {
     model::proto::LearnerCapabilities capabilities;
     capabilities.set_support_max_training_duration(true);
     capabilities.set_resume_training(true);
+    capabilities.set_support_validation_dataset(true);
     return capabilities;
   }
 
@@ -171,7 +172,8 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   // Training with dataset sampling using shards.
   utils::StatusOr<std::unique_ptr<AbstractModel>> ShardedSamplingTrain(
       const absl::string_view typed_path,
-      const dataset::proto::DataSpecification& data_spec) const;
+      const dataset::proto::DataSpecification& data_spec,
+      const absl::optional<std::string>& typed_valid_path) const;
 };
 
 REGISTER_AbstractLearner(GradientBoostedTreesLearner,

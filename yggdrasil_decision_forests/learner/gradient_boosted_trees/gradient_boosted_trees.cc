@@ -572,16 +572,18 @@ GradientBoostedTreesLearner::TrainWithStatus(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   if (!gbt_config.has_sample_with_shards()) {
     // Regular training.
-    return AbstractLearner::TrainWithStatus(typed_path, data_spec);
+    return AbstractLearner::TrainWithStatus(typed_path, data_spec,
+                                            typed_valid_path);
   }
 
-  return ShardedSamplingTrain(typed_path, data_spec);
+  return ShardedSamplingTrain(typed_path, data_spec, typed_valid_path);
 }
 
 utils::StatusOr<std::unique_ptr<AbstractModel>>
 GradientBoostedTreesLearner::ShardedSamplingTrain(
     const absl::string_view typed_path,
-    const dataset::proto::DataSpecification& data_spec) const {
+    const dataset::proto::DataSpecification& data_spec,
+    const absl::optional<std::string>& typed_valid_path) const {
   // The logic of this method is similar to "TrainWithStatus", with the
   // exceptions:
   // - The loss on the training dataset is  computed.
@@ -629,15 +631,29 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   // Split the shards between train and validation.
   std::vector<std::string> training_shards;
   std::vector<std::string> validation_shards;
-  int num_validation_shards = std::lround(
-      all_shards.size() * config.gbt_config->validation_set_ratio());
-  const bool has_validation_dataset = num_validation_shards > 0;
-  if (config.gbt_config->validation_set_ratio() > 0.f &&
-      num_validation_shards == 0) {
-    num_validation_shards = 1;
+  bool has_validation_dataset;
+
+  if (typed_valid_path.has_value()) {
+    // The user provided a validation dataset.
+    training_shards = all_shards;
+    std::string valid_dataset_path, valid_dataset_prefix;
+    ASSIGN_OR_RETURN(std::tie(valid_dataset_prefix, valid_dataset_path),
+                     dataset::SplitTypeAndPath(typed_valid_path.value()));
+    RETURN_IF_ERROR(
+        utils::ExpandInputShards(valid_dataset_path, &validation_shards));
+    has_validation_dataset = !validation_shards.empty();
+  } else {
+    // Extract a validation dataset from training dataset.
+    int num_validation_shards = std::lround(
+        all_shards.size() * config.gbt_config->validation_set_ratio());
+    has_validation_dataset = num_validation_shards > 0;
+    if (config.gbt_config->validation_set_ratio() > 0.f &&
+        num_validation_shards == 0) {
+      num_validation_shards = 1;
+    }
+    RETURN_IF_ERROR(SplitShards(all_shards, num_validation_shards,
+                                &training_shards, &validation_shards, &random));
   }
-  RETURN_IF_ERROR(SplitShards(all_shards, num_validation_shards,
-                              &training_shards, &validation_shards, &random));
 
   // Load and prepare the validation dataset.
   std::unique_ptr<internal::CompleteTrainingDatasetForWeakLearner> validation;
@@ -1109,21 +1125,32 @@ GradientBoostedTreesLearner::TrainWithStatus(
 
   utils::RandomEngine random(config.train_config.random_seed());
 
-  // Divide the original training dataset into a validation and a training
-  // dataset.
   dataset::VerticalDataset sub_train_dataset;
   dataset::VerticalDataset validation_dataset;
-  RETURN_IF_ERROR(internal::ExtractValidationDataset(
-      train_dataset, config.gbt_config->validation_set_ratio(),
-      config.effective_validation_set_group, &sub_train_dataset,
-      &validation_dataset, &random));
-  const bool has_validation_dataset = validation_dataset.nrow() > 0;
-  if (config.gbt_config->validation_set_ratio() > 0 &&
-      !has_validation_dataset) {
-    LOG(WARNING)
-        << "The validation dataset is empty. Either increase the number "
-           "of training examples, or increase the validation set ratio.";
+  bool has_validation_dataset;
+
+  if (valid_dataset.has_value()) {
+    has_validation_dataset = true;
+    sub_train_dataset = train_dataset.ShallowNonOwningClone();
+    validation_dataset = valid_dataset.value().get().ShallowNonOwningClone();
+  } else {
+    // Divide the original training dataset into a validation and a training
+    // dataset.
+    RETURN_IF_ERROR(internal::ExtractValidationDataset(
+        train_dataset, config.gbt_config->validation_set_ratio(),
+        config.effective_validation_set_group, &sub_train_dataset,
+        &validation_dataset, &random));
+    has_validation_dataset = validation_dataset.nrow() > 0;
+    if (config.gbt_config->validation_set_ratio() > 0 &&
+        !has_validation_dataset) {
+      LOG(WARNING)
+          << "The validation dataset is empty. Either increase the number "
+             "of training examples, or increase the validation set ratio.";
+    }
   }
+
+  LOG(INFO) << sub_train_dataset.nrow() << " examples used for training and "
+            << validation_dataset.nrow() << " examples used for validation";
 
   // Compute the example weights.
   std::vector<float> weights, validation_weights;
@@ -1556,12 +1583,13 @@ GradientBoostedTreesLearner::TrainWithStatus(
     if (per_tree_weights.size() < num_iters) {
       return absl::InternalError("Wrong number of trees");
     }
-    for (int iter_idx = 0; iter_idx < num_iters; iter_idx++) {
+    for (int sub_iter_idx = 0; sub_iter_idx < num_iters; sub_iter_idx++) {
       for (int sub_tree_idx = 0; sub_tree_idx < mdl->num_trees_per_iter();
            sub_tree_idx++) {
-        (*mdl->mutable_decision_trees())[iter_idx * mdl->num_trees_per_iter() +
+        (*mdl->mutable_decision_trees())[sub_iter_idx *
+                                             mdl->num_trees_per_iter() +
                                          sub_tree_idx]
-            ->ScaleRegressorOutput(per_tree_weights[iter_idx]);
+            ->ScaleRegressorOutput(per_tree_weights[sub_iter_idx]);
       }
     }
   }

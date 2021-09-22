@@ -127,6 +127,7 @@ class TrainAndTestTester : public ::testing::Test {
 
   // Train and testing datasets.
   dataset::VerticalDataset train_dataset_;
+  dataset::VerticalDataset valid_dataset_;
   dataset::VerticalDataset test_dataset_;
   dataset::proto::DataSpecificationGuide guide_;
 
@@ -140,7 +141,7 @@ class TrainAndTestTester : public ::testing::Test {
   bool pass_training_dataset_as_path_ = false;
 
   // Number of shards to use if "pass_training_dataset_as_path_" is set to true.
-  int num_shards = 3;
+  int num_shards_ = 3;
 
   // If set, interrupts the training after "interrupt_training_after".
   absl::optional<absl::Duration> interrupt_training_after;
@@ -149,6 +150,10 @@ class TrainAndTestTester : public ::testing::Test {
   // potential issues e.g. serializing+deserializing, creation of serving
   // engines.
   bool check_model = true;
+
+  // If true, the training method is called with a validation dataset (either a
+  // path or a VerticalDataset; depending on "pass_training_dataset_as_path_");
+  bool pass_validation_dataset_ = false;
 
  private:
   std::pair<std::string, std::string> GetTrainAndTestDatasetPaths();
@@ -162,7 +167,7 @@ class TrainAndTestTester : public ::testing::Test {
       int32_t* numerical_weight_attribute_idx,
       float* max_numerical_weight_value);
 
-  void BuildTrainAndTestDatasets(
+  void BuildTrainValidTestDatasets(
       const dataset::proto::DataSpecification& data_spec,
       const absl::string_view train_path, const absl::string_view test_path,
       int32_t numerical_weight_attribute_idx, float max_numerical_weight_value);

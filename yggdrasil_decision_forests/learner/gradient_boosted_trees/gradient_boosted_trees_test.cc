@@ -578,6 +578,24 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
   EXPECT_TRUE(gbt_model->IsMissingValueConditionResultFollowGlobalImputation());
 }
 
+// Train a GBT with a validation dataset provided as a VerticalDataset.
+
+TEST_F(GradientBoostedTreesOnAdult, ValidVerticalDataset) {
+  pass_validation_dataset_ = true;
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.86119, 0.0025);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.30955, 0.04);
+}
+
+// Train a GBT with a validation dataset provided as a path.
+TEST_F(GradientBoostedTreesOnAdult, ValidPathDataset) {
+  pass_training_dataset_as_path_ = true;
+  pass_validation_dataset_ = true;
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.86119, 0.0025);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.30955, 0.04);
+}
+
 TEST_F(GradientBoostedTreesOnAdult, VariableImportance) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);

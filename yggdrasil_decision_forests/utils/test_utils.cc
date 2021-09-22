@@ -108,9 +108,9 @@ void TrainAndTestTester::TrainAndEvaluateModel(
                    &max_numerical_weight_value);
 
   // Instantiate the train and test datasets.
-  BuildTrainAndTestDatasets(data_spec, dataset_path, test_dataset_path,
-                            numerical_weight_attribute_idx,
-                            max_numerical_weight_value);
+  BuildTrainValidTestDatasets(data_spec, dataset_path, test_dataset_path,
+                              numerical_weight_attribute_idx,
+                              max_numerical_weight_value);
 
   // Configure the learner.
   CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
@@ -143,10 +143,27 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   // Train the model.
   if (pass_training_dataset_as_path_) {
     const auto train_dataset_path =
-        ShardDataset(train_dataset_, num_shards, 1.f, preferred_format_type);
-    model_ = learner_->TrainWithStatus(train_dataset_path, data_spec).value();
+        ShardDataset(train_dataset_, num_shards_, 1.f, preferred_format_type);
+    if (pass_validation_dataset_) {
+      const auto valid_dataset_path =
+          absl::StrCat(preferred_format_type, ":",
+                       file::JoinPath(test::TmpDirectory(), "valid_dataset"));
+      CHECK_OK(
+          dataset::SaveVerticalDataset(valid_dataset_, valid_dataset_path));
+      model_ = learner_
+                   ->TrainWithStatus(train_dataset_path, data_spec,
+                                     valid_dataset_path)
+                   .value();
+    } else {
+      model_ = learner_->TrainWithStatus(train_dataset_path, data_spec).value();
+    }
   } else {
-    model_ = learner_->TrainWithStatus(train_dataset_).value();
+    if (pass_validation_dataset_) {
+      model_ =
+          learner_->TrainWithStatus(train_dataset_, valid_dataset_).value();
+    } else {
+      model_ = learner_->TrainWithStatus(train_dataset_).value();
+    }
   }
 
   const auto end_training = absl::Now();
@@ -296,13 +313,16 @@ void TrainAndTestTester::FixConfiguration(
   }
 }
 
-void TrainAndTestTester::BuildTrainAndTestDatasets(
+void TrainAndTestTester::BuildTrainValidTestDatasets(
     const dataset::proto::DataSpecification& data_spec,
     const absl::string_view train_path, const absl::string_view test_path,
     int32_t numerical_weight_attribute_idx, float max_numerical_weight_value) {
   if (!test_path.empty()) {
     CHECK_OK(LoadVerticalDataset(train_path, data_spec, &train_dataset_));
     CHECK_OK(LoadVerticalDataset(test_path, data_spec, &test_dataset_));
+    if (pass_validation_dataset_) {
+      LOG(FATAL) << "pass_validation_dataset not supported with test_path";
+    }
     return;
   }
 
@@ -310,8 +330,8 @@ void TrainAndTestTester::BuildTrainAndTestDatasets(
   CHECK_OK(LoadVerticalDataset(train_path, data_spec, &dataset));
 
   // Split the dataset in two folds: training and testing.
-  std::vector<dataset::VerticalDataset::row_t> train_examples_idxs,
-      test_examples_idxs;
+  std::vector<dataset::VerticalDataset::row_t> train_example_idxs,
+      test_example_idxs, valid_example_idxs;
 
   utils::RandomEngine rnd(1234);
   std::uniform_real_distribution<double> dist_01;
@@ -331,12 +351,23 @@ void TrainAndTestTester::BuildTrainAndTestDatasets(
         continue;
       }
     }
-    (((example_idx % 2) == 0) ? train_examples_idxs : test_examples_idxs)
-        .push_back(example_idx);
+    if ((example_idx % 2) == 0) {
+      train_example_idxs.push_back(example_idx);
+    } else {
+      if (pass_validation_dataset_ && ((example_idx / 2) % 2) == 0) {
+        valid_example_idxs.push_back(example_idx);
+      } else {
+        test_example_idxs.push_back(example_idx);
+      }
+    }
   }
 
-  train_dataset_ = dataset.Extract(train_examples_idxs).value();
-  test_dataset_ = dataset.Extract(test_examples_idxs).value();
+  train_dataset_ = dataset.Extract(train_example_idxs).value();
+  test_dataset_ = dataset.Extract(test_example_idxs).value();
+  valid_dataset_ = dataset.Extract(valid_example_idxs).value();
+  LOG(INFO) << "Number of examples: train:" << train_dataset_.nrow()
+            << " valid:" << valid_dataset_.nrow()
+            << " test:" << test_dataset_.nrow();
 }
 
 void TestGenericEngine(const model::AbstractModel& model,
