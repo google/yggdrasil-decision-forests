@@ -566,7 +566,8 @@ GradientBoostedTreesLearner::InitializeModel(
 utils::StatusOr<std::unique_ptr<AbstractModel>>
 GradientBoostedTreesLearner::TrainWithStatus(
     const absl::string_view typed_path,
-    const dataset::proto::DataSpecification& data_spec) const {
+    const dataset::proto::DataSpecification& data_spec,
+    const absl::optional<std::string>& typed_valid_path) const {
   const auto& gbt_config = training_config().GetExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   if (!gbt_config.has_sample_with_shards()) {
@@ -1062,7 +1063,9 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 
 utils::StatusOr<std::unique_ptr<AbstractModel>>
 GradientBoostedTreesLearner::TrainWithStatus(
-    const dataset::VerticalDataset& train_dataset) const {
+    const dataset::VerticalDataset& train_dataset,
+    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        valid_dataset) const {
   // The training of the model works as follows:
   //
   // 1. Determine the "constant prediction" part of the model

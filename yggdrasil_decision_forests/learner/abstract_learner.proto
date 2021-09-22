@@ -359,4 +359,12 @@ message LearnerCapabilities {
   // The learner can resume training of the model from the "cache_path" given in
   // the deployment configuration.
   optional bool resume_training = 2 [default = false];
+
+  // If true, the algorithm uses a validation dataset for training (e.g. for
+  // early stopping) and support for the validation dataset to be passed to the
+  // training method (with the "valid_dataset" or "typed_valid_path" argument).
+  // If the learning algorithm has the "use_validation_dataset" capability and
+  // no validation dataset is given to the training function, the learning
+  // algorithm will extract a validation dataset from the training dataset.
+  optional bool support_validation_dataset = 3 [default = false];
 }

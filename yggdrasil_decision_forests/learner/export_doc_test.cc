@@ -30,7 +30,9 @@ class FakeLearner1 : public AbstractLearner {
       : AbstractLearner(training_config) {}
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
-      const dataset::VerticalDataset& train_dataset) const override {
+      const dataset::VerticalDataset& train_dataset,
+      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+          valid_dataset = {}) const override {
     return std::unique_ptr<AbstractModel>();
   }
 
@@ -55,7 +57,9 @@ class FakeLearner2 : public AbstractLearner {
       : AbstractLearner(training_config) {}
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
-      const dataset::VerticalDataset& train_dataset) const override {
+      const dataset::VerticalDataset& train_dataset,
+      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+          valid_dataset = {}) const override {
     return std::unique_ptr<AbstractModel>();
   }
 };
@@ -68,7 +72,9 @@ class FakeLearner3 : public AbstractLearner {
       : AbstractLearner(training_config) {}
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
-      const dataset::VerticalDataset& train_dataset) const override {
+      const dataset::VerticalDataset& train_dataset,
+      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+          valid_dataset = {}) const override {
     return std::unique_ptr<AbstractModel>();
   }
 };

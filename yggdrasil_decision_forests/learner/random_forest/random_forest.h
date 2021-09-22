@@ -66,7 +66,9 @@ class RandomForestLearner : public AbstractLearner {
       "compute_oob_variable_importances";
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
-      const dataset::VerticalDataset& train_dataset) const override;
+      const dataset::VerticalDataset& train_dataset,
+      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+          valid_dataset = {}) const override;
 
   // Detects configuration errors and warnings.
   static absl::Status CheckConfiguration(

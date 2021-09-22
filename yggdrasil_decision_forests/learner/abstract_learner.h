@@ -44,14 +44,34 @@ class AbstractLearner {
 
   virtual ~AbstractLearner() {}
 
-  // Trains and returns a model from a training dataset stored on drive.
+  // Trains a model using the dataset stored on disk at the path "typed_path".
+  //
+  // A typed path is a dataset with a format prefix. prefix format. For example,
+  // "csv:/tmp/dataset.csv". The path supports sharding, globbing and comma
+  // separation. See the "Dataset path and format" section of the user manual
+  // for more details: go/ydf_documentation/user_manual.md#dataset-path-and-format
+  //
+  // Algorithms with the "use_validation_dataset" capability use a validation
+  // dataset for training. If "typed_valid_path" is provided, it will be used
+  // for validation. If "typed_valid_path" is not provided, a validation dataset
+  // will be extracted from the training dataset. If the algorithm does not have
+  // the "use_validation_dataset" capability, "typed_valid_path" is ignored.
   virtual utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const absl::string_view typed_path,
-      const dataset::proto::DataSpecification& data_spec) const;
+      const dataset::proto::DataSpecification& data_spec,
+      const absl::optional<std::string>& typed_valid_path = {}) const;
 
-  // Trains and returns a model from a training dataset stored in memory.
+  // Trains a model using the dataset stored on memory .
+  //
+  // Algorithms with the "use_validation_dataset" capability use a validation
+  // dataset for training. If "valid_dataset" is provided, it will be used
+  // for validation. If "valid_dataset" is not provided, a validation dataset
+  // will be extracted from the training dataset. If the algorithm does not have
+  // the "use_validation_dataset" capability, "valid_dataset" is ignored.
   virtual utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
-      const dataset::VerticalDataset& train_dataset) const = 0;
+      const dataset::VerticalDataset& train_dataset,
+      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+          valid_dataset = {}) const = 0;
 
   // Similar as TrainWithStatus, but crash in case of error.
   // [Deprecated]

@@ -210,7 +210,9 @@ TEST(AbstractLearner, EvaluateLearner) {
         : AbstractLearner(training_config) {}
 
     utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
-        const dataset::VerticalDataset& train_dataset) const override {
+        const dataset::VerticalDataset& train_dataset,
+        absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+            valid_dataset = {}) const override {
       auto model = absl::make_unique<FakeModel>();
       model::proto::TrainingConfigLinking config_link;
       CHECK_OK(AbstractLearner::LinkTrainingConfig(

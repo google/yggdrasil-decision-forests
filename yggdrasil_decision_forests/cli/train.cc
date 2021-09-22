@@ -44,6 +44,12 @@ ABSL_FLAG(
     "model::proto::DeploymentConfig. If not specified, the training is done "
     "locally with a number of threads chosen by the training algorithm.");
 
+ABSL_FLAG(
+    std::string, valid_dataset, "",
+    "Optional validation dataset specified with [type]:[path] format. If "
+    "not specified and if the learning algorithm uses a validation dataset, "
+    "the effective validation dataset is extracted from the training dataset.");
+
 constexpr char kUsageMessage[] = "Train a ML model and export it to disk.";
 
 namespace yggdrasil_decision_forests {
@@ -76,9 +82,17 @@ void Train() {
   *learner->mutable_deployment() = deployment;
   learner->set_log_directory(
       file::JoinPath(absl::GetFlag(FLAGS_output), "train_logs"));
+
+  absl::optional<std::string> valid_dataset;
+  if (!absl::GetFlag(FLAGS_valid_dataset).empty()) {
+    valid_dataset = absl::GetFlag(FLAGS_valid_dataset);
+  }
+
   LOG(INFO) << "Start training model.";
-  auto model =
-      learner->TrainWithStatus(absl::GetFlag(FLAGS_dataset), data_spec).value();
+  auto model = learner
+                   ->TrainWithStatus(absl::GetFlag(FLAGS_dataset), data_spec,
+                                     valid_dataset)
+                   .value();
 
   LOG(INFO) << "Save model.";
   QCHECK_OK(model::SaveModel(absl::GetFlag(FLAGS_output), model.get()));

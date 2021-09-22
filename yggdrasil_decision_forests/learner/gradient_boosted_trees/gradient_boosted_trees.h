@@ -121,11 +121,14 @@ class GradientBoostedTreesLearner : public AbstractLearner {
       "compute_permutation_variable_importance";
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
-      const dataset::VerticalDataset& train_dataset) const override;
+      const dataset::VerticalDataset& train_dataset,
+      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+          valid_dataset = {}) const override;
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const absl::string_view typed_path,
-      const dataset::proto::DataSpecification& data_spec) const override;
+      const dataset::proto::DataSpecification& data_spec,
+      const absl::optional<std::string>& typed_valid_path = {}) const override;
 
   // Detects configuration errors and warnings.
   static absl::Status CheckConfiguration(

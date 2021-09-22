@@ -272,7 +272,9 @@ absl::Status RandomForestLearner::CheckConfiguration(
 
 utils::StatusOr<std::unique_ptr<AbstractModel>>
 RandomForestLearner::TrainWithStatus(
-    const dataset::VerticalDataset& train_dataset) const {
+    const dataset::VerticalDataset& train_dataset,
+    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        valid_dataset) const {
   const auto begin_training = absl::Now();
 
   if (training_config().task() != model::proto::Task::CLASSIFICATION &&

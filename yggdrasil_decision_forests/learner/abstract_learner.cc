@@ -192,7 +192,8 @@ std::unique_ptr<AbstractModel> AbstractLearner::Train(
 utils::StatusOr<std::unique_ptr<AbstractModel>>
 AbstractLearner::TrainWithStatus(
     const absl::string_view typed_path,
-    const dataset::proto::DataSpecification& data_spec) const {
+    const dataset::proto::DataSpecification& data_spec,
+    const absl::optional<std::string>& typed_valid_path) const {
   // List the columns used for the training.
   // Only these columns will be loaded.
   proto::TrainingConfigLinking link_config;
@@ -204,7 +205,17 @@ AbstractLearner::TrainWithStatus(
   RETURN_IF_ERROR(LoadVerticalDataset(typed_path, data_spec, &train_dataset,
                                       /*ensure_non_missing=*/{},
                                       dataset_loading_config));
-  return TrainWithStatus(train_dataset);
+
+  dataset::VerticalDataset valid_dataset_data;
+  absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      valid_dataset;
+  if (typed_valid_path.has_value()) {
+    RETURN_IF_ERROR(LoadVerticalDataset(
+        typed_valid_path.value(), data_spec, &valid_dataset_data,
+        /*ensure_non_missing=*/{}, dataset_loading_config));
+    valid_dataset = valid_dataset_data;
+  }
+  return TrainWithStatus(train_dataset, valid_dataset);
 }
 
 absl::Status CheckGenericHyperParameterSpecification(
