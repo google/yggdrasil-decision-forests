@@ -20,6 +20,8 @@
 
 #include <limits>
 
+#include "yggdrasil_decision_forests/learner/types.h"
+
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
@@ -27,11 +29,9 @@ namespace decision_tree {
 // Item used to pass the sorted numerical attribute values to the
 // "ScanSplitsPresortedSparseDuplicateExampleTemplate" function below.
 struct SparseItem {
-  // For efficiency reasons, this structure should be as small as possible.
-  // Indexing examples with uint32_t will covert most of simpleML cases. If the
-  // number of examples is larger than 2B, the user can disable pre-sorting.
-  using ExampleIdx = uint32_t;
-  static constexpr auto kMaxNumExamples = std::numeric_limits<int32_t>::max();
+  typedef UnsignedExampleIdx ExampleIdx;
+  static constexpr auto kMaxNumExamples =
+      std::numeric_limits<SignedExampleIdx>::max();
 
   // Index of the example in the training dataset.
   // The highest bit is 1 iif. the feature value of this item is strictly

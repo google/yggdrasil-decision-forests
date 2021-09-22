@@ -43,6 +43,7 @@
 
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
@@ -535,7 +536,50 @@ struct LabelNumericalScoreAccumulator {
 
   double WeightedNumExamples() const { return label.NumObservations(); }
 
+  void ImportLabelStats(const proto::LabelStatistics& src) {
+    label.Load(src.regression().labels());
+  }
+
+  void ExportLabelStats(proto::LabelStatistics* dst) const {
+    label.Save(dst->mutable_regression()->mutable_labels());
+  }
+
+  void Sub(LabelNumericalScoreAccumulator* dst) const { dst->label.Sub(label); }
+
+  void Add(LabelNumericalScoreAccumulator* dst) const { dst->label.Add(label); }
+
   utils::NormalDistributionDouble label;
+};
+
+struct LabelNumericalWithHessianScoreAccumulator {
+  static constexpr bool kNormalizeByWeight = false;
+
+  double Score() const { return label.VarTimesSumWeights(); }
+
+  double WeightedNumExamples() const { return label.NumObservations(); }
+
+  void ImportLabelStats(const proto::LabelStatistics& src) {
+    label.Load(src.regression_with_hessian().labels());
+    sum_hessian = src.regression_with_hessian().sum_hessian();
+  }
+
+  void ExportLabelStats(proto::LabelStatistics* dst) const {
+    label.Save(dst->mutable_regression_with_hessian()->mutable_labels());
+    dst->mutable_regression_with_hessian()->set_sum_hessian(sum_hessian);
+  }
+
+  void Sub(LabelNumericalWithHessianScoreAccumulator* dst) const {
+    dst->label.Sub(label);
+    dst->sum_hessian -= sum_hessian;
+  }
+
+  void Add(LabelNumericalWithHessianScoreAccumulator* dst) const {
+    dst->label.Add(label);
+    dst->sum_hessian += sum_hessian;
+  }
+
+  utils::NormalDistributionDouble label;
+  double sum_hessian;
 };
 
 struct LabelCategoricalScoreAccumulator {
@@ -544,6 +588,24 @@ struct LabelCategoricalScoreAccumulator {
   double Score() const { return label.Entropy(); }
 
   double WeightedNumExamples() const { return label.NumObservations(); }
+
+  void SetZero() { label.Clear(); }
+
+  void ImportLabelStats(const proto::LabelStatistics& src) {
+    label.Load(src.classification().labels());
+  }
+
+  void ExportLabelStats(proto::LabelStatistics* dst) const {
+    label.Save(dst->mutable_classification()->mutable_labels());
+  }
+
+  void Sub(LabelCategoricalScoreAccumulator* dst) const {
+    dst->label.Sub(label);
+  }
+
+  void Add(LabelCategoricalScoreAccumulator* dst) const {
+    dst->label.Add(label);
+  }
 
   utils::IntegerDistributionDouble label;
 };
@@ -696,26 +758,13 @@ struct LabelNumericalOneValueBucket {
     acc->label.Add(value, -weight);
   }
 
-  class Filler {
+  class Initializer {
    public:
-    Filler(const std::vector<float>& label, const std::vector<float>& weights,
-           const utils::NormalDistributionDouble& label_distribution)
-        : label_(label),
-          weights_(weights),
-          label_distribution_(label_distribution),
+    Initializer(const utils::NormalDistributionDouble& label_distribution)
+        : label_distribution_(label_distribution),
           initial_variance_time_weight_(
               label_distribution.VarTimesSumWeights()),
           sum_weights_(label_distribution.NumObservations()) {}
-
-    void InitializeAndZero(LabelNumericalOneValueBucket* acc) const {}
-
-    void Finalize(LabelNumericalOneValueBucket* acc) const {}
-
-    void ConsumeExample(const row_t example_idx,
-                        LabelNumericalOneValueBucket* acc) const {
-      acc->value = label_[example_idx];
-      acc->weight = weights_[example_idx];
-    }
 
     void InitEmpty(LabelNumericalScoreAccumulator* acc) const {
       acc->label.Clear();
@@ -727,6 +776,27 @@ struct LabelNumericalOneValueBucket {
 
     double NormalizeScore(const double score) const {
       return (initial_variance_time_weight_ - score) / sum_weights_;
+    }
+
+   private:
+    const utils::NormalDistributionDouble& label_distribution_;
+    const double initial_variance_time_weight_;
+    const double sum_weights_;
+  };
+
+  class Filler {
+   public:
+    Filler(const std::vector<float>& label, const std::vector<float>& weights)
+        : label_(label), weights_(weights) {}
+
+    void InitializeAndZero(LabelNumericalOneValueBucket* acc) const {}
+
+    void Finalize(LabelNumericalOneValueBucket* acc) const {}
+
+    void ConsumeExample(const row_t example_idx,
+                        LabelNumericalOneValueBucket* acc) const {
+      acc->value = label_[example_idx];
+      acc->weight = weights_[example_idx];
     }
 
     template <typename ExampleIdx>
@@ -766,9 +836,6 @@ struct LabelNumericalOneValueBucket {
    private:
     const std::vector<float>& label_;
     const std::vector<float>& weights_;
-    const utils::NormalDistributionDouble& label_distribution_;
-    const double initial_variance_time_weight_;
-    const double sum_weights_;
   };
 
   friend std::ostream& operator<<(std::ostream& os,
@@ -796,19 +863,46 @@ struct LabelHessianNumericalOneValueBucket {
     acc->Sub(gradient, hessian, weight);
   }
 
+  class Initializer {
+   public:
+    Initializer(const double sum_gradient, const double sum_hessian,
+                const double sum_weights, const double hessian_l1,
+                const double hessian_l2)
+        : sum_gradient_(sum_gradient),
+          sum_hessian_(sum_hessian),
+          sum_weights_(sum_weights),
+          hessian_l1_(hessian_l1),
+          hessian_l2_(hessian_l2) {}
+
+    void InitEmpty(LabelHessianNumericalScoreAccumulator* acc) const {
+      acc->Clear();
+      acc->SetRegularization(hessian_l1_, hessian_l2_);
+    }
+
+    void InitFull(LabelHessianNumericalScoreAccumulator* acc) const {
+      acc->Set(sum_gradient_, sum_hessian_, sum_weights_);
+      acc->SetRegularization(hessian_l1_, hessian_l2_);
+    }
+
+    double NormalizeScore(const double score) const { return score; }
+
+   private:
+    const double sum_gradient_;
+    const double sum_hessian_;
+    const double sum_weights_;
+    const double hessian_l1_;
+    const double hessian_l2_;
+  };
+
   class Filler {
    public:
     Filler(const std::vector<float>& gradients,
            const std::vector<float>& hessians,
-           const std::vector<float>& weights, const double sum_gradient,
-           const double sum_hessian, const double sum_weights,
-           const double hessian_l1, const double hessian_l2)
+           const std::vector<float>& weights, const double hessian_l1,
+           const double hessian_l2)
         : gradients_(gradients),
           hessians_(hessians),
           weights_(weights),
-          sum_gradient_(sum_gradient),
-          sum_hessian_(sum_hessian),
-          sum_weights_(sum_weights),
           hessian_l1_(hessian_l1),
           hessian_l2_(hessian_l2) {}
 
@@ -821,16 +915,6 @@ struct LabelHessianNumericalOneValueBucket {
       acc->gradient = gradients_[example_idx];
       acc->hessian = hessians_[example_idx];
       acc->weight = weights_[example_idx];
-    }
-
-    void InitEmpty(LabelHessianNumericalScoreAccumulator* acc) const {
-      acc->Clear();
-      acc->SetRegularization(hessian_l1_, hessian_l2_);
-    }
-
-    void InitFull(LabelHessianNumericalScoreAccumulator* acc) const {
-      acc->Set(sum_gradient_, sum_hessian_, sum_weights_);
-      acc->SetRegularization(hessian_l1_, hessian_l2_);
     }
 
     template <typename ExampleIdx>
@@ -870,16 +954,10 @@ struct LabelHessianNumericalOneValueBucket {
       PREFETCH(&weights_[example_idx]);
     }
 
-    double NormalizeScore(const double score) const { return score; }
-
    private:
     const std::vector<float>& gradients_;
     const std::vector<float>& hessians_;
     const std::vector<float>& weights_;
-
-    const double sum_gradient_;
-    const double sum_hessian_;
-    const double sum_weights_;
 
     const double hessian_l1_;
     const double hessian_l2_;
@@ -913,14 +991,34 @@ struct LabelCategoricalOneValueBucket {
     acc->label.Add(value, -weight);
   }
 
+  class Initializer {
+   public:
+    Initializer(const utils::IntegerDistributionDouble& label_distribution)
+        : label_distribution_(label_distribution),
+          initial_entropy_(label_distribution.Entropy()) {}
+
+    void InitEmpty(LabelCategoricalScoreAccumulator* acc) const {
+      acc->label.SetNumClasses(label_distribution_.NumClasses());
+      acc->label.Clear();
+    }
+
+    void InitFull(LabelCategoricalScoreAccumulator* acc) const {
+      acc->label = label_distribution_;
+    }
+
+    double NormalizeScore(const double score) const {
+      return initial_entropy_ - score;
+    }
+
+   private:
+    const utils::IntegerDistributionDouble& label_distribution_;
+    const double initial_entropy_;
+  };
+
   class Filler {
    public:
-    Filler(const std::vector<int>& label, const std::vector<float>& weights,
-           const utils::IntegerDistributionDouble& label_distribution)
-        : label_(label),
-          weights_(weights),
-          label_distribution_(label_distribution),
-          initial_entropy_(label_distribution.Entropy()) {}
+    Filler(const std::vector<int>& label, const std::vector<float>& weights)
+        : label_(label), weights_(weights) {}
 
     void InitializeAndZero(LabelCategoricalOneValueBucket* acc) const {}
 
@@ -930,15 +1028,6 @@ struct LabelCategoricalOneValueBucket {
                         LabelCategoricalOneValueBucket* acc) const {
       acc->value = label_[example_idx];
       acc->weight = weights_[example_idx];
-    }
-
-    void InitEmpty(LabelCategoricalScoreAccumulator* acc) const {
-      acc->label.SetNumClasses(label_distribution_.NumClasses());
-      acc->label.Clear();
-    }
-
-    void InitFull(LabelCategoricalScoreAccumulator* acc) const {
-      acc->label = label_distribution_;
     }
 
     template <typename ExampleIdx>
@@ -975,15 +1064,9 @@ struct LabelCategoricalOneValueBucket {
       PREFETCH(&weights_[example_idx]);
     }
 
-    double NormalizeScore(const double score) const {
-      return initial_entropy_ - score;
-    }
-
    private:
     const std::vector<int>& label_;
     const std::vector<float>& weights_;
-    const utils::IntegerDistributionDouble& label_distribution_;
-    const double initial_entropy_;
   };
 
   friend std::ostream& operator<<(std::ostream& os,
@@ -1014,11 +1097,9 @@ struct LabelBinaryCategoricalOneValueBucket {
     acc->SubOne(value, weight);
   }
 
-  class Filler {
+  class Initializer {
    public:
-    Filler(const std::vector<int>& label, const std::vector<float>& weights,
-           const utils::IntegerDistributionDouble& label_distribution)
-        : label_(label), weights_(weights) {
+    Initializer(const utils::IntegerDistributionDouble& label_distribution) {
       DCHECK_EQ(label_distribution.NumClasses(), 3);
       label_distribution_trues_ = label_distribution.count(2);
       label_distribution_weights_ = label_distribution.NumObservations();
@@ -1028,6 +1109,29 @@ struct LabelBinaryCategoricalOneValueBucket {
              0.0001);
     }
 
+    void InitEmpty(LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->Clear();
+    }
+
+    void InitFull(LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->Set(label_distribution_trues_, label_distribution_weights_);
+    }
+
+    double NormalizeScore(const double score) const {
+      return initial_entropy_ - score;
+    }
+
+   private:
+    double label_distribution_trues_;
+    double label_distribution_weights_;
+    double initial_entropy_;
+  };
+
+  class Filler {
+   public:
+    Filler(const std::vector<int>& label, const std::vector<float>& weights)
+        : label_(label), weights_(weights) {}
+
     void InitializeAndZero(LabelBinaryCategoricalOneValueBucket* acc) const {}
 
     void Finalize(LabelBinaryCategoricalOneValueBucket* acc) const {}
@@ -1036,14 +1140,6 @@ struct LabelBinaryCategoricalOneValueBucket {
                         LabelBinaryCategoricalOneValueBucket* acc) const {
       acc->value = label_[example_idx] == 2;
       acc->weight = weights_[example_idx];
-    }
-
-    void InitEmpty(LabelBinaryCategoricalScoreAccumulator* acc) const {
-      acc->Clear();
-    }
-
-    void InitFull(LabelBinaryCategoricalScoreAccumulator* acc) const {
-      acc->Set(label_distribution_trues_, label_distribution_weights_);
     }
 
     template <typename ExampleIdx>
@@ -1082,16 +1178,9 @@ struct LabelBinaryCategoricalOneValueBucket {
       PREFETCH(&weights_[example_idx]);
     }
 
-    double NormalizeScore(const double score) const {
-      return initial_entropy_ - score;
-    }
-
    private:
     const std::vector<int>& label_;
     const std::vector<float>& weights_;
-    double label_distribution_trues_;
-    double label_distribution_weights_;
-    double initial_entropy_;
   };
 
   friend std::ostream& operator<<(
@@ -1117,32 +1206,27 @@ struct LabelNumericalBucket {
     acc->label.Sub(value);
   }
 
+  void AddToBucket(LabelNumericalBucket* dst) const {
+    dst->value.Add(value);
+    dst->count += count;
+  }
+
   bool operator<(const LabelNumericalBucket& other) const {
     return value.Mean() < other.value.Mean();
   }
 
-  class Filler {
+  class Initializer {
    public:
-    Filler(const std::vector<float>& label, const std::vector<float>& weights,
-           const utils::NormalDistributionDouble& label_distribution)
-        : label_(label),
-          weights_(weights),
-          label_distribution_(label_distribution),
+    Initializer(const utils::NormalDistributionDouble& label_distribution)
+        : label_distribution_(label_distribution),
           initial_variance_time_weight_(
               label_distribution.VarTimesSumWeights()),
           sum_weights_(label_distribution.NumObservations()) {}
 
-    void InitializeAndZero(LabelNumericalBucket* acc) const {
-      acc->value.Clear();
-      acc->count = 0;
-    }
-
-    void Finalize(LabelNumericalBucket* acc) const {}
-
-    void ConsumeExample(const row_t example_idx,
-                        LabelNumericalBucket* acc) const {
-      acc->value.Add(label_[example_idx], weights_[example_idx]);
-      acc->count++;
+    explicit Initializer(const proto::LabelStatistics& statistics) {
+      label_distribution_.Load(statistics.regression().labels());
+      initial_variance_time_weight_ = label_distribution_.VarTimesSumWeights();
+      sum_weights_ = label_distribution_.NumObservations();
     }
 
     void InitEmpty(LabelNumericalScoreAccumulator* acc) const {
@@ -1158,11 +1242,32 @@ struct LabelNumericalBucket {
     }
 
    private:
+    utils::NormalDistributionDouble label_distribution_;
+    double initial_variance_time_weight_;
+    double sum_weights_;
+  };
+
+  class Filler {
+   public:
+    Filler(const std::vector<float>& label, const std::vector<float>& weights)
+        : label_(label), weights_(weights) {}
+
+    void InitializeAndZero(LabelNumericalBucket* acc) const {
+      acc->value.Clear();
+      acc->count = 0;
+    }
+
+    void Finalize(LabelNumericalBucket* acc) const {}
+
+    void ConsumeExample(const row_t example_idx,
+                        LabelNumericalBucket* acc) const {
+      acc->value.Add(label_[example_idx], weights_[example_idx]);
+      acc->count++;
+    }
+
+   private:
     const std::vector<float>& label_;
     const std::vector<float>& weights_;
-    const utils::NormalDistributionDouble& label_distribution_;
-    const double initial_variance_time_weight_;
-    const double sum_weights_;
   };
 
   friend std::ostream& operator<<(std::ostream& os,
@@ -1171,6 +1276,72 @@ struct LabelNumericalBucket {
 
 inline std::ostream& operator<<(std::ostream& os,
                                 const LabelNumericalBucket& data) {
+  os << "value:{mean:" << data.value.Mean()
+     << " obs:" << data.value.NumObservations() << "} count:" << data.count;
+  return os;
+}
+
+struct LabelNumericalWithHessianBucket {
+  utils::NormalDistributionDouble value;
+  double sum_hessian;
+  int64_t count;
+
+  void AddToScoreAcc(LabelNumericalWithHessianScoreAccumulator* acc) const {
+    acc->label.Add(value);
+    acc->sum_hessian += sum_hessian;
+  }
+
+  void SubToScoreAcc(LabelNumericalWithHessianScoreAccumulator* acc) const {
+    acc->label.Sub(value);
+    acc->sum_hessian -= sum_hessian;
+  }
+
+  void AddToBucket(LabelNumericalWithHessianBucket* dst) const {
+    dst->value.Add(value);
+    dst->count += count;
+    dst->sum_hessian += sum_hessian;
+  }
+
+  bool operator<(const LabelNumericalWithHessianBucket& other) const {
+    return value.Mean() < other.value.Mean();
+  }
+
+  class Initializer {
+   public:
+    explicit Initializer(const proto::LabelStatistics& statistics) {
+      label_distribution_.Load(statistics.regression_with_hessian().labels());
+      initial_variance_time_weight_ = label_distribution_.VarTimesSumWeights();
+      sum_weights_ = label_distribution_.NumObservations();
+      sum_hessian_ = statistics.regression_with_hessian().sum_hessian();
+    }
+
+    void InitEmpty(LabelNumericalWithHessianScoreAccumulator* acc) const {
+      acc->label.Clear();
+      acc->sum_hessian = 0;
+    }
+
+    void InitFull(LabelNumericalWithHessianScoreAccumulator* acc) const {
+      acc->label = label_distribution_;
+      acc->sum_hessian = sum_hessian_;
+    }
+
+    double NormalizeScore(const double score) const {
+      return (initial_variance_time_weight_ - score) / sum_weights_;
+    }
+
+   private:
+    utils::NormalDistributionDouble label_distribution_;
+    double initial_variance_time_weight_;
+    double sum_weights_;
+    double sum_hessian_;
+  };
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const LabelNumericalWithHessianBucket& data);
+};
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const LabelNumericalWithHessianBucket& data) {
   os << "value:{mean:" << data.value.Mean()
      << " obs:" << data.value.NumObservations() << "} count:" << data.count;
   return os;
@@ -1201,19 +1372,47 @@ struct LabelHessianNumericalBucket {
     return priority < priority;
   }
 
+  class Initializer {
+   public:
+    Initializer(const double sum_gradient, const double sum_hessian,
+                const double sum_weights, const double hessian_l1,
+                const double hessian_l2)
+        : sum_gradient_(sum_gradient),
+          sum_hessian_(sum_hessian),
+          sum_weights_(sum_weights),
+          hessian_l1_(hessian_l1),
+          hessian_l2_(hessian_l2) {}
+
+    void InitEmpty(LabelHessianNumericalScoreAccumulator* acc) const {
+      acc->Clear();
+      acc->SetRegularization(hessian_l1_, hessian_l2_);
+    }
+
+    void InitFull(LabelHessianNumericalScoreAccumulator* acc) const {
+      acc->Set(sum_gradient_, sum_hessian_, sum_weights_);
+      acc->SetRegularization(hessian_l1_, hessian_l2_);
+    }
+
+    double NormalizeScore(const double score) const { return score; }
+
+   private:
+    const double sum_gradient_;
+    const double sum_hessian_;
+    const double sum_weights_;
+
+    const double hessian_l1_;
+    const double hessian_l2_;
+  };
+
   class Filler {
    public:
     Filler(const std::vector<float>& gradients,
            const std::vector<float>& hessians,
-           const std::vector<float>& weights, const double sum_gradient,
-           const double sum_hessian, const double sum_weights,
-           const double hessian_l1, const double hessian_l2)
+           const std::vector<float>& weights, const double hessian_l1,
+           const double hessian_l2)
         : gradients_(gradients),
           hessians_(hessians),
           weights_(weights),
-          sum_gradient_(sum_gradient),
-          sum_hessian_(sum_hessian),
-          sum_weights_(sum_weights),
           hessian_l1_(hessian_l1),
           hessian_l2_(hessian_l2) {}
 
@@ -1241,26 +1440,10 @@ struct LabelHessianNumericalBucket {
       acc->count++;
     }
 
-    void InitEmpty(LabelHessianNumericalScoreAccumulator* acc) const {
-      acc->Clear();
-      acc->SetRegularization(hessian_l1_, hessian_l2_);
-    }
-
-    void InitFull(LabelHessianNumericalScoreAccumulator* acc) const {
-      acc->Set(sum_gradient_, sum_hessian_, sum_weights_);
-      acc->SetRegularization(hessian_l1_, hessian_l2_);
-    }
-
-    double NormalizeScore(const double score) const { return score; }
-
    private:
     const std::vector<float>& gradients_;
     const std::vector<float>& hessians_;
     const std::vector<float>& weights_;
-
-    const double sum_gradient_;
-    const double sum_hessian_;
-    const double sum_weights_;
 
     const double hessian_l1_;
     const double hessian_l2_;
@@ -1290,9 +1473,57 @@ struct LabelCategoricalBucket {
     acc->label.Sub(value);
   }
 
+  void AddToBucket(LabelCategoricalBucket* dst) const {
+    dst->value.Add(value);
+    dst->count += count;
+  }
+
   float SafeProportionOrMinusInfinity(int idx) const {
     return value.SafeProportionOrMinusInfinity(idx);
   }
+
+  class Initializer {
+   public:
+    Initializer(const utils::IntegerDistributionDouble& label_distribution)
+        : non_owned_label_distribution_(&label_distribution),
+          initial_entropy_(label_distribution.Entropy()) {}
+
+    explicit Initializer(const proto::LabelStatistics& statistics) {
+      owned_label_distribution_ = utils::IntegerDistributionDouble();
+      owned_label_distribution_->Load(statistics.classification().labels());
+      initial_entropy_ = owned_label_distribution_->Entropy();
+    }
+
+    const utils::IntegerDistributionDouble& label_distribution() const {
+      if (non_owned_label_distribution_) {
+        return *non_owned_label_distribution_;
+      }
+      return owned_label_distribution_.value();
+    }
+
+    void InitEmpty(LabelCategoricalScoreAccumulator* acc) const {
+      acc->label.Clear();
+      acc->label.SetNumClasses(label_distribution().NumClasses());
+    }
+
+    void InitFull(LabelCategoricalScoreAccumulator* acc) const {
+      acc->label = label_distribution();
+    }
+
+    double NormalizeScore(const double score) const {
+      return initial_entropy_ - score;
+    }
+
+    bool IsEmpty(const int32_t idx) const {
+      return label_distribution().count(idx) == 0;
+    }
+
+   private:
+    const utils::IntegerDistributionDouble* non_owned_label_distribution_ =
+        nullptr;
+    absl::optional<utils::IntegerDistributionDouble> owned_label_distribution_;
+    double initial_entropy_;
+  };
 
   class Filler {
    public:
@@ -1300,12 +1531,11 @@ struct LabelCategoricalBucket {
            const utils::IntegerDistributionDouble& label_distribution)
         : label_(label),
           weights_(weights),
-          label_distribution_(label_distribution),
-          initial_entropy_(label_distribution.Entropy()) {}
+          num_classes_(label_distribution.NumClasses()) {}
 
     void InitializeAndZero(LabelCategoricalBucket* acc) const {
       acc->value.Clear();
-      acc->value.SetNumClasses(label_distribution_.NumClasses());
+      acc->value.SetNumClasses(num_classes_);
       acc->count = 0;
     }
 
@@ -1317,24 +1547,10 @@ struct LabelCategoricalBucket {
       acc->count++;
     }
 
-    void InitEmpty(LabelCategoricalScoreAccumulator* acc) const {
-      acc->label.Clear();
-      acc->label.SetNumClasses(label_distribution_.NumClasses());
-    }
-
-    void InitFull(LabelCategoricalScoreAccumulator* acc) const {
-      acc->label = label_distribution_;
-    }
-
-    double NormalizeScore(const double score) const {
-      return initial_entropy_ - score;
-    }
-
    private:
     const std::vector<int>& label_;
     const std::vector<float>& weights_;
-    const utils::IntegerDistributionDouble& label_distribution_;
-    const double initial_entropy_;
+    const int num_classes_;
   };
 
   friend std::ostream& operator<<(std::ostream& os,
@@ -1374,11 +1590,9 @@ struct LabelBinaryCategoricalBucket {
     }
   }
 
-  class Filler {
+  class Initializer {
    public:
-    Filler(const std::vector<int>& label, const std::vector<float>& weights,
-           const utils::IntegerDistributionDouble& label_distribution)
-        : label_(label), weights_(weights) {
+    Initializer(const utils::IntegerDistributionDouble& label_distribution) {
       DCHECK_EQ(label_distribution.NumClasses(), 3);
       label_distribution_trues_ = label_distribution.count(2);
       label_distribution_weights_ = label_distribution.NumObservations();
@@ -1387,6 +1601,30 @@ struct LabelBinaryCategoricalBucket {
       DCHECK(std::abs(initial_entropy_ - label_distribution.Entropy()) <=
              0.0001);
     }
+
+    void InitEmpty(LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->Clear();
+    }
+
+    void InitFull(LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->Set(label_distribution_trues_, label_distribution_weights_);
+    }
+
+    double NormalizeScore(const double score) const {
+      return initial_entropy_ - score;
+    }
+
+   private:
+    double label_distribution_trues_;
+    double label_distribution_weights_;
+    double initial_entropy_;
+  };
+
+  class Filler {
+   public:
+    Filler(const std::vector<int>& label, const std::vector<float>& weights,
+           const utils::IntegerDistributionDouble& label_distribution)
+        : label_(label), weights_(weights) {}
 
     void InitializeAndZero(LabelBinaryCategoricalBucket* acc) const {
       acc->sum_trues = 0;
@@ -1404,24 +1642,9 @@ struct LabelBinaryCategoricalBucket {
       acc->count++;
     }
 
-    void InitEmpty(LabelBinaryCategoricalScoreAccumulator* acc) const {
-      acc->Clear();
-    }
-
-    void InitFull(LabelBinaryCategoricalScoreAccumulator* acc) const {
-      acc->Set(label_distribution_trues_, label_distribution_weights_);
-    }
-
-    double NormalizeScore(const double score) const {
-      return initial_entropy_ - score;
-    }
-
    private:
     const std::vector<int>& label_;
     const std::vector<float>& weights_;
-    double label_distribution_trues_;
-    double label_distribution_weights_;
-    double initial_entropy_;
   };
 
   friend std::ostream& operator<<(std::ostream& os,

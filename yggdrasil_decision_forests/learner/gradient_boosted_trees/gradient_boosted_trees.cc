@@ -49,6 +49,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees_loss.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/metric/ranking_ndcg.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -157,33 +158,6 @@ void ConfigureTrainingConfigForGradients(
   }
 }
 
-// Computes the loss best adapted to the problem.
-utils::StatusOr<proto::Loss> DefaultLoss(
-    const model::proto::Task task, const dataset::proto::Column& label_spec) {
-  if (task == model::proto::Task::CLASSIFICATION &&
-      label_spec.type() == dataset::proto::ColumnType::CATEGORICAL) {
-    if (label_spec.categorical().number_of_unique_values() == 3) {
-      // Note: "number_of_unique_values() == 3" because of the reserved
-      // "out-of-dictionary" item.
-      return proto::Loss::BINOMIAL_LOG_LIKELIHOOD;
-    } else if (label_spec.categorical().number_of_unique_values() > 3) {
-      return proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD;
-    }
-  }
-
-  if (task == model::proto::Task::REGRESSION &&
-      label_spec.type() == dataset::proto::ColumnType::NUMERICAL) {
-    return proto::Loss::SQUARED_ERROR;
-  }
-
-  if (task == model::proto::Task::RANKING &&
-      label_spec.type() == dataset::proto::ColumnType::NUMERICAL) {
-    return proto::Loss::LAMBDA_MART_NDCG5;
-  }
-
-  return absl::InvalidArgumentError(
-      "No defined default loss for this combination of label type and task");
-}
 // Returns the task used to train the individual decision trees. This task might
 // be different from the task that the GBT model is trained to solve.
 //
@@ -195,95 +169,10 @@ model::proto::Task SubTask(const proto::Loss loss) {
 }
 
 // Set the default value of non-specified hyper-parameters.
-void SetDefaultHyperParameters(model::proto::TrainingConfig* config) {
+absl::Status SetDefaultHyperParameters(model::proto::TrainingConfig* config) {
   auto* gbt_config = config->MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
-  decision_tree::SetDefaultHyperParameters(gbt_config->mutable_decision_tree());
-
-  if (gbt_config->has_sample_with_shards()) {
-    gbt_config->mutable_decision_tree()
-        ->mutable_internal()
-        ->set_sorting_strategy(
-            decision_tree::proto::DecisionTreeTrainingConfig::Internal::
-                IN_NODE);
-  }
-
-  if (!gbt_config->decision_tree().has_max_depth()) {
-    if (gbt_config->decision_tree().has_growing_strategy_best_first_global()) {
-      gbt_config->mutable_decision_tree()->set_max_depth(-1);
-    } else {
-      gbt_config->mutable_decision_tree()->set_max_depth(6);
-    }
-  }
-  if (!gbt_config->decision_tree().has_num_candidate_attributes() &&
-      !gbt_config->decision_tree().has_num_candidate_attributes_ratio()) {
-    // The basic definition of GBT does not have any attribute sampling.
-    gbt_config->mutable_decision_tree()->set_num_candidate_attributes(-1);
-  }
-  if (!gbt_config->has_shrinkage()) {
-    if (gbt_config->forest_extraction_case() ==
-        proto::GradientBoostedTreesTrainingConfig::kDart) {
-      gbt_config->set_shrinkage(1.f);
-    }
-  }
-  if (gbt_config->has_use_goss()) {
-    if (gbt_config->has_gradient_one_side_sampling()) {
-      LOG(WARNING) << "Ignoring deprecated use_goss, goss_alpha, and goss_beta "
-                      "values because `gradient_one_side_sampling` is already "
-                      "present in "
-                      "the train config.";
-    } else if ((gbt_config->has_subsample() && gbt_config->subsample() < 1) ||
-               gbt_config->sampling_methods_case() !=
-                   proto::GradientBoostedTreesTrainingConfig::
-                       SAMPLING_METHODS_NOT_SET) {
-      LOG(WARNING)
-          << "Ignoring deprecated use_goss, goss_alpha, and goss_beta "
-             "values because another sampling method is already present in the "
-             "train config.";
-    } else {
-      gbt_config->mutable_gradient_one_side_sampling()->set_alpha(
-          gbt_config->goss_alpha());
-      gbt_config->mutable_gradient_one_side_sampling()->set_beta(
-          gbt_config->goss_beta());
-    }
-
-    // Clear deprecated fields.
-    gbt_config->clear_subsample();
-    gbt_config->clear_use_goss();
-    gbt_config->clear_goss_alpha();
-    gbt_config->clear_goss_beta();
-  }
-  if (gbt_config->has_subsample()) {
-    if (gbt_config->has_stochastic_gradient_boosting()) {
-      LOG(WARNING)
-          << "Ignoring deprecated subsample value because "
-             "`stochastic_gradient_boosting` is already present in the config.";
-    } else if (gbt_config->sampling_methods_case() !=
-               proto::GradientBoostedTreesTrainingConfig::
-                   SAMPLING_METHODS_NOT_SET) {
-      LOG(WARNING) << "Ignoring deprecated subsample value because another "
-                      "sampling method is already present in the train config.";
-    } else {
-      gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(
-          gbt_config->subsample());
-    }
-
-    // Clear deprecated fields.
-    gbt_config->clear_subsample();
-  }
-
-  if (gbt_config->early_stopping() !=
-          proto::GradientBoostedTreesTrainingConfig::NONE &&
-      gbt_config->validation_set_ratio() == 0) {
-    LOG(WARNING)
-        << "early_stopping != \"NONE\" requires validation_set_ratio>0. "
-           "Setting early_stopping=\"NONE\" (was \""
-        << proto::GradientBoostedTreesTrainingConfig::EarlyStopping_Name(
-               gbt_config->early_stopping())
-        << "\") i.e. sabling early stopping.";
-    gbt_config->set_early_stopping(
-        proto::GradientBoostedTreesTrainingConfig::NONE);
-  }
+  return internal::SetDefaultHyperParameters(gbt_config);
 }
 
 // Splits the training shards between effective training and validation.
@@ -489,7 +378,7 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
     const dataset::proto::DataSpecification& data_spec,
     internal::AllTrainingConfiguration* all_config) const {
   all_config->train_config = training_config();
-  SetDefaultHyperParameters(&all_config->train_config);
+  RETURN_IF_ERROR(SetDefaultHyperParameters(&all_config->train_config));
 
   all_config->gbt_config = &all_config->train_config.GetExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -508,8 +397,9 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
   if (mutable_gbt_config->loss() == proto::Loss::DEFAULT) {
     ASSIGN_OR_RETURN(
         const auto default_loss,
-        DefaultLoss(all_config->train_config.task(),
-                    data_spec.columns(all_config->train_config_link.label())));
+        internal::DefaultLoss(
+            all_config->train_config.task(),
+            data_spec.columns(all_config->train_config_link.label())));
     mutable_gbt_config->set_loss(default_loss);
     LOG(INFO) << "Default loss set to "
               << proto::Loss_Name(mutable_gbt_config->loss());
@@ -691,6 +581,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
                                             num_sample_train_shards, &random),
                        dataset_prefix, data_spec, config,
                        /*allocate_gradient=*/true, mdl.get()));
+  RETURN_IF_ERROR(CheckNumExamples(current_train_dataset->dataset.nrow()));
   LOG(INFO) << current_train_dataset->dataset.nrow()
             << " examples loaded in the first training sample in "
             << (absl::Now() - begin_load_first_sample);
@@ -1071,7 +962,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
 
   utils::usage::OnTrainingEnd(
-      data_spec, training_config(), config.train_config_link,
+      data_spec, config.train_config, config.train_config_link,
       /*num_examples=*/-1, *mdl, absl::Now() - begin_training);
 
   return mdl;
@@ -1100,6 +991,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
   //     all the gradients).
 
   const auto begin_training = absl::Now();
+  RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
 
   // Initialize the configuration.
   internal::AllTrainingConfiguration config;
@@ -2009,7 +1901,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
       "learner/gradient_boosted_trees/gradient_boosted_trees.proto";
 
   model::proto::TrainingConfig config;
-  SetDefaultHyperParameters(&config);
+  RETURN_IF_ERROR(SetDefaultHyperParameters(&config));
   const auto& gbt_config = config.GetExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
 
@@ -2258,6 +2150,33 @@ For example, in the case of binary classification, the pre-link function output 
 
 namespace internal {
 
+utils::StatusOr<proto::Loss> DefaultLoss(
+    const model::proto::Task task, const dataset::proto::Column& label_spec) {
+  if (task == model::proto::Task::CLASSIFICATION &&
+      label_spec.type() == dataset::proto::ColumnType::CATEGORICAL) {
+    if (label_spec.categorical().number_of_unique_values() == 3) {
+      // Note: "number_of_unique_values() == 3" because of the reserved
+      // "out-of-dictionary" item.
+      return proto::Loss::BINOMIAL_LOG_LIKELIHOOD;
+    } else if (label_spec.categorical().number_of_unique_values() > 3) {
+      return proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD;
+    }
+  }
+
+  if (task == model::proto::Task::REGRESSION &&
+      label_spec.type() == dataset::proto::ColumnType::NUMERICAL) {
+    return proto::Loss::SQUARED_ERROR;
+  }
+
+  if (task == model::proto::Task::RANKING &&
+      label_spec.type() == dataset::proto::ColumnType::NUMERICAL) {
+    return proto::Loss::LAMBDA_MART_NDCG5;
+  }
+
+  return absl::InvalidArgumentError(
+      "No defined default loss for this combination of label type and task");
+}
+
 utils::StatusOr<std::unique_ptr<CompleteTrainingDatasetForWeakLearner>>
 LoadCompleteDatasetForWeakLearner(
     const std::vector<std::string>& shards,
@@ -2434,18 +2353,6 @@ absl::Status CreateGradientDataset(
   return absl::OkStatus();
 }
 
-template <typename V>
-void SetInitialPredictions(const std::vector<float>& initial_predictions,
-                           const row_t num_rows, std::vector<V>* predictions) {
-  predictions->resize(num_rows * initial_predictions.size());
-  size_t cur = 0;
-  for (row_t example_idx = 0; example_idx < num_rows; example_idx++) {
-    for (const auto initial_prediction : initial_predictions) {
-      (*predictions)[cur++] = initial_prediction;
-    }
-  }
-}
-
 absl::Status ComputePredictions(
     const GradientBoostedTreesModel* mdl,
     const serving::FastEngine* optional_engine,
@@ -2505,11 +2412,6 @@ absl::Status ComputePredictions(
   }
   return absl::OkStatus();
 }
-
-// Instantiation for the unit test.
-template void SetInitialPredictions<float>(
-    const std::vector<float>& initial_predictions,
-    dataset::VerticalDataset::row_t num_rows, std::vector<float>* predictions);
 
 void SampleTrainingExamples(const dataset::VerticalDataset::row_t num_rows,
                             const float sample, utils::RandomEngine* random,
@@ -2642,16 +2544,23 @@ absl::Status ExportTrainingLogs(const proto::TrainingLogs& training_logs,
   file::OutputFileCloser file(std::move(file_handle));
 
   utils::csv::Writer writer(file.stream());
-  std::vector<std::string> fields = {"num_trees", "valid_loss"};
+  std::vector<std::string> fields = {"num_trees", "valid_loss", "train_loss"};
   for (const auto& metric : training_logs.secondary_metric_names()) {
     fields.push_back(absl::StrCat("valid_", metric));
+  }
+  for (const auto& metric : training_logs.secondary_metric_names()) {
+    fields.push_back(absl::StrCat("train_", metric));
   }
   RETURN_IF_ERROR(writer.WriteRowStrings(fields));
   for (const auto& entry : training_logs.entries()) {
     std::vector<std::string> row;
     row.push_back(absl::StrCat(entry.number_of_trees()));
     row.push_back(absl::StrCat(entry.validation_loss()));
+    row.push_back(absl::StrCat(entry.training_loss()));
     for (const auto metric : entry.validation_secondary_metrics()) {
+      row.push_back(absl::StrCat(metric));
+    }
+    for (const auto metric : entry.training_secondary_metrics()) {
       row.push_back(absl::StrCat(metric));
     }
     RETURN_IF_ERROR(writer.WriteRowStrings(row));
@@ -2817,6 +2726,110 @@ bool EarlyStopping::ShouldStop() {
     return true;
   }
   return false;
+}
+
+void SetInitialPredictions(const std::vector<float>& initial_predictions,
+                           const row_t num_rows,
+                           std::vector<float>* predictions) {
+  predictions->resize(num_rows * initial_predictions.size());
+  size_t cur = 0;
+  for (row_t example_idx = 0; example_idx < num_rows; example_idx++) {
+    for (const auto initial_prediction : initial_predictions) {
+      (*predictions)[cur++] = initial_prediction;
+    }
+  }
+}
+
+absl::Status SetDefaultHyperParameters(
+    gradient_boosted_trees::proto::GradientBoostedTreesTrainingConfig*
+        gbt_config) {
+  decision_tree::SetDefaultHyperParameters(gbt_config->mutable_decision_tree());
+
+  if (gbt_config->has_sample_with_shards()) {
+    gbt_config->mutable_decision_tree()
+        ->mutable_internal()
+        ->set_sorting_strategy(
+            decision_tree::proto::DecisionTreeTrainingConfig::Internal::
+                IN_NODE);
+  }
+
+  if (!gbt_config->decision_tree().has_max_depth()) {
+    if (gbt_config->decision_tree().has_growing_strategy_best_first_global()) {
+      gbt_config->mutable_decision_tree()->set_max_depth(-1);
+    } else {
+      gbt_config->mutable_decision_tree()->set_max_depth(6);
+    }
+  }
+  if (!gbt_config->decision_tree().has_num_candidate_attributes() &&
+      !gbt_config->decision_tree().has_num_candidate_attributes_ratio()) {
+    // The basic definition of GBT does not have any attribute sampling.
+    gbt_config->mutable_decision_tree()->set_num_candidate_attributes(-1);
+  }
+  if (!gbt_config->has_shrinkage()) {
+    if (gbt_config->forest_extraction_case() ==
+        proto::GradientBoostedTreesTrainingConfig::kDart) {
+      gbt_config->set_shrinkage(1.f);
+    }
+  }
+  if (gbt_config->has_use_goss()) {
+    if (gbt_config->has_gradient_one_side_sampling()) {
+      LOG(WARNING) << "Ignoring deprecated use_goss, goss_alpha, and goss_beta "
+                      "values because `gradient_one_side_sampling` is already "
+                      "present in "
+                      "the train config.";
+    } else if ((gbt_config->has_subsample() && gbt_config->subsample() < 1) ||
+               gbt_config->sampling_methods_case() !=
+                   proto::GradientBoostedTreesTrainingConfig::
+                       SAMPLING_METHODS_NOT_SET) {
+      LOG(WARNING)
+          << "Ignoring deprecated use_goss, goss_alpha, and goss_beta "
+             "values because another sampling method is already present in the "
+             "train config.";
+    } else {
+      gbt_config->mutable_gradient_one_side_sampling()->set_alpha(
+          gbt_config->goss_alpha());
+      gbt_config->mutable_gradient_one_side_sampling()->set_beta(
+          gbt_config->goss_beta());
+    }
+
+    // Clear deprecated fields.
+    gbt_config->clear_subsample();
+    gbt_config->clear_use_goss();
+    gbt_config->clear_goss_alpha();
+    gbt_config->clear_goss_beta();
+  }
+  if (gbt_config->has_subsample()) {
+    if (gbt_config->has_stochastic_gradient_boosting()) {
+      LOG(WARNING)
+          << "Ignoring deprecated subsample value because "
+             "`stochastic_gradient_boosting` is already present in the config.";
+    } else if (gbt_config->sampling_methods_case() !=
+               proto::GradientBoostedTreesTrainingConfig::
+                   SAMPLING_METHODS_NOT_SET) {
+      LOG(WARNING) << "Ignoring deprecated subsample value because another "
+                      "sampling method is already present in the train config.";
+    } else {
+      gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(
+          gbt_config->subsample());
+    }
+
+    // Clear deprecated fields.
+    gbt_config->clear_subsample();
+  }
+
+  if (gbt_config->early_stopping() !=
+          proto::GradientBoostedTreesTrainingConfig::NONE &&
+      gbt_config->validation_set_ratio() == 0) {
+    LOG(WARNING)
+        << "early_stopping != \"NONE\" requires validation_set_ratio>0. "
+           "Setting early_stopping=\"NONE\" (was \""
+        << proto::GradientBoostedTreesTrainingConfig::EarlyStopping_Name(
+               gbt_config->early_stopping())
+        << "\") i.e. sabling early stopping.";
+    gbt_config->set_early_stopping(
+        proto::GradientBoostedTreesTrainingConfig::NONE);
+  }
+  return absl::OkStatus();
 }
 
 }  // namespace internal

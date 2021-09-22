@@ -20,14 +20,14 @@
 //   ExampleBucket (or bucket) : Accumulation of information for a set of
 //     examples. Composed of a FeatureBucket (accumulate the information about
 //     the feature) and the LabelBucket (accumulate the information about the
-//     label). In some algorithms, the bucket may only contain one examples. The
+//     label). In some algorithms, the bucket may only contain one example. The
 //     examples in a bucket are not separable according to the split being
-//     searched i.e. for a categorical feature, all the example with the same
+//     searched i.e. for a categorical feature, all the examples of the same
 //     feature value will end in the same bucket.
 //   ExampleBucketSet: A set of ExampleBuckets. A ExampleBucketSet is
 //     constructed by scanning the training examples, assigning each example to
-//     one of the bucket, and accumulating the information about this example
-//     (feature and label) to this ExampleBucket. The split is mad to optimize
+//     one of the buckets, and accumulating the information about this example
+//     (feature and label) to its ExampleBucket. The split is made to optimize
 //     the separation of buckets in a bucket-set.
 //   score accumulator: Accumulates the statistics from multiple buckets, and
 //     propose a split and a split score.
@@ -73,6 +73,7 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
 
+// TODO(gbm): Explain the expected signature of FeatureBucket and LabelBucket.
 template <typename FeatureBucket, typename LabelBucket>
 struct ExampleBucket {
   FeatureBucket feature;
@@ -176,8 +177,14 @@ using FeatureBooleanLabelBinaryCategorical = ExampleBucketSet<
 using FeatureIsMissingLabelBinaryCategorical = ExampleBucketSet<
     ExampleBucket<FeatureIsMissingBucket, LabelBinaryCategoricalBucket>>;
 
+// Memory cache for the splitter.
+//
+// Used to avoid re-allocating memory each time the splitter is called.
 struct PerThreadCacheV2 {
   // Cache for example bucket sets.
+  // The postfix digit is only used to differentiate between the objects. There
+  // is not special semantic to it.
+
   FeatureNumericalLabelNumericalOneValue example_bucket_set_num_1;
   FeatureDiscretizedNumericalLabelNumerical example_bucket_set_num_5;
   FeatureCategoricalLabelNumerical example_bucket_set_num_2;
@@ -209,6 +216,8 @@ struct PerThreadCacheV2 {
       label_hessian_numerical_score_accumulator[2];
   LabelBinaryCategoricalScoreAccumulator
       label_binary_categorical_score_accumulator[2];
+  LabelNumericalWithHessianScoreAccumulator
+      label_numerical_with_hessian_score_accumulator[2];
 
   std::vector<std::pair<float, int32_t>> bucket_order;
 
@@ -318,6 +327,9 @@ auto* GetCachedLabelScoreAccumulator(const bool side, PerThreadCacheV2* cache) {
   } else if constexpr (is_same_v<LabelScoreAccumulator,
                                  LabelHessianNumericalScoreAccumulator>) {
     return &cache->label_hessian_numerical_score_accumulator[side];
+  } else if constexpr (is_same_v<LabelScoreAccumulator,
+                                 LabelNumericalWithHessianScoreAccumulator>) {
+    return &cache->label_numerical_with_hessian_score_accumulator[side];
   } else {
     static_assert(!is_same_v<LabelScoreAccumulator, LabelScoreAccumulator>,
                   "Not implemented.");
@@ -376,20 +388,20 @@ void FillExampleBucketSet(
   }
 }
 
-template <typename ExampleBucketSet, typename LabelScoreAccumulator>
-ABSL_ATTRIBUTE_ALWAYS_INLINE double Score(
-    const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
-    const double weighted_num_examples, const LabelScoreAccumulator& pos,
-    const LabelScoreAccumulator& neg) {
+template <typename LabelScoreAccumulator, typename Initializer>
+ABSL_ATTRIBUTE_ALWAYS_INLINE double Score(const Initializer& initializer,
+                                          const double weighted_num_examples,
+                                          const LabelScoreAccumulator& pos,
+                                          const LabelScoreAccumulator& neg) {
   const double score_neg = neg.Score();
   const double score_pos = pos.Score();
 
   if constexpr (LabelScoreAccumulator::kNormalizeByWeight) {
     const double ratio_pos = pos.WeightedNumExamples() / weighted_num_examples;
-    return label_filler.NormalizeScore(score_pos * ratio_pos +
-                                       score_neg * (1. - ratio_pos));
+    return initializer.NormalizeScore(score_pos * ratio_pos +
+                                      score_neg * (1. - ratio_pos));
   } else {
-    return label_filler.NormalizeScore(score_pos + score_neg);
+    return initializer.NormalizeScore(score_pos + score_neg);
   }
 }
 
@@ -399,7 +411,7 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE double Score(
 template <typename ExampleBucketSet, typename LabelScoreAccumulator>
 SplitSearchResult ScanSplits(
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
-    const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
+    const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
     const ExampleBucketSet& example_bucket_set, const int64_t num_examples,
     const int min_num_obs, const int attribute_idx,
     proto::NodeCondition* condition, PerThreadCacheV2* cache) {
@@ -422,8 +434,8 @@ SplitSearchResult ScanSplits(
   LabelScoreAccumulator& pos =
       *GetCachedLabelScoreAccumulator<LabelScoreAccumulator>(true, cache);
 
-  label_filler.InitEmpty(&neg);
-  label_filler.InitFull(&pos);
+  initializer.InitEmpty(&neg);
+  initializer.InitFull(&pos);
 
   // Running statistics.
   int64_t num_pos_examples = num_examples;
@@ -462,8 +474,7 @@ SplitSearchResult ScanSplits(
       continue;
     }
 
-    const auto score = Score<ExampleBucketSet, LabelScoreAccumulator>(
-        label_filler, weighted_num_examples, pos, neg);
+    const auto score = Score<>(initializer, weighted_num_examples, pos, neg);
     tried_one_split = true;
 
     if (score > best_score) {
@@ -494,13 +505,14 @@ SplitSearchResult ScanSplits(
 
 // Scans the buckets (similarly to "ScanSplits"), but in the order specified by
 // "bucket_order[i].second" (instead of the bucket order).
-template <typename ExampleBucketSet, typename LabelScoreAccumulator>
+template <typename ExampleBucketSet, typename LabelScoreAccumulator,
+          typename Initializer =
+              typename ExampleBucketSet::LabelBucketType::Initializer>
 SplitSearchResult ScanSplitsCustomOrder(
     const std::vector<std::pair<float, int32_t>>& bucket_order,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
-    const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
-    const ExampleBucketSet& example_bucket_set, const int64_t num_examples,
-    const int min_num_obs, const int attribute_idx,
+    const Initializer& initializer, const ExampleBucketSet& example_bucket_set,
+    const int64_t num_examples, const int min_num_obs, const int attribute_idx,
     proto::NodeCondition* condition, PerThreadCacheV2* cache) {
   using FeatureBucketType = typename ExampleBucketSet::FeatureBucketType;
 
@@ -521,8 +533,8 @@ SplitSearchResult ScanSplitsCustomOrder(
   LabelScoreAccumulator& pos =
       *GetCachedLabelScoreAccumulator<LabelScoreAccumulator>(true, cache);
 
-  label_filler.InitEmpty(&neg);
-  label_filler.InitFull(&pos);
+  initializer.InitEmpty(&neg);
+  initializer.InitFull(&pos);
 
   // Running statistics.
   int64_t num_pos_examples = num_examples;
@@ -563,8 +575,7 @@ SplitSearchResult ScanSplitsCustomOrder(
     }
 
     // Compute the split's score.
-    const auto score = Score<ExampleBucketSet, LabelScoreAccumulator>(
-        label_filler, weighted_num_examples, pos, neg);
+    const auto score = Score<>(initializer, weighted_num_examples, pos, neg);
     tried_one_split = true;
 
     if (score > best_score) {
@@ -622,6 +633,7 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
     const std::vector<SparseItem>& sorted_attributes,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
+    const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
     const int min_num_obs, const int attribute_idx,
     proto::NodeCondition* condition, PerThreadCacheV2* cache) {
   if (selected_examples.size() <= 1) {
@@ -661,8 +673,8 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   LabelScoreAccumulator& pos =
       *GetCachedLabelScoreAccumulator<LabelScoreAccumulator>(true, cache);
 
-  label_filler.InitEmpty(&neg);
-  label_filler.InitFull(&pos);
+  initializer.InitEmpty(&neg);
+  initializer.InitFull(&pos);
 
   // Running statistics.
   int64_t num_pos_examples = selected_examples.size();
@@ -728,8 +740,8 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
       if (num_pos_examples >= min_num_obs &&
           num_pos_examples <= max_num_pos_examples) {
         // Compute the split's score.
-        const auto score = Score<ExampleBucketSet, LabelScoreAccumulator>(
-            label_filler, weighted_num_examples, pos, neg);
+        const auto score =
+            Score<>(initializer, weighted_num_examples, pos, neg);
         tried_one_split = true;
 
         if (score > best_score) {
@@ -805,6 +817,7 @@ SplitSearchResult ScanSplitsPresortedSparse(
     const std::vector<SparseItem>& sorted_attributes,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
+    const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
     const int min_num_obs, const int attribute_idx,
     const bool duplicate_examples, proto::NodeCondition* condition,
     PerThreadCacheV2* cache) {
@@ -812,14 +825,14 @@ SplitSearchResult ScanSplitsPresortedSparse(
     return ScanSplitsPresortedSparseDuplicateExampleTemplate<
         ExampleBucketSet, LabelScoreAccumulator, true>(
         total_num_examples, selected_examples, sorted_attributes,
-        feature_filler, label_filler, min_num_obs, attribute_idx, condition,
-        cache);
+        feature_filler, label_filler, initializer, min_num_obs, attribute_idx,
+        condition, cache);
   } else {
     return ScanSplitsPresortedSparseDuplicateExampleTemplate<
         ExampleBucketSet, LabelScoreAccumulator, false>(
         total_num_examples, selected_examples, sorted_attributes,
-        feature_filler, label_filler, min_num_obs, attribute_idx, condition,
-        cache);
+        feature_filler, label_filler, initializer, min_num_obs, attribute_idx,
+        condition, cache);
   }
 }
 
@@ -830,6 +843,7 @@ template <typename ExampleBucketSet, typename LabelScoreAccumulator>
 SplitSearchResult ScanSplitsRandomBuckets(
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
+    const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
     const ExampleBucketSet& example_bucket_set, const int64_t num_examples,
     const int min_num_obs, const int attribute_idx,
     const std::function<int(const int num_non_empty_buckets)>& num_trials_fn,
@@ -856,8 +870,8 @@ SplitSearchResult ScanSplitsRandomBuckets(
   LabelScoreAccumulator& pos =
       *GetCachedLabelScoreAccumulator<LabelScoreAccumulator>(true, cache);
 
-  label_filler.InitEmpty(&neg);
-  label_filler.InitFull(&pos);
+  initializer.InitEmpty(&neg);
+  initializer.InitFull(&pos);
 
   // Running statistics.
   int64_t num_pos_examples;
@@ -890,8 +904,8 @@ SplitSearchResult ScanSplitsRandomBuckets(
   for (int trial_idx = 0; trial_idx < num_trials; trial_idx++) {
     pos_buckets.clear();
     num_pos_examples = 0;
-    label_filler.InitFull(&neg);
-    label_filler.InitEmpty(&pos);
+    initializer.InitFull(&neg);
+    initializer.InitEmpty(&pos);
     for (const int bucket_idx : active_bucket_idxs) {
       if (((*random)() & 1) == 0) {
         const auto& bucket = example_bucket_set.items[bucket_idx];
@@ -904,19 +918,18 @@ SplitSearchResult ScanSplitsRandomBuckets(
     num_neg_examples = num_examples - num_pos_examples;
 
     if (num_pos_examples < min_num_obs) {
-      // Not enought examples in the positive branch.
+      // Not enough examples in the positive branch.
       break;
     }
 
     if (num_neg_examples < min_num_obs) {
-      // Not enought examples in the negative branch.
+      // Not enough examples in the negative branch.
       continue;
     }
 
     DCHECK(!pos_buckets.empty());
 
-    const auto score = Score<ExampleBucketSet, LabelScoreAccumulator>(
-        label_filler, weighted_num_examples, pos, neg);
+    const auto score = Score<>(initializer, weighted_num_examples, pos, neg);
     tried_one_split = true;
 
     if (score > best_score) {
@@ -953,6 +966,7 @@ SplitSearchResult FindBestSplit(
     const std::vector<row_t>& selected_examples,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
+    const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
     const int min_num_obs, const int attribute_idx,
     proto::NodeCondition* condition, PerThreadCacheV2* cache) {
   DCHECK(condition != nullptr);
@@ -966,7 +980,7 @@ SplitSearchResult FindBestSplit(
 
   // Scan buckets.
   return ScanSplits<ExampleBucketSet, LabelBucketSet>(
-      feature_filler, label_filler, example_set_accumulator,
+      feature_filler, initializer, example_set_accumulator,
       selected_examples.size(), min_num_obs, attribute_idx, condition, cache);
 }
 
@@ -977,6 +991,7 @@ SplitSearchResult FindBestSplitRandom(
     const std::vector<row_t>& selected_examples,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
+    const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
     const int min_num_obs, const int attribute_idx,
     const std::function<int(const int num_non_empty_buckets)>& num_trials_fn,
     proto::NodeCondition* condition, PerThreadCacheV2* cache,
@@ -992,9 +1007,18 @@ SplitSearchResult FindBestSplitRandom(
 
   // Scan buckets.
   return ScanSplitsRandomBuckets<ExampleBucketSet, LabelBucketSet>(
-      feature_filler, label_filler, example_set_accumulator,
+      feature_filler, label_filler, initializer, example_set_accumulator,
       selected_examples.size(), min_num_obs, attribute_idx, num_trials_fn,
       condition, cache, random);
+}
+
+// Adds the content's of "src" label bucket to "dst"'s label bucket.
+template <typename ExampleBucketSet>
+void AddLabelBucket(const ExampleBucketSet& src, ExampleBucketSet* dst) {
+  DCHECK_EQ(src.items.size(), dst->items.size());
+  for (size_t item_idx = 0; item_idx < src.items.size(); item_idx++) {
+    src.items[item_idx].label.AddToBucket(&dst->items[item_idx].label);
+  }
 }
 
 // Pre-defined ExampleBucketSets

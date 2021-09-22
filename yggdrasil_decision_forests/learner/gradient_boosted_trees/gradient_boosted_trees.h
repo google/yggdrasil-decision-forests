@@ -450,6 +450,19 @@ class EarlyStopping {
   int trees_per_iterations_ = -1;
 };
 
+// Computes the loss best adapted to the problem.
+utils::StatusOr<proto::Loss> DefaultLoss(
+    model::proto::Task task, const dataset::proto::Column& label_spec);
+
+void SetInitialPredictions(const std::vector<float>& initial_predictions,
+                           const dataset::VerticalDataset::row_t num_rows,
+                           std::vector<float>* predictions);
+
+// Sets the default hyper-parameters of the learner.
+absl::Status SetDefaultHyperParameters(
+    gradient_boosted_trees::proto::GradientBoostedTreesTrainingConfig*
+        gbt_config);
+
 }  // namespace internal
 
 }  // namespace gradient_boosted_trees

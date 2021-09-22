@@ -299,9 +299,9 @@ TEST(GradientBoostedTrees, UpdateGradientsBinomialLogLikelihood) {
       dataset.nrow(), &predictions);
 
   utils::RandomEngine random(1234);
-  CHECK_OK(loss_imp.UpdateGradients(gradient_dataset, /* label_col_idx= */ 1,
-                                    predictions, /*ranking_index=*/nullptr,
-                                    &gradients, &random));
+  CHECK_OK(loss_imp.UpdateGradients(
+      gradient_dataset, /* label_col_idx= */ 1, predictions,
+      /*ranking_index=*/nullptr, &gradients, &random));
 
   EXPECT_THAT(gradients.front().gradient, ElementsAre(-0.5f, 0.5, -0.5f, 0.5f));
 }

@@ -30,6 +30,7 @@
 #include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/memory/memory.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -142,6 +143,63 @@ utils::StatusOr<std::unique_ptr<AbstractLoss>> CreateLoss(
   return loss_imp;
 }
 
+absl::Status AbstractLoss::UpdateGradients(
+    const dataset::VerticalDataset& dataset, int label_col_idx,
+    const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index,
+    std::vector<GradientData>* gradients, utils::RandomEngine* random) const {
+  GradientDataRef compact_gradient(gradients->size());
+  for (int i = 0; i < gradients->size(); i++) {
+    compact_gradient[i] = {&(*gradients)[i].gradient, (*gradients)[i].hessian};
+  }
+
+  const auto* categorical_labels =
+      dataset.ColumnWithCastOrNull<dataset::VerticalDataset::CategoricalColumn>(
+          label_col_idx);
+  if (categorical_labels) {
+    return UpdateGradients(categorical_labels->values(), predictions,
+                           ranking_index, &compact_gradient, random, nullptr);
+  }
+
+  const auto* numerical_labels =
+      dataset.ColumnWithCastOrNull<dataset::VerticalDataset::NumericalColumn>(
+          label_col_idx);
+  if (numerical_labels) {
+    return UpdateGradients(numerical_labels->values(), predictions,
+                           ranking_index, &compact_gradient, random, nullptr);
+  }
+
+  return absl::InternalError(
+      absl::Substitute("Non supported label type for column \"$0\" ($1)",
+                       dataset.column(label_col_idx)->name(), label_col_idx));
+}
+
+absl::Status AbstractLoss::Loss(const dataset::VerticalDataset& dataset,
+                                int label_col_idx,
+                                const std::vector<float>& predictions,
+                                const std::vector<float>& weights,
+                                const RankingGroupsIndices* ranking_index,
+                                float* loss_value,
+                                std::vector<float>* secondary_metric) const {
+  const auto* categorical_labels =
+      dataset.ColumnWithCastOrNull<dataset::VerticalDataset::CategoricalColumn>(
+          label_col_idx);
+  if (categorical_labels) {
+    return Loss(categorical_labels->values(), predictions, weights,
+                ranking_index, loss_value, secondary_metric, nullptr);
+  }
+
+  const auto* numerical_labels =
+      dataset.ColumnWithCastOrNull<dataset::VerticalDataset::NumericalColumn>(
+          label_col_idx);
+  if (numerical_labels) {
+    return Loss(numerical_labels->values(), predictions, weights, ranking_index,
+                loss_value, secondary_metric, nullptr);
+  }
+
+  return absl::InternalError("Unknown label type");
+}
+
 BinomialLogLikelihoodLoss::BinomialLogLikelihoodLoss(
     const proto::GradientBoostedTreesTrainingConfig& gbt_config,
     const model::proto::Task task, const dataset::proto::Column& label_column)
@@ -185,11 +243,57 @@ BinomialLogLikelihoodLoss::InitialPredictions(
   }
 }
 
-absl::Status BinomialLogLikelihoodLoss::UpdateGradients(
-    const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions,
-    const RankingGroupsIndices* ranking_index,
-    std::vector<GradientData>* gradients, utils::RandomEngine* random) const {
+utils::StatusOr<std::vector<float>>
+BinomialLogLikelihoodLoss::InitialPredictions(
+    const decision_tree::proto::LabelStatistics& label_statistics) const {
+  // Return: log(y/(1-y)) with y the ratio of positive labels.
+  if (label_statistics.classification().labels().counts_size() != 3) {
+    return absl::InternalError(absl::Substitute(
+        "The binary loglikelihood loss expects 2 classes i.e. 3 unique values "
+        "(including the OOV item). Got $0 unique values instead.",
+        label_statistics.classification().labels().counts_size()));
+  }
+  const auto ratio_positive =
+      label_statistics.classification().labels().counts(2) /
+      label_statistics.classification().labels().sum();
+  if (ratio_positive == 0.0) {
+    return std::vector<float>{-std::numeric_limits<float>::max()};
+  } else if (ratio_positive == 1.0) {
+    return std::vector<float>{std::numeric_limits<float>::max()};
+  } else {
+    return std::vector<float>{
+        static_cast<float>(std::log(ratio_positive / (1. - ratio_positive)))};
+  }
+}
+
+template <typename T>
+void BinomialLogLikelihoodLoss::TemplatedUpdateGradientsImp(
+    const std::vector<T>& labels, const std::vector<float>& predictions,
+    size_t begin_example_idx, size_t end_example_idx,
+    std::vector<float>* gradient_data, std::vector<float>* hessian_data) {
+  for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
+       example_idx++) {
+    const float label = (labels[example_idx] == 2) ? 1.f : 0.f;
+    const float prediction = predictions[example_idx];
+    const float prediction_proba = 1.f / (1.f + std::exp(-prediction));
+    DCheckIsFinite(prediction);
+    DCheckIsFinite(prediction_proba);
+    (*gradient_data)[example_idx] = label - prediction_proba;
+    if (hessian_data) {
+      (*hessian_data)[example_idx] = prediction_proba * (1 - prediction_proba);
+    }
+  }
+}
+
+template <typename T>
+absl::Status BinomialLogLikelihoodLoss::TemplatedUpdateGradients(
+    const std::vector<T>& labels, const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  static_assert(std::is_integral<T>::value, "Integral required.");
+  // TODO(gbm): Implement thread_pool.
+
   // Set the gradient to:
   //   label - 1/(1 + exp(-prediction))
   // where "label" is in {0,1} and prediction is the probability of
@@ -197,26 +301,46 @@ absl::Status BinomialLogLikelihoodLoss::UpdateGradients(
   if (gradients->size() != 1) {
     return absl::InternalError("Wrong gradient shape");
   }
-  const auto* labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          label_col_idx);
-  std::vector<float>& gradient_data = (*gradients)[0].gradient;
-  std::vector<float>* hessian_data = nullptr;
-  if (gbt_config_.use_hessian_gain()) {
-    hessian_data = (*gradients)[0].hessian;
+
+  std::vector<float>& gradient_data = *(*gradients)[0].gradient;
+  std::vector<float>* hessian_data = (*gradients)[0].hessian;
+  if (gbt_config_.use_hessian_gain() && hessian_data == nullptr) {
+    return absl::InternalError("Hessian missing");
   }
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
-    const float label = (labels->values()[example_idx] == 2) ? 1.f : 0.f;
-    const float prediction = predictions[example_idx];
-    const float prediction_proba = 1.f / (1.f + std::exp(-prediction));
-    DCheckIsFinite(prediction);
-    DCheckIsFinite(prediction_proba);
-    gradient_data[example_idx] = label - prediction_proba;
-    if (hessian_data) {
-      (*hessian_data)[example_idx] = prediction_proba * (1 - prediction_proba);
-    }
+  const size_t num_examples = labels.size();
+
+  if (thread_pool == nullptr) {
+    TemplatedUpdateGradientsImp(labels, predictions, 0, num_examples,
+                                &gradient_data, hessian_data);
+  } else {
+    decision_tree::ConcurrentForLoop(
+        thread_pool->num_threads(), thread_pool, num_examples,
+        [&labels, &predictions, &gradient_data, hessian_data](
+            size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
+          TemplatedUpdateGradientsImp(labels, predictions, begin_idx, end_idx,
+                                      &gradient_data, hessian_data);
+        });
   }
+
   return absl::OkStatus();
+}
+
+absl::Status BinomialLogLikelihoodLoss::UpdateGradients(
+    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  return TemplatedUpdateGradients(labels, predictions, ranking_index, gradients,
+                                  random, thread_pool);
+}
+
+absl::Status BinomialLogLikelihoodLoss::UpdateGradients(
+    const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  return TemplatedUpdateGradients(labels, predictions, ranking_index, gradients,
+                                  random, thread_pool);
 }
 
 decision_tree::CreateSetLeafValueFunctor
@@ -248,9 +372,9 @@ void BinomialLogLikelihoodLoss::SetLeaf(
     decision_tree::SetRegressionLabelDistribution(
         train_dataset, selected_examples, weights, config_link,
         node->mutable_node());
-    // Even if "use_hessian_gain" is not enabled for the splits. We use a Newton
-    // step in the leafs i.e. if "use_hessian_gain" is false, we need all the
-    // information.
+    // Even if "use_hessian_gain" is not enabled for the splits. We use a
+    // Newton step in the leafs i.e. if "use_hessian_gain" is false, we need
+    // all the information.
   }
 
   // Set the value of the leaf to:
@@ -315,33 +439,100 @@ std::vector<std::string> BinomialLogLikelihoodLoss::SecondaryMetricNames()
   return {"accuracy"};
 }
 
-absl::Status BinomialLogLikelihoodLoss::Loss(
-    const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions, const std::vector<float>& weights,
+template <bool use_weights, typename T>
+void BinomialLogLikelihoodLoss::TemplatedLossImp(
+    const std::vector<T>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights, size_t begin_example_idx,
+    size_t end_example_idx, double* __restrict sum_loss,
+    double* __restrict count_correct_predictions,
+    double* __restrict sum_weights) {
+  for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
+       example_idx++) {
+    const bool pos_label = labels[example_idx] == 2;
+    const float label = pos_label ? 1.f : 0.f;
+    const float prediction = predictions[example_idx];
+    const bool pos_prediction = prediction >= 0;
+    if constexpr (use_weights) {
+      const float weight = weights[example_idx];
+      *sum_weights += weight;
+      if (pos_label == pos_prediction) {
+        *count_correct_predictions += weight;
+      }
+      *sum_loss -= 2 * weight *
+                   (label * prediction - std::log(1 + std::exp(prediction)));
+    } else {
+      if (pos_label == pos_prediction) {
+        *count_correct_predictions += 1.;
+      }
+      // Loss:
+      //   -2 * ( label * prediction - log(1+exp(prediction)))
+      *sum_loss -=
+          2 * (label * prediction - std::log(1 + std::exp(prediction)));
+      DCheckIsFinite(*sum_loss);
+    }
+    DCheckIsFinite(*sum_loss);
+  }
+  if constexpr (!use_weights) {
+    *sum_weights += labels.size();
+  }
+}
+
+template <typename T>
+absl::Status BinomialLogLikelihoodLoss::TemplatedLoss(
+    const std::vector<T>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
     const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric) const {
-  const auto* labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          label_col_idx);
+    std::vector<float>* secondary_metric,
+    utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
   double count_correct_predictions = 0;
   double sum_weights = 0;
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
-    const bool pos_label = labels->values()[example_idx] == 2;
-    const float label = pos_label ? 1.f : 0.f;
-    const float prediction = predictions[example_idx];
-    const float weight = weights[example_idx];
-    const bool pos_prediction = prediction >= 0;
-    sum_weights += weight;
-    if (pos_label == pos_prediction) {
-      count_correct_predictions += weight;
+  if (thread_pool == nullptr) {
+    if (weights.empty()) {
+      TemplatedLossImp<false>(labels, predictions, weights, 0, labels.size(),
+                              &sum_loss, &count_correct_predictions,
+                              &sum_weights);
+    } else {
+      TemplatedLossImp<true>(labels, predictions, weights, 0, labels.size(),
+                             &sum_loss, &count_correct_predictions,
+                             &sum_weights);
     }
-    // Loss:
-    //   -2 * ( label * prediction - log(1+exp(prediction)))
-    sum_loss -=
-        2 * weight * (label * prediction - std::log(1 + std::exp(prediction)));
-    DCheckIsFinite(sum_loss);
+  } else {
+    const auto num_threads = thread_pool->num_threads();
+
+    struct PerThread {
+      double sum_loss = 0;
+      double count_correct_predictions = 0;
+      double sum_weights = 0;
+    };
+    std::vector<PerThread> per_threads(num_threads);
+
+    decision_tree::ConcurrentForLoop(
+        num_threads, thread_pool, labels.size(),
+        [&labels, &predictions, &per_threads, &weights](
+            size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
+          auto& block = per_threads[block_idx];
+
+          if (weights.empty()) {
+            TemplatedLossImp<false>(labels, predictions, weights, begin_idx,
+                                    end_idx, &block.sum_loss,
+                                    &block.count_correct_predictions,
+                                    &block.sum_weights);
+          } else {
+            TemplatedLossImp<true>(labels, predictions, weights, begin_idx,
+                                   end_idx, &block.sum_loss,
+                                   &block.count_correct_predictions,
+                                   &block.sum_weights);
+          }
+        });
+
+    for (const auto& block : per_threads) {
+      sum_loss += block.sum_loss;
+      sum_weights += block.sum_weights;
+      count_correct_predictions += block.count_correct_predictions;
+    }
   }
+
   secondary_metric->resize(1);
   if (sum_weights > 0) {
     *loss_value = static_cast<float>(sum_loss / sum_weights);
@@ -353,6 +544,26 @@ absl::Status BinomialLogLikelihoodLoss::Loss(
             std::numeric_limits<float>::quiet_NaN();
   }
   return absl::OkStatus();
+}
+
+absl::Status BinomialLogLikelihoodLoss::Loss(
+    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
+    const RankingGroupsIndices* ranking_index, float* loss_value,
+    std::vector<float>* secondary_metric,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  return TemplatedLoss(labels, predictions, weights, ranking_index, loss_value,
+                       secondary_metric, thread_pool);
+}
+
+absl::Status BinomialLogLikelihoodLoss::Loss(
+    const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
+    const RankingGroupsIndices* ranking_index, float* loss_value,
+    std::vector<float>* secondary_metric,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  return TemplatedLoss(labels, predictions, weights, ranking_index, loss_value,
+                       secondary_metric, thread_pool);
 }
 
 MeanSquaredErrorLoss::MeanSquaredErrorLoss(
@@ -400,22 +611,28 @@ utils::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
       static_cast<float>(weighted_sum_values / sum_weights)};
 }
 
+utils::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
+    const decision_tree::proto::LabelStatistics& label_statistics) const {
+  const auto stats = label_statistics.regression().labels();
+  return std::vector<float>{static_cast<float>(stats.sum() / stats.count())};
+}
+
 absl::Status MeanSquaredErrorLoss::UpdateGradients(
-    const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions,
-    const RankingGroupsIndices* ranking_index,
-    std::vector<GradientData>* gradients, utils::RandomEngine* random) const {
+    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  // TODO(gbm): Implement thread_pool.
+
   // Set the gradient to:
   //   label - prediction
   if (gradients->size() != 1) {
     return absl::InternalError("Wrong gradient shape");
   }
-  const auto* labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          label_col_idx);
-  std::vector<float>& gradient_data = (*gradients)[0].gradient;
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
-    const float label = labels->values()[example_idx];
+  const auto num_examples = labels.size();
+  std::vector<float>& gradient_data = *(*gradients)[0].gradient;
+  for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
+    const float label = labels[example_idx];
     const float prediction = predictions[example_idx];
     gradient_data[example_idx] = label - prediction;
   }
@@ -495,25 +712,26 @@ std::vector<std::string> MeanSquaredErrorLoss::SecondaryMetricNames() const {
 }
 
 absl::Status MeanSquaredErrorLoss::Loss(
-    const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions, const std::vector<float>& weights,
+    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
     const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric) const {
-  const auto* labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          label_col_idx);
-  const float rmse = metric::RMSE(labels->values(), predictions, weights);
+    std::vector<float>* secondary_metric,
+    utils::concurrency::ThreadPool* thread_pool) const {
   // The RMSE is also the loss.
-  *loss_value = rmse;
+  if (weights.empty()) {
+    *loss_value = metric::RMSE(labels, predictions);
+  } else {
+    *loss_value = metric::RMSE(labels, predictions, weights);
+  }
 
   if (task_ == model::proto::Task::RANKING) {
     secondary_metric->resize(2);
-    (*secondary_metric)[0] = rmse;
+    (*secondary_metric)[0] = *loss_value;
     (*secondary_metric)[1] =
         ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
   } else {
     secondary_metric->resize(1);
-    (*secondary_metric)[0] = rmse;
+    (*secondary_metric)[0] = *loss_value;
   }
   return absl::OkStatus();
 }
@@ -544,19 +762,31 @@ MultinomialLogLikelihoodLoss::InitialPredictions(
   return std::vector<float>(dimension_, 0);
 }
 
-absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
-    const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions,
-    const RankingGroupsIndices* ranking_index,
-    std::vector<GradientData>* gradients, utils::RandomEngine* random) const {
+utils::StatusOr<std::vector<float>>
+MultinomialLogLikelihoodLoss::InitialPredictions(
+    const decision_tree::proto::LabelStatistics& label_statistics) const {
+  return std::vector<float>(dimension_, 0);
+}
+
+template <typename T>
+absl::Status MultinomialLogLikelihoodLoss::TemplatedUpdateGradients(
+    const std::vector<T>& labels, const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  static_assert(std::is_integral<T>::value, "Integral required.");
+  // TODO(gbm): Implement thread_pool.
+
   // Set the gradient to:
   //   label_i - pred_i
   // where "label_i" is in {0,1}.
-  const auto* labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          label_col_idx);
   absl::FixedArray<float> accumulator(gradients->size());
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+  const auto num_examples = labels.size();
+  const auto use_hessian_gain = (*gradients)[0].hessian;
+  if (gbt_config_.use_hessian_gain() && !use_hessian_gain) {
+    return absl::InternalError("Hessian missing");
+  }
+  for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
     // Compute normalization term.
     float sum_exp = 0;
     for (int grad_idx = 0; grad_idx < gradients->size(); grad_idx++) {
@@ -567,7 +797,7 @@ absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
     }
     const float normalization = 1.f / sum_exp;
     // Update gradient.
-    const int label_cat = labels->values()[example_idx];
+    const int label_cat = labels[example_idx];
     for (int grad_idx = 0; grad_idx < gradients->size(); grad_idx++) {
       const float label = (label_cat == (grad_idx + 1)) ? 1.f : 0.f;
       DCheckIsFinite(label);
@@ -576,8 +806,8 @@ absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
       const float grad = label - prediction;
       const float abs_grad = std::abs(grad);
       DCheckIsFinite(grad);
-      (*gradients)[grad_idx].gradient[example_idx] = grad;
-      if (gbt_config_.use_hessian_gain()) {
+      (*(*gradients)[grad_idx].gradient)[example_idx] = grad;
+      if (use_hessian_gain) {
         (*(*gradients)[grad_idx].hessian)[example_idx] =
             abs_grad * (1 - abs_grad);
         DCheckIsFinite(abs_grad * (1 - abs_grad));
@@ -585,6 +815,24 @@ absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
     }
   }
   return absl::OkStatus();
+}
+
+absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
+    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  return TemplatedUpdateGradients(labels, predictions, ranking_index, gradients,
+                                  random, thread_pool);
+}
+
+absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
+    const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  return TemplatedUpdateGradients(labels, predictions, ranking_index, gradients,
+                                  random, thread_pool);
 }
 
 decision_tree::CreateSetLeafValueFunctor
@@ -685,45 +933,76 @@ std::vector<std::string> MultinomialLogLikelihoodLoss::SecondaryMetricNames()
   return {"accuracy"};
 }
 
-absl::Status MultinomialLogLikelihoodLoss::Loss(
-    const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions, const std::vector<float>& weights,
+template <typename T>
+absl::Status MultinomialLogLikelihoodLoss::TemplatedLoss(
+    const std::vector<T>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
     const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric) const {
-  const auto* labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          label_col_idx);
+    std::vector<float>* secondary_metric,
+    utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
   double count_correct_predictions = 0;
   double sum_weights = 0;
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
-    const int label = labels->values()[example_idx];
-    const float weight = weights[example_idx];
-    sum_weights += weight;
 
-    int predicted_class = -1;
-    float predicted_class_exp_value = 0;
-    float sum_exp = 0;
-    for (int grad_idx = 0; grad_idx < dimension_; grad_idx++) {
-      const float exp_val =
-          std::exp(predictions[grad_idx + example_idx * dimension_]);
-      sum_exp += exp_val;
-      DCheckIsFinite(sum_exp);
-      if (exp_val > predicted_class_exp_value) {
-        predicted_class_exp_value = exp_val;
-        predicted_class = grad_idx + 1;
+  if (weights.empty()) {
+    for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
+      const int label = labels[example_idx];
+
+      int predicted_class = -1;
+      float predicted_class_exp_value = 0;
+      float sum_exp = 0;
+      for (int grad_idx = 0; grad_idx < dimension_; grad_idx++) {
+        const float exp_val =
+            std::exp(predictions[grad_idx + example_idx * dimension_]);
+        sum_exp += exp_val;
+        DCheckIsFinite(sum_exp);
+        if (exp_val > predicted_class_exp_value) {
+          predicted_class_exp_value = exp_val;
+          predicted_class = grad_idx + 1;
+        }
       }
+      if (label == predicted_class) {
+        count_correct_predictions += 1;
+      }
+      // Loss:
+      //   - log(predict_proba[true_label])
+      const float tree_label_exp_value =
+          std::exp(predictions[(label - 1) + example_idx * dimension_]);
+      sum_loss -= std::log(tree_label_exp_value / sum_exp);
+      DCheckIsFinite(sum_loss);
+      DCheckIsFinite(sum_weights);
     }
-    if (label == predicted_class) {
-      count_correct_predictions += weight;
+    sum_weights += labels.size();
+  } else {
+    for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
+      const int label = labels[example_idx];
+      const float weight = weights[example_idx];
+      sum_weights += weight;
+
+      int predicted_class = -1;
+      float predicted_class_exp_value = 0;
+      float sum_exp = 0;
+      for (int grad_idx = 0; grad_idx < dimension_; grad_idx++) {
+        const float exp_val =
+            std::exp(predictions[grad_idx + example_idx * dimension_]);
+        sum_exp += exp_val;
+        DCheckIsFinite(sum_exp);
+        if (exp_val > predicted_class_exp_value) {
+          predicted_class_exp_value = exp_val;
+          predicted_class = grad_idx + 1;
+        }
+      }
+      if (label == predicted_class) {
+        count_correct_predictions += weight;
+      }
+      // Loss:
+      //   - log(predict_proba[true_label])
+      const float tree_label_exp_value =
+          std::exp(predictions[(label - 1) + example_idx * dimension_]);
+      sum_loss -= weight * std::log(tree_label_exp_value / sum_exp);
+      DCheckIsFinite(sum_loss);
+      DCheckIsFinite(sum_weights);
     }
-    // Loss:
-    //   - log(predict_proba[true_label])
-    const float tree_label_exp_value =
-        std::exp(predictions[(label - 1) + example_idx * dimension_]);
-    sum_loss -= weight * std::log(tree_label_exp_value / sum_exp);
-    DCheckIsFinite(sum_loss);
-    DCheckIsFinite(sum_weights);
   }
 
   secondary_metric->resize(1);
@@ -738,6 +1017,26 @@ absl::Status MultinomialLogLikelihoodLoss::Loss(
             std::numeric_limits<float>::quiet_NaN();
   }
   return absl::OkStatus();
+}
+
+absl::Status MultinomialLogLikelihoodLoss::Loss(
+    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
+    const RankingGroupsIndices* ranking_index, float* loss_value,
+    std::vector<float>* secondary_metric,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  return TemplatedLoss(labels, predictions, weights, ranking_index, loss_value,
+                       secondary_metric, thread_pool);
+}
+
+absl::Status MultinomialLogLikelihoodLoss::Loss(
+    const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
+    const RankingGroupsIndices* ranking_index, float* loss_value,
+    std::vector<float>* secondary_metric,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  return TemplatedLoss(labels, predictions, weights, ranking_index, loss_value,
+                       secondary_metric, thread_pool);
 }
 
 NDCGLoss::NDCGLoss(const proto::GradientBoostedTreesTrainingConfig& gbt_config,
@@ -759,12 +1058,19 @@ utils::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
   return std::vector<float>{0.f};
 }
 
+utils::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
+    const decision_tree::proto::LabelStatistics& label_statistics) const {
+  return std::vector<float>{0.f};
+}
+
 absl::Status NDCGLoss::UpdateGradients(
-    const dataset::VerticalDataset& dataset, const int label_col_idx,
-    const std::vector<float>& predictions,
-    const RankingGroupsIndices* ranking_index,
-    std::vector<GradientData>* gradients, utils::RandomEngine* random) const {
-  std::vector<float>& gradient_data = (*gradients)[0].gradient;
+    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  // TODO(gbm): Implement thread_pool.
+
+  std::vector<float>& gradient_data = *(*gradients)[0].gradient;
   std::vector<float>& second_order_derivative_data = *(*gradients)[0].hessian;
   metric::NDCGCalculator ndcg_calculator(kNDCG5Truncation);
 
@@ -803,8 +1109,8 @@ absl::Status NDCGLoss::UpdateGradients(
 
     // Sort by decreasing predicted value.
     // Note: We shuffle the predictions so that the expected gradient value is
-    // aligned with the metric value with ties taken into account (which is too
-    // expensive to do here).
+    // aligned with the metric value with ties taken into account (which is
+    // too expensive to do here).
     std::shuffle(pred_and_in_ground_idx.begin(), pred_and_in_ground_idx.end(),
                  *random);
     std::sort(pred_and_in_ground_idx.begin(), pred_and_in_ground_idx.end(),
@@ -971,16 +1277,17 @@ std::vector<std::string> NDCGLoss::SecondaryMetricNames() const {
   return {"NDCG@5"};
 }
 
-absl::Status NDCGLoss::Loss(const dataset::VerticalDataset& dataset,
-                            int label_col_idx,
+absl::Status NDCGLoss::Loss(const std::vector<float>& labels,
                             const std::vector<float>& predictions,
                             const std::vector<float>& weights,
                             const RankingGroupsIndices* ranking_index,
                             float* loss_value,
-                            std::vector<float>* secondary_metric) const {
+                            std::vector<float>* secondary_metric,
+                            utils::concurrency::ThreadPool* thread_pool) const {
   if (ranking_index == nullptr) {
     return absl::InternalError("Missing ranking index");
   }
+
   const auto ndcg = ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
 
   // The loss is -1 * the ndcg.
@@ -1010,12 +1317,19 @@ utils::StatusOr<std::vector<float>> CrossEntropyNDCGLoss::InitialPredictions(
   return std::vector<float>{0.f};
 }
 
+utils::StatusOr<std::vector<float>> CrossEntropyNDCGLoss::InitialPredictions(
+    const decision_tree::proto::LabelStatistics& label_statistics) const {
+  return std::vector<float>{0.f};
+}
+
 absl::Status CrossEntropyNDCGLoss::UpdateGradients(
-    const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions,
-    const RankingGroupsIndices* ranking_index,
-    std::vector<GradientData>* gradients, utils::RandomEngine* random) const {
-  std::vector<float>& gradient_data = (*gradients)[0].gradient;
+    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  // TODO(gbm): Implement thread_pool.
+
+  std::vector<float>& gradient_data = *(*gradients)[0].gradient;
   std::vector<float>& second_order_derivative_data = *((*gradients)[0].hessian);
 
   std::uniform_real_distribution<float> distribution(0.0, 1.0);
@@ -1151,10 +1465,11 @@ std::vector<std::string> CrossEntropyNDCGLoss::SecondaryMetricNames() const {
 }
 
 absl::Status CrossEntropyNDCGLoss::Loss(
-    const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions, const std::vector<float>& weights,
+    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
     const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric) const {
+    std::vector<float>* secondary_metric,
+    utils::concurrency::ThreadPool* thread_pool) const {
   if (ranking_index == nullptr) {
     return absl::InternalError("Missing ranking index");
   }
@@ -1243,17 +1558,30 @@ double RankingGroupsIndices::NDCG(const std::vector<float>& predictions,
 
   double sum_weighted_ndcg = 0;
   double sum_weights = 0;
-  for (auto& group : groups_) {
-    DCHECK(!group.items.empty());
-    const float weight = weights[group.items.front().example_idx];
 
-    ExtractPredAndLabelRelevance(group.items, predictions,
-                                 &pred_and_label_relevance);
+  if (weights.empty()) {
+    for (auto& group : groups_) {
+      DCHECK(!group.items.empty());
+      ExtractPredAndLabelRelevance(group.items, predictions,
+                                   &pred_and_label_relevance);
 
-    sum_weighted_ndcg +=
-        weight * ndcg_calculator.NDCG(pred_and_label_relevance);
-    sum_weights += weight;
+      sum_weighted_ndcg += ndcg_calculator.NDCG(pred_and_label_relevance);
+    }
+    sum_weights += groups_.size();
+  } else {
+    for (auto& group : groups_) {
+      DCHECK(!group.items.empty());
+      const float weight = weights[group.items.front().example_idx];
+
+      ExtractPredAndLabelRelevance(group.items, predictions,
+                                   &pred_and_label_relevance);
+
+      sum_weighted_ndcg +=
+          weight * ndcg_calculator.NDCG(pred_and_label_relevance);
+      sum_weights += weight;
+    }
   }
+
   return sum_weighted_ndcg / sum_weights;
 }
 
@@ -1266,6 +1594,45 @@ void RankingGroupsIndices::ExtractPredAndLabelRelevance(
         /*.prediction =*/predictions[group[item_idx].example_idx],
         /*.label =*/group[item_idx].relevance};
   }
+}
+
+absl::Status SetLeafValueWithNewtonRaphsonStep(
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config_,
+    const decision_tree::proto::LabelStatistics& label_statistics,
+    decision_tree::proto::Node* node) {
+  node->set_num_pos_training_examples_without_weight(
+      label_statistics.num_examples());
+
+  double sum_gradients = 0;
+  double sum_hessians = 0;
+  double sum_weights = 0;
+
+  switch (label_statistics.type_case()) {
+    case decision_tree::proto::LabelStatistics::kRegressionWithHessian:
+      sum_weights = label_statistics.regression_with_hessian().labels().count();
+      sum_gradients = label_statistics.regression_with_hessian().labels().sum();
+      sum_hessians = label_statistics.regression_with_hessian().sum_hessian();
+      break;
+
+    default:
+      return absl::InternalError("No hessian data available");
+  }
+
+  if (sum_hessians <= kMinHessianForNewtonStep) {
+    sum_hessians = kMinHessianForNewtonStep;
+  }
+
+  const auto leaf_value =
+      gbt_config_.shrinkage() *
+      static_cast<float>(decision_tree::l1_threshold(
+                             sum_gradients, gbt_config_.l1_regularization()) /
+                         (sum_hessians + gbt_config_.l2_regularization()));
+
+  node->mutable_regressor()->set_top_value(
+      utils::clamp(leaf_value, -gbt_config_.clamp_leaf_logit(),
+                   gbt_config_.clamp_leaf_logit()));
+
+  return absl::OkStatus();
 }
 
 }  // namespace gradient_boosted_trees

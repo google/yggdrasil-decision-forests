@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/container/inlined_vector.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -72,6 +73,16 @@ struct GradientData {
   // Index of the hessian column in the gradient dataset.
   int hessian_col_idx = -1;
 };
+
+struct UnitGradientDataRef {
+  // Gradient and hessian for each example.
+  std::vector<float>* gradient = nullptr;
+  std::vector<float>* hessian = nullptr;
+};
+
+// Gradient/hessian for each output dimension e.g. n for n-classes
+// classification.
+typedef absl::InlinedVector<UnitGradientDataRef, 2> GradientDataRef;
 
 // Index of example groups optimized for query. Used for ranking.
 class RankingGroupsIndices {
@@ -130,11 +141,18 @@ struct LossShape {
   bool has_hessian;
 };
 
+// Set a leaf's value using one stop of the Newton–Raphson method.
+// The label statistics should contain gradients + hessian values.
+absl::Status SetLeafValueWithNewtonRaphsonStep(
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config_,
+    const decision_tree::proto::LabelStatistics& label_statistics,
+    decision_tree::proto::Node* node);
+
 // Loss to optimize during the training of a GBT.
 //
 // The life of a loss object is as follow:
 //   1. The loss is created.
-//   2. Gradient, hessian and predictions buffer are created using "Shape".
+//   2. Gradient, hessian and predictions buffer are created using "Shape()".
 //   3. "InitialPredictions" is called to get the initial prediction of the
 //      model.
 //   4. The gradient of the model is updated using "UpdateGradients".
@@ -151,7 +169,8 @@ class AbstractLoss {
   // Check that the loss is valid. To be called after the constructor.
   virtual absl::Status Status() const = 0;
 
-  // Shape of the gradient, prediction and hessian buffers required by the loss.
+  // Shape / number of dimensions of the gradient, prediction and hessian
+  // buffers required by the loss.
   virtual LossShape Shape() const = 0;
 
   // Initial prediction of the model before any tree is trained. Sometime called
@@ -160,20 +179,64 @@ class AbstractLoss {
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const = 0;
 
+  // Initial predictions from a pre-aggregated label statistics.
+  virtual utils::StatusOr<std::vector<float>> InitialPredictions(
+      const decision_tree::proto::LabelStatistics& label_statistics) const = 0;
+
   // Returns true iif. the loss needs for the examples to be grouped i.e.
   // "ranking_index" will be set in "UpdateGradients" and "Loss". For example,
   // grouping can be used in ranking.
   virtual bool RequireGroupingAttribute() const { return false; }
 
-  // Computes the gradient of the loss with respect to the model output.
-  virtual absl::Status UpdateGradients(
-      const dataset::VerticalDataset& dataset, int label_col_idx,
-      const std::vector<float>& predictions,
-      const RankingGroupsIndices* ranking_index,
-      std::vector<GradientData>* gradients,
-      utils::RandomEngine* random) const = 0;
+  // The "UpdateGradients" methods compute the gradient of the loss with respect
+  // to the model output. Different version of "UpdateGradients" are implemented
+  // for different representation of the label.
+  //
+  // Currently:
+  // UpdateGradients on float should be implemented for numerical labels.
+  // UpdateGradients on int32_t should be implemented for categorical labels.
+  // UpdateGradients on int16_t should be implemented for categorical labels
+  // (only used for distributed training).
 
-  // Creates a functions able to set the value of a leaf.
+  // Updates the gradient with label stored in a vector<float>.
+  virtual absl::Status UpdateGradients(
+      const std::vector<float>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const {
+    return absl::InternalError("Not implemented");
+  }
+
+  // Updates the gradient with label stored in a vector<int32_t>.
+  virtual absl::Status UpdateGradients(
+      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const {
+    return absl::InternalError("Not implemented");
+  }
+
+  // Updates the gradient with label stored in a vector<int16_t>.
+  virtual absl::Status UpdateGradients(
+      const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const {
+    return absl::InternalError("Not implemented");
+  }
+
+  // Updates the gradient with label stored in a VerticalDataset.
+  // This method calls the UpdateGradients defined above depending on the type
+  // of the label column in the VerticalDataset (currently, only support float
+  // (Numerical) and int32 (Categorical)).
+  absl::Status UpdateGradients(const dataset::VerticalDataset& dataset,
+                               int label_col_idx,
+                               const std::vector<float>& predictions,
+                               const RankingGroupsIndices* ranking_index,
+                               std::vector<GradientData>* gradients,
+                               utils::RandomEngine* random) const;
+
+  // Creates a function able to set the value of a leaf.
   //
   // The returned CreateSetLeafValueFunctor uses the object (this) and possibly
   // "predictions" and "gradients". All of them should outlive calls to the
@@ -186,6 +249,11 @@ class AbstractLoss {
   virtual decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
       const std::vector<float>& predictions,
       const std::vector<GradientData>& gradients, int label_col_idx) const = 0;
+
+  virtual utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+  SetLeafFunctorFromLabelStatistics() const {
+    return absl::InternalError("Not implemented");
+  }
 
   // Updates the prediction accumulator (contains the predictions of the trees
   // trained so far) with a newly learned tree (or list of trees, for
@@ -210,14 +278,49 @@ class AbstractLoss {
   // method.
   virtual std::vector<std::string> SecondaryMetricNames() const = 0;
 
-  // Computes the loss(es) for the currently accumulated predictions.
-  virtual absl::Status Loss(const dataset::VerticalDataset& dataset,
-                            int label_col_idx,
+  // The "Loss" methods compute the loss(es) for the currently accumulated
+  // predictions. Like for "UpdateGradients", different version of "Loss" are
+  // implemented for different representation of the label.
+  //
+  // See the instructions of "UpdateGradients" to see which version of "Loss"
+  // should be implemented.
+
+  absl::Status Loss(const dataset::VerticalDataset& dataset, int label_col_idx,
+                    const std::vector<float>& predictions,
+                    const std::vector<float>& weights,
+                    const RankingGroupsIndices* ranking_index,
+                    float* loss_value,
+                    std::vector<float>* secondary_metric) const;
+
+  virtual absl::Status Loss(const std::vector<int16_t>& labels,
                             const std::vector<float>& predictions,
                             const std::vector<float>& weights,
                             const RankingGroupsIndices* ranking_index,
                             float* loss_value,
-                            std::vector<float>* secondary_metric) const = 0;
+                            std::vector<float>* secondary_metric,
+                            utils::concurrency::ThreadPool* thread_pool) const {
+    return absl::InternalError("Not implemented");
+  }
+
+  virtual absl::Status Loss(const std::vector<int32_t>& labels,
+                            const std::vector<float>& predictions,
+                            const std::vector<float>& weights,
+                            const RankingGroupsIndices* ranking_index,
+                            float* loss_value,
+                            std::vector<float>* secondary_metric,
+                            utils::concurrency::ThreadPool* thread_pool) const {
+    return absl::InternalError("Not implemented");
+  }
+
+  virtual absl::Status Loss(const std::vector<float>& labels,
+                            const std::vector<float>& predictions,
+                            const std::vector<float>& weights,
+                            const RankingGroupsIndices* ranking_index,
+                            float* loss_value,
+                            std::vector<float>* secondary_metric,
+                            utils::concurrency::ThreadPool* thread_pool) const {
+    return absl::InternalError("Not implemented");
+  }
 };
 
 // Binomial log-likelihood loss.
@@ -225,6 +328,10 @@ class AbstractLoss {
 // See "AbstractLoss" for the method documentation.
 class BinomialLogLikelihoodLoss : public AbstractLoss {
  public:
+  // For unit testing.
+  using AbstractLoss::Loss;
+  using AbstractLoss::UpdateGradients;
+
   BinomialLogLikelihoodLoss(
       const proto::GradientBoostedTreesTrainingConfig& gbt_config,
       model::proto::Task task, const dataset::proto::Column& label_column);
@@ -241,12 +348,36 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const override;
 
-  absl::Status UpdateGradients(const dataset::VerticalDataset& dataset,
-                               int label_col_idx,
-                               const std::vector<float>& predictions,
-                               const RankingGroupsIndices* ranking_index,
-                               std::vector<GradientData>* gradients,
-                               utils::RandomEngine* random) const override;
+  virtual utils::StatusOr<std::vector<float>> InitialPredictions(
+      const decision_tree::proto::LabelStatistics& label_statistics)
+      const override;
+
+  template <typename T>
+  absl::Status TemplatedUpdateGradients(
+      const std::vector<T>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const;
+
+  template <typename T>
+  static void TemplatedUpdateGradientsImp(const std::vector<T>& labels,
+                                          const std::vector<float>& predictions,
+                                          size_t begin_example_idx,
+                                          size_t end_example_idx,
+                                          std::vector<float>* gradient_data,
+                                          std::vector<float>* hessian_data);
+
+  absl::Status UpdateGradients(
+      const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const override;
+
+  absl::Status UpdateGradients(
+      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const override;
 
   decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
       const std::vector<float>& predictions,
@@ -262,6 +393,14 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
       const std::vector<float>& predictions, int label_col_idx,
       decision_tree::NodeWithChildren* node) const;
 
+  utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+  SetLeafFunctorFromLabelStatistics() const override {
+    return [&](const decision_tree::proto::LabelStatistics& label_stats,
+               decision_tree::proto::Node* node) {
+      return SetLeafValueWithNewtonRaphsonStep(gbt_config_, label_stats, node);
+    };
+  }
+
   absl::Status UpdatePredictions(
       const std::vector<const decision_tree::DecisionTree*>& new_trees,
       const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
@@ -269,12 +408,37 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
 
   std::vector<std::string> SecondaryMetricNames() const override;
 
-  absl::Status Loss(const dataset::VerticalDataset& dataset, int label_col_idx,
+  template <typename T>
+  absl::Status TemplatedLoss(const std::vector<T>& labels,
+                             const std::vector<float>& predictions,
+                             const std::vector<float>& weights,
+                             const RankingGroupsIndices* ranking_index,
+                             float* loss_value,
+                             std::vector<float>* secondary_metric,
+                             utils::concurrency::ThreadPool* thread_pool) const;
+
+  template <bool use_weights, typename T>
+  static void TemplatedLossImp(const std::vector<T>& labels,
+                               const std::vector<float>& predictions,
+                               const std::vector<float>& weights,
+                               size_t begin_example_idx, size_t end_example_idx,
+                               double* __restrict sum_loss,
+                               double* __restrict count_correct_predictions,
+                               double* __restrict sum_weights);
+
+  absl::Status Loss(const std::vector<int32_t>& labels,
                     const std::vector<float>& predictions,
                     const std::vector<float>& weights,
                     const RankingGroupsIndices* ranking_index,
-                    float* loss_value,
-                    std::vector<float>* secondary_metric) const override;
+                    float* loss_value, std::vector<float>* secondary_metric,
+                    utils::concurrency::ThreadPool* thread_pool) const override;
+
+  absl::Status Loss(const std::vector<int16_t>& labels,
+                    const std::vector<float>& predictions,
+                    const std::vector<float>& weights,
+                    const RankingGroupsIndices* ranking_index,
+                    float* loss_value, std::vector<float>* secondary_metric,
+                    utils::concurrency::ThreadPool* thread_pool) const override;
 
  private:
   proto::GradientBoostedTreesTrainingConfig gbt_config_;
@@ -287,6 +451,10 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
 // See "AbstractLoss" for the method documentation.
 class MeanSquaredErrorLoss : public AbstractLoss {
  public:
+  // For unit testing.
+  using AbstractLoss::Loss;
+  using AbstractLoss::UpdateGradients;
+
   MeanSquaredErrorLoss(
       const proto::GradientBoostedTreesTrainingConfig& gbt_config,
       model::proto::Task task, const dataset::proto::Column& label_column);
@@ -302,12 +470,15 @@ class MeanSquaredErrorLoss : public AbstractLoss {
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const override;
 
-  absl::Status UpdateGradients(const dataset::VerticalDataset& dataset,
-                               int label_col_idx,
-                               const std::vector<float>& predictions,
-                               const RankingGroupsIndices* ranking_index,
-                               std::vector<GradientData>* gradients,
-                               utils::RandomEngine* random) const override;
+  virtual utils::StatusOr<std::vector<float>> InitialPredictions(
+      const decision_tree::proto::LabelStatistics& label_statistics)
+      const override;
+
+  absl::Status UpdateGradients(
+      const std::vector<float>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const override;
 
   decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
       const std::vector<float>& predictions,
@@ -330,12 +501,12 @@ class MeanSquaredErrorLoss : public AbstractLoss {
 
   std::vector<std::string> SecondaryMetricNames() const override;
 
-  absl::Status Loss(const dataset::VerticalDataset& dataset, int label_col_idx,
+  absl::Status Loss(const std::vector<float>& labels,
                     const std::vector<float>& predictions,
                     const std::vector<float>& weights,
                     const RankingGroupsIndices* ranking_index,
-                    float* loss_value,
-                    std::vector<float>* secondary_metric) const override;
+                    float* loss_value, std::vector<float>* secondary_metric,
+                    utils::concurrency::ThreadPool* thread_pool) const override;
 
  private:
   // Effective task to solve. RMSE can be used for both RMSE and RANKING.
@@ -348,6 +519,10 @@ class MeanSquaredErrorLoss : public AbstractLoss {
 // See "AbstractLoss" for the method documentation.
 class MultinomialLogLikelihoodLoss : public AbstractLoss {
  public:
+  // For unit testing.
+  using AbstractLoss::Loss;
+  using AbstractLoss::UpdateGradients;
+
   MultinomialLogLikelihoodLoss(
       const proto::GradientBoostedTreesTrainingConfig& gbt_config,
       model::proto::Task task, const dataset::proto::Column& label_column);
@@ -364,12 +539,28 @@ class MultinomialLogLikelihoodLoss : public AbstractLoss {
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const override;
 
-  absl::Status UpdateGradients(const dataset::VerticalDataset& dataset,
-                               int label_col_idx,
-                               const std::vector<float>& predictions,
-                               const RankingGroupsIndices* ranking_index,
-                               std::vector<GradientData>* gradients,
-                               utils::RandomEngine* random) const override;
+  virtual utils::StatusOr<std::vector<float>> InitialPredictions(
+      const decision_tree::proto::LabelStatistics& label_statistics)
+      const override;
+
+  template <typename T>
+  absl::Status TemplatedUpdateGradients(
+      const std::vector<T>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const;
+
+  absl::Status UpdateGradients(
+      const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const override;
+
+  absl::Status UpdateGradients(
+      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const override;
 
   decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
       const std::vector<float>& predictions,
@@ -385,6 +576,14 @@ class MultinomialLogLikelihoodLoss : public AbstractLoss {
       const std::vector<float>& predictions, int label_col_idx,
       decision_tree::NodeWithChildren* node) const;
 
+  utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+  SetLeafFunctorFromLabelStatistics() const override {
+    return [&](const decision_tree::proto::LabelStatistics& label_stats,
+               decision_tree::proto::Node* node) {
+      return SetLeafValueWithNewtonRaphsonStep(gbt_config_, label_stats, node);
+    };
+  }
+
   absl::Status UpdatePredictions(
       const std::vector<const decision_tree::DecisionTree*>& new_trees,
       const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
@@ -392,12 +591,28 @@ class MultinomialLogLikelihoodLoss : public AbstractLoss {
 
   std::vector<std::string> SecondaryMetricNames() const override;
 
-  absl::Status Loss(const dataset::VerticalDataset& dataset, int label_col_idx,
+  template <typename T>
+  absl::Status TemplatedLoss(const std::vector<T>& labels,
+                             const std::vector<float>& predictions,
+                             const std::vector<float>& weights,
+                             const RankingGroupsIndices* ranking_index,
+                             float* loss_value,
+                             std::vector<float>* secondary_metric,
+                             utils::concurrency::ThreadPool* thread_pool) const;
+
+  absl::Status Loss(const std::vector<int32_t>& labels,
                     const std::vector<float>& predictions,
                     const std::vector<float>& weights,
                     const RankingGroupsIndices* ranking_index,
-                    float* loss_value,
-                    std::vector<float>* secondary_metric) const override;
+                    float* loss_value, std::vector<float>* secondary_metric,
+                    utils::concurrency::ThreadPool* thread_pool) const override;
+
+  absl::Status Loss(const std::vector<int16_t>& labels,
+                    const std::vector<float>& predictions,
+                    const std::vector<float>& weights,
+                    const RankingGroupsIndices* ranking_index,
+                    float* loss_value, std::vector<float>* secondary_metric,
+                    utils::concurrency::ThreadPool* thread_pool) const override;
 
  private:
   int dimension_;
@@ -411,6 +626,10 @@ class MultinomialLogLikelihoodLoss : public AbstractLoss {
 // See "AbstractLoss" for the method documentation.
 class NDCGLoss : public AbstractLoss {
  public:
+  // For unit testing.
+  using AbstractLoss::Loss;
+  using AbstractLoss::UpdateGradients;
+
   NDCGLoss(const proto::GradientBoostedTreesTrainingConfig& gbt_config,
            model::proto::Task task, const dataset::proto::Column& label_column);
 
@@ -427,12 +646,15 @@ class NDCGLoss : public AbstractLoss {
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const override;
 
-  absl::Status UpdateGradients(const dataset::VerticalDataset& dataset,
-                               int label_col_idx,
-                               const std::vector<float>& predictions,
-                               const RankingGroupsIndices* ranking_index,
-                               std::vector<GradientData>* gradients,
-                               utils::RandomEngine* random) const override;
+  virtual utils::StatusOr<std::vector<float>> InitialPredictions(
+      const decision_tree::proto::LabelStatistics& label_statistics)
+      const override;
+
+  absl::Status UpdateGradients(
+      const std::vector<float>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const override;
 
   decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
       const std::vector<float>& predictions,
@@ -457,12 +679,12 @@ class NDCGLoss : public AbstractLoss {
 
   std::vector<std::string> SecondaryMetricNames() const override;
 
-  absl::Status Loss(const dataset::VerticalDataset& dataset, int label_col_idx,
+  absl::Status Loss(const std::vector<float>& labels,
                     const std::vector<float>& predictions,
                     const std::vector<float>& weights,
                     const RankingGroupsIndices* ranking_index,
-                    float* loss_value,
-                    std::vector<float>* secondary_metric) const override;
+                    float* loss_value, std::vector<float>* secondary_metric,
+                    utils::concurrency::ThreadPool* thread_pool) const override;
 
  private:
   proto::GradientBoostedTreesTrainingConfig gbt_config_;
@@ -474,6 +696,10 @@ class NDCGLoss : public AbstractLoss {
 // See "AbstractLoss" for the method documentation.
 class CrossEntropyNDCGLoss : public AbstractLoss {
  public:
+  // For unit testing.
+  using AbstractLoss::Loss;
+  using AbstractLoss::UpdateGradients;
+
   CrossEntropyNDCGLoss(
       const proto::GradientBoostedTreesTrainingConfig& gbt_config,
       model::proto::Task task, const dataset::proto::Column& label_column);
@@ -491,12 +717,15 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const override;
 
-  absl::Status UpdateGradients(const dataset::VerticalDataset& dataset,
-                               int label_col_idx,
-                               const std::vector<float>& predictions,
-                               const RankingGroupsIndices* ranking_index,
-                               std::vector<GradientData>* gradients,
-                               utils::RandomEngine* random) const override;
+  virtual utils::StatusOr<std::vector<float>> InitialPredictions(
+      const decision_tree::proto::LabelStatistics& label_statistics)
+      const override;
+
+  absl::Status UpdateGradients(
+      const std::vector<float>& labels, const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool) const override;
 
   decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
       const std::vector<float>& predictions,
@@ -510,12 +739,12 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
 
   std::vector<std::string> SecondaryMetricNames() const override;
 
-  absl::Status Loss(const dataset::VerticalDataset& dataset, int label_col_idx,
+  absl::Status Loss(const std::vector<float>& labels,
                     const std::vector<float>& predictions,
                     const std::vector<float>& weights,
                     const RankingGroupsIndices* ranking_index,
-                    float* loss_value,
-                    std::vector<float>* secondary_metric) const override;
+                    float* loss_value, std::vector<float>* secondary_metric,
+                    utils::concurrency::ThreadPool* thread_pool) const override;
 
  private:
   proto::GradientBoostedTreesTrainingConfig gbt_config_;

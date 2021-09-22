@@ -29,6 +29,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_scanner.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/circular_buffer.h"
@@ -210,13 +211,20 @@ struct SplitterConcurrencySetup {
   std::unique_ptr<SplitterFinderStreamProcessor> split_finder_processor;
 };
 
-// Signature of a function that sets the value (i.e. the prediction) of a leaf.
+// Signature of a function that sets the value (i.e. the prediction) of a leaf
+// from the gradient data.
 typedef std::function<void(
     const dataset::VerticalDataset&,
     const std::vector<dataset::VerticalDataset::row_t>&,
     const std::vector<float>&, const model::proto::TrainingConfig&,
     const model::proto::TrainingConfigLinking&, NodeWithChildren* node)>
     CreateSetLeafValueFunctor;
+
+// Signature of a function that sets the value (i.e. the prediction) of a leaf
+// from the gradient label statistics.
+typedef std::function<absl::Status(const decision_tree::proto::LabelStatistics&,
+                                   decision_tree::proto::Node*)>
+    SetLeafValueFromLabelStatsFunctor;
 
 // Pre-computation on the training dataset used for the training of individual
 // trees. The pre-processing is computed before any tree is trained.

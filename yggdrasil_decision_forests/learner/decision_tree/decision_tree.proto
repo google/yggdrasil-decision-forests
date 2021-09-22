@@ -17,6 +17,8 @@ syntax = "proto2";
 
 package yggdrasil_decision_forests.model.decision_tree.proto;
 
+import "yggdrasil_decision_forests/utils/distribution.proto";
+
 // Training configuration for the Random Forest algorithm.
 message DecisionTreeTrainingConfig {
   // Next ID: 22
@@ -365,4 +367,31 @@ message GrowingStrategyLocalBest {}
 message GrowingStrategyGlobalBest {
   // Maximum number of nodes in the tree. Set to "-1" to disable this limit.
   optional int32 max_num_nodes = 1 [default = 31];
+}
+
+// Statistics about the label values used to operate a splitter algorithm.
+message LabelStatistics {
+  optional int64 num_examples = 1;
+
+  oneof type {
+    Classification classification = 2;
+    Regression regression = 3;
+    RegressionWithHessian regression_with_hessian = 4;
+  }
+
+  message Classification {
+    optional yggdrasil_decision_forests.utils.proto.IntegerDistributionDouble
+        labels = 1;
+  }
+
+  message Regression {
+    optional yggdrasil_decision_forests.utils.proto.NormalDistributionDouble
+        labels = 1;
+  }
+
+  message RegressionWithHessian {
+    optional yggdrasil_decision_forests.utils.proto.NormalDistributionDouble
+        labels = 1;
+    optional double sum_hessian = 2;
+  }
 }

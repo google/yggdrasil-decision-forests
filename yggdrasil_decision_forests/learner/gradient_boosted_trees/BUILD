@@ -21,6 +21,7 @@ cc_library_ydf(
     ],
     deps = [
         ":gradient_boosted_trees_cc_proto",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/container:fixed_array",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
@@ -41,6 +42,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner/decision_tree:generic_parameters",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
         "//yggdrasil_decision_forests/learner/decision_tree:utils",
+        "//yggdrasil_decision_forests/learner:types",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:ranking",
         "//yggdrasil_decision_forests/metric:ranking_utils",

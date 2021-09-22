@@ -51,6 +51,9 @@ class ThreadPool {
   // Schedules a new job.
   void Schedule(std::function<void()> callback);
 
+  // Number of threads configured in the constructor.
+  int num_threads() const { return threads_.size(); }
+
  private:
   // Ensure all the jobs are done and all the threads have been joined.
   void JoinAllAndStopThreads();

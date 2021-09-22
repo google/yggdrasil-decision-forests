@@ -1419,8 +1419,9 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
   // False, True).
   if (num_label_classes == 3) {
     // Binary classification.
-    LabelBinaryCategoricalOneValueBucket::Filler label_filler(
-        labels, weights, label_distribution);
+    LabelBinaryCategoricalOneValueBucket::Filler label_filler(labels, weights);
+    LabelBinaryCategoricalOneValueBucket::Initializer initializer(
+        label_distribution);
 
     if (sorting_strategy ==
             proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -1442,19 +1443,20 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
             FeatureNumericalLabelBinaryCategoricalOneValue,
             LabelBinaryCategoricalScoreAccumulator>(
             internal_config.preprocessing->num_examples(), selected_examples,
-            sorted_attributes.items, feature_filler, label_filler, min_num_obs,
-            attribute_idx, internal_config.duplicated_selected_examples,
-            condition, &cache->cache_v2);
+            sorted_attributes.items, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx,
+            internal_config.duplicated_selected_examples, condition,
+            &cache->cache_v2);
       }
     }
 
     return FindBestSplit_LabelBinaryClassificationFeatureNumerical(
-        selected_examples, feature_filler, label_filler, min_num_obs,
-        attribute_idx, condition, &cache->cache_v2);
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
   } else {
     // Multi-class classification.
-    LabelCategoricalOneValueBucket::Filler label_filler(labels, weights,
-                                                        label_distribution);
+    LabelCategoricalOneValueBucket::Filler label_filler(labels, weights);
+    LabelCategoricalOneValueBucket::Initializer initializer(label_distribution);
 
     if (sorting_strategy ==
             proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -1476,15 +1478,16 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
             FeatureNumericalLabelCategoricalOneValue,
             LabelCategoricalScoreAccumulator>(
             internal_config.preprocessing->num_examples(), selected_examples,
-            sorted_attributes.items, feature_filler, label_filler, min_num_obs,
-            attribute_idx, internal_config.duplicated_selected_examples,
-            condition, &cache->cache_v2);
+            sorted_attributes.items, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx,
+            internal_config.duplicated_selected_examples, condition,
+            &cache->cache_v2);
       }
     }
 
     return FindBestSplit_LabelClassificationFeatureNumerical(
-        selected_examples, feature_filler, label_filler, min_num_obs,
-        attribute_idx, condition, &cache->cache_v2);
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
   }
 }
 
@@ -1505,18 +1508,20 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
     // Binary classification.
     LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
                                                       label_distribution);
+    LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
 
     return FindBestSplit_LabelBinaryClassificationFeatureDiscretizedNumerical(
-        selected_examples, feature_filler, label_filler, min_num_obs,
-        attribute_idx, condition, &cache->cache_v2);
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
   } else {
     // Multi-class classification.
     LabelCategoricalBucket::Filler label_filler(labels, weights,
                                                 label_distribution);
+    LabelCategoricalBucket::Initializer initializer(label_distribution);
 
     return FindBestSplit_LabelClassificationFeatureDiscretizedNumerical(
-        selected_examples, feature_filler, label_filler, min_num_obs,
-        attribute_idx, condition, &cache->cache_v2);
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
   }
 }
 
@@ -1666,8 +1671,12 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
                                                 na_replacement, attributes);
 
   LabelHessianNumericalOneValueBucket::Filler label_filler(
-      gradients, hessians, weights, sum_gradient, sum_hessian, sum_weights,
-      internal_config.hessian_l1, internal_config.hessian_l2_numerical);
+      gradients, hessians, weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_numerical);
+
+  LabelHessianNumericalOneValueBucket::Initializer initializer(
+      sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_numerical);
 
   if (dt_config.internal().sorting_strategy() ==
           proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -1690,14 +1699,15 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
           FeatureNumericalLabelHessianNumericalOneValue,
           LabelHessianNumericalScoreAccumulator>(
           internal_config.preprocessing->num_examples(), selected_examples,
-          sorted_attributes.items, feature_filler, label_filler, min_num_obs,
-          attribute_idx, internal_config.duplicated_selected_examples,
-          condition, &cache->cache_v2);
+          sorted_attributes.items, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx,
+          internal_config.duplicated_selected_examples, condition,
+          &cache->cache_v2);
     }
   }
 
   return FindBestSplit_LabelHessianRegressionFeatureNumerical(
-      selected_examples, feature_filler, label_filler, min_num_obs,
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
@@ -1716,11 +1726,15 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
       num_bins, na_replacement, attributes);
 
   LabelHessianNumericalBucket::Filler label_filler(
-      gradients, hessians, weights, sum_gradient, sum_hessian, sum_weights,
-      internal_config.hessian_l1, internal_config.hessian_l2_categorical);
+      gradients, hessians, weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_categorical);
+
+  LabelHessianNumericalBucket::Initializer initializer(
+      sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_categorical);
 
   return FindBestSplit_LabelHessianRegressionFeatureDiscretizedNumerical(
-      selected_examples, feature_filler, label_filler, min_num_obs,
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
@@ -1742,8 +1756,9 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
   FeatureNumericalBucket::Filler feature_filler(selected_examples.size(),
                                                 na_replacement, attributes);
 
-  LabelNumericalOneValueBucket::Filler label_filler(labels, weights,
-                                                    label_distribution);
+  LabelNumericalOneValueBucket::Filler label_filler(labels, weights);
+
+  LabelNumericalOneValueBucket::Initializer initializer(label_distribution);
   const auto sorting_strategy = dt_config.internal().sorting_strategy();
   if (sorting_strategy ==
           proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -1757,7 +1772,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
     if (sorting_strategy ==
             proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
         IsPresortingOnNumericalSplitMoreEfficient(
-            selected_examples.size(),
+            -selected_examples.size(),
             internal_config.preprocessing->num_examples())) {
       const auto& sorted_attributes =
           internal_config.preprocessing
@@ -1765,14 +1780,15 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
       return ScanSplitsPresortedSparse<FeatureNumericalLabelNumericalOneValue,
                                        LabelNumericalScoreAccumulator>(
           internal_config.preprocessing->num_examples(), selected_examples,
-          sorted_attributes.items, feature_filler, label_filler, min_num_obs,
-          attribute_idx, internal_config.duplicated_selected_examples,
-          condition, &cache->cache_v2);
+          sorted_attributes.items, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx,
+          internal_config.duplicated_selected_examples, condition,
+          &cache->cache_v2);
     }
   }
 
   return FindBestSplit_LabelRegressionFeatureNumerical(
-      selected_examples, feature_filler, label_filler, min_num_obs,
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
@@ -1789,11 +1805,12 @@ SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
   FeatureDiscretizedNumericalBucket::Filler feature_filler(
       num_bins, na_replacement, attributes);
 
-  LabelNumericalBucket::Filler label_filler(labels, weights,
-                                            label_distribution);
+  LabelNumericalBucket::Filler label_filler(labels, weights);
+
+  LabelNumericalBucket::Initializer initializer(label_distribution);
 
   return FindBestSplit_LabelRegressionFeatureDiscretizedNumerical(
-      selected_examples, feature_filler, label_filler, min_num_obs,
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
@@ -1813,17 +1830,20 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
     LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
                                                       label_distribution);
 
+    LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+
     return FindBestSplit_LabelBinaryClassificationFeatureNACart(
-        selected_examples, feature_filler, label_filler, min_num_obs,
-        attribute_idx, condition, &cache->cache_v2);
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
   } else {
     // Multi-class classification.
     LabelCategoricalBucket::Filler label_filler(labels, weights,
                                                 label_distribution);
+    LabelCategoricalBucket::Initializer initializer(label_distribution);
 
     return FindBestSplit_LabelClassificationFeatureNACart(
-        selected_examples, feature_filler, label_filler, min_num_obs,
-        attribute_idx, condition, &cache->cache_v2);
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
   }
 }
 
@@ -1839,11 +1859,12 @@ SplitSearchResult FindSplitLabelRegressionFeatureNA(
     SplitterPerThreadCache* cache) {
   FeatureIsMissingBucket::Filler feature_filler(attributes);
 
-  LabelNumericalBucket::Filler label_filler(labels, weights,
-                                            label_distribution);
+  LabelNumericalBucket::Filler label_filler(labels, weights);
+
+  LabelNumericalBucket::Initializer initializer(label_distribution);
 
   return FindBestSplit_LabelRegressionFeatureNACart(
-      selected_examples, feature_filler, label_filler, min_num_obs,
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
@@ -1861,11 +1882,15 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
   FeatureIsMissingBucket::Filler feature_filler(attributes);
 
   LabelHessianNumericalBucket::Filler label_filler(
-      gradients, hessians, weights, sum_gradient, sum_hessian, sum_weights,
-      internal_config.hessian_l1, internal_config.hessian_l2_numerical);
+      gradients, hessians, weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_numerical);
+
+  LabelHessianNumericalBucket::Initializer initializer(
+      sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_numerical);
 
   return FindBestSplit_LabelHessianRegressionFeatureNACart(
-      selected_examples, feature_filler, label_filler, min_num_obs,
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
@@ -1891,17 +1916,21 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
     LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
                                                       label_distribution);
 
+    LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+
     return FindBestSplit_LabelBinaryClassificationFeatureBooleanCart(
-        selected_examples, feature_filler, label_filler, min_num_obs,
-        attribute_idx, condition, &cache->cache_v2);
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
   } else {
     // Multi-class classification.
     LabelCategoricalBucket::Filler label_filler(labels, weights,
                                                 label_distribution);
 
+    LabelCategoricalBucket::Initializer initializer(label_distribution);
+
     return FindBestSplit_LabelClassificationFeatureBooleanCart(
-        selected_examples, feature_filler, label_filler, min_num_obs,
-        attribute_idx, condition, &cache->cache_v2);
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
   }
 }
 
@@ -1921,11 +1950,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
   }
 
   FeatureBooleanBucket::Filler feature_filler(na_replacement, attributes);
-  LabelNumericalBucket::Filler label_filler(labels, weights,
-                                            label_distribution);
+  LabelNumericalBucket::Filler label_filler(labels, weights);
+  LabelNumericalBucket::Initializer initializer(label_distribution);
 
   return FindBestSplit_LabelRegressionFeatureBooleanCart(
-      selected_examples, feature_filler, label_filler, min_num_obs,
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
@@ -1947,11 +1976,15 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
 
   FeatureBooleanBucket::Filler feature_filler(na_replacement, attributes);
   LabelHessianNumericalBucket::Filler label_filler(
-      gradients, hessians, weights, sum_gradient, sum_hessian, sum_weights,
-      internal_config.hessian_l1, internal_config.hessian_l2_numerical);
+      gradients, hessians, weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_numerical);
+
+  LabelHessianNumericalBucket::Initializer initializer(
+      sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_numerical);
 
   return FindBestSplit_LabelHessianRegressionFeatureBooleanCart(
-      selected_examples, feature_filler, label_filler, min_num_obs,
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
@@ -1976,8 +2009,12 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
   FeatureCategoricalBucket::Filler feature_filler(num_attribute_classes,
                                                   na_replacement, attributes);
   LabelHessianNumericalBucket::Filler label_filler(
-      gradients, hessians, weights, sum_gradient, sum_hessian, sum_weights,
-      internal_config.hessian_l1, internal_config.hessian_l2_categorical);
+      gradients, hessians, weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_categorical);
+
+  LabelHessianNumericalBucket::Initializer initializer(
+      sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
+      internal_config.hessian_l2_categorical);
 
   const auto algorithm =
       (num_attribute_classes < dt_config.categorical().arity_limit_for_random())
@@ -1988,13 +2025,13 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
     case proto::Categorical::ALGORITHM_NOT_SET:
     case proto::Categorical::kCart:
       return FindBestSplit_LabelHessianRegressionFeatureCategoricalCart(
-          selected_examples, feature_filler, label_filler, min_num_obs,
-          attribute_idx, condition, &cache->cache_v2);
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
 
     case proto::Categorical::kRandom:
       return FindBestSplit_LabelHessianRegressionFeatureCategoricalRandom(
-          selected_examples, feature_filler, label_filler, min_num_obs,
-          attribute_idx,
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx,
           NumTrialsForRandomCategoricalSplit(dt_config.categorical().random()),
           condition, &cache->cache_v2, random);
 
@@ -2021,8 +2058,9 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
 
   FeatureCategoricalBucket::Filler feature_filler(num_attribute_classes,
                                                   na_replacement, attributes);
-  LabelNumericalBucket::Filler label_filler(labels, weights,
-                                            label_distribution);
+  LabelNumericalBucket::Filler label_filler(labels, weights);
+
+  LabelNumericalBucket::Initializer initializer(label_distribution);
 
   const auto algorithm =
       (num_attribute_classes < dt_config.categorical().arity_limit_for_random())
@@ -2033,13 +2071,13 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
     case proto::Categorical::ALGORITHM_NOT_SET:
     case proto::Categorical::kCart:
       return FindBestSplit_LabelRegressionFeatureCategoricalCart(
-          selected_examples, feature_filler, label_filler, min_num_obs,
-          attribute_idx, condition, &cache->cache_v2);
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
 
     case proto::Categorical::kRandom:
       return FindBestSplit_LabelRegressionFeatureCategoricalRandom(
-          selected_examples, feature_filler, label_filler, min_num_obs,
-          attribute_idx,
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx,
           NumTrialsForRandomCategoricalSplit(dt_config.categorical().random()),
           condition, &cache->cache_v2, random);
 
@@ -2432,6 +2470,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
   typename LabelBucket::Filler label_filler(labels, weights,
                                             label_distribution);
 
+  typename LabelBucket::Initializer initializer(label_distribution);
+
   // Create buckets.
   ExampleBucketSet& example_set_accumulator =
       *GetCachedExampleBucketSet<ExampleBucketSet>(&cache->cache_v2);
@@ -2480,7 +2520,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
       // Scan the buckets in order.
       const auto scan_result =
           ScanSplitsCustomOrder<ExampleBucketSet, LabelScoreAccumulator>(
-              bucket_order, feature_filler, label_filler,
+              bucket_order, feature_filler, initializer,
               example_set_accumulator, selected_examples.size(), min_num_obs,
               attribute_idx, condition, &cache->cache_v2);
       if (scan_result < split_status) {
@@ -2506,7 +2546,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
     auto& pos = *GetCachedLabelScoreAccumulator<LabelScoreAccumulator>(
         true, &cache->cache_v2);
 
-    label_filler.InitFull(&pos);
+    initializer.InitFull(&pos);
     const double weighted_num_examples = pos.WeightedNumExamples();
 
     double best_score = condition->split_score();
@@ -2532,14 +2572,13 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
         continue;
       }
 
-      label_filler.InitFull(&neg);
-      label_filler.InitEmpty(&pos);
+      initializer.InitFull(&neg);
+      initializer.InitEmpty(&pos);
 
       item.label.SubToScoreAcc(&neg);
       item.label.AddToScoreAcc(&pos);
 
-      const auto score = Score<ExampleBucketSet, LabelScoreAccumulator>(
-          label_filler, weighted_num_examples, pos, neg);
+      const auto score = Score<>(initializer, weighted_num_examples, pos, neg);
       tried_one_split = true;
 
       if (score > best_score) {
@@ -2587,7 +2626,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
 
     case proto::Categorical::kRandom:
       return ScanSplitsRandomBuckets<ExampleBucketSet, LabelScoreAccumulator>(
-          feature_filler, label_filler, example_set_accumulator,
+          feature_filler, label_filler, initializer, example_set_accumulator,
           selected_examples.size(), min_num_obs, attribute_idx,
           NumTrialsForRandomCategoricalSplit(dt_config.categorical().random()),
           condition, &cache->cache_v2, random);
@@ -3120,12 +3159,7 @@ absl::Status PresortNumericalFeatures(
     const model::proto::TrainingConfigLinking& config_link,
     const int num_threads, Preprocessing* preprocessing) {
   // Check number of examples.
-  if (train_dataset.nrow() >= SparseItem::kMaxNumExamples) {
-    return absl::InvalidArgumentError(absl::StrCat(
-        "Presort numerical features don't support datasets with more than ",
-        SparseItem::kMaxNumExamples,
-        " examples. Use sorting_strategy=IN_NODE instead."));
-  }
+  RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
 
   preprocessing->mutable_presorted_numerical_features()->resize(
       train_dataset.data_spec().columns_size());

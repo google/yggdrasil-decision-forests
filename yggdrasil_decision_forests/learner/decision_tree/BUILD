@@ -22,6 +22,7 @@ cc_library_ydf(
         "training.h",
     ],
     deps = [
+        "//yggdrasil_decision_forests/learner:types",
         ":decision_tree_cc_proto",
         ":utils",
         "@com_google_absl//absl/base:core_headers",
@@ -91,6 +92,7 @@ cc_library_ydf(
 all_proto_library(
     name = "decision_tree_proto",
     srcs = ["decision_tree.proto"],
+    deps = ["//yggdrasil_decision_forests/utils:distribution_proto"],
 )
 
 # Test
