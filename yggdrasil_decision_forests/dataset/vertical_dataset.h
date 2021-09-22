@@ -758,13 +758,18 @@ void VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
   auto* cast_dst =
       dynamic_cast<VerticalDataset::TemplateScalarStorage<T>*>(dst);
   CHECK(cast_dst != nullptr);
-
+  if (values_.empty() && !indices.empty()) {
+    LOG(FATAL) << "Trying to extract " << indices.size()
+               << " examples from the non-allocated column \"" << name()
+               << "\".";
+  }
   const size_t indices_size = indices.size();
   const size_t init_dst_nrows = dst->nrows();
   cast_dst->Resize(init_dst_nrows + indices_size);
   for (size_t new_idx = 0; new_idx < indices_size; new_idx++) {
     const auto src_row_idx = indices[new_idx];
     const auto dst_row_idx = new_idx + init_dst_nrows;
+    DCHECK_LT(src_row_idx, values_.size());
     if (!IsNa(src_row_idx)) {
       cast_dst->values_[dst_row_idx] = values_[src_row_idx];
     } else {
@@ -779,8 +784,12 @@ void VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
   auto* cast_dst =
       dynamic_cast<VerticalDataset::TemplateMultiValueStorage<T>*>(dst);
   CHECK(cast_dst != nullptr);
+  if (values_.empty() && !indices.empty()) {
+    LOG(FATAL) << "ExtractAndAppend on an empty column";
+  }
   cast_dst->Reserve(dst->nrows() + indices.size());
   for (const auto row_idx : indices) {
+    DCHECK_LT(row_idx, values_.size());
     if (!IsNa(row_idx)) {
       cast_dst->Add(bank_.begin() + values_[row_idx].first,
                     bank_.begin() + values_[row_idx].second);

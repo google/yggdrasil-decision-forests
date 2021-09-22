@@ -268,8 +268,10 @@ void FinalizeComputeSpecColumnCategorical(
   if (col->categorical().min_value_count() > 0) {
     while (!item_frequency_vector.empty() &&
            item_frequency_vector.back().first <
-               col->categorical().min_value_count())
+               col->categorical().min_value_count()) {
+      count_ood_items++;
       item_frequency_vector.pop_back();
+    }
   }
 
   // If the number of unique items is higher than the maximum threshold
@@ -284,7 +286,6 @@ void FinalizeComputeSpecColumnCategorical(
   // Information message if items have been pruned.
   const uint64_t count_pruned_items =
       non_pruned_number_of_unique_values - item_frequency_vector.size();
-  count_ood_items += count_pruned_items;
   if (count_pruned_items > 0) {
     LOG(INFO) << count_pruned_items
               << " item(s) have been pruned (i.e. they are considered "

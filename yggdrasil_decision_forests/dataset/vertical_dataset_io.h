@@ -66,8 +66,8 @@ struct LoadConfig {
 };
 
 absl::Status LoadVerticalDataset(
-    const absl::string_view typed_path,
-    const proto::DataSpecification& data_spec, VerticalDataset* dataset,
+    absl::string_view typed_path, const proto::DataSpecification& data_spec,
+    VerticalDataset* dataset,
     absl::optional<std::vector<int>> ensure_non_missing = {},
     const LoadConfig& config = {});
 

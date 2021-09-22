@@ -52,6 +52,7 @@ absl::Status LoadVerticalDatasetSingleThread(
   // Initialize dataset.
   dataset->set_data_spec(data_spec);
   RETURN_IF_ERROR(dataset->CreateColumnsFromDataspec());
+  dataset->set_nrow(0);
 
   // Read and record the examples.
   ASSIGN_OR_RETURN(auto reader, CreateExampleReader(typed_path, data_spec,
@@ -118,6 +119,7 @@ absl::Status LoadVerticalDataset(
   // Initialize dataset.
   dataset->set_data_spec(data_spec);
   RETURN_IF_ERROR(dataset->CreateColumnsFromDataspec());
+  dataset->set_nrow(0);
 
   // Reads the examples in a shard.
   const auto load_shard = [&](const std::string shard)
@@ -207,7 +209,8 @@ absl::Status LoadVerticalDataset(
       30, _ << dataset->nrow() << " examples and " << loaded_shards
             << " shards scanned in total. Memory: " << dataset->MemorySummary()
             << ". " << skipped_examples << " ("
-            << 100 * skipped_examples / (dataset->nrow() + skipped_examples)
+            << 100 * skipped_examples /
+                   std::max<size_t>(1, dataset->nrow() + skipped_examples)
             << "%) examples have been skipped.");
   return absl::OkStatus();
 }
