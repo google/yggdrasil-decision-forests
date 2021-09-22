@@ -22,11 +22,18 @@ namespace distribute {
 
 utils::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
     const proto::Config& config, const absl::string_view worker_name,
-    Blob welcome_blob) {
+    Blob welcome_blob, int parallel_execution_per_worker) {
   ASSIGN_OR_RETURN(auto manager, AbstractManagerRegisterer::Create(
                                      config.implementation_key()));
-  RETURN_IF_ERROR(manager->Initialize(config, worker_name, welcome_blob));
+  RETURN_IF_ERROR(manager->Initialize(config, worker_name, welcome_blob,
+                                      parallel_execution_per_worker));
   return manager;
+}
+
+utils::StatusOr<int> NumWorkers(const proto::Config& config) {
+  ASSIGN_OR_RETURN(auto manager, AbstractManagerRegisterer::Create(
+                                     config.implementation_key()));
+  return manager->NumWorkersInConfiguration(config);
 }
 
 }  // namespace distribute

@@ -44,7 +44,8 @@ absl::Status GrpcStatusToAbslStatus(const grpc::Status& src) {
 
 constexpr char GRPCManager::kKey[];
 
-absl::Status GRPCManager::InitializeWorkers(const proto::Config& config) {
+absl::Status GRPCManager::InitializeWorkers(
+    const proto::Config& config, const int parallel_execution_per_worker) {
   const auto& imp_config = config.GetExtension(proto::grpc);
 
   std::vector<std::string> worker_addresses;
@@ -58,8 +59,6 @@ absl::Status GRPCManager::InitializeWorkers(const proto::Config& config) {
     case proto::GRPCImp::kBns:
       for (int worker_idx = 0; worker_idx < imp_config.bns().num_workers();
            worker_idx++) {
-        // const auto worker_address =
-        //     BuildURI(imp_config.bns().prefix(), worker_idx);
         worker_addresses.push_back(
             absl::StrCat(imp_config.bns().prefix(), "/", worker_idx));
       }
@@ -71,7 +70,7 @@ absl::Status GRPCManager::InitializeWorkers(const proto::Config& config) {
   if (worker_addresses.empty()) {
     return absl::InvalidArgumentError("There should be at least one worker");
   }
-  if (verbose_) {
+  if (verbosity_ >= 1) {
     LOG(INFO) << "Start manager with " << worker_addresses.size()
               << " workers.";
   }
@@ -102,7 +101,7 @@ absl::Status GRPCManager::InitializeWorkers(const proto::Config& config) {
       proto::Empty answer;
       const auto ping_status = worker->stub->Ping(&context, query, &answer);
       if (!ping_status.ok()) {
-        if (verbose_) {
+        if (verbosity_ >= 1) {
           LOG(INFO) << "Worker #" << worker_idx
                     << " is not yet available. Waiting 10s";
         }
@@ -114,20 +113,61 @@ absl::Status GRPCManager::InitializeWorkers(const proto::Config& config) {
     }
 
     worker->address = worker_addresses[worker_idx];
-
-    worker->main_thread_1 = absl::make_unique<utils::concurrency::Thread>(
-        [this, worker = worker.get()]() { WorkerMain1(worker); });
-
-    worker->main_thread_2 = absl::make_unique<utils::concurrency::Thread>(
-        [this, worker = worker.get()]() { WorkerMain2(worker); });
-
+    worker->StartThreads(parallel_execution_per_worker, this);
     workers_.push_back(std::move(worker));
   }
 
-  if (verbose_) {
+  if (verbosity_ >= 1) {
     LOG(INFO) << "All the workers are available";
   }
 
+  return absl::OkStatus();
+}
+
+void GRPCManager::Worker::StartThreads(int parallel_execution_per_worker,
+                                       GRPCManager* manager) {
+  process_local_queries.Start(parallel_execution_per_worker, [this, manager]() {
+    manager->ProcessLocalQueries(this);
+  });
+
+  process_global_queries.Start(
+      parallel_execution_per_worker,
+      [this, manager]() { manager->ProcessGlobalQueries(this); });
+}
+
+utils::StatusOr<int> GRPCManager::NumWorkersInConfiguration(
+    const proto::Config& config) const {
+  const auto& imp_config = config.GetExtension(proto::grpc);
+  switch (imp_config.worker_address_case()) {
+    case proto::GRPCImp::kSocketAddresses:
+      return imp_config.socket_addresses().addresses_size();
+    case proto::GRPCImp::kBns:
+      return imp_config.bns().num_workers();
+    default:
+      return absl::UnimplementedError("Unknown worker address type");
+  }
+}
+
+absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
+  if (verbosity_) {
+    LOG(INFO) << "Change the number of parallel execution per worker";
+  }
+
+  // Close the query channels.
+  async_pending_queries_.Close();
+  for (auto& worker : workers_) {
+    worker->async_pending_queries_.Close();
+  }
+
+  // Wait for the threads to join
+  JoinWorkers();
+
+  // Re-open the channels and restart the threads.
+  async_pending_queries_.Reopen();
+  for (auto& worker : workers_) {
+    worker->async_pending_queries_.Reopen();
+    worker->StartThreads(num, this);
+  }
   return absl::OkStatus();
 }
 
@@ -148,15 +188,17 @@ void GRPCManager::WorkerRun(Blob blob, Worker* worker) {
     const auto status = worker->stub->Run(&context, query, &answer);
 
     if (!status.ok()) {
-      if (verbose_) {
+      if (verbosity_ >= 1) {
         LOG(WARNING) << "GRPC call to worker #" << worker->worker_idx
                      << " failed with error: " << status.error_message();
       }
       if (status.error_message() == "Socket closed" ||
-          status.error_message() == "Connection reset by peer") {
+          status.error_message() == "Connection reset by peer" ||
+          status.error_message() == "Broken pipe" ||
+          status.error_message() == "keepalive watchdog timeout") {
         // The worker died during the execution (e.g. rescheduling).
         // Let's try again.
-        if (verbose_) {
+        if (verbosity_ >= 1) {
           num_re_emitting++;
           LOG(WARNING) << "Re-emitting request (num_re_emitting:"
                        << num_re_emitting << ")";
@@ -169,7 +211,7 @@ void GRPCManager::WorkerRun(Blob blob, Worker* worker) {
         return;
       }
     } else {
-      if (verbose_ && answer.has_error()) {
+      if (verbosity_ >= 1 && answer.has_error()) {
         LOG(WARNING) << "Worker #" << worker->worker_idx
                      << " returned an error: " << answer.error();
       }
@@ -179,7 +221,7 @@ void GRPCManager::WorkerRun(Blob blob, Worker* worker) {
   }
 }
 
-void GRPCManager::WorkerMain1(Worker* worker) {
+void GRPCManager::ProcessLocalQueries(Worker* worker) {
   while (true) {
     auto pending_blob_or = worker->async_pending_queries_.Pop();
     if (!pending_blob_or.has_value()) {
@@ -189,7 +231,7 @@ void GRPCManager::WorkerMain1(Worker* worker) {
   }
 }
 
-void GRPCManager::WorkerMain2(Worker* worker) {
+void GRPCManager::ProcessGlobalQueries(Worker* worker) {
   while (true) {
     auto pending_blob_or = async_pending_queries_.Pop();
     if (!pending_blob_or.has_value()) {
@@ -201,7 +243,7 @@ void GRPCManager::WorkerMain2(Worker* worker) {
 
 absl::Status GRPCManager::InitializeConfigFile(
     const proto::Config& config, const absl::string_view worker_name,
-    const Blob welcome_blob) {
+    const int parallel_execution_per_worker, Blob welcome_blob) {
   if (config.working_directory().empty()) {
     return absl::InvalidArgumentError("The worker directory cannot be empty.");
   }
@@ -213,6 +255,9 @@ absl::Status GRPCManager::InitializeConfigFile(
   worker_config.set_worker_name(std::string(worker_name));
   worker_config.set_welcome_blob(welcome_blob);
   worker_config.set_manager_uid(manager_uid_);
+  worker_config.set_parallel_execution_per_worker(
+      parallel_execution_per_worker);
+
   for (const auto& worker : workers_) {
     worker_config.add_worker_addresses(worker->address);
   }
@@ -222,8 +267,8 @@ absl::Status GRPCManager::InitializeConfigFile(
 }
 
 utils::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
-  if (verbose_) {
-    LOG(INFO) << "Incoming blocking request with " << blob.size() << " bytes";
+  if (verbosity_ >= 2) {
+    LOG(INFO) << "Emitting blocking request of " << blob.size() << " bytes";
   }
 
   if (worker_idx < 0) {
@@ -245,12 +290,14 @@ utils::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
                          std::chrono::hours(kDeadLineInHours));
     const auto status = worker->stub->Run(&context, query, &answer);
     if (!status.ok()) {
-      if (verbose_) {
+      if (verbosity_ >= 1) {
         LOG(WARNING) << "GRPC to worker #" << worker_idx
                      << " failed with error: " << status.error_message();
       }
       if (status.error_message() == "Socket closed" ||
-          status.error_message() == "Connection reset by peer") {
+          status.error_message() == "Connection reset by peer" ||
+          status.error_message() == "Broken pipe" ||
+          status.error_message() == "keepalive watchdog timeout") {
         // The worker died during the execution (e.g. rescheduling).
         // Let's try again.
         continue;
@@ -263,7 +310,7 @@ utils::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
   }
 
   if (answer.has_error()) {
-    if (verbose_) {
+    if (verbosity_ >= 1) {
       LOG(WARNING) << "Worker #" << worker_idx
                    << " returned an error: " << answer.error();
     }
@@ -273,9 +320,8 @@ utils::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
 }
 
 absl::Status GRPCManager::AsynchronousRequest(Blob blob, int worker_idx) {
-  if (verbose_) {
-    LOG(INFO) << "Incoming asynchronous request with " << blob.size()
-              << " bytes";
+  if (verbosity_ >= 2) {
+    LOG(INFO) << "Emitting asynchronous request of " << blob.size() << " bytes";
   }
   if (worker_idx < 0) {
     async_pending_queries_.Push(std::move(blob));
@@ -299,7 +345,7 @@ utils::StatusOr<Blob> GRPCManager::NextAsynchronousAnswer() {
 int GRPCManager::NumWorkers() { return workers_.size(); }
 
 absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
-  if (verbose_) {
+  if (verbosity_ >= 1) {
     LOG(INFO) << "Shutdown manager";
   }
   if (done_was_called_) {
@@ -315,7 +361,7 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
   }
 
   JoinWorkers();
-  if (verbose_) {
+  if (verbosity_ >= 1) {
     LOG(INFO) << "Worked joined";
   }
 
@@ -341,7 +387,7 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
     }
   }
 
-  if (verbose_) {
+  if (verbosity_ >= 1) {
     LOG(INFO) << "Manager has been shutdown";
   }
 
@@ -350,15 +396,16 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
 
 void GRPCManager::JoinWorkers() {
   for (auto& worker : workers_) {
-    worker->main_thread_1->Join();
-    worker->main_thread_2->Join();
+    worker->process_local_queries.JoinAndClear();
+    worker->process_global_queries.JoinAndClear();
   }
 }
 
 absl::Status GRPCManager::Initialize(const proto::Config& config,
                                      const absl::string_view worker_name,
-                                     Blob welcome_blob) {
-  verbose_ = config.verbose();
+                                     Blob welcome_blob,
+                                     const int parallel_execution_per_worker) {
+  verbosity_ = config.verbosity();
 
   // Generate manager uid.  Used to distinguish between the different managers
   // controlling a same pool of workers.
@@ -367,13 +414,14 @@ absl::Status GRPCManager::Initialize(const proto::Config& config,
       std::numeric_limits<uint64_t>::lowest(),
       std::numeric_limits<uint64_t>::max())(rnd);
 
-  if (verbose_) {
+  if (verbosity_ >= 1) {
     LOG(INFO) << "Initialize manager with " << welcome_blob.size()
               << " bytes welcome blob, uid:" << manager_uid_;
   }
-  RETURN_IF_ERROR(InitializeWorkers(config));
-  RETURN_IF_ERROR(
-      InitializeConfigFile(config, worker_name, std::move(welcome_blob)));
+  RETURN_IF_ERROR(InitializeWorkers(config, parallel_execution_per_worker));
+  RETURN_IF_ERROR(InitializeConfigFile(config, worker_name,
+                                       parallel_execution_per_worker,
+                                       std::move(welcome_blob)));
   return absl::OkStatus();
 }
 

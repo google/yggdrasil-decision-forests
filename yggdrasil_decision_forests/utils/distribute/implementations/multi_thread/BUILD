@@ -28,6 +28,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
+        "//yggdrasil_decision_forests/utils/distribute:utils",
     ],
     alwayslink = 1,
 )

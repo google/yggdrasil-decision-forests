@@ -88,6 +88,13 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "utils",
+    srcs = ["utils.cc"],
+    hdrs = ["utils.h"],
+    deps = ["//yggdrasil_decision_forests/utils:concurrency"],
+)
+
 # Tests
 # =====
 
@@ -97,6 +104,7 @@ cc_library_ydf(
     hdrs = ["toy_worker.h"],
     deps = [
         ":core",
+        "@com_google_absl//absl/synchronization",
         "//yggdrasil_decision_forests/utils:logging",
     ],
     alwayslink = 1,

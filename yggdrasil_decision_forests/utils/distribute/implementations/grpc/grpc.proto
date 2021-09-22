@@ -44,11 +44,15 @@ message WorkerConfig {
   optional uint64 manager_uid = 3;
   // Job done by the worker.
   optional string worker_name = 4;
+  // "parallel_execution_per_worker" parameter of the manager. How many request
+  // can a worker process in parallel.
+  optional int32 parallel_execution_per_worker = 5;
 }
 
 // GRPC service.
 service Server {
   rpc Run(Query) returns (Answer);
+  rpc WorkerRun(WorkerQuery) returns (WorkerAnswer);
   rpc Shutdown(ShutdownQuery) returns (Empty);
   rpc Ping(Empty) returns (Empty);
 }
@@ -68,6 +72,16 @@ message Answer {
 
 message ShutdownQuery {
   optional bool kill_worker_manager = 1;
+}
+
+message WorkerQuery {
+  optional bytes blob = 1;
+  optional uint64 manager_uid = 3;
+}
+
+message WorkerAnswer {
+  optional bytes blob = 1;
+  optional string error = 2;
 }
 
 message Empty {}

@@ -80,5 +80,35 @@ void TestAsynchronousRequestWithSpecificWorker(AbstractManager* manager) {
   EXPECT_OK(manager->Done(true));
 }
 
+void TestAsynchronousIntraWorkerCommunication(AbstractManager* manager) {
+  for (int w = 0; w < manager->NumWorkers(); w++) {
+    auto result =
+        manager->BlockingRequest("worker_idx", /*worker_idx=*/w).value();
+    EXPECT_EQ(result, absl::StrCat(w));
+  }
+
+  const int sum_worker_idxs =
+      (manager->NumWorkers() - 1) * manager->NumWorkers() / 2;
+  for (int w = 0; w < manager->NumWorkers(); w++) {
+    auto result =
+        manager->BlockingRequest("sum_other_worker_idxs", /*worker_idx=*/w)
+            .value();
+    EXPECT_EQ(result, absl::StrCat(sum_worker_idxs - w));
+  }
+  EXPECT_OK(manager->Done(true));
+}
+
+void TestAsynchronousParallelWorkerExecution(AbstractManager* manager) {
+  const int n = 5;
+  CHECK_OK(manager->BlockingRequest("create_5_barrier", 0).status());
+  for (int i = 0; i < n; i++) {
+    EXPECT_OK(manager->AsynchronousRequest("wait_barrier", 0));
+  }
+  for (int i = 0; i < n; i++) {
+    EXPECT_OK(manager->NextAsynchronousAnswer().status());
+  }
+  EXPECT_OK(manager->Done(true));
+}
+
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

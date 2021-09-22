@@ -25,8 +25,11 @@ message Config {
   // distribution strategy.
   optional string implementation_key = 1;
 
-  // If true, the manager displays logs about the scheduled tasks.
-  optional bool verbose = 5 [default = true];
+  // Amount of verbose.
+  // 0: No information.
+  // 1: Small amount of information (e.g. creating of the workers).
+  // 2: Information at every query.
+  optional int32 verbosity = 5 [default = 1];
 
   // Working directory accessible by the manager and workers. Can be used for
   // communication by distribution implementations.

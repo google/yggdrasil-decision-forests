@@ -74,10 +74,18 @@ namespace distribute {
 //   worker_name: Target registered worker class.
 //   welcome_blob: Data received by each worker during setup and
 //     restart-after-rescheduling.
+//   parallel_execution_per_worker: Number of jobs that each worker will run in
+//     parallel. For example, If parallel_execution_per_worker=1, each worker
+//     will receive only one job at a time.
 //
 utils::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
     const proto::Config& config, absl::string_view worker_name,
-    Blob welcome_blob);
+    Blob welcome_blob, int parallel_execution_per_worker = 1);
+
+// Gets the number of workers available in a distribute configuration without
+// having to create the distribution manager. If a distribute manager is
+// available, use the "distribute->NumWorkers()" instead.
+utils::StatusOr<int> NumWorkers(const proto::Config& config);
 
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

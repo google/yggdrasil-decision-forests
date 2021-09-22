@@ -36,7 +36,7 @@ std::unique_ptr<distribute::AbstractManager> CreateSingleThreadManager() {
   distribute::proto::Config config;
   config.set_implementation_key("MULTI_THREAD");
   config.MutableExtension(distribute::proto::multi_thread)->set_num_workers(5);
-  config.set_verbose(true);
+  config.set_verbosity(2);
   proto::Welcome welcome;
   welcome.set_temporary_directory(test::TmpDirectory());
   return distribute::CreateManager(config,

@@ -28,15 +28,16 @@ namespace distribute {
 namespace {
 
 // Create a single thread manager with 5 workers.
-ManagerAndWorkers CreateSingleThreadManager() {
+ManagerAndWorkers CreateSingleThreadManager(
+    int parallel_execution_per_worker = 1) {
   ManagerAndWorkers manager_and_workers;
   proto::Config config;
   config.set_implementation_key("MULTI_THREAD");
   config.MutableExtension(proto::multi_thread)->set_num_workers(5);
-  config.set_verbose(false);
+  config.set_verbosity(0);
   manager_and_workers.manager =
       CreateManager(config, /*worker_name=*/kToyWorkerKey,
-                    /*welcome_blob=*/"hello")
+                    /*welcome_blob=*/"hello", parallel_execution_per_worker)
           .value();
   return manager_and_workers;
 }
@@ -84,6 +85,18 @@ TEST(SingleThread, BlockingRequestWithSpecificWorker) {
 TEST(SingleThread, AsynchronousRequestWithSpecificWorker) {
   auto all = CreateSingleThreadManager();
   TestAsynchronousRequestWithSpecificWorker(all.manager.get());
+  all.Join();
+}
+
+TEST(SingleThread, AsynchronousIntraWorkerCommunication) {
+  auto all = CreateSingleThreadManager();
+  TestAsynchronousIntraWorkerCommunication(all.manager.get());
+  all.Join();
+}
+
+TEST(SingleThread, AsynchronousParallelWorkerExecution) {
+  auto all = CreateSingleThreadManager(5);
+  TestAsynchronousParallelWorkerExecution(all.manager.get());
   all.Join();
 }
 

@@ -32,6 +32,8 @@ namespace distribute {
 // the blob should be moved (std::move).
 typedef std::string Blob;
 
+class AbstractWorkerHook;
+
 // Abstract worker class containing the custom worker logic.
 //
 // A separate worker is instantiated on each distribution unit (e.g. machine).
@@ -59,14 +61,44 @@ class AbstractWorker {
   // Index of the worker.
   int WorkerIdx() const { return worker_idx_; }
 
+  // Number of workers.
+  int NumWorkers() const { return num_workers_; }
+
+  // Runs a task on another worker asynchronously. The result can be retrieved
+  // by "NextAsynchronousAnswer". Asynchronous answers may not come in the same
+  // order as the requests.
+  absl::Status AsynchronousRequestToOtherWorker(Blob blob, int worker_idx);
+
+  // Same as "AsynchronousRequestToOtherWorker" but with a proto. Asynchronous
+  // answers may not come in the same order as the requests.
+  template <typename Request>
+  absl::Status AsynchronousProtoRequestToOtherWorker(Request request,
+                                                     int worker_idx);
+
+  // Waits and retrieves the next answer from an
+  // AsynchronousRequestToOtherWorker or AsynchronousProtoRequestToOtherWorker.
+  utils::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker();
+
+  // Same as "NextAsynchronousAnswerFromOtherWorker", but unserialize the answer
+  // into a proto.
+  template <typename Result>
+  utils::StatusOr<Result> NextAsynchronousProtoAnswerFromOtherWorker();
+
  private:
   // Initialize the internal fields of the workers. Called before "Setup".
-  absl::Status InternalInitialize(int worker_idx);
+  absl::Status InternalInitialize(int worker_idx, int num_workers,
+                                  AbstractWorkerHook* worker_implementation);
 
-  int worker_idx_;
+  int worker_idx_ = -1;
+  int num_workers_ = -1;
 
-  friend absl::Status InternalInitializeWorker(int worker_idx,
-                                               AbstractWorker* worker);
+  // Non owning implementation pointer.
+  AbstractWorkerHook* hook_ = &default_hook_;
+  static AbstractWorkerHook default_hook_;
+
+  friend absl::Status InternalInitializeWorker(
+      int worker_idx, int num_workers, AbstractWorker* worker,
+      AbstractWorkerHook* worker_implementation);
 };
 
 REGISTRATION_CREATE_POOL(AbstractWorker);
@@ -74,9 +106,27 @@ REGISTRATION_CREATE_POOL(AbstractWorker);
 #define REGISTER_Distribution_Worker(implementation, worker_name) \
   REGISTRATION_REGISTER_CLASS(implementation, worker_name, AbstractWorker);
 
-// Manages a remote collection of workers. Should be created with
-// "CreateManager()". Unless specified otherwise, all the methods are thread
-// safe.
+// Custom logic specified by the distribution implementation and available to
+// the worker implementation.
+class AbstractWorkerHook {
+ public:
+  virtual ~AbstractWorkerHook() = default;
+
+  // Note: Methods names and logics are similar as in "AbstractWorker".
+
+  // Emits a request to another worker.
+  virtual absl::Status AsynchronousRequestToOtherWorker(
+      Blob blob, int target_worker_idx, AbstractWorker* emitter_worker);
+
+  // Retrieve an answer from a request previously send to another worker.
+  virtual utils::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
+      AbstractWorker* emitter_worker);
+};
+
+// A manager is in charge to managed (e.g. create, kill) and communicate (send
+// tasks, retrieve results) with the possibly remote workers. The manager should
+// be instantiated with "CreateManager()". Unless specified otherwise, all the
+// methods are thread safe.
 class AbstractManager {
  public:
   virtual ~AbstractManager() = default;
@@ -124,17 +174,37 @@ class AbstractManager {
   // NextAsynchronousAnswer) after Done is called results in an error.
   virtual absl::Status Done(absl::optional<bool> kill_worker_manager = {}) = 0;
 
+  // Changes the number of queries executed by each worker in parallel.
+  // This method should be called with no pending queries.
+  virtual absl::Status SetParallelExecutionPerWorker(int num) {
+    return absl::InternalError("SetParallelExecutionPerWorker not implemented");
+  }
+
  private:
-  // Called one at creation with the distribution configuration.
+  // Gets the number of workers specified in a configuration without having to
+  // "Initialize" the object. The returned number of workers is the same as
+  // calling "Initialize" and then "NumWorkers".
+  virtual utils::StatusOr<int> NumWorkersInConfiguration(
+      const proto::Config& config) const = 0;
+
+  // Initialize the manager. "Initialize" is called by the generic
+  // `CreateManager()` after the object is constructed. "Initialize" should
+  // contain the expensive and possibly failing initialization code (e.g.
+  // starting and connecting to the workers). The default implementation is a
+  // No-op. Only the method "NumWorkersInConfiguration" can be called on a
+  // non-initialized object.
   virtual absl::Status Initialize(const proto::Config& config,
                                   const absl::string_view worker_name,
-                                  Blob welcome_blob) {
+                                  Blob welcome_blob,
+                                  int parallel_execution_per_worker) {
     return absl::OkStatus();
   }
 
   friend utils::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
       const proto::Config& config, absl::string_view worker_name,
-      Blob welcome_blob);
+      Blob welcome_blob, int parallel_execution_per_worker);
+
+  friend utils::StatusOr<int> NumWorkers(const proto::Config& config);
 };
 
 REGISTRATION_CREATE_POOL(AbstractManager);
@@ -143,7 +213,9 @@ REGISTRATION_CREATE_POOL(AbstractManager);
   REGISTRATION_REGISTER_CLASS(implementation, name, AbstractManager);
 
 // Calls worker->InternalInitialize().
-absl::Status InternalInitializeWorker(int worker_idx, AbstractWorker* worker);
+absl::Status InternalInitializeWorker(
+    int worker_idx, const int num_workers, AbstractWorker* worker,
+    AbstractWorkerHook* worker_implementation = nullptr);
 
 template <typename Result, typename Request>
 utils::StatusOr<Result> AbstractManager::BlockingProtoRequest(
@@ -162,6 +234,21 @@ absl::Status AbstractManager::AsynchronousProtoRequest(Request request,
 template <typename Result>
 utils::StatusOr<Result> AbstractManager::NextAsynchronousProtoAnswer() {
   ASSIGN_OR_RETURN(auto serialized_result, NextAsynchronousAnswer());
+  return utils::ParseBinaryProto<Result>(serialized_result);
+}
+
+template <typename Request>
+absl::Status AbstractWorker::AsynchronousProtoRequestToOtherWorker(
+    Request request, int worker_idx) {
+  return AsynchronousRequestToOtherWorker(request.SerializeAsString(),
+                                          worker_idx);
+}
+
+template <typename Result>
+utils::StatusOr<Result>
+AbstractWorker::NextAsynchronousProtoAnswerFromOtherWorker() {
+  ASSIGN_OR_RETURN(auto serialized_result,
+                   NextAsynchronousAnswerFromOtherWorker());
   return utils::ParseBinaryProto<Result>(serialized_result);
 }
 

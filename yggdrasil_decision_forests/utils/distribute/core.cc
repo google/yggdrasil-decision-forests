@@ -18,14 +18,45 @@
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
-absl::Status InternalInitializeWorker(const int worker_idx,
-                                      AbstractWorker* worker) {
-  return worker->InternalInitialize(worker_idx);
+AbstractWorkerHook AbstractWorker::default_hook_;
+
+absl::Status InternalInitializeWorker(
+    const int worker_idx, const int num_workers, AbstractWorker* worker,
+    AbstractWorkerHook* worker_implementation) {
+  return worker->InternalInitialize(worker_idx, num_workers,
+                                    worker_implementation);
 }
 
-absl::Status AbstractWorker::InternalInitialize(int worker_idx) {
+absl::Status AbstractWorker::InternalInitialize(
+    int worker_idx, const int num_workers,
+    AbstractWorkerHook* worker_implementation) {
   worker_idx_ = worker_idx;
+  num_workers_ = num_workers;
+  if (worker_implementation) {
+    hook_ = worker_implementation;
+  }
   return absl::OkStatus();
+}
+
+absl::Status AbstractWorker::AsynchronousRequestToOtherWorker(Blob blob,
+                                                              int worker_idx) {
+  return hook_->AsynchronousRequestToOtherWorker(blob, worker_idx, this);
+}
+
+utils::StatusOr<Blob> AbstractWorker::NextAsynchronousAnswerFromOtherWorker() {
+  return hook_->NextAsynchronousAnswerFromOtherWorker(this);
+}
+
+absl::Status AbstractWorkerHook::AsynchronousRequestToOtherWorker(
+    Blob blob, int target_worker_idx, AbstractWorker* emitter_worker) {
+  return absl::InternalError(
+      "AsynchronousRequestToOtherWorker Not implemented");
+}
+
+utils::StatusOr<Blob> AbstractWorkerHook::NextAsynchronousAnswerFromOtherWorker(
+    AbstractWorker* emitter_worker) {
+  return absl::InternalError(
+      "NextAsynchronousAnswerFromOtherWorker Not implemented");
 }
 
 }  // namespace distribute

@@ -24,6 +24,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
+#include "yggdrasil_decision_forests/utils/distribute/utils.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -34,7 +35,8 @@ class GRPCManager : public AbstractManager {
 
   virtual ~GRPCManager() {
     if (!done_was_called_) {
-      LOG(WARNING) << "Calling Done in distribution manager destructor";
+      LOG(WARNING) << "Calling destructor on distribute manager before having "
+                      "called \"Done\".";
       CHECK_OK(Done({}));
     }
   }
@@ -49,6 +51,11 @@ class GRPCManager : public AbstractManager {
 
   absl::Status Done(absl::optional<bool> kill_worker_manager) override;
 
+  utils::StatusOr<int> NumWorkersInConfiguration(
+      const proto::Config& config) const override;
+
+  absl::Status SetParallelExecutionPerWorker(int num) override;
+
  private:
   struct Worker {
     int worker_idx;
@@ -59,30 +66,36 @@ class GRPCManager : public AbstractManager {
     // Async query to execute specific to this worker.
     utils::concurrency::Channel<Blob> async_pending_queries_;
 
-    std::unique_ptr<utils::concurrency::Thread> main_thread_1;
-    std::unique_ptr<utils::concurrency::Thread> main_thread_2;
+    ThreadVector process_local_queries;
+    ThreadVector process_global_queries;
+
+    void StartThreads(int parallel_execution_per_worker, GRPCManager* manager);
   };
 
   absl::Status Initialize(const proto::Config& config,
-                          const absl::string_view worker_name,
-                          Blob welcome_blob) override;
+                          absl::string_view worker_name, Blob welcome_blob,
+                          int parallel_execution_per_worker) override;
 
-  absl::Status InitializeWorkers(const proto::Config& config);
+  absl::Status InitializeWorkers(const proto::Config& config,
+                                 int parallel_execution_per_worker);
 
   absl::Status InitializeConfigFile(const proto::Config& config,
-                                    const absl::string_view worker_name,
+                                    absl::string_view worker_name,
+                                    int parallel_execution_per_worker,
                                     Blob welcome_blob);
 
-  void WorkerMain1(Worker* worker);
-  void WorkerMain2(Worker* worker);
+  // Thread loop to process the global and worker-specific queries.
+  void ProcessGlobalQueries(Worker* worker);
+  void ProcessLocalQueries(Worker* worker);
 
+  // Process a query and export the result to the answer queue.
   void WorkerRun(Blob blob, Worker* worker);
 
   void JoinWorkers();
 
   // Path to serialized worker configuration accessible by all workers.
   std::string worker_config_path_;
-  bool verbose_ = true;
+  int verbosity_;
   std::vector<std::unique_ptr<Worker>> workers_;
 
   // Manager UID.

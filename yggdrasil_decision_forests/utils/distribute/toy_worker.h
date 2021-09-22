@@ -16,6 +16,7 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_TOY_WORKER_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_TOY_WORKER_H_
 
+#include "absl/synchronization/barrier.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -51,9 +52,40 @@ class ToyWorker final : public AbstractWorker {
       return absl::InvalidArgumentError("Some error");
     } else if (blob == "worker_idx") {
       return absl::StrCat(WorkerIdx());
+    } else if (blob == "sum_other_worker_idxs") {
+      // Request and sum the idx of all the other workers.
+      int sum_other_idxs = 0;
+      for (int w = 0; w < NumWorkers(); w++) {
+        if (w != WorkerIdx()) {
+          RETURN_IF_ERROR(AsynchronousRequestToOtherWorker("worker_idx", w));
+        }
+      }
+      for (int w = 0; w < NumWorkers() - 1; w++) {
+        ASSIGN_OR_RETURN(const auto str_other_worker_idx,
+                         NextAsynchronousAnswerFromOtherWorker());
+        int other_worker_idx;
+        CHECK(absl::SimpleAtoi(str_other_worker_idx, &other_worker_idx));
+        sum_other_idxs += other_worker_idx;
+      }
+      return absl::StrCat(sum_other_idxs);
+    } else if (blob == "create_5_barrier") {
+      barrier_ = new absl::Barrier(5);
+      return "";
+    } else if (blob == "wait_barrier") {
+      // Wait and block for 5 calls to this request.
+      CHECK(barrier_);
+      if (barrier_->Block()) {
+        delete barrier_;
+        barrier_ = nullptr;
+      }
+      LOG(INFO) << "Worker #" << WorkerIdx() << " passed the barrier";
+      return "";
     }
     return absl::InvalidArgumentError("Unknown task");
   }
+
+ private:
+  absl::Barrier *barrier_ = nullptr;
 };
 
 constexpr char kToyWorkerKey[] = "ToyWorker";

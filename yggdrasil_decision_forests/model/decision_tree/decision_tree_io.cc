@@ -49,10 +49,12 @@ absl::Status SaveTreesToDisk(
 
   // FutureWork(gbm): The current function is fully sequential. If speed
   // becomes an issue, make it so that the shards are written in parallel.
-  *num_shards = (EstimateSizeInByte(trees) + kMaxShardSizeInByte - 1) /
-                kMaxShardSizeInByte;
+  *num_shards =
+      std::max<int>(1, (EstimateSizeInByte(trees) + kMaxShardSizeInByte - 1) /
+                           kMaxShardSizeInByte);
   const int64_t num_nodes = NumberOfNodes(trees);
-  const int num_nodes_per_shard = (num_nodes + *num_shards - 1) / *num_shards;
+  const int num_nodes_per_shard =
+      std::max<int>(1, (num_nodes + *num_shards - 1) / *num_shards);
   auto node_writer = format_impl->CreateWriter();
   const auto base_path = file::JoinPath(directory, basename);
   RETURN_IF_ERROR(

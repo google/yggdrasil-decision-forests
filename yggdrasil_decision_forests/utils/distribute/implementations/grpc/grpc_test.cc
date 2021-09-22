@@ -13,13 +13,13 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_manager.h"
-#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_worker.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.pb.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_manager.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_worker.h"
 #include "yggdrasil_decision_forests/utils/distribute/test_utils.h"
 #include "yggdrasil_decision_forests/utils/distribute/toy_worker.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -30,12 +30,12 @@ namespace distribute {
 namespace {
 
 // Create a GRPC manager and its workers.
-ManagerAndWorkers CreateGrpcManager() {
+ManagerAndWorkers CreateGrpcManager(int parallel_execution_per_worker = 1) {
   ManagerAndWorkers manager_and_workers;
   // Manager configuration.
   proto::Config config;
   config.set_implementation_key("GRPC");
-  config.set_verbose(true);
+  config.set_verbosity(1);
   config.set_working_directory(
       file::JoinPath(test::TmpDirectory(), "work_dir"));
   auto* addresses =
@@ -59,7 +59,7 @@ ManagerAndWorkers CreateGrpcManager() {
   // Start manager.
   manager_and_workers.manager =
       CreateManager(config, /*worker_name=*/kToyWorkerKey,
-                    /*welcome_blob=*/"hello")
+                    /*welcome_blob=*/"hello", parallel_execution_per_worker)
           .value();
   return manager_and_workers;
 }
@@ -91,6 +91,18 @@ TEST(GRPC, BlockingRequestWithSpecificWorker) {
 TEST(GRPC, AsynchronousRequestWithSpecificWorker) {
   auto all = CreateGrpcManager();
   TestAsynchronousRequestWithSpecificWorker(all.manager.get());
+  all.Join();
+}
+
+TEST(GRPC, AsynchronousIntraWorkerCommunication) {
+  auto all = CreateGrpcManager();
+  TestAsynchronousIntraWorkerCommunication(all.manager.get());
+  all.Join();
+}
+
+TEST(GRPC, AsynchronousParallelWorkerExecution) {
+  auto all = CreateGrpcManager(5);
+  TestAsynchronousParallelWorkerExecution(all.manager.get());
   all.Join();
 }
 

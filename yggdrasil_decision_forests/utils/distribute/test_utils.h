@@ -49,7 +49,8 @@ void TestBlockingRequest(AbstractManager* manager);
 void TestBlockingRequestWithSpecificWorker(AbstractManager* manager);
 void TestAsynchronousRequest(AbstractManager* manager);
 void TestAsynchronousRequestWithSpecificWorker(AbstractManager* manager);
-
+void TestAsynchronousIntraWorkerCommunication(AbstractManager* manager);
+void TestAsynchronousParallelWorkerExecution(AbstractManager* manager);
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests
 
