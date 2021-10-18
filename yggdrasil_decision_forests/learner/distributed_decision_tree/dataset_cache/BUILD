@@ -52,6 +52,28 @@ cc_library_ydf(
 )
 
 cc_library_ydf(
+    name = "dataset_cache_reader",
+    srcs = ["dataset_cache_reader.cc"],
+    hdrs = ["dataset_cache_reader.h"],
+    deps = [
+        ":column_cache",
+        ":dataset_cache",
+        ":dataset_cache_cc_proto",
+        ":dataset_cache_common",
+        "@com_google_absl//absl/strings",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:formats",
+        "//yggdrasil_decision_forests/learner:types",
+        "//yggdrasil_decision_forests/utils:concurrency",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:sharded_io",
+        "//yggdrasil_decision_forests/utils/distribute:core",
+        "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
+        "//yggdrasil_decision_forests/utils/distribute:distribute_without_implementations",
+    ],
+)
+
+cc_library_ydf(
     name = "dataset_cache_worker",
     srcs = ["dataset_cache_worker.cc"],
     hdrs = ["dataset_cache_worker.h"],
@@ -115,6 +137,32 @@ cc_test(
         ":column_cache",
         ":dataset_cache",
         ":dataset_cache_common",
+        ":dataset_cache_worker",
+        "@com_google_googletest//:gtest_main",
+        "//yggdrasil_decision_forests/dataset:csv_example_reader",
+        "//yggdrasil_decision_forests/dataset:data_spec_inference",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:test_utils",
+        "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",
+        "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_cc_proto",
+    ],
+)
+
+cc_test(
+    name = "dataset_cache_reader_test",
+    srcs = ["dataset_cache_reader_test.cc"],
+    data = [
+        "//yggdrasil_decision_forests/test_data",
+    ],
+    deps = [
+        ":column_cache",
+        ":dataset_cache",
+        ":dataset_cache_common",
+        ":dataset_cache_reader",
         ":dataset_cache_worker",
         "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",

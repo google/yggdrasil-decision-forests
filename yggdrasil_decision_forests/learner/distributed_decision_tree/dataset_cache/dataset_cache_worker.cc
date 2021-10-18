@@ -470,8 +470,9 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
 
   // Export the boundary values.
   FloatColumnWriter boundary_writer;
-  RETURN_IF_ERROR(boundary_writer.Open(file::JoinPath(
-      result->output_directory(), absl::StrCat(kFilenameBoundaryValue, 0))));
+  RETURN_IF_ERROR(boundary_writer.Open(
+      file::JoinPath(result->output_directory(),
+                     ShardFilename(kFilenameBoundaryValueNoUnderscore, 0, 1))));
   RETURN_IF_ERROR(boundary_writer.WriteValues(boundaries));
   RETURN_IF_ERROR(boundary_writer.Close());
 
@@ -508,8 +509,9 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
       // Open a new shard.
       RETURN_IF_ERROR(indexed_values_writer.Open(
           file::JoinPath(result->output_directory(),
-                         absl::StrCat(kFilenameDiscretizedValues,
-                                      next_output_shard_idx++)),
+                         ShardFilename(kFilenameDiscretizedValuesNoUnderscore,
+                                       next_output_shard_idx++,
+                                       request.num_shards_in_output_shards())),
           /*max_value=*/num_discretized_values));
       indexed_values_writer_is_open = true;
       remaining_examples_in_shard = request.num_example_per_output_shards();
@@ -531,6 +533,10 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
 
   if (indexed_values_writer_is_open) {
     RETURN_IF_ERROR(indexed_values_writer.Close());
+  }
+
+  if (next_output_shard_idx != request.num_shards_in_output_shards()) {
+    return absl::InternalError("Unexpected number of generated shards.");
   }
 
   result->mutable_metadata()->set_num_discretized_shards(next_output_shard_idx);
