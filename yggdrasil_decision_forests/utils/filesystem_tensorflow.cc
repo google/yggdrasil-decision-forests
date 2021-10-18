@@ -93,6 +93,13 @@ absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
       tensorflow::Env::Default()->RecursivelyCreateDir(std::string(path)));
 }
 
+absl::Status RecursivelyDelete(absl::string_view path, int options) {
+  int64_t ignore_1, ignore_2;
+  return yggdrasil_decision_forests::utils::ToUtilStatus(
+      tensorflow::Env::Default()->DeleteRecursively(std::string(path),
+                                                    &ignore_1, &ignore_2));
+}
+
 absl::Status FileInputByteStream::Open(absl::string_view path) {
   std::unique_ptr<tensorflow::RandomAccessFile> file;
   RETURN_IF_ERROR(ToUtilStatus(tensorflow::Env::Default()->NewRandomAccessFile(

@@ -97,6 +97,16 @@ absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
   }
 }
 
+// Delete the directory "path".
+absl::Status RecursivelyDelete(absl::string_view path, int options) {
+  try {
+    std::filesystem::remove(path);
+    return absl::OkStatus();
+  } catch (const std::exception& e) {
+    return absl::InvalidArgumentError(e.what());
+  }
+}
+
 absl::Status FileInputByteStream::Open(absl::string_view path) {
   file_ = std::fopen(std::string(path).c_str(), "rb");
   if (!file_) {
