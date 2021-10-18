@@ -1,0 +1,246 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.distributed_gradient_boosted_trees.proto;
+
+import "yggdrasil_decision_forests/dataset/data_spec.proto";
+import "yggdrasil_decision_forests/learner/abstract_learner.proto";
+import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
+import "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.proto";
+import "yggdrasil_decision_forests/learner/distributed_decision_tree/training.proto";
+
+// Welcome message of the worker.
+message WorkerWelcome {
+  // Location used by the manager and the workers to store intermediate data.
+  optional string work_directory = 1;
+
+  // Location of the dataset cache i.e. the dataset indexed for fast training.
+  optional string cache_path = 2;
+
+  // List of features owned by each worker.
+  // "owned_features[i].features" are the features owned by the i-th worker.
+  repeated FeatureList owned_features = 3;
+  message FeatureList {
+    repeated int32 features = 1 [packed = true];
+  }
+
+  // Classical yggdrasil training configuration.
+  optional model.proto.TrainingConfig train_config = 4;
+  optional model.proto.TrainingConfigLinking train_config_linking = 5;
+  optional model.proto.DeploymentConfig deployment_config = 6;
+  optional dataset.proto.DataSpecification dataspec = 7;
+}
+
+// Request message of the workers. Unless expressed, the messages are designed
+// to be send from the manager to one of the workers.
+message WorkerRequest {
+  oneof type {
+    // Computes the statistics of the labels e.g. number of element of each
+    // class for classification.
+    GetLabelStatistics get_label_statistics = 1;
+
+    // Sets the initial predictions (also call bias) of the model.
+    SetInitialPredictions set_initial_predictions = 2;
+
+    // Starts the training of a new iteration e.g. starts the training of a new
+    // tree if one tree is trained at each iteration. The workers return the
+    // statistics of the weak model labels.
+    StartNewIter start_new_iter = 3;
+
+    // Finds the highest scoring splits for each of the model nodes in the
+    // current tree.
+    FindSplits find_splits = 4;
+
+    // Each worker will evaluate the split (on each examples) based on the
+    // features it owns.
+    EvaluateSplits evaluate_splits = 5;
+
+    // Share the evaluation split values in between the workers. Once the split
+    // are sharded, update the node map, tree structure and label statistics.
+    ShareSplits share_splits = 6;
+
+    // Request a subset of split values. This message is only used in between
+    // workers.
+    GetSplitValue get_split_value = 7;
+
+    // Finalize the current iteration.
+    EndIter end_iter = 8;
+
+    // Restore an existing checkpoint.
+    RestoreCheckpoint restore_checkpoint = 9;
+
+    // Create the worker side checkpoint. Possibly, only create part of a
+    // checkpoint (for distributed checkpoint creation).
+    CreateCheckpoint create_checkpoint = 10;
+
+    // First message send to the worker by the manager. Will be sent both for
+    // new or resumed training.
+    StartTraining start_training = 11;
+  }
+
+  optional int64 request_id = 12;
+
+  message GetLabelStatistics {}
+
+  message SetInitialPredictions {
+    optional decision_tree.proto.LabelStatistics label_statistics = 1;
+  }
+
+  message StartNewIter {
+    // Index of the iteration.
+    optional int32 iter_idx = 1;
+
+    // Unique identifier of the iteration. If the manager is rescheduled, a same
+    // iteration index can be started multiple time. However, the UID will
+    // change.
+    optional string iter_uid = 2;
+
+    // Seed used to initialize the random generator.
+    optional int64 seed = 3;
+  }
+
+  message FindSplits {
+    // List of features to test per weak learner and open nodes.
+    repeated FeaturePerNode features_per_weak_models = 1;
+
+    message FeaturePerNode {
+      repeated FeatureList features_per_node = 1;
+    }
+
+    message FeatureList {
+      repeated int32 features = 1 [packed = true];
+    }
+  }
+
+  message EvaluateSplits {
+    repeated distributed_decision_tree.proto.SplitPerOpenNode
+        split_per_weak_model = 1;
+  }
+
+  message ShareSplits {
+    repeated distributed_decision_tree.proto.SplitPerOpenNode
+        split_per_weak_model = 1;
+
+    // List of the workers that owns the split evaluation data.
+    repeated int32 active_workers = 2 [packed = true];
+  }
+
+  message GetSplitValue {}
+
+  message EndIter {
+    optional int32 iter_idx = 1;
+    // If true, the worker is expected to return the training loss.
+    optional bool compute_training_loss = 2;
+  }
+
+  message RestoreCheckpoint {
+    optional int32 iter_idx = 2;
+    optional int32 num_shards = 3;
+    optional int32 num_weak_models = 4;
+  }
+
+  message CreateCheckpoint {
+    // Range of examples to export. Note: The checkpoint only contains the
+    // prediction accumulator of the checkpoint.
+    optional int64 begin_example_idx = 1;
+    optional int64 end_example_idx = 2;
+
+    // Used by the manager to keep track of the shards.
+    optional int32 shard_idx = 3;
+  }
+
+  message StartTraining {}
+}
+
+// Result message of the worker.
+message WorkerResult {
+  // Each WorkerRequest leads to a WorkerResult with the same set attribute.
+  oneof type {
+    GetLabelStatistics get_label_statistics = 1;
+    SetInitialPredictions set_initial_predictions = 2;
+    StartNewIter start_new_iter = 3;
+    FindSplits find_splits = 4;
+    EvaluateSplits evaluate_splits = 5;
+    ShareSplits share_splits = 6;
+    GetSplitValue get_split_value = 7;
+    EndIter end_iter = 8;
+    RestoreCheckpoint restore_checkpoint = 9;
+    CreateCheckpoint create_checkpoint = 10;
+    StartTraining start_training = 11;
+  }
+
+  // If true, indicates that the worker is missing information to complete the
+  // request and continue the training of the tree. This situation is caused by
+  // a rescheduling.
+  //
+  // This message is only possible for the messages related to the training an
+  // individual tree as snapshots are made in between trees.
+  optional bool request_restart_iter = 12 [default = false];
+
+  optional int64 request_id = 13;
+
+  optional int32 worker_idx = 14;
+
+  message GetLabelStatistics {
+    optional decision_tree.proto.LabelStatistics label_statistics = 1;
+  }
+
+  message SetInitialPredictions {}
+
+  message StartNewIter {
+    // One for each weak models.
+    repeated decision_tree.proto.LabelStatistics label_statistics = 1;
+  }
+
+  message FindSplits {
+    // One for each weak models.
+    repeated distributed_decision_tree.proto.SplitPerOpenNode
+        split_per_weak_model = 1;
+  }
+
+  message EvaluateSplits {}
+
+  message ShareSplits {}
+
+  message GetSplitValue {
+    optional int32 source_worker = 1;
+    repeated SplitEvaluationPerWeakModel evaluation_per_weak_model = 2;
+    message SplitEvaluationPerWeakModel {
+      repeated bytes evaluation_per_open_node = 1;
+    }
+  }
+
+  message EndIter {
+    optional float training_loss = 1;
+    repeated float training_metrics = 2;
+  }
+
+  message RestoreCheckpoint {}
+
+  message CreateCheckpoint {
+    optional int32 shard_idx = 1;
+    optional string path = 2;
+  }
+
+  message StartTraining {}
+}
+
+// Meta-data of a checkpoint.
+message Checkpoint {
+  optional decision_tree.proto.LabelStatistics label_statistics = 1;
+  optional int32 num_shards = 2;
+}

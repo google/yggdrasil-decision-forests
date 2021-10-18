@@ -1,0 +1,72 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.distributed_gradient_boosted_trees.proto;
+
+import "yggdrasil_decision_forests/learner/abstract_learner.proto";
+import "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.proto";
+import "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto";
+import "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.proto";
+
+// Training configuration for the Distributed Gradient Boosted Trees algorithm.
+message DistributedGradientBoostedTreesTrainingConfig {
+  // Classical training configuration for a GBT.
+  optional gradient_boosted_trees.proto.GradientBoostedTreesTrainingConfig gbt =
+      1;
+
+  // Hyper-parameters for the creation of the dataset cache.
+  optional yggdrasil_decision_forests.model.distributed_decision_tree
+      .dataset_cache.proto.CreateDatasetCacheConfig create_cache = 2;
+
+  // How to read the dataset cache.
+  optional
+      distributed_decision_tree.dataset_cache.proto.DatasetCacheReaderOptions
+          dataset_reader_options = 3;
+
+  // If true, workers will print training logs.
+  optional bool worker_logs = 4 [default = true];
+
+  // Internal in between the creation og checkpoints. If one of the worker or
+  // the manager is rescheduled, all the training from the last checkpoint is
+  // lost. On the other hand, creating a checkpoint is expensive.
+  //
+  // Value "-1" disables the interval.
+  optional int32 checkpoint_interval_trees = 5 [default = -1];
+  optional double checkpoint_interval_seconds = 6
+      [default = 600];  // Default to 10 minutes.
+
+  optional Internal internal = 7;
+
+  message Internal {
+    // If true, the workers will simulate failures to test the checkpoint during
+    // training. The training will eventually complete.
+    optional bool simulate_worker_failure = 1 [default = false];
+
+    // If true, all the workers are running all the splits i.e. the same amount
+    // of computation. This option can be used to benchmark and detect slow
+    // workers.
+    //
+    // Note that each worker will have a full copy of the dataset i.e. the
+    // dataset is not distributed.
+    optional bool duplicate_computation_on_all_workers = 2 [default = false];
+  }
+}
+
+extend model.proto.TrainingConfig {
+  optional DistributedGradientBoostedTreesTrainingConfig
+      distributed_gradient_boosted_trees_config = 1008;
+}

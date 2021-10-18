@@ -27,6 +27,7 @@ cc_library_ydf(
     deps = [
         ":toy_worker",
         "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_worker",
+        "//yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees:worker",
         "//yggdrasil_decision_forests/learner/generic_worker",
     ],
     alwayslink = 1,
