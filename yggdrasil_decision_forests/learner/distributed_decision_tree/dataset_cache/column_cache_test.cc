@@ -48,6 +48,25 @@ std::string CreatedShardedInteger(const int num_shards,
   return base_path;
 }
 
+// Create a sharded record with the pattern: value_i = value_idx * 2 + 0.5.
+// Returns the base path.
+std::string CreatedShardedFloat(const int num_shards,
+                                const int num_values_per_shards) {
+  const auto base_path = file::JoinPath(test::TmpDirectory(), "record");
+  int64_t value_idx = 0;
+  for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
+    FloatColumnWriter writer;
+    CHECK_OK(writer.Open(ShardFilename(base_path, shard_idx, num_shards)));
+    for (int value_in_shard_idx = 0; value_in_shard_idx < num_values_per_shards;
+         value_in_shard_idx++) {
+      CHECK_OK(writer.WriteValues({2.f * value_idx + 0.5f}));
+      value_idx++;
+    }
+    CHECK_OK(writer.Close());
+  }
+  return base_path;
+}
+
 TEST(NumBytes, Base) {
   EXPECT_EQ(NumBytes(0), 1);
   EXPECT_EQ(NumBytes(1), 1);
@@ -163,6 +182,66 @@ TEST(InMemoryIntegerColumnReaderFactory, Differentformat) {
   for (int i = 0; i < 5 * 10; i += 2) {
     CHECK_OK(reader->Next());
     EXPECT_EQ(reader->Values(), (absl::Span<const int32_t>{2 * i, 2 * i + 2}));
+  }
+  CHECK_OK(reader->Next());
+  EXPECT_TRUE(reader->Values().empty());
+}
+
+TEST(FloatColumn, WriteAndRead) {
+  // Write the 5 values.
+  const auto path = file::JoinPath(test::TmpDirectory(), "record");
+  FloatColumnWriter writer;
+  CHECK_OK(writer.Open(path));
+  CHECK_OK(writer.WriteValues({1.5f, 2.5f, 3.5f}));
+  CHECK_OK(writer.WriteValues({4.5f, 5.5f}));
+  CHECK_OK(writer.Close());
+
+  // Read the 5 values.
+  FloatColumnReader reader;
+  CHECK_OK(reader.Open(path, 3));
+  CHECK_OK(reader.Next());
+  EXPECT_EQ(reader.Values(), (absl::Span<const float>{1.5f, 2.5f, 3.5f}));
+  CHECK_OK(reader.Next());
+  EXPECT_EQ(reader.Values(), (absl::Span<const float>{4.5f, 5.5f}));
+  CHECK_OK(reader.Next());
+  EXPECT_TRUE(reader.Values().empty());
+
+  CHECK_OK(reader.Close());
+}
+
+TEST(ShardedFloatColumnReader, Base) {
+  const auto base_path = CreatedShardedFloat(
+      /*num_shards=*/5, /*num_values_per_shards=*/10);
+
+  ShardedFloatColumnReader reader;
+  CHECK_OK(reader.Open(base_path, /*max_num_values=*/2,
+                       /*begin_shard_idx=*/0, /*end_shard_idx=*/5));
+  for (int i = 0; i < 5 * 10; i += 2) {
+    CHECK_OK(reader.Next());
+    EXPECT_EQ(reader.Values(),
+              (absl::Span<const float>{2 * i + 0.5f, 2.f * i + 2.5f}));
+  }
+  CHECK_OK(reader.Next());
+  EXPECT_TRUE(reader.Values().empty());
+
+  CHECK_OK(reader.Close());
+}
+
+TEST(InMemoryFloatColumnReaderFactory, Base) {
+  const auto base_path = CreatedShardedFloat(
+      /*num_shards=*/5, /*num_values_per_shards=*/10);
+
+  InMemoryFloatColumnReaderFactory reader_factory;
+  CHECK_OK(reader_factory.Load(base_path, /*max_num_values=*/2,
+                               /*begin_shard_idx=*/0, /*end_shard_idx=*/5));
+
+  EXPECT_EQ(reader_factory.MemoryUsage(), 5 * 10 * 4);
+
+  auto reader = reader_factory.CreateIterator();
+  for (int i = 0; i < 5 * 10; i += 2) {
+    CHECK_OK(reader->Next());
+    EXPECT_EQ(reader->Values(),
+              (absl::Span<const float>{2.f * i + 0.5f, 2.f * i + 2.5f}));
   }
   CHECK_OK(reader->Next());
   EXPECT_TRUE(reader->Values().empty());

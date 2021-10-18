@@ -281,6 +281,118 @@ class InMemoryIntegerColumnReaderFactory {
   uint8_t file_num_bytes_ = 0;
 };
 
+// Writes a sequence of float values. Follows the same convention as
+// "IntegerColumnWriter".
+class FloatColumnWriter {
+ public:
+  absl::Status Open(absl::string_view path);
+  absl::Status WriteValues(absl::Span<const float> values);
+  absl::Status Close();
+
+ private:
+  file::FileOutputByteStream file_;
+
+  // Open file.
+  std::string path_;
+};
+
+// Returns a sequence of float values. Follows the same convention as
+// "AbstractIntegerColumnIterator".
+class AbstractFloatColumnIterator {
+ public:
+  virtual ~AbstractFloatColumnIterator() {}
+  virtual absl::Span<const float> Values() = 0;
+  virtual absl::Status Next() = 0;
+  virtual absl::Status Close() = 0;
+};
+
+class FloatColumnReader : public AbstractFloatColumnIterator {
+ public:
+  ~FloatColumnReader() {}
+  absl::Status Open(absl::string_view path, int max_num_values);
+  absl::Span<const float> Values() override;
+  absl::Status Next() override;
+  absl::Status Close() override;
+
+ private:
+  file::FileInputByteStream file_;
+
+  // Buffer containing the last read values.
+  std::vector<float> buffer_;
+
+  // Number of values read in the last "Next".
+  int num_values_ = 0;
+};
+
+// Reads a sequence of float values from a sharded set of files. Follows the
+// same convention as "ShardedIntegerColumnReader".
+class ShardedFloatColumnReader : public AbstractFloatColumnIterator {
+ public:
+  ~ShardedFloatColumnReader() {}
+
+  absl::Status Open(absl::string_view base_path, int max_num_values,
+                    int begin_shard_idx, int end_shard_idx);
+  absl::Span<const float> Values() override;
+  absl::Status Next() override;
+  absl::Status Close() override;
+
+  // Reads and appends the content of a sharded file.
+  static absl::Status ReadAndAppend(absl::string_view base_path,
+                                    int begin_shard_idx, int end_shard_idx,
+                                    std::vector<float>* output);
+
+ private:
+  FloatColumnReader sub_reader_;
+  std::string base_path_;
+  int max_num_values_ = 0;
+  int end_shard_idx_ = 0;
+  int current_shard_idx_ = 0;
+};
+
+// Loads a sequence of float in memory and make those values available through a
+// "AbstractFloatColumnIterator". Follows the same convention as
+// "InMemoryIntegerColumnReaderFactory".
+class InMemoryFloatColumnReaderFactory {
+ public:
+  class InMemoryFloatColumnReader : public AbstractFloatColumnIterator {
+   public:
+    InMemoryFloatColumnReader(
+        const InMemoryFloatColumnReaderFactory* const parent);
+
+    ~InMemoryFloatColumnReader() = default;
+
+    absl::Span<const float> Values() override;
+    absl::Status Next() override;
+    absl::Status Close() override;
+
+   private:
+    // Index of the first value currently returned by "Values".
+    size_t value_idx_ = 0;
+
+    // Current values.
+    absl::Span<const float> values_;
+
+    const InMemoryFloatColumnReaderFactory* const parent_ = nullptr;
+  };
+
+  void Reserve(size_t num_values);
+  absl::Status Load(absl::string_view base_path, int max_num_values,
+                    int begin_shard_idx, int end_shard_idx);
+
+  std::unique_ptr<InMemoryFloatColumnReader> CreateIterator() const;
+  size_t MemoryUsage() { return buffer_.capacity() * sizeof(float); }
+
+ private:
+  // All the values.
+  std::vector<float> buffer_;
+
+  // Maximum number of values returned in a single "Next" call.
+  int max_num_values_ = 0;
+};
+
+// Indicates that a file is done being written
+absl::Status FinalizeFile(absl::string_view path);
+
 }  // namespace dataset_cache
 }  // namespace distributed_decision_tree
 }  // namespace model

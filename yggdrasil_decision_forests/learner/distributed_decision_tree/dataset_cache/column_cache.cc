@@ -408,6 +408,159 @@ template class InMemoryIntegerColumnReaderFactory<int8_t>;
 template class InMemoryIntegerColumnReaderFactory<int32_t>;
 template class InMemoryIntegerColumnReaderFactory<int64_t>;
 
+absl::Status FloatColumnWriter::Open(absl::string_view path) {
+  path_ = path;
+  return file_.Open(path);
+}
+
+absl::Status FloatColumnWriter::WriteValues(absl::Span<const float> values) {
+  return file_.Write(
+      absl::string_view(reinterpret_cast<const char*>(values.data()),
+                        sizeof(float) * values.size()));
+}
+
+absl::Status FloatColumnWriter::Close() {
+  RETURN_IF_ERROR(file_.Close());
+  return FinalizeFile(path_);
+}
+
+absl::Status FloatColumnReader::Open(absl::string_view path,
+                                     int max_num_values) {
+  buffer_.resize(max_num_values);
+  return file_.Open(path);
+}
+
+absl::Span<const float> FloatColumnReader::Values() {
+  return absl::Span<const float>(buffer_.data(), num_values_);
+}
+
+absl::Status FloatColumnReader::Next() {
+  ASSIGN_OR_RETURN(const auto read_bytes,
+                   file_.ReadUpTo(reinterpret_cast<char*>(buffer_.data()),
+                                  buffer_.size() * sizeof(float)));
+  num_values_ = read_bytes / sizeof(float);
+  return absl::OkStatus();
+}
+
+absl::Status FloatColumnReader::Close() { return file_.Close(); }
+
+absl::Status ShardedFloatColumnReader::ReadAndAppend(
+    absl::string_view base_path, int begin_shard_idx, int end_shard_idx,
+    std::vector<float>* output) {
+  ShardedFloatColumnReader reader;
+  RETURN_IF_ERROR(
+      reader.Open(base_path,
+                  /*max_num_values=*/kIOBufferSizeInBytes / sizeof(float),
+                  /*begin_shard_idx=*/begin_shard_idx,
+                  /*end_shard_idx=*/end_shard_idx));
+
+  while (true) {
+    CHECK_OK(reader.Next());
+    const auto values = reader.Values();
+    if (values.empty()) {
+      break;
+    }
+    output->insert(output->end(), values.begin(), values.end());
+  }
+  return reader.Close();
+}
+
+absl::Status ShardedFloatColumnReader::Open(absl::string_view base_path,
+                                            int max_num_values,
+                                            int begin_shard_idx,
+                                            int end_shard_idx) {
+  base_path_ = base_path;
+  max_num_values_ = max_num_values;
+  end_shard_idx_ = end_shard_idx;
+  current_shard_idx_ = begin_shard_idx;
+  if (current_shard_idx_ < end_shard_idx) {
+    return sub_reader_.Open(
+        ShardFilename(base_path_, current_shard_idx_, end_shard_idx),
+        max_num_values_);
+  } else {
+    return absl::OkStatus();
+  }
+}
+
+absl::Span<const float> ShardedFloatColumnReader::Values() {
+  return sub_reader_.Values();
+}
+
+absl::Status ShardedFloatColumnReader::Next() {
+  RETURN_IF_ERROR(sub_reader_.Next());
+  if (sub_reader_.Values().empty() && current_shard_idx_ + 1 < end_shard_idx_) {
+    RETURN_IF_ERROR(sub_reader_.Close());
+    current_shard_idx_++;
+    RETURN_IF_ERROR(sub_reader_.Open(
+        ShardFilename(base_path_, current_shard_idx_, end_shard_idx_),
+        max_num_values_));
+    return sub_reader_.Next();
+  }
+  return absl::OkStatus();
+}
+
+absl::Status ShardedFloatColumnReader::Close() { return sub_reader_.Close(); }
+
+InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader::
+    InMemoryFloatColumnReader(
+        const InMemoryFloatColumnReaderFactory* const parent)
+    : parent_(parent) {}
+
+absl::Span<const float>
+InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader::Values() {
+  return values_;
+}
+
+absl::Status
+InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader::Next() {
+  value_idx_ += values_.size();
+  const auto num_values =
+      std::min(parent_->buffer_.size() - value_idx_,
+               static_cast<size_t>(parent_->max_num_values_));
+  values_ =
+      absl::Span<const float>(parent_->buffer_.data() + value_idx_, num_values);
+  return absl::OkStatus();
+}
+
+absl::Status InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader::
+    Close() {  // Nothing to do.
+  return absl::OkStatus();
+}
+
+void InMemoryFloatColumnReaderFactory::Reserve(size_t num_values) {
+  buffer_.reserve(num_values);
+}
+
+absl::Status InMemoryFloatColumnReaderFactory::Load(absl::string_view base_path,
+                                                    int max_num_values,
+                                                    int begin_shard_idx,
+                                                    int end_shard_idx) {
+  ShardedFloatColumnReader file_reader;
+  constexpr int buffer_size = kIOBufferSizeInBytes / sizeof(float);
+  RETURN_IF_ERROR(
+      file_reader.Open(base_path, buffer_size, begin_shard_idx, end_shard_idx));
+
+  while (true) {
+    RETURN_IF_ERROR(file_reader.Next());
+    if (file_reader.Values().empty()) {
+      break;
+    }
+    // TODO: Estimate the final buffer size and pre-allocate it.
+
+    buffer_.insert(buffer_.end(), file_reader.Values().begin(),
+                   file_reader.Values().end());
+  }
+  buffer_.shrink_to_fit();
+  max_num_values_ = max_num_values;
+  return file_reader.Close();
+}
+
+std::unique_ptr<InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader>
+InMemoryFloatColumnReaderFactory::CreateIterator() const {
+  return absl::make_unique<
+      InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader>(this);
+}
+
 }  // namespace dataset_cache
 }  // namespace distributed_decision_tree
 }  // namespace model
