@@ -48,7 +48,8 @@ class ThreadPool {
   // Starts the threads.
   void StartWorkers();
 
-  // Schedules a new job.
+  // Schedules a new job. Returns immediately i.e. does not wait for the job to
+  // be executed.
   void Schedule(std::function<void()> callback);
 
   // Number of threads configured in the constructor.

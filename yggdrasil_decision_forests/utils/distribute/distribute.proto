@@ -21,8 +21,13 @@ package yggdrasil_decision_forests.distribute.proto;
 message Config {
   // Identifier of the distribution strategy.
   //
-  // If you use the C++ API, make sure to link the implementation if the
-  // distribution strategy.
+  // The registration strategy are registered with
+  // "REGISTER_Distribution_Manager" method. Make sure to link the
+  // implementation you are using.
+  //
+  // The "MULTI_THREAD" implementation is inefficient and only exist for unit
+  // testing purpose. For non-distributed training, rely on the multi-threading
+  // directly implemented in the learning algorithm.
   optional string implementation_key = 1;
 
   // Amount of verbose.
