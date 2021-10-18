@@ -74,6 +74,8 @@ class ToyWorker final : public AbstractWorker {
     } else if (blob == "wait_barrier") {
       // Wait and block for 5 calls to this request.
       CHECK(barrier_);
+      LOG(INFO) << "Worker " << WorkerIdx()
+                << " is waiting for 5 other calls at barrier";
       if (barrier_->Block()) {
         delete barrier_;
         barrier_ = nullptr;

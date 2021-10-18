@@ -176,9 +176,7 @@ class AbstractManager {
 
   // Changes the number of queries executed by each worker in parallel.
   // This method should be called with no pending queries.
-  virtual absl::Status SetParallelExecutionPerWorker(int num) {
-    return absl::InternalError("SetParallelExecutionPerWorker not implemented");
-  }
+  virtual absl::Status SetParallelExecutionPerWorker(int num) = 0;
 
  private:
   // Gets the number of workers specified in a configuration without having to

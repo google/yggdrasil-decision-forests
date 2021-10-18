@@ -67,6 +67,10 @@ utils::StatusOr<Blob> MultiThreadManager::NextAsynchronousAnswer() {
   if (!answer.has_value()) {
     return absl::OutOfRangeError("No more results available");
   }
+  if (verbosity_ >= 1 && !answer.value().ok()) {
+    LOG(INFO) << "Return asynchronous result failure: "
+              << answer.value().status();
+  }
   if (verbosity_ >= 2 && answer.value().ok()) {
     LOG(INFO) << "Return asynchronous result with "
               << answer.value().value().size() << " bytes";
