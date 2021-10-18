@@ -50,6 +50,25 @@ class CreateDatasetCacheWorker : public distribute::AbstractWorker {
                                      absl::string_view temp_directory,
                                      absl::string_view output_directory);
 
+  absl::Status SortNumericalColumn(
+      const proto::WorkerRequest::SortNumericalColumn& request,
+      proto::WorkerResult::SortNumericalColumn* result);
+
+  // Export sorted numerical values. Used by "SortNumericalColumn".
+  absl::Status ExportSortedNumericalColumn(
+      const proto::WorkerRequest::SortNumericalColumn& request,
+      const std::vector<std::pair<float, model::SignedExampleIdx>>&
+          value_and_example_idxs,
+      proto::WorkerResult::SortNumericalColumn* result);
+
+  // Export discretized numerical values. Used by "SortNumericalColumn".
+  absl::Status ExportSortedDiscretizedNumericalColumn(
+      const proto::WorkerRequest::SortNumericalColumn& request,
+      const std::vector<std::pair<float, model::SignedExampleIdx>>&
+          value_and_example_idxs,
+      int64_t num_unique_values,
+      proto::WorkerResult::SortNumericalColumn* result);
+
   proto::WorkerWelcome welcome_;
 };
 

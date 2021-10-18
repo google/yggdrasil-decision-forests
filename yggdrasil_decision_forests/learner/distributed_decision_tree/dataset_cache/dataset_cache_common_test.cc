@@ -25,13 +25,48 @@ namespace distributed_decision_tree {
 namespace dataset_cache {
 namespace {
 
+using testing::ElementsAre;
+
+const double kEps = 0.00001;
+
 TEST(DeltaBit, Base) {
   EXPECT_EQ(MaskDeltaBit(0b1101), 0b10000);
   EXPECT_EQ(MaskExampleIdx(0b1101), 0b01111);
-  EXPECT_EQ(MaxValue(0b1101), 0b01111);
+  EXPECT_EQ(MaxValueWithDeltaBit(0b1101), 0b11101);
 
   EXPECT_EQ(MaskDeltaBit(0b1000), 0b10000);
   EXPECT_EQ(MaskDeltaBit(0b1111), 0b10000);
+}
+
+TEST(NumericalToDiscretizedNumerical, Base) {
+  EXPECT_NEAR(DiscretizedNumericalToNumerical({1, 2, 3}, 0), 0, kEps);
+  EXPECT_NEAR(DiscretizedNumericalToNumerical({1, 2, 3}, 1), 1.5, kEps);
+  EXPECT_NEAR(DiscretizedNumericalToNumerical({1, 2, 3}, 2), 2.5, kEps);
+  EXPECT_NEAR(DiscretizedNumericalToNumerical({1, 2, 3}, 3), 4, kEps);
+}
+
+TEST(DiscretizedNumericalToNumerical, Base) {
+  EXPECT_EQ(NumericalToDiscretizedNumerical({1, 2, 3}, -1), 0);
+  EXPECT_EQ(NumericalToDiscretizedNumerical({1, 2, 3}, 1.5), 1);
+  EXPECT_EQ(NumericalToDiscretizedNumerical({1, 2, 3}, 2.5), 2);
+  EXPECT_EQ(NumericalToDiscretizedNumerical({1, 2, 3}, 4), 3);
+}
+
+TEST(ExtractDiscretizedBoundariesWithoutDownsampling, Base) {
+  const auto boundaries =
+      ExtractDiscretizedBoundariesWithoutDownsampling(
+          {{10.f, 0}, {11.f, 1}, {11.f, 2}, {12.f, 3}, {12.f, 4}, {13.f, 5}}, 4)
+          .ValueOrDie();
+  EXPECT_THAT(boundaries, ElementsAre(10.5, 11.5f, 12.5f));
+}
+
+TEST(ExtractDiscretizedBoundariesWithDownsampling, Base) {
+  const auto boundaries =
+      ExtractDiscretizedBoundariesWithDownsampling(
+          {{10.f, 0}, {11.f, 1}, {11.f, 2}, {12.f, 3}, {12.f, 4}, {13.f, 5}}, 4,
+          3)
+          .ValueOrDie();
+  EXPECT_THAT(boundaries, ElementsAre(11.5f, 12.5f));
 }
 
 }  // namespace

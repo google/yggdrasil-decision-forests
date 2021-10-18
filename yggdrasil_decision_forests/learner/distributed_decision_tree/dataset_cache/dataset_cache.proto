@@ -68,6 +68,27 @@ message WorkerRequest {
     // Separate the columns of a dataset into individual files (per column and
     // per shards).
     SeparateDatasetColumns separate_dataset_columns = 1;
+
+    // Sort or discretize a numerical column (depending on the number of unique
+    // values).
+    //
+    // Sorting a numerical column consist in exporting both the unique attribute
+    // values (sorted by value) as well as the example indices (ordered by the
+    // attribute value).
+    //
+    // Discretizing a numerical column consists in export the unique attribute
+    // values (sorted by value; same as before) and the index of the attribute
+    // value in this table (sorted by example index i.e. the original dataset
+    // ordering).
+    //
+    // Currently, this stage is implemented with in-memory sorting i.e. worker
+    // should be able to load an entire column in memory i.e. 4 bytes * number
+    // of examples.
+    //
+    // If the number of unique values is small enough, this stage can compute
+    // the optimal discretization (using the sorted values) and then export
+    // the discretized values.
+    SortNumericalColumn sort_numerical_column = 2;
   }
 
   message SeparateDatasetColumns {
@@ -91,18 +112,68 @@ message WorkerRequest {
     // Number of shards for the feature.
     optional int32 num_shards = 7;
   }
+
+  message SortNumericalColumn {
+    // Where to save the sorted columns.
+    optional string output_base_directory = 1;
+
+    // Total number of example in the column.
+    optional int64 num_examples = 2;
+
+    // Index of the column.
+    optional int32 column_idx = 3;
+
+    // Number of shards in the input data.
+    optional int32 num_shards = 4;
+
+    // Root directory of the cache. Contains the input columns.
+    optional string cache_directory = 5;
+
+    // Number of examples to write in each output shard.
+    optional int32 num_example_per_output_shards = 6;
+
+    // Depending on the number of unique values, the numerical column will
+    // exported as pre-sorted or pre-discretized.
+    //
+    // If the number of unique values is >
+    // max_unique_values_for_discretized_numerical, the output will contains
+    // sorted numerical values. Otherwise, the output will contain in-order
+    // discretizerd numerical values.
+    optional int64 max_unique_values_for_discretized_numerical = 7;
+
+    // Value replacing missing values in the input. This is only used to compute
+    // the returned meta data message (as missing values have been filted in the
+    // previous stage).
+    optional float replacement_missing_value = 8;
+
+    // If true, force the discretization of the column. If the column contains
+    // more than "max_unique_values_for_discretized_numerical" unique values,
+    // the column is discretized using
+    // "max_unique_values_for_discretized_numerical" quantiles.
+    optional bool force_numerical_discretization = 9;
+
+    // Number of expected shards in the output.
+    optional int32 num_shards_in_output_shards = 10;
+  }
 }
 
 // Result message of the worker.
 message WorkerResult {
   oneof type {
     SeparateDatasetColumns separate_dataset_columns = 1;
+    SortNumericalColumn sort_numerical_column = 2;
   }
 
   message SeparateDatasetColumns {
     // optional string output_directory = 1;
     optional int32 shard_idx = 2;
     optional int64 num_examples = 3;
+  }
+
+  message SortNumericalColumn {
+    optional string output_directory = 1;
+    optional int32 column_idx = 2;
+    optional CacheMetadata.NumericalColumn metadata = 3;
   }
 }
 

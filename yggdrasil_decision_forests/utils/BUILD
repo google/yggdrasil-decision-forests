@@ -633,6 +633,11 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "math",
+    hdrs = ["math.h"],
+)
+
 # Bzl Libraries
 # =============
 
@@ -934,6 +939,16 @@ cc_test(
     deps = [
         ":filesystem",
         ":snapshot",
+        ":test",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "math_test",
+    srcs = ["math_test.cc"],
+    deps = [
+        ":math",
         ":test",
         "@com_google_googletest//:gtest_main",
     ],

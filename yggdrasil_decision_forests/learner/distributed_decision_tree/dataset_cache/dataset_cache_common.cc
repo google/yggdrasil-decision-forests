@@ -61,8 +61,90 @@ uint64_t MaskExampleIdx(uint64_t num_examples) {
   return MaskDeltaBit(num_examples) - 1;
 }
 
-uint64_t MaxValue(uint64_t num_examples) {
-  return MaskExampleIdx(num_examples);
+uint64_t MaxValueWithDeltaBit(uint64_t num_examples) {
+  return MaskDeltaBit(num_examples) | num_examples;
+}
+
+float DiscretizedNumericalToNumerical(
+    const std::vector<float>& boundaries,
+    const DiscretizedIndexedNumericalType value) {
+  DCHECK_GT(boundaries.size(), 0);
+  DCHECK_LE(value, boundaries.size());
+  if (value == 0) {
+    return std::min(
+        std::nextafter(boundaries[0], -std::numeric_limits<float>::infinity()),
+        boundaries[0] - 1.f);
+  }
+  if (value == boundaries.size()) {
+    return std::max(std::nextafter(boundaries[boundaries.size() - 1],
+                                   std::numeric_limits<float>::infinity()),
+                    boundaries[boundaries.size() - 1] + 1.f);
+  }
+  return decision_tree::MidThreshold(boundaries[value - 1], boundaries[value]);
+}
+
+DiscretizedIndexedNumericalType NumericalToDiscretizedNumerical(
+    const std::vector<float>& boundaries, float value) {
+  const auto it = std::upper_bound(boundaries.begin(), boundaries.end(), value);
+  return std::distance(boundaries.begin(), it);
+}
+
+utils::StatusOr<std::vector<float>>
+ExtractDiscretizedBoundariesWithoutDownsampling(
+    const std::vector<std::pair<float, model::SignedExampleIdx>>&
+        value_and_example_idxs,
+    int64_t num_unique_values) {
+  // Get the sorted list of unique values.
+  std::vector<float> sorted_unique_values;
+  sorted_unique_values.reserve(num_unique_values);
+  if (!value_and_example_idxs.empty()) {
+    sorted_unique_values.push_back(value_and_example_idxs.front().first);
+  }
+  for (size_t sorted_idx = 1; sorted_idx < value_and_example_idxs.size();
+       sorted_idx++) {
+    if (value_and_example_idxs[sorted_idx - 1].first <
+        value_and_example_idxs[sorted_idx].first) {
+      sorted_unique_values.push_back(value_and_example_idxs[sorted_idx].first);
+    }
+  }
+
+  // Get the list of boundary values.
+  std::vector<float> boundaries(sorted_unique_values.size() - 1);
+  for (size_t boundary_idx = 0; boundary_idx < boundaries.size();
+       boundary_idx++) {
+    boundaries[boundary_idx] =
+        decision_tree::MidThreshold(sorted_unique_values[boundary_idx],
+                                    sorted_unique_values[boundary_idx + 1]);
+  }
+  return boundaries;
+}
+
+utils::StatusOr<std::vector<float>>
+ExtractDiscretizedBoundariesWithDownsampling(
+    const std::vector<std::pair<float, model::SignedExampleIdx>>&
+        value_and_example_idxs,
+    int64_t num_unique_values, int64_t num_discretized_values) {
+  // Gather the unique values and observation count.
+  std::vector<std::pair<float, int>> unique_values_and_counts;
+  unique_values_and_counts.reserve(num_unique_values);
+
+  int current_count = 0;
+  float current_value = std::numeric_limits<float>::quiet_NaN();
+  for (const auto& value_and_example_idx : value_and_example_idxs) {
+    if (value_and_example_idx.first != current_value) {
+      unique_values_and_counts.push_back(
+          {value_and_example_idx.first, current_count});
+      current_value = value_and_example_idx.first;
+      current_count = 0;
+    }
+    current_count++;
+  }
+  if (current_count > 0) {
+    unique_values_and_counts.push_back({current_value, current_count});
+  }
+
+  return dataset::GenDiscretizedBoundaries(unique_values_and_counts,
+                                           num_discretized_values, 1, {});
 }
 
 }  // namespace dataset_cache

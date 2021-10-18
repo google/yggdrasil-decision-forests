@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_worker.h"
 
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
@@ -256,6 +257,286 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
   return worker_status;
 }
 
+absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
+    const proto::WorkerRequest::SortNumericalColumn& request,
+    proto::WorkerResult::SortNumericalColumn* result) {
+  LOG(INFO) << "Sorting numerical column #" << request.column_idx();
+
+  // Read the values.
+  LOG(INFO) << "Allocate " << request.num_examples()
+            << " examples for column  #" << request.column_idx();
+  // TODO(gbm): Read the shards in parallel.
+  std::vector<std::pair<float, model::SignedExampleIdx>> value_and_example_idxs(
+      request.num_examples());
+  LOG(INFO) << "Start reading column  #" << request.column_idx();
+  const int input_buffer_size = kIOBufferSizeInBytes / sizeof(float);
+  ShardedFloatColumnReader reader;
+  RETURN_IF_ERROR(reader.Open(
+      file::JoinPath(request.cache_directory(), kFilenameRaw,
+                     absl::StrCat(kFilenameColumn, request.column_idx()),
+                     kFilenameShardNoUnderscore),
+      /*max_num_values=*/input_buffer_size,
+      /*begin_shard_idx=*/0, /*end_shard_idx=*/request.num_shards()));
+  size_t example_idx = 0;
+  while (true) {
+    RETURN_IF_ERROR(reader.Next());
+    const auto values = reader.Values();
+    if (values.empty()) {
+      break;
+    }
+    for (const float value : values) {
+      value_and_example_idxs[example_idx] = {value, example_idx};
+      example_idx++;
+    }
+  }
+  RETURN_IF_ERROR(reader.Close());
+
+  // Sort the values.
+  LOG(INFO) << "Sort the numerical values of column #" << request.column_idx();
+  std::sort(value_and_example_idxs.begin(), value_and_example_idxs.end());
+
+  // Export the sorted values.
+  LOG(INFO) << "Export the pre-sorted numerical values of column #"
+            << request.column_idx();
+
+  result->set_output_directory(
+      file::JoinPath(request.output_base_directory(), utils::GenUniqueId()));
+  RETURN_IF_ERROR(
+      file::RecursivelyCreateDir(result->output_directory(), file::Defaults()));
+  result->set_column_idx(request.column_idx());
+  result->mutable_metadata()->set_replacement_missing_value(
+      request.replacement_missing_value());
+
+  // Count the number of unique values.
+  int64_t num_unique_values = 0;
+  for (size_t sorted_idx = 1; sorted_idx < value_and_example_idxs.size();
+       sorted_idx++) {
+    if (value_and_example_idxs[sorted_idx - 1].first <
+        value_and_example_idxs[sorted_idx].first) {
+      num_unique_values++;
+    }
+  }
+  result->mutable_metadata()->set_num_unique_values(num_unique_values);
+  LOG(INFO) << "Found " << num_unique_values << "/" << request.num_examples()
+            << " unique values on numerical column #" << request.column_idx()
+            << ".";
+
+  // Select how export the values (pre-sorted or discretized).
+  result->mutable_metadata()->set_discretized(
+      request.force_numerical_discretization() ||
+      num_unique_values <=
+          request.max_unique_values_for_discretized_numerical());
+
+  if (result->metadata().discretized()) {
+    LOG(INFO) << "Exported column  column #" << request.column_idx()
+              << " as pre-discretized";
+    RETURN_IF_ERROR(ExportSortedDiscretizedNumericalColumn(
+        request, value_and_example_idxs, num_unique_values, result));
+  } else {
+    LOG(INFO) << "Exported column  column #" << request.column_idx()
+              << " as pre-sorted";
+    RETURN_IF_ERROR(
+        ExportSortedNumericalColumn(request, value_and_example_idxs, result));
+  }
+
+  LOG(INFO) << "Done exporting column #" << request.column_idx() << " with "
+            << num_unique_values << "/" << request.num_examples()
+            << " unique values.";
+  return absl::OkStatus();
+}
+
+absl::Status CreateDatasetCacheWorker::ExportSortedNumericalColumn(
+    const proto::WorkerRequest::SortNumericalColumn& request,
+    const std::vector<std::pair<float, model::SignedExampleIdx>>&
+        value_and_example_idxs,
+    proto::WorkerResult::SortNumericalColumn* result) {
+  proto::CreateDatasetCacheConfig config;
+
+  IntegerColumnWriter example_idx_writer;
+  FloatColumnWriter values_writer;
+
+  // Number of remaining examples the current shard can receive. When a shard
+  // is full, a new one is created. If remaining_examples_in_shard=0, a new
+  // shard will be created on the next example.
+  int64_t remaining_examples_in_shard = 0;
+  int next_output_shard_idx = 0;
+
+  RETURN_IF_ERROR(values_writer.Open(
+      file::JoinPath(result->output_directory(),
+                     ShardFilename(kFilenameDeltaValueNoUnderscore, 0, 1))));
+
+  RETURN_IF_ERROR(
+      values_writer.WriteValues({value_and_example_idxs.front().first}));
+  const auto max_value_example_idx =
+      MaxValueWithDeltaBit(request.num_examples());
+
+  // Output buffers;
+  std::vector<float> value_buffer;
+  std::vector<model::SignedExampleIdx> example_idx_buffer;
+  value_buffer.reserve(kIOBufferSizeInBytes / sizeof(float));
+  example_idx_buffer.reserve(kIOBufferSizeInBytes /
+                             sizeof(model::SignedExampleIdx));
+
+  // TODO(gbm): Distribute writing.
+  const auto delta_bit_mask = MaskDeltaBit(request.num_examples());
+  for (size_t sorted_idx = 0; sorted_idx < value_and_example_idxs.size();
+       sorted_idx++) {
+    const bool delta_bit =
+        sorted_idx > 0 && value_and_example_idxs[sorted_idx - 1].first <
+                              value_and_example_idxs[sorted_idx].first;
+    model::SignedExampleIdx example_idx_with_delta_bit =
+        value_and_example_idxs[sorted_idx].second;
+    if (delta_bit) {
+      example_idx_with_delta_bit |= delta_bit_mask;
+
+      value_buffer.push_back(value_and_example_idxs[sorted_idx].first);
+      if (value_buffer.size() >= kIOBufferSizeInBytes / sizeof(float)) {
+        RETURN_IF_ERROR(values_writer.WriteValues(value_buffer));
+        value_buffer.clear();
+      }
+    }
+
+    if (remaining_examples_in_shard == 0) {
+      if (sorted_idx > 0) {
+        // Close the current shard.
+        RETURN_IF_ERROR(example_idx_writer.Close());
+      }
+      // Open a new shard.
+      RETURN_IF_ERROR(example_idx_writer.Open(
+          file::JoinPath(result->output_directory(),
+                         ShardFilename(kFilenameExampleIdxNoUnderscore,
+                                       next_output_shard_idx++,
+                                       request.num_shards_in_output_shards())),
+
+          /*max_value=*/max_value_example_idx));
+      remaining_examples_in_shard = request.num_example_per_output_shards();
+    }
+
+    example_idx_buffer.push_back(example_idx_with_delta_bit);
+    if (example_idx_buffer.size() >=
+        kIOBufferSizeInBytes / sizeof(model::SignedExampleIdx)) {
+      RETURN_IF_ERROR(example_idx_writer.WriteValues<model::SignedExampleIdx>(
+          example_idx_buffer));
+      example_idx_buffer.clear();
+    }
+
+    remaining_examples_in_shard--;
+  }
+
+  // Flush buffers.
+  RETURN_IF_ERROR(values_writer.WriteValues(value_buffer));
+  RETURN_IF_ERROR(example_idx_writer.WriteValues<model::SignedExampleIdx>(
+      example_idx_buffer));
+
+  RETURN_IF_ERROR(example_idx_writer.Close());
+  RETURN_IF_ERROR(values_writer.Close());
+
+  if (next_output_shard_idx != request.num_shards_in_output_shards()) {
+    return absl::InternalError("Unexpected number of generated shards.");
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
+    const proto::WorkerRequest::SortNumericalColumn& request,
+    const std::vector<std::pair<float, model::SignedExampleIdx>>&
+        value_and_example_idxs,
+    int64_t num_unique_values,
+    proto::WorkerResult::SortNumericalColumn* result) {
+  proto::CreateDatasetCacheConfig config;
+
+  std::vector<float> boundaries;
+  if (num_unique_values <=
+      request.max_unique_values_for_discretized_numerical()) {
+    ASSIGN_OR_RETURN(boundaries,
+                     ExtractDiscretizedBoundariesWithoutDownsampling(
+                         value_and_example_idxs, num_unique_values));
+
+  } else {
+    ASSIGN_OR_RETURN(
+        boundaries, ExtractDiscretizedBoundariesWithDownsampling(
+                        value_and_example_idxs, num_unique_values,
+                        request.max_unique_values_for_discretized_numerical()));
+  }
+
+  const auto num_discretized_values = boundaries.size() + 1;
+  result->mutable_metadata()->set_num_discretized_values(
+      num_discretized_values);
+
+  result->mutable_metadata()->set_discretized_replacement_missing_value(
+      NumericalToDiscretizedNumerical(boundaries,
+                                      request.replacement_missing_value()));
+
+  // Export the boundary values.
+  FloatColumnWriter boundary_writer;
+  RETURN_IF_ERROR(boundary_writer.Open(file::JoinPath(
+      result->output_directory(), absl::StrCat(kFilenameBoundaryValue, 0))));
+  RETURN_IF_ERROR(boundary_writer.WriteValues(boundaries));
+  RETURN_IF_ERROR(boundary_writer.Close());
+
+  // Indexed the values.
+  ShardedFloatColumnReader values_reader;
+  IntegerColumnWriter indexed_values_writer;
+  bool indexed_values_writer_is_open = false;
+
+  const int buffer_size = kIOBufferSizeInBytes / sizeof(float);
+  std::vector<DiscretizedIndexedNumericalType> indexed_value_buffer;
+
+  RETURN_IF_ERROR(values_reader.Open(
+      file::JoinPath(request.cache_directory(), kFilenameRaw,
+                     absl::StrCat(kFilenameColumn, request.column_idx()),
+                     kFilenameShardNoUnderscore),
+      /*max_num_values=*/buffer_size,
+      /*begin_shard_idx=*/0, /*end_shard_idx=*/request.num_shards()));
+
+  int64_t remaining_examples_in_shard = 0;
+  int next_output_shard_idx = 0;
+
+  while (true) {
+    RETURN_IF_ERROR(values_reader.Next());
+    const auto values = values_reader.Values();
+    if (values.empty()) {
+      break;
+    }
+
+    if (remaining_examples_in_shard == 0) {
+      if (indexed_values_writer_is_open) {
+        // Close the current shard.
+        RETURN_IF_ERROR(indexed_values_writer.Close());
+      }
+      // Open a new shard.
+      RETURN_IF_ERROR(indexed_values_writer.Open(
+          file::JoinPath(result->output_directory(),
+                         absl::StrCat(kFilenameDiscretizedValues,
+                                      next_output_shard_idx++)),
+          /*max_value=*/num_discretized_values));
+      indexed_values_writer_is_open = true;
+      remaining_examples_in_shard = request.num_example_per_output_shards();
+    }
+    remaining_examples_in_shard -= indexed_value_buffer.size();
+
+    indexed_value_buffer.resize(values.size());
+    for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {
+      indexed_value_buffer[value_idx] =
+          NumericalToDiscretizedNumerical(boundaries, values[value_idx]);
+    }
+
+    RETURN_IF_ERROR(
+        indexed_values_writer.WriteValues<DiscretizedIndexedNumericalType>(
+            indexed_value_buffer));
+  }
+
+  RETURN_IF_ERROR(values_reader.Close());
+
+  if (indexed_values_writer_is_open) {
+    RETURN_IF_ERROR(indexed_values_writer.Close());
+  }
+
+  result->mutable_metadata()->set_num_discretized_shards(next_output_shard_idx);
+  return absl::OkStatus();
+}
+
 absl::Status CreateDatasetCacheWorker::Setup(Blob serialized_welcome) {
   ASSIGN_OR_RETURN(welcome_, utils::ParseBinaryProto<proto::WorkerWelcome>(
                                  serialized_welcome));
@@ -272,6 +553,11 @@ utils::StatusOr<Blob> CreateDatasetCacheWorker::RunRequest(
       RETURN_IF_ERROR(
           SeparateDatasetColumns(request.separate_dataset_columns(),
                                  result.mutable_separate_dataset_columns()));
+      break;
+    case proto::WorkerRequest::kSortNumericalColumn:
+      RETURN_IF_ERROR(
+          SortNumericalColumn(request.sort_numerical_column(),
+                              result.mutable_sort_numerical_column()));
       break;
     case proto::WorkerRequest::TYPE_NOT_SET:
       return absl::InvalidArgumentError("Request without type");

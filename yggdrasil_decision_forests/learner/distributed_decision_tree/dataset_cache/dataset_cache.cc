@@ -20,8 +20,10 @@
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/math.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 
 namespace yggdrasil_decision_forests {
@@ -150,6 +152,11 @@ absl::Status CreateDatasetCacheFromShardedFiles(
   RETURN_IF_ERROR(internal::SeparateDatasetColumns(
       dataset_shards, dataset_type, data_spec, cache_directory,
       effective_columns, config, distribute_manager.get(), &metadata));
+
+  // Pre-sort the numerical columns.
+  RETURN_IF_ERROR(internal::SortNumericalColumns(
+      data_spec, cache_directory, effective_columns, config,
+      distribute_manager.get(), &metadata));
 
   // Export the cache header.
   RETURN_IF_ERROR(
@@ -375,6 +382,112 @@ absl::Status SeparateDatasetColumns(
 
   LOG(INFO) << "Column separation done. " << cache_metadata->num_examples()
             << " example(s) found";
+  return absl::OkStatus();
+}
+
+absl::Status SortNumericalColumns(
+    const dataset::proto::DataSpecification& data_spec,
+    absl::string_view cache_directory, const std::vector<int>& columns,
+    const proto::CreateDatasetCacheConfig& config,
+    distribute::AbstractManager* distribute_manager,
+    proto::CacheMetadata* cache_metadata) {
+  LOG(INFO) << "Start sorting numerical columns";
+
+  // Common part of the requests.
+  proto::WorkerRequest generic_request;
+  auto& request = *generic_request.mutable_sort_numerical_column();
+  request.set_output_base_directory(
+      file::JoinPath(cache_directory, kFilenameTmp));
+  request.set_num_examples(cache_metadata->num_examples());
+  request.set_cache_directory(cache_directory);
+
+  // We assume that a cache entry takes 4 bytes.
+  request.set_num_example_per_output_shards(
+      config.index_cache_file_size_bytes() / sizeof(SignedExampleIdx));
+  cache_metadata->set_num_shards_in_index_cache(utils::CeilDiV<int64_t>(
+      cache_metadata->num_examples(), request.num_example_per_output_shards()));
+  request.set_num_shards_in_output_shards(
+      cache_metadata->num_shards_in_index_cache());
+
+  request.set_max_unique_values_for_discretized_numerical(
+      config.max_unique_values_for_discretized_numerical());
+  request.set_force_numerical_discretization(
+      config.force_numerical_discretization());
+
+  int pending_requests = 0;
+  for (int column_idx : columns) {
+    const auto& column_spec = data_spec.columns(column_idx);
+    if (column_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
+      continue;
+    }
+
+    // Check if the job was already executed.
+    const auto metadata_path = file::JoinPath(
+        cache_directory, kFilenameIndexed,
+        absl::StrCat(kFilenameColumn, column_idx), kFilenamePresortedMetaData);
+    ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(metadata_path));
+    if (already_exist) {
+      proto::SortedColumnMetadata metadata;
+      RETURN_IF_ERROR(
+          file::GetBinaryProto(metadata_path, &metadata, file::Defaults()));
+
+      auto* column_metadata =
+          cache_metadata->mutable_columns(column_idx)->mutable_numerical();
+      column_metadata->MergeFrom(metadata.metadata());
+      LOG(INFO) << "The result of job for column #" << column_idx
+                << " is already there.";
+      continue;
+    }
+
+    // Create the job.
+    request.set_column_idx(column_idx);
+    request.set_num_shards(cache_metadata->num_shards_in_feature_cache());
+    request.set_replacement_missing_value(cache_metadata->columns(column_idx)
+                                              .numerical()
+                                              .replacement_missing_value());
+
+    RETURN_IF_ERROR(
+        distribute_manager->AsynchronousProtoRequest(generic_request));
+    pending_requests++;
+  }
+
+  // Receive and rename the results.
+  for (int result_idx = 0; result_idx < pending_requests; result_idx++) {
+    LOG_INFO_EVERY_N_SEC(10, _ << "\tsorting numerical columns "
+                               << (result_idx + 1) << "/" << pending_requests);
+
+    ASSIGN_OR_RETURN(
+        const auto generic_result,
+        distribute_manager->NextAsynchronousProtoAnswer<proto::WorkerResult>());
+    const auto& result = generic_result.sort_numerical_column();
+
+    // Rename the output directory.
+    const auto final_directory =
+        file::JoinPath(cache_directory, kFilenameIndexed,
+                       absl::StrCat(kFilenameColumn, result.column_idx()));
+    ASSIGN_OR_RETURN(const bool already_exist,
+                     file::FileExists(final_directory));
+    if (already_exist) {
+      LOG(WARNING) << "The directory result of job on column #"
+                   << result.column_idx() << " already exist.";
+    } else {
+      RETURN_IF_ERROR(file::Rename(result.output_directory(), final_directory,
+                                   file::Defaults()));
+    }
+
+    // Save the meta-data information.
+    const auto metadata_path =
+        file::JoinPath(final_directory, kFilenamePresortedMetaData);
+
+    proto::SortedColumnMetadata metadata;
+    *metadata.mutable_metadata() = result.metadata();
+    auto* column_metadata = cache_metadata->mutable_columns(result.column_idx())
+                                ->mutable_numerical();
+    column_metadata->MergeFrom(result.metadata());
+
+    RETURN_IF_ERROR(
+        file::SetBinaryProto(metadata_path, metadata, file::Defaults()));
+  }
   return absl::OkStatus();
 }
 

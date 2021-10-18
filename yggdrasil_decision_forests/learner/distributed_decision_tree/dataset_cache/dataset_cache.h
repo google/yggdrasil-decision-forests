@@ -83,6 +83,14 @@ absl::Status SeparateDatasetColumns(
     distribute::AbstractManager* distribute_manager,
     proto::CacheMetadata* cache_metadata);
 
+// Sort the numerical columns.
+absl::Status SortNumericalColumns(
+    const dataset::proto::DataSpecification& data_spec,
+    absl::string_view cache_directory, const std::vector<int>& columns,
+    const proto::CreateDatasetCacheConfig& config,
+    distribute::AbstractManager* distribute_manager,
+    proto::CacheMetadata* cache_metadata);
+
 // Initializes the meta-data content from the dataspec, column and configs.
 // TODO(gbm): Make "InitializeMetadata" return a "CacheMetadata" directly.
 absl::Status InitializeMetadata(

@@ -173,6 +173,121 @@ TEST_F(End2End, CategoricalInOrder) {
   EXPECT_EQ(histogram[2], 1777);
 }
 
+// Check an sorted numerical categorical column.
+TEST_F(End2End, SortedNumericalColumn) {
+  const auto column_spec = data_spec_.columns(0);
+
+  // List the delta values.
+  ShardedFloatColumnReader delta_reader;
+  CHECK_OK(delta_reader.Open(file::JoinPath(cache_path_, kFilenameIndexed,
+                                            absl::StrCat(kFilenameColumn, 0),
+                                            kFilenameDeltaValueNoUnderscore),
+                             /*max_num_values=*/1000, 0, 1));
+
+  std::vector<float> delta_values;
+  float last_value = column_spec.numerical().min_value() - 1;
+  while (true) {
+    CHECK_OK(delta_reader.Next());
+    const auto values = delta_reader.Values();
+    if (values.empty()) {
+      break;
+    }
+    for (const float value : values) {
+      // The value are stored in strict increasing order.
+      EXPECT_LT(last_value, value);
+      delta_values.push_back(value);
+      last_value = value;
+    }
+  }
+
+  // List the example indices.
+  ShardedIntegerColumnReader<int64_t> example_idx_reader;
+  CHECK_OK(example_idx_reader.Open(
+      file::JoinPath(cache_path_, kFilenameIndexed,
+                     absl::StrCat(kFilenameColumn, 0),  // "age" column.
+                     kFilenameExampleIdxNoUnderscore),
+      /*max_value=*/MaxValueWithDeltaBit(meta_data_.num_examples()),
+      /*max_num_values=*/1000,
+      /*begin_shard_idx=*/0,
+      /*end_shard_idx=*/meta_data_.num_shards_in_index_cache()));
+
+  // Grab and sort the values of the feature.
+  auto ground_truth_values =
+      dataset_.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(0)
+          ->values();
+  for (auto& value : ground_truth_values) {
+    if (std::isnan(value)) {
+      value = column_spec.numerical().mean();
+    }
+  }
+  auto sorted_ground_truth_values = ground_truth_values;
+  std::sort(sorted_ground_truth_values.begin(),
+            sorted_ground_truth_values.end());
+
+  const auto mask_delta_bit = MaskDeltaBit(meta_data_.num_examples());
+  const auto mask_example_idx = MaskExampleIdx(meta_data_.num_examples());
+
+  int delta_bit_idx = 0;
+  size_t num_examples = 0;
+  while (true) {
+    CHECK_OK(example_idx_reader.Next());
+    const auto values = example_idx_reader.Values();
+    if (values.empty()) {
+      break;
+    }
+    for (const int64_t value : values) {
+      const auto example_idx = value & mask_example_idx;
+      EXPECT_EQ(ground_truth_values[example_idx],
+                sorted_ground_truth_values[num_examples]);
+      if (value & mask_delta_bit) {
+        delta_bit_idx++;
+      }
+      EXPECT_EQ(delta_values[delta_bit_idx], ground_truth_values[example_idx]);
+      num_examples++;
+    }
+  }
+
+  CHECK_OK(example_idx_reader.Close());
+  CHECK_OK(delta_reader.Close());
+
+  EXPECT_EQ(num_examples, 22792);
+  EXPECT_EQ(delta_values.size(), 73);
+}
+
+// Check an in order numerical column.
+TEST_F(End2End, NumericalInOrderDiscretized) {
+  ShardedFloatColumnReader reader;
+  CHECK_OK(reader.Open(
+      file::JoinPath(
+          cache_path_, kFilenameRaw,
+          absl::StrCat(kFilenameColumn, 4),  // "education_num" column.
+          kFilenameShardNoUnderscore),
+      /*max_num_values=*/1000,
+      /*begin_shard_idx=*/0,
+      /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache()));
+
+  const auto& ground_truth_values =
+      dataset_.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(4)
+          ->values();
+
+  size_t num_examples = 0;
+  double sum = 0;
+  while (true) {
+    CHECK_OK(reader.Next());
+    const auto values = reader.Values();
+    if (values.empty()) {
+      break;
+    }
+    for (const float value : values) {
+      EXPECT_EQ(value, ground_truth_values[num_examples]);
+      sum += value;
+      num_examples++;
+    }
+  }
+  CHECK_OK(reader.Close());
+  EXPECT_EQ(num_examples, 22792);
+}
+
 }  // namespace
 }  // namespace dataset_cache
 }  // namespace distributed_decision_tree

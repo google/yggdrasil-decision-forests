@@ -99,9 +99,52 @@ std::string RawColumnFileDirectory(absl::string_view directory, int column_idx);
 uint64_t MaskDeltaBit(uint64_t num_examples);
 uint64_t MaskExampleIdx(uint64_t num_examples);
 
-// Integer value such that [-MaxValue-1, MaxValue] use the same encoding
-// precision as "num_examples" examples and a delta bit.
-uint64_t MaxValue(uint64_t num_examples);
+// Maximum possible value of an "example index with delta bit" where the example
+// index (without the delta bit) is in [0,num_examples).
+//
+// For example:
+//   num_examples = 10 = 0b00001010
+//   MaxValueWithDeltaBit(num_examples) = 0b00011010 = 26
+uint64_t MaxValueWithDeltaBit(uint64_t num_examples);
+
+// Converts a numerical value into a discretized numerical value.
+// This function is not compatible with
+// (nondistribute)dataset::NumericalToDiscretizedNumerical.
+DiscretizedIndexedNumericalType NumericalToDiscretizedNumerical(
+    const std::vector<float>& boundaries, float value);
+
+// Converts a discretized numerical value into a numerical value.
+// This function is not compatible with
+// (nondistribute)dataset::DiscretizedNumericalToNumerical.
+float DiscretizedNumericalToNumerical(const std::vector<float>& boundaries,
+                                      DiscretizedIndexedNumericalType value);
+
+// Generates the boundaries of a discretized numerical feature.
+//
+// Creates exactly enought boundaries to separate all the values in
+// "value_and_example_idxs".
+//
+// "value_and_example_idxs" needs to be sorted according to the float value.
+utils::StatusOr<std::vector<float>>
+ExtractDiscretizedBoundariesWithoutDownsampling(
+    const std::vector<std::pair<float, model::SignedExampleIdx>>&
+        value_and_example_idxs,
+    int64_t num_unique_values);
+
+// Generates the boundaries of a discretized numerical feature.
+//
+// Creates "num_discretized_values" boundaries to separate the values in
+// "value_and_example_idxs" as well as possible. The boudaries are essentially
+// quantiles (with some improvement in case a given value speads over multiple
+// quantiles).
+//
+// "value_and_example_idxs" needs to be sorted according to the float value.
+utils::StatusOr<std::vector<float>>
+ExtractDiscretizedBoundariesWithDownsampling(
+    const std::vector<std::pair<float, model::SignedExampleIdx>>&
+        value_and_example_idxs,
+    int64_t num_unique_values, int64_t num_discretized_values);
+
 }  // namespace dataset_cache
 }  // namespace distributed_decision_tree
 }  // namespace model
