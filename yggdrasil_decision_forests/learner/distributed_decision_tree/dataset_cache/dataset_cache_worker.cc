@@ -543,6 +543,122 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
   return absl::OkStatus();
 }
 
+absl::Status ConvertPartialToFinalRawDataNumerical(
+    const absl::string_view input_file, const absl::string_view output_file,
+    const proto::WorkerRequest::ConvertPartialToFinalRawData::Numerical&
+        transformation) {
+  const int input_buffer_size = kIOBufferSizeInBytes / sizeof(float);
+
+  FloatColumnReader input_stream;
+  RETURN_IF_ERROR(input_stream.Open(input_file, input_buffer_size));
+
+  FloatColumnWriter output_stream;
+  RETURN_IF_ERROR(output_stream.Open(output_file));
+
+  std::vector<float> transform_buffer;
+  while (true) {
+    RETURN_IF_ERROR(input_stream.Next());
+    const auto values = input_stream.Values();
+    if (values.empty()) {
+      break;
+    }
+
+    transform_buffer.resize(values.size());
+    std::transform(values.begin(), values.end(), transform_buffer.begin(),
+                   [&transformation](const float value) -> float {
+                     if (std::isnan(value)) {
+                       return transformation.nan_value_replacement();
+                     } else {
+                       return value;
+                     }
+                   });
+
+    RETURN_IF_ERROR(output_stream.WriteValues(transform_buffer));
+  }
+
+  RETURN_IF_ERROR(input_stream.Close());
+  RETURN_IF_ERROR(output_stream.Close());
+  return absl::OkStatus();
+}
+
+absl::Status ConvertPartialToFinalRawDataCategoricalInt(
+    const absl::string_view input_file, const absl::string_view output_file,
+    const proto::WorkerRequest::ConvertPartialToFinalRawData::CategoricalInt&
+        transformation) {
+  const int input_buffer_size = kIOBufferSizeInBytes / sizeof(float);
+
+  IntegerColumnReader<int32_t> input_stream;
+  RETURN_IF_ERROR(input_stream.Open(
+      input_file, std::numeric_limits<int32_t>::max(), input_buffer_size));
+
+  IntegerColumnWriter output_stream;
+  RETURN_IF_ERROR(output_stream.Open(output_file, transformation.max_value()));
+
+  while (true) {
+    RETURN_IF_ERROR(input_stream.Next());
+    const auto values = input_stream.Values();
+    if (values.empty()) {
+      break;
+    }
+    RETURN_IF_ERROR(output_stream.WriteValues(values));
+  }
+
+  RETURN_IF_ERROR(input_stream.Close());
+  RETURN_IF_ERROR(output_stream.Close());
+  return absl::OkStatus();
+}
+
+absl::Status CreateDatasetCacheWorker::ConvertPartialToFinalRawData(
+    const proto::WorkerRequest::ConvertPartialToFinalRawData& request,
+    proto::WorkerResult::ConvertPartialToFinalRawData* result) {
+  LOG(INFO) << "Convert partial to final for column #" << request.column_idx()
+            << " and shard #" << request.shard_idx();
+
+  // Get the various paths.
+  const auto tmp_file = file::JoinPath(request.final_cache_directory(),
+                                       kFilenameTmp, utils::GenUniqueId());
+  const auto input_file =
+      PartialRawColumnFilePath(request.partial_cache_directory(),
+                               request.column_idx(), request.shard_idx());
+  const auto output_file =
+      RawColumnFilePath(request.final_cache_directory(), request.column_idx(),
+                        request.shard_idx(), request.num_shards());
+  const auto output_directory = RawColumnFileDirectory(
+      request.final_cache_directory(), request.column_idx());
+
+  RETURN_IF_ERROR(
+      file::RecursivelyCreateDir(output_directory, file::Defaults()));
+
+  ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(output_file));
+  if (already_exist) {
+    LOG(INFO) << "The result already exist.";
+    return absl::OkStatus();
+  }
+
+  switch (request.transformation_case()) {
+    case proto::WorkerRequest_ConvertPartialToFinalRawData::kNumerical:
+      RETURN_IF_ERROR(ConvertPartialToFinalRawDataNumerical(
+          input_file, tmp_file, request.numerical()));
+      break;
+
+    case proto::WorkerRequest_ConvertPartialToFinalRawData::kCategoricalInt:
+      RETURN_IF_ERROR(ConvertPartialToFinalRawDataCategoricalInt(
+          input_file, tmp_file, request.categorical_int()));
+      break;
+
+    case proto::WorkerRequest_ConvertPartialToFinalRawData::
+        TRANSFORMATION_NOT_SET:
+      return absl::InternalError("Transformation not set");
+  }
+
+  if (!file::Rename(tmp_file, output_file, file::Defaults()).ok()) {
+    LOG(WARNING) << "Already existing final file. Multiple workers seems to "
+                    "work on the same shard.";
+  }
+
+  return absl::OkStatus();
+}
+
 absl::Status CreateDatasetCacheWorker::Setup(Blob serialized_welcome) {
   ASSIGN_OR_RETURN(welcome_, utils::ParseBinaryProto<proto::WorkerWelcome>(
                                  serialized_welcome));
@@ -564,6 +680,11 @@ utils::StatusOr<Blob> CreateDatasetCacheWorker::RunRequest(
       RETURN_IF_ERROR(
           SortNumericalColumn(request.sort_numerical_column(),
                               result.mutable_sort_numerical_column()));
+      break;
+    case proto::WorkerRequest::kConvertPartialToFinalRawData:
+      RETURN_IF_ERROR(ConvertPartialToFinalRawData(
+          request.convert_partial_to_final_raw_data(),
+          result.mutable_convert_partial_to_final_raw_data()));
       break;
     case proto::WorkerRequest::TYPE_NOT_SET:
       return absl::InvalidArgumentError("Request without type");

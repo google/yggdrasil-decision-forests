@@ -39,6 +39,9 @@ const char* const FORMAT_CSV = "csv";
 // TFRecord of binary serialized TensorFlow.Example proto. Compressed with GZip.
 const char* const FORMAT_TFE_TFRECORD = "tfrecord+tfe";
 
+// Partially computed (e.g. non indexed) dataset cache.
+const char* const FORMAT_PARTIAL_DATASET_CACHE = "partial_dataset_cache";
+
 // Splits the format and path from a typed path.
 std::pair<std::string, proto::DatasetFormat> GetDatasetPathAndType(
     absl::string_view typed_path);

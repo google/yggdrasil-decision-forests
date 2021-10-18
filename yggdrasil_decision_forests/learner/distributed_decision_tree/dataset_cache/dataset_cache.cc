@@ -93,6 +93,93 @@ utils::StatusOr<std::vector<int>> GetColumnsOrAll(
 
 }  // namespace
 
+absl::Status CreateDatasetCacheFromPartialDatasetCache(
+    const dataset::proto::DataSpecification& data_spec,
+    absl::string_view partial_cache_directory,
+    absl::string_view final_cache_directory,
+    const proto::CreateDatasetCacheConfig& config,
+    const distribute::proto::Config& distribute_config,
+    const bool delete_source_file) {
+  const auto begin = absl::Now();
+  LOG(INFO) << "Create dataset cache " << final_cache_directory
+            << " from partial dataset cache " << partial_cache_directory;
+
+  // Check if the cache is already there.
+  const auto done_path = file::JoinPath(final_cache_directory, kFilenameDone);
+  ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(done_path));
+  if (already_exist) {
+    LOG(INFO) << "The dataset cache already exist.";
+    return absl::OkStatus();
+  }
+
+  // Create the directory structure.
+  RETURN_IF_ERROR(
+      file::RecursivelyCreateDir(final_cache_directory, file::Defaults()));
+  RETURN_IF_ERROR(file::RecursivelyCreateDir(
+      file::JoinPath(final_cache_directory, kFilenameIndexed),
+      file::Defaults()));
+  RETURN_IF_ERROR(file::RecursivelyCreateDir(
+      file::JoinPath(final_cache_directory, kFilenameRaw), file::Defaults()));
+  RETURN_IF_ERROR(file::RecursivelyCreateDir(
+      file::JoinPath(final_cache_directory, kFilenameTmp), file::Defaults()));
+
+  // Initialize the distribution manager.
+  proto::WorkerWelcome welcome;
+  ASSIGN_OR_RETURN(
+      auto distribute_manager,
+      distribute::CreateManager(
+          distribute_config,
+          /*worker_name=*/"CREATE_DATASET_CACHE_WORKER",
+          /*welcome_blob=*/welcome.SerializeAsString(),
+          // Each worker is expected to do up to QueryPerWorker tasks in
+          // parallel.
+          /*parallel_execution_per_worker=*/kNumParallelQueriesPerWorker));
+
+  std::vector<int> columns(data_spec.columns_size());
+  std::iota(columns.begin(), columns.end(), 0);
+
+  proto::CacheMetadata metadata;
+  RETURN_IF_ERROR(
+      internal::InitializeMetadata(data_spec, columns, config, &metadata));
+
+  // Load the partial meta-data.
+  proto::PartialDatasetMetadata partial_meta_data;
+  CHECK_OK(file::GetBinaryProto(
+      file::JoinPath(partial_cache_directory, kFilenamePartialMetaData),
+      &partial_meta_data, file::Defaults()));
+  metadata.set_num_examples(data_spec.created_num_rows());
+  metadata.set_num_shards_in_feature_cache(partial_meta_data.num_shards());
+
+  // TODO(gbm): Index the categorical-string features.
+
+  // Copy / transform the raw feature values.
+  RETURN_IF_ERROR(internal::ConvertPartialToFinalRawData(
+      data_spec, partial_meta_data, partial_cache_directory,
+      final_cache_directory, columns, config, delete_source_file,
+      distribute_manager.get(), &metadata));
+
+  // Pre-sort the numerical columns.
+  RETURN_IF_ERROR(internal::SortNumericalColumns(
+      data_spec, final_cache_directory, columns, config,
+      distribute_manager.get(), &metadata));
+
+  // Export the cache header.
+  const auto metadata_path =
+      file::JoinPath(final_cache_directory, kFilenameMetaData);
+  RETURN_IF_ERROR(
+      file::SetBinaryProto(metadata_path, metadata, file::Defaults()));
+
+  RETURN_IF_ERROR(distribute_manager->Done());
+  RETURN_IF_ERROR(file::SetContent(done_path, "done"));
+
+  LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
+  LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
+
+  LOG(INFO) << "Raw meta-data:\n" << metadata.DebugString();
+
+  return absl::OkStatus();
+}
+
 absl::Status CreateDatasetCacheFromShardedFiles(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
@@ -104,13 +191,10 @@ absl::Status CreateDatasetCacheFromShardedFiles(
             << typed_path;
 
   // Check if the cache is already there.
-  proto::CacheMetadata metadata;
-  const auto metadata_path = file::JoinPath(cache_directory, kFilenameMetaData);
-  ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(metadata_path));
+  const auto done_path = file::JoinPath(cache_directory, kFilenameDone);
+  ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(done_path));
   if (already_exist) {
     LOG(INFO) << "The dataset cache already exist.";
-    RETURN_IF_ERROR(
-        file::GetBinaryProto(metadata_path, &metadata, file::Defaults()));
     return absl::OkStatus();
   }
 
@@ -121,6 +205,8 @@ absl::Status CreateDatasetCacheFromShardedFiles(
       file::JoinPath(cache_directory, kFilenameIndexed), file::Defaults()));
   RETURN_IF_ERROR(file::RecursivelyCreateDir(
       file::JoinPath(cache_directory, kFilenameRaw), file::Defaults()));
+  RETURN_IF_ERROR(file::RecursivelyCreateDir(
+      file::JoinPath(cache_directory, kFilenameTmp), file::Defaults()));
 
   // Initialize the distribution manager.
   proto::WorkerWelcome welcome;
@@ -139,6 +225,7 @@ absl::Status CreateDatasetCacheFromShardedFiles(
                    GetColumnsOrAll(data_spec, columns, config));
   LOG(INFO) << "Found " << effective_columns.size() << " column(s)";
 
+  proto::CacheMetadata metadata;
   RETURN_IF_ERROR(internal::InitializeMetadata(data_spec, effective_columns,
                                                config, &metadata));
 
@@ -159,10 +246,12 @@ absl::Status CreateDatasetCacheFromShardedFiles(
       distribute_manager.get(), &metadata));
 
   // Export the cache header.
+  const auto metadata_path = file::JoinPath(cache_directory, kFilenameMetaData);
   RETURN_IF_ERROR(
       file::SetBinaryProto(metadata_path, metadata, file::Defaults()));
 
   RETURN_IF_ERROR(distribute_manager->Done());
+  RETURN_IF_ERROR(file::SetContent(done_path, "done"));
 
   LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
   LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
@@ -382,6 +471,69 @@ absl::Status SeparateDatasetColumns(
 
   LOG(INFO) << "Column separation done. " << cache_metadata->num_examples()
             << " example(s) found";
+  return absl::OkStatus();
+}
+
+absl::Status ConvertPartialToFinalRawData(
+    const dataset::proto::DataSpecification& data_spec,
+    const proto::PartialDatasetMetadata& partial_metadata,
+    absl::string_view partial_cache_directory,
+    absl::string_view final_cache_directory, const std::vector<int>& columns,
+    const proto::CreateDatasetCacheConfig& config,
+    const bool delete_source_file,
+    distribute::AbstractManager* distribute_manager,
+    proto::CacheMetadata* cache_metadata) {
+  LOG(INFO) << "Convert partial to final raw data";
+
+  // Common part of the requests.
+  proto::WorkerRequest generic_request;
+  auto& request = *generic_request.mutable_convert_partial_to_final_raw_data();
+  request.set_partial_cache_directory(partial_cache_directory);
+  request.set_final_cache_directory(final_cache_directory);
+  request.set_num_shards(partial_metadata.num_shards());
+  request.set_delete_source_file(delete_source_file);
+
+  int pending_requests = 0;
+  for (int shard_idx = 0; shard_idx < partial_metadata.num_shards();
+       shard_idx++) {
+    request.set_shard_idx(shard_idx);
+    for (int column_idx : columns) {
+      request.set_column_idx(column_idx);
+
+      const auto& column_spec = data_spec.columns(column_idx);
+      switch (column_spec.type()) {
+        case dataset::proto::NUMERICAL:
+          request.mutable_numerical()->set_nan_value_replacement(
+              cache_metadata->columns(column_idx)
+                  .numerical()
+                  .replacement_missing_value());
+          break;
+        case dataset::proto::CATEGORICAL:
+          request.mutable_categorical_int()->set_max_value(
+              cache_metadata->columns(column_idx).categorical().num_values());
+          break;
+        default:
+          return absl::InternalError(absl::Substitute(
+              "Conversion not implemented for column of type $0",
+              column_spec.type()));
+      }
+
+      RETURN_IF_ERROR(
+          distribute_manager->AsynchronousProtoRequest(generic_request));
+      pending_requests++;
+    }
+  }
+
+  // Receive and rename the results.
+  for (int result_idx = 0; result_idx < pending_requests; result_idx++) {
+    LOG_INFO_EVERY_N_SEC(10, _ << "\tconverted columns " << (result_idx + 1)
+                               << "/" << pending_requests);
+
+    ASSIGN_OR_RETURN(
+        const auto generic_result,
+        distribute_manager->NextAsynchronousProtoAnswer<proto::WorkerResult>());
+  }
+
   return absl::OkStatus();
 }
 

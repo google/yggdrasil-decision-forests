@@ -20,6 +20,7 @@
 
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
@@ -170,6 +171,40 @@ class DatasetCacheReader {
 }  // namespace dataset_cache
 }  // namespace distributed_decision_tree
 }  // namespace model
+
+namespace dataset {
+
+// Creates a dataspec for a partial dataset cache.
+//
+// See "dataset_cache.h" for an explanation of the dataset cache.
+class PartialDatasetCacheDataSpecCreator : public AbstractDataSpecCreator {
+ public:
+  void InferColumnsAndTypes(const std::vector<std::string>& paths,
+                            const proto::DataSpecificationGuide& guide,
+                            proto::DataSpecification* data_spec) override;
+
+  void ComputeColumnStatistics(
+      const std::vector<std::string>& paths,
+      const proto::DataSpecificationGuide& guide,
+      proto::DataSpecification* data_spec,
+      proto::DataSpecificationAccumulator* accumulator) override;
+
+  utils::StatusOr<int64_t> CountExamples(absl::string_view path) override;
+
+ private:
+  // Compute the statistics of a single column on a single shard.
+  static void ComputeColumnStatisticsColumnAndShard(
+      int col_idx,
+      const model::distributed_decision_tree::dataset_cache::proto::
+          PartialColumnShardMetadata& shard_meta_data,
+      proto::DataSpecification* data_spec,
+      proto::DataSpecificationAccumulator* accumulator);
+};
+
+REGISTER_AbstractDataSpecCreator(PartialDatasetCacheDataSpecCreator,
+                                 "FORMAT_PARTIAL_DATASET_CACHE");
+
+}  // namespace dataset
 }  // namespace yggdrasil_decision_forests
 
 #endif  // YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_DATASET_CACHE_READER_H_

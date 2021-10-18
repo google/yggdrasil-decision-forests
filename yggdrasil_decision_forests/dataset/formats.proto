@@ -23,4 +23,5 @@ enum DatasetFormat {
   FORMAT_CSV = 1;
   reserved 2, 3, 4, 6;
   FORMAT_TFE_TFRECORD = 5;
+  FORMAT_PARTIAL_DATASET_CACHE = 7;
 }

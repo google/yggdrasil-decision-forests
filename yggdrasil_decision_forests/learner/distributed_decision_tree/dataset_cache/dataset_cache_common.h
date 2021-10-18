@@ -45,6 +45,10 @@ constexpr char kFilenameShardNoUnderscore[] = "shard";
 
 constexpr char kFilenameIndexed[] = "indexed";
 constexpr char kFilenameRaw[] = "raw";
+constexpr char kFilenamePartialRaw[] = "partial_raw";
+constexpr char kFilenameTmp[] = "tmp";
+constexpr char kFilenameDone[] = "done";
+constexpr char kFilenamePartialDone[] = "partial_done";
 
 constexpr char kFilenameExampleIdx[] = "example_idx_with_delta_";
 constexpr char kFilenameExampleIdxNoUnderscore[] = "example_idx_with_delta";
@@ -61,10 +65,9 @@ constexpr char kFilenamePresortedMetaData[] = "presorted_metadata.pb";
 constexpr char kFilenameMetaData[] = "metadata.pb";
 constexpr char kFilenameMetaDataPostfix[] = "_metadata.pb";
 constexpr char kFilenameShardMetadataNoUnderscore[] = "shard_metadata";
+constexpr char kFilenamePartialMetaData[] = "partial_metadata.pb";
 
-constexpr char kFilenameTmp[] = "tmp";
-
-// Path of the file containing the column data.
+// Path of the directory containing the column data.
 std::string ColumnPath(absl::string_view directory, int column_idx);
 
 // Path of the file containing the meta data of a single shard.
@@ -75,8 +78,16 @@ std::string ShardMetadataPath(absl::string_view directory, int shard_idx,
 std::string RawColumnFilePath(absl::string_view directory, int column_idx,
                               int shard_idx, int num_shards);
 
+// Path to the file containing the partial raw column data.
+std::string PartialRawColumnFilePath(absl::string_view directory,
+                                     int column_idx, int shard_idx);
+
 // Path to the directory containing the raw / in-order column data.
 std::string RawColumnFileDirectory(absl::string_view directory, int column_idx);
+
+// Path to the directory containing the partial raw column data.
+std::string PartialRawColumnFileDirectory(absl::string_view directory,
+                                          int column_idx);
 
 // Background:
 // An "example index with delta bit" is an example index (i.e. an integer

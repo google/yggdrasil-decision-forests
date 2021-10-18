@@ -10,6 +10,7 @@ cc_library_ydf(
     deps = [
         ":csv_example_reader",
         ":csv_example_writer",
+        "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_reader",
     ] + select({
         "//yggdrasil_decision_forests:use_tensorflow_io": [":tf_example_io_tfrecord"],
         "//conditions:default": [

@@ -22,6 +22,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_reader.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -32,6 +33,8 @@ namespace model {
 namespace distributed_decision_tree {
 namespace dataset_cache {
 namespace {
+
+using test::EqualsProto;
 
 class End2End : public ::testing::Test {
  public:
@@ -286,6 +289,225 @@ TEST_F(End2End, NumericalInOrderDiscretized) {
   }
   CHECK_OK(reader.Close());
   EXPECT_EQ(num_examples, 22792);
+}
+
+class TestCreateDatasetCacheFromPartialDatasetCache : public ::testing::Test {
+ public:
+  void SetUp() override {
+    const auto partial_dataset_cache = CreatePartialCache();
+
+    // Create the dataspec from the partial dataspec.
+    dataset::CreateDataSpec(
+        absl::StrCat("partial_dataset_cache:", partial_dataset_cache), false,
+        {}, &data_spec_);
+
+    // Convert the partial cache into a (final) cache.
+
+    // Multi-threads distribution.
+    distribute::proto::Config distribute_config;
+    distribute_config.set_implementation_key("MULTI_THREAD");
+
+    proto::CreateDatasetCacheConfig config;
+
+    cache_path_ = file::JoinPath(test::TmpDirectory(),
+                                 "cache_from_partial_dataset_cache");
+    EXPECT_OK(CreateDatasetCacheFromPartialDatasetCache(
+        data_spec_, partial_dataset_cache, cache_path_, config,
+        distribute_config, /*delete_source_file=*/true));
+
+    // Try to generate the cache again. Will be instantaneous as the cache is
+    // already there.
+    EXPECT_OK(CreateDatasetCacheFromPartialDatasetCache(
+        data_spec_, partial_dataset_cache, cache_path_, config,
+        distribute_config, /*delete_source_file=*/true));
+
+    meta_data_ = LoadCacheMetadata(cache_path_).value();
+  }
+
+  void WriteFloatValues(absl::string_view path,
+                        absl::Span<const float> values) {
+    FloatColumnWriter writer;
+    CHECK_OK(writer.Open(path));
+    CHECK_OK(writer.WriteValues(values));
+    CHECK_OK(writer.Close());
+  }
+
+  void WriteInt32Values(absl::string_view path,
+                        absl::Span<const int32_t> values) {
+    IntegerColumnWriter writer;
+    CHECK_OK(writer.Open(path, std::numeric_limits<int32_t>::max()));
+    CHECK_OK(writer.WriteValues(values));
+    CHECK_OK(writer.Close());
+  }
+
+  std::string CreatePartialCache() {
+    // Create a partial cache.
+    const auto partial_dataset_cache =
+        file::JoinPath(test::TmpDirectory(), "partial_dataset_cache");
+
+    CreatePartialCacheFeature0(partial_dataset_cache);
+    CreatePartialCacheFeature1(partial_dataset_cache);
+
+    proto::PartialDatasetMetadata meta_data;
+    meta_data.add_column_names("f0");
+    meta_data.add_column_names("f1");
+    meta_data.set_num_shards(2);
+    CHECK_OK(file::SetBinaryProto(
+        file::JoinPath(partial_dataset_cache, kFilenamePartialMetaData),
+        meta_data, file::Defaults()));
+
+    return partial_dataset_cache;
+  }
+
+  void CreatePartialCacheFeature0(absl::string_view partial_dataset_cache) {
+    const int feature_idx = 0;
+
+    CHECK_OK(file::RecursivelyCreateDir(
+        PartialRawColumnFileDirectory(partial_dataset_cache, feature_idx),
+        file::Defaults()));
+
+    {
+      WriteFloatValues(PartialRawColumnFilePath(partial_dataset_cache,
+                                                feature_idx, /*shard_idx=*/0),
+                       {1, 5, 2, 4, 3});
+
+      proto::PartialColumnShardMetadata feature_shard_meta_data;
+      feature_shard_meta_data.set_num_examples(5);
+      feature_shard_meta_data.set_num_missing_examples(0);
+      feature_shard_meta_data.mutable_numerical()->set_mean(
+          (1. + 5. + 2. + 4. + 3.) / 5);
+
+      CHECK_OK(file::SetBinaryProto(
+          absl::StrCat(PartialRawColumnFilePath(partial_dataset_cache,
+                                                feature_idx, /*shard_idx=*/0),
+                       kFilenameMetaDataPostfix),
+          feature_shard_meta_data, file::Defaults()));
+    }
+
+    {
+      WriteFloatValues(PartialRawColumnFilePath(partial_dataset_cache,
+                                                feature_idx, /*shard_idx=*/1),
+                       {1, 2, 3, std::numeric_limits<float>::quiet_NaN(),
+                        std::numeric_limits<float>::quiet_NaN()});
+
+      proto::PartialColumnShardMetadata feature_shard_meta_data;
+      feature_shard_meta_data.set_num_examples(5);
+      feature_shard_meta_data.set_num_missing_examples(2);
+      feature_shard_meta_data.mutable_numerical()->set_mean((1. + 2. + 3.) / 3);
+
+      CHECK_OK(file::SetBinaryProto(
+          absl::StrCat(PartialRawColumnFilePath(partial_dataset_cache,
+                                                feature_idx, /*shard_idx=*/1),
+                       kFilenameMetaDataPostfix),
+          feature_shard_meta_data, file::Defaults()));
+    }
+  }
+
+  void CreatePartialCacheFeature1(absl::string_view partial_dataset_cache) {
+    const int feature_idx = 1;
+
+    CHECK_OK(file::RecursivelyCreateDir(
+        PartialRawColumnFileDirectory(partial_dataset_cache, feature_idx),
+        file::Defaults()));
+
+    {
+      WriteInt32Values(
+          PartialRawColumnFilePath(partial_dataset_cache, feature_idx,
+                                   /*shard_idx=*/0),
+          {1, 5, 2, 4, 3});
+
+      proto::PartialColumnShardMetadata feature_shard_meta_data;
+      feature_shard_meta_data.set_num_examples(5);
+      feature_shard_meta_data.set_num_missing_examples(0);
+      feature_shard_meta_data.mutable_categorical()
+          ->set_number_of_unique_values(6);
+
+      CHECK_OK(file::SetBinaryProto(
+          absl::StrCat(PartialRawColumnFilePath(partial_dataset_cache,
+                                                feature_idx, /*shard_idx=*/0),
+                       kFilenameMetaDataPostfix),
+          feature_shard_meta_data, file::Defaults()));
+    }
+
+    {
+      WriteInt32Values(
+          PartialRawColumnFilePath(partial_dataset_cache, feature_idx,
+                                   /*shard_idx=*/1),
+          {1, 2, 3, -1, -1});
+
+      proto::PartialColumnShardMetadata feature_shard_meta_data;
+      feature_shard_meta_data.set_num_examples(5);
+      feature_shard_meta_data.set_num_missing_examples(2);
+      feature_shard_meta_data.mutable_categorical()
+          ->set_number_of_unique_values(4);
+
+      CHECK_OK(file::SetBinaryProto(
+          absl::StrCat(PartialRawColumnFilePath(partial_dataset_cache,
+                                                feature_idx, /*shard_idx=*/1),
+                       kFilenameMetaDataPostfix),
+          feature_shard_meta_data, file::Defaults()));
+    }
+  }
+
+  dataset::proto::DataSpecification data_spec_;
+  std::string cache_path_;
+  proto::CacheMetadata meta_data_;
+  dataset::VerticalDataset dataset_;
+};
+
+TEST_F(TestCreateDatasetCacheFromPartialDatasetCache, Base) {
+  proto::DatasetCacheReaderOptions options;
+  auto reader = DatasetCacheReader::Create(cache_path_, options).value();
+  EXPECT_EQ(reader->num_examples(), 10);
+
+  const dataset::proto::DataSpecification expected_dataspec = PARSE_TEST_PROTO(
+      R"pb(
+        columns {
+          type: NUMERICAL
+          name: "f0"
+          numerical {
+            mean: 2.625
+            min_value: 0
+            max_value: 0
+            standard_deviation: 0
+          }
+          count_nas: 2
+        }
+        columns {
+          type: CATEGORICAL
+          name: "f1"
+          categorical {
+            number_of_unique_values: 6
+            is_already_integerized: true
+          }
+          count_nas: 2
+        }
+        created_num_rows: 10
+      )pb");
+  EXPECT_THAT(data_spec_, EqualsProto(expected_dataspec));
+
+  const proto::CacheMetadata expected_meta_data = PARSE_TEST_PROTO(
+      R"pb(
+        num_examples: 10
+        num_shards_in_feature_cache: 2
+        num_shards_in_index_cache: 1
+        columns {
+          available: true
+          numerical {
+            replacement_missing_value: 2.625  # mean(c(1,2,3,4,5,1,2,3))
+            num_unique_values: 5
+            discretized: true
+            discretized_replacement_missing_value: 2
+            num_discretized_shards: 1
+            num_discretized_values: 6
+          }
+        }
+        columns {
+          available: true
+          categorical { num_values: 6 replacement_missing_value: 0 }
+        }
+      )pb");
+  EXPECT_THAT(reader->meta_data(), EqualsProto(expected_meta_data));
 }
 
 }  // namespace

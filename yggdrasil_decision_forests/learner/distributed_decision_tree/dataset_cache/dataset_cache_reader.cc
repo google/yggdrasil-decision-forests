@@ -547,4 +547,152 @@ DatasetCacheReader::DiscretizedNumericalFeatureBoundaries(
 }  // namespace dataset_cache
 }  // namespace distributed_decision_tree
 }  // namespace model
+namespace dataset {
+
+using model::distributed_decision_tree::dataset_cache::kFilenameMetaDataPostfix;
+using model::distributed_decision_tree::dataset_cache::kFilenamePartialMetaData;
+using model::distributed_decision_tree::dataset_cache::PartialRawColumnFilePath;
+using model::distributed_decision_tree::dataset_cache::proto::
+    PartialColumnShardMetadata;
+using model::distributed_decision_tree::dataset_cache::proto::
+    PartialDatasetMetadata;
+
+void PartialDatasetCacheDataSpecCreator::InferColumnsAndTypes(
+    const std::vector<std::string>& paths,
+    const proto::DataSpecificationGuide& guide,
+    proto::DataSpecification* data_spec) {
+  if (paths.size() != 1) {
+    LOG(FATAL)
+        << "The inference of dataspec on a partial dataset cache requires "
+           " exactly one file path";
+  }
+  const auto& cache_path = paths.front();
+
+  PartialDatasetMetadata partial_meta_data;
+  CHECK_OK(
+      file::GetBinaryProto(file::JoinPath(cache_path, kFilenamePartialMetaData),
+                           &partial_meta_data, file::Defaults()));
+
+  for (int col_idx = 0; col_idx < partial_meta_data.column_names_size();
+       col_idx++) {
+    const auto col_name = partial_meta_data.column_names(col_idx);
+
+    // Load the column+shard meta-data.
+    PartialColumnShardMetadata shard_meta_data;
+    CHECK_OK(file::GetBinaryProto(
+        absl::StrCat(
+            PartialRawColumnFilePath(cache_path, col_idx, /*shard_idx=*/0),
+            kFilenameMetaDataPostfix),
+        &shard_meta_data, file::Defaults()));
+
+    // Create the column name and type.
+    proto::Column* column = data_spec->add_columns();
+    column->set_name(col_name);
+    switch (shard_meta_data.type_case()) {
+      case PartialColumnShardMetadata::kNumerical:
+        column->set_type(dataset::proto::ColumnType::NUMERICAL);
+        break;
+      case PartialColumnShardMetadata::kCategorical:
+        column->set_type(dataset::proto::ColumnType::CATEGORICAL);
+        column->mutable_categorical()->set_is_already_integerized(true);
+        break;
+      case PartialColumnShardMetadata::TYPE_NOT_SET:
+        break;
+    }
+  }
+}
+
+void PartialDatasetCacheDataSpecCreator::ComputeColumnStatisticsColumnAndShard(
+    const int col_idx, const PartialColumnShardMetadata& shard_meta_data,
+    proto::DataSpecification* data_spec,
+    proto::DataSpecificationAccumulator* accumulator) {
+  proto::Column* column = data_spec->mutable_columns(col_idx);
+  auto* col_accumulator = accumulator->mutable_columns(col_idx);
+
+  if (col_idx == 0) {
+    // We only count the number of examples in the first columns.
+    data_spec->set_created_num_rows(data_spec->created_num_rows() +
+                                    shard_meta_data.num_examples());
+  }
+  column->set_count_nas(column->count_nas() +
+                        shard_meta_data.num_missing_examples());
+
+  switch (shard_meta_data.type_case()) {
+    case PartialColumnShardMetadata::kNumerical:
+      col_accumulator->set_kahan_sum(
+          col_accumulator->kahan_sum() +
+          shard_meta_data.numerical().mean() *
+              (shard_meta_data.num_examples() -
+               shard_meta_data.num_missing_examples()));
+      break;
+    case PartialColumnShardMetadata::kCategorical:
+      column->mutable_categorical()->set_number_of_unique_values(
+          std::max(column->categorical().number_of_unique_values(),
+                   shard_meta_data.categorical().number_of_unique_values()));
+      break;
+    case PartialColumnShardMetadata::TYPE_NOT_SET:
+      break;
+  }
+}
+
+void PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
+    const std::vector<std::string>& paths,
+    const proto::DataSpecificationGuide& guide,
+    proto::DataSpecification* data_spec,
+    proto::DataSpecificationAccumulator* accumulator) {
+  DCHECK_EQ(paths.size(), 1);
+  const auto& cache_path = paths.front();
+
+  PartialDatasetMetadata partial_meta_data;
+  CHECK_OK(
+      file::GetBinaryProto(file::JoinPath(cache_path, kFilenamePartialMetaData),
+                           &partial_meta_data, file::Defaults()));
+
+  std::vector<int64_t> num_examples_per_columns(data_spec->columns_size(), 0);
+  {
+    utils::concurrency::ThreadPool thread_pool("InferDataspec",
+                                               /*num_threads=*/20);
+    thread_pool.StartWorkers();
+    absl::Mutex mutex_data;
+
+    for (int col_idx = 0; col_idx < data_spec->columns_size(); col_idx++) {
+      for (int shard_idx = 0; shard_idx < partial_meta_data.num_shards();
+           shard_idx++) {
+        const auto shard_meta_data_path = absl::StrCat(
+            PartialRawColumnFilePath(cache_path, col_idx, shard_idx),
+            kFilenameMetaDataPostfix);
+        thread_pool.Schedule([shard_meta_data_path, &mutex_data, accumulator,
+                              data_spec, col_idx, &num_examples_per_columns]() {
+          PartialColumnShardMetadata shard_meta_data;
+          CHECK_OK(file::GetBinaryProto(shard_meta_data_path, &shard_meta_data,
+                                        file::Defaults()));
+          absl::MutexLock l(&mutex_data);
+
+          num_examples_per_columns[col_idx] += shard_meta_data.num_examples();
+          ComputeColumnStatisticsColumnAndShard(col_idx, shard_meta_data,
+                                                data_spec, accumulator);
+        });
+      }
+    }
+  }
+
+  if (!num_examples_per_columns.empty()) {
+    for (int col_idx = 0; col_idx < num_examples_per_columns.size();
+         col_idx++) {
+      if (num_examples_per_columns[col_idx] !=
+          num_examples_per_columns.front()) {
+        LOG(FATAL) << "Invalid partial dataset cache: The different columns do "
+                      "not have the same number of examples.";
+      }
+    }
+  }
+}
+
+utils::StatusOr<int64_t> PartialDatasetCacheDataSpecCreator::CountExamples(
+    absl::string_view path) {
+  return absl::UnimplementedError("Not implemented");
+}
+
+}  // namespace dataset
+
 }  // namespace yggdrasil_decision_forests

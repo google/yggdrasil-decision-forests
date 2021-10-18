@@ -89,6 +89,10 @@ message WorkerRequest {
     // the optimal discretization (using the sorted values) and then export
     // the discretized values.
     SortNumericalColumn sort_numerical_column = 2;
+
+    // Copy and transform the raw data in the partial cache format into the raw
+    // data in the (final) cache format.
+    ConvertPartialToFinalRawData convert_partial_to_final_raw_data = 3;
   }
 
   message SeparateDatasetColumns {
@@ -142,8 +146,8 @@ message WorkerRequest {
     optional int64 max_unique_values_for_discretized_numerical = 7;
 
     // Value replacing missing values in the input. This is only used to compute
-    // the returned meta data message (as missing values have been filted in the
-    // previous stage).
+    // the returned meta data message (as missing values have been filtered in
+    // the previous stage).
     optional float replacement_missing_value = 8;
 
     // If true, force the discretization of the column. If the column contains
@@ -155,6 +159,29 @@ message WorkerRequest {
     // Number of expected shards in the output.
     optional int32 num_shards_in_output_shards = 10;
   }
+
+  message ConvertPartialToFinalRawData {
+    optional string partial_cache_directory = 1;
+    optional string final_cache_directory = 2;
+    optional int32 column_idx = 3;
+    optional int32 shard_idx = 4;
+    optional int32 num_shards = 5;
+    optional bool delete_source_file = 6 [default = false];
+
+    oneof transformation {
+      Numerical numerical = 7;
+      CategoricalInt categorical_int = 8;
+    }
+
+    message Numerical {
+      // Replace the NaN values.
+      optional float nan_value_replacement = 1;
+    }
+
+    message CategoricalInt {
+      optional int64 max_value = 1;
+    }
+  }
 }
 
 // Result message of the worker.
@@ -162,6 +189,7 @@ message WorkerResult {
   oneof type {
     SeparateDatasetColumns separate_dataset_columns = 1;
     SortNumericalColumn sort_numerical_column = 2;
+    ConvertPartialToFinalRawData convert_partial_to_final_raw_data = 3;
   }
 
   message SeparateDatasetColumns {
@@ -175,6 +203,8 @@ message WorkerResult {
     optional int32 column_idx = 2;
     optional CacheMetadata.NumericalColumn metadata = 3;
   }
+
+  message ConvertPartialToFinalRawData {}
 }
 
 // Information relative to one shard in the feature cache.
@@ -251,4 +281,33 @@ message DatasetCacheReaderOptions {
 
   // Load an read the cache from memory, or read the cache from disk.
   optional bool load_cache_in_memory = 3 [default = true];
+}
+
+// Partial metadata from a subset of observations of a given column obtained
+// during the creation of a dataset cache.
+message PartialColumnShardMetadata {
+  // Number of example in the shard.
+  optional int64 num_examples = 1;
+  optional int64 num_missing_examples = 2;
+
+  oneof type {
+    NumericalColumn numerical = 3;
+    CategoricalColumn categorical = 4;
+  }
+
+  message NumericalColumn {
+    optional double mean = 1;
+  }
+
+  message CategoricalColumn {
+    // Same as "number_of_unique_values" in the dataspec.
+    // Integer values should be in [-1, number_of_unique_values).
+    optional int64 number_of_unique_values = 1;
+  }
+}
+
+// Partial metadata  during the creation of a dataset cache.
+message PartialDatasetMetadata {
+  repeated string column_names = 1;
+  optional int32 num_shards = 2;
 }

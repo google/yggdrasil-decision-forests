@@ -47,10 +47,28 @@ std::string RawColumnFilePath(absl::string_view directory, int column_idx,
       ShardFilename(kFilenameShardNoUnderscore, shard_idx, num_shards));
 }
 
+std::string PartialRawColumnFilePath(absl::string_view directory,
+                                     int column_idx, int shard_idx) {
+  return file::JoinPath(PartialRawColumnFileDirectory(directory, column_idx),
+                        absl::StrCat(kFilenameShard, shard_idx));
+}
+
 std::string RawColumnFileDirectory(absl::string_view directory,
                                    int column_idx) {
   return file::JoinPath(directory, kFilenameRaw,
                         absl::StrCat(kFilenameColumn, column_idx));
+}
+
+std::string PartialRawColumnFileDirectory(absl::string_view directory,
+                                          int column_idx) {
+  return file::JoinPath(directory, kFilenamePartialRaw,
+                        absl::StrCat(kFilenameColumn, column_idx));
+}
+
+std::string ShardMetadataPath(absl::string_view directory, int shard_idx) {
+  return file::JoinPath(
+      directory, kFilenameRaw,
+      absl::StrCat(kFilenameShard, shard_idx, kFilenameMetaDataPostfix));
 }
 
 uint64_t MaskDeltaBit(uint64_t num_examples) {

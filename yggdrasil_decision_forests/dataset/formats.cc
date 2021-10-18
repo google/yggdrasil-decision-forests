@@ -85,6 +85,8 @@ std::string FormatToRecommendedExtension(proto::DatasetFormat format) {
       return "csv";
     case proto::FORMAT_TFE_TFRECORD:
       return "tfrecord";
+    case proto::FORMAT_PARTIAL_DATASET_CACHE:
+      return "partial_dataset_cache";
   }
 }
 
@@ -97,6 +99,8 @@ std::string DatasetFormatToPrefix(proto::DatasetFormat format) {
       return FORMAT_CSV;
     case proto::FORMAT_TFE_TFRECORD:
       return FORMAT_TFE_TFRECORD;
+    case proto::FORMAT_PARTIAL_DATASET_CACHE:
+      return FORMAT_PARTIAL_DATASET_CACHE;
   }
 }
 

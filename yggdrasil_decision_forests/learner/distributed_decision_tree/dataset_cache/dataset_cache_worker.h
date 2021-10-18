@@ -50,6 +50,10 @@ class CreateDatasetCacheWorker : public distribute::AbstractWorker {
                                      absl::string_view temp_directory,
                                      absl::string_view output_directory);
 
+  absl::Status ConvertPartialToFinalRawData(
+      const proto::WorkerRequest::ConvertPartialToFinalRawData& request,
+      proto::WorkerResult::ConvertPartialToFinalRawData* result);
+
   absl::Status SortNumericalColumn(
       const proto::WorkerRequest::SortNumericalColumn& request,
       proto::WorkerResult::SortNumericalColumn* result);
