@@ -513,7 +513,7 @@ void PredictQuickScorerSequential(
     }
 
     // Get the active leaf.
-    auto* leaf_reader = &model.leaf_values[0];
+    auto* leaf_reader = model.leaf_values.data();
     float output = model.initial_prediction;
     for (int tree_idx = 0; tree_idx < model.num_trees; ++tree_idx) {
       const auto shift_mask = active_leaf_buffer[tree_idx];
@@ -606,8 +606,8 @@ void PredictQuickScorerMajorFeatureOffset(
 
 #ifdef __AVX2__
   if (model.cpu_supports_avx2) {
-    auto* sample_reader = &fixed_length_features[0];
-    float* prediction_reader = &(*predictions)[0];
+    auto* sample_reader = fixed_length_features.data();
+    auto* prediction_reader = predictions->data();
 
     // First run on sub-batches of kNumParallelExamples at a time. The
     // remaining will be done sequentially below.
@@ -701,7 +701,7 @@ void PredictQuickScorerMajorFeatureOffset(
         prediction_reader[sub_example_idx] = model.initial_prediction;
       }
 
-      auto* leaf_reader = &model.leaf_values[0];
+      auto* leaf_reader = model.leaf_values.data();
       for (int tree_idx = 0; tree_idx < model.num_trees; ++tree_idx) {
 #pragma loop unroll(full)
         for (int sub_example_idx = 0; sub_example_idx < kNumParallelExamples;
