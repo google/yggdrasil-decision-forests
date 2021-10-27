@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
+#include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
@@ -54,8 +55,17 @@ DistributedGradientBoostedTreesLearner::TrainWithStatus(
 
 absl::Status DistributedGradientBoostedTreesLearner::SetHyperParametersImpl(
     utils::GenericHyperParameterConsumer* generic_hyper_params) {
-  RETURN_IF_ERROR(
-      AbstractLearner::SetHyperParametersImpl(generic_hyper_params));
+  // Use the non-distributed GBT learner to set the configuration.
+  gradient_boosted_trees::GradientBoostedTreesLearner gbt_learner(
+      training_config_);
+  RETURN_IF_ERROR(gbt_learner.SetHyperParametersImpl(generic_hyper_params));
+  auto* dgbt_config = training_config_.MutableExtension(
+      distributed_gradient_boosted_trees::proto::
+          distributed_gradient_boosted_trees_config);
+  dgbt_config->mutable_gbt()->MergeFrom(
+      gbt_learner.training_config().GetExtension(
+          gradient_boosted_trees::proto::gradient_boosted_trees_config));
+
   return absl::OkStatus();
 }
 
@@ -70,7 +80,29 @@ DistributedGradientBoostedTreesLearner::GetGenericHyperParameterSpecification()
       "algorithm. See the documentation of the non-distributed Gradient "
       "Boosted Tree learning algorithm for an introduction to GBTs.");
 
-  // TODO(gbm): Expose the generic hyper-parameters.
+  using GBTL = gradient_boosted_trees::GradientBoostedTreesLearner;
+  GBTL gbt_learner(training_config_);
+  ASSIGN_OR_RETURN(const auto gbt_params,
+                   gbt_learner.GetGenericHyperParameterSpecification());
+
+  // Extract a subset of supported non-distributed GBT parameters.
+  for (const auto& supported_field : {
+           GBTL::kHParamNumTrees,
+           GBTL::kHParamShrinkage,
+           GBTL::kHParamUseHessianGain,
+           GBTL::kHParamApplyLinkFunction,
+           decision_tree::kHParamMaxDepth,
+           decision_tree::kHParamMinExamples,
+       }) {
+    const auto src_field = gbt_params.fields().find(supported_field);
+    if (src_field == gbt_params.fields().end()) {
+      return absl::InternalError(
+          absl::StrCat("Could not find field ", supported_field));
+    }
+    hparam_def.mutable_fields()->operator[](supported_field) =
+        src_field->second;
+  }
+
   return hparam_def;
 }
 

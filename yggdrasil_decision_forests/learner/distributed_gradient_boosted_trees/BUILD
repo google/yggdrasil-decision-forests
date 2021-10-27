@@ -24,6 +24,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner:abstract_learner",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/learner:types",
+        "//yggdrasil_decision_forests/learner/decision_tree:generic_parameters",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
         "//yggdrasil_decision_forests/learner/distributed_decision_tree:training",
         "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache",
