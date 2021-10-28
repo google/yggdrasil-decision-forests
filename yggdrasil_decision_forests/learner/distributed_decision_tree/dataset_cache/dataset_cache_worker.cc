@@ -432,7 +432,11 @@ absl::Status CreateDatasetCacheWorker::ExportSortedNumericalColumn(
   RETURN_IF_ERROR(values_writer.Close());
 
   if (next_output_shard_idx != request.num_shards_in_output_shards()) {
-    return absl::InternalError("Unexpected number of generated shards.");
+    return absl::InternalError(
+        absl::Substitute("Unexpected number of generated shards in sorted "
+                         "numerical feature #$0. $1 != $2",
+                         request.column_idx(), next_output_shard_idx,
+                         request.num_shards_in_output_shards()));
   }
 
   return absl::OkStatus();
@@ -501,42 +505,55 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
       break;
     }
 
-    if (remaining_examples_in_shard == 0) {
-      if (indexed_values_writer_is_open) {
-        // Close the current shard.
-        RETURN_IF_ERROR(indexed_values_writer.Close());
+    for (const auto value : values) {
+      if (remaining_examples_in_shard == 0) {
+        if (indexed_values_writer_is_open) {
+          // Close the current shard.
+          RETURN_IF_ERROR(indexed_values_writer.Close());
+        }
+        // Open a new shard.
+        RETURN_IF_ERROR(indexed_values_writer.Open(
+            file::JoinPath(
+                result->output_directory(),
+                ShardFilename(kFilenameDiscretizedValuesNoUnderscore,
+                              next_output_shard_idx++,
+                              request.num_shards_in_output_shards())),
+            /*max_value=*/num_discretized_values));
+        indexed_values_writer_is_open = true;
+        remaining_examples_in_shard = request.num_example_per_output_shards();
       }
-      // Open a new shard.
-      RETURN_IF_ERROR(indexed_values_writer.Open(
-          file::JoinPath(result->output_directory(),
-                         ShardFilename(kFilenameDiscretizedValuesNoUnderscore,
-                                       next_output_shard_idx++,
-                                       request.num_shards_in_output_shards())),
-          /*max_value=*/num_discretized_values));
-      indexed_values_writer_is_open = true;
-      remaining_examples_in_shard = request.num_example_per_output_shards();
-    }
-    remaining_examples_in_shard -= indexed_value_buffer.size();
 
-    indexed_value_buffer.resize(values.size());
-    for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {
-      indexed_value_buffer[value_idx] =
-          NumericalToDiscretizedNumerical(boundaries, values[value_idx]);
-    }
+      indexed_value_buffer.push_back(
+          NumericalToDiscretizedNumerical(boundaries, value));
+      if (indexed_value_buffer.size() >=
+          kIOBufferSizeInBytes / sizeof(model::SignedExampleIdx)) {
+        RETURN_IF_ERROR(
+            indexed_values_writer.WriteValues<DiscretizedIndexedNumericalType>(
+                indexed_value_buffer));
+        indexed_value_buffer.clear();
+      }
 
-    RETURN_IF_ERROR(
-        indexed_values_writer.WriteValues<DiscretizedIndexedNumericalType>(
-            indexed_value_buffer));
+      remaining_examples_in_shard--;
+    }
   }
 
   RETURN_IF_ERROR(values_reader.Close());
 
   if (indexed_values_writer_is_open) {
+    RETURN_IF_ERROR(
+        indexed_values_writer.WriteValues<DiscretizedIndexedNumericalType>(
+            indexed_value_buffer));
+    indexed_value_buffer.clear();
+
     RETURN_IF_ERROR(indexed_values_writer.Close());
   }
 
   if (next_output_shard_idx != request.num_shards_in_output_shards()) {
-    return absl::InternalError("Unexpected number of generated shards.");
+    return absl::InternalError(
+        absl::Substitute("Unexpected number of generated shards in discretized "
+                         "numerical feature #$0. $1 != $2",
+                         request.column_idx(), next_output_shard_idx,
+                         request.num_shards_in_output_shards()));
   }
 
   result->mutable_metadata()->set_num_discretized_shards(next_output_shard_idx);
