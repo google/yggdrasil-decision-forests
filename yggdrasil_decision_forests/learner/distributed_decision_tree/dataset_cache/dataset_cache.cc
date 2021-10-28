@@ -17,6 +17,7 @@
 
 #include <numeric>
 
+#include "absl/container/flat_hash_map.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
@@ -386,7 +387,7 @@ absl::Status SeparateDatasetColumns(
       config.has_weight_column_idx()) {
     request.set_column_idx_remove_example_with_zero(config.weight_column_idx());
   }
-  request.set_output_directory(cache_directory);
+  request.set_output_directory(std::string(cache_directory));
 
   // Each request will combine "shards_per_requests" input shards (from the
   // input dataset; all the column values are in the same file) into 1 output
@@ -488,8 +489,8 @@ absl::Status ConvertPartialToFinalRawData(
   // Common part of the requests.
   proto::WorkerRequest generic_request;
   auto& request = *generic_request.mutable_convert_partial_to_final_raw_data();
-  request.set_partial_cache_directory(partial_cache_directory);
-  request.set_final_cache_directory(final_cache_directory);
+  request.set_partial_cache_directory(std::string(partial_cache_directory));
+  request.set_final_cache_directory(std::string(final_cache_directory));
   request.set_num_shards(partial_metadata.num_shards());
   request.set_delete_source_file(delete_source_file);
 
@@ -560,7 +561,7 @@ absl::Status SortNumericalColumns(
   request.set_output_base_directory(
       file::JoinPath(cache_directory, kFilenameTmp));
   request.set_num_examples(cache_metadata->num_examples());
-  request.set_cache_directory(cache_directory);
+  request.set_cache_directory(std::string(cache_directory));
 
   // We assume that a cache entry takes 4 bytes.
   request.set_num_example_per_output_shards(

@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 
+#include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
 
 namespace yggdrasil_decision_forests {

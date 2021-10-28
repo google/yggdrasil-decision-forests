@@ -128,9 +128,9 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
     if (missing_data) {
       // The worker was restarted during the training of this tree. Tell the
       // manager to restart the training of this tree.
-      LOG(WARNING)
-          << "Incomplete information to run this iteration. Ask manager "
-             "to restart";
+      LOG(WARNING) << "Incomplete information to run a request #"
+                   << request.type_case() << " on worker #" << WorkerIdx()
+                   << ". Ask manager to restart";
       result.set_request_restart_iter(true);
       return result.SerializeAsString();
     }
@@ -558,6 +558,14 @@ absl::Status DistributedGradientBoostedTreesWorker::MergingSplitEvaluation(
     auto* src_evaluations =
         src_split_values->mutable_evaluation_per_weak_model(weak_model_idx)
             ->mutable_evaluation_per_open_node();
+    if (src_evaluations->size() !=
+        (*dst_layer_per_weak_models)[weak_model_idx].split_evaluations.size()) {
+      return absl::InternalError(absl::Substitute(
+          "Wrong number of splits in MergingSplitEvaluation. $0 != $1",
+          src_evaluations->size(),
+          (*dst_layer_per_weak_models)[weak_model_idx]
+              .split_evaluations.size()));
+    }
     for (int split_idx = 0; split_idx < src_evaluations->size(); split_idx++) {
       if (src_evaluations->Get(split_idx).empty()) {
         continue;

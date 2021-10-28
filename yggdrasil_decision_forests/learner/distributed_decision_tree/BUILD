@@ -34,6 +34,7 @@ cc_library_ydf(
         ":training_cc_proto",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/synchronization",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:training",

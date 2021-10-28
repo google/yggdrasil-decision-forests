@@ -106,6 +106,7 @@ absl::Status FileInputByteStream::Open(absl::string_view path) {
       std::string(path), &file)));
   file_ =
       absl::make_unique<tensorflow::RandomAccessFileWrapper>(file.release());
+  offset_ = 0;
   return absl::OkStatus();
 }
 

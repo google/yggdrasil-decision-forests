@@ -69,6 +69,12 @@ TEST(Filesystem, FileIO) {
   auto read_content = input_handle->ReadAll().value();
   EXPECT_OK(input_handle->Close());
   EXPECT_EQ(content, read_content);
+
+  // Re-open the same file.
+  EXPECT_OK(input_handle->Open(file_path));
+  auto read_content_again = input_handle->ReadAll().value();
+  EXPECT_OK(input_handle->Close());
+  EXPECT_EQ(content, read_content_again);
 }
 
 TEST(Filesystem, Override) {

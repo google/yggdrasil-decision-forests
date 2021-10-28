@@ -23,6 +23,7 @@ cc_library_ydf(
     hdrs = ["column_cache.h"],
     deps = [
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils/distribute:core",
@@ -37,6 +38,7 @@ cc_library_ydf(
         ":column_cache",
         ":dataset_cache_cc_proto",
         ":dataset_cache_common",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:formats",
@@ -102,11 +104,11 @@ cc_library_ydf(
     srcs = ["dataset_cache_common.cc"],
     hdrs = ["dataset_cache_common.h"],
     deps = [
+        ":column_cache",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/learner:types",
         "//yggdrasil_decision_forests/learner/decision_tree:utils",
-        "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:column_cache",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:uid",

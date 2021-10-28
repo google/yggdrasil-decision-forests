@@ -56,7 +56,7 @@ TEST(ExtractDiscretizedBoundariesWithoutDownsampling, Base) {
   const auto boundaries =
       ExtractDiscretizedBoundariesWithoutDownsampling(
           {{10.f, 0}, {11.f, 1}, {11.f, 2}, {12.f, 3}, {12.f, 4}, {13.f, 5}}, 4)
-          .ValueOrDie();
+          .value();
   EXPECT_THAT(boundaries, ElementsAre(10.5, 11.5f, 12.5f));
 }
 
@@ -65,7 +65,7 @@ TEST(ExtractDiscretizedBoundariesWithDownsampling, Base) {
       ExtractDiscretizedBoundariesWithDownsampling(
           {{10.f, 0}, {11.f, 1}, {11.f, 2}, {12.f, 3}, {12.f, 4}, {13.f, 5}}, 4,
           3)
-          .ValueOrDie();
+          .value();
   EXPECT_THAT(boundaries, ElementsAre(11.5f, 12.5f));
 }
 

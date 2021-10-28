@@ -406,7 +406,7 @@ TrainWithCache(
         input_features, log_directory, model.get(), &training_evaluation,
         distribute_manager.get(), &random, monitoring);
     if (!iter_status.ok()) {
-      LOG(WARNING) << iter_status.message();
+      LOG(WARNING) << "Iteration issue: " << iter_status.message();
     }
 
     if (absl::IsDataLoss(iter_status)) {
@@ -743,8 +743,8 @@ InitializeDistributionManager(
     const dataset::proto::DataSpecification& data_spec,
     const FeatureOwnership& feature_ownership) {
   proto::WorkerWelcome welcome;
-  welcome.set_work_directory(work_directory);
-  welcome.set_cache_path(cache_path);
+  welcome.set_work_directory(std::string(work_directory));
+  welcome.set_cache_path(std::string(cache_path));
   *welcome.mutable_train_config() = config;
   *welcome.mutable_train_config_linking() = config_link;
   *welcome.mutable_deployment_config() = deployment;
