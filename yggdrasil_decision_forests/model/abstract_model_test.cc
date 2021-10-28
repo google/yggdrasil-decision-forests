@@ -460,6 +460,12 @@ TEST(Evaluate, FromDisk) {
   EXPECT_NEAR(metric::Accuracy(evaluation), 0.8723513, 0.000001);
 }
 
+TEST(Model, AbstractAttributesSizeInBytes) {
+  FakeModelWithEngine model;
+  // The model size is compiler+arch dependent.
+  EXPECT_GT(model.AbstractAttributesSizeInBytes(), 0);
+}
+
 }  // namespace
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

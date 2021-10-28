@@ -268,7 +268,7 @@ void AppendConditionDescription(
       node.num_pos_training_examples_without_weight(), node.na_value());
 }
 
-size_t DecisionTree::EstimateModelSizeInByte() const {
+size_t DecisionTree::EstimateModelSizeInBytes() const {
   if (root_) {
     return root_->EstimateSizeInByte() + sizeof(DecisionTree);
   } else {
@@ -277,7 +277,7 @@ size_t DecisionTree::EstimateModelSizeInByte() const {
 }
 
 size_t NodeWithChildren::EstimateSizeInByte() const {
-  size_t size = node_.ByteSizeLong();
+  size_t size = node_.SpaceUsedLong();
   if (!IsLeaf()) {
     size += children_[0]->EstimateSizeInByte();
     size += children_[1]->EstimateSizeInByte();
@@ -1022,7 +1022,7 @@ size_t EstimateSizeInByte(
     const std::vector<std::unique_ptr<DecisionTree>>& trees) {
   size_t size = 0;
   for (const auto& tree : trees) {
-    size += tree->EstimateModelSizeInByte();
+    size += tree->EstimateModelSizeInBytes();
   }
   return size;
 }

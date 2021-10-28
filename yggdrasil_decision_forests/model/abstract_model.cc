@@ -995,5 +995,18 @@ AbstractModel::BuildFastEngine() const {
   return engine_or;
 }
 
+size_t AbstractModel::AbstractAttributesSizeInBytes() const {
+  size_t size = sizeof(*this) + name_.size() + data_spec_.SpaceUsedLong();
+  size +=
+      input_features_.size() * sizeof(decltype(input_features_)::value_type);
+  if (weights_.has_value()) {
+    size += weights_->ByteSizeLong();
+  }
+  for (const auto& v : precomputed_variable_importances_) {
+    size += sizeof(v) + v.first.size() + v.second.SpaceUsedLong();
+  }
+  return size;
+}
+
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

@@ -171,8 +171,9 @@ class NodeWithChildren {
 // opposition to fast serving).
 class DecisionTree {
  public:
-  // Approximate size of the model without compression.
-  size_t EstimateModelSizeInByte() const;
+  // Estimates the memory usage of the model in RAM. The serialized or the
+  // compiled version of the model can be much smaller.
+  size_t EstimateModelSizeInBytes() const;
 
   // Number of nodes in the tree.
   int64_t NumNodes() const;

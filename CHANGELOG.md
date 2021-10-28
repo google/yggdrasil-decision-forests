@@ -5,6 +5,8 @@
 ### Features
 
 -   Distributed training of Gradient Boosted Decision Trees.
+-   Add `maximum_model_size_in_memory_in_bytes` hyper-parameter to limit the
+    size of the model in memory.
 
 ### Fixes
 

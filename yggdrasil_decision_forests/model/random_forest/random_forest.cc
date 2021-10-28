@@ -171,8 +171,8 @@ absl::Status RandomForestModel::Validate() const {
   return absl::OkStatus();
 }
 
-size_t RandomForestModel::EstimateModelSizeInByte() const {
-  return sizeof(RandomForestModel) +
+absl::optional<size_t> RandomForestModel::ModelSizeInBytes() const {
+  return AbstractAttributesSizeInBytes() +
          decision_tree::EstimateSizeInByte(decision_trees_);
 }
 

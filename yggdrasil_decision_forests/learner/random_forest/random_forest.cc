@@ -297,6 +297,14 @@ RandomForestLearner::TrainWithStatus(
       random_forest::proto::random_forest_config);
   decision_tree::SetDefaultHyperParameters(rf_config.mutable_decision_tree());
 
+  // If the maximum model size is limited, "keep_non_leaf_label_distribution"
+  // defaults to false.
+  if (!rf_config.decision_tree().has_keep_non_leaf_label_distribution() &&
+      config_with_default.has_maximum_model_size_in_memory_in_bytes()) {
+    rf_config.mutable_decision_tree()->set_keep_non_leaf_label_distribution(
+        false);
+  }
+
   auto mdl = absl::make_unique<RandomForestModel>();
   mdl->set_data_spec(train_dataset.data_spec());
   model::proto::TrainingConfigLinking config_link;
@@ -424,6 +432,7 @@ RandomForestLearner::TrainWithStatus(
   int64_t total_num_nodes_accounted = 0;
   // Index of the next tree to account.
   int next_tree_idx_to_account = 0;
+  int64_t model_size_in_bytes = mdl->AbstractAttributesSizeInBytes();
 
   // Note: "num_trained_trees" is defined outside of the following brackets so
   // to make use it is not released before "pool".
@@ -449,6 +458,7 @@ RandomForestLearner::TrainWithStatus(
               adaptative_work->OptimalApproximationFactor();
         }
 
+        // Maximum training time.
         if (training_config().has_maximum_training_duration_seconds()) {
           // Stop the training if it lasted too long.
           if ((absl::Now() - begin_training) >
@@ -459,6 +469,15 @@ RandomForestLearner::TrainWithStatus(
               LOG(INFO) << "Stop training because of the maximum training "
                            "duration.";
             }
+            return;
+          }
+        }
+
+        // Maximum model size.
+        if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
+          absl::MutexLock lock(&mutex_max_total_num_nodes);
+          if (model_size_in_bytes >
+              training_config().maximum_model_size_in_memory_in_bytes()) {
             return;
           }
         }
@@ -477,7 +496,7 @@ RandomForestLearner::TrainWithStatus(
         // Examples selected for the training.
         // Note: This in the inverse of the Out-of-bag (OOB) set.
         std::vector<row_t> selected_examples;
-        auto* decision_tree = (*mdl->mutable_decision_trees())[tree_idx].get();
+        auto& decision_tree = (*mdl->mutable_decision_trees())[tree_idx];
         if (rf_config.bootstrap_training_dataset()) {
           const auto num_samples = std::max(
               int64_t{1},
@@ -505,7 +524,30 @@ RandomForestLearner::TrainWithStatus(
         CHECK_OK(decision_tree::Train(
             train_dataset, selected_examples, config_with_default, config_link,
             rf_config.decision_tree(), deployment(), weights, &random,
-            decision_tree, internal_config));
+            decision_tree.get(), internal_config));
+
+        if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
+          const auto tree_size_in_bytes =
+              decision_tree->EstimateModelSizeInBytes();
+          absl::MutexLock lock(&mutex_max_total_num_nodes);
+          model_size_in_bytes += tree_size_in_bytes;
+          // Note: A model should contain at least one tree.
+          if (num_trained_trees > 0 &&
+              model_size_in_bytes >
+                  training_config().maximum_model_size_in_memory_in_bytes()) {
+            if (!training_stopped_early) {
+              training_stopped_early = true;
+              LOG(INFO)
+                  << "Stop training after " << num_trained_trees
+                  << " trees because the model size exceeded "
+                     "maximum_model_size_in_memory_in_bytes="
+                  << training_config().maximum_model_size_in_memory_in_bytes();
+            }
+            // Remove the tree that was just trained.
+            decision_tree.reset();
+            return;
+          }
+        }
 
         const auto current_num_trained_trees = ++num_trained_trees;
 
@@ -576,6 +618,10 @@ RandomForestLearner::TrainWithStatus(
               absl::StrAppendFormat(&snippet, " work-factor:%f",
                                     bootstrap_size_ratio_factor);
             }
+            if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
+              absl::StrAppendFormat(&snippet, " model-size:%d bytes",
+                                    model_size_in_bytes);
+            }
             absl::StrAppendFormat(
                 &snippet, " (tree index:%d) done %s", tree_idx,
                 internal::EvaluationSnippet(evaluation.evaluation()));
@@ -610,11 +656,12 @@ RandomForestLearner::TrainWithStatus(
   if (training_stopped_early) {
     // Remove the non-trained trees.
     auto& trees = *mdl->mutable_decision_trees();
-    trees.erase(std::remove_if(
-                    trees.begin(), trees.end(),
-                    [](const std::unique_ptr<decision_tree::DecisionTree>& tree)
-                        -> bool { return tree->mutable_root() == nullptr; }),
-                trees.end());
+    trees.erase(
+        std::remove_if(
+            trees.begin(), trees.end(),
+            [](const std::unique_ptr<decision_tree::DecisionTree>& tree)
+                -> bool { return !tree || tree->mutable_root() == nullptr; }),
+        trees.end());
   }
 
   if (rf_config.total_max_num_nodes() > 0 &&

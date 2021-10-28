@@ -194,6 +194,8 @@ REGISTRATION_CREATE_POOL(AbstractLearner, const proto::TrainingConfig&);
 // Generic hyper parameter names.
 static constexpr char kHParamMaximumTrainingDurationSeconds[] =
     "maximum_training_duration_seconds";
+static constexpr char kHParamMaximumModelSizeInMemoryInBytes[] =
+    "maximum_model_size_in_memory_in_bytes";
 
 // Check a set of hyper parameter against an hyper parameter specification.
 absl::Status CheckGenericHyperParameterSpecification(

@@ -119,10 +119,16 @@ utils::StatusOr<std::string> ExportHParamSpecToMarkdown(
   // Check if the set of generic hyper-parameters is empty.
   // Note: "kHParamMaximumTrainingDurationSeconds" is added to most learners
   // automatically.
-  const bool no_generic_hparams =
-      hparams.fields_size() == 0 ||
-      (hparams.fields_size() == 1 && hparams.fields().begin()->first ==
-                                         kHParamMaximumTrainingDurationSeconds);
+
+  bool no_generic_hparams = true;
+  for (const auto& field : hparams.fields()) {
+    if (field.first == kHParamMaximumTrainingDurationSeconds ||
+        field.first == kHParamMaximumModelSizeInMemoryInBytes) {
+      continue;
+    }
+    no_generic_hparams = false;
+    break;
+  }
 
   if (no_generic_hparams) {
     // The name of the proto filename, source filename, c++ name_space,

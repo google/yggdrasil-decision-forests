@@ -92,8 +92,9 @@ class RandomForestModel : public AbstractModel {
   // Add a new tree to the model.
   void AddTree(std::unique_ptr<decision_tree::DecisionTree> decision_tree);
 
-  // Approximate the size of the model without compression.
-  size_t EstimateModelSizeInByte() const;
+  // Estimates the memory usage of the model in RAM. The serialized or the
+  // compiled version of the model can be much smaller.
+  absl::optional<size_t> ModelSizeInBytes() const override;
 
   // Number of nodes in the model.
   int64_t NumNodes() const;

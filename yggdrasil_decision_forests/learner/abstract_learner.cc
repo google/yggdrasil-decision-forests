@@ -407,6 +407,19 @@ absl::Status AbstractLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamMaximumModelSizeInMemoryInBytes);
+    if (hparam.has_value()) {
+      if (hparam.value().value().real() >= 0) {
+        training_config_.set_maximum_model_size_in_memory_in_bytes(
+            hparam.value().value().real());
+      } else {
+        training_config_.clear_maximum_model_size_in_memory_in_bytes();
+      }
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -422,6 +435,17 @@ AbstractLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_description(
         R"(Maximum training duration of the model expressed in seconds. Each learning algorithm is free to use this parameter at it sees fit. Enabling maximum training duration makes the model training non-deterministic.)");
   }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamMaximumModelSizeInMemoryInBytes);
+    param.mutable_real()->set_default_value(-1);
+    param.mutable_documentation()->set_proto_path(
+        "learner/abstract_learner.proto");
+    param.mutable_documentation()->set_description(
+        R"(Limit the size of the model when stored in ram. Different algorithms can enforce this limit differently. Note that when models are compiled into an inference, the size of the inference engine is generally much smaller than the original model.)");
+  }
+
   return hparam_def;
 }
 
@@ -533,6 +557,15 @@ absl::Status AbstractLearner::CheckCapabilities() const {
     return absl::InvalidArgumentError(
         absl::Substitute("The learner $0 does not support the "
                          "\"maximum_training_duration_seconds\" flag.",
+                         training_config().learner()));
+  }
+
+  // Maximum model size.
+  if (!capabilities.support_max_model_size_in_memory() &&
+      training_config().has_maximum_model_size_in_memory_in_bytes()) {
+    return absl::InvalidArgumentError(
+        absl::Substitute("The learner $0 does not support the "
+                         "\"maximum_model_size_in_memory_in_bytes\" flag.",
                          training_config().learner()));
   }
 

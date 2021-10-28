@@ -157,11 +157,12 @@ class GradientBoostedTreesModel : public AbstractModel {
   void PredictRegression(const dataset::proto::Example& example,
                          model::proto::Prediction* prediction) const;
 
-  // Add a new tree to the model.
+  // Adds a new tree to the model.
   void AddTree(std::unique_ptr<decision_tree::DecisionTree> decision_tree);
 
-  // Approximate the size of the model without compression.
-  size_t EstimateModelSizeInByte() const;
+  // Estimates the memory usage of the model in RAM. The serialized or the
+  // compiled version of the model can be much smaller.
+  absl::optional<size_t> ModelSizeInBytes() const override;
 
   // Call the function "callback" on all the leafs in which the example (defined
   // by a dataset and a row index) is falling.

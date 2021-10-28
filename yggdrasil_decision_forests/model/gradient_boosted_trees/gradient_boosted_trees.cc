@@ -168,8 +168,8 @@ absl::Status GradientBoostedTreesModel::Validate() const {
   return absl::OkStatus();
 }
 
-size_t GradientBoostedTreesModel::EstimateModelSizeInByte() const {
-  return sizeof(GradientBoostedTreesModel) +
+absl::optional<size_t> GradientBoostedTreesModel::ModelSizeInBytes() const {
+  return AbstractAttributesSizeInBytes() +
          decision_tree::EstimateSizeInByte(decision_trees_);
 }
 

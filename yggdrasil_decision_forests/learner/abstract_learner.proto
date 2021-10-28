@@ -126,6 +126,11 @@ message TrainingConfig {
 
   reserved 10;
 
+  // Limits the trained model by memory usage. Different algorithms can enforce
+  // this limit differently. Serialized or compiled models are generally much
+  // smaller. This limit can be fussy: The final model can be slightly larger.
+  optional int64 maximum_model_size_in_memory_in_bytes = 11;
+
   // Learner specific configuration/hyper-parameters.
   // The message/extension is dependent on the "learner". For example, see
   // "yggdrasil_decision_forests/learner/random_forest.proto" for the parameters
@@ -371,4 +376,8 @@ message LearnerCapabilities {
   // If true, the algorithm supports training datasets in the "partial cache
   // dataset" format.
   optional bool support_partial_cache_dataset_format = 4 [default = false];
+
+  // If true, the algorithm supports training with a maximum model size
+  // (maximum_model_size_in_memory_in_bytes).
+  optional bool support_max_model_size_in_memory = 5 [default = false];
 }

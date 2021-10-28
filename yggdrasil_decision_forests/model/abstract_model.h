@@ -299,6 +299,14 @@ class AbstractModel {
   // indicative and should not be used to compare models.
   virtual metric::proto::EvaluationResults ValidationEvaluation() const;
 
+  // Estimates the memory usage of the model in RAM. The serialized or the
+  // compiled version of the model can be much smaller.
+  virtual absl::optional<size_t> ModelSizeInBytes() const { return {}; }
+
+  // Estimates the memory usage of the attributes defined in the "AbstractModel"
+  // object.
+  size_t AbstractAttributesSizeInBytes() const;
+
   // List of input features of the model.
   const std::vector<int>& input_features() const { return input_features_; }
   std::vector<int>* mutable_input_features() { return &input_features_; }

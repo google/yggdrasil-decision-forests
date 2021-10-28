@@ -230,7 +230,7 @@ TEST(AbstractLearner, EvaluateLearner) {
   FakeLearner learner(train_config);
 
   const dataset::proto::DataSpecification data_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns {
           type: CATEGORICAL
           name: "a"
@@ -239,7 +239,7 @@ TEST(AbstractLearner, EvaluateLearner) {
             number_of_unique_values: 3
           }
         }
-      )");
+      )pb");
 
   dataset::VerticalDataset dataset;
   dataset.set_data_spec(data_spec);
@@ -263,6 +263,64 @@ TEST(AbstractLearner, EvaluateLearner) {
 
   EXPECT_NEAR(metric::Accuracy(eval), 0.5f, 0.001f);
   EXPECT_NEAR(eval.count_predictions(), 4000., 0.001);
+}
+
+TEST(AbstractLearner, MaximumModelSizeInMemoryInBytes) {
+  class FakeLearner : public AbstractLearner {
+   public:
+    explicit FakeLearner(const proto::TrainingConfig& training_config)
+        : AbstractLearner(training_config) {}
+
+    utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+        const dataset::VerticalDataset& train_dataset,
+        absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+            valid_dataset = {}) const override {
+      return absl::UnimplementedError("");
+    }
+
+    void set_tested_capability(bool value) {
+      capabilities_.set_support_max_model_size_in_memory(value);
+    }
+
+    model::proto::LearnerCapabilities Capabilities() const override {
+      return capabilities_;
+    }
+
+   private:
+    model::proto::LearnerCapabilities capabilities_;
+  };
+
+  const proto::TrainingConfig train_config =
+      PARSE_TEST_PROTO(R"pb(
+        label: "a" task: CLASSIFICATION learner: "fake"
+      )pb");
+  FakeLearner learner(train_config);
+
+  // Set the hparam without actual support for it.
+  EXPECT_OK(learner.SetHyperParameters(PARSE_TEST_PROTO(
+      "fields { name: \"maximum_model_size_in_memory_in_bytes\" "
+      "value { real: "
+      "500 } }")));
+  EXPECT_THAT(learner.CheckCapabilities(),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "does not support the "
+                       "\"maximum_model_size_in_memory_in_bytes\" flag"));
+
+  // Add support for the hparam.
+  learner.set_tested_capability(true);
+  EXPECT_OK(learner.CheckCapabilities());
+
+  // Check the hparam value.
+  EXPECT_EQ(learner.training_config().maximum_model_size_in_memory_in_bytes(),
+            500);
+
+  // Remove the hparam value i.e. return to the default logic.
+  EXPECT_OK(learner.SetHyperParameters(PARSE_TEST_PROTO(
+      "fields { name: \"maximum_model_size_in_memory_in_bytes\" "
+      "value { real: "
+      "-1 } }")));
+  EXPECT_FALSE(
+      learner.training_config().has_maximum_model_size_in_memory_in_bytes());
 }
 
 }  // namespace

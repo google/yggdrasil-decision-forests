@@ -447,6 +447,24 @@ TEST_F(RandomForestOnAdult, MaximumDuration) {
   EXPECT_GT(metric::Accuracy(evaluation_), 0.840);
 }
 
+// Train a model with a maximum size in RAM.
+TEST_F(RandomForestOnAdult, MaximumSize) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_num_trees(100000);  // Would be a very big model.
+  rf_config->set_winner_take_all_inference(false);
+
+  const int max_size = 2 * 1024 * 1024;  // 2MB
+  // Note: Each tree takes ~200k of RAM; the majority caused by proto overhead
+  // and pointers. The serialized model will be ~5x smaller.
+  train_config_.set_maximum_model_size_in_memory_in_bytes(max_size);
+
+  TrainAndEvaluateModel();
+  EXPECT_LT(model_->ModelSizeInBytes().value(), max_size);
+
+  EXPECT_GT(metric::Accuracy(evaluation_), 0.840);
+}
+
 TEST_F(RandomForestOnAdult, MaximumDurationInTree) {
   dataset_sampling_ = 1.0f;
   auto* rf_config = train_config_.MutableExtension(
