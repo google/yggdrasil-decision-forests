@@ -509,8 +509,17 @@ absl::Status ConvertPartialToFinalRawData(
                   .replacement_missing_value());
           break;
         case dataset::proto::CATEGORICAL:
-          request.mutable_categorical_int()->set_max_value(
-              cache_metadata->columns(column_idx).categorical().num_values());
+          if (column_spec.categorical().is_already_integerized()) {
+            request.mutable_categorical_int()->set_nan_value_replacement(
+                column_spec.categorical().most_frequent_value());
+            request.mutable_categorical_int()->set_max_value(
+                cache_metadata->columns(column_idx).categorical().num_values());
+          } else {
+            *request.mutable_categorical_string()->mutable_items() =
+                column_spec.categorical().items();
+            request.mutable_categorical_string()->set_nan_value_replacement(
+                column_spec.categorical().most_frequent_value());
+          }
           break;
         default:
           return absl::InternalError(absl::Substitute(

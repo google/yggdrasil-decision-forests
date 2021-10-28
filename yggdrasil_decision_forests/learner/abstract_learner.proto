@@ -367,4 +367,8 @@ message LearnerCapabilities {
   // no validation dataset is given to the training function, the learning
   // algorithm will extract a validation dataset from the training dataset.
   optional bool support_validation_dataset = 3 [default = false];
+
+  // If true, the algorithm supports training datasets in the "partial cache
+  // dataset" format.
+  optional bool support_partial_cache_dataset_format = 4 [default = false];
 }

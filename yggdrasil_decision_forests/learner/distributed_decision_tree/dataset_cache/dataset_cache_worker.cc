@@ -594,13 +594,80 @@ absl::Status ConvertPartialToFinalRawDataCategoricalInt(
   IntegerColumnWriter output_stream;
   RETURN_IF_ERROR(output_stream.Open(output_file, transformation.max_value()));
 
+  std::vector<int32_t> transform_buffer;
   while (true) {
     RETURN_IF_ERROR(input_stream.Next());
     const auto values = input_stream.Values();
     if (values.empty()) {
       break;
     }
-    RETURN_IF_ERROR(output_stream.WriteValues(values));
+
+    transform_buffer.resize(values.size());
+    std::transform(values.begin(), values.end(), transform_buffer.begin(),
+                   [&transformation](const int32_t value) -> int32_t {
+                     if (value < 0) {
+                       return transformation.nan_value_replacement();
+                     }
+                     return value;
+                   });
+
+    RETURN_IF_ERROR(
+        output_stream.WriteValues(absl::Span<const int32_t>(transform_buffer)));
+  }
+
+  RETURN_IF_ERROR(input_stream.Close());
+  RETURN_IF_ERROR(output_stream.Close());
+  return absl::OkStatus();
+}
+
+absl::Status ConvertPartialToFinalRawDataCategoricalString(
+    const absl::string_view input_file, const absl::string_view output_file,
+    const proto::WorkerRequest::ConvertPartialToFinalRawData::CategoricalString&
+        transformation,
+    const proto::PartialColumnShardMetadata& meta_data) {
+  // Compute the re-mapping.
+  // Value "i" is transformed into "mapping[i]". If i<0, replace the value with
+  // "nan_value_replacement".
+  std::vector<int32_t> mapping(meta_data.categorical().items_size());
+  for (const auto& src_item : meta_data.categorical().items()) {
+    const auto it_src = transformation.items().find(src_item.first);
+    if (it_src == transformation.items().end()) {
+      // This item is unknown in the final dictionary. It is transformed to
+      // Out-of-vocabulary.
+      mapping[src_item.second.index()] = dataset::kOutOfDictionaryItemIndex;
+    } else {
+      mapping[src_item.second.index()] = it_src->second.index();
+    }
+  }
+
+  const int input_buffer_size = kIOBufferSizeInBytes / sizeof(float);
+
+  IntegerColumnReader<int32_t> input_stream;
+  RETURN_IF_ERROR(input_stream.Open(
+      input_file, std::numeric_limits<int32_t>::max(), input_buffer_size));
+
+  IntegerColumnWriter output_stream;
+  RETURN_IF_ERROR(output_stream.Open(output_file, transformation.items_size()));
+
+  std::vector<int32_t> transform_buffer;
+  while (true) {
+    RETURN_IF_ERROR(input_stream.Next());
+    const auto values = input_stream.Values();
+    if (values.empty()) {
+      break;
+    }
+
+    transform_buffer.resize(values.size());
+    std::transform(values.begin(), values.end(), transform_buffer.begin(),
+                   [&transformation, &mapping](const int32_t value) -> int32_t {
+                     if (value < 0) {
+                       return transformation.nan_value_replacement();
+                     }
+                     return mapping[value];
+                   });
+
+    RETURN_IF_ERROR(
+        output_stream.WriteValues(absl::Span<const int32_t>(transform_buffer)));
   }
 
   RETURN_IF_ERROR(input_stream.Close());
@@ -620,6 +687,14 @@ absl::Status CreateDatasetCacheWorker::ConvertPartialToFinalRawData(
   const auto input_file =
       PartialRawColumnFilePath(request.partial_cache_directory(),
                                request.column_idx(), request.shard_idx());
+
+  // Meta-data specific for the shard+column.
+  const auto input_metadata_path =
+      absl::StrCat(input_file, kFilenameMetaDataPostfix);
+  proto::PartialColumnShardMetadata meta_data;
+  RETURN_IF_ERROR(
+      file::GetBinaryProto(input_metadata_path, &meta_data, file::Defaults()));
+
   const auto output_file =
       RawColumnFilePath(request.final_cache_directory(), request.column_idx(),
                         request.shard_idx(), request.num_shards());
@@ -645,6 +720,13 @@ absl::Status CreateDatasetCacheWorker::ConvertPartialToFinalRawData(
       RETURN_IF_ERROR(ConvertPartialToFinalRawDataCategoricalInt(
           input_file, tmp_file, request.categorical_int()));
       break;
+
+    case proto::WorkerRequest_ConvertPartialToFinalRawData::
+        kCategoricalString: {
+      RETURN_IF_ERROR(ConvertPartialToFinalRawDataCategoricalString(
+          input_file, tmp_file, request.categorical_string(), meta_data));
+      break;
+    }
 
     case proto::WorkerRequest_ConvertPartialToFinalRawData::
         TRANSFORMATION_NOT_SET:

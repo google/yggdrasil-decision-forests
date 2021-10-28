@@ -211,6 +211,14 @@ absl::Status CreateDatasetCache(
     absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec);
 
+// Finalize the creation of a dataset cache from a partial dataset cache.
+absl::Status CreateDatasetCacheFromPartialDatasetCache(
+    const model::proto::DeploymentConfig& deployment,
+    absl::string_view partial_cache_path, absl::string_view final_cache_path,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
+    const dataset::proto::DataSpecification& data_spec);
+
 // Initiliaze the model for training.
 utils::StatusOr<
     std::unique_ptr<gradient_boosted_trees::GradientBoostedTreesModel>>

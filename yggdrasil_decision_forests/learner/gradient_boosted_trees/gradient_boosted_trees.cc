@@ -1463,6 +1463,23 @@ GradientBoostedTreesLearner::TrainWithStatus(
     }
   }  // End of training iteration.
 
+  // Create a final snapshot
+  if (deployment_.try_resume_training()) {
+    const auto last_snapshot = utils::GetGreatestSnapshot(snapshot_directory);
+    if (!last_snapshot.ok() || last_snapshot.value() < iter_idx) {
+      LOG(INFO) << "Create final snapshot of the model at iteration "
+                << iter_idx;
+      const auto model_path = file::JoinPath(deployment_.cache_path(),
+                                             absl::StrCat("model_", iter_idx));
+
+      // Save the model structure.
+      RETURN_IF_ERROR(mdl->Save(model_path));
+
+      // Record the snapshot.
+      RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
+    }
+  }
+
   if (has_validation_dataset) {
     RETURN_IF_ERROR(FinalizeModelWithValidationDataset(
         config, early_stopping, validation_dataset, mdl.get()));

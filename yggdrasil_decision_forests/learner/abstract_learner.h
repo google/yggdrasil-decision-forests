@@ -153,7 +153,7 @@ class AbstractLearner {
   absl::Status CheckCapabilities() const;
 
   // Register a trigger to stop the training. Later if a trigger is set to true
-  // at any time during training (e.g. durint an interrupt caused by user
+  // at any time during training (e.g. during an interrupt caused by user
   // control+C one may want to set it to true), the training algorithm will
   // gracefully interrupt. This is done by polling, so expect a little latency
   // to respond to the trigger setting.

@@ -35,6 +35,7 @@ namespace dataset_cache {
 namespace {
 
 using test::EqualsProto;
+using testing::ElementsAre;
 
 class End2End : public ::testing::Test {
  public:
@@ -347,10 +348,12 @@ class TestCreateDatasetCacheFromPartialDatasetCache : public ::testing::Test {
 
     CreatePartialCacheFeature0(partial_dataset_cache);
     CreatePartialCacheFeature1(partial_dataset_cache);
+    CreatePartialCacheFeature2(partial_dataset_cache);
 
     proto::PartialDatasetMetadata meta_data;
     meta_data.add_column_names("f0");
     meta_data.add_column_names("f1");
+    meta_data.add_column_names("f2");
     meta_data.set_num_shards(2);
     CHECK_OK(file::SetBinaryProto(
         file::JoinPath(partial_dataset_cache, kFilenamePartialMetaData),
@@ -449,6 +452,89 @@ class TestCreateDatasetCacheFromPartialDatasetCache : public ::testing::Test {
     }
   }
 
+  void CreatePartialCacheFeature2(absl::string_view partial_dataset_cache) {
+    const int feature_idx = 2;
+
+    CHECK_OK(file::RecursivelyCreateDir(
+        PartialRawColumnFileDirectory(partial_dataset_cache, feature_idx),
+        file::Defaults()));
+
+    {
+      WriteInt32Values(
+          PartialRawColumnFilePath(partial_dataset_cache, feature_idx,
+                                   /*shard_idx=*/0),
+          {0, 1, 2, 3, 1});
+
+      proto::PartialColumnShardMetadata feature_shard_meta_data;
+      feature_shard_meta_data.set_num_examples(5);
+      feature_shard_meta_data.set_num_missing_examples(0);
+      auto& items =
+          *feature_shard_meta_data.mutable_categorical()->mutable_items();
+
+      {
+        auto& item = items["a"];
+        item.set_index(0);
+        item.set_count(1);  // "a" will be pruned because too infrequent.
+      }
+
+      {
+        auto& item = items["b"];
+        item.set_index(1);
+        item.set_count(20);
+      }
+
+      {
+        auto& item = items["c"];
+        item.set_index(2);
+        item.set_count(30);
+      }
+
+      {
+        auto& item = items["d"];
+        item.set_index(3);
+        item.set_count(40);
+      }
+
+      CHECK_OK(file::SetBinaryProto(
+          absl::StrCat(PartialRawColumnFilePath(partial_dataset_cache,
+                                                feature_idx, /*shard_idx=*/0),
+                       kFilenameMetaDataPostfix),
+          feature_shard_meta_data, file::Defaults()));
+    }
+
+    {
+      WriteInt32Values(
+          PartialRawColumnFilePath(partial_dataset_cache, feature_idx,
+                                   /*shard_idx=*/1),
+          {0, 1, 0, -1, -1});
+
+      proto::PartialColumnShardMetadata feature_shard_meta_data;
+      feature_shard_meta_data.set_num_examples(5);
+      feature_shard_meta_data.set_num_missing_examples(2);
+
+      auto& items =
+          *feature_shard_meta_data.mutable_categorical()->mutable_items();
+
+      {
+        auto& item = items["c"];
+        item.set_index(0);
+        item.set_count(50);
+      }
+
+      {
+        auto& item = items["d"];
+        item.set_index(1);
+        item.set_count(60);
+      }
+
+      CHECK_OK(file::SetBinaryProto(
+          absl::StrCat(PartialRawColumnFilePath(partial_dataset_cache,
+                                                feature_idx, /*shard_idx=*/1),
+                       kFilenameMetaDataPostfix),
+          feature_shard_meta_data, file::Defaults()));
+    }
+  }
+
   dataset::proto::DataSpecification data_spec_;
   std::string cache_path_;
   proto::CacheMetadata meta_data_;
@@ -482,6 +568,32 @@ TEST_F(TestCreateDatasetCacheFromPartialDatasetCache, Base) {
           }
           count_nas: 2
         }
+        columns {
+          type: CATEGORICAL
+          name: "f2"
+          categorical {
+            most_frequent_value: 1
+            number_of_unique_values: 4
+            is_already_integerized: false
+            items {
+              key: "<OOD>"
+              value { index: 0 count: 1 }
+            }
+            items {
+              key: "d"
+              value { index: 1 count: 100 }
+            }
+            items {
+              key: "c"
+              value { index: 2 count: 80 }
+            }
+            items {
+              key: "b"
+              value { index: 3 count: 20 }
+            }
+          }
+          count_nas: 2
+        }
         created_num_rows: 10
       )pb");
   EXPECT_THAT(data_spec_, EqualsProto(expected_dataspec));
@@ -506,8 +618,40 @@ TEST_F(TestCreateDatasetCacheFromPartialDatasetCache, Base) {
           available: true
           categorical { num_values: 6 replacement_missing_value: 0 }
         }
+        columns {
+          available: true
+          categorical { num_values: 4 replacement_missing_value: 1 }
+        }
       )pb");
   EXPECT_THAT(reader->meta_data(), EqualsProto(expected_meta_data));
+
+  {
+    auto iter = reader->InOrderNumericalFeatureValueIterator(0).value();
+    CHECK_OK(iter->Next());
+    EXPECT_THAT(iter->Values(),
+                ElementsAre(1, 5, 2, 4, 3, 1, 2, 3, 2.625, 2.625));
+    CHECK_OK(iter->Next());
+    EXPECT_TRUE(iter->Values().empty());
+    CHECK_OK(iter->Close());
+  }
+
+  {
+    auto iter = reader->InOrderCategoricalFeatureValueIterator(1).value();
+    CHECK_OK(iter->Next());
+    EXPECT_THAT(iter->Values(), ElementsAre(1, 5, 2, 4, 3, 1, 2, 3, 0, 0));
+    CHECK_OK(iter->Next());
+    EXPECT_TRUE(iter->Values().empty());
+    CHECK_OK(iter->Close());
+  }
+
+  {
+    auto iter = reader->InOrderCategoricalFeatureValueIterator(2).value();
+    CHECK_OK(iter->Next());
+    EXPECT_THAT(iter->Values(), ElementsAre(0, 3, 2, 1, 3, 2, 1, 2, 1, 1));
+    CHECK_OK(iter->Next());
+    EXPECT_TRUE(iter->Values().empty());
+    CHECK_OK(iter->Close());
+  }
 }
 
 }  // namespace

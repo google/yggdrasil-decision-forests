@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.6 - ???
+
+### Features
+
+-   Distributed training of Gradient Boosted Decision Trees.
+
+### Fixes
+
+-   Fix invalid splitting of pre-sorted numerical features (make use to use
+    midpoint).
+
 ## 0.1.5 - 2021-08-11
 
 ### Fixes

@@ -594,7 +594,8 @@ void PartialDatasetCacheDataSpecCreator::InferColumnsAndTypes(
         break;
       case PartialColumnShardMetadata::kCategorical:
         column->set_type(dataset::proto::ColumnType::CATEGORICAL);
-        column->mutable_categorical()->set_is_already_integerized(true);
+        column->mutable_categorical()->set_is_already_integerized(
+            shard_meta_data.categorical().has_number_of_unique_values());
         break;
       case PartialColumnShardMetadata::TYPE_NOT_SET:
         break;
@@ -624,12 +625,43 @@ void PartialDatasetCacheDataSpecCreator::ComputeColumnStatisticsColumnAndShard(
           shard_meta_data.numerical().mean() *
               (shard_meta_data.num_examples() -
                shard_meta_data.num_missing_examples()));
+
+      if (!col_accumulator->has_min_value() ||
+          shard_meta_data.numerical().min() < col_accumulator->min_value()) {
+        col_accumulator->set_min_value(shard_meta_data.numerical().min());
+      }
+
+      if (!col_accumulator->has_max_value() ||
+          shard_meta_data.numerical().max() > col_accumulator->max_value()) {
+        col_accumulator->set_max_value(shard_meta_data.numerical().max());
+      }
       break;
-    case PartialColumnShardMetadata::kCategorical:
-      column->mutable_categorical()->set_number_of_unique_values(
-          std::max(column->categorical().number_of_unique_values(),
-                   shard_meta_data.categorical().number_of_unique_values()));
-      break;
+
+    case PartialColumnShardMetadata::kCategorical: {
+      const auto& src_categorical = shard_meta_data.categorical();
+      auto* dst_categorical = column->mutable_categorical();
+
+      if (dst_categorical->is_already_integerized()) {
+        // Maximum value of "number_of_unique_values" seen in all the shards.
+        dst_categorical->set_number_of_unique_values(
+            std::max(dst_categorical->number_of_unique_values(),
+                     src_categorical.number_of_unique_values()));
+      } else {
+        for (const auto& src_item : src_categorical.items()) {
+          auto it_dst = dst_categorical->mutable_items()->find(src_item.first);
+          if (it_dst == dst_categorical->items().end()) {
+            // A new item.
+            (*dst_categorical->mutable_items())[src_item.first].set_count(
+                src_item.second.count());
+          } else {
+            // Increase the count of the known item.
+            it_dst->second.set_count(it_dst->second.count() +
+                                     src_item.second.count());
+          }
+        }
+      }
+    } break;
+
     case PartialColumnShardMetadata::TYPE_NOT_SET:
       break;
   }

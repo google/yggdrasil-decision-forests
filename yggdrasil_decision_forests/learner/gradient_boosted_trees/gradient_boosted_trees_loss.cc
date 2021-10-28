@@ -473,7 +473,7 @@ void BinomialLogLikelihoodLoss::TemplatedLossImp(
     DCheckIsFinite(*sum_loss);
   }
   if constexpr (!use_weights) {
-    *sum_weights += labels.size();
+    *sum_weights += end_example_idx - begin_example_idx;
   }
 }
 
@@ -487,6 +487,7 @@ absl::Status BinomialLogLikelihoodLoss::TemplatedLoss(
   double sum_loss = 0;
   double count_correct_predictions = 0;
   double sum_weights = 0;
+
   if (thread_pool == nullptr) {
     if (weights.empty()) {
       TemplatedLossImp<false>(labels, predictions, weights, 0, labels.size(),

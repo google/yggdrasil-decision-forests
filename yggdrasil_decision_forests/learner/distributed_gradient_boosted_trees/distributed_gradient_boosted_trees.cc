@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
+#include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
@@ -40,6 +41,7 @@ model::proto::LearnerCapabilities
 DistributedGradientBoostedTreesLearner::Capabilities() const {
   model::proto::LearnerCapabilities capabilities;
   capabilities.set_resume_training(true);
+  capabilities.set_support_partial_cache_dataset_format(true);
   return capabilities;
 }
 
@@ -49,8 +51,15 @@ DistributedGradientBoostedTreesLearner::TrainWithStatus(
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   return absl::InvalidArgumentError(
-      "Training with a Vertical dataset not implemented. Specify the training "
-      "dataset as a path, or use the non-distributed version of GBT.");
+      "The Distributed Gradient Boosted Tree learner does not support training "
+      "from in-memory datasets (i.e. VerticalDataset in Yggdrasil Decision "
+      "Forests, (non distributed) Dataset in TensorFlow Decision Forests). If "
+      "your dataset is small, use the (non distributed) Gradient Boosted Tree "
+      "learner (i.e. GRADIENT_BOOSTED_TREES with Yggdrasil Decision Forests, "
+      "GradientBoostedTreesModel in TensorFlow Decision Forests). If your "
+      "dataset is large, provide the dataset as a path (Yggdrasil Decision "
+      "Forests) or use a TF Distribution Strategy (TensorFlow Decision "
+      "Forests).");
 }
 
 absl::Status DistributedGradientBoostedTreesLearner::SetHyperParametersImpl(
@@ -140,13 +149,31 @@ DistributedGradientBoostedTreesLearner::TrainWithStatus(
   updated_deployment.mutable_distribute()->set_working_directory(
       work_directory);
 
-  // Create / resume the creation of the dataset cache.
-  const auto dataset_cache_path =
+  // Detect if the training dataset is a stored in the dataset cache format
+  // directly, or if the conversion should be done first.
+  std::string train_path, train_prefix;
+  ASSIGN_OR_RETURN(std::tie(train_prefix, train_path),
+                   dataset::SplitTypeAndPath(typed_path));
+
+  std::string dataset_cache_path =
       file::JoinPath(work_directory, kFileNameDatasetCache);
-  monitoring.BeginDatasetCacheCreation();
-  RETURN_IF_ERROR(internal::CreateDatasetCache(
-      updated_deployment, dataset_cache_path, config_link, spe_config,
-      typed_path, data_spec));
+  if (train_prefix == dataset::FORMAT_PARTIAL_DATASET_CACHE) {
+    // The dataset is stored in the partially cache format.
+    monitoring.BeginDatasetCacheCreation();
+    RETURN_IF_ERROR(internal::CreateDatasetCacheFromPartialDatasetCache(
+        updated_deployment, train_path, dataset_cache_path, config_link,
+        spe_config, data_spec));
+
+    // TODO(gbm): Delete the partial dataset cache.
+  } else {
+    // The dataset is stored in a generic format.
+
+    // Create / resume the creation of the dataset cache.
+    monitoring.BeginDatasetCacheCreation();
+    RETURN_IF_ERROR(internal::CreateDatasetCache(
+        updated_deployment, dataset_cache_path, config_link, spe_config,
+        typed_path, data_spec));
+  }
 
   // Train the model.
   monitoring.BeginTraining();
@@ -206,6 +233,29 @@ absl::Status CheckConfiguration(
         "deployment.cache_path to specify the cache directory.");
   }
   return absl::OkStatus();
+}
+
+absl::Status CreateDatasetCacheFromPartialDatasetCache(
+    const model::proto::DeploymentConfig& deployment,
+    absl::string_view partial_cache_path, absl::string_view final_cache_path,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
+    const dataset::proto::DataSpecification& data_spec) {
+  auto create_cache_config = spe_config.create_cache();
+  create_cache_config.set_label_column_idx(config_link.label());
+  if (config_link.has_weight_definition()) {
+    if (!config_link.weight_definition().has_numerical()) {
+      return absl::InvalidArgumentError(
+          "Only the weighting with a numerical column is supported");
+    }
+    create_cache_config.set_weight_column_idx(
+        config_link.weight_definition().attribute_idx());
+  }
+
+  return distributed_decision_tree::dataset_cache::
+      CreateDatasetCacheFromPartialDatasetCache(
+          data_spec, partial_cache_path, final_cache_path, create_cache_config,
+          deployment.distribute(), /*delete_source_file=*/true);
 }
 
 absl::Status CreateDatasetCache(
@@ -283,21 +333,21 @@ TrainWithCache(
   // Minimum iter index for the creation of a new checkpoint.
   int minimum_iter_for_new_checkpoint = -1;
 
-  const auto checkpoint_iter_idx =
+  auto last_checkpoint_idx =
       utils::GetGreatestSnapshot(SnapshotDirectory(work_directory));
-  if (checkpoint_iter_idx.ok()) {
+  if (last_checkpoint_idx.ok()) {
     // Restoring the model from the checkpoint.
-    iter_idx = checkpoint_iter_idx.value();
+    iter_idx = last_checkpoint_idx.value();
     LOG(INFO) << "Resume training from iteration #" << iter_idx;
     minimum_iter_for_new_checkpoint = iter_idx + 1;
     proto::Checkpoint checkpoint_metadata;
     RETURN_IF_ERROR(RestoreManagerCheckpoint(
-        checkpoint_iter_idx.value(), work_directory, &model, &label_statistics,
+        last_checkpoint_idx.value(), work_directory, &model, &label_statistics,
         &checkpoint_metadata));
     model->set_data_spec(data_spec);
     InitializeModelWithAbstractTrainingConfig(config, config_link, model.get());
     RETURN_IF_ERROR(EmitRestoreCheckpoint(
-        checkpoint_iter_idx.value(), checkpoint_metadata.num_shards(),
+        last_checkpoint_idx.value(), checkpoint_metadata.num_shards(),
         model->num_trees_per_iter(), distribute_manager.get(), monitoring));
   } else {
     // Initializing a new model.
@@ -341,8 +391,10 @@ TrainWithCache(
   for (; iter_idx < spe_config.gbt().num_trees(); iter_idx++) {
     // Create a checkpoint.
     if (iter_idx >= minimum_iter_for_new_checkpoint &&
-        ShouldCreateCheckpoint(iter_idx, time_last_checkpoint, spe_config)) {
+        ShouldCreateCheckpoint(iter_idx, time_last_checkpoint, spe_config) &&
+        (!last_checkpoint_idx.ok() || iter_idx > last_checkpoint_idx.value())) {
       time_last_checkpoint = absl::Now();
+      last_checkpoint_idx = iter_idx;
       RETURN_IF_ERROR(CreateCheckpoint(iter_idx, *model, work_directory,
                                        label_statistics,
                                        distribute_manager.get(), monitoring));
@@ -387,6 +439,13 @@ TrainWithCache(
     } else if (!iter_status.ok()) {
       return iter_status;
     }
+  }
+
+  if (!last_checkpoint_idx.ok() || iter_idx > last_checkpoint_idx.value()) {
+    // Create the final checkpoint
+    RETURN_IF_ERROR(CreateCheckpoint(iter_idx, *model, work_directory,
+                                     label_statistics, distribute_manager.get(),
+                                     monitoring));
   }
 
   // Display the final training logs.
@@ -1083,6 +1142,7 @@ absl::Status EmitEndIter(int iter_idx, distribute::AbstractManager* distribute,
       if (!training_evaluation.has_value()) {
         return absl::InternalError("Receiving a non requested loss");
       }
+
       training_evaluation.value()->loss = result.training_loss();
       training_evaluation.value()->metrics = {result.training_metrics().begin(),
                                               result.training_metrics().end()};

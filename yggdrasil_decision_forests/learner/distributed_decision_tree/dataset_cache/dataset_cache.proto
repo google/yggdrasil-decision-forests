@@ -171,6 +171,7 @@ message WorkerRequest {
     oneof transformation {
       Numerical numerical = 7;
       CategoricalInt categorical_int = 8;
+      CategoricalString categorical_string = 9;
     }
 
     message Numerical {
@@ -180,6 +181,14 @@ message WorkerRequest {
 
     message CategoricalInt {
       optional int64 max_value = 1;
+      optional int32 nan_value_replacement = 2;
+    }
+
+    message CategoricalString {
+      // Same as "items" in the dataspec.
+      // Dictionary for a categorical string feature of the result.
+      map<string, dataset.proto.CategoricalSpec.VocabValue> items = 1;
+      optional int32 nan_value_replacement = 2;
     }
   }
 }
@@ -297,12 +306,18 @@ message PartialColumnShardMetadata {
 
   message NumericalColumn {
     optional double mean = 1;
+    optional double min = 2;
+    optional double max = 3;
   }
 
   message CategoricalColumn {
     // Same as "number_of_unique_values" in the dataspec.
     // Integer values should be in [-1, number_of_unique_values).
     optional int64 number_of_unique_values = 1;
+
+    // Same as "items" in the dataspec.
+    // Dictionary for a categorical string feature.
+    map<string, dataset.proto.CategoricalSpec.VocabValue> items = 2;
   }
 }
 
