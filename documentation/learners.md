@@ -77,6 +77,14 @@ the gradient of the loss relative to the model output).
 -   For categorical set splits e.g. texts. Minimum number of occurrences of an
     item to be considered.
 
+#### [compute_permutation_variable_importance](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:compute_permutation_variable_importance)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   If true, compute the permutation variable importance of the model at the end
+    of the training using the validation dataset. Enabling this feature can
+    increase the training time significantly.
+
 #### [dart_dropout](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:dropout_rate)
 
 -   **Type:** Real **Default:** 0.01 **Possible values:** min:0 max:1
@@ -707,5 +715,73 @@ used to grow the tree while the second is used to prune the tree.
 -   Ratio of the training dataset used to create the validation dataset used to
     prune the tree. If set to 0, the entire dataset is used for training, and
     the tree is not pruned.
+
+</font>
+
+## DISTRIBUTED_GRADIENT_BOOSTED_TREES
+
+<font size="2">
+
+Exact distributed version of the Gradient Boosted Tree learning algorithm. See
+the documentation of the non-distributed Gradient Boosted Tree learning
+algorithm for an introduction to GBTs.
+
+### Training configuration
+
+-   <a href="../yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
+-   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
+-   <a href="../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto">learner/gradient_boosted_trees/gradient_boosted_trees.proto</a>
+
+### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+
+#### [apply_link_function](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:apply_link_function)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   If true, applies the link function (a.k.a. activation function), if any, before returning the model prediction. If false, returns the pre-link function model output.<br>For example, in the case of binary classification, the pre-link function output is a logic while the post-link function is a probability.
+
+#### [max_depth](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_depth)
+
+-   **Type:** Integer **Default:** 6 **Possible values:** min:-1
+
+-   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
+    Negative values are ignored.
+
+#### [maximum_training_duration_seconds](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:maximum_training_duration_seconds)
+
+-   **Type:** Real **Default:** -1
+
+-   Maximum training duration of the model expressed in seconds. Each learning
+    algorithm is free to use this parameter at it sees fit. Enabling maximum
+    training duration makes the model training non-deterministic.
+
+#### [min_examples](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:min_examples)
+
+-   **Type:** Integer **Default:** 5 **Possible values:** min:1
+
+-   Minimum number of examples in a node.
+
+#### [num_trees](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:num_trees)
+
+-   **Type:** Integer **Default:** 300 **Possible values:** min:1
+
+-   Maximum number of decision trees. The effective number of trained tree can
+    be smaller if early stopping is enabled.
+
+#### [shrinkage](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:shrinkage)
+
+-   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
+
+-   Coefficient applied to each tree prediction. A small value (0.02) tends to
+    give more accurate results (assuming enough trees are trained), but results
+    in larger models. Analogous to neural network learning rate.
+
+#### [use_hessian_gain](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:use_hessian_gain)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   Use true, uses a formulation of split gain with a hessian term i.e.
+    optimizes the splits to minimize the variance of "gradient / hessian.
+    Available for all losses except regression.
 
 </font>

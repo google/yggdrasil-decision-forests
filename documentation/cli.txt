@@ -20,6 +20,10 @@ train: Train a ML model and export it to disk.
       done locally with a number of threads chosen by the training algorithm.);
       default: "";
     --output (Output model directory.); default: "";
+    --valid_dataset (Optional validation dataset specified with [type]:[path]
+      format. If not specified and if the learning algorithm uses a validation
+      dataset, the effective validation dataset is extracted from the training
+      dataset.); default: "";
 
 Try --helpfull to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or

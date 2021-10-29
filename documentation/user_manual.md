@@ -13,10 +13,16 @@ It is complementary to the beginner example available in `examples/`.
     *   [Dataset](#dataset)
     *   [Dataset path and format](#dataset-path-and-format)
     *   [Learners and Models](#learners-and-models)
+    *   [Distributed Training](#distributed-training)
+        *   [GRPC distribute implementation](#grpc-distribute-implementation)
+        *   [TF_DIST distribute implementation](#tf_dist-distribute-implementation)
     *   [Meta-Learner](#meta-learner)
     *   [Model/Learner Evaluation](#modellearner-evaluation)
     *   [Experiment](#experiment)
     *   [Model Analysis](#model-analysis)
+        *   [Variable Importances](#variable-importances)
+            *   [Model agnostic](#model-agnostic)
+            *   [Decision Forests specific](#decision-forests-specific)
     *   [Manual Tuning of Hyper-parameters](#manual-tuning-of-hyper-parameters)
         *   [Best first global growing strategy for GBT](#best-first-global-growing-strategy-for-gbt)
         *   [Oblique splits for GBT and RF](#oblique-splits-for-gbt-and-rf)
@@ -62,7 +68,7 @@ Note: For efficiency reasons, **examples** are not stored as string dictionaries
 An **Example** (in Python notation):
 
 ```python
-{"attribute_1":5.1, "attribute_2":"CAT", "attribute_3":[1,2,3]}
+{"attribute_1": 5.1, "attribute_2": "CAT", "attribute_3": [1, 2, 3]}
 ```
 
 A **dataset** is a list of **examples**. Datasets are stored in memory (e.g.
@@ -183,7 +189,8 @@ using namespace yggdrasil_decision_forests;
 dataset::proto::DataSpecification data_spec;
 dataset::CreateDataSpec("csv:/my/dataset.csv", false, guide, &data_spec);
 
-# Human description of the dataspec.
+# Human
+description of the dataspec.
 std::cout << dataset::PrintHumanReadable(data_spec);
 ```
 
@@ -336,6 +343,78 @@ All the official supported models and learners can be respectively injected with
 the dependencies `yggdrasil_decision_forests/model:all_models` and
 `yggdrasil_decision_forests/learners:all_learners`.
 
+## Distributed Training
+
+*Distributed training* refers to the training a model with the use of multiple
+computers. The distribution of computation, memory and the network IO in between
+the machines depends on each distributed algorithm. See specific algorithm
+documentation for more details.
+
+When distributed training is used, the process running the user code (i.e.
+running the `learner->Train()` function) is the manager. Unless specified
+otherwise, the manager process runs close to no computation.
+
+The following learners support distributed training:
+
+-   `DISTRIBUTED_GRADIENT_BOOSTED_TREES`: an exact distributed implementation of
+    the GRADIENT_BOOSTED_TREES learner. See
+    [the DGBT manual](learner_distributed_gradient_boosted_trees.md) for
+    specific details.
+
+Distributed training is enabled by configuring a `distribute` execution engine
+and the `cache_path` field in the
+[DeploymentConfig](../yggdrasil_decision_forests/learner/abstract_learner.proto)
+. Different `distribute` execution engines are available. They don't impact the
+effective trained model.
+
+### `GRPC` distribute implementation (recommended)
+
+Each worker is a process running the
+`yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_worker_main`
+binary. Workers are communicating through GRPC. This option is recommended for
+Yggdrasil users. It is up to the user to start the `:grpc_worker_main` processes
+and configure the socket addresses in the DeploymentConfig proto.
+
+For example:
+
+DeploymentConfig proto:
+
+```
+cache_path: "/directory/accessible/to/all/the/workers"
+num_threads: 32 # Each worker will run 32 threads.
+try_resume_training: true # Allow training to be interrupted and resumed.
+
+distribute {
+  implementation_key: "GRPC"
+  [yggdrasil_decision_forests.distribute.proto.grpc] = {
+    socket_addresses {
+      # Configure the 3 workers.
+      addresses { ip: "192.168.0.10" port: 1001 }
+      addresses { ip: "192.168.0.11" port: 1001 }
+      addresses { ip: "192.168.0.12" port: 1001 }
+      }
+    }
+  }
+```
+
+See
+[yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.proto](../yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.proto)
+for more details.
+
+### `TF_DIST` distribute implementation
+
+Each worker is a generic TensorFlow parameter server with TF-DF custom ops. One
+such rule is pre-configured:
+`tensorflow_decision_forests/tensorflow/distribute:tensorflow_std_server`. This
+implementation is best suited for TensorFlow Decision Forest users. The workers
+can be configured either by socket addresses or with the
+[TF_CONFIG](https://www.tensorflow.org/guide/distributed_training#setting_up_the_tf_config_environment_variable)
+variable
+
+See
+[tensorflow_decision_forests/tensorflow/distribute/tf_distribution.proto](http://google3/third_party/tensorflow_decision_forests/tensorflow/distribute/tf_distribution.proto)
+for more details.
+
 ## Meta-Learner
 
 The **Learner and Model** abstraction allows the development of generic tools
@@ -364,8 +443,8 @@ tool shows the following information about a model:
 
 Alternatively, models can be visualized and analysed programmatically directly
 using the
-[TensorFlow Decision Forests python inspector](https://www.tensorflow.org/decision_forests/api_docs/python/tfdf/inspector/make_inspector).
-See the
+[TensorFlow Decision Forests python inspector](https://www.tensorflow.org/decision_forests/api_docs/python/tfdf/inspector/make_inspector)
+. See the
 [Inspect and debug](https://www.tensorflow.org/decision_forests/tutorials/advanced_colab)
 colab for more details. An Yggdrasil model can be converted into a Tensorflow
 Decision Forests model using the
@@ -385,8 +464,8 @@ The available variable importances are:
 
 `MEAN_{INCREASE,DECREASE}_IN_{metric}`: Estimated metric change from removing a
 feature using
-[permutation importance](https://christophm.github.io/interpretable-ml-book/feature-importance.html).
-Depending on the learning algorithm and hyper-parameters, the VIs can be
+[permutation importance](https://christophm.github.io/interpretable-ml-book/feature-importance.html)
+. Depending on the learning algorithm and hyper-parameters, the VIs can be
 computed with validation, cross-validation or out-of-bag. For example, the
 `MEAN_DECREASE_IN_ACCURACY` of a feature is the drop in accuracy (the larger,
 the most important the feature) caused by shuffling the values of a features.
@@ -436,8 +515,8 @@ decision_tree {
 **Generic hyper-parameter:**
 
 ```python
-{ growing_strategy = "BEST_FIRST_GLOBAL",
-  max_num_nodes = 64 }
+{growing_strategy = "BEST_FIRST_GLOBAL",
+                    max_num_nodes = 64}
 ```
 
 ### Oblique splits for GBT and RF
@@ -462,9 +541,9 @@ decision_tree {
 **Generic hyper-parameter:**
 
 ```python
-{ split_axis = "SPARSE_OBLIQUE",
-  sparse_oblique_num_projections_exponent = 2,
-  sparse_oblique_normalization = 64 }
+{split_axis = "SPARSE_OBLIQUE",
+              sparse_oblique_num_projections_exponent = 2,
+                                                        sparse_oblique_normalization = 64}
 ```
 
 ### Random Categorical splits for GBT and RF
@@ -486,7 +565,7 @@ decision_tree {
 **Generic hyper-parameter:**
 
 ```python
-{ categorical_algorithm = "RANDOM" }
+{categorical_algorithm = "RANDOM"}
 ```
 
 ### Hessian splits for GBT
@@ -503,7 +582,7 @@ use_hessian_gain: true
 **Generic hyper-parameter:**
 
 ```python
-{ use_hessian_gain = "true" }
+{use_hessian_gain = "true"}
 ```
 
 ### Number of trees for RF and GBT
@@ -519,7 +598,7 @@ num_trees: 2000
 **Generic hyper-parameter:**
 
 ```python
-{ num_trees = 2000 }
+{num_trees = 2000}
 ```
 
 ### Disabling the validation dataset for GBT
@@ -539,7 +618,7 @@ early_stopping: NONE
 **Generic hyper-parameter:**
 
 ```python
-{ validation_ratio = 0.0, early_stopping = "NONE" }
+{validation_ratio = 0.0, early_stopping = "NONE"}
 ```
 
 ### Disabling winner take all for RF
@@ -557,7 +636,7 @@ winner_take_all_inference: false
 **Generic hyper-parameter:**
 
 ```python
-{ winner_take_all = "false" }
+{winner_take_all = "false"}
 ```
 
 ### Super learners
@@ -678,8 +757,10 @@ const int example_idx = 0;
 examples->SetNumerical(example_idx, feature_age, 30, features);
 examples->SetCategorical(example_idx, feature_country, "UK", features);
 examples->SetCategoricalSet(example_idx, feature_text,
-                            std::vector<std::string>{"hello", "world"},
-                            features);
+std::vector<std::string>{
+"hello", "world"
+},
+features);
 
 // Run the model on the first example.
 //
@@ -701,20 +782,21 @@ to include all the canonical ones using helpers):
 
 ```python
 # Dependency to the Random Forest model.
-//third_party/yggdrasil_decision_forests/model/random_forest
+// third_party / yggdrasil_decision_forests / model / random_forest
 
 # Dependency to the Gradient Boosted Decision Tree model.
-//third_party/yggdrasil_decision_forests/model/gradient_boosted_trees
+// third_party / yggdrasil_decision_forests / model / gradient_boosted_trees
 
 # Dependency to ALL the canonical models.
-//third_party/yggdrasil_decision_forests/model:all_models
+// third_party / yggdrasil_decision_forests / model: all_models
 
 # Dependency to all the canonical engines.
-//third_party/yggdrasil_decision_forests:all_inference_engines
+// third_party / yggdrasil_decision_forests: all_inference_engines
 ```
 
 Note: If you get the following error: `No compatible engine available for model
 RANDOM_FOREST. 1) Make sure the corresponding engine is added as a dependency,
+
 2) use the (slow) generic engine (i.e. "model.Predict()") or 3) use one of the
 fast non-generic engines available in ../serving.`, you likely did not link a
 compatible engine.
