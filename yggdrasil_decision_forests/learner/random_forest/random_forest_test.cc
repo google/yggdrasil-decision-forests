@@ -460,7 +460,10 @@ TEST_F(RandomForestOnAdult, MaximumSize) {
   train_config_.set_maximum_model_size_in_memory_in_bytes(max_size);
 
   TrainAndEvaluateModel();
-  EXPECT_LT(model_->ModelSizeInBytes().value(), max_size);
+  // Add an extra 2kB to help with the test flakiness.
+  // Note: the model can be slighly larger than the
+  // "set_maximum_model_size_in_memory_in_bytes" directive.
+  EXPECT_LT(model_->ModelSizeInBytes().value(), max_size + 2 * 1024);
 
   EXPECT_GT(metric::Accuracy(evaluation_), 0.840);
 }

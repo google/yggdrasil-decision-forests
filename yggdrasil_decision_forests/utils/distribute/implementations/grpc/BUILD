@@ -20,6 +20,11 @@ all_proto_library(
 
 cc_binary_ydf(
     name = "grpc_worker_main",
+    deps = [":grpc_worker_lib_with_main"],
+)
+
+cc_library_ydf(
+    name = "grpc_worker_lib_with_main",
     srcs = ["grpc_worker_main.cc"],
     deps = [
         ":grpc_worker",

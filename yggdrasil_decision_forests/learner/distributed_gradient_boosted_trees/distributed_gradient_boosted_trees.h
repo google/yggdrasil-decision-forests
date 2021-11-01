@@ -339,7 +339,7 @@ absl::Status EmitShareSplits(
     internal::Monitoring* monitoring);
 
 absl::Status EmitEndIter(int iter_idx, distribute::AbstractManager* distribute,
-                         std::optional<Evaluation*> training_evaluation,
+                         absl::optional<Evaluation*> training_evaluation,
                          internal::Monitoring* monitoring);
 
 absl::Status EmitRestoreCheckpoint(int iter_idx, int num_shards,

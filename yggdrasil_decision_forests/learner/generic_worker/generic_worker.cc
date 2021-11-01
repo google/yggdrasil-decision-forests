@@ -33,6 +33,8 @@ namespace {
 using Blob = distribute::Blob;
 }
 
+constexpr char GenericWorker::kWorkerKey[];
+
 absl::Status GenericWorker::TrainModel(
     const proto::Request::TrainModel& request,
     proto::Result::TrainModel* result) {

@@ -4,7 +4,8 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 def deps(prefix = ""):
     http_archive(
-        name = "com_google_farmhash",
+        # The name should match TF's name for farmhash lib.
+        name = "farmhash_archive",
         build_file = prefix + "//third_party/farmhash:farmhash.BUILD",
         strip_prefix = "farmhash-master",
         # Does not have any release.

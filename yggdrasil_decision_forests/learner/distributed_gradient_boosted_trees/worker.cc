@@ -26,6 +26,8 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace distributed_gradient_boosted_trees {
 
+constexpr char DistributedGradientBoostedTreesWorker::kWorkerKey[];
+
 absl::Status DistributedGradientBoostedTreesWorker::Setup(
     distribute::Blob serialized_welcome) {
   ASSIGN_OR_RETURN(welcome_, utils::ParseBinaryProto<proto::WorkerWelcome>(

@@ -84,7 +84,7 @@ absl::Status IntegerColumnWriter::Open(absl::string_view path,
                                        int64_t max_value) {
   num_bytes_ = NumBytes(max_value);
   max_value_ = max_value;
-  path_ = path;
+  path_ = std::string(path);
   return file_.Open(path);
 }
 
@@ -249,7 +249,7 @@ template <typename Value>
 absl::Status ShardedIntegerColumnReader<Value>::Open(
     absl::string_view base_path, int64_t max_value, int max_num_values,
     int begin_shard_idx, int end_shard_idx) {
-  base_path_ = base_path;
+  base_path_ = std::string(base_path);
   max_value_ = max_value;
   max_num_values_ = max_num_values;
   end_shard_idx_ = end_shard_idx;
@@ -410,7 +410,7 @@ template class InMemoryIntegerColumnReaderFactory<int32_t>;
 template class InMemoryIntegerColumnReaderFactory<int64_t>;
 
 absl::Status FloatColumnWriter::Open(absl::string_view path) {
-  path_ = path;
+  path_ = std::string(path);
   return file_.Open(path);
 }
 
@@ -470,7 +470,7 @@ absl::Status ShardedFloatColumnReader::Open(absl::string_view base_path,
                                             int max_num_values,
                                             int begin_shard_idx,
                                             int end_shard_idx) {
-  base_path_ = base_path;
+  base_path_ = std::string(base_path);
   max_num_values_ = max_num_values;
   end_shard_idx_ = end_shard_idx;
   current_shard_idx_ = begin_shard_idx;

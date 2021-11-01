@@ -269,7 +269,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCache() {
       num_columns);
 
   const auto begin = absl::Now();
-  std::atomic<size_t> memory_usage = 0;
+  std::atomic<size_t> memory_usage{0};
 
   {
     absl::Status worker_status;

@@ -32,6 +32,9 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace distributed_decision_tree {
 namespace dataset_cache {
+
+constexpr char CreateDatasetCacheWorker::kWorkerKey[];
+
 namespace {
 using Blob = distribute::Blob;
 

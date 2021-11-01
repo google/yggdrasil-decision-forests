@@ -32,4 +32,5 @@ copy configure\cli_readme.txt dist\README
  .\%CLI%\evaluate.exe^
  .\%CLI%\convert_dataset.exe^
  .\%CLI%\benchmark_inference.exe^
- .\%CLI%\utils\synthetic_dataset.exe
+ .\%CLI%\utils\synthetic_dataset.exe^
+ .\%CLI%\distribute\implementations\grpc\grpc_worker_main.exe

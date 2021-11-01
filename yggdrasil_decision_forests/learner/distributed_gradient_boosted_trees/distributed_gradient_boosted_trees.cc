@@ -1102,7 +1102,7 @@ absl::Status EmitShareSplits(
 }
 
 absl::Status EmitEndIter(int iter_idx, distribute::AbstractManager* distribute,
-                         std::optional<Evaluation*> training_evaluation,
+                         absl::optional<Evaluation*> training_evaluation,
                          internal::Monitoring* monitoring) {
   monitoring->BeginStage(internal::Monitoring::kEndIter);
 
@@ -1547,7 +1547,7 @@ void Monitoring::FindSplitWorkerReplyTime(int worker_idx,
     LOG(INFO) << "\tWorker #" << worker_idx << " replied to FindSplits in "
               << delay;
   }
-  last_min_split_reply_times_.push_back(std::pair(worker_idx, delay));
+  last_min_split_reply_times_.push_back({worker_idx, delay});
 }
 
 absl::string_view Monitoring::StageName(Monitoring::Stages stage) {
