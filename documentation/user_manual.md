@@ -386,7 +386,7 @@ try_resume_training: true # Allow training to be interrupted and resumed.
 
 distribute {
   implementation_key: "GRPC"
-  [yggdrasil_decision_forests.distribute.proto.grpc] = {
+  [yggdrasil_decision_forests.distribute.proto.grpc] {
     socket_addresses {
       # Configure the 3 workers.
       addresses { ip: "192.168.0.10" port: 1001 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 - ????
+
+### Features
+
+-   Add example of distributed training at examples/distributed_training.sh
+
+### Fixes
+
+-   Register the GRPC distribution strategy in :train.
+
 ## 0.2.0 - 2021-10-29
 
 ### Features
