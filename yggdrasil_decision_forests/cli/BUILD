@@ -85,6 +85,7 @@ cc_binary_ydf(
         ":all_file_systems",
         "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
+        "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:all_models",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:logging",

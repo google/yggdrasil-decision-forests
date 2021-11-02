@@ -16,9 +16,9 @@
 // Display the statistics and structure of a model.
 
 #include "absl/flags/flag.h"
+#include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
-
 ABSL_FLAG(std::string, model, "", "Model directory.");
 
 ABSL_FLAG(bool, full_definition, false,
@@ -36,16 +36,23 @@ ABSL_FLAG(bool, dataspec, false,
           "running :show_dataspec on the "
           "data_spec.pb file in the model directory.");
 
+ABSL_FLAG(bool, explain_engine_incompatibility, false,
+          "If true, and if --engines=true, print an explanation of why each of "
+          "the available serving engine is not compatible with the model.");
+
 constexpr char kUsageMessage[] =
     "Display the statistics and structure of a model.";
 
 namespace yggdrasil_decision_forests {
 namespace cli {
 
-void ListEngines(const model::AbstractModel* model) {
-  std::cout << "Fast serving engines:" << std::endl;
+void ListEngines(const bool explain_engine_incompatibility,
+                 const model::AbstractModel* model) {
+  const auto compatible_engines = model->ListCompatibleFastEngines();
+  std::cout << "  There are " << compatible_engines.size()
+            << " compatible fast serving engine(s):" << std::endl;
 
-  for (auto& factory : model->ListCompatibleFastEngines()) {
+  for (auto& factory : compatible_engines) {
     // Information about the engine.
     std::cout << "  " << factory->name() << std::endl;
     std::cout << "    is better than: {"
@@ -63,12 +70,39 @@ void ListEngines(const model::AbstractModel* model) {
   }
 
   // Create the best engine.
+  std::cout << std::endl
+            << "  Create the best engine with \"BuildFastEngine()\":"
+            << std::endl;
   auto best_engine = model->BuildFastEngine();
   if (best_engine.ok()) {
     std::cout << "  The best engine was created successfully." << std::endl;
   } else {
     std::cout << "  The best engine could not be created: "
               << best_engine.status() << std::endl;
+  }
+
+  // Explain why each engine is compatible or not.
+  if (explain_engine_incompatibility) {
+    const auto all_engine_factors = model::ListAllFastEngines();
+    std::cout << "  There are " << all_engine_factors.size()
+              << " registered fast serving engine(s):" << std::endl;
+    for (auto& factory : all_engine_factors) {
+      if (factory->IsCompatible(model)) {
+        std::cout << "  engine " << factory->name() << " is compatible"
+                  << std::endl;
+      } else {
+        const auto engine_or = factory->CreateEngine(model);
+        std::cout << "  engine " << factory->name()
+                  << " is not compatible:" << std::endl
+                  << "    ";
+        if (engine_or.ok()) {
+          std::cout << "Unknown reason. Please report this error to us.";
+        } else {
+          std::cout << engine_or.status().message();
+        }
+        std::cout << std::endl;
+      }
+    }
   }
 }
 
@@ -98,7 +132,8 @@ void ShowModel() {
   if (absl::GetFlag(FLAGS_engines)) {
     std::cout << std::endl << "Engines" << std::endl;
     std::cout << "========" << std::endl << std::endl;
-    ListEngines(model.get());
+    ListEngines(absl::GetFlag(FLAGS_explain_engine_incompatibility),
+                model.get());
   }
 }
 

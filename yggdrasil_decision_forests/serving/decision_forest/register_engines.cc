@@ -31,6 +31,14 @@ namespace model {
 
 namespace {
 
+absl::Status NoGlobalImputationError(const absl::string_view class_name) {
+  return absl::InvalidArgumentError(absl::StrCat(
+      "The inference engine \"", class_name,
+      "\" only support models trained with "
+      "missing_value_policy=GLOBAL_IMPUTATION. This model was trained with "
+      "another type of imputation for missing values"));
+}
+
 // Maximum number of nodes in any tree.
 int64_t MaxNumberOfNodesPerTree(
     const std::vector<std::unique_ptr<decision_tree::DecisionTree>>& trees) {
@@ -167,6 +175,11 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
       return absl::InvalidArgumentError("The model is not a GBDT.");
     }
 
+    if (!gbt_model->IsMissingValueConditionResultFollowGlobalImputation()) {
+      return NoGlobalImputationError(
+          "GradientBoostedTreesGenericFastEngineFactory");
+    }
+
     const bool need_uint32_node_index =
         MaxNumberOfNodesPerTree(gbt_model->decision_trees()) >=
         std::numeric_limits<uint16_t>::max();
@@ -291,6 +304,11 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
       return absl::InvalidArgumentError("The model is not a GBDT.");
     }
 
+    if (!gbt_model->IsMissingValueConditionResultFollowGlobalImputation()) {
+      return NoGlobalImputationError(
+          "GradientBoostedTreesQuickScorerFastEngineFactory");
+    }
+
     switch (gbt_model->task()) {
       case proto::CLASSIFICATION:
         if (gbt_model->label_col_spec()
@@ -391,6 +409,11 @@ class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
       return absl::InvalidArgumentError("The model is not a GBDT.");
     }
 
+    if (!gbt_model->IsMissingValueConditionResultFollowGlobalImputation()) {
+      return NoGlobalImputationError(
+          "GradientBoostedTreesOptPredFastEngineFactory");
+    }
+
     switch (gbt_model->task()) {
       case proto::CLASSIFICATION:
         if (gbt_model->label_col_spec()
@@ -456,6 +479,10 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
     auto* rf_model = dynamic_cast<const SourceModel*>(model);
     if (!rf_model) {
       return absl::InvalidArgumentError("The model is not a RF.");
+    }
+
+    if (!rf_model->IsMissingValueConditionResultFollowGlobalImputation()) {
+      return NoGlobalImputationError("RandomForestGenericFastEngineFactory");
     }
 
     const bool need_uint32_node_index =
@@ -578,6 +605,10 @@ class RandomForestOptPredFastEngineFactory : public model::FastEngineFactory {
     auto* rf_model = dynamic_cast<const SourceModel*>(model);
     if (!rf_model) {
       return absl::InvalidArgumentError("The model is not a RF.");
+    }
+
+    if (!rf_model->IsMissingValueConditionResultFollowGlobalImputation()) {
+      return NoGlobalImputationError("RandomForestOptPredFastEngineFactory");
     }
 
     switch (rf_model->task()) {
