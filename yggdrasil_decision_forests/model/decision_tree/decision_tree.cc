@@ -303,7 +303,7 @@ bool NodeWithChildren::IsMissingValueConditionResultFollowGlobalImputation(
   const auto& attribute_spec = data_spec.columns(condition.attribute());
   switch (condition.condition().type_case()) {
     case proto::Condition::kHigherCondition:
-      if ((attribute_spec.numerical().mean() >=
+      if ((static_cast<float>(attribute_spec.numerical().mean()) >=
            condition.condition().higher_condition().threshold()) !=
           condition.na_value()) {
         return false;
