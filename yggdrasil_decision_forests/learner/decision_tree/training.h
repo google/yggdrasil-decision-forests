@@ -422,7 +422,7 @@ SplitSearchResult FindBestCondition(
     SplitterPerThreadCache* cache);
 
 // Following are the split finder fonctions. Their name follow the patter:
-// FindBestLabel{label_type}Feature{feature_type}{algorithm_name}.
+// FindSplitLabel{label_type}Feature{feature_type}{algorithm_name}.
 
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
 // missing") for classification.
