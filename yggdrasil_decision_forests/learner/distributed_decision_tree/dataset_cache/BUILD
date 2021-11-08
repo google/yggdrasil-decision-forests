@@ -143,6 +143,7 @@ cc_test(
         ":dataset_cache_reader",
         ":dataset_cache_worker",
         "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/container:flat_hash_map",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",

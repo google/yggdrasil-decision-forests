@@ -17,6 +17,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/container/flat_hash_map.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -147,7 +148,7 @@ TEST_F(End2End, CategoricalInOrder) {
           ->values();
 
   size_t num_examples = 0;
-  std::unordered_map<int, int> histogram;
+  absl::flat_hash_map<int, int> histogram;
   while (true) {
     CHECK_OK(reader.Next());
     const auto values = reader.Values();
