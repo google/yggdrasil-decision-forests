@@ -185,7 +185,7 @@ class DecisionTree {
   // node.
   absl::Status WriteNodes(utils::ShardedWriter<proto::Node>* writer) const;
 
-  // Imports the tree to a RecordIO reader.
+  // Imports the tree from a RecordIO reader.
   absl::Status ReadNodes(utils::ShardedReader<proto::Node>* reader);
 
   // Creates a root node. Fails if the tree is not empty (i.e. if there is

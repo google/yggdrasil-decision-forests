@@ -804,7 +804,7 @@ absl::Status DecisionTreeTrain(
     const InternalTrainConfig& internal_config = InternalTrainConfig());
 constexpr auto Train = DecisionTreeTrain;
 
-// This a node and its children.
+// Train a node and its children.
 absl::Status NodeTrain(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
