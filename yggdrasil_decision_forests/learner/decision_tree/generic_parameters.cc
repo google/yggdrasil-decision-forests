@@ -319,8 +319,10 @@ absl::Status SetHyperParameters(
     const auto hparam =
         generic_hyper_params->Get(kHParamNumCandidateAttributesRatio);
     if (hparam.has_value()) {
-      dt_config->set_num_candidate_attributes_ratio(
-          hparam.value().value().real());
+      const auto value = hparam.value().value().real();
+      if (value >= 0) {
+        dt_config->set_num_candidate_attributes_ratio(value);
+      }
     }
   }
 
