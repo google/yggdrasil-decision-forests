@@ -116,7 +116,7 @@ utils::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
   }
 
   if (options.load_cache_in_memory()) {
-    RETURN_IF_ERROR(cache->LoadInMemoryCache());
+    RETURN_IF_ERROR(cache->InitializeAndLoadInMemoryCache());
   }
 
   LOG(INFO) << "Dataset cache meta-data:\n" << cache->MetadataInformation();
@@ -124,13 +124,241 @@ utils::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
   return cache;
 }
 
-absl::Status DatasetCacheReader::LoadLoadInMemoryCacheColumn(
-    const int column_idx, size_t* memory_usage) {
+absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
+    const std::vector<int>& load_features,
+    const std::vector<int>& unload_features, const int num_threads) {
+  if (!options_.load_cache_in_memory()) {
+    return absl::OkStatus();
+  }
+
+  if (IsNonBlockingLoadingInProgress()) {
+    return absl::InternalError(
+        "Non-blocking feature loading already in progress.");
+  }
+  absl::MutexLock lock(&non_blocking_.status_mutex);
+  non_blocking_.is_running = true;
+  non_blocking_.status = {};  // Clear status
+  non_blocking_.load_features = load_features;
+  non_blocking_.unload_features = unload_features;
+
+  non_blocking_.loading_thread =
+      absl::make_unique<utils::concurrency::Thread>([this, num_threads]() {
+        const auto begin = absl::Now();
+
+        {
+          utils::concurrency::ThreadPool pool(
+              "LoadFeatures",
+              std::min<int>(non_blocking_.load_features.size(), num_threads));
+          pool.StartWorkers();
+          for (const int column_idx : non_blocking_.load_features) {
+            pool.Schedule([&, column_idx]() {
+              {
+                absl::MutexLock l(&non_blocking_.status_mutex);
+                if (!non_blocking_.status.ok()) {
+                  return;
+                }
+              }
+              size_t column_memory_usage;
+              const auto status =
+                  LoadInMemoryCacheColumn(column_idx, &column_memory_usage);
+              absl::MutexLock l(&non_blocking_.status_mutex);
+              non_blocking_.status.Update(status);
+            });
+          }
+        }  // Join on "pool".
+
+        LOG(INFO) << "Non-blocking feature update done in "
+                  << (absl::Now() - begin);
+        DCHECK(non_blocking_.is_running);
+        non_blocking_.is_running = false;
+      });
+
+  return absl::OkStatus();
+}
+
+bool DatasetCacheReader::IsNonBlockingLoadingInProgress() {
+  return non_blocking_.loading_thread != nullptr;
+}
+
+const std::vector<int>&
+DatasetCacheReader::NonBlockingLoadingInProgressLoadedFeatures() const {
+  return non_blocking_.load_features;
+}
+
+const std::vector<int>&
+DatasetCacheReader::NonBlockingLoadingInProgressUnloadedFeatures() const {
+  return non_blocking_.unload_features;
+}
+
+utils::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
+  absl::MutexLock lock(&non_blocking_.status_mutex);
+  if (non_blocking_.is_running) {
+    // Still running.
+    return true;
+  }
+  if (non_blocking_.loading_thread == nullptr) {
+    // Not running.
+    return false;
+  }
+  LOG(INFO) << "Non-blocking work done. Making the new features available";
+
+  // Wait for the loading thread.
+  CHECK(non_blocking_.loading_thread != nullptr);
+  non_blocking_.loading_thread->Join();
+  non_blocking_.loading_thread.reset();
+
+  // Propagate the loading thread error (if any).
+  if (!non_blocking_.status.ok()) {
+    LOG(INFO) << "Error in non-blocking loading: "
+              << non_blocking_.status.message();
+    return non_blocking_.status;
+  }
+
+  for (const int column_idx : non_blocking_.unload_features) {
+    RETURN_IF_ERROR(UnloadInMemoryCacheColumn(column_idx));
+  }
+
+  // Update the meta-data. After this, the changes are visible to the user.
+  RETURN_IF_ERROR(ApplyLoadingAndUnloadingFeaturesToMetadata(
+      non_blocking_.load_features, non_blocking_.unload_features));
+  return false;
+}
+
+absl::Status DatasetCacheReader::LoadingAndUnloadingFeatures(
+    const std::vector<int>& load_features,
+    const std::vector<int>& unload_features) {
+  if (IsNonBlockingLoadingInProgress()) {
+    return absl::InternalError(
+        "Non-blocking feature loading already in progress.");
+  }
+
+  LOG(INFO) << "Loading " << load_features.size() << " and unloading "
+            << unload_features.size() << " feature(s)";
+
+  if (options_.load_cache_in_memory()) {
+    const auto begin = absl::Now();
+
+    for (const int column_idx : unload_features) {
+      RETURN_IF_ERROR(UnloadInMemoryCacheColumn(column_idx));
+    }
+
+    if (!load_features.empty()) {
+      absl::Status worker_status;
+      {
+        absl::Mutex mutex_worker_status;
+        utils::concurrency::ThreadPool pool(
+            "LoadFeatures", std::min<int>(load_features.size(), 20));
+        pool.StartWorkers();
+
+        for (const int column_idx : load_features) {
+          pool.Schedule([&, column_idx]() {
+            {
+              absl::MutexLock l(&mutex_worker_status);
+              if (!worker_status.ok()) {
+                return;
+              }
+            }
+            size_t column_memory_usage;
+            const auto status =
+                LoadInMemoryCacheColumn(column_idx, &column_memory_usage);
+            absl::MutexLock l(&mutex_worker_status);
+            worker_status.Update(status);
+          });
+        }
+      }
+      RETURN_IF_ERROR(worker_status);
+    }
+
+    LOG(INFO) << "Update loaded features in " << (absl::Now() - begin);
+  }
+
+  return ApplyLoadingAndUnloadingFeaturesToMetadata(load_features,
+                                                    unload_features);
+}
+
+absl::Status DatasetCacheReader::ApplyLoadingAndUnloadingFeaturesToMetadata(
+    const std::vector<int>& load_features,
+    const std::vector<int>& unload_features) {
+  std::vector<int> new_features;
+  new_features.reserve(features_.size() + load_features.size() -
+                       unload_features.size());
+  std::set_difference(features_.begin(), features_.end(),
+                      unload_features.begin(), unload_features.end(),
+                      std::back_inserter(new_features));
+  new_features.insert(new_features.end(), load_features.begin(),
+                      load_features.end());
+  std::sort(new_features.begin(), new_features.end());
+  if (new_features.size() !=
+      features_.size() + load_features.size() - unload_features.size()) {
+    return absl::InternalError(absl::Substitute(
+        "Unexpected number of features after load/unload features ($0) + "
+        "load_features ($1) unload_features ($2) != new_features ($3)",
+        features_.size(), load_features.size(), unload_features.size(),
+        new_features.size()));
+  }
+  features_ = new_features;
+  return absl::OkStatus();
+}
+
+absl::Status DatasetCacheReader::UnloadInMemoryCacheColumn(
+    const int column_idx) {
+  const auto& column = meta_data().columns(column_idx);
+  switch (column.type_case()) {
+    case proto::CacheMetadata_Column::kCategorical:
+      DCHECK(in_memory_cache_.inorder_categorical_columns_[column_idx] !=
+             nullptr);
+      in_memory_cache_.inorder_categorical_columns_[column_idx].reset();
+      break;
+
+    case proto::CacheMetadata_Column::kNumerical:
+      DCHECK(in_memory_cache_.inorder_numerical_columns_[column_idx] !=
+             nullptr);
+      if (column.numerical().discretized()) {
+        DCHECK(in_memory_cache_
+                   .inorder_discretized_numerical_columns_[column_idx] !=
+               nullptr);
+        DCHECK(!in_memory_cache_
+                    .boundaries_of_discretized_numerical_columns_[column_idx]
+                    .empty());
+      } else {
+        DCHECK(in_memory_cache_
+                   .presorted_numerical_example_idx_columns_[column_idx] !=
+               nullptr);
+        DCHECK(in_memory_cache_
+                   .presorted_numerical_unique_values_columns_[column_idx] !=
+               nullptr);
+      }
+
+      in_memory_cache_.inorder_numerical_columns_[column_idx].reset();
+      in_memory_cache_.presorted_numerical_example_idx_columns_[column_idx]
+          .reset();
+      in_memory_cache_.presorted_numerical_unique_values_columns_[column_idx]
+          .reset();
+      in_memory_cache_.inorder_discretized_numerical_columns_[column_idx]
+          .reset();
+      in_memory_cache_.boundaries_of_discretized_numerical_columns_[column_idx]
+          .clear();
+      break;
+
+    case proto::CacheMetadata_Column::kBoolean:
+      DCHECK(in_memory_cache_.inorder_boolean_columns_[column_idx] != nullptr);
+      in_memory_cache_.inorder_boolean_columns_[column_idx].reset();
+      break;
+
+    case proto::CacheMetadata_Column::TYPE_NOT_SET:
+      break;
+  }
+  return absl::OkStatus();
+}
+
+absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
+                                                         size_t* memory_usage) {
   *memory_usage = 0;
   const auto& column = meta_data().columns(column_idx);
   switch (column.type_case()) {
     case proto::CacheMetadata_Column::kCategorical: {
       auto& dst = in_memory_cache_.inorder_categorical_columns_[column_idx];
+      DCHECK(dst == nullptr);
       dst = absl::make_unique<
           InMemoryIntegerColumnReaderFactory<CategoricalType>>();
       const auto max_value =
@@ -161,6 +389,12 @@ absl::Status DatasetCacheReader::LoadLoadInMemoryCacheColumn(
       auto& dst_discretized_boundaries =
           in_memory_cache_
               .boundaries_of_discretized_numerical_columns_[column_idx];
+
+      DCHECK(dst_in_order == nullptr);
+      DCHECK(dst_presorted_example_idxs == nullptr);
+      DCHECK(dst_presorted_unique_values == nullptr);
+      DCHECK(dst_discretized_values == nullptr);
+      DCHECK(dst_discretized_boundaries.empty());
 
       // Raw numerical value.
       // TODO: Do not load the raw value if they are discretized.
@@ -234,6 +468,8 @@ absl::Status DatasetCacheReader::LoadLoadInMemoryCacheColumn(
 
     case proto::CacheMetadata_Column::kBoolean: {
       auto& dst = in_memory_cache_.inorder_boolean_columns_[column_idx];
+      DCHECK(dst == nullptr);
+
       dst =
           absl::make_unique<InMemoryIntegerColumnReaderFactory<BooleanType>>();
       dst->Reserve(meta_data_.num_examples(), 2);
@@ -254,7 +490,7 @@ absl::Status DatasetCacheReader::LoadLoadInMemoryCacheColumn(
   return absl::OkStatus();
 }
 
-absl::Status DatasetCacheReader::LoadInMemoryCache() {
+absl::Status DatasetCacheReader::InitializeAndLoadInMemoryCache() {
   LOG(INFO) << "Loading features in memory";
 
   const auto num_columns = meta_data().columns_size();
@@ -271,8 +507,8 @@ absl::Status DatasetCacheReader::LoadInMemoryCache() {
   const auto begin = absl::Now();
   std::atomic<size_t> memory_usage{0};
 
+  absl::Status worker_status;
   {
-    absl::Status worker_status;
     absl::Mutex mutex_worker_status;
     utils::concurrency::ThreadPool pool("LoadFeatures", 20);
     pool.StartWorkers();
@@ -286,15 +522,17 @@ absl::Status DatasetCacheReader::LoadInMemoryCache() {
         }
         size_t column_memory_usage;
         const auto status =
-            LoadLoadInMemoryCacheColumn(column_idx, &column_memory_usage);
+            LoadInMemoryCacheColumn(column_idx, &column_memory_usage);
         memory_usage += column_memory_usage;
         absl::MutexLock l(&mutex_worker_status);
         worker_status.Update(status);
       });
     }
   }
+  RETURN_IF_ERROR(worker_status);
 
-  LOG(INFO) << "Features loaded in memory in " << (absl::Now() - begin)
+  load_in_memory_duration_ = absl::Now() - begin;
+  LOG(INFO) << "Features loaded in memory in " << load_in_memory_duration_
             << " for " << (memory_usage / (1024 * 1024)) << " MB";
   return absl::OkStatus();
 }

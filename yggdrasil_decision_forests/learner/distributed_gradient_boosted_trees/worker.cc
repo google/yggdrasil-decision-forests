@@ -45,6 +45,9 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
       distributed_decision_tree::dataset_cache::DatasetCacheReader::Create(
           welcome_.cache_path(), read_options));
 
+  dataset_feature_duration_ = dataset_->load_in_memory_duration();
+  dataset_num_features_loaded_ = dataset_->features().size();
+
   // Training loss.
   ASSIGN_OR_RETURN(
       loss_,
@@ -138,6 +141,21 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
     }
   }
 
+  // Make sure the requested features are available.
+  // Such change open append when the worker is restarted.
+  if (request.has_owned_features()) {
+    RETURN_IF_ERROR(
+        UpdateOwnedFeatures({request.owned_features().features().begin(),
+                             request.owned_features().features().end()}));
+  }
+
+  // Non-blocking pre-loading of the features that will be required in the
+  // future.
+  if (request.has_future_owned_features()) {
+    RETURN_IF_ERROR(
+        PreloadFutureOwnedFeatures(request.future_owned_features()).status());
+  }
+
   switch (request.type_case()) {
     case proto::WorkerRequest::kGetLabelStatistics:
       RETURN_IF_ERROR(
@@ -172,6 +190,8 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
       break;
 
     case proto::WorkerRequest::kGetSplitValue:
+      // TODO(gbm): Since the answer is large and the same for all the workers,
+      // can the answer be somehow not duplicated in memory?
       RETURN_IF_ERROR(GetSplitValue(request.get_split_value(),
                                     result.mutable_get_split_value()));
       break;
@@ -199,10 +219,16 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
       return absl::InvalidArgumentError("Request without type");
   }
 
+  const auto runtime = absl::Now() - begin;
   if (spe_config.worker_logs()) {
     LOG(INFO) << "Worker #" << WorkerIdx() << " answered request "
-              << request.type_case() << " in " << absl::Now() - begin;
+              << request.type_case() << " in " << runtime;
   }
+  result.set_runtime_seconds(absl::ToDoubleSeconds(runtime));
+
+  // Update the manager about pre-loading status.
+  result.set_preloading_work_in_progress(
+      dataset_->IsNonBlockingLoadingInProgress());
 
   return result.SerializeAsString();
 }
@@ -523,6 +549,106 @@ absl::Status DistributedGradientBoostedTreesWorker::EvaluateSplits(
   return absl::OkStatus();
 }
 
+absl::Status DistributedGradientBoostedTreesWorker::UpdateOwnedFeatures(
+    std::vector<int> target_features) {
+  const auto& initial_features = dataset_->features();
+  std::sort(target_features.begin(), target_features.end());
+
+  // New features to load i.e. target_features / initial_features
+  std::vector<int> features_to_load;
+  std::set_difference(target_features.begin(), target_features.end(),
+                      initial_features.begin(), initial_features.end(),
+                      std::back_inserter(features_to_load));
+
+  // Features to unload i.e. initial_features / target_features.
+  std::vector<int> features_to_unload;
+  std::set_difference(initial_features.begin(), initial_features.end(),
+                      target_features.begin(), target_features.end(),
+                      std::back_inserter(features_to_unload));
+
+  if (features_to_load.empty() && features_to_unload.empty()) {
+    return absl::OkStatus();
+  }
+
+  if (dataset_->IsNonBlockingLoadingInProgress()) {
+    // TODO(gbm): Just wait?
+    return absl::InternalError(absl::StrCat(
+        "Unexpected change of loaded features while a non-blocking loading is "
+        "in progress on worker #",
+        WorkerIdx()));
+  }
+
+  return dataset_->LoadingAndUnloadingFeatures(features_to_load,
+                                               features_to_unload);
+}
+
+utils::StatusOr<bool>
+DistributedGradientBoostedTreesWorker::PreloadFutureOwnedFeatures(
+    const proto::WorkerRequest::FutureOwnedFeatures& future_owned_features) {
+  const std::vector<int> load_features = {
+      future_owned_features.load_features().begin(),
+      future_owned_features.load_features().end(),
+  };
+  // We ignore the unloading instructions.
+  std::vector<int> unload_features;
+
+  // Is the request similar at the already running process?
+  const bool requested_equals_running =
+      (dataset_->NonBlockingLoadingInProgressLoadedFeatures() ==
+       load_features) &&
+      (dataset_->NonBlockingLoadingInProgressUnloadedFeatures() ==
+       unload_features);
+
+  if (dataset_->IsNonBlockingLoadingInProgress()) {
+    // Pre-loading is already running.
+
+    // Check and update running status.
+    ASSIGN_OR_RETURN(const auto preloading_running,
+                     dataset_->CheckAndUpdateNonBlockingLoading());
+
+    if (preloading_running) {
+      // Still running.
+      if (!requested_equals_running) {
+        LOG(INFO) << "Requested future owned features are different from the "
+                     "ones currently being loaded";
+      }
+      return true;
+    } else {
+      // Just done running.
+
+      LOG(INFO) << "Feature pre-loading done on worker " << WorkerIdx();
+      if (!requested_equals_running) {
+        // Quickly start the pre-loading of the request (because it was
+        // different from the execution).
+        LOG(INFO) << "Immediate restart of non-blocking loading ("
+                  << load_features.size() << ") and unloading ("
+                  << unload_features.size()
+                  << ") of features for future work on worker " << WorkerIdx();
+
+        RETURN_IF_ERROR(dataset_->NonBlockingLoadingAndUnloadingFeatures(
+            load_features, unload_features, /*num_threads=*/5));
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    return true;
+  } else {
+    if (!requested_equals_running) {
+      LOG(INFO) << "Non-blocking loading (" << load_features.size()
+                << ") and unloading (" << unload_features.size()
+                << ") of features for future work on worker " << WorkerIdx();
+
+      RETURN_IF_ERROR(dataset_->NonBlockingLoadingAndUnloadingFeatures(
+          load_features, unload_features));
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
+
 absl::Status
 DistributedGradientBoostedTreesWorker::InitializeSplitEvaluationMerging(
     const proto::WorkerRequest::ShareSplits& request,
@@ -776,6 +902,9 @@ absl::Status DistributedGradientBoostedTreesWorker::CreateCheckpoint(
 absl::Status DistributedGradientBoostedTreesWorker::StartTraining(
     const proto::WorkerRequest::StartTraining& request,
     proto::WorkerResult::StartTraining* answer) {
+  answer->set_num_loaded_features(dataset_num_features_loaded_);
+  answer->set_feature_loading_time_seconds(
+      absl::ToDoubleSeconds(dataset_feature_duration_));
   return absl::OkStatus();
 }
 

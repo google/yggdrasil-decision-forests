@@ -310,18 +310,21 @@ TrainWithCache(
                                      config_link.features().end()};
   ASSIGN_OR_RETURN(const auto num_workers,
                    distribute::NumWorkers(deployment.distribute()));
-  ASSIGN_OR_RETURN(const auto feature_ownership,
-                   AssignFeaturesToWorkers(spe_config, input_features,
-                                           num_workers, cache_metadata));
+
+  ASSIGN_OR_RETURN(auto load_balancer,
+                   distributed_decision_tree::LoadBalancer::Create(
+                       input_features, num_workers, cache_metadata,
+                       spe_config.load_balancer()));
 
   // Initializer the distribute manager.
   ASSIGN_OR_RETURN(auto distribute_manager,
                    InitializeDistributionManager(
                        deployment, config, config_link, spe_config, cache_path,
-                       work_directory, data_spec, feature_ownership));
+                       work_directory, data_spec, load_balancer));
 
   // Warn the workers that the training will start.
-  RETURN_IF_ERROR(EmitStartTraining(distribute_manager.get(), monitoring));
+  RETURN_IF_ERROR(
+      EmitStartTraining(distribute_manager.get(), monitoring, &load_balancer));
 
   utils::RandomEngine random(config.random_seed());
 
@@ -402,7 +405,7 @@ TrainWithCache(
 
     const auto iter_status = RunIteration(
         iter_idx, config_link, spe_config, weak_learner_train_config,
-        set_leaf_functor, feature_ownership, data_spec, metric_names,
+        set_leaf_functor, &load_balancer, data_spec, metric_names,
         input_features, log_directory, model.get(), &training_evaluation,
         distribute_manager.get(), &random, monitoring);
     if (!iter_status.ok()) {
@@ -451,7 +454,7 @@ TrainWithCache(
   // Display the final training logs.
   LOG(INFO) << "Training done. Final model: "
             << TrainingLog(*model, training_evaluation, spe_config,
-                           metric_names, monitoring);
+                           metric_names, monitoring, load_balancer);
 
   // Export training logs.
   if (!log_directory.empty()) {
@@ -477,7 +480,8 @@ std::string TrainingLog(
     const Evaluation& training_evaluation,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const std::vector<std::string>& metric_names,
-    internal::Monitoring* monitoring) {
+    internal::Monitoring* monitoring,
+    const distributed_decision_tree::LoadBalancer& load_balancer) {
   auto log = absl::Substitute(
       "num-trees:$0/$1 train-loss:$2",
       model.decision_trees().size() / model.num_trees_per_iter(),
@@ -488,6 +492,8 @@ std::string TrainingLog(
                           training_evaluation.metrics[metric_idx]);
   }
   absl::StrAppend(&log, " ", monitoring->InlineLogs());
+
+  absl::StrAppend(&log, "\nBalancer: ", load_balancer.Info(false));
   return log;
 }
 
@@ -496,7 +502,7 @@ absl::Status RunIteration(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const model::proto::TrainingConfig& weak_learner_train_config,
     const decision_tree::SetLeafValueFromLabelStatsFunctor& set_leaf_functor,
-    const FeatureOwnership& feature_ownership,
+    distributed_decision_tree::LoadBalancer* load_balancer,
     const dataset::proto::DataSpecification& data_spec,
     const std::vector<std::string>& metric_names,
     const std::vector<int>& features, const absl::string_view& log_directory,
@@ -530,7 +536,7 @@ absl::Status RunIteration(
        layer_idx++) {
     ASSIGN_OR_RETURN(
         const auto splits_per_weak_models,
-        EmitFindSplits(spe_config, features, feature_ownership, weak_models,
+        EmitFindSplits(spe_config, features, load_balancer, weak_models,
                        distribute_manager, rnd, monitoring));
 
     // Check if there is at least one open node.
@@ -556,16 +562,16 @@ absl::Status RunIteration(
     }
 
     // Request for the workers to evaluate the splits.
-    ASSIGN_OR_RETURN(
-        const auto active_workers,
-        EmitEvaluateSplits(splits_per_weak_models, feature_ownership,
-                           distribute_manager, rnd, monitoring));
+    ASSIGN_OR_RETURN(const auto active_workers,
+                     EmitEvaluateSplits(splits_per_weak_models, load_balancer,
+                                        distribute_manager, rnd, monitoring));
 
     // Request for the workers to share the evaluation results,
     // update the tree structures, example->node mapping and label
     // statistics
     RETURN_IF_ERROR(EmitShareSplits(splits_per_weak_models, active_workers,
-                                    distribute_manager, monitoring));
+                                    load_balancer, distribute_manager,
+                                    monitoring));
   }
 
   RETURN_IF_ERROR(EmitEndIter(iter_idx, distribute_manager, training_evaluation,
@@ -588,7 +594,7 @@ absl::Status RunIteration(
   // Display training logs.
   if (monitoring->ShouldDisplayLogs()) {
     LOG(INFO) << TrainingLog(*model, *training_evaluation, spe_config,
-                             metric_names, monitoring);
+                             metric_names, monitoring, *load_balancer);
   }
 
   // Record training logs.
@@ -741,7 +747,7 @@ InitializeDistributionManager(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     absl::string_view cache_path, absl::string_view work_directory,
     const dataset::proto::DataSpecification& data_spec,
-    const FeatureOwnership& feature_ownership) {
+    const distributed_decision_tree::LoadBalancer& load_balancer) {
   proto::WorkerWelcome welcome;
   welcome.set_work_directory(std::string(work_directory));
   welcome.set_cache_path(std::string(cache_path));
@@ -750,10 +756,10 @@ InitializeDistributionManager(
   *welcome.mutable_deployment_config() = deployment;
   *welcome.mutable_dataspec() = data_spec;
 
-  // Copy "feature_ownership" to "welcome.feature_ownership()".
-  welcome.mutable_owned_features()->Reserve(
-      feature_ownership.worker_to_feature.size());
-  for (const auto& src : feature_ownership.worker_to_feature) {
+  // Copy "load_balancer" to "welcome.feature_ownership()".
+  const auto feature_ownership = load_balancer.FeaturesPerWorkers();
+  welcome.mutable_owned_features()->Reserve(feature_ownership.size());
+  for (const auto& src : feature_ownership) {
     auto* dst = welcome.mutable_owned_features()->Add();
     *dst->mutable_features() = {src.begin(), src.end()};
   }
@@ -764,74 +770,6 @@ InitializeDistributionManager(
       /*welcome_blob=*/welcome.SerializeAsString(),
       // Number of evaluation split sharing at the same time.
       /*parallel_execution_per_worker=*/10);
-}
-
-utils::StatusOr<FeatureOwnership> AssignFeaturesToWorkers(
-    const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
-    const std::vector<int>& features, int num_workers,
-    const distributed_decision_tree::dataset_cache::proto::CacheMetadata&
-        cache_metadata) {
-  FeatureOwnership ownership;
-
-  int max_feature_idx = 0;
-  for (const int feature : features) {
-    max_feature_idx = std::max(feature, max_feature_idx);
-  }
-
-  ownership.worker_to_feature.resize(num_workers);
-  ownership.feature_to_worker.resize(max_feature_idx + 1);
-
-  // Assign all the features to all the workers.
-  if (spe_config.internal().duplicate_computation_on_all_workers()) {
-    LOG(WARNING) << "Assigning all the features to all the workers. This "
-                    "option should only be used for debugging.";
-    for (const auto feature : features) {
-      ownership.feature_to_worker[feature].push_back(0);
-      for (int worker_idx = 0; worker_idx < num_workers; worker_idx++) {
-        ownership.worker_to_feature[worker_idx].push_back(feature);
-      }
-    }
-    return ownership;
-  }
-
-  // Score of each feature.
-  // The score is: boolean < categorical==discretized numerical < numerical.
-  std::vector<std::pair<int64_t, int>> feature_and_scores;
-  feature_and_scores.reserve(features.size());
-  for (const auto feature : features) {
-    const auto col_metadata = cache_metadata.columns(feature);
-    int64_t score;
-    switch (col_metadata.type_case()) {
-      case CacheMetadata_Column::kNumerical:
-        if (col_metadata.numerical().discretized()) {
-          score =
-              col_metadata.numerical().num_discretized_values() + (1ll << 32);
-        } else {
-          score = col_metadata.numerical().num_unique_values() + (2ll << 32);
-        }
-        break;
-      case CacheMetadata_Column::kCategorical:
-        score = col_metadata.categorical().num_values() + (1ll << 32);
-        break;
-      case CacheMetadata_Column::kBoolean:
-        score = 0;
-        break;
-      case CacheMetadata_Column::TYPE_NOT_SET:
-        break;
-    }
-    feature_and_scores.push_back({score, feature});
-  }
-  std::sort(feature_and_scores.begin(), feature_and_scores.end(),
-            std::greater<>());
-
-  int cur = 0;
-  for (const auto feature_and_score : feature_and_scores) {
-    const auto worker_idx = (cur++) % num_workers;
-    ownership.worker_to_feature[worker_idx].push_back(feature_and_score.second);
-    ownership.feature_to_worker[feature_and_score.second].push_back(worker_idx);
-  }
-
-  return ownership;
 }
 
 utils::StatusOr<decision_tree::proto::LabelStatistics> EmitGetLabelStatistics(
@@ -932,7 +870,8 @@ EmitStartNewIter(const int iter_idx,
 utils::StatusOr<std::vector<distributed_decision_tree::SplitPerOpenNode>>
 EmitFindSplits(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
-    const std::vector<int>& features, const FeatureOwnership& feature_ownership,
+    const std::vector<int>& features,
+    distributed_decision_tree::LoadBalancer* load_balancer,
     const WeakModels& weak_models, distribute::AbstractManager* distribute,
     utils::RandomEngine* rnd, internal::Monitoring* monitoring) {
   monitoring->BeginStage(internal::Monitoring::kFindSplits);
@@ -940,8 +879,19 @@ EmitFindSplits(
 
   FeaturesPerWorkerWeakModelAndNode sampled_features;
   RETURN_IF_ERROR(SampleInputFeatures(spe_config, distribute->NumWorkers(),
-                                      features, feature_ownership, weak_models,
+                                      features, *load_balancer, weak_models,
                                       &sampled_features, rnd));
+
+  // During of the self reported work duration for each worker. Does take into
+  // account network communication or worker restarts.
+  std::vector<distributed_decision_tree::LoadBalancer::Measure>
+      runtime_per_workers;
+  runtime_per_workers.resize(distribute->NumWorkers());
+
+  std::vector<std::vector<int>> feature_per_workers;
+  if (load_balancer->is_dynamic_balancing_active()) {
+    feature_per_workers = load_balancer->FeaturesPerWorkers();
+  }
 
   // Send the requests.
   int num_requests = 0;
@@ -953,6 +903,12 @@ EmitFindSplits(
     int num_selected_features;
     RETURN_IF_ERROR(ExactSampledFeaturesForWorker(
         sampled_features, worker_idx, &request, &num_selected_features));
+
+    runtime_per_workers[worker_idx].num_features = num_selected_features;
+
+    // Load balancing updates.
+    RETURN_IF_ERROR(
+        SetLoadBalancingRequest(worker_idx, load_balancer, &generic_request));
 
     // TODO(gbm): Only ask for splits is num_selected_features>0. Note: The
     // worker's code for FindSplit is responsible to clear the local split
@@ -971,7 +927,12 @@ EmitFindSplits(
     splits_per_weak_models[weak_model_idx].resize(
         weak_models[weak_model_idx].tree_builder->num_open_nodes());
   }
+
   // Parse the replies.
+
+  // Number of workers doing pre-loading work.
+  int num_worker_preloading = 0;
+
   for (int reply_idx = 0; reply_idx < num_requests; reply_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
@@ -983,12 +944,21 @@ EmitFindSplits(
     }
     monitoring->FindSplitWorkerReplyTime(generic_result.worker_idx(),
                                          absl::Now() - begin);
+
+    runtime_per_workers[generic_result.worker_idx()].time =
+        generic_result.runtime_seconds();
+
     if (!generic_result.has_find_splits()) {
       return absl::InternalError("Unexpected answer. Expecting FindSplits");
     }
     const auto& result = generic_result.find_splits();
     if (result.split_per_weak_model_size() != weak_models.size()) {
       return absl::InternalError("Unexpected number of weak model splits");
+    }
+
+    // Load balancing updates.
+    if (generic_result.preloading_work_in_progress()) {
+      num_worker_preloading++;
     }
 
     for (int weak_model_idx = 0; weak_model_idx < weak_models.size();
@@ -1002,14 +972,25 @@ EmitFindSplits(
     }
   }
 
+  ASSIGN_OR_RETURN(
+      const auto new_balancing,
+      load_balancer->AddWorkDurationMeasurement(runtime_per_workers));
+
+  if (num_worker_preloading == 0 && !new_balancing &&
+      load_balancer->HasPendingOrder()) {
+    LOG(INFO) << "Apply load balancer pending order.";
+    RETURN_IF_ERROR(load_balancer->ApplyPendingOrder());
+  }
+
   monitoring->EndStage(internal::Monitoring::kFindSplits);
+
   return splits_per_weak_models;
 }
 
 utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    const FeatureOwnership& feature_ownership,
+    distributed_decision_tree::LoadBalancer* load_balancer,
     distribute::AbstractManager* distribute, utils::RandomEngine* rnd,
     internal::Monitoring* monitoring) {
   monitoring->BeginStage(internal::Monitoring::kEvaluateSplits);
@@ -1017,7 +998,7 @@ utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
   // Mapping worker_idx -> weak_model_idx -> split_dx.
   ASSIGN_OR_RETURN(
       const auto active_workers,
-      BuildActiveWorkers(splits_per_weak_models, feature_ownership, rnd));
+      BuildActiveWorkers(splits_per_weak_models, *load_balancer, rnd));
 
   WorkerIdxs active_worker_idxs;
   active_worker_idxs.reserve(active_workers.size());
@@ -1037,6 +1018,11 @@ utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
           splits_per_weak_models[weak_model_idx], active_split_idxs,
           dst_splits);
     }
+
+    // Load balancing updates.
+    RETURN_IF_ERROR(SetLoadBalancingRequest(active_worker.first, load_balancer,
+                                            &generic_request));
+
     RETURN_IF_ERROR(distribute->AsynchronousProtoRequest(generic_request,
                                                          active_worker.first));
   }
@@ -1062,9 +1048,13 @@ utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
 absl::Status EmitShareSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    const WorkerIdxs& active_workers, distribute::AbstractManager* distribute,
-    internal::Monitoring* monitoring) {
+    const WorkerIdxs& active_workers,
+    distributed_decision_tree::LoadBalancer* load_balancer,
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring) {
   monitoring->BeginStage(internal::Monitoring::kShareSplits);
+
+  const auto max_parallel_requests =
+      load_balancer->MaxConcurrentIntraWorkerConnections();
 
   proto::WorkerRequest generic_request;
   auto& request = *generic_request.mutable_share_splits();
@@ -1075,15 +1065,13 @@ absl::Status EmitShareSplits(
   *request.mutable_active_workers() = {active_workers.begin(),
                                        active_workers.end()};
 
-  // TODO(gbm): Implement multicast operations.
-  for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
-       worker_idx++) {
+  const auto emit_request = [&](const int worker_idx) -> absl::Status {
     RETURN_IF_ERROR(
         distribute->AsynchronousProtoRequest(generic_request, worker_idx));
-  }
+    return absl::OkStatus();
+  };
 
-  // TODO(gbm): No need for an answer.
-  for (int reply_idx = 0; reply_idx < distribute->NumWorkers(); reply_idx++) {
+  const auto consume_reply = [&](const int reply_idx) -> absl::Status {
     ASSIGN_OR_RETURN(
         const auto generic_result,
         distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
@@ -1095,6 +1083,21 @@ absl::Status EmitShareSplits(
     if (!generic_result.has_share_splits()) {
       return absl::InternalError("Unexpected answer. Expecting ShareSplits");
     }
+    return absl::OkStatus();
+  };
+
+  int reply_idx = 0;
+  int active_request = 0;
+  int next_worker_idx_request = 0;
+
+  while (reply_idx < distribute->NumWorkers()) {
+    while (next_worker_idx_request < distribute->NumWorkers() &&
+           active_request < max_parallel_requests) {
+      RETURN_IF_ERROR(emit_request(next_worker_idx_request++));
+      active_request++;
+    }
+    RETURN_IF_ERROR(consume_reply(reply_idx++));
+    active_request--;
   }
 
   monitoring->EndStage(internal::Monitoring::kShareSplits);
@@ -1271,8 +1274,9 @@ absl::Status EmitCreateCheckpoint(const int iter_idx, const size_t num_examples,
   return absl::OkStatus();
 }
 
-absl::Status EmitStartTraining(distribute::AbstractManager* distribute,
-                               internal::Monitoring* monitoring) {
+absl::Status EmitStartTraining(
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer) {
   monitoring->BeginStage(internal::Monitoring::kStartTraining);
   const auto begin = absl::Now();
 
@@ -1286,7 +1290,6 @@ absl::Status EmitStartTraining(distribute::AbstractManager* distribute,
         distribute->AsynchronousProtoRequest(generic_request, worker_idx));
   }
 
-  // TODO(gbm): No need for an answer.
   for (int reply_idx = 0; reply_idx < distribute->NumWorkers(); reply_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
@@ -1296,6 +1299,11 @@ absl::Status EmitStartTraining(distribute::AbstractManager* distribute,
           "Unexpected answer. Expecting StartTraining. Got " +
           generic_result.DebugString());
     }
+
+    const auto& result = generic_result.start_training();
+    load_balancer->AddFeatureLoadingDurationMeasurement(
+        result.feature_loading_time_seconds());
+
     // Most of the time is used for the workers to load the dataset.
     LOG_INFO_EVERY_N_SEC(60, _ << "\tLoading dataset in workers "
                                << (reply_idx + 1) << " / "
@@ -1305,14 +1313,37 @@ absl::Status EmitStartTraining(distribute::AbstractManager* distribute,
   LOG(INFO) << "Worker ready to train in " << absl::Now() - begin;
 
   monitoring->EndStage(internal::Monitoring::kStartTraining);
+
+  return absl::OkStatus();
+}
+
+absl::Status SetLoadBalancingRequest(
+    const int worker, distributed_decision_tree::LoadBalancer* load_balancer,
+    proto::WorkerRequest* generic_request) {
+  if (load_balancer->is_dynamic_balancing_active()) {
+    const auto& features = load_balancer->FeaturesPerWorker(worker);
+    *generic_request->mutable_owned_features()->mutable_features() = {
+        features.begin(), features.end()};
+
+    if (load_balancer->HasPendingOrder()) {
+      const auto& src_order = load_balancer->PendingOrderPerWorker(worker);
+      auto dst_order = generic_request->mutable_future_owned_features();
+      *dst_order->mutable_load_features() = {src_order.load_features.begin(),
+                                             src_order.load_features.end()};
+      *dst_order->mutable_unload_features() = {
+          src_order.unload_features.begin(), src_order.unload_features.end()};
+    }
+  }
+
   return absl::OkStatus();
 }
 
 absl::Status SampleInputFeatures(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const int num_workers, const std::vector<int>& features,
-    const FeatureOwnership& feature_ownership, const WeakModels& weak_models,
-    FeaturesPerWorkerWeakModelAndNode* samples, utils::RandomEngine* rnd) {
+    const distributed_decision_tree::LoadBalancer& load_balancer,
+    const WeakModels& weak_models, FeaturesPerWorkerWeakModelAndNode* samples,
+    utils::RandomEngine* rnd) {
   const auto& dt_config = spe_config.gbt().decision_tree();
 
   // How many features to select for each split.
@@ -1358,8 +1389,9 @@ absl::Status SampleInputFeatures(
             (*samples)[worker_idx][weak_model_idx][node_idx].push_back(feature);
           }
         } else {
-          ASSIGN_OR_RETURN(const int worker_idx,
-                           SelectOwnerWorker(feature_ownership, feature, rnd));
+          // Select worker with load balancer.
+          ASSIGN_OR_RETURN(const auto worker_idx,
+                           load_balancer.FeatureOwner(feature));
           (*samples)[worker_idx][weak_model_idx][node_idx].push_back(feature);
         }
       }
@@ -1391,31 +1423,17 @@ absl::Status SampleFeatures(const std::vector<int>& features,
   return absl::OkStatus();
 }
 
-utils::StatusOr<int> SelectOwnerWorker(
-    const FeatureOwnership& feature_ownership, int feature,
-    utils::RandomEngine* rnd) {
-  const auto& candidate_workers = feature_ownership.feature_to_worker[feature];
-  if (candidate_workers.empty()) {
-    return absl::InternalError("No owning worker for feature");
-  } else if (candidate_workers.size() == 1) {
-    return candidate_workers.front();
-  } else {
-    return candidate_workers[std::uniform_int_distribution<int>(
-        0, candidate_workers.size() - 1)(*rnd)];
-  }
-}
-
 absl::Status ExactSampledFeaturesForWorker(
     const FeaturesPerWorkerWeakModelAndNode& sampled_features,
     const int worker_idx, proto::WorkerRequest::FindSplits* request,
     int* num_selected_features) {
-  *num_selected_features = 0;
   const auto& src_per_weak_model = sampled_features[worker_idx];
   request->mutable_features_per_weak_models()->Clear();
   request->mutable_features_per_weak_models()->Reserve(
       src_per_weak_model.size());
 
   // TODO: implement if internal.duplicate.
+  absl::flat_hash_set<int> selected_features;
 
   for (int weak_model_idx = 0; weak_model_idx < src_per_weak_model.size();
        weak_model_idx++) {
@@ -1427,16 +1445,18 @@ absl::Status ExactSampledFeaturesForWorker(
       const auto& features = src_per_node[node_idx];
       *request_features_per_node->Add()->mutable_features() = {features.begin(),
                                                                features.end()};
-      *num_selected_features += features.size();
+      selected_features.insert(features.begin(), features.end());
     }
   }
+  *num_selected_features = selected_features.size();
   return absl::OkStatus();
 }
 
 utils::StatusOr<ActiveWorkerMap> BuildActiveWorkers(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    const FeatureOwnership& feature_ownership, utils::RandomEngine* rnd) {
+    const distributed_decision_tree::LoadBalancer& load_balancer,
+    utils::RandomEngine* rnd) {
   absl::flat_hash_map<int, std::vector<std::vector<int>>> active_workers;
 
   for (int weak_model_idx = 0; weak_model_idx < splits_per_weak_models.size();
@@ -1448,8 +1468,7 @@ utils::StatusOr<ActiveWorkerMap> BuildActiveWorkers(
         continue;
       }
       ASSIGN_OR_RETURN(const auto worker_idx,
-                       SelectOwnerWorker(feature_ownership,
-                                         split.condition.attribute(), rnd));
+                       load_balancer.FeatureOwner(split.condition.attribute()));
       auto& worker_eval_splits = active_workers[worker_idx];
       if (worker_eval_splits.empty()) {
         worker_eval_splits.assign(splits_per_weak_models.size(), {});
@@ -1535,8 +1554,9 @@ void Monitoring::EndStage(Monitoring::Stages stage) {
 }
 
 void Monitoring::NewIter() {
+  begin_current_iter_ = absl::Now();
   if (num_iters_ == 0) {
-    time_first_iter_ = absl::Now();
+    time_first_iter_ = begin_current_iter_;
   }
   num_iters_++;
 }
@@ -1581,9 +1601,11 @@ absl::string_view Monitoring::StageName(Monitoring::Stages stage) {
 std::string Monitoring::InlineLogs() {
   std::string logs;
   if (num_iters_ > 0) {
-    const auto time_per_iters = (absl::Now() - time_first_iter_) / num_iters_;
-    absl::SubstituteAndAppend(&logs, "time-per-iter:$0",
-                              FormatDuration(time_per_iters));
+    const auto now = absl::Now();
+    const auto time_per_iters = (now - time_first_iter_) / num_iters_;
+    absl::SubstituteAndAppend(&logs, "time-per-iter-{avg,last}:$0 $1",
+                              FormatDuration(time_per_iters),
+                              FormatDuration(now - begin_current_iter_));
   }
   absl::SubstituteAndAppend(&logs, " last-{min,median,max}-split-time:$0 $1 $2",
                             FormatDuration(last_min_split_reply_time_),

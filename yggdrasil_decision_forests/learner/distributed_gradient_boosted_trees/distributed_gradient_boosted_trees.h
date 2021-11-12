@@ -42,6 +42,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/splitter.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.pb.h"
@@ -98,16 +99,6 @@ struct WeakModel {
 // List of weak models being build.
 typedef std::vector<WeakModel> WeakModels;
 
-// Ownership information between workers and features.
-struct FeatureOwnership {
-  // Indices of the features owned by each worker.
-
-  // worker_to_feature[i][j] is the j-th feature owned by the i-th worker.
-  std::vector<std::vector<int>> worker_to_feature;
-
-  // feature_to_worker[i][j] is the j-th worker that own the i-th feature.
-  std::vector<std::vector<int>> feature_to_worker;
-};
 
 // List of worker indices.
 typedef std::vector<int> WorkerIdxs;
@@ -190,6 +181,7 @@ class Monitoring {
 
   // Starting time of the first iteration i.e. ~ start of the training.
   absl::Time time_first_iter_;
+  absl::Time begin_current_iter_;
 };
 
 absl::Status SetDefaultHyperParameters(
@@ -247,7 +239,7 @@ absl::Status RunIteration(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const model::proto::TrainingConfig& weak_learner_train_config,
     const decision_tree::SetLeafValueFromLabelStatsFunctor& set_leaf_functor,
-    const FeatureOwnership& feature_ownership,
+    distributed_decision_tree::LoadBalancer* load_balancer,
     const dataset::proto::DataSpecification& data_spec,
     const std::vector<std::string>& metric_names,
     const std::vector<int>& features, const absl::string_view& log_directory,
@@ -287,7 +279,8 @@ std::string TrainingLog(
     const Evaluation& training_evaluation,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const std::vector<std::string>& metric_names,
-    internal::Monitoring* monitoring);
+    internal::Monitoring* monitoring,
+    const distributed_decision_tree::LoadBalancer& load_balancer);
 
 absl::Status InitializeDirectoryStructure(absl::string_view work_directory);
 
@@ -299,7 +292,7 @@ InitializeDistributionManager(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     absl::string_view cache_path, absl::string_view work_directory,
     const dataset::proto::DataSpecification& data_spec,
-    const FeatureOwnership& feature_ownership);
+    const distributed_decision_tree::LoadBalancer& load_balancer);
 
 // The following "Emit{stage_name}" function are calling the workers with the
 // {stage_name} work. All these functions are blocking. See "worker.proto" for
@@ -320,7 +313,8 @@ EmitStartNewIter(int iter_idx, utils::RandomEngine::result_type seed,
 utils::StatusOr<std::vector<distributed_decision_tree::SplitPerOpenNode>>
 EmitFindSplits(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
-    const std::vector<int>& features, const FeatureOwnership& feature_ownership,
+    const std::vector<int>& features,
+    distributed_decision_tree::LoadBalancer* load_balancer,
     const WeakModels& weak_models, distribute::AbstractManager* distribute,
     utils::RandomEngine* rnd, internal::Monitoring* monitoring);
 
@@ -328,15 +322,16 @@ EmitFindSplits(
 utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    const FeatureOwnership& feature_ownership,
+    distributed_decision_tree::LoadBalancer* load_balancer,
     distribute::AbstractManager* distribute, utils::RandomEngine* rnd,
     internal::Monitoring* monitoring);
 
 absl::Status EmitShareSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    const WorkerIdxs& active_workers, distribute::AbstractManager* distribute,
-    internal::Monitoring* monitoring);
+    const WorkerIdxs& active_workers,
+    distributed_decision_tree::LoadBalancer* load_balancer,
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring);
 
 absl::Status EmitEndIter(int iter_idx, distribute::AbstractManager* distribute,
                          absl::optional<Evaluation*> training_evaluation,
@@ -353,16 +348,16 @@ absl::Status EmitCreateCheckpoint(int iter_idx, size_t num_examples,
                                   distribute::AbstractManager* distribute,
                                   internal::Monitoring* monitoring);
 
-absl::Status EmitStartTraining(distribute::AbstractManager* distribute,
-                               internal::Monitoring* monitoring);
+absl::Status EmitStartTraining(
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer);
 
-// Defines which feature is owned by which worker.
-// Currently, a feature can only be assigned to one worker.
-utils::StatusOr<FeatureOwnership> AssignFeaturesToWorkers(
-    const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
-    const std::vector<int>& features, int num_workers,
-    const distributed_decision_tree::dataset_cache::proto::CacheMetadata&
-        cache_metadata);
+// Sets the load-balancing fields of in a worker request/result.
+// The load balancing fields are only necessary for worker tasks that require
+// access to the feature data.
+absl::Status SetLoadBalancingRequest(
+    int worker, distributed_decision_tree::LoadBalancer* load_balancer,
+    proto::WorkerRequest* generic_request);
 
 // Computes the list of active workers (i.e. workers having a job to do) and the
 // features their have to check. Returns a mapping worker_idx -> weak_model_idx
@@ -371,7 +366,8 @@ typedef absl::flat_hash_map<int, std::vector<std::vector<int>>> ActiveWorkerMap;
 utils::StatusOr<ActiveWorkerMap> BuildActiveWorkers(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    const FeatureOwnership& feature_ownership, utils::RandomEngine* rnd);
+    const distributed_decision_tree::LoadBalancer& load_balancer,
+    utils::RandomEngine* rnd);
 
 // Samples the input features to send to a worker/weak model/node.
 typedef std::vector<std::vector<std::vector<std::vector<int>>>>
@@ -379,20 +375,15 @@ typedef std::vector<std::vector<std::vector<std::vector<int>>>>
 absl::Status SampleInputFeatures(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     int num_workers, const std::vector<int>& features,
-    const FeatureOwnership& feature_ownership, const WeakModels& weak_models,
-    FeaturesPerWorkerWeakModelAndNode* samples, utils::RandomEngine* rnd);
+    const distributed_decision_tree::LoadBalancer& load_balancer,
+    const WeakModels& weak_models, FeaturesPerWorkerWeakModelAndNode* samples,
+    utils::RandomEngine* rnd);
 
 // Randomly selects "num_sampled_features" features from "features".
 absl::Status SampleFeatures(const std::vector<int>& features,
                             int num_sampled_features,
                             std::vector<int>* sampled_features,
                             utils::RandomEngine* rnd);
-
-// Returns the index of a worker that owns the feature. If multiple workers are
-// owning the feature, randomly select one.
-utils::StatusOr<int> SelectOwnerWorker(
-    const FeatureOwnership& feature_ownership, int feature,
-    utils::RandomEngine* rnd);
 
 // Extracts the sampled features for a specific worker.
 absl::Status ExactSampledFeaturesForWorker(

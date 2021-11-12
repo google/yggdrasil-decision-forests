@@ -24,6 +24,7 @@
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"
 
@@ -42,10 +43,19 @@ class DatasetCacheReader {
   //     "cache_directory" argument of the CreateDatasetCacheFromShardedFiles
   //     dataset cache creation method.
   //   options: Configure how the cache is read. The default options are
-  //     satifying in most cases.
+  //     satisfying in most cases.
   //
   static utils::StatusOr<std::unique_ptr<DatasetCacheReader>> Create(
       absl::string_view path, const proto::DatasetCacheReaderOptions& options);
+
+  ~DatasetCacheReader() {
+    // TODO(gbm): Interrupt the non-blocking feature loading (if any).
+    // CHECK_OK(WaitFeatureLoadingIsDone());
+    if (non_blocking_.loading_thread) {
+      non_blocking_.loading_thread->Join();
+      non_blocking_.loading_thread.reset();
+    }
+  }
 
   // Number of examples in the cache.
   uint64_t num_examples() const;
@@ -111,15 +121,89 @@ class DatasetCacheReader {
   // Compact human readable information about the metadata.
   std::string MetadataInformation() const;
 
+  // Features, sorted by index value, available in the reader.
+  std::vector<int> features() const { return features_; }
+
+  // Load and unload a set of features.
+  absl::Status LoadingAndUnloadingFeatures(
+      const std::vector<int>& load_features,
+      const std::vector<int>& unload_features);
+
+  // Start loading and unloading a set of features asynchronously. Returns
+  // immediately.
+  //
+  // Progresses can be checked regularly with
+  // "CheckAndUpdateNonBlockingLoading()".
+  //
+  // Calling another method that changes the dataset reader (e.g.
+  // "LoadingAndUnloadingFeatures") while features are being loaded will raise
+  // an error.
+  //
+  // DatasetCacheReader's destructor will try to interrupt and wait for the
+  // feature loading to be done. I.e. it is safe to destruct a
+  // DatasetCacheReader that is loading features.
+  //
+  // Usage example:
+  //
+  //   DatasetCacheReader reader(features={0,1});
+  //   reader.NonBlockingLoadingAndUnloadingFeatures(load_features={2,3},
+  //      unload_features={1})
+  //
+  //   while(CheckAndUpdateNonBlockingLoading().value()) {
+  //      // Use the features 0 and 1 in the reader.
+  //   }
+  //   // Can use the features 0, 2 and 3 in the reader.
+  //
+  absl::Status NonBlockingLoadingAndUnloadingFeatures(
+      const std::vector<int>& load_features,
+      const std::vector<int>& unload_features, const int num_threads = 10);
+
+  // Indicates if features are currently loaded with
+  // "NonBlockingLoadingAndUnloadingFeatures". This value is updated by
+  // "CheckAndUpdateNonBlockingLoading()".
+  bool IsNonBlockingLoadingInProgress();
+
+  // Checks for the completion of the non-blocking dataset loading.
+  // If no loading is in progress, return false.
+  // If there is a loading in progress, return true.
+  // If the loading in progress failed, return the error.
+  // If the loading in progress just completed, finalize it (i.e. the user can
+  // access the feature values and "NonBlockingLoadingInProgress()" will now
+  // return false), and return false.
+  utils::StatusOr<bool> CheckAndUpdateNonBlockingLoading();
+
+  // Features being loaded. Empty if there are not features being pre-loaded at
+  // this time.
+  const std::vector<int>& NonBlockingLoadingInProgressLoadedFeatures() const;
+  const std::vector<int>& NonBlockingLoadingInProgressUnloadedFeatures() const;
+
+  // Duration of the initial loading of features in memory i.e. duration of
+  // "InitializeAndLoadInMemoryCache".
+  absl::Duration load_in_memory_duration() const {
+    return load_in_memory_duration_;
+  }
+
  private:
   DatasetCacheReader(absl::string_view path,
                      const proto::DatasetCacheReaderOptions& options)
       : path_(path), options_(options) {}
 
-  absl::Status LoadInMemoryCache();
+  // Initialize the internal structure and load the feature columns in RAM.
+  absl::Status InitializeAndLoadInMemoryCache();
 
-  absl::Status LoadLoadInMemoryCacheColumn(int column_idx,
-                                           size_t* memory_usage);
+  // Loads a single column in RAM.
+  absl::Status LoadInMemoryCacheColumn(int column_idx, size_t* memory_usage);
+
+  // Unloads a single column from RAM.
+  absl::Status UnloadInMemoryCacheColumn(int column_idx);
+
+  // Updates the meta-data to make the specified features available. Note: This
+  // method is not in charge of actually loading/unloading the features (i.e.
+  // LoadInMemoryCacheColumn and UnloadInMemoryCacheColumn). Instead, the
+  // feature loading/unload should already have been done.
+  absl::Status ApplyLoadingAndUnloadingFeaturesToMetadata(
+      const std::vector<int>& load_features,
+      const std::vector<int>& unload_features);
 
   std::string path_;
   proto::CacheMetadata meta_data_;
@@ -138,6 +222,25 @@ class DatasetCacheReader {
 
   // List of the features available for reading. Sorted in increasing order.
   std::vector<int> features_;
+
+  absl::Duration load_in_memory_duration_;
+
+  struct NonBlocking {
+    // Loading thread.
+    std::unique_ptr<utils::concurrency::Thread> loading_thread;
+
+    // Status of the loading thread. True set by the manager. False set by the
+    // thread.
+    std::atomic_bool is_running{false};
+
+    absl::Status status;
+    absl::Mutex status_mutex;
+
+    // Features being loaded / unloaded.
+    std::vector<int> load_features;
+    std::vector<int> unload_features;
+  };
+  NonBlocking non_blocking_;
 
   struct {
     // Sorted numerical.

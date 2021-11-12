@@ -1,0 +1,80 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.distributed_decision_tree.proto;
+
+message LoadBalancerOptions {
+  // Maximum relative difference in resource usage of a worker compared to
+  // the "balanced state" (i.e. all the workers are received the same amount of
+  // work). In other words, the memory / cpu usage of worker can increase by up
+  // to "max_unbalance_ratio" * "initial / default / balanced usage".
+  //
+  // For example, suppose a 100MB dataset splitted among 10 workers. In the
+  // balanced state, each worker receive 1/10 of the dataset i.e. 10MB of data.
+  // If `max_unbalance_ratio = 0.2`, a fast worker can receive up to 10MB * 1.2
+  // = 12MB of data.
+  optional float max_unbalance_ratio = 1 [default = 0.1];
+
+  // Number of consecutive observations used to estimate the worker's speed.
+  optional int32 estimation_window_length = 2 [default = 40];
+
+  // Frequency of the balancing optimization. Frequent balancing optimization
+  // better use the available resources but create an overhead on the
+  // computation.
+  //
+  // If both "dynamic_balancing_frequency_iteration" and
+  // "dynamic_balancing_frequency_seconds" are set and active, the optimization
+  // is run when whether of the criterion is meet.
+
+  // Number of iterations in between each optimization rounds. Set -1 to
+  // disable.
+  optional int32 dynamic_balancing_frequency_iteration = 3 [default = -1];
+  // Number of seconds in between each optimization rounds. Set -1 to disable.
+  optional int32 dynamic_balancing_frequency_seconds = 4 [default = 900];
+
+  // Maximum number of individual changes (i.e. transferring one feature from
+  // one worker to another) that can be done in a single balancing optimization.
+  // Note that the most optimization are applied, the worst the quality of the
+  // cost (and therefore the less accurate the balancing).
+  optional int32 max_balancing_changes_per_dynamic_balancing = 5 [default = 20];
+
+  // Workers with an average running time greater than the median running time
+  // times "median_margin_ratio" are candidate for optimization i.e. have some
+  // of their features taken.
+  optional float median_margin_ratio = 6 [default = 2.0];
+
+  // Maximum number of synchronization requests executed on a worker in
+  // parallel. During the synchronization phrase, each active workers (limited
+  // by the number of leaves) needs to synchronize with all the other worker.
+  // During this phrase, the memory of the active worker is linearly dependent
+  // on the number of active synchronization requests.
+  //
+  // Increasing this value will speed-up the synchronization between workers
+  // (i.e. increase the training speed), but increase the worker RAM usage.
+  // TODO(gbm): Share the synchronization output buffer.
+  optional int32 max_concurrent_intra_worker_connections = 7 [default = 100];
+
+  // TODO(gbm): Implement multi-hops synchronization.
+
+  optional Internal internal = 8;
+
+  message Internal {
+    // If true, continuously and randomly change the load balancing. For unit
+    // test only.
+    optional bool random_dynamic_balancing = 1 [default = false];
+  }
+}

@@ -129,6 +129,15 @@ class DistributedGradientBoostedTreesWorker
 
   // End of stage names.
 
+  // Change the features owned by the worker.
+  absl::Status UpdateOwnedFeatures(std::vector<int> features);
+
+  // Initiate the pre-loading of features for future usage.
+  //
+  // True true if any preloading work is in progress.
+  utils::StatusOr<bool> PreloadFutureOwnedFeatures(
+      const proto::WorkerRequest::FutureOwnedFeatures& future_owned_features);
+
   // Prepares for the aggregation of split evaluation.
   // Integrate the local split evaluation (if any).
   absl::Status InitializeSplitEvaluationMerging(
@@ -210,6 +219,10 @@ class DistributedGradientBoostedTreesWorker
   // Number of running "RunRequest".
   int num_running_requests_ = 0;
   absl::Mutex mutex_num_running_requests_;
+
+  // Time taken to load the features of the dataset in memory.
+  absl::Duration dataset_feature_duration_;
+  int dataset_num_features_loaded_ = 0;
 };
 
 // Extract the requested features in a FindSplits request.

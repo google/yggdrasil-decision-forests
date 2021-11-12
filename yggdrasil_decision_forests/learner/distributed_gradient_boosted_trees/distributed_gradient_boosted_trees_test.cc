@@ -211,6 +211,20 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
   EXPECT_EQ(description_classical, description_distributed);
 }
 
+// The load balancer continuously change the worker<->feature mapping.
+TEST_F(DatasetAdult, ContinuousRebalancing) {
+  auto* spe_config = train_config_.MutableExtension(
+      distributed_gradient_boosted_trees::proto::
+          distributed_gradient_boosted_trees_config);
+  spe_config->mutable_load_balancer()
+      ->mutable_internal()
+      ->set_random_dynamic_balancing(true);
+  TrainAndEvaluateModel();
+  // Note: This result does not take early stopping into account.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
+}
+
 class DatasetIris : public utils::TrainAndTestTester {
   void SetUp() override {
     train_config_ = PARSE_TEST_PROTO(R"pb(
@@ -285,30 +299,6 @@ TEST_F(DatasetDna, Base) {
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.95291, 0.02);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.27166, 0.04);
   // Note: R RandomForest has an OOB accuracy of 0.909.
-}
-
-TEST(AssignFeaturesToWorkers, Base) {
-  distributed_decision_tree::dataset_cache::proto::CacheMetadata
-      cache_metadata = PARSE_TEST_PROTO(R"pb(
-        columns { categorical { num_values: 15 } }
-        columns { numerical { num_unique_values: 20 } }
-        columns { numerical { discretized: true num_discretized_values: 10 } }
-        columns { boolean {} }
-      )pb");
-  const auto result =
-      internal::AssignFeaturesToWorkers({}, {0, 1, 2, 3}, 2, cache_metadata)
-          .value();
-
-  EXPECT_EQ(result.worker_to_feature.size(), 2);
-  EXPECT_EQ(result.feature_to_worker.size(), 4);
-
-  EXPECT_THAT(result.worker_to_feature[0], ElementsAre(1, 2));
-  EXPECT_THAT(result.worker_to_feature[1], ElementsAre(0, 3));
-
-  EXPECT_THAT(result.feature_to_worker[0], ElementsAre(1));
-  EXPECT_THAT(result.feature_to_worker[1], ElementsAre(0));
-  EXPECT_THAT(result.feature_to_worker[2], ElementsAre(0));
-  EXPECT_THAT(result.feature_to_worker[3], ElementsAre(1));
 }
 
 }  // namespace

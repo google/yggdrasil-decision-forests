@@ -94,6 +94,26 @@ message WorkerRequest {
 
   optional int64 request_id = 12;
 
+  // If set, the worker is to make sure the following (and only the following)
+  // features are loaded in RAM (in case features are loaded in RAM) as they are
+  // used in the computation.
+  //
+  // Those values can be different from the features in the welcome message
+  // (which are the initial features owned by the worker).
+  optional UpdateOwnedFeatures owned_features = 13;
+  message UpdateOwnedFeatures {
+    repeated int32 features = 1 [packed = true];
+  }
+
+  // Features not currently used in requests, but that will be used (or stopped
+  // to be used) in the future. The worker is expected to load these features in
+  // the background (i.e. independently of the core computation).
+  optional FutureOwnedFeatures future_owned_features = 14;
+  message FutureOwnedFeatures {
+    repeated int32 load_features = 1 [packed = true];
+    repeated int32 unload_features = 2 [packed = true];
+  }
+
   message GetLabelStatistics {}
 
   message SetInitialPredictions {
@@ -195,6 +215,14 @@ message WorkerResult {
 
   optional int32 worker_idx = 14;
 
+  // Duration of the computation expressed in seconds.
+  // If the worker restart during the computation, the duration of the last
+  // execution is used.
+  optional double runtime_seconds = 15;
+
+  // True if the pre-loading is currently being done.
+  optional bool preloading_work_in_progress = 16;
+
   message GetLabelStatistics {
     optional decision_tree.proto.LabelStatistics label_statistics = 1;
   }
@@ -236,7 +264,11 @@ message WorkerResult {
     optional string path = 2;
   }
 
-  message StartTraining {}
+  message StartTraining {
+    // If specified, the worker loaded the dataset in memory.
+    optional int32 num_loaded_features = 1;
+    optional double feature_loading_time_seconds = 2;
+  }
 }
 
 // Meta-data of a checkpoint.

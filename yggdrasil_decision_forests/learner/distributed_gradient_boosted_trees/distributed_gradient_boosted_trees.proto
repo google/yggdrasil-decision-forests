@@ -19,6 +19,7 @@ package yggdrasil_decision_forests.model.distributed_gradient_boosted_trees.prot
 
 import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.proto";
+import "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.proto";
 import "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto";
 import "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.proto";
 
@@ -39,6 +40,11 @@ message DistributedGradientBoostedTreesTrainingConfig {
 
   // If true, workers will print training logs.
   optional bool worker_logs = 4 [default = true];
+
+  // Dynamic balancing of workload in between workers in the case the speed of
+  // workers is not uniform or not constant.
+  optional distributed_decision_tree.proto.LoadBalancerOptions load_balancer =
+      8;
 
   // Internal in between the creation og checkpoints. If one of the worker or
   // the manager is rescheduled, all the training from the last checkpoint is
