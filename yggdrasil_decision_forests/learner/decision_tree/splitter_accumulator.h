@@ -248,6 +248,22 @@ struct FeatureDiscretizedNumericalBucket {
       condition->set_na_value(na_replacement_ > best_bucket_idx);
     }
 
+    template <typename ExampleBucketSet>
+    void SetConditionInterpolatedFinal(
+        const ExampleBucketSet& example_bucket_set,
+        const size_t best_bucket_1_idx, const size_t best_bucket_2_idx,
+        proto::NodeCondition* condition) const {
+      // The "discretized_higher_condition" does not allow to express
+      // condition with threshold other than the threshold of the discretized
+      // value. Therefore, we do an interpolation in the bucket index domain and
+      // round up to the smallest one.
+      const int best_bucket_idx = (best_bucket_1_idx + best_bucket_2_idx) / 2;
+      condition->mutable_condition()
+          ->mutable_discretized_higher_condition()
+          ->set_threshold(best_bucket_idx + 1);
+      condition->set_na_value(na_replacement_ > best_bucket_idx);
+    }
+
    private:
     int num_bins_;
     dataset::DiscretizedNumericalIndex na_replacement_;

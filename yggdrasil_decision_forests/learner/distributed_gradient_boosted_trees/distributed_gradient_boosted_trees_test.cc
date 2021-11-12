@@ -162,7 +162,7 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
     learner: "GRADIENT_BOOSTED_TREES"
     task: CLASSIFICATION
     label: "income"
-    features: "^(?!education)$"
+    features: "^(?!.*education).*$"
     [yggdrasil_decision_forests.model.gradient_boosted_trees.proto
          .gradient_boosted_trees_config] {
       num_trees: 3
@@ -180,13 +180,26 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
     learner: "DISTRIBUTED_GRADIENT_BOOSTED_TREES"
     task: CLASSIFICATION
     label: "income"
-    features: "^(?!education)$"
+    features: "^(?!.*education).*$"
     [yggdrasil_decision_forests.model.distributed_gradient_boosted_trees.proto
          .distributed_gradient_boosted_trees_config] {
       worker_logs: false
       gbt {
         num_trees: 3
         decision_tree { max_depth: 3 }
+      }
+      create_cache {
+        # Disable the discretization of numerical features.
+        #
+        # Enabling this feature leads to a one difference between the two
+        # models: A threshold value of 5095.5 vs 5119.0 for the attribute
+        # "capital_gain" in one of the nodes. The score and statistics of those
+        # nodes are the same.
+        #
+        # The difference is dues to the classical algorithm applying a mean
+        # in the feature domain while the distributed algorithm makes a mean
+        # in the bucket domain.
+        max_unique_values_for_discretized_numerical: 0
       }
     }
   )pb");

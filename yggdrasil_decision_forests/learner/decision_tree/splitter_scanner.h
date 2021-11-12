@@ -408,7 +408,8 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE double Score(const Initializer& initializer,
 // Scans the buckets iteratively. At each iteration evaluate the split that
 // could put all the already visited buckets in the negative branch, and the non
 // visited buckets in the positive branch.
-template <typename ExampleBucketSet, typename LabelScoreAccumulator>
+template <typename ExampleBucketSet, typename LabelScoreAccumulator,
+          bool bucket_interpolation = false>
 SplitSearchResult ScanSplits(
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
@@ -447,9 +448,22 @@ SplitSearchResult ScanSplits(
 
   double best_score = condition->split_score();
   int best_bucket_idx = -1;
+  int best_bucket_interpolation_idx = -1;
+
+  // If true, a new best split was found ("best_bucket_idx" was set accordingly)
+  // but no new examples were observed (i.e. all the bucket visited since the
+  // last new best split were empty).
+  bool no_new_examples_since_last_new_best_split = false;
 
   for (int bucket_idx = 0; bucket_idx < end_bucket_idx; bucket_idx++) {
     const auto& item = example_bucket_set.items[bucket_idx];
+
+    if constexpr (bucket_interpolation) {
+      if (no_new_examples_since_last_new_best_split && item.label.count > 0) {
+        best_bucket_interpolation_idx = bucket_idx;
+        no_new_examples_since_last_new_best_split = false;
+      }
+    }
 
     // Remove the bucket from the positive accumulator and add it to the
     // negative accumulator.
@@ -484,13 +498,31 @@ SplitSearchResult ScanSplits(
       condition->set_num_pos_training_examples_without_weight(num_pos_examples);
       condition->set_num_pos_training_examples_with_weight(
           pos.WeightedNumExamples());
+      if constexpr (bucket_interpolation) {
+        no_new_examples_since_last_new_best_split = true;
+        best_bucket_interpolation_idx = -1;
+      }
     }
   }
 
   if (best_bucket_idx != -1) {
     // Finalize the best found split.
-    feature_filler.SetConditionFinal(example_bucket_set, best_bucket_idx,
-                                     condition);
+
+    if constexpr (bucket_interpolation) {
+      if (best_bucket_interpolation_idx != -1 &&
+          best_bucket_interpolation_idx != best_bucket_idx + 1) {
+        // Bucket interpolation.
+        feature_filler.SetConditionInterpolatedFinal(
+            example_bucket_set, best_bucket_idx, best_bucket_interpolation_idx,
+            condition);
+      } else {
+        feature_filler.SetConditionFinal(example_bucket_set, best_bucket_idx,
+                                         condition);
+      }
+    } else {
+      feature_filler.SetConditionFinal(example_bucket_set, best_bucket_idx,
+                                       condition);
+    }
 
     condition->set_attribute(attribute_idx);
     condition->set_num_training_examples_without_weight(num_examples);
@@ -961,7 +993,7 @@ SplitSearchResult ScanSplitsRandomBuckets(
 // Find the best possible split (and update the condition accordingly) using
 // a simple "scan" of the buckets.  See "ScanSplits".
 template <typename ExampleBucketSet, typename LabelBucketSet,
-          bool require_label_sorting>
+          bool require_label_sorting, bool bucket_interpolation = false>
 SplitSearchResult FindBestSplit(
     const std::vector<row_t>& selected_examples,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
@@ -979,7 +1011,7 @@ SplitSearchResult FindBestSplit(
       cache);
 
   // Scan buckets.
-  return ScanSplits<ExampleBucketSet, LabelBucketSet>(
+  return ScanSplits<ExampleBucketSet, LabelBucketSet, bucket_interpolation>(
       feature_filler, initializer, example_set_accumulator,
       selected_examples.size(), min_num_obs, attribute_idx, condition, cache);
 }
@@ -1033,7 +1065,8 @@ constexpr auto FindBestSplit_LabelRegressionFeatureNumerical =
 constexpr auto FindBestSplit_LabelRegressionFeatureDiscretizedNumerical =
     FindBestSplit<FeatureDiscretizedNumericalLabelNumerical,
                   LabelNumericalScoreAccumulator,
-                  /*require_label_sorting*/ false>;
+                  /*require_label_sorting*/ false,
+                  /*bucket_interpolation=*/true>;
 
 constexpr auto FindBestSplit_LabelRegressionFeatureCategoricalCart =
     FindBestSplit<FeatureCategoricalLabelNumerical,
@@ -1063,7 +1096,8 @@ constexpr auto FindBestSplit_LabelClassificationFeatureNumerical =
 constexpr auto FindBestSplit_LabelClassificationFeatureDiscretizedNumerical =
     FindBestSplit<FeatureDiscretizedNumericalLabelCategorical,
                   LabelCategoricalScoreAccumulator,
-                  /*require_label_sorting*/ false>;
+                  /*require_label_sorting*/ false,
+                  /*bucket_interpolation=*/true>;
 
 constexpr auto FindBestSplit_LabelClassificationFeatureCategoricalCart =
     FindBestSplit<FeatureCategoricalLabelCategorical,
@@ -1091,7 +1125,8 @@ constexpr auto
     FindBestSplit_LabelBinaryClassificationFeatureDiscretizedNumerical =
         FindBestSplit<FeatureDiscretizedNumericalLabelBinaryCategorical,
                       LabelBinaryCategoricalScoreAccumulator,
-                      /*require_label_sorting*/ false>;
+                      /*require_label_sorting*/ false,
+                      /*bucket_interpolation=*/true>;
 
 constexpr auto FindBestSplit_LabelBinaryClassificationFeatureCategoricalCart =
     FindBestSplit<FeatureCategoricalLabelBinaryCategorical,
@@ -1118,7 +1153,8 @@ constexpr auto FindBestSplit_LabelHessianRegressionFeatureNumerical =
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureDiscretizedNumerical =
     FindBestSplit<FeatureDiscretizedNumericalLabelHessianNumerical,
                   LabelHessianNumericalScoreAccumulator,
-                  /*require_label_sorting*/ false>;
+                  /*require_label_sorting*/ false,
+                  /*bucket_interpolation=*/true>;
 
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureCategoricalCart =
     FindBestSplit<FeatureCategoricalLabelHessianNumerical,

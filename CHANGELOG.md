@@ -5,6 +5,8 @@
 ### Features
 
 -   Add example of distributed training at examples/distributed_training.sh
+-   Use the median bucket split value strategy in the discretized numerical
+    splitters (local and distributed).
 
 ### Fixes
 

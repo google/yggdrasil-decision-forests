@@ -2131,6 +2131,40 @@ TEST(DecisionTree, MidThreshold) {
   test(nl::lowest(), std::nextafter(nl::lowest(), 0.f));
 }
 
+TEST(DecisionTree, FindBestNumericalDiscretizedSplitCartBase) {
+  const std::vector<row_t> selected_examples = {0, 1, 2, 3};
+  const std::vector<float> weights(selected_examples.size(), 1.f);
+
+  const int num_binds = 6;
+  // The best split is on the right size of the bin[1].
+  std::vector<dataset::DiscretizedNumericalIndex> attributes = {0, 1, 4, 5};
+  const std::vector<int32_t> labels = {0, 0, 1, 1};
+  const int32_t num_label_classes = 2;
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  utils::IntegerDistributionDouble label_distribution;
+  label_distribution.SetNumClasses(num_label_classes);
+  for (const auto example_idx : selected_examples) {
+    label_distribution.Add(labels[example_idx], weights[example_idx]);
+  }
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  EXPECT_EQ(FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
+                selected_examples, weights, attributes, num_binds, labels,
+                num_label_classes, /*na_replacement=*/0, /*min_num_obs=*/1,
+                dt_config, label_distribution, -1, &best_condition, &cache),
+            SplitSearchResult::kBetterSplitFound);
+
+  // The equivalent threshold values are in [2,4]. We take the center.
+  EXPECT_EQ(
+      best_condition.condition().discretized_higher_condition().threshold(), 3);
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 4);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 4);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
+  EXPECT_EQ(best_condition.na_value(), false);
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

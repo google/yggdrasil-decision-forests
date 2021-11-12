@@ -764,7 +764,8 @@ absl::Status FindDiscretizedNumericalThreshold(
 
     auto& split = (*common.best_splits)[node_idx];
     if (decision_tree::ScanSplits<ExampleBucketSet,
-                                  typename LabelFiller::Accumulator>(
+                                  typename LabelFiller::Accumulator,
+                                  /*bucket_interpolation=*/true>(
             feature_filler, accumulator_initializers[node_idx],
             example_bucket_set, label_stats.num_examples(), min_num_examples,
             feature, &split.condition,
@@ -780,6 +781,7 @@ absl::Status FindDiscretizedNumericalThreshold(
       const auto& boundaries =
           common.dataset->DiscretizedNumericalFeatureBoundaries(feature);
       const auto threshold = boundaries[discretized_threshold - 1];
+
       split.condition.mutable_condition()
           ->mutable_higher_condition()
           ->set_threshold(threshold);
