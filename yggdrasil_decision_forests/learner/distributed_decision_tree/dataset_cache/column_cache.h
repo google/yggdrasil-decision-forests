@@ -390,8 +390,11 @@ class InMemoryFloatColumnReaderFactory {
   int max_num_values_ = 0;
 };
 
-// Indicates that a file is done being written
-absl::Status FinalizeFile(absl::string_view path);
+// Indicates that a file will be written.
+absl::Status PrepareOutputFile(absl::string_view path);
+
+// Indicates that a file is done being written.
+absl::Status FinalizeOutputFile(absl::string_view path);
 
 }  // namespace dataset_cache
 }  // namespace distributed_decision_tree

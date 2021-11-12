@@ -17,6 +17,7 @@
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/utils/filesystem.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -58,7 +59,11 @@ absl::Status ConvertIntegerBuffer(const char* const src_buffer,
 
 }  // namespace
 
-absl::Status FinalizeFile(absl::string_view path) {
+absl::Status PrepareOutputFile(absl::string_view path) {
+  return absl::OkStatus();
+}
+
+absl::Status FinalizeOutputFile(absl::string_view path) {
   return absl::OkStatus();
 }
 
@@ -85,6 +90,7 @@ absl::Status IntegerColumnWriter::Open(absl::string_view path,
   num_bytes_ = NumBytes(max_value);
   max_value_ = max_value;
   path_ = std::string(path);
+  RETURN_IF_ERROR(PrepareOutputFile(path));
   return file_.Open(path);
 }
 
@@ -155,7 +161,7 @@ absl::Status IntegerColumnWriter::WriteValuesWithCast(
 
 absl::Status IntegerColumnWriter::Close() {
   RETURN_IF_ERROR(file_.Close());
-  return FinalizeFile(path_);
+  return FinalizeOutputFile(path_);
 }
 
 template <typename Value>
@@ -411,6 +417,7 @@ template class InMemoryIntegerColumnReaderFactory<int64_t>;
 
 absl::Status FloatColumnWriter::Open(absl::string_view path) {
   path_ = std::string(path);
+  RETURN_IF_ERROR(PrepareOutputFile(path));
   return file_.Open(path);
 }
 
@@ -422,7 +429,7 @@ absl::Status FloatColumnWriter::WriteValues(absl::Span<const float> values) {
 
 absl::Status FloatColumnWriter::Close() {
   RETURN_IF_ERROR(file_.Close());
-  return FinalizeFile(path_);
+  return FinalizeOutputFile(path_);
 }
 
 absl::Status FloatColumnReader::Open(absl::string_view path,
