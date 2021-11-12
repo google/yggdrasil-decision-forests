@@ -66,6 +66,12 @@ class DistributedGradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kRegisteredName[] =
       "DISTRIBUTED_GRADIENT_BOOSTED_TREES";
 
+  static constexpr char kHParamWorkerLogs[] = "worker_logs";
+  static constexpr char kHParamMaxUniqueValuesForDiscretizedNumerical[] =
+      "max_unique_values_for_discretized_numerical";
+  static constexpr char kHParamForceNumericalDiscretization[] =
+      "force_numerical_discretization";
+
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>

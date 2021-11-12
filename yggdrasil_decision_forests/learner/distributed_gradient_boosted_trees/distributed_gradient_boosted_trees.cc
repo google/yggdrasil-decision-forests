@@ -35,7 +35,11 @@ namespace model {
 namespace distributed_gradient_boosted_trees {
 
 constexpr char DistributedGradientBoostedTreesLearner::kRegisteredName[];
-using distributed_decision_tree::dataset_cache::proto::CacheMetadata_Column;
+constexpr char DistributedGradientBoostedTreesLearner::kHParamWorkerLogs[];
+constexpr char DistributedGradientBoostedTreesLearner::
+    kHParamMaxUniqueValuesForDiscretizedNumerical[];
+constexpr char DistributedGradientBoostedTreesLearner::
+    kHParamForceNumericalDiscretization[];
 
 model::proto::LearnerCapabilities
 DistributedGradientBoostedTreesLearner::Capabilities() const {
@@ -75,6 +79,33 @@ absl::Status DistributedGradientBoostedTreesLearner::SetHyperParametersImpl(
       gbt_learner.training_config().GetExtension(
           gradient_boosted_trees::proto::gradient_boosted_trees_config));
 
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamMaxUniqueValuesForDiscretizedNumerical);
+    if (hparam.has_value()) {
+      dgbt_config->mutable_create_cache()
+          ->set_max_unique_values_for_discretized_numerical(
+              hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamWorkerLogs);
+    if (hparam.has_value()) {
+      dgbt_config->set_worker_logs(hparam.value().value().categorical() ==
+                                   "true");
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamForceNumericalDiscretization);
+    if (hparam.has_value()) {
+      dgbt_config->mutable_create_cache()->set_force_numerical_discretization(
+          hparam.value().value().categorical() == "true");
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -89,8 +120,10 @@ DistributedGradientBoostedTreesLearner::GetGenericHyperParameterSpecification()
       "algorithm. See the documentation of the non-distributed Gradient "
       "Boosted Tree learning algorithm for an introduction to GBTs.");
 
+  model::proto::TrainingConfig config;
+
   using GBTL = gradient_boosted_trees::GradientBoostedTreesLearner;
-  GBTL gbt_learner(training_config_);
+  GBTL gbt_learner(config);
   ASSIGN_OR_RETURN(const auto gbt_params,
                    gbt_learner.GetGenericHyperParameterSpecification());
 
@@ -102,6 +135,8 @@ DistributedGradientBoostedTreesLearner::GetGenericHyperParameterSpecification()
            GBTL::kHParamApplyLinkFunction,
            decision_tree::kHParamMaxDepth,
            decision_tree::kHParamMinExamples,
+           decision_tree::kHParamNumCandidateAttributes,
+           decision_tree::kHParamNumCandidateAttributesRatio,
        }) {
     const auto src_field = gbt_params.fields().find(supported_field);
     if (src_field == gbt_params.fields().end()) {
@@ -110,6 +145,50 @@ DistributedGradientBoostedTreesLearner::GetGenericHyperParameterSpecification()
     }
     hparam_def.mutable_fields()->operator[](supported_field) =
         src_field->second;
+  }
+
+  const auto& dgbt_config =
+      config.GetExtension(distributed_gradient_boosted_trees::proto::
+                              distributed_gradient_boosted_trees_config);
+
+  const auto proto_path =
+      "learner/distributed_gradient_boosted_trees/"
+      "distributed_gradient_boosted_trees.proto";
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](kHParamWorkerLogs);
+    param.mutable_categorical()->set_default_value(
+        dgbt_config.worker_logs() ? "true" : "false");
+    param.mutable_categorical()->add_possible_values("true");
+    param.mutable_categorical()->add_possible_values("false");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(If true, workers will print training logs.)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamForceNumericalDiscretization);
+    param.mutable_categorical()->set_default_value(
+        dgbt_config.create_cache().force_numerical_discretization() ? "true"
+                                                                    : "false");
+    param.mutable_categorical()->add_possible_values("true");
+    param.mutable_categorical()->add_possible_values("false");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(If false, only the numerical column safisfying "max_unique_values_for_discretized_numerical" will be discretized. If true, all the numerical columns will be discretized. Columns with more than "max_unique_values_for_discretized_numerical" unique values will be approximated with "max_unique_values_for_discretized_numerical" bins. This parameter will impact the model training.)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamMaxUniqueValuesForDiscretizedNumerical);
+    param.mutable_integer()->set_minimum(1);
+    param.mutable_integer()->set_default_value(
+        dgbt_config.create_cache()
+            .max_unique_values_for_discretized_numerical());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Maximum number of unique value of a numerical feature to allow its pre-discretization. In case of large datasets, discretized numerical features with a small number of unique values are more efficient to learn than classical / non-discretized numerical features. This parameter does not impact the final model. However, it can speed-up or slown the training.)");
   }
 
   return hparam_def;
