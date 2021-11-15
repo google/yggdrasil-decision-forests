@@ -225,6 +225,15 @@ void AppendTextReportRanking(const proto::EvaluationResults& eval,
   }
   absl::StrAppend(report, "\n");
 
+  absl::StrAppend(report, "Precision@1: ", PrecisionAt1(eval));
+  if (eval.ranking().precision_at_1().has_bootstrap_based_95p()) {
+    absl::SubstituteAndAppend(
+        report, " CI95[B][$0 $1]",
+        eval.ranking().precision_at_1().bootstrap_based_95p().lower(),
+        eval.ranking().precision_at_1().bootstrap_based_95p().upper());
+  }
+  absl::StrAppend(report, "\n");
+
   absl::StrAppend(report, "Default NDCG@", eval.ranking().ndcg_truncation(),
                   ": ", DefaultNDCG(eval), "\n");
   absl::StrAppend(report, "Number of groups: ", eval.ranking().num_groups(),

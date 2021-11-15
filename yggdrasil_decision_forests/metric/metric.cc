@@ -83,6 +83,26 @@ double computeAP(const google::protobuf::RepeatedPtrField<proto::Roc::Point>& cu
   return ap;
 }
 
+// Returns the index of the item in "items" with the greatest "prediction"
+// value. If multiple item have the same greatest prediction value, returns the
+// smallest index. Returns "-1" if items is empty.
+int GreatestPredictionIndex(
+    const std::vector<RankingLabelAndPrediction>& items) {
+  if (ABSL_PREDICT_FALSE(items.empty())) {
+    return -1;
+  }
+  int max_idx = 0;
+  float max_prediction = items.front().prediction;
+
+  for (size_t index = 1; index < items.size(); index++) {
+    if (items[index].prediction > max_prediction) {
+      max_prediction = items[index].prediction;
+      max_idx = index;
+    }
+  }
+  return max_idx;
+}
+
 // Extract the lower and upper bounds from the samples (using the "getter") and
 // store the values using the "setter".
 void SetLowerAndUpperBounds(
@@ -210,20 +230,19 @@ void FinalizeRankingMetricsFromSampledPredictions(
   CHECK_GT(num_preds, 0);
   auto& ranking = *eval->mutable_ranking();
 
-  // sorted_prediction_by_group[i][j][0] is the predicted relevance for the j-th
-  // prediction for the i-th group. sorted_prediction_by_group[i][j][1] is the
-  // ground truth relevance for the j-th prediction for the i-th group.
-  // sorted_prediction_by_group[i][j] are stored in decreasing predicted
-  // relevance value.
+  // sorted_prediction_by_group[i].pred_and_label_relevance[j] is the predicted
+  // score and label for the j-th example for the i-th group.
+  // sorted_prediction_by_group[i][j] are stored by decreasing label (i.e.
+  // relevance) value.
   struct Item {
     float weight;
     std::vector<RankingLabelAndPrediction> pred_and_label_relevance;
   };
-  absl::flat_hash_map<uint64_t, Item> sorted_prediction_by_group;
+  absl::flat_hash_map<uint64_t, Item> grouped_examples;
 
   // Populate the groups.
   for (const auto& prediction : eval->sampled_predictions()) {
-    auto& group = sorted_prediction_by_group[prediction.ranking().group_id()];
+    auto& group = grouped_examples[prediction.ranking().group_id()];
     group.weight = prediction.weight();
     group.pred_and_label_relevance.push_back(
         {/*.prediction =*/prediction.ranking().relevance(),
@@ -231,7 +250,7 @@ void FinalizeRankingMetricsFromSampledPredictions(
   }
 
   if (!option.ranking().allow_only_one_group() &&
-      sorted_prediction_by_group.size() == 1) {
+      grouped_examples.size() == 1) {
     LOG(FATAL) << "During the ranking evaluation, all items ("
                << eval->sampled_predictions().size()
                << ") (e.g. documents) are in the same group (e.g. "
@@ -248,18 +267,20 @@ void FinalizeRankingMetricsFromSampledPredictions(
   double sum_default_weighted_ndcg = 0;
 
   double sum_weighted_mrr = 0;
+  double sum_weighted_precision_at_1 = 0;
 
   // NDCGs and weights of each group. Used for the computation of confidence
   // intervals using bootstrapping.
   std::vector<std::pair<float, float>> individual_ndcgs, individual_mrrs;
-  individual_ndcgs.reserve(sorted_prediction_by_group.size());
-  individual_mrrs.reserve(sorted_prediction_by_group.size());
+  individual_ndcgs.reserve(grouped_examples.size());
+  individual_mrrs.reserve(grouped_examples.size());
 
   size_t min_num_items_in_group = std::numeric_limits<size_t>::max();
   size_t max_num_items_in_group = std::numeric_limits<size_t>::min();
 
   // Sort the prediction in each group.
-  for (auto& group : sorted_prediction_by_group) {
+  for (auto& group : grouped_examples) {
+    // Sort the groups by decreasing label value.
     std::sort(
         group.second.pred_and_label_relevance.begin(),
         group.second.pred_and_label_relevance.end(),
@@ -285,6 +306,11 @@ void FinalizeRankingMetricsFromSampledPredictions(
 
     sum_weighted_mrr += weighted_mrr;
 
+    // Precision @ 1
+    const auto precision_at_1 =
+        GreatestPredictionIndex(group.second.pred_and_label_relevance) == 0;
+    sum_weighted_precision_at_1 += group.second.weight * precision_at_1;
+
     sum_weights += group.second.weight;
     min_num_items_in_group = std::min(
         min_num_items_in_group, group.second.pred_and_label_relevance.size());
@@ -298,11 +324,14 @@ void FinalizeRankingMetricsFromSampledPredictions(
   ranking.mutable_mrr()->set_value(sum_weighted_mrr / sum_weights);
   ranking.set_mrr_truncation(option.ranking().mrr_truncation());
 
-  ranking.set_num_groups(sorted_prediction_by_group.size());
+  ranking.mutable_precision_at_1()->set_value(sum_weighted_precision_at_1 /
+                                              sum_weights);
+
+  ranking.set_num_groups(grouped_examples.size());
   ranking.set_min_num_items_in_group(min_num_items_in_group);
   ranking.set_max_num_items_in_group(max_num_items_in_group);
   ranking.set_mean_num_items_in_group(
-      num_preds / static_cast<double>(sorted_prediction_by_group.size()));
+      num_preds / static_cast<double>(grouped_examples.size()));
 
   ranking.set_ndcg_truncation(option.ranking().ndcg_truncation());
 
@@ -899,6 +928,10 @@ float NDCG(const proto::EvaluationResults& eval) {
 
 float MRR(const proto::EvaluationResults& eval) {
   return eval.ranking().mrr().value();
+}
+
+float PrecisionAt1(const proto::EvaluationResults& eval) {
+  return eval.ranking().precision_at_1().value();
 }
 
 float DefaultRMSE(const proto::EvaluationResults& eval) {

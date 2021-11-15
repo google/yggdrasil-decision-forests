@@ -152,7 +152,11 @@ message EvaluationResults {
 
     reserved 6, 7;
 
-    // Next ID: 13
+    // Fraction of examples were the highest predicted example is also the
+    // example with the highest relevance value.
+    optional MetricEstimate precision_at_1 = 13;
+
+    // Next ID: 14
     reserved 1;
   }
 

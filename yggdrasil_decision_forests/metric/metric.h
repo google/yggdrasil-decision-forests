@@ -108,15 +108,22 @@ void ComputeXAtYMetrics(
     const google::protobuf::RepeatedPtrField<proto::Roc::Point>& curve, proto::Roc* roc);
 
 // Extract key metrics from an evaluation.
+// The metric are defined in "metric.proto".
+
 float Accuracy(const proto::EvaluationResults& eval);
 float LogLoss(const proto::EvaluationResults& eval);
 float RMSE(const proto::EvaluationResults& eval);
 float ErrorRate(const proto::EvaluationResults& eval);
+
 // Normalized Discounted Cumulative Gain.
 float NDCG(const proto::EvaluationResults& eval);
 
 // Mean Reciprocal Rank.
 float MRR(const proto::EvaluationResults& eval);
+
+// Equivalent to the fraction of examples were the highest predicted example is
+// also the example with the highest relevance value.
+float PrecisionAt1(const proto::EvaluationResults& eval);
 
 // Confidence interval on the Accuracy using the Wilson score interval with
 // continuity correction.

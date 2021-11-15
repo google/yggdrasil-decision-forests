@@ -391,7 +391,7 @@ TEST(Metric, CreateDataSpecForComparisonTable) {
 
 TEST(Metric, ExtractFlatMetrics) {
   proto::EvaluationResults evaluation = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         task: CLASSIFICATION
         classification {
           rocs {
@@ -417,7 +417,7 @@ TEST(Metric, ExtractFlatMetrics) {
             is_already_integerized: true
           }
         }
-      )");
+      )pb");
 
   auto& confusion = *evaluation.mutable_classification()->mutable_confusion();
   utils::InitializeConfusionMatrixProto(2, 2, &confusion);
@@ -448,7 +448,7 @@ TEST(Metric, ExtractFlatMetrics) {
 
 TEST(Metric, ComputeXAtYMetrics) {
   const proto::EvaluationOptions options = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         task: CLASSIFICATION
         classification {
           precision_at_recall: 0.90
@@ -469,14 +469,14 @@ TEST(Metric, ComputeXAtYMetrics) {
           false_positive_rate_at_recall: 0.50
           false_positive_rate_at_recall: 0.20
         }
-      )");
+      )pb");
   proto::Roc roc = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         # Recall: 0.8 Prec: 0.5 Vol: 0.8 fpr: 0.8
         curve { tp: 160 tn: 40 fp: 160 fn: 40 }
         # Recall: 0.5 Prec: 0.8 vol:~0.31 fpr: ~0.21
         curve { tp: 100 tn: 175 fp: 25 fn: 100 }
-      )");
+      )pb");
   ComputeXAtYMetrics(options, roc.curve(), &roc);
 
   // Precision @ fixed Recall
@@ -485,22 +485,22 @@ TEST(Metric, ComputeXAtYMetrics) {
   EXPECT_TRUE(std::isnan(roc.precision_at_recall(0).threshold()));
 
   EXPECT_THAT(roc.precision_at_recall(1),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.7
                 x_metric_value: 0.5
-                threshold: 0)")));
+                threshold: 0)pb")));
 
   EXPECT_THAT(roc.precision_at_recall(2),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.5
                 x_metric_value: 0.8
-                threshold: 0)")));
+                threshold: 0)pb")));
 
   EXPECT_THAT(roc.precision_at_recall(3),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.3
                 x_metric_value: 0.8
-                threshold: 0)")));
+                threshold: 0)pb")));
 
   // Recall @ fixed Precision
   EXPECT_EQ(roc.recall_at_precision(0).y_metric_constraint(), 0.9);
@@ -508,23 +508,23 @@ TEST(Metric, ComputeXAtYMetrics) {
   EXPECT_TRUE(std::isnan(roc.recall_at_precision(0).threshold()));
 
   EXPECT_THAT(roc.recall_at_precision(1),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.6
                 x_metric_value: 0.5
-                threshold: 0)")));
+                threshold: 0)pb")));
 
   EXPECT_THAT(roc.recall_at_precision(2),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.4
                 x_metric_value: 0.8
-                threshold: 0)")));
+                threshold: 0)pb")));
 
   // Precision @ fixed Volume
   EXPECT_THAT(roc.precision_at_volume(0),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.5
                 x_metric_value: 0.5
-                threshold: 0)")));
+                threshold: 0)pb")));
 
   EXPECT_EQ(roc.precision_at_volume(1).y_metric_constraint(), 0.9);
   EXPECT_TRUE(std::isnan(roc.recall_at_precision(0).x_metric_value()));
@@ -532,29 +532,29 @@ TEST(Metric, ComputeXAtYMetrics) {
 
   // Recall @ fixed False positive rate
   EXPECT_THAT(roc.recall_at_false_positive_rate(0),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.5
                 x_metric_value: 0.5
-                threshold: 0)")));
+                threshold: 0)pb")));
 
   EXPECT_THAT(roc.recall_at_false_positive_rate(1),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.9
                 x_metric_value: 0.8
-                threshold: 0)")));
+                threshold: 0)pb")));
 
   // False positive rate @ fixed Recall
   EXPECT_THAT(roc.false_positive_rate_at_recall(0),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.5
                 x_metric_value: 0.125
-                threshold: 0)")));
+                threshold: 0)pb")));
 
   EXPECT_THAT(roc.false_positive_rate_at_recall(1),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"(
+              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
                 y_metric_constraint: 0.2
                 x_metric_value: 0.125
-                threshold: 0)")));
+                threshold: 0)pb")));
 }
 
 TEST(Metric, AccuracyConfidenceInterval) {
@@ -579,10 +579,10 @@ TEST(Metric, AccuracyConfidenceInterval) {
 
 TEST(Metric, AUCConfidenceInterval) {
   const proto::Roc roc = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         curve { tp: 100 fp: 100 tn: 0 fn: 0 }
         auc: 0.75
-      )");
+      )pb");
   const auto ci = AUCConfidenceInterval(roc, 0.95);
   EXPECT_NEAR(ci.first, 0.683, 0.01);
   EXPECT_NEAR(ci.second, 0.817, 0.01);
@@ -590,10 +590,10 @@ TEST(Metric, AUCConfidenceInterval) {
 
 TEST(Metric, PRAUCConfidenceInterval) {
   const proto::Roc roc = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         curve { tp: 100 fp: 100 tn: 0 fn: 0 }
         pr_auc: 0.75
-      )");
+      )pb");
   const auto ci = PRAUCConfidenceInterval(roc, 0.95);
   EXPECT_NEAR(ci.first, 0.656f, 0.01f);
   EXPECT_NEAR(ci.second, 0.825f, 0.01f);
@@ -629,10 +629,10 @@ TEST(Metric, GetQuantiles) {
 
 TEST(Metric, ComputeRocConfidenceIntervalsUsingBootstrapping) {
   const proto::EvaluationOptions options = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         task: CLASSIFICATION
         classification { precision_at_recall: 0.50 recall_at_precision: 0.50 }
-      )");
+      )pb");
   const std::vector<BinaryPrediction> sorted_predictions = {
       {0.0, false, 1}, {0.1, false, 1}, {0.2, false, 1}, {0.3, true, 1},
       {0.4, false, 1}, {0.5, false, 1}, {0.6, true, 1},  {0.7, true, 1},
@@ -682,11 +682,11 @@ TEST(Metric, DefaultRMSE) {
   // Labels: 1 2 3 4
   // Label sd: sqrt(mean(l^2)-mean(l)^2) = 1.118
   const proto::EvaluationResults eval = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         task: REGRESSION
         count_predictions: 4
         regression { sum_label: 10 sum_square_label: 30 }
-      )");
+      )pb");
   EXPECT_NEAR(DefaultRMSE(eval), 1.118, 0.02f);
 }
 
@@ -698,9 +698,9 @@ TEST(Metric, DefaultRMSE) {
 // Evaluates both bootstrapping and closed form estimators.
 TEST(Metric, RMSEConfidenceIntervals) {
   const proto::EvaluationOptions options = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         task: REGRESSION
-      )");
+      )pb");
   utils::RandomEngine rnd;
   std::normal_distribution<float> dist_residual;
   std::uniform_real_distribution<float> dist_label(0, 10);
@@ -749,17 +749,17 @@ TEST(Metric, RMSEConfidenceIntervals) {
 }
 
 TEST(Metric, GetMetric) {
-  const proto::EvaluationResults results_regression = PARSE_TEST_PROTO(R"(
+  const proto::EvaluationResults results_regression = PARSE_TEST_PROTO(R"pb(
     task: REGRESSION
     label_column { type: NUMERICAL }
     regression { sum_square_error: 10 }
     count_predictions: 10
-  )");
+  )pb");
   EXPECT_NEAR(
       GetMetric(results_regression, PARSE_TEST_PROTO("regression { rmse {}}")),
       RMSE(results_regression), 0.0001);
 
-  const proto::EvaluationResults results_classification = PARSE_TEST_PROTO(R"(
+  const proto::EvaluationResults results_classification = PARSE_TEST_PROTO(R"pb(
     task: CLASSIFICATION
     label_column {
       type: CATEGORICAL
@@ -794,7 +794,7 @@ TEST(Metric, GetMetric) {
       rocs { auc: 1.4 pr_auc: 1.5 ap: 1.6 }
     }
     count_predictions: 10
-  )");
+  )pb");
 
   EXPECT_NEAR(GetMetric(results_classification,
                         PARSE_TEST_PROTO("classification { accuracy {}}")),
@@ -803,75 +803,75 @@ TEST(Metric, GetMetric) {
                         PARSE_TEST_PROTO("classification { logloss {}}")),
               LogLoss(results_classification), 0.0001);
 
-  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"(
+  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"pb(
                           classification {
                             one_vs_other {
                               positive_class: "1"
                               auc {}
                             }
-                          })")),
+                          })pb")),
               results_classification.classification().rocs(1).auc(), 0.0001);
 
-  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"(
+  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"pb(
                           classification {
                             one_vs_other {
                               positive_class: "0"
                               auc {}
                             }
-                          })")),
+                          })pb")),
               results_classification.classification().rocs(0).auc(), 0.0001);
 
-  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"(
+  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"pb(
                           classification {
                             one_vs_other {
                               positive_class: "0"
                               ap {}
                             }
-                          })")),
+                          })pb")),
               results_classification.classification().rocs(0).ap(), 0.0001);
 
-  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"(
+  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"pb(
                           classification {
                             one_vs_other {
                               positive_class: "0"
                               pr_auc {}
                             }
-                          })")),
+                          })pb")),
               results_classification.classification().rocs(0).pr_auc(), 0.0001);
 
-  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"(
+  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"pb(
                           classification {
                             one_vs_other {
                               positive_class: "0"
                               precision_at_recall { recall: 0.5 }
                             }
-                          })")),
+                          })pb")),
               results_classification.classification()
                   .rocs(0)
                   .precision_at_recall(0)
                   .x_metric_value(),
               0.0001);
 
-  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"(
+  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"pb(
                           classification {
                             one_vs_other {
                               positive_class: "0"
                               recall_at_precision { precision: 0.7 }
                             }
-                          })")),
+                          })pb")),
               results_classification.classification()
                   .rocs(0)
                   .recall_at_precision(0)
                   .x_metric_value(),
               0.0001);
 
-  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"(
+  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"pb(
                           classification {
                             one_vs_other {
                               positive_class: "0"
                               precision_at_volume { volume: 0.9 }
                             }
-                          })")),
+                          })pb")),
               results_classification.classification()
                   .rocs(0)
                   .precision_at_volume(0)
@@ -879,26 +879,26 @@ TEST(Metric, GetMetric) {
               0.0001);
 
   EXPECT_NEAR(
-      GetMetric(results_classification, PARSE_TEST_PROTO(R"(
+      GetMetric(results_classification, PARSE_TEST_PROTO(R"pb(
                   classification {
                     one_vs_other {
                       positive_class: "0"
                       recall_at_false_positive_rate { false_positive_rate: 1.1 }
                     }
-                  })")),
+                  })pb")),
       results_classification.classification()
           .rocs(0)
           .recall_at_false_positive_rate(0)
           .x_metric_value(),
       0.0001);
 
-  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"(
+  EXPECT_NEAR(GetMetric(results_classification, PARSE_TEST_PROTO(R"pb(
                           classification {
                             one_vs_other {
                               positive_class: "0"
                               false_positive_rate_at_recall { recall: 1.3 }
                             }
-                          })")),
+                          })pb")),
               results_classification.classification()
                   .rocs(0)
                   .false_positive_rate_at_recall(0)
@@ -1021,6 +1021,8 @@ TEST(Metric, EvaluationOfRanking) {
 
   // R=1
   EXPECT_NEAR(MRR(eval), 1.0, 0.01);
+
+  EXPECT_NEAR(PrecisionAt1(eval), 1.0, 0.01);
 
   EXPECT_EQ(eval.ranking().num_groups(), 1);
 
@@ -1237,6 +1239,52 @@ TEST(Metric, EvaluationOfRankingWithTiesV2) {
   EXPECT_EQ(eval.ranking().num_groups(), 1);
 }
 
+TEST(Metric, EvaluationOfRankingPrecisionAt1) {
+  // Create a fake column specification.
+  dataset::proto::Column label_column;
+  label_column.set_type(dataset::proto::ColumnType::NUMERICAL);
+  label_column.set_name("label");
+
+  // Configure the evaluation.
+  utils::RandomEngine rnd;
+  proto::EvaluationOptions option;
+  option.mutable_ranking()->set_allow_only_one_group(true);
+  option.set_task(model::proto::Task::RANKING);
+
+  // Initialize.
+  proto::EvaluationResults eval;
+  InitializeEvaluation(option, label_column, &eval);
+  model::proto::Prediction pred;
+
+  // Add some predictions.
+  pred.mutable_ranking()->set_relevance(1);
+  pred.mutable_ranking()->set_ground_truth_relevance(0);
+  pred.mutable_ranking()->set_group_id(1);
+  AddPrediction(option, pred, &rnd, &eval);
+
+  pred.mutable_ranking()->set_relevance(2);
+  pred.mutable_ranking()->set_ground_truth_relevance(1);
+  pred.mutable_ranking()->set_group_id(1);
+  AddPrediction(option, pred, &rnd, &eval);
+
+  pred.mutable_ranking()->set_relevance(2);
+  pred.mutable_ranking()->set_ground_truth_relevance(0);
+  pred.mutable_ranking()->set_group_id(2);
+  AddPrediction(option, pred, &rnd, &eval);
+
+  pred.mutable_ranking()->set_relevance(1);
+  pred.mutable_ranking()->set_ground_truth_relevance(1);
+  pred.mutable_ranking()->set_group_id(2);
+  AddPrediction(option, pred, &rnd, &eval);
+
+  // Finalize.
+  FinalizeEvaluation(option, label_column, &eval);
+
+  EXPECT_EQ(eval.task(), model::proto::Task::RANKING);
+
+  EXPECT_NEAR(PrecisionAt1(eval), 0.5, 0.01);
+}
+
 TEST(Metric, EvaluationOfRankingCI) {
   // Create a fake column specification.
   dataset::proto::Column label_column;
@@ -1326,54 +1374,54 @@ TEST(Metric, RMSE) {
 
 TEST(DefaultMetrics, Classification) {
   const dataset::proto::Column label = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: CATEGORICAL
         categorical { is_already_integerized: true number_of_unique_values: 3 }
-      )");
+      )pb");
   const auto metrics =
       DefaultMetrics(model::proto::Task::CLASSIFICATION, label);
   EXPECT_EQ(metrics.size(), 4);
   EXPECT_EQ(metrics[0].name, "ACCURACY");
   proto::MetricAccessor expected_0 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         classification: { accuracy {} }
-      )");
+      )pb");
   EXPECT_THAT(metrics[0].accessor, EqualsProto(expected_0));
 
   EXPECT_EQ(metrics[1].name, "AUC_2_VS_OTHERS");
   proto::MetricAccessor expected_1 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         classification {
           one_vs_other {
             positive_class: "2"
             auc {}
           }
         }
-      )");
+      )pb");
   EXPECT_THAT(metrics[1].accessor, EqualsProto(expected_1));
 
   EXPECT_EQ(metrics[2].name, "PRAUC_2_VS_OTHERS");
   proto::MetricAccessor expected_2 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         classification {
           one_vs_other {
             positive_class: "2"
             pr_auc {}
           }
         }
-      )");
+      )pb");
   EXPECT_THAT(metrics[2].accessor, EqualsProto(expected_2));
 
   EXPECT_EQ(metrics[3].name, "AP_2_VS_OTHERS");
   proto::MetricAccessor expected_3 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         classification {
           one_vs_other {
             positive_class: "2"
             ap {}
           }
         }
-      )");
+      )pb");
   EXPECT_THAT(metrics[3].accessor, EqualsProto(expected_3));
 }
 
@@ -1382,9 +1430,9 @@ TEST(DefaultMetrics, Regression) {
   EXPECT_EQ(metrics.size(), 1);
   EXPECT_EQ(metrics[0].name, "RMSE");
   proto::MetricAccessor expected = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         regression { rmse {} }
-      )");
+      )pb");
   EXPECT_THAT(metrics[0].accessor, EqualsProto(expected));
 }
 
@@ -1393,15 +1441,15 @@ TEST(DefaultMetrics, Ranking) {
   EXPECT_EQ(metrics.size(), 1);
   EXPECT_EQ(metrics[0].name, "NDCG");
   proto::MetricAccessor expected = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         ranking { ndcg {} }
-      )");
+      )pb");
   EXPECT_THAT(metrics[0].accessor, EqualsProto(expected));
 }
 
 TEST(Metric, MergeEvaluationClassification) {
   const proto::EvaluationResults src = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         count_predictions: 1
         count_predictions_no_weight: 2
         sampled_predictions { example_key: "a" }
@@ -1412,9 +1460,9 @@ TEST(Metric, MergeEvaluationClassification) {
           sum_log_loss: 6
           confusion { nrow: 1 ncol: 1 counts: 7 sum: 7 }
         }
-      )");
+      )pb");
   proto::EvaluationResults dst = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         count_predictions: 10
         count_predictions_no_weight: 20
         sampled_predictions { example_key: "b" }
@@ -1425,10 +1473,10 @@ TEST(Metric, MergeEvaluationClassification) {
           sum_log_loss: 60
           confusion { nrow: 1 ncol: 1 counts: 70 sum: 70 }
         }
-      )");
+      )pb");
   MergeEvaluation({}, src, &dst);
   proto::EvaluationResults expected_dst = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         count_predictions: 11
         count_predictions_no_weight: 22
         sampled_predictions { example_key: "b" }
@@ -1440,7 +1488,7 @@ TEST(Metric, MergeEvaluationClassification) {
           sum_log_loss: 66
           confusion { nrow: 1 ncol: 1 counts: 77 sum: 77 }
         }
-      )");
+      )pb");
   EXPECT_THAT(dst, EqualsProto(expected_dst));
 }
 
