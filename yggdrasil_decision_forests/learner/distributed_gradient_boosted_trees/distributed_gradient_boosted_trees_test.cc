@@ -301,6 +301,42 @@ TEST_F(DatasetDna, Base) {
   // Note: R RandomForest has an OOB accuracy of 0.909.
 }
 
+class DatasetAbalone : public utils::TrainAndTestTester {
+  void SetUp() override {
+    train_config_ = PARSE_TEST_PROTO(R"pb(
+      learner: "DISTRIBUTED_GRADIENT_BOOSTED_TREES"
+      task: REGRESSION
+      label: "Rings"
+      [yggdrasil_decision_forests.model.distributed_gradient_boosted_trees.proto
+           .distributed_gradient_boosted_trees_config] { worker_logs: false }
+    )pb");
+
+    deployment_config_ = PARSE_TEST_PROTO(R"pb(
+      distribute {
+        implementation_key: "MULTI_THREAD"
+        [yggdrasil_decision_forests.distribute.proto.multi_thread] {
+          num_workers: 5
+        }
+      }
+    )pb");
+
+    dataset_filename_ = "abalone.csv";
+    preferred_format_type = "csv";
+    pass_training_dataset_as_path_ = true;
+    num_shards_ = 20;
+
+    deployment_config_.set_cache_path(
+        file::JoinPath(test::TmpDirectory(), "working_directory"));
+  }
+};
+
+// Train and test a model on the adult dataset.
+TEST_F(DatasetAbalone, Base) {
+  TrainAndEvaluateModel();
+  // Note: This result does not take early stopping into account.
+  EXPECT_NEAR(metric::RMSE(evaluation_), 2.205387, 0.01);
+}
+
 }  // namespace
 }  // namespace distributed_gradient_boosted_trees
 }  // namespace model

@@ -314,7 +314,7 @@ absl::Status DistributedGradientBoostedTreesWorker::InitializerWorkingMemory(
       weak_model.hessians.resize(dataset_->num_examples());
 
       if (spe_config.gbt().use_hessian_gain()) {
-        return absl::InternalError("Not implemented");
+        return absl::InternalError("Use hessian gain not implemented.");
       } else {
         weak_model.label_accessor_type =
             distributed_decision_tree::LabelAccessorType::kNumericalWithHessian;

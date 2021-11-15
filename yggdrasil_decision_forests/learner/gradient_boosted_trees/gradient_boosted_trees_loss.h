@@ -204,7 +204,7 @@ class AbstractLoss {
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError("UpdateGradients not implemented");
   }
 
   // Updates the gradient with label stored in a vector<int32_t>.
@@ -213,7 +213,7 @@ class AbstractLoss {
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError("UpdateGradients not implemented");
   }
 
   // Updates the gradient with label stored in a vector<int16_t>.
@@ -222,7 +222,7 @@ class AbstractLoss {
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError("UpdateGradients not implemented");
   }
 
   // Updates the gradient with label stored in a VerticalDataset.
@@ -252,7 +252,8 @@ class AbstractLoss {
 
   virtual utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
   SetLeafFunctorFromLabelStatistics() const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError(
+        "SetLeafFunctorFromLabelStatistics not implemented");
   }
 
   // Updates the prediction accumulator (contains the predictions of the trees
@@ -299,7 +300,7 @@ class AbstractLoss {
                             float* loss_value,
                             std::vector<float>* secondary_metric,
                             utils::concurrency::ThreadPool* thread_pool) const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError("Loss not implemented");
   }
 
   virtual absl::Status Loss(const std::vector<int32_t>& labels,
@@ -309,7 +310,7 @@ class AbstractLoss {
                             float* loss_value,
                             std::vector<float>* secondary_metric,
                             utils::concurrency::ThreadPool* thread_pool) const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError("Loss lot implemented");
   }
 
   virtual absl::Status Loss(const std::vector<float>& labels,
@@ -319,7 +320,7 @@ class AbstractLoss {
                             float* loss_value,
                             std::vector<float>* secondary_metric,
                             utils::concurrency::ThreadPool* thread_pool) const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError("Loss not implemented");
   }
 };
 
@@ -493,6 +494,9 @@ class MeanSquaredErrorLoss : public AbstractLoss {
       const model::proto::TrainingConfigLinking& config_link,
       const std::vector<float>& predictions, int label_col_idx,
       decision_tree::NodeWithChildren* node) const;
+
+  utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+  SetLeafFunctorFromLabelStatistics() const override;
 
   absl::Status UpdatePredictions(
       const std::vector<const decision_tree::DecisionTree*>& new_trees,

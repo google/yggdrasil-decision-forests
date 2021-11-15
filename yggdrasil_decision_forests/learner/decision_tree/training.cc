@@ -919,7 +919,7 @@ utils::StatusOr<bool> FindBestConditionSingleThreadManager(
           }
           break;
         default:
-          return absl::UnimplementedError("Not implemented");
+          return absl::UnimplementedError("Task not implemented");
       }
       break;
   }
@@ -3290,7 +3290,7 @@ std::vector<float> GenHistogramBins(const proto::NumericalSplit::Type type,
       }
     } break;
     default:
-      LOG(FATAL) << "Not implemented";
+      LOG(FATAL) << "Numerical histogram not implemented";
   }
   std::sort(candidate_splits.begin(), candidate_splits.end());
   return candidate_splits;

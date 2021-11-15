@@ -695,6 +695,7 @@ void MeanSquaredErrorLoss::SetLeaf(
   }
   if (sum_weights <= 0) {
     LOG(WARNING) << "Zero or negative weights in node";
+    sum_weights = 1.0;
   }
   // Note: The "sum_weights" terms carries an implicit 2x factor that is
   // integrated in the shrinkage. We don't integrate this factor here not to
@@ -702,6 +703,33 @@ void MeanSquaredErrorLoss::SetLeaf(
   node->mutable_node()->mutable_regressor()->set_top_value(
       gbt_config_.shrinkage() * sum_weighted_values /
       (sum_weights + gbt_config_.l2_regularization() / 2));
+}
+
+utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+MeanSquaredErrorLoss::SetLeafFunctorFromLabelStatistics() const {
+  return [&](const decision_tree::proto::LabelStatistics& label_stats,
+             decision_tree::proto::Node* node) {
+    if (!label_stats.has_regression()) {
+      return absl::InternalError("No regression data available");
+    }
+
+    double denominator = label_stats.regression().labels().count();
+    if (denominator <= 0) {
+      LOG(WARNING) << "Zero or negative weights in node";
+      denominator = 1.0;
+    }
+
+    const float leaf_value =
+        gbt_config_.shrinkage() *
+        (label_stats.regression().labels().sum() /
+         (denominator + gbt_config_.l2_regularization() / 2));
+
+    node->mutable_regressor()->set_top_value(
+        utils::clamp(leaf_value, -gbt_config_.clamp_leaf_logit(),
+                     gbt_config_.clamp_leaf_logit()));
+
+    return absl::OkStatus();
+  };
 }
 
 std::vector<std::string> MeanSquaredErrorLoss::SecondaryMetricNames() const {

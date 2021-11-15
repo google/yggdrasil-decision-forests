@@ -238,35 +238,40 @@ class AbstractLabelAccessor {
   // Classification.
   virtual utils::StatusOr<ClassificationLabelFiller>
   CreateClassificationLabelFiller() const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError(
+        "CreateClassificationLabelFiller not implemented");
   }
   virtual utils::StatusOr<ClassificationLabelFiller::AccumulatorInitializer>
   CreateClassificationAccumulatorInitializer(
       const decision_tree::proto::LabelStatistics& statistics) const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError(
+        "CreateClassificationAccumulatorInitializer not implemented");
   }
 
   // Regression.
   virtual utils::StatusOr<RegressionLabelFiller> CreateRegressionLabelFiller()
       const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError("CreateRegressionLabelFiller not implemented");
   }
   virtual utils::StatusOr<RegressionLabelFiller::AccumulatorInitializer>
   CreateRegressionAccumulatorInitializer(
       const decision_tree::proto::LabelStatistics& statistics) const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError(
+        "CreateRegressionAccumulatorInitializer not implemented");
   }
 
   // Regression with hessian information
   virtual utils::StatusOr<RegressionWithHessianLabelFiller>
   CreateRegressionWithHessianLabelFiller() const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError(
+        "CreateRegressionWithHessianLabelFiller not implemented");
   }
   virtual utils::StatusOr<
       RegressionWithHessianLabelFiller::AccumulatorInitializer>
   CreateRegressionWithHessianAccumulatorInitializer(
       const decision_tree::proto::LabelStatistics& statistics) const {
-    return absl::InternalError("Not implemented");
+    return absl::InternalError(
+        "CreateRegressionWithHessianAccumulatorInitializer not implemented");
   }
 };
 

@@ -960,7 +960,7 @@ void PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
 
 utils::StatusOr<int64_t> PartialDatasetCacheDataSpecCreator::CountExamples(
     absl::string_view path) {
-  return absl::UnimplementedError("Not implemented");
+  return absl::UnimplementedError("CountExamples not implemented");
 }
 
 }  // namespace dataset

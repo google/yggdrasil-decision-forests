@@ -519,7 +519,7 @@ utils::StatusOr<double> LoadBalancer::CostPerFeatureType(
       return 1.0;
 
     default:
-      return absl::InternalError("Not implemented");
+      return absl::InternalError("Feature type not supported in balancer");
   }
 }
 
