@@ -119,6 +119,8 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamApplyLinkFunction[] = "apply_link_function";
   static constexpr char kHParamComputePermutationVariableImportance[] =
       "compute_permutation_variable_importance";
+  static constexpr char kHParamValidationIntervalInTrees[] =
+      "validation_interval_in_trees";
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,

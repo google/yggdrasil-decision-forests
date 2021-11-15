@@ -123,7 +123,8 @@ utils::StatusOr<std::string> ExportHParamSpecToMarkdown(
   bool no_generic_hparams = true;
   for (const auto& field : hparams.fields()) {
     if (field.first == kHParamMaximumTrainingDurationSeconds ||
-        field.first == kHParamMaximumModelSizeInMemoryInBytes) {
+        field.first == kHParamMaximumModelSizeInMemoryInBytes ||
+        field.first == kHParamRandomSeed) {
       continue;
     }
     no_generic_hparams = false;

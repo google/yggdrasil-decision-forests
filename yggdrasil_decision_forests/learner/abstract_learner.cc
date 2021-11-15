@@ -420,12 +420,21 @@ absl::Status AbstractLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamRandomSeed);
+    if (hparam.has_value()) {
+      training_config_.set_random_seed(hparam.value().value().integer());
+    }
+  }
+
   return absl::OkStatus();
 }
 
 utils::StatusOr<model::proto::GenericHyperParameterSpecification>
 AbstractLearner::GetGenericHyperParameterSpecification() const {
   model::proto::GenericHyperParameterSpecification hparam_def;
+  const proto::TrainingConfig default_config;
+
   {
     auto& param = hparam_def.mutable_fields()->operator[](
         kHParamMaximumTrainingDurationSeconds);
@@ -444,6 +453,15 @@ AbstractLearner::GetGenericHyperParameterSpecification() const {
         "learner/abstract_learner.proto");
     param.mutable_documentation()->set_description(
         R"(Limit the size of the model when stored in ram. Different algorithms can enforce this limit differently. Note that when models are compiled into an inference, the size of the inference engine is generally much smaller than the original model.)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](kHParamRandomSeed);
+    param.mutable_integer()->set_default_value(default_config.random_seed());
+    param.mutable_documentation()->set_proto_path(
+        "learner/abstract_learner.proto");
+    param.mutable_documentation()->set_description(
+        R"(Random seed for the training of the model. Learners are expected to be deterministic by the random seed.)");
   }
 
   return hparam_def;

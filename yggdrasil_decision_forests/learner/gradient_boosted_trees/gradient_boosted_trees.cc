@@ -113,6 +113,7 @@ constexpr char
 constexpr char GradientBoostedTreesLearner::kHParamApplyLinkFunction[];
 constexpr char
     GradientBoostedTreesLearner::kHParamComputePermutationVariableImportance[];
+constexpr char GradientBoostedTreesLearner::kHParamValidationIntervalInTrees[];
 
 using dataset::VerticalDataset;
 using CategoricalColumn = VerticalDataset::CategoricalColumn;
@@ -1697,6 +1698,15 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamValidationIntervalInTrees);
+    if (hparam.has_value()) {
+      gbt_config->set_validation_interval_in_trees(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
     const auto hparam = generic_hyper_params->Get(kHParamEarlyStopping);
     if (hparam.has_value()) {
       const auto early_stopping = hparam.value().value().categorical();
@@ -2115,6 +2125,17 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
         R"(Rolling number of trees used to detect validation loss increase and trigger early stopping.)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamValidationIntervalInTrees);
+    param.mutable_integer()->set_minimum(1);
+    param.mutable_integer()->set_default_value(
+        gbt_config.validation_interval_in_trees());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Evaluate the model on the validation set every "validation_interval_in_trees" trees. Increasing this value reduce the cost of validation and can impact the early stopping policy (as early stopping is only tested during the validation).)");
   }
 
   {

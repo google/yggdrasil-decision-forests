@@ -77,6 +77,9 @@ constexpr char kHParamSortingStrategy[] = "sorting_strategy";
 constexpr char kHParamSortingStrategyInNode[] = "IN_NODE";
 constexpr char kHParamSortingStrategyPresort[] = "PRESORT";
 
+constexpr char kHParamKeepNonLeafLabelDistribution[] =
+    "keep_non_leaf_label_distribution";
+
 // Fill decision tree specific generic hyper parameter specifications.
 // This function is designed to be called by the learners using decision trees
 // learning.

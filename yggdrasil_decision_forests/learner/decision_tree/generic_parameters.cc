@@ -283,6 +283,17 @@ absl::Status GetGenericHyperParameterSpecification(
 .)");
   }
 
+  {
+    ASSIGN_OR_RETURN(auto param,
+                     get_params(kHParamKeepNonLeafLabelDistribution));
+    param->mutable_categorical()->set_default_value(
+        config.keep_non_leaf_label_distribution() ? "true" : "false");
+    param->mutable_categorical()->add_possible_values("true");
+    param->mutable_categorical()->add_possible_values("false");
+    param->mutable_documentation()->set_description(
+        R"(Whether to keep the node value (i.e. the distribution of the labels of the training examples) of non-leaf nodes. This information is not used during serving, however it can be used for model interpretation as well as hyper parameter tuning. This can take lots of space, sometimes accounting for half of the model size.)");
+  }
+
   return absl::OkStatus();
 }
 
@@ -535,6 +546,15 @@ absl::Status SetHyperParameters(
     }
     dt_config->mutable_growing_strategy_best_first_global()->set_max_num_nodes(
         max_nodes);
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamKeepNonLeafLabelDistribution);
+    if (hparam.has_value()) {
+      dt_config->set_keep_non_leaf_label_distribution(
+          hparam.value().value().categorical() == "true");
+    }
   }
 
   return absl::OkStatus();
