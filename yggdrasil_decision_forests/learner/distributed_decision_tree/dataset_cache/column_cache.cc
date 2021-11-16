@@ -149,7 +149,9 @@ absl::Status IntegerColumnWriter::WriteValuesWithCast(
 #ifndef NDEBUG
   for (const auto value : values) {
     DCHECK_LE(value, max_value_);
-    DCHECK_GT(value, -max_value_);
+    if (max_value_ > 0) {
+      DCHECK_GT(value, -max_value_);
+    }
   }
 #endif
   // TODO(gbm): Keep a buffer in between calls.
