@@ -31,6 +31,10 @@ enum Task {
   // 0: Completely unrelated.
   // 4: Perfect match.
   RANKING = 3;
+
+  // Predicts the incremental impact of a treatment on a categorical outcome.
+  // See https://en.wikipedia.org/wiki/Uplift_modelling.
+  CATEGORICAL_UPLIFT = 4;
 }
 
 // Contains the same information as a model::AbstractModel (without the
@@ -65,6 +69,9 @@ message AbstractModel {
   // be used accordingly (e.g. averaged, clamped to [0,1]). If false, the output
   // of the task=CLASSIFICATION model might not be a probability.
   optional bool classification_outputs_probabilities = 8 [default = true];
+
+  // Index of the "treatment" attribute in the dataspec for uplift problems.
+  optional int32 uplift_treatment_col_idx = 9 [default = -1];
 }
 
 // Description of the importance of a given attribute. The semantic of

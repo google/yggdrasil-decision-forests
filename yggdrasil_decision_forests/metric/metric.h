@@ -125,6 +125,14 @@ float MRR(const proto::EvaluationResults& eval);
 // also the example with the highest relevance value.
 float PrecisionAt1(const proto::EvaluationResults& eval);
 
+// Area under the uplift curve.
+// Use trapezoidal AUC integration. Examples with similar effects are merged
+// together i.e. the order of the examples have not effect on the metric.
+double AUUC(const proto::EvaluationResults& eval);
+
+// Qini score : AUUC offset such that a random model gets a Qini score of 0.
+double Qini(const proto::EvaluationResults& eval);
+
 // Confidence interval on the Accuracy using the Wilson score interval with
 // continuity correction.
 std::pair<float, float> AccuracyConfidenceInterval(

@@ -45,10 +45,31 @@ message Prediction {
     optional uint64 group_id = 4;
   }
 
+  message Uplift {
+    // Predicted treatment effect.
+    //
+    // treatment_effect[i] is the effect of the "i+1"-th treatment (categorical
+    // value i+2) compared to the control group (0-th treatment; categorical
+    // value = 1). The treatment out-of-vocabulary item (value = 0) is not taken
+    // into account.
+    repeated float treatment_effect = 1 [packed = true];
+
+    // Applied treatment. The control group is treatment = 1. Other treatments
+    // are >1.
+    optional int32 treatment = 2;
+
+    // Outcome (with or without treatment).
+    oneof outcome_type {
+      int32 outcome_categorical = 3;
+      float outcome_numerical = 4;
+    }
+  }
+
   oneof type {
     Classification classification = 1;
     Regression regression = 2;
     Ranking ranking = 5;
+    Uplift uplift = 6;
   }
   optional float weight = 3 [default = 1];
 

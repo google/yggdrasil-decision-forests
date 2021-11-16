@@ -12,10 +12,12 @@ cc_library_ydf(
     name = "metric",
     srcs = [
         "metric.cc",
+        "uplift.cc",
     ],
     hdrs = [
         "labels.h",
         "metric.h",
+        "uplift.h",
     ],
     deps = [
         ":metric_cc_proto",
@@ -157,5 +159,24 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@org_boost//:boost",
         "//yggdrasil_decision_forests/utils:random",
+    ],
+)
+
+cc_test(
+    name = "uplift_test",
+    srcs = ["uplift_test.cc"],
+    deps = [
+        ":comparison",
+        ":metric",
+        ":metric_cc_proto",
+        ":report",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/strings",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/utils:compatibility",
+        "//yggdrasil_decision_forests/utils:distribution",
+        "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:test",
     ],
 )

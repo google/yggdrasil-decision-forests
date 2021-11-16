@@ -85,9 +85,24 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   } else {
     if (training_config.has_ranking_group())
       return absl::InvalidArgumentError(
-          "\"ranking_group\" should not be specified for a ranking task.");
+          "\"ranking_group\" should not be specified for a non ranking task.");
   }
   config_link->set_ranking_group(ranking_group);
+
+  // Uplift threatment.
+  int32_t uplift_treatment = -1;
+  if (training_config.task() == proto::CATEGORICAL_UPLIFT) {
+    if (!training_config.has_uplift_treatment())
+      return absl::InvalidArgumentError(
+          "\"uplift_treatment\" should be specified for an uplift task.");
+    RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
+        training_config.uplift_treatment(), data_spec, &uplift_treatment));
+  } else {
+    if (training_config.has_uplift_treatment())
+      return absl::InvalidArgumentError(
+          "\"uplift_treatment\" should not be specified for non uplift task.");
+  }
+  config_link->set_uplift_treatment(uplift_treatment);
 
   // Weights.
   if (training_config.has_weight_definition()) {
@@ -126,6 +141,18 @@ absl::Status AbstractLearner::LinkTrainingConfig(
       LOG(INFO) << "The ranking_group \"" << training_config.ranking_group()
                 << "\" was removed from the input feature set.";
       feature_idxs.erase(it_ranking_group_result);
+    }
+  }
+
+  // Remove the uplift treatment from the input features.
+  if (uplift_treatment != -1) {
+    auto it_uplift_treatment_result =
+        std::find(feature_idxs.begin(), feature_idxs.end(), uplift_treatment);
+    if (it_uplift_treatment_result != feature_idxs.end()) {
+      LOG(INFO) << "The uplift_treatment \""
+                << training_config.uplift_treatment()
+                << "\" was removed from the input feature set.";
+      feature_idxs.erase(it_uplift_treatment_result);
     }
   }
 
@@ -369,6 +396,26 @@ absl::Status AbstractLearner::CheckConfiguration(
         }
       }
     } break;
+    case model::proto::Task::CATEGORICAL_UPLIFT: {
+      if (label_col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
+        return absl::InvalidArgumentError(
+            "The label column should be CATEGORICAL for an CATEGORICAL_UPLIFT "
+            "task.");
+      }
+      if (!config_link.has_uplift_treatment() ||
+          config_link.uplift_treatment() < 0) {
+        return absl::InvalidArgumentError(
+            "The \"uplift_treatment\" is not defined but required for an "
+            "UPLIFT task.");
+      }
+      const auto& uplift_treatment_col_spec =
+          data_spec.columns(config_link.uplift_treatment());
+      if (uplift_treatment_col_spec.type() !=
+          dataset::proto::ColumnType::CATEGORICAL) {
+        return absl::InvalidArgumentError(
+            "The \"uplift_treatment\" column must be CATEGORICAL.");
+      }
+    } break;
   }
   // Check the label don't contains NaN.
   if (label_col_spec.count_nas() != 0) {
@@ -553,6 +600,10 @@ void InitializeModelWithAbstractTrainingConfig(
     model->set_ranking_group_col(training_config_linking.ranking_group());
   }
 
+  if (training_config.task() == proto::Task::CATEGORICAL_UPLIFT) {
+    model->set_uplift_treatment_col(training_config_linking.uplift_treatment());
+  }
+
   model->set_task(training_config.task());
   model->mutable_input_features()->assign(
       training_config_linking.features().begin(),
@@ -639,6 +690,17 @@ absl::Status CopyProblemDefinition(const proto::TrainingConfig& src,
     }
   }
 
+  if (src.has_uplift_treatment()) {
+    if (dst->has_uplift_treatment() &&
+        dst->uplift_treatment() != src.uplift_treatment()) {
+      return absl::InvalidArgumentError(
+          absl::Substitute("Invalid uplift_treatment. $0 != $1",
+                           src.uplift_treatment(), dst->uplift_treatment()));
+    } else {
+      dst->set_uplift_treatment(src.uplift_treatment());
+    }
+  }
+
   if (src.has_weight_definition()) {
     if (dst->has_weight_definition() &&
         dst->weight_definition().DebugString() !=
@@ -670,6 +732,11 @@ dataset::LoadConfig OptimalDatasetLoadingConfig(
   if (link_config.has_ranking_group() && link_config.ranking_group() >= 0) {
     load_config.load_columns->push_back(link_config.ranking_group());
   }
+  if (link_config.has_uplift_treatment() &&
+      link_config.uplift_treatment() >= 0) {
+    load_config.load_columns->push_back(link_config.uplift_treatment());
+  }
+
   if (link_config.has_weight_definition()) {
     load_config.load_columns->push_back(
         link_config.weight_definition().attribute_idx());

@@ -74,7 +74,7 @@ message DeploymentConfig {
 // Contains all the configuration for the training of a model e.g. label, input
 // features, hyper-parameters.
 message TrainingConfig {
-  // Next ID: 11
+  // Next ID: 13
 
   // Identifier of the learner e.g. "RANDOM_FOREST".
   // The learner should be registered i.e. injected as a dependency to the
@@ -131,6 +131,11 @@ message TrainingConfig {
   // smaller. This limit can be fussy: The final model can be slightly larger.
   optional int64 maximum_model_size_in_memory_in_bytes = 11;
 
+  // Categorical column identifying the treatment group in an uplift task.
+  // For example, whether a patient received a treatment in a study about the
+  // impact of a medication.
+  optional string uplift_treatment = 12;
+
   // Learner specific configuration/hyper-parameters.
   // The message/extension is dependent on the "learner". For example, see
   // "yggdrasil_decision_forests/learner/random_forest.proto" for the parameters
@@ -166,6 +171,9 @@ message TrainingConfigLinking {
 
   // Index of the column matching "ranking_group" in the "TrainingConfig".
   optional int32 ranking_group = 8 [default = -1];
+
+  // Index of the column matching "uplift_treatment" in the "TrainingConfig".
+  optional int32 uplift_treatment = 12 [default = -1];
 }
 
 // Generic hyper parameters of a learner.

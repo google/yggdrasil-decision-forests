@@ -427,6 +427,13 @@ TEST(FloatToProtoPrediction, Base) {
   EXPECT_THAT(prediction, EqualsProto(utils::ParseTextProto<proto::Prediction>(
                                           R"(ranking { relevance: 0.2 })")
                                           .value()));
+
+  FloatToProtoPrediction({0.2, 0.4, 0.5, 0.6}, /*example_idx=*/1,
+                         proto::Task::CATEGORICAL_UPLIFT,
+                         /*num_prediction_dimensions=*/1, &prediction);
+  EXPECT_THAT(prediction, EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                                          R"(uplift { treatment_effect: 0.4 })")
+                                          .value()));
 }
 
 TEST(Evaluate, FromVerticalDataset) {

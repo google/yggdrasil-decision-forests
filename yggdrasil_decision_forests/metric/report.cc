@@ -68,6 +68,9 @@ void AppendTextReport(const proto::EvaluationResults& eval,
     case proto::EvaluationResults::TypeCase::kRanking:
       AppendTextReportRanking(eval, report);
       break;
+    case proto::EvaluationResults::TypeCase::kUplift:
+      AppendTextReportUplift(eval, report);
+      break;
     default:
       LOG(FATAL) << "Not implemented";
   }
@@ -242,6 +245,14 @@ void AppendTextReportRanking(const proto::EvaluationResults& eval,
                   eval.ranking().mean_num_items_in_group(),
                   " min:", eval.ranking().min_num_items_in_group(),
                   " max:", eval.ranking().max_num_items_in_group(), "\n");
+}
+
+void AppendTextReportUplift(const proto::EvaluationResults& eval,
+                            std::string* report) {
+  absl::StrAppend(
+      report, "Number of treatments: ", eval.uplift().num_treatments(), "\n");
+  absl::StrAppend(report, "AUUC: ", AUUC(eval), "\n");
+  absl::StrAppend(report, "Qini: ", Qini(eval), "\n");
 }
 
 }  // namespace metric

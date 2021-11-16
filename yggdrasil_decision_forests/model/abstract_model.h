@@ -137,6 +137,14 @@ class AbstractModel {
   // Get the model ranking group column.
   int ranking_group_col_idx() const { return ranking_group_col_idx_; }
 
+  // Set the model uplift treatment column.
+  void set_uplift_treatment_col(int uplift_treatment_col_idx) {
+    uplift_treatment_col_idx_ = uplift_treatment_col_idx;
+  }
+
+  // Get the model uplift treatment column.
+  int uplift_treatment_col_idx() const { return uplift_treatment_col_idx_; }
+
   // Column spec of the label.
   const dataset::proto::Column& label_col_spec() const {
     return data_spec().columns(label_col_idx());
@@ -367,6 +375,9 @@ class AbstractModel {
 
   // Column index of groups (e.g. queries) in ranking.
   int ranking_group_col_idx_ = -1;
+
+  // Column index of uplift treatment.
+  int uplift_treatment_col_idx_ = -1;
 
   // Example weight used during training. If not specified, all the examples
   // have the same weight.

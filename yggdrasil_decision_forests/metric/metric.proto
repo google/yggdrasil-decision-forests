@@ -66,6 +66,8 @@ message EvaluationOptions {
     optional bool allow_only_one_group = 3 [default = false];
   }
 
+  message Uplift {}
+
   // Task of the model.
   optional model.proto.Task task = 1 [default = CLASSIFICATION];
   // Evaluation configuration depending on the type of problem.
@@ -73,6 +75,7 @@ message EvaluationOptions {
     Classification classification = 2;
     Regression regression = 3;
     Ranking ranking = 7;
+    Uplift uplift = 8;
   }
   // Percentage of sampled predictions. If no predictions need to be sampled
   // (i.e. no part of the configuration needs it), this parameter is ignored and
@@ -160,6 +163,26 @@ message EvaluationResults {
     reserved 1;
   }
 
+  message Uplift {
+    // Note: In the case of multi-treatments, the "auuc" and "qini" are the
+    // example weights average of the per-treatment AUUC and Qini.
+    //
+    // We use the implementation described in Guelman ("Optimal personalized
+    // treatment learning models with insurance applications") or in Betlei
+    // ("Treatment targeting by AUUC maximization with generalization
+    // guarantees") work.
+    optional double auuc = 1;
+    optional double qini = 2;
+
+    // Number of possible treatments. The treatment values (i.e. the value of
+    // the categorical column specifying the treatment) are in [1,
+    // num_treatments+1) with value "1" reserved for the control treatment.
+    //
+    // For example, in case of single-treatment vs control, "num_treatments=2"
+    // and the treatment value will be 1 (control) or 2 (treatment).
+    optional int32 num_treatments = 3;
+  }
+
   // Number of predictions (weighted by example weight).
   optional double count_predictions = 1 [default = 0];
   // Number of predictions (without weights).
@@ -175,6 +198,7 @@ message EvaluationResults {
     Classification classification = 6;
     Regression regression = 7;
     Ranking ranking = 12;
+    Uplift uplift = 14;
   }
   // The dataspec of the label column. This field can contain information such
   // as: The possible label values, the distribution of the label values, the
@@ -197,7 +221,7 @@ message EvaluationResults {
   // The number of folds is 1 for train-and-test, and equals to the
   // cross-validation number of folds in case of cross-validation.
   optional int32 num_folds = 13;
-  // Next ID: 14
+  // Next ID: 15
 }
 
 // Reference a metric."MetricAccessor" is used as a parameter of the function

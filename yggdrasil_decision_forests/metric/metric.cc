@@ -19,6 +19,9 @@
 #include <random>
 #include <vector>
 
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -30,6 +33,7 @@
 #include "yggdrasil_decision_forests/metric/labels.h"
 #include "yggdrasil_decision_forests/metric/ranking_mrr.h"
 #include "yggdrasil_decision_forests/metric/ranking_ndcg.h"
+#include "yggdrasil_decision_forests/metric/uplift.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
@@ -367,6 +371,11 @@ void MergeEvaluationRegression(const proto::EvaluationResults::Regression& src,
 
 void MergeEvaluationRanking(const proto::EvaluationResults::Ranking& src,
                             proto::EvaluationResults::Ranking* dst) {
+  // No merging to be done.
+}
+
+void MergeEvaluationUplift(const proto::EvaluationResults::Uplift& src,
+                           proto::EvaluationResults::Uplift* dst) {
   // No merging to be done.
 }
 
@@ -765,6 +774,9 @@ void InitializeEvaluation(const proto::EvaluationOptions& option,
                           proto::EvaluationResults* eval) {
   switch (option.task()) {
     case model::proto::Task::CLASSIFICATION: {
+      if (label_column.type() != dataset::proto::ColumnType::CATEGORICAL) {
+        LOG(FATAL) << "Classification requires a categorical label.";
+      }
       // Allocate and zero the confusion matrix.
       const int32_t num_classes =
           label_column.categorical().number_of_unique_values();
@@ -773,10 +785,19 @@ void InitializeEvaluation(const proto::EvaluationOptions& option,
           eval->mutable_classification()->mutable_confusion());
     } break;
     case model::proto::Task::REGRESSION:
+      if (label_column.type() != dataset::proto::ColumnType::NUMERICAL) {
+        LOG(FATAL) << "Regression requires a numerical label.";
+      }
       eval->mutable_regression();
       break;
     case model::proto::Task::RANKING:
+      if (label_column.type() != dataset::proto::ColumnType::NUMERICAL) {
+        LOG(FATAL) << "Ranking requires a numerical label.";
+      }
       eval->mutable_ranking();
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      CHECK_OK(uplift::InitializeUpliftEvaluation(option, label_column, eval));
       break;
     default:
       CHECK(false) << "Non supported task type: "
@@ -793,7 +814,13 @@ void AddPrediction(const proto::EvaluationOptions& option,
   eval->set_count_predictions(eval->count_predictions() + pred.weight());
   eval->set_count_predictions_no_weight(eval->count_predictions_no_weight() +
                                         1);
+
+  // If "need_prediction_sampling=true" examples (or a sample of the examples)
+  // are saved in the "sampled_predictions" field of the evaluation result
+  // "eval". If "need_prediction_sampling=false", "sampled_predictions" is not
+  // populated.
   bool need_prediction_sampling = option.bootstrapping_samples() > 0;
+
   switch (option.task()) {
     case model::proto::Task::CLASSIFICATION: {
       CHECK(pred.has_classification());
@@ -841,10 +868,14 @@ void AddPrediction(const proto::EvaluationOptions& option,
       need_prediction_sampling |= option.regression().enable_regression_plots();
     } break;
 
-    case model::proto::Task::RANKING: {
+    case model::proto::Task::RANKING:
       CHECK(pred.has_ranking());
       need_prediction_sampling = true;
-    } break;
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      CHECK_OK(uplift::AddUpliftPredictionImp(option, pred, rnd, eval));
+      need_prediction_sampling = true;
+      break;
 
     default:
       break;
@@ -884,9 +915,13 @@ void FinalizeEvaluation(const proto::EvaluationOptions& option,
         internal::UpdateRMSEConfidenceIntervalUsingBootstrapping(option, eval);
       }
     } break;
-    case model::proto::Task::RANKING: {
+    case model::proto::Task::RANKING:
       FinalizeRankingMetricsFromSampledPredictions(option, eval);
-    } break;
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      CHECK_OK(uplift::FinalizeUpliftMetricsFromSampledPredictions(
+          option, label_column, eval));
+      break;
     default:
       break;
   }
@@ -932,6 +967,14 @@ float MRR(const proto::EvaluationResults& eval) {
 
 float PrecisionAt1(const proto::EvaluationResults& eval) {
   return eval.ranking().precision_at_1().value();
+}
+
+double AUUC(const proto::EvaluationResults& eval) {
+  return eval.uplift().auuc();
+}
+
+double Qini(const proto::EvaluationResults& eval) {
+  return eval.uplift().qini();
 }
 
 float DefaultRMSE(const proto::EvaluationResults& eval) {
@@ -1166,6 +1209,9 @@ void MergeEvaluation(const proto::EvaluationOptions& option,
       break;
     case proto::EvaluationResults::kRanking:
       MergeEvaluationRanking(src.ranking(), dst->mutable_ranking());
+      break;
+    case proto::EvaluationResults::kUplift:
+      MergeEvaluationUplift(src.uplift(), dst->mutable_uplift());
       break;
     case proto::EvaluationResults::TYPE_NOT_SET:
       LOG(FATAL) << "Non initialized evaluation";

@@ -709,12 +709,15 @@ TEST(Metric, RMSEConfidenceIntervals) {
   const int num_runs = 1000;
   const int num_predictions = 100;
 
+  dataset::proto::Column label_column;
+  label_column.set_type(dataset::proto::ColumnType::NUMERICAL);
+
   int count_in_confidence_interval_boot = 0;
   int count_in_confidence_interval_closed = 0;
   for (int run = 0; run < num_runs; run++) {
     // Simulate a dataset evaluation.
     proto::EvaluationResults eval;
-    InitializeEvaluation(options, dataset::proto::Column(), &eval);
+    InitializeEvaluation(options, label_column, &eval);
     for (int pred_idx = 0; pred_idx < num_predictions; pred_idx++) {
       model::proto::Prediction pred;
       const float label = dist_label(rnd);
@@ -723,7 +726,7 @@ TEST(Metric, RMSEConfidenceIntervals) {
       pred.mutable_regression()->set_value(label);
       AddPrediction(options, pred, &rnd, &eval);
     }
-    FinalizeEvaluation(options, dataset::proto::Column(), &eval);
+    FinalizeEvaluation(options, label_column, &eval);
     // Check validity of confidence intervals.
     const bool in_confidence_interval_boot =
         (real_rmse >= eval.regression().bootstrap_rmse_lower_bounds_95p()) &&

@@ -35,6 +35,8 @@ void AppendTextReportRegression(const proto::EvaluationResults& eval,
                                 std::string* report);
 void AppendTextReportRanking(const proto::EvaluationResults& eval,
                              std::string* report);
+void AppendTextReportUplift(const proto::EvaluationResults& eval,
+                            std::string* report);
 
 }  // namespace metric
 }  // namespace yggdrasil_decision_forests

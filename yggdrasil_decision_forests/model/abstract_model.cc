@@ -66,6 +66,8 @@ void AbstractModel::ExportProto(const AbstractModel& model,
   proto->set_task(model.task_);
   proto->set_label_col_idx(model.label_col_idx_);
   proto->set_ranking_group_col_idx(model.ranking_group_col_idx_);
+  proto->set_uplift_treatment_col_idx(model.uplift_treatment_col_idx_);
+
   *proto->mutable_input_features() = {model.input_features_.begin(),
                                       model.input_features_.end()};
   if (model.weights_.has_value()) {
@@ -84,6 +86,7 @@ void AbstractModel::ImportProto(const proto::AbstractModel& proto,
   model->task_ = proto.task();
   model->label_col_idx_ = proto.label_col_idx();
   model->ranking_group_col_idx_ = proto.ranking_group_col_idx();
+  model->uplift_treatment_col_idx_ = proto.uplift_treatment_col_idx();
   model->input_features_.assign(proto.input_features().begin(),
                                 proto.input_features().end());
   if (proto.has_weights()) {
@@ -200,10 +203,19 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
       dst_prediction->mutable_regression()->set_value(
           src_prediction[example_idx]);
       break;
+
     case proto::RANKING:
       DCHECK_EQ(num_prediction_dimensions, 1);
       dst_prediction->mutable_ranking()->set_relevance(
           src_prediction[example_idx]);
+      break;
+
+    case proto::CATEGORICAL_UPLIFT:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      *dst_prediction->mutable_uplift()->mutable_treatment_effect() = {
+          src_prediction.begin() + example_idx * num_prediction_dimensions,
+          src_prediction.begin() +
+              (example_idx + 1) * num_prediction_dimensions};
       break;
   }
 }
