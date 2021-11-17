@@ -29,6 +29,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/container/btree_set.h"
 #include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
@@ -186,10 +187,10 @@ TEST(GradientBoostedTrees, ExtractValidationDatasetWithGroup) {
           group_feature_idx);
 
   // Ensure the intersection of the groups is empty.
-  std::set<int> train_group_values(train_group->values().begin(),
-                                   train_group->values().end());
-  std::set<int> validation_group_values(validation_group->values().begin(),
-                                        validation_group->values().end());
+  absl::btree_set<int> train_group_values(train_group->values().begin(),
+                                          train_group->values().end());
+  absl::btree_set<int> validation_group_values(
+      validation_group->values().begin(), validation_group->values().end());
   std::vector<int> group_intersection;
   std::set_intersection(train_group_values.begin(), train_group_values.end(),
                         validation_group_values.begin(),
