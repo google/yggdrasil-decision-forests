@@ -35,6 +35,7 @@
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
+#include "absl/container/btree_set.h"
 #include "yggdrasil_decision_forests/utils/fold_generator.h"
 
 namespace yggdrasil_decision_forests {
@@ -94,9 +95,9 @@ class FoldGenerator : public ::testing::Test {
           generator_.cross_validation().fold_group().group_attribute());
       const auto& group_attribute = dataset_.column(group_column_idx);
       // All the groups.
-      std::set<std::string> groups;
+      absl::btree_set<std::string> groups;
       // Groups present in each fold.
-      std::vector<std::set<std::string>> groups_per_folds(folds_.size());
+      std::vector<absl::btree_set<std::string>> groups_per_folds(folds_.size());
       for (int fold_idx = 0; fold_idx < folds_.size(); fold_idx++) {
         for (const auto example_idx : folds_[fold_idx]) {
           const std::string group = group_attribute->ToString(
@@ -108,7 +109,8 @@ class FoldGenerator : public ::testing::Test {
 
       for (const std::string& group : groups) {
         int number_of_folds_with_group = 0;
-        for (const std::set<std::string>& groups_in_fold : groups_per_folds) {
+        for (const absl::btree_set<std::string>& groups_in_fold :
+             groups_per_folds) {
           if (groups_in_fold.find(group) != groups_in_fold.end()) {
             number_of_folds_with_group++;
           }

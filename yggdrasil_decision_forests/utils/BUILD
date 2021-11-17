@@ -833,6 +833,7 @@ cc_test(
         ":status_macros",
         ":test",
         "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
