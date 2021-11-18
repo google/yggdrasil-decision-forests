@@ -14,7 +14,7 @@ It is complementary to the beginner example available in `examples/`.
     *   [Dataset path and format](#dataset-path-and-format)
     *   [Learners and Models](#learners-and-models)
     *   [Distributed Training](#distributed-training)
-        *   [GRPC distribute implementation](#grpc-distribute-implementation)
+        *   [GRPC distribute implementation (recommended)](#grpc-distribute-implementation-recommended)
         *   [TF_DIST distribute implementation](#tf_dist-distribute-implementation)
     *   [Meta-Learner](#meta-learner)
     *   [Model/Learner Evaluation](#modellearner-evaluation)

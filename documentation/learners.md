@@ -143,6 +143,16 @@ the gradient of the loss relative to the model output).
     only if it contains more than `min_examples` examples). If false, there can
     be nodes with less than `min_examples` training examples.
 
+#### [keep_non_leaf_label_distribution](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:keep_non_leaf_label_distribution)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   Whether to keep the node value (i.e. the distribution of the labels of the
+    training examples) of non-leaf nodes. This information is not used during
+    serving, however it can be used for model interpretation as well as hyper
+    parameter tuning. This can take lots of space, sometimes accounting for half
+    of the model size.
+
 #### [l1_regularization](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:l1_regularization)
 
 -   **Type:** Real **Default:** 0 **Possible values:** min:0
@@ -184,6 +194,15 @@ the gradient of the loss relative to the model output).
 
 -   Maximum number of nodes in the tree. Set to -1 to disable this limit. Only
     available for `growing_strategy=BEST_FIRST_GLOBAL`.
+
+#### [maximum_model_size_in_memory_in_bytes](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:maximum_model_size_in_memory_in_bytes)
+
+-   **Type:** Real **Default:** -1
+
+-   Limit the size of the model when stored in ram. Different algorithms can
+    enforce this limit differently. Note that when models are compiled into an
+    inference, the size of the inference engine is generally much smaller than
+    the original model.
 
 #### [maximum_training_duration_seconds](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:maximum_training_duration_seconds)
 
@@ -233,6 +252,13 @@ the gradient of the loss relative to the model output).
 
 -   Maximum number of decision trees. The effective number of trained tree can
     be smaller if early stopping is enabled.
+
+#### [random_seed](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:random_seed)
+
+-   **Type:** Integer **Default:** 123456
+
+-   Random seed for the training of the model. Learners are expected to be
+    deterministic by the random seed.
 
 #### [sampling_method](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:sampling_method)
 
@@ -315,6 +341,15 @@ the gradient of the loss relative to the model output).
 -   Use true, uses a formulation of split gain with a hessian term i.e.
     optimizes the splits to minimize the variance of "gradient / hessian.
     Available for all losses except regression.
+
+#### [validation_interval_in_trees](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:validation_interval_in_trees)
+
+-   **Type:** Integer **Default:** 1 **Possible values:** min:1
+
+-   Evaluate the model on the validation set every
+    "validation_interval_in_trees" trees. Increasing this value reduce the cost
+    of validation and can impact the early stopping policy (as early stopping is
+    only tested during the validation).
 
 #### [validation_ratio](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:validation_ratio)
 
@@ -430,6 +465,16 @@ It is probably the most well-known of the Decision Forest training algorithms.
     only if it contains more than `min_examples` examples). If false, there can
     be nodes with less than `min_examples` training examples.
 
+#### [keep_non_leaf_label_distribution](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:keep_non_leaf_label_distribution)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   Whether to keep the node value (i.e. the distribution of the labels of the
+    training examples) of non-leaf nodes. This information is not used during
+    serving, however it can be used for model interpretation as well as hyper
+    parameter tuning. This can take lots of space, sometimes accounting for half
+    of the model size.
+
 #### [max_depth](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_depth)
 
 -   **Type:** Integer **Default:** 16 **Possible values:** min:-1
@@ -443,6 +488,15 @@ It is probably the most well-known of the Decision Forest training algorithms.
 
 -   Maximum number of nodes in the tree. Set to -1 to disable this limit. Only
     available for `growing_strategy=BEST_FIRST_GLOBAL`.
+
+#### [maximum_model_size_in_memory_in_bytes](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:maximum_model_size_in_memory_in_bytes)
+
+-   **Type:** Real **Default:** -1
+
+-   Limit the size of the model when stored in ram. Different algorithms can
+    enforce this limit differently. Note that when models are compiled into an
+    inference, the size of the inference engine is generally much smaller than
+    the original model.
 
 #### [maximum_training_duration_seconds](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:maximum_training_duration_seconds)
 
@@ -493,6 +547,13 @@ It is probably the most well-known of the Decision Forest training algorithms.
 -   Number of individual decision trees. Increasing the number of trees can
     increase the quality of the model at the expense of size, training speed,
     and inference latency.
+
+#### [random_seed](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:random_seed)
+
+-   **Type:** Integer **Default:** 123456
+
+-   Random seed for the training of the model. Learners are expected to be
+    deterministic by the random seed.
 
 #### [sorting_strategy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sorting_strategy)
 
@@ -615,6 +676,16 @@ used to grow the tree while the second is used to prune the tree.
     only if it contains more than `min_examples` examples). If false, there can
     be nodes with less than `min_examples` training examples.
 
+#### [keep_non_leaf_label_distribution](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:keep_non_leaf_label_distribution)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   Whether to keep the node value (i.e. the distribution of the labels of the
+    training examples) of non-leaf nodes. This information is not used during
+    serving, however it can be used for model interpretation as well as hyper
+    parameter tuning. This can take lots of space, sometimes accounting for half
+    of the model size.
+
 #### [max_depth](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_depth)
 
 -   **Type:** Integer **Default:** 16 **Possible values:** min:-1
@@ -628,6 +699,15 @@ used to grow the tree while the second is used to prune the tree.
 
 -   Maximum number of nodes in the tree. Set to -1 to disable this limit. Only
     available for `growing_strategy=BEST_FIRST_GLOBAL`.
+
+#### [maximum_model_size_in_memory_in_bytes](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:maximum_model_size_in_memory_in_bytes)
+
+-   **Type:** Real **Default:** -1
+
+-   Limit the size of the model when stored in ram. Different algorithms can
+    enforce this limit differently. Note that when models are compiled into an
+    inference, the size of the inference engine is generally much smaller than
+    the original model.
 
 #### [maximum_training_duration_seconds](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:maximum_training_duration_seconds)
 
@@ -670,6 +750,13 @@ used to grow the tree while the second is used to prune the tree.
     num_candidate_attributes_ratio`. The possible values are between ]0, and 1]
     as well as -1. If not set or equal to -1, the `num_candidate_attributes` is
     used.
+
+#### [random_seed](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:random_seed)
+
+-   **Type:** Integer **Default:** 123456
+
+-   Random seed for the training of the model. Learners are expected to be
+    deterministic by the random seed.
 
 #### [sorting_strategy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sorting_strategy)
 
@@ -730,6 +817,7 @@ algorithm for an introduction to GBTs.
 
 -   <a href="../yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
+-   <a href="../yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto">learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto">learner/gradient_boosted_trees/gradient_boosted_trees.proto</a>
 
 ### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
@@ -740,12 +828,42 @@ algorithm for an introduction to GBTs.
 
 -   If true, applies the link function (a.k.a. activation function), if any, before returning the model prediction. If false, returns the pre-link function model output.<br>For example, in the case of binary classification, the pre-link function output is a logic while the post-link function is a probability.
 
+#### [force_numerical_discretization](../yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto?q=symbol:force_numerical_discretization)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   If false, only the numerical column safisfying
+    "max_unique_values_for_discretized_numerical" will be discretized. If true,
+    all the numerical columns will be discretized. Columns with more than
+    "max_unique_values_for_discretized_numerical" unique values will be
+    approximated with "max_unique_values_for_discretized_numerical" bins. This
+    parameter will impact the model training.
+
 #### [max_depth](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_depth)
 
 -   **Type:** Integer **Default:** 6 **Possible values:** min:-1
 
 -   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
     Negative values are ignored.
+
+#### [max_unique_values_for_discretized_numerical](../yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto?q=symbol:max_unique_values_for_discretized_numerical)
+
+-   **Type:** Integer **Default:** 16000 **Possible values:** min:1
+
+-   Maximum number of unique value of a numerical feature to allow its
+    pre-discretization. In case of large datasets, discretized numerical
+    features with a small number of unique values are more efficient to learn
+    than classical / non-discretized numerical features. This parameter does not
+    impact the final model. However, it can speed-up or slown the training.
+
+#### [maximum_model_size_in_memory_in_bytes](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:maximum_model_size_in_memory_in_bytes)
+
+-   **Type:** Real **Default:** -1
+
+-   Limit the size of the model when stored in ram. Different algorithms can
+    enforce this limit differently. Note that when models are compiled into an
+    inference, the size of the inference engine is generally much smaller than
+    the original model.
 
 #### [maximum_training_duration_seconds](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:maximum_training_duration_seconds)
 
@@ -761,12 +879,40 @@ algorithm for an introduction to GBTs.
 
 -   Minimum number of examples in a node.
 
+#### [num_candidate_attributes](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes)
+
+-   **Type:** Integer **Default:** -1 **Possible values:** min:-1
+
+-   Number of unique valid attributes tested for each node. An attribute is
+    valid if it has at least a valid split. If `num_candidate_attributes=0`, the
+    value is set to the classical default value for Random Forest: `sqrt(number
+    of input attributes)` in case of classification and
+    `number_of_input_attributes / 3` in case of regression. If
+    `num_candidate_attributes=-1`, all the attributes are tested.
+
+#### [num_candidate_attributes_ratio](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:num_candidate_attributes_ratio)
+
+-   **Type:** Real **Default:** -1 **Possible values:** min:-1 max:1
+
+-   Ratio of attributes tested at each node. If set, it is equivalent to
+    `num_candidate_attributes = number_of_input_features x
+    num_candidate_attributes_ratio`. The possible values are between ]0, and 1]
+    as well as -1. If not set or equal to -1, the `num_candidate_attributes` is
+    used.
+
 #### [num_trees](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:num_trees)
 
 -   **Type:** Integer **Default:** 300 **Possible values:** min:1
 
 -   Maximum number of decision trees. The effective number of trained tree can
     be smaller if early stopping is enabled.
+
+#### [random_seed](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:random_seed)
+
+-   **Type:** Integer **Default:** 123456
+
+-   Random seed for the training of the model. Learners are expected to be
+    deterministic by the random seed.
 
 #### [shrinkage](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:shrinkage)
 
@@ -783,5 +929,11 @@ algorithm for an introduction to GBTs.
 -   Use true, uses a formulation of split gain with a hessian term i.e.
     optimizes the splits to minimize the variance of "gradient / hessian.
     Available for all losses except regression.
+
+#### [worker_logs](../yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto?q=symbol:worker_logs)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   If true, workers will print training logs.
 
 </font>

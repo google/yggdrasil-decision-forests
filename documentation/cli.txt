@@ -40,6 +40,9 @@ show_model: Display the statistics and structure of a model.
       Engines needs to be linked to the binary. Some engines depend on the
       platform e.g. if you don't have AVX2, AVX2 engines won't be listed.);
       default: false;
+    --explain_engine_incompatibility (If true, and if --engines=true, print an
+      explanation of why each of the available serving engine is not compatible
+      with the model.); default: false;
     --full_definition (Show the full details of the model. For decision forest
       models, show the tree structure.); default: false;
     --model (Model directory.); default: "";

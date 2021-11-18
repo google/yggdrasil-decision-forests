@@ -8,6 +8,7 @@
     *   [Table of Contents](#table-of-contents)
     *   [Introduction](#introduction)
     *   [Features](#features)
+    *   [Training speed](#training-speed)
     *   [Distribution parameter tuning](#distribution-parameter-tuning)
         *   [RAM](#ram)
         *   [RAM IO (memory bandwidth)](#ram-io-memory-bandwidth)
