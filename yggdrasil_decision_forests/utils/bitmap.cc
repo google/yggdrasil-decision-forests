@@ -195,7 +195,7 @@ uint64_t NextAlignedIndex(const int32_t bits_by_elements,
          bits_by_elements;
 }
 
-BitWriter::BitWriter(const uint64_t size, std::string* bitmap)
+BitWriter::BitWriter(const size_t size, std::string* bitmap)
     : size_(size), bitmap_(*bitmap) {}
 
 void BitWriter::AllocateAndZeroBitMap() { bitmap_.resize((size_ + 7) / 8); }

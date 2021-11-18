@@ -274,3 +274,11 @@ with `BAZEL_VC_FULL_VERSION`.
 
 `lstdc++fs` is not linked. You are likely using GCC8 without TensorFlow. Update
 to GCC>=9 or use TensorFlow for IO (`--config=use_tensorflow_io`).
+
+**[MacOS] `ld: illegal thread local variable reference to regular symbol
+__ZN4absl13base_internal19thread_identity_ptrE for architecture x86_64`**
+
+Bazel can have issues with Clang and GRPC (see
+[details](https://github.com/bazelbuild/bazel/issues/4341#issuecomment-758361769)).
+Adding `--features=-supports_dynamic_linker` to the Bazel build command will
+solve the issue.
