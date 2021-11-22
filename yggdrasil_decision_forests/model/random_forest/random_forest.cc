@@ -94,6 +94,10 @@ absl::Status RandomForestModel::Save(absl::string_view directory) const {
   *header.mutable_mean_increase_in_rmse() = {mean_increase_in_rmse_.begin(),
                                              mean_increase_in_rmse_.end()};
 
+  if (num_pruned_nodes_.has_value()) {
+    header.set_num_pruned_nodes(num_pruned_nodes_.value());
+  }
+
   RETURN_IF_ERROR(file::SetBinaryProto(
       file::JoinPath(directory, kHeaderFilename), header, file::Defaults()));
   return absl::OkStatus();
@@ -118,6 +122,10 @@ absl::Status RandomForestModel::Load(absl::string_view directory) {
 
   mean_increase_in_rmse_.assign(header.mean_increase_in_rmse().begin(),
                                 header.mean_increase_in_rmse().end());
+
+  if (header.has_num_pruned_nodes()) {
+    num_pruned_nodes_ = header.num_pruned_nodes();
+  }
 
   return absl::OkStatus();
 }
@@ -333,6 +341,12 @@ void RandomForestModel::AppendDescriptionAndStatistics(
 
   absl::StrAppend(description,
                   "Node format: ", node_format_.value_or("NOT_SET"), "\n");
+
+  if (num_pruned_nodes_.has_value()) {
+    absl::StrAppend(description,
+                    "Pruned nodes during training: ", num_pruned_nodes_.value(),
+                    "\n");
+  }
 
   if (!out_of_bag_evaluations_.empty()) {
     absl::StrAppend(description, "\nTraining OOB:\n");

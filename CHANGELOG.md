@@ -1,5 +1,17 @@
 # Changelog
 
+## ????
+
+### Features
+
+-   The CART learner exports the number of pruned nodes in the output model
+    meta-data. Note: The CART learner outputs a Random Forest model with a
+    single tree.
+
+### Fixes
+
+-   Fix tree pruning in the CART learner for regressive tasks.
+
 ## 0.2.1 - 2021-11-05
 
 ### Features

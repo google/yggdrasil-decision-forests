@@ -84,7 +84,16 @@ class CartOnAbalone : public utils::TrainAndTestTester {
 TEST_F(CartOnAbalone, Base) {
   TrainAndEvaluateModel();
   // Random Forest has an rmse of ~2.10.
-  EXPECT_NEAR(metric::RMSE(evaluation_), 3.2047, 0.01);
+  // The default RMSE (always retuning the label mean) is ~3.204.
+  // Note: This test show a lot of variance with RMSE ranging from 2.333
+  // to 2.649 from only changes in the random generator output.
+  EXPECT_LT(metric::RMSE(evaluation_), 2.67);
+  EXPECT_GT(metric::RMSE(evaluation_), 2.31);
+
+  auto* rf_model =
+      dynamic_cast<const random_forest::RandomForestModel*>(model_.get());
+  EXPECT_GT(rf_model->num_pruned_nodes().value(), 50);
+  EXPECT_GT(rf_model->NumNodes(), 10);
 }
 
 class CartOnIris : public utils::TrainAndTestTester {

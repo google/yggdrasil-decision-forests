@@ -203,8 +203,11 @@ utils::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
 
   if (!valid_examples.empty()) {
     // Prune the tree.
+    const auto num_nodes_pre_pruning = decision_tree->NumNodes();
     RETURN_IF_ERROR(internal::PruneTree(train_dataset, weights, valid_examples,
                                         config, config_link, decision_tree));
+    mdl->set_num_pruned_nodes(num_nodes_pre_pruning -
+                              decision_tree->NumNodes());
   }
 
   utils::usage::OnTrainingEnd(train_dataset.data_spec(), config, config_link,
@@ -220,18 +223,43 @@ utils::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
 
 namespace internal {
 
-template <typename ScoreAccumulator, typename Label>
+// Prunes the node of a tree that would lead to an improvement of the "Score"
+// computed by the "ScoreAccumulator".
+//
+// Template:
+//   ScoreAccumulator: Class accumulating label+predictions and outputting a
+//     score.
+//   Label: Representation of the label.
+//   Prediction: Representation of the predictions.
+//   Secondary: Representation of an optional secondary label.
+//
+// Args:
+//   dataset: Validation dataset.
+//   weights: Example weights.
+//   labels: Example labels.
+//   secondary_labels: Example secondary labels. Empty if secondary labels are
+//     not used. Secondary labels are an optional second column that store label
+//     values. It is used in task where the label is stored on two columns (e.g.
+//     ranking, uplifting). It is only up to "ScoreAccumulator" to use (or not)
+//     secondary labels.
+//   example_idxs: Indices of the examples to evaluate.
+//   predictions: Example predictions.
+//   node: Current node.
+//
+template <typename ScoreAccumulator, typename Label, typename Prediction,
+          typename Secondary>
 absl::Status PruneNode(const dataset::VerticalDataset& dataset,
-                       const std::vector<float> weights,
+                       const std::vector<float>& weights,
                        const std::vector<Label>& labels,
+                       const std::vector<Secondary>& secondary_labels,
                        const std::vector<row_t>& example_idxs,
-                       std::vector<Label>* predictions,
+                       std::vector<Prediction>* predictions,
                        model::decision_tree::NodeWithChildren* node) {
   if (node->IsLeaf()) {
     // Compute the predictions and return.
     // Leaf cannot be pruned "more".
     for (const auto& example_idx : example_idxs) {
-      (*predictions)[example_idx] = node->node().classifier().top_value();
+      (*predictions)[example_idx] = ScoreAccumulator::LeafToPrediction(node);
     }
     return absl::OkStatus();
   }
@@ -244,15 +272,15 @@ absl::Status PruneNode(const dataset::VerticalDataset& dataset,
       &positive_examples, &negative_examples,
       /*examples_are_training_examples=*/false));
 
-  RETURN_IF_ERROR((PruneNode<ScoreAccumulator, Label>(
-      dataset, weights, labels, positive_examples, predictions,
-      node->mutable_pos_child())));
+  RETURN_IF_ERROR((PruneNode<ScoreAccumulator, Label, Prediction, Secondary>(
+      dataset, weights, labels, secondary_labels, positive_examples,
+      predictions, node->mutable_pos_child())));
   positive_examples.clear();
   positive_examples.shrink_to_fit();
 
-  RETURN_IF_ERROR((PruneNode<ScoreAccumulator, Label>(
-      dataset, weights, labels, negative_examples, predictions,
-      node->mutable_neg_child())));
+  RETURN_IF_ERROR((PruneNode<ScoreAccumulator, Label, Prediction, Secondary>(
+      dataset, weights, labels, secondary_labels, negative_examples,
+      predictions, node->mutable_neg_child())));
   negative_examples.clear();
   negative_examples.shrink_to_fit();
 
@@ -260,9 +288,14 @@ absl::Status PruneNode(const dataset::VerticalDataset& dataset,
   ScoreAccumulator score_as_leaf;
   ScoreAccumulator score_as_non_leaf;
   for (const auto& example_idx : example_idxs) {
-    score_as_non_leaf.Add(labels[example_idx], (*predictions)[example_idx],
-                          weights[example_idx]);
-    score_as_leaf.Add(labels[example_idx], score_as_leaf.LeafToPrediction(node),
+    Secondary secondary_label{};
+    if (!secondary_labels.empty()) {
+      secondary_label = secondary_labels[example_idx];
+    }
+    score_as_non_leaf.Add(labels[example_idx], secondary_label,
+                          (*predictions)[example_idx], weights[example_idx]);
+    score_as_leaf.Add(labels[example_idx], secondary_label,
+                      ScoreAccumulator::LeafToPrediction(node),
                       weights[example_idx]);
   }
 
@@ -276,7 +309,7 @@ absl::Status PruneNode(const dataset::VerticalDataset& dataset,
 
   // Update the predictions with this node as a leaf.
   for (const auto& example_idx : example_idxs) {
-    (*predictions)[example_idx] = node->node().classifier().top_value();
+    (*predictions)[example_idx] = ScoreAccumulator::LeafToPrediction(node);
   }
   return absl::OkStatus();
 }
@@ -295,11 +328,12 @@ absl::Status PruneTreeClassification(
 
   class AccuracyAccumulator {
    public:
-    int32_t LeafToPrediction(model::decision_tree::NodeWithChildren* leaf) {
+    static int32_t LeafToPrediction(
+        model::decision_tree::NodeWithChildren* leaf) {
       return leaf->node().classifier().top_value();
     }
 
-    void Add(const int32_t label, const int32_t prediction,
+    void Add(const int32_t label, const bool ignored, const int32_t prediction,
              const float weight) {
       good_predictions_ += weight * (label == prediction);
       predictions_ += weight;
@@ -314,8 +348,9 @@ absl::Status PruneTreeClassification(
   };
 
   std::vector<int32_t> predictions(dataset.nrow());
-  return PruneNode<AccuracyAccumulator>(dataset, weights, labels, example_idxs,
-                                        &predictions, tree->mutable_root());
+  return PruneNode<AccuracyAccumulator, int32_t, int32_t, bool>(
+      dataset, weights, labels, {}, example_idxs, &predictions,
+      tree->mutable_root());
 }
 
 absl::Status PruneTreeRegression(
@@ -332,11 +367,13 @@ absl::Status PruneTreeRegression(
 
   class NegMSEAccumulator {
    public:
-    int32_t LeafToPrediction(model::decision_tree::NodeWithChildren* leaf) {
+    static float LeafToPrediction(
+        model::decision_tree::NodeWithChildren* leaf) {
       return leaf->node().regressor().top_value();
     }
 
-    void Add(const float label, const float prediction, const float weight) {
+    void Add(const float label, const bool ignored, const float prediction,
+             const float weight) {
       sum_squared_error_ +=
           weight * (label - prediction) * (label - prediction);
       sum_weights_ += weight;
@@ -351,12 +388,13 @@ absl::Status PruneTreeRegression(
   };
 
   std::vector<float> predictions(dataset.nrow());
-  return PruneNode<NegMSEAccumulator>(dataset, weights, labels, example_idxs,
-                                      &predictions, tree->mutable_root());
+  return PruneNode<NegMSEAccumulator, float, float, bool>(
+      dataset, weights, labels, {}, example_idxs, &predictions,
+      tree->mutable_root());
 }
 
 absl::Status PruneTree(const dataset::VerticalDataset& dataset,
-                       const std::vector<float> weights,
+                       const std::vector<float>& weights,
                        const std::vector<row_t>& example_idxs,
                        const model::proto::TrainingConfig& config,
                        const model::proto::TrainingConfigLinking& config_link,
@@ -371,6 +409,7 @@ absl::Status PruneTree(const dataset::VerticalDataset& dataset,
   } else {
     return absl::UnimplementedError("Non supported task");
   }
+
   const auto num_nodes_post_pruning = tree->NumNodes();
   LOG(INFO) << num_nodes_pre_pruning << " nodes before pruning. "
             << num_nodes_post_pruning << " nodes after pruning.";

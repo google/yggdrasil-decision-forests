@@ -184,6 +184,11 @@ class RandomForestModel : public AbstractModel {
     node_format_ = format;
   }
 
+  // Number of nodes pruned during training.
+  absl::optional<int64_t> num_pruned_nodes() const { return num_pruned_nodes_; }
+
+  void set_num_pruned_nodes(int64_t value) { num_pruned_nodes_ = value; }
+
  private:
   // The decision trees.
   std::vector<std::unique_ptr<decision_tree::DecisionTree>> decision_trees_;
@@ -204,6 +209,10 @@ class RandomForestModel : public AbstractModel {
   // used. When loading a model from disk, this field is populated with the
   // format.
   absl::optional<std::string> node_format_;
+
+  // Number of nodes trained and then pruned during the training.
+  // The classical random forest learning algorithm does not prune nodes.
+  absl::optional<int64_t> num_pruned_nodes_;
 };
 
 namespace internal {

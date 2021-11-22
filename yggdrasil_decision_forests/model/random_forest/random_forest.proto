@@ -39,6 +39,10 @@ message Header {
 
   // Container used to store the trees' nodes.
   optional string node_format = 7 [default = "TFE_RECORDIO"];
+
+  // Number of nodes trained and then pruned during the training.
+  // The classical random forest learning algorithm does not prune nodes.
+  optional int64 num_pruned_nodes = 8;
 }
 
 message OutOfBagTrainingEvaluations {

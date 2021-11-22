@@ -84,7 +84,7 @@ namespace internal {
 // leaf and the children nodes are pruned.
 absl::Status PruneTree(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<float> weights,
+    const std::vector<float>& weights,
     const std::vector<dataset::VerticalDataset::row_t>& example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
