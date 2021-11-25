@@ -160,6 +160,39 @@ absl::Status RandomForestModel::Validate() const {
     return absl::OkStatus();
   };
 
+  const auto validate_uplift =
+      [&](const decision_tree::proto::Node& node) -> absl::Status {
+    if (!node.has_uplift()) {
+      return absl::InvalidArgumentError("Uplift missing in RF");
+    }
+
+    const auto& outcome_col_spec = label_col_spec();
+    const auto& treatment_col_spec =
+        data_spec().columns(uplift_treatment_col_idx());
+
+    if (outcome_col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
+      return absl::InvalidArgumentError("The outcome is not categorical.");
+    }
+    if (outcome_col_spec.categorical().number_of_unique_values() - 1 != 2) {
+      return absl::InvalidArgumentError("Only binary outcome is supported.");
+    }
+
+    const int num_treatments =
+        treatment_col_spec.categorical().number_of_unique_values() - 1;
+
+    if (node.uplift().sum_weights_per_treatment_size() != num_treatments) {
+      return absl::InvalidArgumentError("Invalid uplift in RF");
+    }
+    if (node.uplift().sum_weights_per_treatment_and_outcome_size() !=
+        num_treatments) {
+      return absl::InvalidArgumentError("Invalid uplift in RF");
+    }
+    if (node.uplift().treatment_effect_size() != num_treatments - 1) {
+      return absl::InvalidArgumentError("Invalid uplift in RF");
+    }
+    return absl::OkStatus();
+  };
+
   switch (task_) {
     case model::proto::Task::CLASSIFICATION:
       for (const auto& tree : decision_trees_) {
@@ -169,6 +202,11 @@ absl::Status RandomForestModel::Validate() const {
     case model::proto::Task::REGRESSION:
       for (const auto& tree : decision_trees_) {
         RETURN_IF_ERROR(tree->Validate(data_spec(), validate_regression));
+      }
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      for (const auto& tree : decision_trees_) {
+        RETURN_IF_ERROR(tree->Validate(data_spec(), validate_uplift));
       }
       break;
     default:
@@ -218,6 +256,9 @@ void RandomForestModel::Predict(const dataset::VerticalDataset& dataset,
     case model::proto::Task::REGRESSION:
       PredictRegression(dataset, row_idx, prediction);
       break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      PredictUplift(dataset, row_idx, prediction);
+      break;
     default:
       LOG(FATAL) << "Non supported task.";
       break;
@@ -234,6 +275,9 @@ void RandomForestModel::Predict(const dataset::proto::Example& example,
     case model::proto::Task::REGRESSION:
       PredictRegression(example, prediction);
       break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      PredictUplift(example, prediction);
+      break;
     default:
       LOG(FATAL) << "Non supported task.";
       break;
@@ -270,6 +314,29 @@ void RandomForestModel::PredictRegression(
   prediction->mutable_regression()->set_value(accumulator);
 }
 
+void RandomForestModel::PredictUplift(
+    const dataset::VerticalDataset& dataset,
+    dataset::VerticalDataset::row_t row_idx,
+    model::proto::Prediction* prediction) const {
+  absl::InlinedVector<float, 2> accumulator(
+      data_spec_.columns(uplift_treatment_col_idx_)
+              .categorical()
+              .number_of_unique_values() -
+          2,
+      0);
+  CallOnAllLeafs(dataset, row_idx,
+                 [&accumulator](const decision_tree::proto::Node& node) {
+                   internal::AddUpliftLeafToAccumulator(node, &accumulator);
+                 });
+  const auto num_trees = NumTrees();
+  DCHECK_GT(num_trees, 0);
+  for (auto& value : accumulator) {
+    value /= num_trees;
+  }
+  *prediction->mutable_uplift()->mutable_treatment_effect() = {
+      accumulator.begin(), accumulator.end()};
+}
+
 void RandomForestModel::PredictClassification(
     const dataset::proto::Example& example,
     model::proto::Prediction* prediction) const {
@@ -297,6 +364,28 @@ void RandomForestModel::PredictRegression(
   DCHECK_GT(NumTrees(), 0);
   accumulator /= NumTrees();
   prediction->mutable_regression()->set_value(accumulator);
+}
+
+void RandomForestModel::PredictUplift(
+    const dataset::proto::Example& example,
+    model::proto::Prediction* prediction) const {
+  internal::UplifLeafAccumulator accumulator(
+      data_spec_.columns(uplift_treatment_col_idx_)
+              .categorical()
+              .number_of_unique_values() -
+          2,
+      0);
+  CallOnAllLeafs(example,
+                 [&accumulator](const decision_tree::proto::Node& node) {
+                   internal::AddUpliftLeafToAccumulator(node, &accumulator);
+                 });
+  const auto num_trees = NumTrees();
+  DCHECK_GT(num_trees, 0);
+  for (auto& value : accumulator) {
+    value /= num_trees;
+  }
+  *prediction->mutable_uplift()->mutable_treatment_effect() = {
+      accumulator.begin(), accumulator.end()};
 }
 
 void RandomForestModel::CallOnAllLeafs(
@@ -399,6 +488,9 @@ std::vector<std::string> RandomForestModel::AvailableVariableImportances()
       if (!mean_increase_in_rmse_.empty()) {
         variable_importances.push_back(kVariableImportanceMeanIncreaseInRmse);
       }
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      // TODO(gbm): Add uplift variable importances.
       break;
     default:
       LOG(FATAL) << "RandomForest for task " << model::proto::Task_Name(task())
@@ -527,6 +619,15 @@ void FinalizeClassificationLeafToAccumulator(
 void AddRegressionLeafToAccumulator(const decision_tree::proto::Node& node,
                                     double* accumulator) {
   *accumulator += node.regressor().top_value();
+}
+
+void AddUpliftLeafToAccumulator(const decision_tree::proto::Node& node,
+                                UplifLeafAccumulator* accumulator) {
+  DCHECK_EQ(accumulator->size(), node.uplift().treatment_effect_size());
+  const int n = accumulator->size();
+  for (int i = 0; i < n; i++) {
+    (*accumulator)[i] += node.uplift().treatment_effect(i);
+  }
 }
 
 }  // namespace internal

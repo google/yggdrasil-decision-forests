@@ -21,13 +21,14 @@ import "yggdrasil_decision_forests/utils/distribution.proto";
 
 // Training configuration for the Random Forest algorithm.
 message DecisionTreeTrainingConfig {
-  // Next ID: 22
+  // Next ID: 23
 
   // Basic parameters.
 
   // Maximum depth of the tree. max_depth=1 means that all trees will be roots.
   // If max_depth=-1, the depth of the tree is not limited.
   optional int32 max_depth = 1 [default = 16];
+
   // Minimum number of examples in a node.
   optional int32 min_examples = 2 [default = 5];
 
@@ -211,6 +212,42 @@ message DecisionTreeTrainingConfig {
       // entire train dataset.
       MIN_MAX = 2;
     }
+  }
+
+  // Uplift specific hyper-parameters.
+  optional Uplift uplift = 22;
+
+  message Uplift {
+    // Minimum number of examples per treatment in a node. Only used for uplift
+    // models.
+    optional int32 min_examples_in_treatment = 1 [default = 5];
+
+    // Splitter score i.e. score optimized by the splitters. Changing the
+    // splitter score will impact the trained model.
+    //
+    // The following scores are introduced in "Decision trees for uplift
+    // modeling with single and multiple treatments", Rzepakowski et al.
+    //
+    // Notation:
+    //  p: probability of the positive outcome (categorical outcome) or average
+    //    value of the outcome (numerical outcome) in the treatment group.
+    //  q: probability / average value in the control group.
+    enum SplitScore {
+      // Score: - p log (p/q)
+      // Categorical outcome only.
+      KULLBACK_LEIBLER = 0;
+
+      // Score: (p-q)^2
+      // Categorical outcome only.
+      // TODO(gbm): Add numerical outcome.
+      EUCLIDEAN_DISTANCE = 1;
+
+      // Score: (p-q)^2/q
+      // Categorical outcome only.
+      CHI_SQUARED = 2;
+    }
+
+    optional SplitScore split_score = 2 [default = KULLBACK_LEIBLER];
   }
 
   // Internal knobs of the algorithm that don't impact the final model.

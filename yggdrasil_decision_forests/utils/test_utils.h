@@ -131,6 +131,15 @@ class TrainAndTestTester : public ::testing::Test {
   dataset::VerticalDataset test_dataset_;
   dataset::proto::DataSpecificationGuide guide_;
 
+  // Ratio of the original dataset going into the training fold. The remaining
+  // examples are uniformly split between the test and valid dataset (is
+  // "pass_validation_dataset_=true").
+  //
+  // If the value if 0.5f (default), the examples are split deterministically
+  // according to their index : even examples are used for training, odd
+  // examples are used for test/validation.
+  float split_train_ratio_ = 0.5f;
+
   // Format and extension used to store the temporary dataset generated during
   // the test. The reader and writer of this format need to be registered.
   std::string preferred_format_type = "tfrecord+tfe";
@@ -154,6 +163,10 @@ class TrainAndTestTester : public ::testing::Test {
   // If true, the training method is called with a validation dataset (either a
   // path or a VerticalDataset; depending on "pass_training_dataset_as_path_");
   bool pass_validation_dataset_ = false;
+
+  // If true, show the entire model structure (e.g. show the decision trees) in
+  // the logs.
+  bool show_full_model_structure_ = false;
 
  private:
   std::pair<std::string, std::string> GetTrainAndTestDatasetPaths();
@@ -300,6 +313,12 @@ void TestPredefinedHyperParametersAdultDataset(
 std::string ShardDataset(const dataset::VerticalDataset& dataset,
                          int num_shards, float sampling,
                          absl::string_view format);
+
+// Exports the predictions of a binary treatment uplift model to a csv file with
+// the columns: "uplift", "response", "weight", "group".
+absl::Status ExportUpliftPredictionsToTFUpliftCsvFormat(
+    const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
+    absl::string_view output_csv_path);
 
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

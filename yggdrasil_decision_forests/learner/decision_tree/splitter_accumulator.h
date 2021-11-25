@@ -44,8 +44,10 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator_uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
@@ -761,6 +763,7 @@ struct LabelHessianNumericalScoreAccumulator {
 // NormalizeScore(weighted sum of the positive and negative accumulators).
 // double NormalizeScore(const double score) const;
 //
+
 struct LabelNumericalOneValueBucket {
   float value;
   float weight;
@@ -792,6 +795,11 @@ struct LabelNumericalOneValueBucket {
 
     double NormalizeScore(const double score) const {
       return (initial_variance_time_weight_ - score) / sum_weights_;
+    }
+
+    bool IsValidSplit(const LabelNumericalScoreAccumulator& neg,
+                      const LabelNumericalScoreAccumulator& pos) const {
+      return true;
     }
 
    private:
@@ -901,6 +909,11 @@ struct LabelHessianNumericalOneValueBucket {
     }
 
     double NormalizeScore(const double score) const { return score; }
+
+    bool IsValidSplit(const LabelHessianNumericalScoreAccumulator& neg,
+                      const LabelHessianNumericalScoreAccumulator& pos) const {
+      return true;
+    }
 
    private:
     const double sum_gradient_;
@@ -1026,6 +1039,11 @@ struct LabelCategoricalOneValueBucket {
       return initial_entropy_ - score;
     }
 
+    bool IsValidSplit(const LabelCategoricalScoreAccumulator& neg,
+                      const LabelCategoricalScoreAccumulator& pos) const {
+      return true;
+    }
+
    private:
     const utils::IntegerDistributionDouble& label_distribution_;
     const double initial_entropy_;
@@ -1135,6 +1153,11 @@ struct LabelBinaryCategoricalOneValueBucket {
 
     double NormalizeScore(const double score) const {
       return initial_entropy_ - score;
+    }
+
+    bool IsValidSplit(const LabelBinaryCategoricalScoreAccumulator& neg,
+                      const LabelBinaryCategoricalScoreAccumulator& pos) const {
+      return true;
     }
 
    private:
@@ -1257,6 +1280,11 @@ struct LabelNumericalBucket {
       return (initial_variance_time_weight_ - score) / sum_weights_;
     }
 
+    bool IsValidSplit(const LabelNumericalScoreAccumulator& neg,
+                      const LabelNumericalScoreAccumulator& pos) const {
+      return true;
+    }
+
    private:
     utils::NormalDistributionDouble label_distribution_;
     double initial_variance_time_weight_;
@@ -1345,6 +1373,12 @@ struct LabelNumericalWithHessianBucket {
       return (initial_variance_time_weight_ - score) / sum_weights_;
     }
 
+    bool IsValidSplit(
+        const LabelNumericalWithHessianScoreAccumulator& neg,
+        const LabelNumericalWithHessianScoreAccumulator& pos) const {
+      return true;
+    }
+
    private:
     utils::NormalDistributionDouble label_distribution_;
     double initial_variance_time_weight_;
@@ -1410,6 +1444,11 @@ struct LabelHessianNumericalBucket {
     }
 
     double NormalizeScore(const double score) const { return score; }
+
+    bool IsValidSplit(const LabelHessianNumericalScoreAccumulator& neg,
+                      const LabelHessianNumericalScoreAccumulator& pos) const {
+      return true;
+    }
 
    private:
     const double sum_gradient_;
@@ -1534,6 +1573,11 @@ struct LabelCategoricalBucket {
       return label_distribution().count(idx) == 0;
     }
 
+    bool IsValidSplit(const LabelCategoricalScoreAccumulator& neg,
+                      const LabelCategoricalScoreAccumulator& pos) const {
+      return true;
+    }
+
    private:
     const utils::IntegerDistributionDouble* non_owned_label_distribution_ =
         nullptr;
@@ -1628,6 +1672,11 @@ struct LabelBinaryCategoricalBucket {
 
     double NormalizeScore(const double score) const {
       return initial_entropy_ - score;
+    }
+
+    bool IsValidSplit(const LabelBinaryCategoricalScoreAccumulator& neg,
+                      const LabelBinaryCategoricalScoreAccumulator& pos) const {
+      return true;
     }
 
    private:

@@ -35,7 +35,7 @@
 // Finding a split is done by calling "FindBestSplit" with the label and feature
 // bucket corresponding to the label and feature.
 //
-// The FindBestSplit algorithm works as follow:
+// The FindBestSplit algorithm works as follows:
 //   - Allocate the buckets.
 //   - Iterate over the training examples and fill the buckets.
 //   - Optionally, reorder the buckets.
@@ -177,6 +177,15 @@ using FeatureBooleanLabelBinaryCategorical = ExampleBucketSet<
 using FeatureIsMissingLabelBinaryCategorical = ExampleBucketSet<
     ExampleBucket<FeatureIsMissingBucket, LabelBinaryCategoricalBucket>>;
 
+// Label: Uplift categorical.
+
+using FeatureNumericalLabelUpliftCategoricalOneValue =
+    ExampleBucketSet<ExampleBucket<FeatureNumericalBucket,
+                                   LabelUpliftCategoricalOneValueBucket>>;
+
+using FeatureCategoricalLabelUpliftCategorical = ExampleBucketSet<
+    ExampleBucket<FeatureCategoricalBucket, LabelUpliftCategoricalBucket>>;
+
 // Memory cache for the splitter.
 //
 // Used to avoid re-allocating memory each time the splitter is called.
@@ -209,6 +218,9 @@ struct PerThreadCacheV2 {
   FeatureIsMissingLabelBinaryCategorical example_bucket_set_bcat_3;
   FeatureBooleanLabelBinaryCategorical example_bucket_set_bcat_4;
 
+  FeatureNumericalLabelUpliftCategoricalOneValue example_bucket_set_ul_1;
+  FeatureCategoricalLabelUpliftCategorical example_bucket_set_ul_2;
+
   // Cache for the label score accumulator;
   LabelNumericalScoreAccumulator label_numerical_score_accumulator[2];
   LabelCategoricalScoreAccumulator label_categorical_score_accumulator[2];
@@ -218,6 +230,8 @@ struct PerThreadCacheV2 {
       label_binary_categorical_score_accumulator[2];
   LabelNumericalWithHessianScoreAccumulator
       label_numerical_with_hessian_score_accumulator[2];
+  LabelUpliftCategoricalScoreAccumulator
+      label_uplift_categorical_score_accumulator[2];
 
   std::vector<std::pair<float, int32_t>> bucket_order;
 
@@ -305,6 +319,14 @@ auto* GetCachedExampleBucketSet(PerThreadCacheV2* cache) {
   } else if constexpr (is_same_v<ExampleBucketSet,
                                  FeatureBooleanLabelBinaryCategorical>) {
     return &cache->example_bucket_set_bcat_4;
+  } else if constexpr (is_same_v<
+                           ExampleBucketSet,
+                           FeatureNumericalLabelUpliftCategoricalOneValue>) {
+    // Uplift categorical
+    return &cache->example_bucket_set_ul_1;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureCategoricalLabelUpliftCategorical>) {
+    return &cache->example_bucket_set_ul_2;
   } else {
     static_assert(!is_same_v<ExampleBucketSet, ExampleBucketSet>,
                   "Not implemented.");
@@ -330,6 +352,9 @@ auto* GetCachedLabelScoreAccumulator(const bool side, PerThreadCacheV2* cache) {
   } else if constexpr (is_same_v<LabelScoreAccumulator,
                                  LabelNumericalWithHessianScoreAccumulator>) {
     return &cache->label_numerical_with_hessian_score_accumulator[side];
+  } else if constexpr (is_same_v<LabelScoreAccumulator,
+                                 LabelUpliftCategoricalScoreAccumulator>) {
+    return &cache->label_uplift_categorical_score_accumulator[side];
   } else {
     static_assert(!is_same_v<LabelScoreAccumulator, LabelScoreAccumulator>,
                   "Not implemented.");
@@ -485,6 +510,10 @@ SplitSearchResult ScanSplits(
     }
 
     if (num_neg_examples < min_num_obs) {
+      continue;
+    }
+
+    if (!initializer.IsValidSplit(neg, pos)) {
       continue;
     }
 
@@ -884,7 +913,7 @@ SplitSearchResult ScanSplitsRandomBuckets(
   using FeatureBucketType = typename ExampleBucketSet::FeatureBucketType;
 
   if (example_bucket_set.items.size() <= 1) {
-    // Not enought examples.
+    // Not enough examples.
     return SplitSearchResult::kInvalidAttribute;
   }
 
@@ -951,11 +980,15 @@ SplitSearchResult ScanSplitsRandomBuckets(
 
     if (num_pos_examples < min_num_obs) {
       // Not enough examples in the positive branch.
-      break;
+      continue;
     }
 
     if (num_neg_examples < min_num_obs) {
       // Not enough examples in the negative branch.
+      continue;
+    }
+
+    if (!initializer.IsValidSplit(neg, pos)) {
       continue;
     }
 
@@ -1174,6 +1207,22 @@ constexpr auto FindBestSplit_LabelHessianRegressionFeatureNACart =
     FindBestSplit<FeatureIsMissingLabelHessianNumerical,
                   LabelHessianNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
+
+// Label : Uplift
+
+constexpr auto FindBestSplit_LabelUpliftClassificationFeatureNumerical =
+    FindBestSplit<FeatureNumericalLabelUpliftCategoricalOneValue,
+                  LabelUpliftCategoricalScoreAccumulator,
+                  /*require_label_sorting*/ false>;
+
+constexpr auto FindBestSplit_LabelUpliftClassificationFeatureCategoricalCart =
+    FindBestSplit<FeatureCategoricalLabelUpliftCategorical,
+                  LabelUpliftCategoricalScoreAccumulator,
+                  /*require_label_sorting*/ true>;
+
+constexpr auto FindBestSplit_LabelUpliftClassificationFeatureCategoricalRandom =
+    FindBestSplitRandom<FeatureCategoricalLabelUpliftCategorical,
+                        LabelUpliftCategoricalScoreAccumulator>;
 
 }  // namespace decision_tree
 }  // namespace model

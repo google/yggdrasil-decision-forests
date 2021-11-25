@@ -660,7 +660,7 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(predictions[2].classification.TopClass(), 0);
 
   const auto evaluation_1 = internal::EvaluateOOBPredictions(
-      dataset, config.task(), config_link.label(), {}, predictions);
+      dataset, config.task(), config_link.label(), -1, {}, predictions);
   EXPECT_EQ(internal::EvaluationSnippet(evaluation_1),
             "accuracy:0.5 logloss:18.0218");
 
@@ -678,7 +678,7 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(predictions[2].classification.TopClass(), 0);
 
   const auto evaluation_2 = internal::EvaluateOOBPredictions(
-      dataset, config.task(), config_link.label(), {}, predictions);
+      dataset, config.task(), config_link.label(), -1, {}, predictions);
   EXPECT_EQ(internal::EvaluationSnippet(evaluation_2),
             "accuracy:0.5 logloss:18.0218");
 }
@@ -991,6 +991,40 @@ TEST(RandomForest, PredefinedHyperParameters) {
   model::proto::TrainingConfig train_config;
   train_config.set_learner(RandomForestLearner::kRegisteredName);
   utils::TestPredefinedHyperParametersAdultDataset(train_config, 2, 0.86);
+}
+
+class RandomForestOnSimPTE : public utils::TrainAndTestTester {
+  void SetUp() override {
+    train_config_.set_learner(RandomForestLearner::kRegisteredName);
+    train_config_.set_task(model::proto::Task::CATEGORICAL_UPLIFT);
+    train_config_.set_label("y");
+    train_config_.set_uplift_treatment("treat");
+
+    guide_ = PARSE_TEST_PROTO(
+        R"pb(
+          column_guides {
+            column_name_pattern: "(y|treat)"
+            type: CATEGORICAL
+            categorial { is_already_integerized: true }
+          }
+          detect_boolean_as_numerical: true
+        )pb");
+
+    dataset_filename_ = "sim_pte_train.csv";
+    dataset_test_filename_ = "sim_pte_test.csv";
+  }
+};
+
+TEST_F(RandomForestOnSimPTE, Base) {
+  TrainAndEvaluateModel();
+  // Note: A Qini of ~0.1 is expected with a simple Random Forest model.
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.105709, 0.001);
+
+  // Export the labels+predictions for external evaluation.
+  const auto uplift_pred_csv_path =
+      file::JoinPath(test::TmpDirectory(), "uplift_pred.csv");
+  CHECK_OK(utils::ExportUpliftPredictionsToTFUpliftCsvFormat(
+      *model_, test_dataset_, uplift_pred_csv_path));
 }
 
 }  // namespace

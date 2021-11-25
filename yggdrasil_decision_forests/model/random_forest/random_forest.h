@@ -78,6 +78,11 @@ class RandomForestModel : public AbstractModel {
                          dataset::VerticalDataset::row_t row_idx,
                          model::proto::Prediction* prediction) const;
 
+  // Compute a single prediction for an uplift random forest.
+  void PredictUplift(const dataset::VerticalDataset& dataset,
+                     dataset::VerticalDataset::row_t row_idx,
+                     model::proto::Prediction* prediction) const;
+
   void Predict(const dataset::proto::Example& example,
                model::proto::Prediction* prediction) const override;
 
@@ -88,6 +93,10 @@ class RandomForestModel : public AbstractModel {
   // Compute a single prediction for a regression random forest.
   void PredictRegression(const dataset::proto::Example& example,
                          model::proto::Prediction* prediction) const;
+
+  // Compute a single prediction for an uplift random forest.
+  void PredictUplift(const dataset::proto::Example& example,
+                     model::proto::Prediction* prediction) const;
 
   // Add a new tree to the model.
   void AddTree(std::unique_ptr<decision_tree::DecisionTree> decision_tree);
@@ -234,6 +243,11 @@ void FinalizeClassificationLeafToAccumulator(
 // Add a node prediction to a prediction accumulator for regression.
 void AddRegressionLeafToAccumulator(const decision_tree::proto::Node& node,
                                     double* accumulator);
+
+// Add a node prediction to a prediction accumulator for uplift.
+typedef absl::InlinedVector<float, 2> UplifLeafAccumulator;
+void AddUpliftLeafToAccumulator(const decision_tree::proto::Node& node,
+                                UplifLeafAccumulator* accumulator);
 
 }  // namespace internal
 

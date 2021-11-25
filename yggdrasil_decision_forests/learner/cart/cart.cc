@@ -35,9 +35,12 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/metric/metric.h"
+#include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/utils/adaptive_work.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -141,7 +144,8 @@ utils::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
   const auto begin_training = absl::Now();
 
   if (training_config().task() != model::proto::Task::CLASSIFICATION &&
-      training_config().task() != model::proto::Task::REGRESSION) {
+      training_config().task() != model::proto::Task::REGRESSION &&
+      training_config().task() != model::proto::Task::CATEGORICAL_UPLIFT) {
     return absl::InvalidArgumentError(
         absl::StrCat("The CART learner does not support the task ",
                      model::proto::Task_Name(training_config().task()), "."));
@@ -228,16 +232,19 @@ namespace internal {
 //
 // Template:
 //   ScoreAccumulator: Class accumulating label+predictions and outputting a
-//     score.
+//     score. Must implement a `.Add()` method to accumulate individual
+//     examples, and a `.Score()` that returns the aggregated score.
 //   Label: Representation of the label.
 //   Prediction: Representation of the predictions.
-//   Secondary: Representation of an optional secondary label.
+//   Secondary: Representation of an optional secondary label. Must have
+//     a default constructor, and is only passed to the ScoreAccumulator.Add
+//     method.
 //
 // Args:
 //   dataset: Validation dataset.
 //   weights: Example weights.
 //   labels: Example labels.
-//   secondary_labels: Example secondary labels. Empty if secondary labels are
+//   secondary_labels: Examples secondary labels. Empty if secondary labels are
 //     not used. Secondary labels are an optional second column that store label
 //     values. It is used in task where the label is stored on two columns (e.g.
 //     ranking, uplifting). It is only up to "ScoreAccumulator" to use (or not)
@@ -393,6 +400,82 @@ absl::Status PruneTreeRegression(
       tree->mutable_root());
 }
 
+absl::Status PruneTreeUplift(
+    const dataset::VerticalDataset& dataset, const std::vector<float> weights,
+    const std::vector<row_t>& example_idxs,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    model::decision_tree::DecisionTree* tree) {
+  const auto& outcomes =
+      dataset
+          .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+              config_link.label())
+          ->values();
+
+  const auto& treatments =
+      dataset
+          .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+              config_link.uplift_treatment())
+          ->values();
+
+  class UpliftAccumulator {
+   public:
+    typedef absl::InlinedVector<float, 2> Prediction;
+
+    static Prediction LeafToPrediction(
+        model::decision_tree::NodeWithChildren* leaf) {
+      const auto& uplift = leaf->node().uplift();
+      return {uplift.treatment_effect().begin(),
+              uplift.treatment_effect().end()};
+    }
+
+    UpliftAccumulator() {
+      options_.set_task(model::proto::Task::CATEGORICAL_UPLIFT);
+      options_.mutable_weights();
+      outcome_column_.set_type(dataset::proto::ColumnType::CATEGORICAL);
+      outcome_column_.mutable_categorical()->set_number_of_unique_values(3);
+      metric::InitializeEvaluation(options_, outcome_column_, &evaluation_);
+    }
+
+    void Add(const int32_t outcome, const int32_t treatment,
+             const Prediction& prediction, const float weight) {
+      model::proto::Prediction proto_pred;
+      proto_pred.set_weight(weight);
+      model::proto::Prediction::Uplift& uplift_pred =
+          *proto_pred.mutable_uplift();
+      uplift_pred.set_outcome_categorical(outcome);
+      uplift_pred.set_treatment(treatment);
+      *uplift_pred.mutable_treatment_effect() = {prediction.begin(),
+                                                 prediction.end()};
+      metric::AddPrediction(options_, proto_pred, &rnd_, &evaluation_);
+    }
+
+    float Score() {
+      if (evaluation_.uplift().num_treatments() < 2) {
+        // The leaf does not contain at least two treatments.
+        return 0;
+      }
+
+      metric::FinalizeEvaluation(options_, outcome_column_, &evaluation_);
+      return metric::AUUC(evaluation_);
+    }
+
+   private:
+    metric::proto::EvaluationOptions options_;
+    utils::RandomEngine rnd_;
+    metric::proto::EvaluationResults evaluation_;
+    dataset::proto::Column outcome_column_;
+  };
+
+  std::vector<typename UpliftAccumulator::Prediction> predictions(
+      dataset.nrow());
+
+  return PruneNode<UpliftAccumulator, int32_t,
+                   typename UpliftAccumulator::Prediction, int32_t>(
+      dataset, weights, outcomes, treatments, example_idxs, &predictions,
+      tree->mutable_root());
+}
+
 absl::Status PruneTree(const dataset::VerticalDataset& dataset,
                        const std::vector<float>& weights,
                        const std::vector<row_t>& example_idxs,
@@ -400,14 +483,24 @@ absl::Status PruneTree(const dataset::VerticalDataset& dataset,
                        const model::proto::TrainingConfigLinking& config_link,
                        model::decision_tree::DecisionTree* tree) {
   const auto num_nodes_pre_pruning = tree->NumNodes();
-  if (config.task() == model::proto::Task::CLASSIFICATION) {
-    RETURN_IF_ERROR(PruneTreeClassification(dataset, weights, example_idxs,
-                                            config, config_link, tree));
-  } else if (config.task() == model::proto::Task::REGRESSION) {
-    RETURN_IF_ERROR(PruneTreeRegression(dataset, weights, example_idxs, config,
-                                        config_link, tree));
-  } else {
-    return absl::UnimplementedError("Non supported task");
+
+  switch (config.task()) {
+    case model::proto::Task::CLASSIFICATION:
+      RETURN_IF_ERROR(PruneTreeClassification(dataset, weights, example_idxs,
+                                              config, config_link, tree));
+      break;
+    case model::proto::Task::REGRESSION:
+      RETURN_IF_ERROR(PruneTreeRegression(dataset, weights, example_idxs,
+                                          config, config_link, tree));
+      break;
+
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      RETURN_IF_ERROR(PruneTreeUplift(dataset, weights, example_idxs, config,
+                                      config_link, tree));
+      break;
+
+    default:
+      return absl::UnimplementedError("Non supported task");
   }
 
   const auto num_nodes_post_pruning = tree->NumNodes();

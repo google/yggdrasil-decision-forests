@@ -17,6 +17,7 @@ cc_library_ydf(
     hdrs = [
         "sparse_oblique.h",
         "splitter_accumulator.h",
+        "splitter_accumulator_uplift.h",
         "splitter_scanner.h",
         "splitter_structure.h",
         "training.h",

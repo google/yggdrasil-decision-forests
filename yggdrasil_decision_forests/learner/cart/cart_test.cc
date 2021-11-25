@@ -211,6 +211,39 @@ TEST_F(CartPruningTest, PruneTree) {
   EXPECT_EQ(tree_.NumNodes(), 3);
 }
 
+class CartOnSimPTE : public utils::TrainAndTestTester {
+  void SetUp() override {
+    train_config_.set_learner(CartLearner::kRegisteredName);
+    train_config_.set_task(model::proto::Task::CATEGORICAL_UPLIFT);
+    train_config_.set_label("y");
+    train_config_.set_uplift_treatment("treat");
+
+    guide_ = PARSE_TEST_PROTO(
+        R"pb(
+          column_guides {
+            column_name_pattern: "(y|treat)"
+            type: CATEGORICAL
+            categorial { is_already_integerized: true }
+          }
+          detect_boolean_as_numerical: true
+        )pb");
+
+    dataset_filename_ = "sim_pte_train.csv";
+    dataset_test_filename_ = "sim_pte_test.csv";
+  }
+};
+
+TEST_F(CartOnSimPTE, Base) {
+  TrainAndEvaluateModel();
+  // Note: A Qini of ~0.1 is expected with a simple Random Forest model.
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.06724, 0.01);
+
+  auto* rf_model =
+      dynamic_cast<const random_forest::RandomForestModel*>(model_.get());
+  EXPECT_GT(rf_model->num_pruned_nodes().value(), 50);
+  EXPECT_GT(rf_model->NumNodes(), 20);
+}
+
 }  // namespace
 }  // namespace cart
 }  // namespace model

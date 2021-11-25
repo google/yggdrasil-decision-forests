@@ -475,6 +475,7 @@ cc_library_ydf(
     deps = [
         ":compatibility",
         ":concurrency",
+        ":csv",
         ":distribution_cc_proto",
         ":filesystem",
         ":logging",

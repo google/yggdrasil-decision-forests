@@ -104,6 +104,37 @@ void SetClassificationLabelDistribution(
   node->mutable_classifier()->set_top_value(label_distribution.TopClass());
 }
 
+void SetUpliftLabelDistribution(
+    const dataset::VerticalDataset& dataset,
+    const std::vector<row_t>& selected_examples,
+    const std::vector<float>& weights,
+    const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
+  const auto* const outcomes =
+      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+          config_link.label());
+
+  const auto* const treatments =
+      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+          config_link.uplift_treatment());
+
+  const auto& outcome_spec = dataset.data_spec().columns(config_link.label());
+  const auto& treatment_spec =
+      dataset.data_spec().columns(config_link.uplift_treatment());
+
+  UpliftCategoricalLabelDistribution label_dist;
+  label_dist.InitializeAndClear(
+      outcome_spec.categorical().number_of_unique_values(),
+      treatment_spec.categorical().number_of_unique_values());
+
+  for (const row_t example_idx : selected_examples) {
+    label_dist.AddCategoricalOutcome(outcomes->values()[example_idx],
+                                     treatments->values()[example_idx],
+                                     weights[example_idx]);
+  }
+  internal::CategoricalUpliftLabelDistToLeaf(label_dist,
+                                             node->mutable_uplift());
+}
+
 // Compute the ratio of true label for all attribute values.
 void ComputeTrueLabelValuePerAttributeValue(
     const utils::IntegersConfusionMatrixDouble& confusion,
@@ -386,10 +417,17 @@ void SetLabelDistribution(
                                          weights, config_link,
                                          node->mutable_node());
       break;
+
     case model::proto::Task::REGRESSION:
       SetRegressionLabelDistribution(train_dataset, selected_examples, weights,
                                      config_link, node->mutable_node());
       break;
+
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      SetUpliftLabelDistribution(train_dataset, selected_examples, weights,
+                                 config_link, node->mutable_node());
+      break;
+
     default:
       DCHECK(false);
   }
@@ -801,6 +839,71 @@ SplitSearchResult FindBestCondition(
   return result;
 }
 
+// Specialization in the case of classification.
+SplitSearchResult FindBestCondition(
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<row_t>& selected_examples,
+    const std::vector<float>& weights,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const proto::Node& parent, const InternalTrainConfig& internal_config,
+    const CategoricalUpliftLabelStats& label_stats, const int32_t attribute_idx,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    SplitterPerThreadCache* cache) {
+  const int min_num_obs =
+      dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
+  const auto& attribute_column_spec =
+      train_dataset.data_spec().columns(attribute_idx);
+
+  SplitSearchResult result;
+
+  switch (train_dataset.column(attribute_idx)->type()) {
+    case dataset::proto::ColumnType::NUMERICAL: {
+      const auto& attribute_data =
+          train_dataset
+              .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+                  attribute_idx)
+              ->values();
+      const auto na_replacement = attribute_column_spec.numerical().mean();
+
+      result = FindSplitLabelUpliftCategoricalFeatureNumericalCart(
+          selected_examples, weights, attribute_data, label_stats,
+          na_replacement, min_num_obs, dt_config, attribute_idx,
+          internal_config, best_condition, cache);
+    } break;
+
+    case dataset::proto::ColumnType::CATEGORICAL: {
+      const auto& attribute_data =
+          train_dataset
+              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+                  attribute_idx)
+              ->values();
+      const auto na_replacement = attribute_column_spec.numerical().mean();
+      const auto num_attribute_classes =
+          attribute_column_spec.categorical().number_of_unique_values();
+
+      result = FindSplitLabelUpliftCategoricalFeatureCategorical(
+          selected_examples, weights, attribute_data, label_stats,
+          num_attribute_classes, na_replacement, min_num_obs, dt_config,
+          attribute_idx, internal_config, best_condition, cache, random);
+    } break;
+
+    default:
+      LOG(FATAL) << dataset::proto::ColumnType_Name(
+                        train_dataset.column(attribute_idx)->type())
+                 << " attribute " << train_dataset.column(attribute_idx)->name()
+                 << " is not supported.";
+  }
+
+  // Condition of the type "Attr is NA".
+  if (dt_config.allow_na_conditions()) {
+    LOG(FATAL) << "allow_na_conditions not supported";
+  }
+
+  return result;
+}
+
 SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
@@ -975,6 +1078,17 @@ utils::StatusOr<bool> FindBestConditionSingleThreadManager(
                                      &cache->splitter_cache_list[0]);
         }
         break;
+
+      case model::proto::Task::CATEGORICAL_UPLIFT: {
+        const auto& uplift_label_stats =
+            utils::down_cast<const CategoricalUpliftLabelStats&>(label_stats);
+        result =
+            FindBestCondition(train_dataset, selected_examples, weights, config,
+                              config_link, dt_config, parent, internal_config,
+                              uplift_label_stats, attribute_idx, best_condition,
+                              random, &cache->splitter_cache_list[0]);
+      } break;
+
       default:
         return absl::UnimplementedError("Non implemented");
     }
@@ -1234,6 +1348,7 @@ utils::StatusOr<bool> FindBestCondition(
           dt_config, splitter_concurrency_setup, parent, internal_config,
           label_stat, best_condition, random, cache);
     } break;
+
     case model::proto::Task::REGRESSION: {
       if (internal_config.use_hessian_gain) {
         RegressionHessianLabelStats label_stat(
@@ -1269,6 +1384,37 @@ utils::StatusOr<bool> FindBestCondition(
             label_stat, best_condition, random, cache);
       }
     } break;
+
+    case model::proto::Task::CATEGORICAL_UPLIFT: {
+      if (internal_config.use_hessian_gain) {
+        return absl::InternalError("Hessian gain not supported for uplift");
+      }
+      const auto& outcome_spec =
+          train_dataset.data_spec().columns(config_link.label());
+      const auto& treatment_spec =
+          train_dataset.data_spec().columns(config_link.uplift_treatment());
+
+      CategoricalUpliftLabelStats label_stat(
+          train_dataset
+              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+                  config_link.label())
+              ->values(),
+          outcome_spec.categorical().number_of_unique_values(),
+          train_dataset
+              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+                  config_link.uplift_treatment())
+              ->values(),
+          treatment_spec.categorical().number_of_unique_values());
+
+      internal::CategoricalUpliftLeafToLabelDist(
+          parent.uplift(), &label_stat.label_distribution);
+
+      return FindBestConditionManager(
+          train_dataset, selected_examples, weights, config, config_link,
+          dt_config, splitter_concurrency_setup, parent, internal_config,
+          label_stat, best_condition, random, cache);
+    } break;
+
     default:
       return absl::UnimplementedError("Non implemented");
   }
@@ -2668,6 +2814,89 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
   }
 }
 
+SplitSearchResult FindSplitLabelUpliftCategoricalFeatureNumericalCart(
+    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<float>& weights, const std::vector<float>& attributes,
+    const CategoricalUpliftLabelStats& label_stats, float na_replacement,
+    dataset::VerticalDataset::row_t min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache) {
+  if (dt_config.missing_value_policy() ==
+      proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
+    LocalImputationForNumericalAttribute(selected_examples, weights, attributes,
+                                         &na_replacement);
+  }
+
+  FeatureNumericalBucket::Filler feature_filler(selected_examples.size(),
+                                                na_replacement, attributes);
+
+  LabelUpliftCategoricalOneValueBucket::Initializer initializer(
+      label_stats.label_distribution,
+      dt_config.uplift().min_examples_in_treatment(),
+      dt_config.uplift().split_score());
+  LabelUpliftCategoricalOneValueBucket::Filler label_filler(
+      label_stats.outcome_values, label_stats.treatment_values, weights);
+
+  // TODO(gbm): Add support for-presorted splitting.
+
+  return FindBestSplit_LabelUpliftClassificationFeatureNumerical(
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
+      attribute_idx, condition, &cache->cache_v2);
+}
+
+SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
+    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const CategoricalUpliftLabelStats& label_stats, int num_attribute_classes,
+    int32_t na_replacement, dataset::VerticalDataset::row_t min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random) {
+  if (dt_config.missing_value_policy() ==
+      proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
+    LocalImputationForCategoricalAttribute(selected_examples, weights,
+                                           attributes, num_attribute_classes,
+                                           &na_replacement);
+  }
+
+  FeatureCategoricalBucket::Filler feature_filler(num_attribute_classes,
+                                                  na_replacement, attributes);
+
+  LabelUpliftCategoricalBucket::Initializer initializer(
+      label_stats.label_distribution,
+      dt_config.uplift().min_examples_in_treatment(),
+      dt_config.uplift().split_score());
+  LabelUpliftCategoricalBucket::Filler label_filler(
+      label_stats.label_distribution, label_stats.outcome_values,
+      label_stats.treatment_values, weights);
+
+  // TODO(gbm): Add support for-presorted splitting.
+
+  const auto algorithm =
+      (num_attribute_classes < dt_config.categorical().arity_limit_for_random())
+          ? dt_config.categorical().algorithm_case()
+          : proto::Categorical::kRandom;
+
+  switch (algorithm) {
+    case proto::Categorical::ALGORITHM_NOT_SET:
+    case proto::Categorical::kCart:
+      return FindBestSplit_LabelUpliftClassificationFeatureCategoricalCart(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+
+    case proto::Categorical::kRandom:
+      return FindBestSplit_LabelUpliftClassificationFeatureCategoricalRandom(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx,
+          NumTrialsForRandomCategoricalSplit(dt_config.categorical().random()),
+          condition, &cache->cache_v2, random);
+
+    default:
+      LOG(FATAL) << "Non supported";
+  }
+}
+
 void GetCandidateAttributes(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -2679,8 +2908,15 @@ void GetCandidateAttributes(
   std::shuffle(candidate_attributes->begin(), candidate_attributes->end(),
                *random);
 
+  // User specified number of candidate attributes.
   if (dt_config.has_num_candidate_attributes_ratio() &&
       dt_config.num_candidate_attributes_ratio() >= 0) {
+    if (dt_config.has_num_candidate_attributes() &&
+        dt_config.num_candidate_attributes() > 0) {
+      LOG(WARNING) << "Both \"num_candidate_attributes\" and "
+                      "\"num_candidate_attributes_ratio\" are specified. "
+                      "Ignoring \"num_candidate_attributes\".";
+    }
     *num_attributes_to_test =
         static_cast<int>(std::ceil(dt_config.num_candidate_attributes_ratio() *
                                    config_link.features_size()));
@@ -2688,9 +2924,11 @@ void GetCandidateAttributes(
     *num_attributes_to_test = dt_config.num_candidate_attributes();
   }
 
+  // Automatic number of attribute selection logic.
   if (*num_attributes_to_test == 0) {
     switch (config.task()) {
       default:
+      case model::proto::Task::CATEGORICAL_UPLIFT:
       case model::proto::Task::CLASSIFICATION:
         *num_attributes_to_test = static_cast<int>(
             ceil(std::sqrt(static_cast<double>(candidate_attributes->size()))));
@@ -2701,13 +2939,15 @@ void GetCandidateAttributes(
         break;
     }
   }
+
+  // Special value to use all the available attributes.
   if (*num_attributes_to_test == -1) {
     *num_attributes_to_test = static_cast<int>(candidate_attributes->size());
-  } else {
-    *num_attributes_to_test =
-        std::min(*num_attributes_to_test,
-                 static_cast<int>(candidate_attributes->size()));
   }
+
+  // Make sure we don't select more than the available attributes.
+  *num_attributes_to_test = std::min(
+      *num_attributes_to_test, static_cast<int>(candidate_attributes->size()));
 }
 
 void GenerateRandomImputation(
@@ -3370,6 +3610,18 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
     }
   }
   return absl::OkStatus();
+}
+
+void CategoricalUpliftLeafToLabelDist(
+    const decision_tree::proto::NodeUpliftOutput& leaf,
+    UpliftCategoricalLabelDistribution* dist) {
+  dist->ImportSetFromLeafProto(leaf);
+}
+
+void CategoricalUpliftLabelDistToLeaf(
+    const UpliftCategoricalLabelDistribution& dist,
+    decision_tree::proto::NodeUpliftOutput* leaf) {
+  dist.ExportToLeafProto(leaf);
 }
 
 }  // namespace internal

@@ -41,6 +41,36 @@ message NodeRegressorOutput {
   optional double sum_weights = 5;
 }
 
+// Output of a node in an uplift tree with either binary categorical or
+// numerical outcome.
+//
+// The fields have the same definition as the fields in the message
+// "UpliftCategoricalLabelDistribution".
+message NodeUpliftOutput {
+  // Weighted number of examples.
+  optional double sum_weights = 1;
+
+  // Currently, the code only support binary categorical or regressive outcomes.
+  repeated double sum_weights_per_treatment = 2 [packed = true];
+
+  // Number of examples for each outcome (major) and each treatment (minor).
+  // In the case of categorical outcome, exclude the zero outcome. For example,
+  // in case of binary treatment, "sum_weights_per_treatment_and_outcome"
+  // contains one value for each treatment.
+  //
+  // Currently, the code only supports binary categorical or regressive outcome.
+  repeated double sum_weights_per_treatment_and_outcome = 3 [packed = true];
+
+  // treatment_effect[i] is the effect of the "i+1"-th treatment (categorical
+  // value i+2) compared to the control group (0-th treatment; categorical
+  // value = 1). The treatment out-of-vocabulary item (value = 0) is not taken
+  // into account.
+  repeated float treatment_effect = 4 [packed = true];
+
+  // Number of examples in each treatment. Not weighted.
+  repeated int64 num_examples_per_treatment = 5 [packed = true];
+}
+
 // The sub-messages of "ConditionParams" are the different types of condition
 // that can be attached to a node.
 message Condition {
@@ -120,11 +150,12 @@ message NodeCondition {
 
 // Node in a decision tree (without the information about the children).
 message Node {
-  // Next ID: 5
+  // Next ID: 6
   // Label value. Might be unspecified for non-leaf nodes.
   oneof output {
     NodeClassifierOutput classifier = 1;
     NodeRegressorOutput regressor = 2;
+    NodeUpliftOutput uplift = 5;
   }
   // Branching condition to the children. If not specified, this node is a leaf.
   optional NodeCondition condition = 3;

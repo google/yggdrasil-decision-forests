@@ -262,8 +262,18 @@ class AbstractModel {
   virtual void Predict(const dataset::proto::Example& example,
                        proto::Prediction* prediction) const = 0;
 
-  // Set the ground truth of a prediction. Requires for the dataset to contain
-  // the ground truth.
+  // Set the ground truth values in a Prediction proto. Ground truth values
+  // can be defined by fields like label or example weight. This depends on the
+  // model "type" (see Prediction proto). This step is required to evaluate the
+  // prediction of one example (done in metric::AddPrediction in "metric.h").
+  //
+  // Both version requires that either the example (this version) or dataset
+  // (next version) contains the label value.
+  void SetGroundTruth(const dataset::proto::Example& example,
+                      proto::Prediction* prediction) const;
+
+  // Set the ground truth values (see description above) of one Prediction
+  // proto from the specified row in the given dataset.
   void SetGroundTruth(const dataset::VerticalDataset& dataset,
                       dataset::VerticalDataset::row_t row_idx,
                       proto::Prediction* prediction) const;
@@ -407,19 +417,47 @@ REGISTRATION_CREATE_POOL(AbstractModel);
 #define REGISTER_AbstractModel(name, key) \
   REGISTRATION_REGISTER_CLASS(name, key, AbstractModel)
 
-// Set the ground truth of a prediction. Requires for the dataset to contain
-// the ground truth.
+// Set the ground truth in a "proto::Prediction".
 //
+// See the definition of AbstractModel::SetGroundTruth(...) for mode details.
+// Unlike AbstractModel::SetGroundTruth, the two following SetGroundTruth
+// functions do not require for a model to exist. When possible use
+// "model.SetGroundTruth(...)" instead.
+
 // In case of non-ranking task (e.g. regression), "ranking_group_col_idx" should
 // be set to  "kNoRankingGroup".
 constexpr int kNoRankingGroup = -1;
+constexpr int kNoUpliftTreatmentGroup = -1;
 
+// Indices of the columns needed to set the ground truth.
+struct GroundTruthColumnIndices {
+  // These fields correspond to the fields defined in AbstractModel.
+  const int label_col_idx;
+  const int group_col_idx;
+  const int uplift_treatment_col_idx;
+
+  GroundTruthColumnIndices(
+      const int label_col_idx, const int group_col_idx = kNoRankingGroup,
+      const int uplift_treatment_col_idx = kNoUpliftTreatmentGroup)
+      : label_col_idx(label_col_idx),
+        group_col_idx(group_col_idx),
+        uplift_treatment_col_idx(uplift_treatment_col_idx) {}
+};
+
+// Note: The "task" defines how the label are interpreted and how the
+// predictions are evaluated. The task should correspond to the model emitting
+// the predictions, or be compatible with it (e.g. a ranking model can be
+// evaluated with task=REGRESSION).
+
+// See comments above.
 void SetGroundTruth(const dataset::VerticalDataset& dataset,
-                    dataset::VerticalDataset::row_t row_idx, int label_col_idx,
-                    int group_col_idx, proto::Task task,
+                    dataset::VerticalDataset::row_t row_idx,
+                    const GroundTruthColumnIndices& columns, proto::Task task,
                     proto::Prediction* prediction);
-void SetGroundTruth(const dataset::proto::Example& example, int label_col_idx,
-                    int group_col_idx, proto::Task task,
+
+// See comments above.
+void SetGroundTruth(const dataset::proto::Example& example,
+                    const GroundTruthColumnIndices& columns, proto::Task task,
                     proto::Prediction* prediction);
 
 // Converts a prediction from one type to another.

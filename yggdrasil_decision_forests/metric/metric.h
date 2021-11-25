@@ -40,7 +40,8 @@ void InitializeEvaluation(const proto::EvaluationOptions& option,
                           const dataset::proto::Column& label_column,
                           proto::EvaluationResults* eval);
 
-// Add a prediction to the evaluation.
+// Add a prediction to the evaluation. The predictions should contain the label
+// / ground truth (see the "SetGroundTruth" methods in "abstract_model.h").
 void AddPrediction(const proto::EvaluationOptions& option,
                    const model::proto::Prediction& pred,
                    utils::RandomEngine* rnd, proto::EvaluationResults* eval);

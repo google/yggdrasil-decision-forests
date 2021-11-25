@@ -19,7 +19,13 @@ package yggdrasil_decision_forests.model.proto;
 
 import "yggdrasil_decision_forests/utils/distribution.proto";
 
-// Generic model output.
+// Generic prediction (prediction over a single example). Those are usually the
+// output of a ML model.
+//
+// Optionally, it may contains the ground truth (e.g. the label value). When the
+// ground truth is present, such a "Prediction" proto can be used for evaluation
+// (see "metric.h").
+//
 message Prediction {
   message Classification {
     // Predicted class as indexed in the dataspec.

@@ -280,7 +280,8 @@ RandomForestLearner::TrainWithStatus(
   RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
 
   if (training_config().task() != model::proto::Task::CLASSIFICATION &&
-      training_config().task() != model::proto::Task::REGRESSION) {
+      training_config().task() != model::proto::Task::REGRESSION &&
+      training_config().task() != model::proto::Task::CATEGORICAL_UPLIFT) {
     std::string tip;
     if (training_config().task() == model::proto::Task::RANKING) {
       tip =
@@ -303,6 +304,13 @@ RandomForestLearner::TrainWithStatus(
       config_with_default.has_maximum_model_size_in_memory_in_bytes()) {
     rf_config.mutable_decision_tree()->set_keep_non_leaf_label_distribution(
         false);
+  }
+
+  if (training_config().task() == model::proto::Task::CATEGORICAL_UPLIFT &&
+      rf_config.compute_oob_performances()) {
+    LOG(WARNING)
+        << "RF does not support OOB performances with the uplift task (yet).";
+    rf_config.set_compute_oob_performances(false);
   }
 
   auto mdl = absl::make_unique<RandomForestModel>();
@@ -606,7 +614,8 @@ RandomForestLearner::TrainWithStatus(
             evaluation.set_number_of_trees(current_num_trained_trees);
             *evaluation.mutable_evaluation() = internal::EvaluateOOBPredictions(
                 train_dataset, mdl->task(), mdl->label_col_idx(),
-                mdl->weights(), oob_predictions,
+                mdl->uplift_treatment_col_idx(), mdl->weights(),
+                oob_predictions,
                 /*for_permutation_importance=*/false);
             mdl->mutable_out_of_bag_evaluations()->push_back(evaluation);
 
@@ -783,6 +792,9 @@ void UpdateOOBPredictionsWithNewTree(
       case model::proto::Task::REGRESSION:
         AddRegressionLeafToAccumulator(*leaf, &accumulator.regression);
         break;
+      case model::proto::Task::RANKING:
+        LOG(FATAL) << "OOB not implemented for Uplift.";
+        break;
       default:
         LOG(WARNING) << "Not implemented";
     }
@@ -792,6 +804,7 @@ void UpdateOOBPredictionsWithNewTree(
 metric::proto::EvaluationResults EvaluateOOBPredictions(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
+    const int uplift_treatment_col_idx,
     const absl::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
     const std::vector<PredictionAccumulator>& oob_predictions,
     const bool for_permutation_importance) {
@@ -808,6 +821,8 @@ metric::proto::EvaluationResults EvaluateOOBPredictions(
       break;
     case model::proto::Task::REGRESSION:
       eval_options.mutable_regression()->set_enable_regression_plots(false);
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
       break;
     default:
       LOG(WARNING) << "Not implemented";
@@ -845,12 +860,17 @@ metric::proto::EvaluationResults EvaluateOOBPredictions(
             prediction_accumulator.regression /
             prediction_accumulator.num_trees);
         break;
+      case model::proto::Task::CATEGORICAL_UPLIFT:
+        LOG(FATAL) << "OOB not implemented for Uplift.";
+        break;
       default:
         LOG(WARNING) << "Not implemented";
     }
-    model::SetGroundTruth(train_dataset, example_idx, label_col_idx,
-                          model::kNoRankingGroup, eval_options.task(),
-                          &prediction);
+    model::SetGroundTruth(
+        train_dataset, example_idx,
+        model::GroundTruthColumnIndices(label_col_idx, model::kNoRankingGroup,
+                                        uplift_treatment_col_idx),
+        eval_options.task(), &prediction);
     if (weight_links.has_value()) {
       prediction.set_weight(
           dataset::GetWeight(train_dataset, example_idx, weight_links.value()));
@@ -874,15 +894,17 @@ void ComputeVariableImportancesFromAccumulatedPredictions(
   // Note: "for_permutation_importance=true" allows to compute AUC, PR-AUC and
   // other expensive evaluation metrics.
   const auto base_evaluation = EvaluateOOBPredictions(
-      dataset, model->task(), model->label_col_idx(), model->weights(),
-      oob_predictions, /*for_permutation_importance=*/true);
+      dataset, model->task(), model->label_col_idx(),
+      model->uplift_treatment_col_idx(), model->weights(), oob_predictions,
+      /*for_permutation_importance=*/true);
   const auto permutation_evaluation = [&](const int feature_idx)
       -> absl::optional<metric::proto::EvaluationResults> {
     if (oob_predictions_per_input_features[feature_idx].empty()) {
       return {};
     }
     return EvaluateOOBPredictions(
-        dataset, model->task(), model->label_col_idx(), model->weights(),
+        dataset, model->task(), model->label_col_idx(),
+        model->uplift_treatment_col_idx(), model->weights(),
         oob_predictions_per_input_features[feature_idx],
         /*for_permutation_importance=*/true);
   };

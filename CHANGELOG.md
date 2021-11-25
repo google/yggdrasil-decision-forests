@@ -7,6 +7,7 @@
 -   The CART learner exports the number of pruned nodes in the output model
     meta-data. Note: The CART learner outputs a Random Forest model with a
     single tree.
+-   The Random Forest and CART learners support the `CATEGORICAL_UPLIFT` task.
 
 ### Fixes
 

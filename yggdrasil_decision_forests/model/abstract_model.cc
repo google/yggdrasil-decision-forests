@@ -422,9 +422,12 @@ void AbstractModel::AppendEvaluationOverrideType(
                                num_prediction_dimensions, &original_prediction);
         ChangePredictionType(task(), override_task, original_prediction,
                              &overridden_prediction);
-        model::SetGroundTruth(dataset, begin_example_idx + sub_example_idx,
-                              override_label_col_idx, override_group_col_idx,
-                              override_task, &overridden_prediction);
+        model::SetGroundTruth(
+            dataset, begin_example_idx + sub_example_idx,
+            model::GroundTruthColumnIndices(override_label_col_idx,
+                                            override_group_col_idx,
+                                            uplift_treatment_col_idx_),
+            override_task, &overridden_prediction);
         if (option.has_weights()) {
           const float weight = dataset::GetWeight(
               dataset, begin_example_idx + sub_example_idx, weight_links);
@@ -444,9 +447,11 @@ void AbstractModel::AppendEvaluationOverrideType(
       Predict(dataset, test_row_idx, &original_prediction);
       ChangePredictionType(task(), override_task, original_prediction,
                            &overridden_prediction);
-      model::SetGroundTruth(dataset, test_row_idx, override_label_col_idx,
-                            override_group_col_idx, override_task,
-                            &overridden_prediction);
+      model::SetGroundTruth(dataset, test_row_idx,
+                            model::GroundTruthColumnIndices(
+                                override_label_col_idx, override_group_col_idx,
+                                uplift_treatment_col_idx_),
+                            override_task, &overridden_prediction);
       if (option.has_weights()) {
         const float weight =
             dataset::GetWeight(dataset, test_row_idx, weight_links);
@@ -490,44 +495,60 @@ void ChangePredictionType(proto::Task src_task, proto::Task dst_task,
 void AbstractModel::SetGroundTruth(const dataset::VerticalDataset& dataset,
                                    dataset::VerticalDataset::row_t row_idx,
                                    proto::Prediction* prediction) const {
-  model::SetGroundTruth(dataset, row_idx, label_col_idx_,
-                        ranking_group_col_idx_, task_, prediction);
+  model::SetGroundTruth(
+      dataset, row_idx,
+      GroundTruthColumnIndices(label_col_idx_, ranking_group_col_idx_,
+                               uplift_treatment_col_idx_),
+      task_, prediction);
+}
+
+void AbstractModel::SetGroundTruth(const dataset::proto::Example& example,
+                                   proto::Prediction* prediction) const {
+  model::SetGroundTruth(
+      example,
+      GroundTruthColumnIndices(label_col_idx_, ranking_group_col_idx_,
+                               uplift_treatment_col_idx_),
+      task_, prediction);
 }
 
 void SetGroundTruth(const dataset::VerticalDataset& dataset,
                     const dataset::VerticalDataset::row_t row_idx,
-                    const int label_col_idx, const int group_col_idx,
+                    const GroundTruthColumnIndices& columns,
                     const proto::Task task, proto::Prediction* prediction) {
   switch (task) {
     case proto::Task::CLASSIFICATION: {
-      CHECK_EQ(group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
       const auto* classification_labels =
           dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              label_col_idx);
+              columns.label_col_idx);
       prediction->mutable_classification()->set_ground_truth(
           classification_labels->values()[row_idx]);
     } break;
     case proto::Task::REGRESSION: {
-      CHECK_EQ(group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
       const auto* regression_labels =
           dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-              label_col_idx);
+              columns.label_col_idx);
       prediction->mutable_regression()->set_ground_truth(
           regression_labels->values()[row_idx]);
     } break;
     case proto::Task::RANKING: {
-      CHECK_NE(group_col_idx, kNoRankingGroup);
+      CHECK_NE(columns.group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
+
       const auto* ranking_labels =
           dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-              label_col_idx);
+              columns.label_col_idx);
       prediction->mutable_ranking()->set_ground_truth_relevance(
           ranking_labels->values()[row_idx]);
 
       const auto* categorical_groups = dataset.ColumnWithCastOrNull<
-          dataset::VerticalDataset::CategoricalColumn>(group_col_idx);
+          dataset::VerticalDataset::CategoricalColumn>(columns.group_col_idx);
       const auto* hash_groups =
           dataset.ColumnWithCastOrNull<dataset::VerticalDataset::HashColumn>(
-              group_col_idx);
+              columns.group_col_idx);
       if (categorical_groups) {
         prediction->mutable_ranking()->set_group_id(
             categorical_groups->values()[row_idx]);
@@ -538,39 +559,65 @@ void SetGroundTruth(const dataset::VerticalDataset& dataset,
         LOG(FATAL) << "The group attribute should be CATEGORICAL or HASH";
       }
     } break;
+    case proto::Task::CATEGORICAL_UPLIFT: {
+      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      CHECK_NE(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
+      const auto& numerical_outcomes = dataset.ColumnWithCastOrNull<
+          dataset::VerticalDataset::CategoricalColumn>(columns.label_col_idx);
+      const auto& categorical_outcomes = dataset.ColumnWithCastOrNull<
+          dataset::VerticalDataset::CategoricalColumn>(columns.label_col_idx);
+      if (categorical_outcomes != nullptr) {
+        prediction->mutable_uplift()->set_outcome_categorical(
+            categorical_outcomes->values()[row_idx]);
+      } else if (numerical_outcomes != nullptr) {
+        prediction->mutable_uplift()->set_outcome_numerical(
+            numerical_outcomes->values()[row_idx]);
+      } else {
+        LOG(FATAL) << "Not supported outcome type";
+      }
+      const auto& treatments =
+          dataset
+              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+                  columns.uplift_treatment_col_idx)
+              ->values();
+      prediction->mutable_uplift()->set_treatment(treatments[row_idx]);
+    } break;
     default:
       LOG(FATAL) << "Non supported task.";
       break;
   }
 }
 
-void SetGroundTruth(const dataset::proto::Example& example, int label_col_idx,
-                    const int group_col_idx, proto::Task task,
+void SetGroundTruth(const dataset::proto::Example& example,
+                    const GroundTruthColumnIndices& columns, proto::Task task,
                     proto::Prediction* prediction) {
   switch (task) {
     case proto::Task::CLASSIFICATION: {
-      CHECK_EQ(group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
       prediction->mutable_classification()->set_ground_truth(
-          example.attributes(label_col_idx).categorical());
+          example.attributes(columns.label_col_idx).categorical());
     } break;
     case proto::Task::REGRESSION: {
-      CHECK_EQ(group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
       prediction->mutable_regression()->set_ground_truth(
-          example.attributes(label_col_idx).numerical());
+          example.attributes(columns.label_col_idx).numerical());
     } break;
     case proto::Task::RANKING: {
-      CHECK_NE(group_col_idx, kNoRankingGroup);
+      CHECK_NE(columns.group_col_idx, kNoRankingGroup);
+      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
       prediction->mutable_ranking()->set_ground_truth_relevance(
-          example.attributes(label_col_idx).numerical());
-      const auto& group_value = example.attributes(group_col_idx);
+          example.attributes(columns.label_col_idx).numerical());
+      const auto& group_value = example.attributes(columns.group_col_idx);
       switch (group_value.type_case()) {
         case dataset::proto::Example_Attribute::kCategorical:
           prediction->mutable_ranking()->set_group_id(
-              example.attributes(group_col_idx).categorical());
+              example.attributes(columns.group_col_idx).categorical());
           break;
         case dataset::proto::Example_Attribute::kHash:
           prediction->mutable_ranking()->set_group_id(
-              example.attributes(group_col_idx).hash());
+              example.attributes(columns.group_col_idx).hash());
           break;
         default:
           LOG(FATAL) << "The group attribute should be CATEGORICAL or HASH";
@@ -920,6 +967,13 @@ absl::Status AbstractModel::Validate() const {
       if (label_col_spec().type() != dataset::proto::NUMERICAL) {
         return absl::InvalidArgumentError(absl::StrCat(
             "Invalid label type for regression: ",
+            dataset::proto::ColumnType_Name(label_col_spec().type())));
+      }
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      if (label_col_spec().type() != dataset::proto::CATEGORICAL) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid label type for uplift: ",
             dataset::proto::ColumnType_Name(label_col_spec().type())));
       }
       break;

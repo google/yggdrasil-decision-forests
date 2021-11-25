@@ -52,6 +52,7 @@
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -140,6 +141,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   const auto begin_training = absl::Now();
 
+  utils::StatusOr<std::unique_ptr<model::AbstractModel>> model_or;
   // Train the model.
   if (pass_training_dataset_as_path_) {
     const auto train_dataset_path =
@@ -150,21 +152,19 @@ void TrainAndTestTester::TrainAndEvaluateModel(
                        file::JoinPath(test::TmpDirectory(), "valid_dataset"));
       CHECK_OK(
           dataset::SaveVerticalDataset(valid_dataset_, valid_dataset_path));
-      model_ = learner_
-                   ->TrainWithStatus(train_dataset_path, data_spec,
-                                     valid_dataset_path)
-                   .value();
+      model_or = learner_->TrainWithStatus(train_dataset_path, data_spec,
+                                           valid_dataset_path);
     } else {
-      model_ = learner_->TrainWithStatus(train_dataset_path, data_spec).value();
+      model_or = learner_->TrainWithStatus(train_dataset_path, data_spec);
     }
+  } else if (pass_validation_dataset_) {
+    model_or = learner_->TrainWithStatus(train_dataset_, valid_dataset_);
   } else {
-    if (pass_validation_dataset_) {
-      model_ =
-          learner_->TrainWithStatus(train_dataset_, valid_dataset_).value();
-    } else {
-      model_ = learner_->TrainWithStatus(train_dataset_).value();
-    }
+    model_or = learner_->TrainWithStatus(train_dataset_);
   }
+
+  CHECK_OK(model_or.status());
+  model_ = std::move(model_or).value();
 
   const auto end_training = absl::Now();
   training_duration_ = end_training - begin_training;
@@ -192,7 +192,8 @@ void TrainAndTestTester::TrainAndEvaluateModel(
       file::JoinPath(test::TmpDirectory(), test_dir_, "model");
   EXPECT_OK(SaveModel(model_path, model_.get()));
 
-  LOG(INFO) << "Description:\n" << model_->DescriptionAndStatistics(false);
+  LOG(INFO) << "Description:\n"
+            << model_->DescriptionAndStatistics(show_full_model_structure_);
 
   const auto check_evaluation_is_equal =
       [this](const metric::proto::EvaluationResults& e1,
@@ -211,6 +212,10 @@ void TrainAndTestTester::TrainAndEvaluateModel(
             break;
           case model::proto::Task::RANKING:
             EXPECT_NEAR(metric::NDCG(e1), metric::NDCG(e2), 0.001);
+            break;
+          case model::proto::Task::CATEGORICAL_UPLIFT:
+            EXPECT_NEAR(metric::AUUC(e1), metric::AUUC(e2), 0.001);
+            EXPECT_NEAR(metric::Qini(e1), metric::Qini(e2), 0.001);
             break;
           default:
             LOG(FATAL) << "Not implemented";
@@ -337,9 +342,12 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
   std::uniform_real_distribution<double> dist_01;
   for (dataset::VerticalDataset::row_t example_idx = 0;
        example_idx < dataset.nrow(); example_idx++) {
+    // Down-sampling of examples.
     if (dataset_sampling_ < dist_01(rnd)) {
       continue;
     }
+
+    // Down-sampling of examples according of a numerical attribute.
     if (numerical_weight_attribute_idx != -1) {
       const float weight =
           dataset
@@ -351,7 +359,15 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
         continue;
       }
     }
-    if ((example_idx % 2) == 0) {
+
+    bool is_training_example;
+    if (split_train_ratio_ == 0.5f) {
+      is_training_example = (example_idx % 2) == 0;
+    } else {
+      is_training_example = dist_01(rnd) < split_train_ratio_;
+    }
+
+    if (is_training_example) {
       train_example_idxs.push_back(example_idx);
     } else {
       if (pass_validation_dataset_ && ((example_idx / 2) % 2) == 0) {
@@ -360,6 +376,11 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
         test_example_idxs.push_back(example_idx);
       }
     }
+  }
+
+  if (split_train_ratio_ == 1.0) {
+    LOG(INFO) << "Using the same dataset for training and evaluation";
+    test_example_idxs = train_example_idxs;
   }
 
   train_dataset_ = dataset.Extract(train_example_idxs).value();
@@ -640,6 +661,39 @@ std::string ShardDataset(const dataset::VerticalDataset& dataset,
         absl::StrCat(format, ":", shards[shard_idx])));
   }
   return typed_sharded_path;
+}
+
+absl::Status ExportUpliftPredictionsToTFUpliftCsvFormat(
+    const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
+    absl::string_view output_csv_path) {
+  ASSIGN_OR_RETURN(auto output_handle, file::OpenOutputFile(output_csv_path));
+  utils::csv::Writer writer(output_handle.get());
+  RETURN_IF_ERROR(writer.WriteRow({"uplift", "response", "weight", "group"}));
+
+  for (int example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+    model::proto::Prediction prediction;
+    model.Predict(dataset, example_idx, &prediction);
+    model.SetGroundTruth(dataset, example_idx, &prediction);
+
+    if (prediction.uplift().treatment_effect_size() != 1) {
+      return absl::InvalidArgumentError("Only binary effect supported");
+    }
+    const auto uplift_str =
+        absl::StrCat(prediction.uplift().treatment_effect(0));
+    if (!prediction.uplift().has_outcome_categorical()) {
+      return absl::InvalidArgumentError("Only categorical outcome supported");
+    }
+    const auto response_str =
+        absl::StrCat(prediction.uplift().outcome_categorical() - 1);
+    const auto group_str = absl::StrCat(prediction.uplift().treatment() - 1);
+    const auto weight_str = absl::StrCat(prediction.weight());
+
+    RETURN_IF_ERROR(
+        writer.WriteRow({uplift_str, response_str, weight_str, group_str}));
+  }
+  RETURN_IF_ERROR(output_handle->Close());
+  LOG(INFO) << "Uplift predictions exported to: " << output_csv_path;
+  return absl::OkStatus();
 }
 
 }  // namespace utils

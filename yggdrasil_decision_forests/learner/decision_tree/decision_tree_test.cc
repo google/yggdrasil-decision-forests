@@ -57,6 +57,8 @@ namespace model {
 namespace decision_tree {
 namespace {
 
+using test::EqualsProto;
+
 using row_t = dataset::VerticalDataset::row_t;
 
 std::string DatasetDir() {
@@ -2163,6 +2165,228 @@ TEST(DecisionTree, FindBestNumericalDiscretizedSplitCartBase) {
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
   EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
   EXPECT_EQ(best_condition.na_value(), false);
+}
+
+TEST(UpliftCategoricalLabelDistribution, Base) {
+  UpliftCategoricalLabelDistribution dist;
+
+  dist.InitializeAndClear(
+      /*num_unique_values_in_treatments_column=*/3,
+      /*num_unique_in_outcomes_column=*/3);
+
+  // Empty dist.
+  EXPECT_EQ(dist.num_examples(), 0);
+  EXPECT_EQ(dist.MinNumExamplesPerTreatment(), 0);
+  EXPECT_EQ(dist.MeanOutcomePerTreatment(0), 0);
+  EXPECT_EQ(dist.MeanOutcomePerTreatment(1), 0);
+  EXPECT_EQ(dist.Uplift(), 0);
+  EXPECT_EQ(dist.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE),
+            0);
+  EXPECT_EQ(dist.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::KULLBACK_LEIBLER),
+            0);
+  EXPECT_EQ(dist.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::CHI_SQUARED),
+            0);
+
+  dist.AddCategoricalOutcome(/*outcome_value=*/2, /*treatment_value=*/2,
+                             /*weight=*/1.f);
+  dist.AddCategoricalOutcome(/*outcome_value=*/2, /*treatment_value=*/2,
+                             /*weight=*/1.f);
+  dist.AddCategoricalOutcome(/*outcome_value=*/2, /*treatment_value=*/1,
+                             /*weight=*/1.f);
+  dist.AddCategoricalOutcome(/*outcome_value=*/1, /*treatment_value=*/1,
+                             /*weight=*/1.f);
+
+  EXPECT_EQ(dist.num_examples(), 4);
+  EXPECT_EQ(dist.MinNumExamplesPerTreatment(), 2);
+  EXPECT_EQ(dist.MeanOutcomePerTreatment(0), 0.5);
+  EXPECT_EQ(dist.MeanOutcomePerTreatment(1), 1.0);
+  EXPECT_EQ(dist.Uplift(), 0.5);
+  EXPECT_EQ(dist.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE),
+            0.5 * 0.5);
+  EXPECT_EQ(dist.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::KULLBACK_LEIBLER),
+            std::log(2));
+  EXPECT_EQ(dist.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::CHI_SQUARED),
+            (1.0 - 0.5) * (1.0 - 0.5) / 0.5);
+
+  UpliftCategoricalLabelDistribution dist2;
+  dist2.InitializeAndClearLike(dist);
+
+  // Empty dist.
+  EXPECT_EQ(dist2.num_examples(), 0);
+
+  dist2.Add(dist);
+  EXPECT_EQ(dist2.num_examples(), 4);
+  EXPECT_EQ(dist2.MinNumExamplesPerTreatment(), 2);
+  EXPECT_EQ(dist2.MeanOutcomePerTreatment(0), 0.5);
+  EXPECT_EQ(dist2.MeanOutcomePerTreatment(1), 1.0);
+  EXPECT_EQ(dist2.Uplift(), 0.5);
+  EXPECT_EQ(dist2.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE),
+            0.5 * 0.5);
+  EXPECT_EQ(dist.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::KULLBACK_LEIBLER),
+            std::log(2));
+  EXPECT_EQ(dist.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::CHI_SQUARED),
+            (1.0 - 0.5) * (1.0 - 0.5) / 0.5);
+
+  // Empty dist.
+  dist2.Sub(dist);
+  EXPECT_EQ(dist2.num_examples(), 0);
+}
+
+TEST(UpliftCategoricalLabelDistribution, FromToLeafProto) {
+  decision_tree::proto::NodeUpliftOutput source_leaf_proto =
+      PARSE_TEST_PROTO(R"pb(
+        sum_weights: 4
+        sum_weights_per_treatment: 2
+        sum_weights_per_treatment: 2
+        sum_weights_per_treatment_and_outcome: 1
+        sum_weights_per_treatment_and_outcome: 2
+        num_examples_per_treatment: 2
+        num_examples_per_treatment: 2
+      )pb");
+  UpliftCategoricalLabelDistribution dist;
+  dist.ImportSetFromLeafProto(source_leaf_proto);
+
+  EXPECT_EQ(dist.num_examples(), 4);
+  EXPECT_EQ(dist.MinNumExamplesPerTreatment(), 2);
+  EXPECT_EQ(dist.MeanOutcomePerTreatment(0), 0.5);
+  EXPECT_EQ(dist.MeanOutcomePerTreatment(1), 1.0);
+  EXPECT_EQ(dist.Uplift(), 0.5);
+  EXPECT_EQ(dist.UpliftSplitScore(
+                proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE),
+            0.5 * 0.5);
+
+  decision_tree::proto::NodeUpliftOutput extracted_leaf_proto;
+  dist.ExportToLeafProto(&extracted_leaf_proto);
+  decision_tree::proto::NodeUpliftOutput expected_extracted_leaf_proto =
+      PARSE_TEST_PROTO(R"pb(
+        # Same as before.
+        sum_weights: 4
+        sum_weights_per_treatment: 2
+        sum_weights_per_treatment: 2
+        sum_weights_per_treatment_and_outcome: 1
+        sum_weights_per_treatment_and_outcome: 2
+        num_examples_per_treatment: 2
+        num_examples_per_treatment: 2
+
+        # Extra field.
+        treatment_effect: 0.5
+      )pb");
+  EXPECT_THAT(extracted_leaf_proto, EqualsProto(expected_extracted_leaf_proto));
+}
+
+TEST(DecisionTree, FindBestSplitNumericalFeatureTaskCategoricalUplift) {
+  const int num_examples = 8;
+  std::vector<row_t> selected_examples(num_examples);
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights(num_examples, 1.f);
+
+  std::vector<float> attributes = {1, 2, 3, 4, 5, 6, 7, 8};
+  const std::vector<int32_t> outcomes = {1, 1, 1, 1, 1, 2, 1, 2};
+  const std::vector<int32_t> treatments = {1, 2, 1, 2, 1, 2, 1, 2};
+
+  const int32_t num_outcome_classes = 2 + 1;
+  const int32_t num_treatment_classes = 2 + 1;
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_uplift()->set_min_examples_in_treatment(1);
+  // EUCLIDEAN_DISTANCE is the only split score that handle natively the
+  // distance between pure distributions.
+  dt_config.mutable_uplift()->set_split_score(
+      proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE);
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  CategoricalUpliftLabelStats label_stats(outcomes, num_outcome_classes,
+                                          treatments, num_treatment_classes);
+
+  auto& label_dist = label_stats.label_distribution;
+  label_dist.InitializeAndClear(num_outcome_classes, num_treatment_classes);
+
+  for (const auto example_idx : selected_examples) {
+    label_dist.AddCategoricalOutcome(
+        outcomes[example_idx], treatments[example_idx], weights[example_idx]);
+  }
+
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  EXPECT_EQ(FindSplitLabelUpliftCategoricalFeatureNumericalCart(
+                selected_examples, weights, attributes, label_stats,
+                /*na_replacement=*/2.5,
+                /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache),
+            SplitSearchResult::kBetterSplitFound);
+
+  EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 4.5f);
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 4);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 4);
+  EXPECT_EQ(best_condition.na_value(), false);
+  EXPECT_NEAR(best_condition.split_score(), 1.f * 0.5f + 0.f * 0.5f - 0.25f,
+              0.0001);
+}
+
+TEST(DecisionTree, FindBestSplitCategoricalFeatureTaskCategoricalUplift) {
+  const int num_examples = 8;
+  std::vector<row_t> selected_examples(num_examples);
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights(num_examples, 1.f);
+
+  // The values  {1,2} or {3,4} are discriminative.
+  std::vector<int32_t> attributes = {1, 2, 1, 2, 3, 4, 3, 4};
+  const std::vector<int32_t> outcomes = {1, 1, 1, 1, 1, 2, 1, 2};
+  const std::vector<int32_t> treatments = {1, 2, 1, 2, 1, 2, 1, 2};
+
+  const int32_t num_attribute_classes = 4 + 1;
+  const int32_t num_outcome_classes = 2 + 1;
+  const int32_t num_treatment_classes = 2 + 1;
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_uplift()->set_min_examples_in_treatment(1);
+  // EUCLIDEAN_DISTANCE is the only split score that handle natively the
+  // distance between pure distributions.
+  dt_config.mutable_uplift()->set_split_score(
+      proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE);
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  CategoricalUpliftLabelStats label_stats(outcomes, num_outcome_classes,
+                                          treatments, num_treatment_classes);
+
+  auto& label_dist = label_stats.label_distribution;
+  label_dist.InitializeAndClear(num_outcome_classes, num_treatment_classes);
+
+  for (const auto example_idx : selected_examples) {
+    label_dist.AddCategoricalOutcome(
+        outcomes[example_idx], treatments[example_idx], weights[example_idx]);
+  }
+
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  utils::RandomEngine random;
+  EXPECT_EQ(FindSplitLabelUpliftCategoricalFeatureCategorical(
+                selected_examples, weights, attributes, label_stats,
+                num_attribute_classes,
+                /*na_replacement=*/0,
+                /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache,
+                &random),
+            SplitSearchResult::kBetterSplitFound);
+
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 4);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 4);
+  EXPECT_EQ(best_condition.na_value(), false);
+  EXPECT_NEAR(best_condition.split_score(), 1.f * 0.5f + 0.f * 0.5f - 0.25f,
+              0.0001);
 }
 
 }  // namespace

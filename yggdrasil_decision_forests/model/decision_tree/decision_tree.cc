@@ -102,6 +102,39 @@ void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
       absl::StrAppend(description, "mean:", node.regressor().top_value(),
                       " sum:", node.regressor().sum_weights());
       break;
+
+    case proto::Node::OutputCase::kUplift: {
+      std::string treatment_effect_str;
+      for (const auto& value : node.uplift().treatment_effect()) {
+        if (!treatment_effect_str.empty()) {
+          absl::StrAppend(&treatment_effect_str, ", ");
+        }
+        absl::StrAppend(&treatment_effect_str, value);
+      }
+
+      std::string sum_weights_per_treatment_str;
+      for (const auto& value : node.uplift().sum_weights_per_treatment()) {
+        if (!sum_weights_per_treatment_str.empty()) {
+          absl::StrAppend(&sum_weights_per_treatment_str, ", ");
+        }
+        absl::StrAppend(&sum_weights_per_treatment_str, value);
+      }
+
+      std::string sum_weights_per_treatment_and_outcome_str;
+      for (const auto& value :
+           node.uplift().sum_weights_per_treatment_and_outcome()) {
+        if (!sum_weights_per_treatment_and_outcome_str.empty()) {
+          absl::StrAppend(&sum_weights_per_treatment_and_outcome_str, ", ");
+        }
+        absl::StrAppend(&sum_weights_per_treatment_and_outcome_str, value);
+      }
+
+      absl::StrAppend(description, "uplift:[", treatment_effect_str,
+                      "] examples_per_treatment:[",
+                      sum_weights_per_treatment_str,
+                      "] examples_per_treatment_and_outcome:[",
+                      sum_weights_per_treatment_and_outcome_str, "]");
+    } break;
   }
 }
 
@@ -451,6 +484,8 @@ void NodeWithChildren::ClearLabelDistributionDetails() {
       node_.mutable_regressor()->clear_sum_gradients();
       node_.mutable_regressor()->clear_sum_hessians();
       node_.mutable_regressor()->clear_sum_weights();
+      break;
+    case proto::Node::OutputCase::kUplift:
       break;
   }
 }

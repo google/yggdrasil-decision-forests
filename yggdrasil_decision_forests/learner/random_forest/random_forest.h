@@ -146,6 +146,7 @@ void UpdateOOBPredictionsWithNewTree(
 metric::proto::EvaluationResults EvaluateOOBPredictions(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
+    int uplift_treatment_col_idx,
     const absl::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
     const std::vector<PredictionAccumulator>& oob_predictions,
     bool for_permutation_importance = false);

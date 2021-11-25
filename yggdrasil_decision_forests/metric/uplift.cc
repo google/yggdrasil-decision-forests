@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/metric/uplift.h"
 
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -47,7 +48,7 @@ absl::Status InitializeUpliftEvaluation(
   if (label_column.type() != dataset::proto::ColumnType::CATEGORICAL) {
     return absl::InvalidArgumentError(
         "Categorical uplift requires a categorical label (i.e. response or "
-        "outcome).");
+        "outcome). ");
   }
   if (label_column.categorical().number_of_unique_values() != 3) {
     return absl::InvalidArgumentError(
@@ -76,7 +77,9 @@ absl::Status FinalizeUpliftMetricsFromSampledPredictions(
   const int num_treatments = eval->uplift().num_treatments();
   if (num_treatments < 2) {
     return absl::InvalidArgumentError(
-        "There should be at least two treatments.");
+        absl::StrCat("There should be at least two treatments (including"
+                     "control). Found ",
+                     num_treatments, " treatments"));
   }
 
   if (num_treatments != 2) {
@@ -100,7 +103,11 @@ absl::Status FinalizeUpliftMetricsFromSampledPredictions(
     ASSIGN_OR_RETURN(const float outcome, GetOutcome(sample));
 
     if (sample.uplift().treatment_effect_size() != num_treatments - 1) {
-      return absl::InvalidArgumentError("Wrong prediction shape");
+      return absl::InvalidArgumentError(absl::Substitute(
+          "Wrong prediction shape. num_treatments:$0 prediction:$1 "
+          "expected_predictions:$2",
+          num_treatments, sample.uplift().treatment_effect_size(),
+          num_treatments - 1));
     }
 
     if (sample.uplift().treatment() == 0) {
