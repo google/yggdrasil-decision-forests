@@ -483,6 +483,16 @@ void ExpectEqualPredictions(const model::proto::Task task,
       EXPECT_NEAR(a.ranking().relevance(), b.ranking().relevance(), epsilon);
       break;
 
+    case model::proto::Task::CATEGORICAL_UPLIFT: {
+      EXPECT_EQ(a.uplift().treatment_effect().size(),
+                b.uplift().treatment_effect().size());
+      for (int effect_idx = 0;
+           effect_idx < a.uplift().treatment_effect().size(); effect_idx++) {
+        EXPECT_NEAR(a.uplift().treatment_effect(effect_idx),
+                    b.uplift().treatment_effect(effect_idx), epsilon);
+      }
+    } break;
+
     default:
       LOG(FATAL) << "Not supported task";
   }
@@ -566,6 +576,21 @@ void ExpectEqualPredictions(
                     predictions[prediction_idx], epsilon)
             << "Predictions don't match.";
         break;
+
+      case model::proto::Task::CATEGORICAL_UPLIFT: {
+        // Precomputed predictions.
+        const int num_effects =
+            generic_prediction.uplift().treatment_effect_size();
+        for (int effect_idx = 0;
+             effect_idx < generic_prediction.uplift().treatment_effect_size();
+             effect_idx++) {
+          EXPECT_NEAR(generic_prediction.uplift().treatment_effect(effect_idx),
+                      predictions[prediction_idx * num_effects + effect_idx],
+                      epsilon)
+              << "Predictions don't match.";
+        }
+
+      } break;
 
       default:
         LOG(FATAL) << "Not supported task";

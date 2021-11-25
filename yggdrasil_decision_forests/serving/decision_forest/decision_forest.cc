@@ -496,6 +496,33 @@ absl::Status SetLeafNodeRandomForestRegression(
   return SetRegressiveLeaf(src_model, src_node, src_model.NumTrees(), dst_node);
 }
 
+template <typename SpecializedModel>
+absl::Status SetLeafNodeRandomForestCategoricalUplift(
+    const RandomForestModel& src_model, const NodeWithChildren& src_node,
+    SpecializedModel* dst_model,
+    typename SpecializedModel::NodeType* dst_node) {
+  using Node = typename SpecializedModel::NodeType;
+  static_assert(std::is_same<Node, GenericNode<uint16_t>>::value ||
+                    std::is_same<Node, GenericNode<uint32_t>>::value,
+                "Non supported node type.");
+  const auto begin_label_index = dst_model->label_buffer.size();
+  dst_model->label_buffer.resize(
+      dst_model->label_buffer.size() + dst_model->num_classes, 0.f);
+  *dst_node = Node::LeafCategoricalUplift(
+      /*.right_idx =*/0,
+      /*.feature_idx =*/0,
+      /*.type = */ Node::Type::kLeaf,
+      /*.label_buffer_offset = */ static_cast<uint32_t>(begin_label_index));
+
+  for (int output_idx = 0; output_idx < dst_model->num_classes; output_idx++) {
+    dst_model->label_buffer[begin_label_index + output_idx] =
+        src_node.node().uplift().treatment_effect(output_idx) /
+        src_model.NumTrees();
+  }
+
+  return absl::OkStatus();
+}
+
 // Set the leaf of a binary classification Gradient Boosted Trees.
 template <typename SpecializedModel>
 absl::Status SetLeafGradientBoostedTreesClassification(
@@ -868,6 +895,16 @@ absl::Status GenericToSpecializedModel(const RandomForestModel& src,
 }
 
 template <>
+absl::Status GenericToSpecializedModel(const RandomForestModel& src,
+                                       RandomForestCategoricalUplift* dst) {
+  dst->num_classes =
+      src.label_col_spec().categorical().number_of_unique_values() - 2;
+  using DstType = std::remove_pointer<decltype(dst)>::type;
+  return GenericToSpecializedModelHelper2(
+      SetLeafNodeRandomForestCategoricalUplift<DstType>, src, dst);
+}
+
+template <>
 absl::Status GenericToSpecializedModel(
     const RandomForestModel& src,
     GenericRandomForestBinaryClassification<uint32_t>* dst) {
@@ -897,6 +934,17 @@ absl::Status GenericToSpecializedModel(
   using DstType = std::remove_pointer<decltype(dst)>::type;
   return GenericToSpecializedModelHelper2(
       SetLeafNodeRandomForestRegression<DstType>, src, dst);
+}
+
+template <>
+absl::Status GenericToSpecializedModel(
+    const RandomForestModel& src,
+    GenericRandomForestCategoricalUplift<uint32_t>* dst) {
+  dst->num_classes =
+      src.label_col_spec().categorical().number_of_unique_values() - 2;
+  using DstType = std::remove_pointer<decltype(dst)>::type;
+  return GenericToSpecializedModelHelper2(
+      SetLeafNodeRandomForestCategoricalUplift<DstType>, src, dst);
 }
 
 template <>
@@ -1654,6 +1702,15 @@ void Predict(const RandomForestRegression& model,
 }
 
 template <>
+void Predict(const RandomForestCategoricalUplift& model,
+             const typename RandomForestCategoricalUplift::ExampleSet& examples,
+             int num_examples, std::vector<float>* predictions) {
+  PredictHelperMultiDimensionTrees<std::remove_reference<decltype(model)>::type,
+                                   Idendity>(model, examples, num_examples,
+                                             predictions);
+}
+
+template <>
 void Predict(const GenericRandomForestBinaryClassification<uint32_t>& model,
              const typename GenericRandomForestBinaryClassification<
                  uint32_t>::ExampleSet& examples,
@@ -1679,6 +1736,17 @@ void Predict(const GenericRandomForestRegression<uint32_t>& model,
              int num_examples, std::vector<float>* predictions) {
   PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
       model, examples, num_examples, predictions);
+}
+
+template <>
+void Predict(
+    const GenericRandomForestCategoricalUplift<uint32_t>& model,
+    const typename GenericRandomForestCategoricalUplift<uint32_t>::ExampleSet&
+        examples,
+    int num_examples, std::vector<float>* predictions) {
+  PredictHelperMultiDimensionTrees<std::remove_reference<decltype(model)>::type,
+                                   Idendity>(model, examples, num_examples,
+                                             predictions);
 }
 
 template <>

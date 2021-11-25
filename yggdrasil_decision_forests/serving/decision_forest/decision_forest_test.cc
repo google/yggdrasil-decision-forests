@@ -334,6 +334,19 @@ TEST(IrisMulticlassClassRF, ManualGeneric) {
       dataset, *model, engine);
 }
 
+TEST(SimPTECategoricalupliftRF, ManualGeneric) {
+  const auto model = LoadModel("sim_pte_categorical_uplift_rf");
+  const auto dataset =
+      LoadDataset(model->data_spec(), "sim_pte_test.csv", "csv");
+
+  auto* rf_model = dynamic_cast<RandomForestModel*>(model.get());
+  RandomForestCategoricalUplift engine;
+  CHECK_OK(GenericToSpecializedModel(*rf_model, &engine));
+
+  utils::ExpectEqualPredictionsTemplate<decltype(engine), Predict>(
+      dataset, *model, engine);
+}
+
 void BuildFullTree(const int d, model::decision_tree::NodeWithChildren* node) {
   if (d <= 0) {
     node->mutable_node()->mutable_classifier()->set_top_value(1.f);

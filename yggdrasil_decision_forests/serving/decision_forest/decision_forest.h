@@ -205,6 +205,14 @@ struct GenericNode {
     node.label_buffer_offset = label_buffer_offset;
     return node;
   }
+
+  // Simple categorical-uplift output leaf constructor.
+  static GenericNode<NodeOffsetRep> LeafCategoricalUplift(
+      NodeOffset right_idx, FeatureIdx feature_idx, Type type,
+      uint32_t label_buffer_offset) {
+    return LeafMulticlassClassification(right_idx, feature_idx, type,
+                                        label_buffer_offset);
+  }
 };
 
 // A generic decision forest.
@@ -380,6 +388,15 @@ struct GenericRandomForestRegression : ExampleSetModel<NodeOffsetRep> {
   static constexpr model::proto::Task kTask = model::proto::Task::REGRESSION;
 };
 using RandomForestRegression = GenericRandomForestRegression<>;
+
+// Random Forest model for categorical uplift.
+template <typename NodeOffsetRep = uint16_t>
+struct GenericRandomForestCategoricalUplift : ExampleSetModel<NodeOffsetRep> {
+  static constexpr model::proto::Task kTask =
+      model::proto::Task::CATEGORICAL_UPLIFT;
+  int num_classes;
+};
+using RandomForestCategoricalUplift = GenericRandomForestCategoricalUplift<>;
 
 // GBDT model for binary classification.
 template <typename NodeOffsetRep = uint16_t>

@@ -544,6 +544,23 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
             return engine;
           }
 
+        case model::proto::CATEGORICAL_UPLIFT:
+          if (need_uint32_node_index) {
+            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+                serving::decision_forest::GenericRandomForestCategoricalUplift<
+                    uint32_t>,
+                serving::decision_forest::Predict>>();
+            RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*rf_model));
+            return engine;
+          } else {
+            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+                serving::decision_forest::GenericRandomForestCategoricalUplift<
+                    uint16_t>,
+                serving::decision_forest::Predict>>();
+            RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*rf_model));
+            return engine;
+          }
+
         default:
           return absl::InvalidArgumentError("Non supported RF model");
       }
