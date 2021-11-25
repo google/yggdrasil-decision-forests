@@ -94,11 +94,26 @@ class WorkerService final : public proto::Server::Service {
   // Execution of a query emitted by the manager.
   grpc::Status Run(grpc::ServerContext* context, const proto::Query* request,
                    proto::Answer* reply) override {
-    RETURN_IF_ERROR(AbslStatusToGrpcStatus(
-        EnsureReadyWorker(request->manager_uid(), request->config_path(),
-                          request->worker_idx())));
+    {
+      absl::MutexLock l(&mutex_);
+      RETURN_IF_ERROR(AbslStatusToGrpcStatus(
+          EnsureReadyWorker(request->manager_uid(), request->config_path(),
+                            request->worker_idx())));
+      num_active_requests_++;
+    }
 
     auto result_or = worker_->RunRequest(request->blob());
+
+    {
+      absl::MutexLock l(&mutex_);
+      num_active_requests_--;
+      if (stopping_worker_) {
+        LOG(INFO) << "Still " << num_active_requests_ << " active requests";
+        if (num_active_requests_ == 0) {
+          request_done_cv_.Signal();
+        }
+      }
+    }
 
     if (!result_or.ok()) {
       reply->set_error(absl::StrCat("Worker #", request->worker_idx(), ": ",
@@ -135,11 +150,10 @@ class WorkerService final : public proto::Server::Service {
                         const proto::ShutdownQuery* request,
                         proto::Empty* reply) override {
     LOG(INFO) << "Shutdown worker";
+    absl::MutexLock l(&mutex_);
     if (worker_) {
-      RETURN_IF_ERROR(AbslStatusToGrpcStatus(worker_->Done()));
-      FinalizeIntraWorkerCommunication();
-      old_workers_.push_back(std::move(worker_));
-      worker_.reset();
+      RETURN_IF_ERROR(AbslStatusToGrpcStatus(BlockingDoneOnWorker()));
+      stopping_worker_ = false;
     }
     if (request->kill_worker_manager() && !stop_server_->HasBeenNotified()) {
       stop_server_->Notify();
@@ -153,21 +167,46 @@ class WorkerService final : public proto::Server::Service {
     return grpc::Status::OK;
   }
 
+  // Calls "Done" on the worker, wait for all the pending operation to be done
+  // or cancel, and destroy the "worker_" object.
+  absl::Status BlockingDoneOnWorker() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    stopping_worker_ = true;
+    RETURN_IF_ERROR(AbslStatusToGrpcStatus(worker_->Done()));
+    LOG(INFO) << "Waiting for the " << num_active_requests_
+              << " active request(s) to complete";
+    while (num_active_requests_ > 0) {
+      request_done_cv_.Wait(&mutex_);
+    }
+    FinalizeIntraWorkerCommunication();
+    worker_.reset();
+    return absl::OkStatus();
+  }
+
   // After a call to this method, the worker is ready to processed requests.
   // This method should be called before any request.
   absl::Status EnsureReadyWorker(uint64_t manager_uid,
                                  absl::string_view config_path,
-                                 const int worker_idx) {
-    absl::MutexLock l(&initialization_);
+                                 const int worker_idx)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     if (worker_) {
       if (manager_uid_ != manager_uid) {
         // The manager has changed e.g. the managed was killed and rescheduled.
         LOG(INFO) << "The manager has changed.";
-        RETURN_IF_ERROR(worker_->Done());
-        FinalizeIntraWorkerCommunication();
-        old_workers_.push_back(std::move(worker_));
-        worker_.reset();
+        if (stopping_worker_) {
+          // Another call is changing the worker.
+          while (stopping_worker_) {
+            stopping_worker_done_cv_.Wait(&mutex_);
+          }
+        } else {
+          RETURN_IF_ERROR(BlockingDoneOnWorker());
+          stopping_worker_ = false;
+          stopping_worker_done_cv_.SignalAll();
+        }
       } else {
+        if (stopping_worker_) {
+          // A new worker is being created.
+          return absl::InternalError("A newer managed id was observed");
+        }
         // Already initialized worker.
         return absl::OkStatus();
       }
@@ -181,7 +220,7 @@ class WorkerService final : public proto::Server::Service {
         file::GetBinaryProto(config_path, &worker_config, file::Defaults()));
     if (worker_config.manager_uid() != manager_uid_) {
       return absl::InvalidArgumentError(
-          "Two managers are fighting for the same worker.");
+          "Two different managers are fighting for the same worker");
     }
 
     worker_addresses_ = {worker_config.worker_addresses().begin(),
@@ -227,6 +266,7 @@ class WorkerService final : public proto::Server::Service {
         // List of non-documented GRPC errors that can indicate a temporary
         // impossibility to reach the server.
         if (status.error_message() == "Socket closed" ||
+            status.error_message() == "Transport closed" ||
             status.error_message() == "Connection reset by peer" ||
             status.error_message() == "Broken pipe" ||
             status.error_message() == "keepalive watchdog timeout") {
@@ -326,10 +366,6 @@ class WorkerService final : public proto::Server::Service {
   // Active worker implementation.
   std::unique_ptr<AbstractWorker> worker_;
 
-  // Inactive workers. "Done" was called on these workers, but they might
-  // still be running threads.
-  std::vector<std::unique_ptr<AbstractWorker>> old_workers_;
-
   // UID of the manager. Only valid if worker_ is set.
   uint64_t manager_uid_;
 
@@ -359,8 +395,23 @@ class WorkerService final : public proto::Server::Service {
   std::unique_ptr<InterWorkerCommunication> intra_worker_communication_;
 
   // Mutex protecting the initialization of the worker.
-  // TODO(gbm): Implement a cleaner design.
-  absl::Mutex initialization_;
+  absl::Mutex mutex_ ABSL_GUARDED_BY(mutex_);
+
+  // True when the worker is being stopped (i.e. waiting for all the requests to
+  // be completed) because the user called "Done" on the manager, or because the
+  // manager have changed.
+  bool stopping_worker_ ABSL_GUARDED_BY(mutex_) = false;
+
+  // Signal when the worker are done beeing stopped i.e. stopping_worker_ goes
+  // from true to false.
+  absl::CondVar stopping_worker_done_cv_;
+
+  // Signal are the end of a request execution when not other request are
+  // running (i.e. num_active_requests_=0).
+  absl::CondVar request_done_cv_;
+
+  // Number of requests currently beeing processed.
+  int num_active_requests_ ABSL_GUARDED_BY(mutex_) = 0;
 
   // Does the worker uses LOAS.
   bool use_loas_;

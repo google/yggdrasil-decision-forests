@@ -28,6 +28,13 @@ namespace distributed_gradient_boosted_trees {
 
 constexpr char DistributedGradientBoostedTreesWorker::kWorkerKey[];
 
+DistributedGradientBoostedTreesWorker::
+    ~DistributedGradientBoostedTreesWorker() {
+  if (worker_logs_) {
+    LOG(INFO) << "Destroying DistributedGradientBoostedTreesWorker";
+  }
+}
+
 absl::Status DistributedGradientBoostedTreesWorker::Setup(
     distribute::Blob serialized_welcome) {
   ASSIGN_OR_RETURN(welcome_, utils::ParseBinaryProto<proto::WorkerWelcome>(
@@ -35,6 +42,11 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
 
   const auto& spe_config = welcome_.train_config().GetExtension(
       proto::distributed_gradient_boosted_trees_config);
+  worker_logs_ = spe_config.worker_logs();
+
+  if (worker_logs_) {
+    LOG(INFO) << "Initializing DistributedGradientBoostedTreesWorker";
+  }
 
   // Load the dataset.
   const auto& worker_features = welcome_.owned_features(WorkerIdx()).features();
@@ -57,7 +69,7 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
           spe_config.gbt()));
 
   // Threadpool.
-  if (spe_config.worker_logs()) {
+  if (worker_logs_) {
     LOG(INFO) << "Create thread pool with "
               << welcome_.deployment_config().num_threads() << " threads";
   }
@@ -81,13 +93,18 @@ DistributedGradientBoostedTreesWorker::RunRequest(
   {
     absl::MutexLock l(&mutex_num_running_requests_);
     num_running_requests_--;
-    if (num_running_requests_ == 0 && stop_) {
-      LOG(INFO) << "Clear the worker memory";
-      dataset_.reset();
-      loss_.reset();
-      predictions_.clear();
-      weak_models_.clear();
-      thread_pool_.reset();
+    if (stop_) {
+      if (num_running_requests_ == 0) {
+        LOG(INFO) << "Clear the worker memory";
+        dataset_.reset();
+        loss_.reset();
+        predictions_.clear();
+        weak_models_.clear();
+        thread_pool_.reset();
+      } else {
+        LOG(INFO) << "Will clear the worker memory when all requests are done ("
+                  << num_running_requests_ << " requeres remaining)";
+      }
     }
   }
 
@@ -103,7 +120,7 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
 
   const auto& spe_config = welcome_.train_config().GetExtension(
       proto::distributed_gradient_boosted_trees_config);
-  if (spe_config.worker_logs()) {
+  if (worker_logs_) {
     LOG(INFO) << "Worker #" << WorkerIdx() << " received request "
               << request.type_case();
   }
@@ -220,7 +237,7 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
   }
 
   const auto runtime = absl::Now() - begin;
-  if (spe_config.worker_logs()) {
+  if (worker_logs_) {
     LOG(INFO) << "Worker #" << WorkerIdx() << " answered request "
               << request.type_case() << " in " << runtime;
   }
@@ -253,7 +270,8 @@ void DistributedGradientBoostedTreesWorker::MaybeSimulateFailure(
 }
 
 absl::Status DistributedGradientBoostedTreesWorker::Done() {
-  LOG(INFO) << "Done called on the worker";
+  LOG(INFO) << "Done called on the worker (" << num_running_requests_
+            << " running requests)";
   stop_ = true;
   return absl::OkStatus();
 }
@@ -298,7 +316,7 @@ absl::Status DistributedGradientBoostedTreesWorker::InitializerWorkingMemory(
   const auto& spe_config = welcome_.train_config().GetExtension(
       proto::distributed_gradient_boosted_trees_config);
 
-  if (spe_config.worker_logs()) {
+  if (worker_logs_) {
     LOG(INFO) << "Initialize worker memory";
   }
 
@@ -351,9 +369,7 @@ absl::Status DistributedGradientBoostedTreesWorker::SetInitialPredictions(
   ASSIGN_OR_RETURN(const auto initial_predictions,
                    loss_->InitialPredictions(request.label_statistics()));
 
-  const auto& spe_config = welcome_.train_config().GetExtension(
-      proto::distributed_gradient_boosted_trees_config);
-  if (spe_config.worker_logs()) {
+  if (worker_logs_) {
     LOG(INFO) << "Initialize initial predictions";
   }
 
@@ -576,6 +592,15 @@ absl::Status DistributedGradientBoostedTreesWorker::UpdateOwnedFeatures(
         "Unexpected change of loaded features while a non-blocking loading is "
         "in progress on worker #",
         WorkerIdx()));
+  }
+  if (worker_logs_) {
+    if (!features_to_load.empty()) {
+      LOG(INFO)
+          << "Blocking loading of " << features_to_load.size()
+          << " features. This is less efficient that non-blocking feature "
+             "loading and should open append when the manager or the "
+             "worker get rescheduled.";
+    }
   }
 
   return dataset_->LoadingAndUnloadingFeatures(features_to_load,

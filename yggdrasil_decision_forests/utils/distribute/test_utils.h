@@ -43,6 +43,22 @@ struct ManagerAndWorkers {
   }
 };
 
+struct ManagerCreatorAndWorkers {
+  std::function<std::unique_ptr<AbstractManager>()> manager_creator;
+  std::vector<std::unique_ptr<utils::concurrency::Thread>> worker_threads;
+
+  void Join() {
+    if (worker_threads.empty()) {
+      return;
+    }
+    LOG(INFO) << "Waiting for workers to stop";
+    for (auto& worker : worker_threads) {
+      worker->Join();
+    }
+    worker_threads.clear();
+  }
+};
+
 // Various tests.
 void TestWorkerError(AbstractManager* manager);
 void TestBlockingRequest(AbstractManager* manager);
@@ -51,6 +67,7 @@ void TestAsynchronousRequest(AbstractManager* manager);
 void TestAsynchronousRequestWithSpecificWorker(AbstractManager* manager);
 void TestAsynchronousIntraWorkerCommunication(AbstractManager* manager);
 void TestAsynchronousParallelWorkerExecution(AbstractManager* manager);
+void TestChangeManager(ManagerCreatorAndWorkers* manager_creator, bool nice);
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests
 

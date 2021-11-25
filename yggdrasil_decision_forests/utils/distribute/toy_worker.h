@@ -32,6 +32,14 @@ namespace distribute {
 //
 class ToyWorker final : public AbstractWorker {
  public:
+  ToyWorker() {
+    num_existing_toy_workers_++;
+    max_num_existing_toy_workers_.store(
+        std::max(max_num_existing_toy_workers_, num_existing_toy_workers_));
+  }
+
+  virtual ~ToyWorker() { num_existing_toy_workers_--; }
+
   absl::Status Setup(Blob welcome_blob) override {
     LOG(INFO) << "Setup worker " << WorkerIdx();
     CHECK_EQ(welcome_blob, "hello");
@@ -82,11 +90,32 @@ class ToyWorker final : public AbstractWorker {
       }
       LOG(INFO) << "Worker #" << WorkerIdx() << " passed the barrier";
       return "";
+    } else if (blob == "get") {
+      return value_;
+    } else if (absl::StartsWith(blob, "set:")) {
+      std::pair<std::string, std::string> items = absl::StrSplit(blob, ":");
+      value_ = items.second;
+      return "";
+    } else if (absl::StartsWith(blob, "sleep")) {
+      absl::SleepFor(absl::Seconds(5));
+      return "";
+    } else if (absl::StartsWith(blob, "num_existing_toy_workers")) {
+      return absl::StrCat(num_existing_toy_workers_.load());
+    } else if (absl::StartsWith(blob, "max_num_existing_toy_workers")) {
+      return absl::StrCat(max_num_existing_toy_workers_.load());
     }
     return absl::InvalidArgumentError("Unknown task");
   }
 
  private:
+  // Number of "ToyWorker" objects initialized in memory.
+  static std::atomic<int> num_existing_toy_workers_;
+
+  // Maximum number of "ToyWorker" objects ever initialized in memory.
+  static std::atomic<int> max_num_existing_toy_workers_;
+
+  std::string value_;  // For the "get/set" task.
+
   absl::Barrier *barrier_ = nullptr;
 };
 

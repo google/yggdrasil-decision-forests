@@ -110,5 +110,43 @@ void TestAsynchronousParallelWorkerExecution(AbstractManager* manager) {
   EXPECT_OK(manager->Done(true));
 }
 
+void TestChangeManager(ManagerCreatorAndWorkers* manager_creator, bool nice) {
+  auto m1 = manager_creator->manager_creator();
+
+  EXPECT_EQ(m1->BlockingRequest("num_existing_toy_workers").value(), "1");
+
+  EXPECT_EQ(m1->BlockingRequest("get").value(), "");
+  EXPECT_OK(m1->BlockingRequest("set:1").status());
+  EXPECT_EQ(m1->BlockingRequest("get").value(), "1");
+
+  EXPECT_OK(m1->AsynchronousRequest("sleep", 0));
+  EXPECT_OK(m1->AsynchronousRequest("sleep", 0));
+  EXPECT_OK(m1->AsynchronousRequest("sleep", 0));
+
+  // Do not check for the results.
+
+  if (nice) {
+    LOG(INFO) << "Nicely stop the manager";
+    EXPECT_OK(m1->Done(false));
+  }
+
+  LOG(INFO) << "Create new manager";
+
+  auto m2 = manager_creator->manager_creator();
+
+  // Make sure the previous worker was removed before the new one as created.
+  EXPECT_EQ(m2->BlockingRequest("num_existing_toy_workers").value(), "1");
+
+  // Ensure there is never more than one worker initialized at any time.
+  LOG(INFO) << "max_num_existing_toy_workers:"
+            << m2->BlockingRequest("max_num_existing_toy_workers").value()
+            << " (expecting 1 if the test is run in isolation)";
+
+  EXPECT_EQ(m2->BlockingRequest("get").value(), "");
+  EXPECT_OK(m2->BlockingRequest("set:2").status());
+  EXPECT_EQ(m2->BlockingRequest("get").value(), "2");
+  EXPECT_OK(m2->Done(true));
+}
+
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

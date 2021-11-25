@@ -193,6 +193,7 @@ void GRPCManager::WorkerRun(Blob blob, Worker* worker) {
                      << " failed with error: " << status.error_message();
       }
       if (status.error_message() == "Socket closed" ||
+          status.error_message() == "Transport closed" ||
           status.error_message() == "Connection reset by peer" ||
           status.error_message() == "Broken pipe" ||
           status.error_message() == "keepalive watchdog timeout") {
@@ -295,6 +296,7 @@ utils::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
                      << " failed with error: " << status.error_message();
       }
       if (status.error_message() == "Socket closed" ||
+          status.error_message() == "Transport closed" ||
           status.error_message() == "Connection reset by peer" ||
           status.error_message() == "Broken pipe" ||
           status.error_message() == "keepalive watchdog timeout") {
@@ -362,7 +364,7 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
 
   JoinWorkers();
   if (verbosity_ >= 1) {
-    LOG(INFO) << "Worked joined";
+    LOG(INFO) << "Workers joined";
   }
 
   proto::ShutdownQuery query;

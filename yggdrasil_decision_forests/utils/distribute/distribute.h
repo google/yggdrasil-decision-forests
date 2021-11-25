@@ -55,8 +55,13 @@
 //     "temporary_directory()" available both for the manager and workers can be
 //     used.
 //   - Error in a worker job (worker->RunRequest()) is returned to the manager,
-//   but
-//     does not stop the worker.
+//     but does not stop the worker.
+//   - If the manager changes (because a new one was initialized, or because the
+//     manager job was restarted), a new worker object "AbstractWorker" will be
+//     instantiated for the new manager.
+//   - (Currently only for the GRPC distribution strategy) When a worker is
+//     restarted (previous point), the previous "AbstractWorker" object is
+//     destructed before the new one is created.
 //
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_DISTRIBUTE_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_DISTRIBUTE_H_

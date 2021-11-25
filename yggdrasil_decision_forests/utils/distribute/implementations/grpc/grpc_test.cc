@@ -30,8 +30,9 @@ namespace distribute {
 namespace {
 
 // Create a GRPC manager and its workers.
-ManagerAndWorkers CreateGrpcManager(int parallel_execution_per_worker = 1) {
-  ManagerAndWorkers manager_and_workers;
+ManagerCreatorAndWorkers CreateGrpcManagerCreator(
+    int parallel_execution_per_worker = 1, int num_workers = 5) {
+  ManagerCreatorAndWorkers manager_and_workers;
   // Manager configuration.
   proto::Config config;
   config.set_implementation_key("GRPC");
@@ -40,7 +41,7 @@ ManagerAndWorkers CreateGrpcManager(int parallel_execution_per_worker = 1) {
       file::JoinPath(test::TmpDirectory(), "work_dir"));
   auto* addresses =
       config.MutableExtension(proto::grpc)->mutable_socket_addresses();
-  for (int worker_idx = 0; worker_idx < 5; worker_idx++) {
+  for (int worker_idx = 0; worker_idx < num_workers; worker_idx++) {
     // Create address.
     auto* address = addresses->add_addresses();
     address->set_ip("localhost");
@@ -53,15 +54,26 @@ ManagerAndWorkers CreateGrpcManager(int parallel_execution_per_worker = 1) {
     manager_and_workers.worker_threads.push_back(
         absl::make_unique<utils::concurrency::Thread>(
             [port]() { CHECK_OK(GRPCWorkerMainWorkerMain(port)); }));
-    absl::SleepFor(absl::Seconds(1));
+    absl::SleepFor(absl::Seconds(0.2));
   }
 
   // Start manager.
-  manager_and_workers.manager =
-      CreateManager(config, /*worker_name=*/kToyWorkerKey,
-                    /*welcome_blob=*/"hello", parallel_execution_per_worker)
-          .value();
+  manager_and_workers.manager_creator = [config,
+                                         parallel_execution_per_worker]() {
+    return CreateManager(config, /*worker_name=*/kToyWorkerKey,
+                         /*welcome_blob=*/"hello",
+                         parallel_execution_per_worker)
+        .value();
+  };
   return manager_and_workers;
+}
+
+ManagerAndWorkers CreateGrpcManager(int parallel_execution_per_worker = 1) {
+  auto creator = CreateGrpcManagerCreator(parallel_execution_per_worker);
+  ManagerAndWorkers m_and_w;
+  m_and_w.worker_threads = std::move(creator.worker_threads);
+  m_and_w.manager = creator.manager_creator();
+  return m_and_w;
 }
 
 TEST(GRPC, WorkerError) {
@@ -103,6 +115,18 @@ TEST(GRPC, AsynchronousIntraWorkerCommunication) {
 TEST(GRPC, AsynchronousParallelWorkerExecution) {
   auto all = CreateGrpcManager(5);
   TestAsynchronousParallelWorkerExecution(all.manager.get());
+  all.Join();
+}
+
+TEST(GRPC, TestChangeManagerNice) {
+  auto all = CreateGrpcManagerCreator(5, 1);
+  TestChangeManager(&all, /*nice=*/true);
+  all.Join();
+}
+
+TEST(GRPC, TestChangeManagerNotNice) {
+  auto all = CreateGrpcManagerCreator(5, 1);
+  TestChangeManager(&all, /*nice=*/false);
   all.Join();
 }
 

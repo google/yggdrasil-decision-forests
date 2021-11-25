@@ -38,6 +38,8 @@ class DistributedGradientBoostedTreesWorker
 
   absl::Status Done() override;
 
+  virtual ~DistributedGradientBoostedTreesWorker();
+
  private:
   // Internal data related to one weak model e.g. a decision tree.
   struct WeakModel {
@@ -223,6 +225,9 @@ class DistributedGradientBoostedTreesWorker
   // Time taken to load the features of the dataset in memory.
   absl::Duration dataset_feature_duration_;
   int dataset_num_features_loaded_ = 0;
+
+  // Prints details about the computation with LOG(INFO).
+  bool worker_logs_ = true;
 };
 
 // Extract the requested features in a FindSplits request.

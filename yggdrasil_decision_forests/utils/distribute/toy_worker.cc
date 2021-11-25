@@ -16,5 +16,10 @@
 #include "yggdrasil_decision_forests/utils/distribute/toy_worker.h"
 
 namespace yggdrasil_decision_forests {
-namespace distribute {}
+namespace distribute {
+
+std::atomic<int> ToyWorker::num_existing_toy_workers_{0};
+std::atomic<int> ToyWorker::max_num_existing_toy_workers_{0};
+
+}  // namespace distribute
 }  // namespace yggdrasil_decision_forests
