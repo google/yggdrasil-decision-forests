@@ -124,6 +124,9 @@ class DatasetCacheReader {
   // Features, sorted by index value, available in the reader.
   std::vector<int> features() const { return features_; }
 
+  // Tests if a feature is available in the reader.
+  bool has_feature(int feature) const;
+
   // Load and unload a set of features.
   absl::Status LoadingAndUnloadingFeatures(
       const std::vector<int>& load_features,

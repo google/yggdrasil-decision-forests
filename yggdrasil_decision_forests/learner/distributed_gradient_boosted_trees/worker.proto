@@ -21,6 +21,7 @@ import "yggdrasil_decision_forests/dataset/data_spec.proto";
 import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.proto";
+import "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/training.proto";
 
 // Welcome message of the worker.
@@ -152,14 +153,14 @@ message WorkerRequest {
   }
 
   message ShareSplits {
-    repeated distributed_decision_tree.proto.SplitPerOpenNode
-        split_per_weak_model = 1;
-
-    // List of the workers that owns the split evaluation data.
-    repeated int32 active_workers = 2 [packed = true];
+    optional distributed_decision_tree.proto.SplitSharingPlan.Request request =
+        1;
   }
 
-  message GetSplitValue {}
+  message GetSplitValue {
+    repeated distributed_decision_tree.proto.SplitSharingPlan.RequestItem.Split
+        splits = 1;
+  }
 
   message EndIter {
     optional int32 iter_idx = 1;

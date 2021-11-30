@@ -109,6 +109,7 @@ all_proto_library(
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_proto",
         "//yggdrasil_decision_forests/learner/distributed_decision_tree:training_proto",
         "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_proto",
+        "//yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer:load_balancer_proto",
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_proto",
     ],
 )

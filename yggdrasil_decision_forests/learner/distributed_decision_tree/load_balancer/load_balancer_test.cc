@@ -23,6 +23,8 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace distributed_decision_tree {
 namespace {
+
+using test::EqualsProto;
 using testing::ElementsAre;
 
 TEST(LoadBalancer, StaticBalancing) {
@@ -128,6 +130,218 @@ TEST(LoadBalancer, DynamicBalancing) {
   // Two transfers of feature expected.
   EXPECT_THAT(balancer.WorkersPerFeatures(),
               ElementsAre(1, -1, 0, -1, 1, -1, 0));  // 2 in worker 0.
+}
+
+TEST(LoadBalancer, MakeSplitSharingPlan) {
+  distributed_decision_tree::dataset_cache::proto::CacheMetadata
+      cache_metadata = PARSE_TEST_PROTO(R"pb(
+        columns { numerical { num_unique_values: 10 } }
+        columns { numerical { num_unique_values: 10 } }
+        columns { numerical { num_unique_values: 10 } }
+        columns { numerical { num_unique_values: 10 } }
+        columns { numerical { num_unique_values: 10 } }
+        columns { numerical { num_unique_values: 10 } }
+        columns { numerical { num_unique_values: 10 } }
+        columns { numerical { num_unique_values: 10 } }
+        columns { numerical { num_unique_values: 10 } }
+        columns { numerical { num_unique_values: 10 } }
+        columns { categorical { num_values: 3 } }
+      )pb");
+  auto balancer =
+      LoadBalancer::Create(/*features=*/{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+                           /*num_workers=*/10, cache_metadata, {})
+          .value();
+  // Features 9 and 10 are owned by worker #0.
+  // Feature 8 is owned by worker #1.
+
+  const auto plan_1 = balancer.MakeSplitSharingPlan({9}).value();
+  const proto::SplitSharingPlan expected_plan_1 = PARSE_TEST_PROTO(R"pb(
+    rounds {
+      requests {
+        key: 1
+        value { items { src_worker: 0 features: 9 } }
+      }
+      requests {
+        key: 2
+        value { items { src_worker: 0 features: 9 } }
+      }
+      requests {
+        key: 3
+        value { items { src_worker: 0 features: 9 } }
+      }
+      requests {
+        key: 4
+        value { items { src_worker: 0 features: 9 } }
+      }
+    }
+    rounds {
+      requests {
+        key: 0
+        value { last_request_of_plan: true }
+      }
+      requests {
+        key: 1
+        value { last_request_of_plan: true }
+      }
+      requests {
+        key: 2
+        value { last_request_of_plan: true }
+      }
+      requests {
+        key: 3
+        value { last_request_of_plan: true }
+      }
+      requests {
+        key: 4
+        value { last_request_of_plan: true }
+      }
+      requests {
+        key: 5
+        value {
+          items { src_worker: 0 features: 9 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 6
+        value {
+          items { src_worker: 1 features: 9 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 7
+        value {
+          items { src_worker: 2 features: 9 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 8
+        value {
+          items { src_worker: 3 features: 9 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 9
+        value {
+          items { src_worker: 4 features: 9 }
+          last_request_of_plan: true
+        }
+      }
+    }
+  )pb");
+  EXPECT_THAT(plan_1, EqualsProto(expected_plan_1));
+
+  const auto plan_2 = balancer.MakeSplitSharingPlan({8, 9, 10}).value();
+  const proto::SplitSharingPlan expected_plan_2 = PARSE_TEST_PROTO(R"pb(
+    rounds {
+      requests {
+        key: 1
+        value { items { src_worker: 0 features: 9 features: 10 } }
+      }
+      requests {
+        key: 2
+        value { items { src_worker: 0 features: 9 features: 10 } }
+      }
+      requests {
+        key: 3
+        value { items { src_worker: 0 features: 9 features: 10 } }
+      }
+      requests {
+        key: 4
+        value { items { src_worker: 0 features: 9 features: 10 } }
+      }
+      requests {
+        key: 5
+        value { items { src_worker: 1 features: 8 } }
+      }
+      requests {
+        key: 6
+        value { items { src_worker: 1 features: 8 } }
+      }
+      requests {
+        key: 7
+        value { items { src_worker: 1 features: 8 } }
+      }
+      requests {
+        key: 8
+        value { items { src_worker: 1 features: 8 } }
+      }
+    }
+    rounds {
+      requests {
+        key: 0
+        value {
+          items { src_worker: 1 features: 8 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 1
+        value { last_request_of_plan: true }
+      }
+      requests {
+        key: 2
+        value {
+          items { src_worker: 5 features: 8 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 3
+        value {
+          items { src_worker: 6 features: 8 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 4
+        value {
+          items { src_worker: 7 features: 8 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 5
+        value {
+          items { src_worker: 0 features: 9 features: 10 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 6
+        value {
+          items { src_worker: 1 features: 9 features: 10 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 7
+        value {
+          items { src_worker: 2 features: 9 features: 10 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 8
+        value {
+          items { src_worker: 3 features: 9 features: 10 }
+          last_request_of_plan: true
+        }
+      }
+      requests {
+        key: 9
+        value {
+          items { src_worker: 4 features: 9 features: 10 }
+          items { src_worker: 8 features: 8 }
+          last_request_of_plan: true
+        }
+      }
+    }
+  )pb");
+  EXPECT_THAT(plan_2, EqualsProto(expected_plan_2));
 }
 
 }  // namespace

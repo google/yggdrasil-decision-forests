@@ -267,11 +267,14 @@ absl::Status TreeBuilder::FindBestSplitsWithThreadPool(
           FindBestSplitsWithFeature(local_common, feature, sub_num_threads);
 
       // Merge the result.
-      absl::MutexLock l(mutex);
-      status->Update(local_status);
-      if (local_status.ok()) {
-        status->Update(
-            MergeBestSplits(*local_common.best_splits, common.best_splits));
+      {
+        absl::MutexLock l(mutex);
+        status->Update(local_status);
+        if (local_status.ok()) {
+          status->Update(
+              MergeBestSplits(*local_common.best_splits, common.best_splits));
+        }
+        // Note: Making sure the mutex lock is destroyed before the mutex.
       }
       counter->DecrementCount();
     });
@@ -719,7 +722,8 @@ absl::Status TreeBuilder::SetRootValue(
 absl::Status EvaluateSplits(const ExampleToNodeMap& example_to_node,
                             const SplitPerOpenNode& splits,
                             SplitEvaluationPerOpenNode* split_evaluation,
-                            dataset_cache::DatasetCacheReader* dataset) {
+                            dataset_cache::DatasetCacheReader* dataset,
+                            utils::concurrency::ThreadPool* thread_pool) {
   // Group the split per feature.
   absl::flat_hash_map<FeatureIndex, std::vector<int>> split_per_feature;
   for (int split_idx = 0; split_idx < splits.size(); split_idx++) {
@@ -728,40 +732,59 @@ absl::Status EvaluateSplits(const ExampleToNodeMap& example_to_node,
       continue;
     }
     const FeatureIndex feature = split.condition.attribute();
+    if (!dataset->has_feature(feature)) {
+      continue;
+    }
     split_per_feature[feature].push_back(split_idx);
   }
 
   split_evaluation->assign(splits.size(), {});
 
-  // TODO(gbm): In parallel.
-  for (const auto& feature_and_split_idx : split_per_feature) {
-    const auto& col_metadata =
-        dataset->meta_data().columns(feature_and_split_idx.first);
+  const auto process =
+      [&](const FeatureIndex feature_idx,
+          const std::vector<int>& active_node_idxs) -> absl::Status {
+    const auto& col_metadata = dataset->meta_data().columns(feature_idx);
     switch (col_metadata.type_case()) {
       case dataset_cache::proto::CacheMetadata_Column::kNumerical:
         RETURN_IF_ERROR(EvaluateSplitsPerNumericalFeature(
-            example_to_node, splits, feature_and_split_idx.first,
-            feature_and_split_idx.second, split_evaluation, dataset));
+            example_to_node, splits, feature_idx, active_node_idxs,
+            split_evaluation, dataset));
         break;
 
       case dataset_cache::proto::CacheMetadata_Column::kCategorical:
         RETURN_IF_ERROR(EvaluateSplitsPerCategoricalFeature(
-            example_to_node, splits, feature_and_split_idx.first,
-            feature_and_split_idx.second, split_evaluation, dataset));
+            example_to_node, splits, feature_idx, active_node_idxs,
+            split_evaluation, dataset));
         break;
 
       case dataset_cache::proto::CacheMetadata_Column::kBoolean:
         RETURN_IF_ERROR(EvaluateSplitsPerBooleanFeature(
-            example_to_node, splits, feature_and_split_idx.first,
-            feature_and_split_idx.second, split_evaluation, dataset));
+            example_to_node, splits, feature_idx, active_node_idxs,
+            split_evaluation, dataset));
         break;
 
       case dataset_cache::proto::CacheMetadata_Column::TYPE_NOT_SET:
         return absl::InternalError("Non set split");
     }
-  }
+    return absl::OkStatus();
+  };
 
-  return absl::OkStatus();
+  absl::Mutex mutex;
+  absl::BlockingCounter blocker(split_per_feature.size());
+  absl::Status status;
+  for (const auto& feature_and_split_idx : split_per_feature) {
+    thread_pool->Schedule([&, feature_idx = feature_and_split_idx.first,
+                           &splits = feature_and_split_idx.second]() {
+      auto local_status = process(feature_idx, splits);
+      {
+        absl::MutexLock l(&mutex);
+        status.Update(local_status);
+      }
+      blocker.DecrementCount();
+    });
+  }
+  blocker.Wait();
+  return status;
 }
 
 absl::Status EvaluateSplitsPerNumericalFeature(
@@ -1033,6 +1056,7 @@ absl::Status UpdateExampleNodeMap(
     DCHECK_LE(num_elements, split_evaluation[node_idx].size() * 8);
     readers[node_idx].Open(split_evaluation[node_idx].data(), num_elements);
   }
+
   // TODO(gbm): In parallel.
   for (ExampleIndex example_idx = 0; example_idx < example_to_node->size();
        example_idx++) {
@@ -1093,6 +1117,7 @@ absl::Status UpdateLabelStatistics(const SplitPerOpenNode& splits,
 
 void ConvertFromProto(const proto::SplitPerOpenNode& src,
                       SplitPerOpenNode* dst) {
+  dst->clear();
   dst->resize(src.splits_size());
   for (int split_idx = 0; split_idx < src.splits_size(); split_idx++) {
     const auto& src_split = src.splits(split_idx);

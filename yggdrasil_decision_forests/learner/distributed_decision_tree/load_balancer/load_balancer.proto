@@ -57,17 +57,6 @@ message LoadBalancerOptions {
   // of their features taken.
   optional float median_margin_ratio = 6 [default = 2.0];
 
-  // Maximum number of synchronization requests executed on a worker in
-  // parallel. During the synchronization phrase, each active workers (limited
-  // by the number of leaves) needs to synchronize with all the other worker.
-  // During this phrase, the memory of the active worker is linearly dependent
-  // on the number of active synchronization requests.
-  //
-  // Increasing this value will speed-up the synchronization between workers
-  // (i.e. increase the training speed), but increase the worker RAM usage.
-  // TODO(gbm): Share the synchronization output buffer.
-  optional int32 max_concurrent_intra_worker_connections = 7 [default = 100];
-
   // TODO(gbm): Implement multi-hops synchronization.
 
   optional Internal internal = 8;
@@ -77,4 +66,42 @@ message LoadBalancerOptions {
     // test only.
     optional bool random_dynamic_balancing = 1 [default = false];
   }
+}
+
+// A "plan" is a partially ordered sequence of instructions of the form
+// "worker i request the evaluation of split j to worker k". A plan allows to
+// synchronize efficiently the evaluation split values of a set of features.
+message SplitSharingPlan {
+  message RequestItem {
+    optional int32 src_worker = 1;
+    repeated int32 features = 2 [packed=true];
+
+    // Weak models + split idx that use this feature.
+    message Split {
+      optional int32 weak_model_idx = 1;
+      optional int32 split_idx = 2;
+    }
+    repeated Split splits = 3;
+  }
+
+  message Request {
+    repeated RequestItem items = 1;
+
+    // If true, this is the last request received by this worker in this plan.
+    optional bool last_request_of_plan = 2 [default = false];
+  }
+
+  message Round {
+    // Requests of a given destination worker.
+    // dst_worker_idx -> {Requests}.
+    //
+    // In other words, worker "dst_worker_idx" will request data to the
+    // "src_worker" workers.
+    map<int32, Request> requests = 1;
+  }
+
+  // Rounds define the ordering in between the orders.
+  // Requests within rounds are not ordered i.e. can be executed in any order /
+  // in parallel.
+  repeated Round rounds = 1;
 }

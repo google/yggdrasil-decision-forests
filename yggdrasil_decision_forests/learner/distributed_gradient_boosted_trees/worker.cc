@@ -498,9 +498,6 @@ absl::Status DistributedGradientBoostedTreesWorker::FindSplits(
                                   unique_active_features_set.end());
     num_unique_active_features_across_weak_models +=
         unique_active_features.size();
-
-    // Clear the last split evaluation.
-    weak_models_[weak_model_idx].last_split_evaluation.clear();
   }
 
   std::vector<distributed_decision_tree::SplitPerOpenNode>
@@ -553,13 +550,15 @@ absl::Status DistributedGradientBoostedTreesWorker::EvaluateSplits(
        weak_model_idx++) {
     auto& weak_model = weak_models_[weak_model_idx];
 
-    distributed_decision_tree::SplitPerOpenNode splits;
+    // Clear the last split evaluation.
+    weak_model.last_split_evaluation.clear();
+
     distributed_decision_tree::ConvertFromProto(
-        request.split_per_weak_model(weak_model_idx), &splits);
+        request.split_per_weak_model(weak_model_idx), &weak_model.last_splits);
 
     RETURN_IF_ERROR(distributed_decision_tree::EvaluateSplits(
-        weak_model.example_to_node, splits, &weak_model.last_split_evaluation,
-        dataset_.get()));
+        weak_model.example_to_node, weak_model.last_splits,
+        &weak_model.last_split_evaluation, dataset_.get(), thread_pool_.get()));
   }
 
   return absl::OkStatus();
@@ -674,57 +673,31 @@ DistributedGradientBoostedTreesWorker::PreloadFutureOwnedFeatures(
   }
 }
 
-absl::Status
-DistributedGradientBoostedTreesWorker::InitializeSplitEvaluationMerging(
-    const proto::WorkerRequest::ShareSplits& request,
-    std::vector<WeakModelLayer>* layer_per_weak_models) {
-  if (request.split_per_weak_model().size() != weak_models_.size()) {
-    return absl::InternalError("Unexpected number of weak models");
-  }
-  layer_per_weak_models->resize(weak_models_.size());
-  for (int weak_model_idx = 0; weak_model_idx < weak_models_.size();
-       weak_model_idx++) {
-    auto& iter = (*layer_per_weak_models)[weak_model_idx];
-    distributed_decision_tree::ConvertFromProto(
-        request.split_per_weak_model(weak_model_idx), &iter.splits);
-    const auto& local_split_evaluation =
-        weak_models_[weak_model_idx].last_split_evaluation;
-    if (local_split_evaluation.empty()) {
-      iter.split_evaluations.assign(iter.splits.size(), {});
-    } else {
-      DCHECK_EQ(local_split_evaluation.size(), iter.splits.size());
-      iter.split_evaluations = local_split_evaluation;
-    }
-  }
-  return absl::OkStatus();
-}
 
-absl::Status DistributedGradientBoostedTreesWorker::MergingSplitEvaluation(
-    proto::WorkerResult::GetSplitValue* src_split_values,
-    std::vector<WeakModelLayer>* dst_layer_per_weak_models) {
-  if (dst_layer_per_weak_models->size() !=
+absl::Status DistributedGradientBoostedTreesWorker::
+    MergingSplitEvaluationToLastSplitEvaluation(
+        proto::WorkerResult::GetSplitValue* src_split_values) {
+  if (weak_models_.size() !=
       src_split_values->evaluation_per_weak_model_size()) {
     return absl::InternalError("Unexpected number of weak models");
   }
-  for (int weak_model_idx = 0;
-       weak_model_idx < dst_layer_per_weak_models->size(); weak_model_idx++) {
+  for (int weak_model_idx = 0; weak_model_idx < weak_models_.size();
+       weak_model_idx++) {
     auto* src_evaluations =
         src_split_values->mutable_evaluation_per_weak_model(weak_model_idx)
             ->mutable_evaluation_per_open_node();
     if (src_evaluations->size() !=
-        (*dst_layer_per_weak_models)[weak_model_idx].split_evaluations.size()) {
+        weak_models_[weak_model_idx].last_split_evaluation.size()) {
       return absl::InternalError(absl::Substitute(
           "Wrong number of splits in MergingSplitEvaluation. $0 != $1",
           src_evaluations->size(),
-          (*dst_layer_per_weak_models)[weak_model_idx]
-              .split_evaluations.size()));
+          weak_models_[weak_model_idx].last_split_evaluation.size()));
     }
     for (int split_idx = 0; split_idx < src_evaluations->size(); split_idx++) {
       if (src_evaluations->Get(split_idx).empty()) {
         continue;
       }
-      (*dst_layer_per_weak_models)[weak_model_idx]
-          .split_evaluations[split_idx] =
+      weak_models_[weak_model_idx].last_split_evaluation[split_idx] =
           std::move(*src_evaluations->Mutable(split_idx));
     }
   }
@@ -736,29 +709,17 @@ absl::Status DistributedGradientBoostedTreesWorker::ShareSplits(
     const proto::WorkerRequest::ShareSplits& request,
     proto::WorkerResult::ShareSplits* answer,
     proto::WorkerResult* generic_answer) {
-  if (request.split_per_weak_model_size() != weak_models_.size()) {
-    return absl::InternalError("Unexpected number of weak models");
-  }
 
   // Request the split evaluation from other workers.
-  int num_requests = 0;
-  for (const auto active_worker_idx : request.active_workers()) {
-    DCHECK_GE(active_worker_idx, 0);
-    DCHECK_LT(active_worker_idx, NumWorkers());
-    if (active_worker_idx == WorkerIdx()) {
-      continue;
-    }
+  for (const auto& items : request.request().items()) {
     proto::WorkerRequest generic_other_request;
-    generic_other_request.mutable_get_split_value();
+    *generic_other_request.mutable_get_split_value()->mutable_splits() =
+        items.splits();
     RETURN_IF_ERROR(AsynchronousProtoRequestToOtherWorker(generic_other_request,
-                                                          active_worker_idx));
-    num_requests++;
+                                                          items.src_worker()));
   }
+  const int num_requests = request.request().items_size();
 
-  // Prepare for the aggregation of split evaluation.
-  std::vector<WeakModelLayer> layer_per_weak_models;
-  RETURN_IF_ERROR(
-      InitializeSplitEvaluationMerging(request, &layer_per_weak_models));
 
   // Aggregate all the split evaluations.
   for (int reply_idx = 0; reply_idx < num_requests; reply_idx++) {
@@ -788,34 +749,36 @@ absl::Status DistributedGradientBoostedTreesWorker::ShareSplits(
       return absl::InternalError("Unexpected answer. Expecting GetSplitValue.");
     }
     auto* other_result = generic_other_result.mutable_get_split_value();
-    RETURN_IF_ERROR(
-        MergingSplitEvaluation(other_result, &layer_per_weak_models));
+    RETURN_IF_ERROR(MergingSplitEvaluationToLastSplitEvaluation(other_result));
   }
 
-  for (int weak_model_idx = 0; weak_model_idx < weak_models_.size();
-       weak_model_idx++) {
-    auto& weak_model = weak_models_[weak_model_idx];
-    const auto& iter = layer_per_weak_models[weak_model_idx];
+  if (request.request().last_request_of_plan()) {
+    for (int weak_model_idx = 0; weak_model_idx < weak_models_.size();
+         weak_model_idx++) {
+      auto& weak_model = weak_models_[weak_model_idx];
+      // const auto& iter = layer_per_weak_models[weak_model_idx];
 
-    ASSIGN_OR_RETURN(const auto node_remapping,
-                     weak_model.tree_builder->ApplySplitToTree(iter.splits));
+      ASSIGN_OR_RETURN(
+          const auto node_remapping,
+          weak_model.tree_builder->ApplySplitToTree(weak_model.last_splits));
 
-    weak_model.has_multiple_node_idxs = true;
+      weak_model.has_multiple_node_idxs = true;
 
-    RETURN_IF_ERROR(UpdateClosingNodesPredictions(
-        weak_model.example_to_node, weak_model.label_stats_per_node,
-        node_remapping, weak_model.tree_builder->set_leaf_functor(),
-        weak_model_idx, weak_models_.size(), &predictions_,
-        thread_pool_.get()));
+      RETURN_IF_ERROR(UpdateClosingNodesPredictions(
+          weak_model.example_to_node, weak_model.label_stats_per_node,
+          node_remapping, weak_model.tree_builder->set_leaf_functor(),
+          weak_model_idx, weak_models_.size(), &predictions_,
+          thread_pool_.get()));
 
-    RETURN_IF_ERROR(UpdateExampleNodeMap(
-        iter.splits, iter.split_evaluations, node_remapping,
-        &weak_model.example_to_node, thread_pool_.get()));
+      RETURN_IF_ERROR(UpdateExampleNodeMap(
+          weak_model.last_splits, weak_model.last_split_evaluation,
+          node_remapping, &weak_model.example_to_node, thread_pool_.get()));
 
-    RETURN_IF_ERROR(UpdateLabelStatistics(iter.splits, node_remapping,
-                                          &weak_model.label_stats_per_node));
+      RETURN_IF_ERROR(UpdateLabelStatistics(weak_model.last_splits,
+                                            node_remapping,
+                                            &weak_model.label_stats_per_node));
+    }
   }
-
   return absl::OkStatus();
 }
 
@@ -832,23 +795,34 @@ absl::Status DistributedGradientBoostedTreesWorker::GetSplitValue(
     const proto::WorkerRequest::GetSplitValue& request,
     proto::WorkerResult::GetSplitValue* answer) {
   answer->set_source_worker(WorkerIdx());
+
+  // Allocate the answer.
+  answer->mutable_evaluation_per_weak_model()->Reserve(weak_models_.size());
   for (int weak_model_idx = 0; weak_model_idx < weak_models_.size();
        weak_model_idx++) {
     const auto& weak_model = weak_models_[weak_model_idx];
     auto* dst_evaluation_per_open_node =
         answer->add_evaluation_per_weak_model()
             ->mutable_evaluation_per_open_node();
-
-    const auto& src_evaluation_per_open_node = weak_model.last_split_evaluation;
-    for (int split_idx = 0; split_idx < src_evaluation_per_open_node.size();
+    dst_evaluation_per_open_node->Reserve(
+        weak_model.last_split_evaluation.size());
+    for (int split_idx = 0; split_idx < weak_model.last_split_evaluation.size();
          split_idx++) {
-      if (!src_evaluation_per_open_node[split_idx].empty()) {
-        *dst_evaluation_per_open_node->Add() =
-            src_evaluation_per_open_node[split_idx];
-      } else {
-        dst_evaluation_per_open_node->Add();
-      }
+      dst_evaluation_per_open_node->Add();
     }
+  }
+
+  // Copy the split evaluations.
+  for (const auto& split : request.splits()) {
+    const auto& src = weak_models_[split.weak_model_idx()]
+                          .last_split_evaluation[split.split_idx()];
+    if (src.empty()) {
+      return absl::InternalError("Split data not available");
+    }
+    auto& dst =
+        *answer->mutable_evaluation_per_weak_model(split.weak_model_idx())
+             ->mutable_evaluation_per_open_node(split.split_idx());
+    dst = src;
   }
 
   return absl::OkStatus();

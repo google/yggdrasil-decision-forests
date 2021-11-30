@@ -641,16 +641,14 @@ absl::Status RunIteration(
     }
 
     // Request for the workers to evaluate the splits.
-    ASSIGN_OR_RETURN(const auto active_workers,
-                     EmitEvaluateSplits(splits_per_weak_models, load_balancer,
-                                        distribute_manager, rnd, monitoring));
+    RETURN_IF_ERROR(EmitEvaluateSplits(splits_per_weak_models, load_balancer,
+                                       distribute_manager, rnd, monitoring));
 
     // Request for the workers to share the evaluation results,
     // update the tree structures, example->node mapping and label
     // statistics
-    RETURN_IF_ERROR(EmitShareSplits(splits_per_weak_models, active_workers,
-                                    load_balancer, distribute_manager,
-                                    monitoring));
+    RETURN_IF_ERROR(EmitShareSplits(splits_per_weak_models, load_balancer,
+                                    distribute_manager, monitoring));
   }
 
   RETURN_IF_ERROR(EmitEndIter(iter_idx, distribute_manager, training_evaluation,
@@ -1066,7 +1064,7 @@ EmitFindSplits(
   return splits_per_weak_models;
 }
 
-utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
+absl::Status EmitEvaluateSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
     distributed_decision_tree::LoadBalancer* load_balancer,
@@ -1074,45 +1072,27 @@ utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
     internal::Monitoring* monitoring) {
   monitoring->BeginStage(internal::Monitoring::kEvaluateSplits);
 
-  // Mapping worker_idx -> weak_model_idx -> split_dx.
-  ASSIGN_OR_RETURN(
-      const auto active_workers,
-      BuildActiveWorkers(splits_per_weak_models, *load_balancer, rnd));
-
-  WorkerIdxs active_worker_idxs;
-  active_worker_idxs.reserve(active_workers.size());
-  for (const auto& active_worker : active_workers) {
-    active_worker_idxs.push_back(active_worker.first);
+  proto::WorkerRequest generic_request;
+  auto& request = *generic_request.mutable_evaluate_splits();
+  for (const auto& splits : splits_per_weak_models) {
+    distributed_decision_tree::ConvertToProto(
+        splits, request.add_split_per_weak_model());
   }
 
-  // Emit the requests.
-  for (const auto& active_worker : active_workers) {
-    proto::WorkerRequest generic_request;
-    auto& request = *generic_request.mutable_evaluate_splits();
-    for (int weak_model_idx = 0; weak_model_idx < splits_per_weak_models.size();
-         weak_model_idx++) {
-      auto* dst_splits = request.add_split_per_weak_model();
-      const auto& active_split_idxs = active_worker.second[weak_model_idx];
-      distributed_decision_tree::ConvertToProto(
-          splits_per_weak_models[weak_model_idx], active_split_idxs,
-          dst_splits);
-    }
-
-    // Load balancing updates.
-    RETURN_IF_ERROR(SetLoadBalancingRequest(active_worker.first, load_balancer,
-                                            &generic_request));
-
-    RETURN_IF_ERROR(distribute->AsynchronousProtoRequest(generic_request,
-                                                         active_worker.first));
+  // TODO(gbm): Implement multicast operations.
+  for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
+       worker_idx++) {
+    RETURN_IF_ERROR(
+        distribute->AsynchronousProtoRequest(generic_request, worker_idx));
   }
 
-  for (int reply_idx = 0; reply_idx < active_workers.size(); reply_idx++) {
+  for (int reply_idx = 0; reply_idx < distribute->NumWorkers(); reply_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
         distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
     if (generic_result.request_restart_iter()) {
-      RETURN_IF_ERROR(
-          SkipAsyncAnswers(active_workers.size() - reply_idx - 1, distribute));
+      RETURN_IF_ERROR(SkipAsyncAnswers(distribute->NumWorkers() - reply_idx - 1,
+                                       distribute));
       return absl::DataLossError("");
     }
     if (!generic_result.has_evaluate_splits()) {
@@ -1121,62 +1101,56 @@ utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
   }
 
   monitoring->EndStage(internal::Monitoring::kEvaluateSplits);
-  return active_worker_idxs;
+  return absl::OkStatus();
 }
 
 absl::Status EmitShareSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    const WorkerIdxs& active_workers,
     distributed_decision_tree::LoadBalancer* load_balancer,
     distribute::AbstractManager* distribute, internal::Monitoring* monitoring) {
   monitoring->BeginStage(internal::Monitoring::kShareSplits);
 
-  const auto max_parallel_requests =
-      load_balancer->MaxConcurrentIntraWorkerConnections();
+  ASSIGN_OR_RETURN(const auto active_features,
+                   ActiveFeatures(splits_per_weak_models));
 
-  proto::WorkerRequest generic_request;
-  auto& request = *generic_request.mutable_share_splits();
-  for (const auto& splits : splits_per_weak_models) {
-    distributed_decision_tree::ConvertToProto(
-        splits, request.add_split_per_weak_model());
+  std::vector<int> active_feature_idxs;
+  active_feature_idxs.reserve(active_features.size());
+  for (const auto& active_feature : active_features) {
+    active_feature_idxs.push_back(active_feature.first);
   }
-  *request.mutable_active_workers() = {active_workers.begin(),
-                                       active_workers.end()};
 
-  const auto emit_request = [&](const int worker_idx) -> absl::Status {
-    RETURN_IF_ERROR(
-        distribute->AsynchronousProtoRequest(generic_request, worker_idx));
-    return absl::OkStatus();
-  };
+  ASSIGN_OR_RETURN(auto plan,
+                   load_balancer->MakeSplitSharingPlan(active_feature_idxs));
 
-  const auto consume_reply = [&](const int reply_idx) -> absl::Status {
-    ASSIGN_OR_RETURN(
-        const auto generic_result,
-        distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
-    if (generic_result.request_restart_iter()) {
-      RETURN_IF_ERROR(SkipAsyncAnswers(distribute->NumWorkers() - reply_idx - 1,
-                                       distribute));
-      return absl::DataLossError("Worker requested to restart the iteration.");
+  RETURN_IF_ERROR(SetSplitsInPlan(active_features, &plan));
+
+  for (const auto& round : plan.rounds()) {
+    // Send requests.
+    for (const auto& request : round.requests()) {
+      proto::WorkerRequest generic_request;
+      auto& share_split_request = *generic_request.mutable_share_splits();
+      *share_split_request.mutable_request() = request.second;
+
+      RETURN_IF_ERROR(
+          distribute->AsynchronousProtoRequest(generic_request, request.first));
     }
-    if (!generic_result.has_share_splits()) {
-      return absl::InternalError("Unexpected answer. Expecting ShareSplits");
-    }
-    return absl::OkStatus();
-  };
 
-  int reply_idx = 0;
-  int active_request = 0;
-  int next_worker_idx_request = 0;
-
-  while (reply_idx < distribute->NumWorkers()) {
-    while (next_worker_idx_request < distribute->NumWorkers() &&
-           active_request < max_parallel_requests) {
-      RETURN_IF_ERROR(emit_request(next_worker_idx_request++));
-      active_request++;
+    // Wait for the answer.
+    for (int reply_idx = 0; reply_idx < round.requests_size(); reply_idx++) {
+      ASSIGN_OR_RETURN(
+          const auto generic_result,
+          distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
+      if (generic_result.request_restart_iter()) {
+        RETURN_IF_ERROR(SkipAsyncAnswers(round.requests_size() - reply_idx - 1,
+                                         distribute));
+        return absl::DataLossError(
+            "Worker requested to restart the iteration.");
+      }
+      if (!generic_result.has_share_splits()) {
+        return absl::InternalError("Unexpected answer. Expecting ShareSplits");
+      }
     }
-    RETURN_IF_ERROR(consume_reply(reply_idx++));
-    active_request--;
   }
 
   monitoring->EndStage(internal::Monitoring::kShareSplits);
@@ -1531,13 +1505,10 @@ absl::Status ExactSampledFeaturesForWorker(
   return absl::OkStatus();
 }
 
-utils::StatusOr<ActiveWorkerMap> BuildActiveWorkers(
+utils::StatusOr<ActiveFeaturesMap> ActiveFeatures(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
-        splits_per_weak_models,
-    const distributed_decision_tree::LoadBalancer& load_balancer,
-    utils::RandomEngine* rnd) {
-  absl::flat_hash_map<int, std::vector<std::vector<int>>> active_workers;
-
+        splits_per_weak_models) {
+  ActiveFeaturesMap active_features;
   for (int weak_model_idx = 0; weak_model_idx < splits_per_weak_models.size();
        weak_model_idx++) {
     const auto& splits = splits_per_weak_models[weak_model_idx];
@@ -1546,16 +1517,13 @@ utils::StatusOr<ActiveWorkerMap> BuildActiveWorkers(
       if (!IsSplitValid(split)) {
         continue;
       }
-      ASSIGN_OR_RETURN(const auto worker_idx,
-                       load_balancer.FeatureOwner(split.condition.attribute()));
-      auto& worker_eval_splits = active_workers[worker_idx];
-      if (worker_eval_splits.empty()) {
-        worker_eval_splits.assign(splits_per_weak_models.size(), {});
-      }
-      worker_eval_splits[weak_model_idx].push_back(split_idx);
+      const auto feature = split.condition.attribute();
+      active_features[feature].splits.push_back(
+          {/*weak_model_idx=*/weak_model_idx,
+           /*split_idx=*/split_idx});
     }
   }
-  return active_workers;
+  return active_features;
 }
 
 void Monitoring::BeginTraining() {}
@@ -1713,6 +1681,29 @@ std::string Monitoring::InlineLogs() {
   }
 
   return logs;
+}
+
+absl::Status SetSplitsInPlan(
+    const ActiveFeaturesMap& active_features,
+    distributed_decision_tree::proto::SplitSharingPlan* plan) {
+  for (auto& round : *plan->mutable_rounds()) {
+    for (auto& request : *round.mutable_requests()) {
+      for (auto& item : *request.second.mutable_items()) {
+        for (const auto feature : item.features()) {
+          const auto it_src_splits = active_features.find(feature);
+          if (it_src_splits == active_features.end()) {
+            return absl::InternalError("Missing split data");
+          }
+          for (const auto& src_split : it_src_splits->second.splits) {
+            auto* dst_split = item.add_splits();
+            dst_split->set_weak_model_idx(src_split.weak_model_idx);
+            dst_split->set_split_idx(src_split.split_idx);
+          }
+        }
+      }
+    }
+  }
+  return absl::OkStatus();
 }
 
 }  // namespace internal

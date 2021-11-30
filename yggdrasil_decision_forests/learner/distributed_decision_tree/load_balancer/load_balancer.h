@@ -147,10 +147,22 @@ class LoadBalancer {
            options_.dynamic_balancing_frequency_seconds() > 1;
   }
 
-  // Maximum number of concurrent leaving from a worker.
-  int MaxConcurrentIntraWorkerConnections() const {
-    return options_.max_concurrent_intra_worker_connections();
-  }
+  // Creates a "plan" to share efficiently the evaluation split values of a set
+  // of features.
+  //
+  // A "plan" is a partially ordered sequence of instructions of the form
+  // "worker i request the evaluation of split j to worker k".
+  //
+  // Plans are currently made with two rounds such that each worker only talks
+  // to sqrt(num_workers) at each round.
+  //
+  // For example, if a single worker needs to share a split value to 99 other
+  // workers. It will first share it to 9 other workers. Then, in a second
+  // round, the 10 workers than now have the evaluation split (the original
+  // worker and the 9 new ones) will share it to the remaining 90 workers (9
+  // output communication for each).
+  utils::StatusOr<proto::SplitSharingPlan> MakeSplitSharingPlan(
+      const std::vector<int>& feature_idxs);
 
  private:
   // Data about a worker.
@@ -168,10 +180,10 @@ class LoadBalancer {
   // Data about a dataset feature.
   struct Feature {
     // Estimation of the "cost" of a feature. The absolute values does not
-    // matters, only the order and the relative magnitude in between scores.
+    // matter, only the order and the relative magnitude in between scores.
     double cost_score = -1.;
 
-    // Currently owning worker.
+    // Currently, owning worker.
     int worker = -1;
 
     // True the feature is used for training and should be assigned to a

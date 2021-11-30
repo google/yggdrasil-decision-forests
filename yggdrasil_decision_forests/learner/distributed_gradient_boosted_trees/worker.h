@@ -66,6 +66,12 @@ class DistributedGradientBoostedTreesWorker
     // Last evaluation of the split value requested in "EvaluateSplits".
     distributed_decision_tree::SplitEvaluationPerOpenNode last_split_evaluation;
 
+    // Split evaluation of the current iteration. Those contains both the split
+    // evaluation computed by this worker (as the end of the "EvaluateSplits"
+    // stage) as well as the split evaluation received from other workers (as
+    // the end of the "ShareSplits" stage).
+    distributed_decision_tree::SplitPerOpenNode last_splits;
+
     bool has_multiple_node_idxs;
   };
 
@@ -140,17 +146,12 @@ class DistributedGradientBoostedTreesWorker
   utils::StatusOr<bool> PreloadFutureOwnedFeatures(
       const proto::WorkerRequest::FutureOwnedFeatures& future_owned_features);
 
-  // Prepares for the aggregation of split evaluation.
-  // Integrate the local split evaluation (if any).
-  absl::Status InitializeSplitEvaluationMerging(
-      const proto::WorkerRequest::ShareSplits& request,
-      std::vector<WeakModelLayer>* layer_per_weak_models);
-
-  // Merges the split evaluation.
-  // After this function call, "src_split_values" is invalid.
-  absl::Status MergingSplitEvaluation(
-      proto::WorkerResult::GetSplitValue* src_split_values,
-      std::vector<WeakModelLayer>* dst_layer_per_weak_models);
+  // Merges the split evaluation into the "last_split_evaluation" field of each
+  // weak model. After this function call, "src_split_values" is invalid. This
+  // method is thread safe (can be called at the same time from different
+  // threads).
+  absl::Status MergingSplitEvaluationToLastSplitEvaluation(
+      proto::WorkerResult::GetSplitValue* src_split_values);
 
   // Loss of a set of predictions.
   absl::Status Loss(

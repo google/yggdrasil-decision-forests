@@ -124,7 +124,7 @@ void GenericTrainingLoop(LabelAccessor* label_accessor, Tester* tester,
     // Evaluate the split for all the active training examples.
     SplitEvaluationPerOpenNode split_evaluation;
     CHECK_OK(EvaluateSplits(example_to_node, splits, &split_evaluation,
-                            tester->dataset_.get()));
+                            tester->dataset_.get(), &thread_pool));
 
     LOG(INFO) << "Split evaluation (" << split_evaluation.size() << "):";
     for (const auto& evaluation : split_evaluation) {
@@ -463,7 +463,7 @@ TEST_F(AdultClassificationDataset, ManualCheck) {
 
   SplitEvaluationPerOpenNode split_evaluation;
   CHECK_OK(EvaluateSplits(example_to_node, splits, &split_evaluation,
-                          dataset_.get()));
+                          dataset_.get(), &thread_pool));
 
   EXPECT_EQ(split_evaluation.size(), 1);
   EXPECT_EQ(split_evaluation.front().size(), (22792 + 7) / 8);

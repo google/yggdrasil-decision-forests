@@ -29,6 +29,10 @@
 // A "feature index" is a "column index" where we know that the column is an
 // input features.
 //
+// A "split evaluation" is an array of bits (one bit for each example in an open
+// node) that describes the result of evaluating a split/condition on those
+// examples.
+//
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_TRAINING_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_TRAINING_H_
 
@@ -286,7 +290,8 @@ absl::Status MergeBestSplits(const SplitPerOpenNode& src,
 absl::Status EvaluateSplits(const ExampleToNodeMap& example_to_node,
                             const SplitPerOpenNode& splits,
                             SplitEvaluationPerOpenNode* split_evaluation,
-                            dataset_cache::DatasetCacheReader* dataset);
+                            dataset_cache::DatasetCacheReader* dataset,
+                            utils::concurrency::ThreadPool* thread_pool);
 
 // Evaluates a collection of splits on a specific numerical feature.
 absl::Status EvaluateSplitsPerNumericalFeature(

@@ -105,9 +105,12 @@ struct WeakModel {
 // List of weak models being build.
 typedef std::vector<WeakModel> WeakModels;
 
-
 // List of worker indices.
 typedef std::vector<int> WorkerIdxs;
+
+// Map worker idx -> features.
+typedef absl::flat_hash_map<int, std::vector<std::vector<int>>>
+    WorkersToFeaturesMap;
 
 // Loss and metric values. The metrics are controlled by the loss
 // implementation.
@@ -325,7 +328,7 @@ EmitFindSplits(
     utils::RandomEngine* rnd, internal::Monitoring* monitoring);
 
 // Returns the list of workers that owns the split evaluation data.
-utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
+absl::Status EmitEvaluateSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
     distributed_decision_tree::LoadBalancer* load_balancer,
@@ -335,7 +338,6 @@ utils::StatusOr<WorkerIdxs> EmitEvaluateSplits(
 absl::Status EmitShareSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    const WorkerIdxs& active_workers,
     distributed_decision_tree::LoadBalancer* load_balancer,
     distribute::AbstractManager* distribute, internal::Monitoring* monitoring);
 
@@ -366,14 +368,32 @@ absl::Status SetLoadBalancingRequest(
     proto::WorkerRequest* generic_request);
 
 // Computes the list of active workers (i.e. workers having a job to do) and the
-// features their have to check. Returns a mapping worker_idx -> weak_model_idx
+// features they have to check. Returns a mapping worker_idx -> weak_model_idx
 // -> split_idx.
-typedef absl::flat_hash_map<int, std::vector<std::vector<int>>> ActiveWorkerMap;
-utils::StatusOr<ActiveWorkerMap> BuildActiveWorkers(
+utils::StatusOr<WorkersToFeaturesMap> BuildActiveWorkers(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
     const distributed_decision_tree::LoadBalancer& load_balancer,
     utils::RandomEngine* rnd);
+
+// Lists the features used in a set of splits.
+struct ActiveFeature {
+  struct Item {
+    int weak_model_idx;
+    int split_idx;
+  };
+  std::vector<Item> splits;
+};
+typedef absl::flat_hash_map<int, ActiveFeature> ActiveFeaturesMap;
+utils::StatusOr<ActiveFeaturesMap> ActiveFeatures(
+    const std::vector<distributed_decision_tree::SplitPerOpenNode>&
+        splits_per_weak_models);
+
+// Sets the "weak learner" and "split idx" fields in a plan from the "feature"
+// field.
+absl::Status SetSplitsInPlan(
+    const ActiveFeaturesMap& active_features,
+    distributed_decision_tree::proto::SplitSharingPlan* plan);
 
 // Samples the input features to send to a worker/weak model/node.
 typedef std::vector<std::vector<std::vector<std::vector<int>>>>

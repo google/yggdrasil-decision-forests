@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -543,6 +544,84 @@ int LoadBalancer::GetBestCandidateWallTime(
     }
   }
   return -1;
+}
+
+utils::StatusOr<proto::SplitSharingPlan> LoadBalancer::MakeSplitSharingPlan(
+    const std::vector<int>& feature_idxs) {
+  proto::SplitSharingPlan plan;
+  auto& round_1 = *plan.add_rounds();
+  auto& round_2 = *plan.add_rounds();
+
+  // Group the features by ownership.
+  std::vector<std::vector<int>> workers_to_features(workers_.size());
+  for (auto feature_idx : feature_idxs) {
+    ASSIGN_OR_RETURN(auto src_worker, FeatureOwner(feature_idx));
+    workers_to_features[src_worker].push_back(feature_idx);
+  }
+
+  const int num_outputs_per_round =
+      static_cast<int>(std::ceil(std::sqrt(workers_.size())));
+
+  int next_round_1_dst_worker = 0;
+  for (int src_worker_idx = 0; src_worker_idx < workers_to_features.size();
+       src_worker_idx++) {
+    const auto& src_features = workers_to_features[src_worker_idx];
+    if (src_features.empty()) {
+      continue;
+    }
+    // Index of the workers currently having the evaluation data.
+    std::vector<int> workers_with_feature;
+
+    // The owner of the feature has always the evaluation data.
+    workers_with_feature.push_back(src_worker_idx);
+
+    // First round
+    for (int local_dst_worker = 0; local_dst_worker < num_outputs_per_round;
+         local_dst_worker++) {
+      if (next_round_1_dst_worker == src_worker_idx) {
+        next_round_1_dst_worker =
+            (next_round_1_dst_worker + 1) % workers_.size();
+      }
+      const int dst_worker = next_round_1_dst_worker;
+      workers_with_feature.push_back(dst_worker);
+
+      next_round_1_dst_worker = (next_round_1_dst_worker + 1) % workers_.size();
+
+      auto& request = (*round_1.mutable_requests())[dst_worker];
+      auto& item = *request.add_items();
+      item.set_src_worker(src_worker_idx);
+      *item.mutable_features() = {src_features.begin(), src_features.end()};
+    }
+
+    std::sort(workers_with_feature.begin(), workers_with_feature.end());
+
+    // Second round.
+    int next_local_src_worker_idx = 0;
+    for (int dst_worker = 0; dst_worker < workers_.size(); dst_worker++) {
+      // Check if this "dst_worker" worker already has the feature data.
+      const auto lb = std::lower_bound(workers_with_feature.begin(),
+                                       workers_with_feature.end(), dst_worker);
+      if (lb != workers_with_feature.end() && *lb == dst_worker) {
+        continue;
+      }
+
+      auto& request = (*round_2.mutable_requests())[dst_worker];
+      auto& item = *request.add_items();
+      item.set_src_worker(workers_with_feature[next_local_src_worker_idx]);
+      next_local_src_worker_idx =
+          (next_local_src_worker_idx + 1) % workers_with_feature.size();
+      *item.mutable_features() = {src_features.begin(), src_features.end()};
+    }
+  }
+
+  // Set the "last_request_of_plan" flag.
+  for (int worker = 0; worker < workers_.size(); worker++) {
+    // We make sure that all the workers are running the final logic at the same
+    // time.
+    (*round_2.mutable_requests())[worker].set_last_request_of_plan(true);
+  }
+
+  return plan;
 }
 
 }  // namespace distributed_decision_tree

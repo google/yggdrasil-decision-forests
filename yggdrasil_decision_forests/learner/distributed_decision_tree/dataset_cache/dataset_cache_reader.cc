@@ -300,6 +300,11 @@ absl::Status DatasetCacheReader::ApplyLoadingAndUnloadingFeaturesToMetadata(
   return absl::OkStatus();
 }
 
+bool DatasetCacheReader::has_feature(const int feature) const {
+  const auto it = std::lower_bound(features_.begin(), features_.end(), feature);
+  return (it != features_.end()) && (*it == feature);
+}
+
 absl::Status DatasetCacheReader::UnloadInMemoryCacheColumn(
     const int column_idx) {
   const auto& column = meta_data().columns(column_idx);
