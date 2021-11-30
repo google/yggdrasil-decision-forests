@@ -33,6 +33,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
@@ -44,7 +45,7 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace random_forest {
 
-class RandomForestModel : public AbstractModel {
+class RandomForestModel : public AbstractModel, public DecisionForestInterface {
  public:
   static constexpr char kRegisteredName[] = "RANDOM_FOREST";
 
@@ -98,6 +99,11 @@ class RandomForestModel : public AbstractModel {
   void PredictUplift(const dataset::proto::Example& example,
                      model::proto::Prediction* prediction) const;
 
+  // Computes the indices of the active leaves.
+  absl::Status PredictGetLeaves(const dataset::VerticalDataset& dataset,
+                                dataset::VerticalDataset::row_t row_idx,
+                                absl::Span<int32_t> leaves) const override;
+
   // Add a new tree to the model.
   void AddTree(std::unique_ptr<decision_tree::DecisionTree> decision_tree);
 
@@ -114,6 +120,8 @@ class RandomForestModel : public AbstractModel {
 
   // Number of trees in the model.
   size_t NumTrees() const { return decision_trees_.size(); }
+
+  int num_trees() const override { return NumTrees(); }
 
   // Number of times each feature is used in the model. Returns a map, indexed
   // by feature index, and counting the number of time a feature is used.

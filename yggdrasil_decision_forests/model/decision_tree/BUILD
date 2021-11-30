@@ -92,6 +92,16 @@ cc_library_ydf(
     alwayslink = 1,
 )
 
+cc_library_ydf(
+    name = "decision_forest_interface",
+    hdrs = ["decision_forest_interface.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/types:span",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+    ],
+)
+
 # Proto
 # ========
 

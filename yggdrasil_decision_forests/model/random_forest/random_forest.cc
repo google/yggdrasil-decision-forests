@@ -245,6 +245,22 @@ void RandomForestModel::CountFeatureUsage(
   }
 }
 
+absl::Status RandomForestModel::PredictGetLeaves(
+    const dataset::VerticalDataset& dataset,
+    dataset::VerticalDataset::row_t row_idx, absl::Span<int32_t> leaves) const {
+  if (leaves.size() != num_trees()) {
+    return absl::InvalidArgumentError("Wrong number of trees");
+  }
+  for (int tree_idx = 0; tree_idx < decision_trees_.size(); tree_idx++) {
+    auto& leaf = decision_trees_[tree_idx]->GetLeafAlt(dataset, row_idx);
+    if (leaf.leaf_idx() < 0) {
+      return absl::InvalidArgumentError("Leaf idx not set");
+    }
+    leaves[tree_idx] = leaf.leaf_idx();
+  }
+  return absl::OkStatus();
+}
+
 void RandomForestModel::Predict(const dataset::VerticalDataset& dataset,
                                 dataset::VerticalDataset::row_t row_idx,
                                 model::proto::Prediction* prediction) const {

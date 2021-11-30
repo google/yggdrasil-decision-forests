@@ -35,6 +35,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
@@ -49,7 +50,8 @@ class GradientBoostedTreesLearner;
 
 // A GBT model i.e. takes as input an example and outputs a prediction.
 // See the file header for a description of the GBT learning algorithm/model.
-class GradientBoostedTreesModel : public AbstractModel {
+class GradientBoostedTreesModel : public AbstractModel,
+                                  public DecisionForestInterface {
  public:
   static constexpr char kRegisteredName[] = "GRADIENT_BOOSTED_TREES";
 
@@ -58,6 +60,11 @@ class GradientBoostedTreesModel : public AbstractModel {
   absl::Status Load(absl::string_view directory) override;
 
   absl::Status Validate() const override;
+
+  // Computes the indices of the active leaves.
+  absl::Status PredictGetLeaves(const dataset::VerticalDataset& dataset,
+                                dataset::VerticalDataset::row_t row_idx,
+                                absl::Span<int32_t> leaves) const override;
 
   void Predict(const dataset::VerticalDataset& dataset,
                dataset::VerticalDataset::row_t row_idx,
@@ -75,6 +82,7 @@ class GradientBoostedTreesModel : public AbstractModel {
 
   // Number of trees in the model.
   size_t NumTrees() const { return decision_trees_.size(); }
+  int num_trees() const override { return NumTrees(); }
 
   // Number of times each feature is used in the model. Returns a map, indexed
   // by feature index, and counting the number of time a feature is used.

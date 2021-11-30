@@ -722,6 +722,7 @@ RandomForestLearner::TrainWithStatus(
   RETURN_IF_ERROR(mdl->PrecomputeVariableImportances(
       mdl->AvailableStructuralVariableImportances()));
 
+  decision_tree::SetLeafIndices(mdl->mutable_decision_trees());
   return std::move(mdl);
 }
 

@@ -130,7 +130,7 @@ class NodeWithChildren {
   void IterateOnMutableNodes(
       const std::function<void(NodeWithChildren* node, const int depth)>&
           call_back,
-      int depth = 0);
+      bool neg_before_pos_child, int depth);
 
   // Append a human readable semi-graphical description of the model structure.
   void AppendModelStructure(const dataset::proto::DataSpecification& data_spec,
@@ -159,12 +159,19 @@ class NodeWithChildren {
   bool IsMissingValueConditionResultFollowGlobalImputation(
       const dataset::proto::DataSpecification& data_spec) const;
 
+  int32_t leaf_idx() const { return leaf_idx_; }
+  void set_leaf_idx(const int32_t v) { leaf_idx_ = v; }
+
  private:
   // Node content (i.e. value and condition).
   proto::Node node_;
 
   // Children (if any).
   std::unique_ptr<NodeWithChildren> children_[2];
+
+  // Index of the leaf (if the node is a leaf) in the tree in a depth first
+  // exploration. It is set by calling "SetLeafIndices()".
+  int32_t leaf_idx_ = -1;
 };
 
 // A generic decision tree. This class is designed for cheap modification (by
@@ -211,6 +218,10 @@ class DecisionTree {
 
   const proto::Node& GetLeaf(const dataset::proto::Example& example) const;
 
+  const NodeWithChildren& GetLeafAlt(
+      const dataset::VerticalDataset& dataset,
+      dataset::VerticalDataset::row_t row_idx) const;
+
   // Apply the decision tree on an example and returns the path.
   const void GetPath(const dataset::VerticalDataset& dataset,
                      dataset::VerticalDataset::row_t row_idx,
@@ -233,7 +244,8 @@ class DecisionTree {
 
   void IterateOnMutableNodes(
       const std::function<void(NodeWithChildren* node, const int depth)>&
-          call_back);
+          call_back,
+      bool neg_before_pos_child = false);
 
   // Append a human readable semi-graphical description of the model structure.
   void AppendModelStructure(const dataset::proto::DataSpecification& data_spec,
@@ -252,49 +264,53 @@ class DecisionTree {
   bool IsMissingValueConditionResultFollowGlobalImputation(
       const dataset::proto::DataSpecification& data_spec) const;
 
+  // Set the "leaf_idx" field for all the leaves. The index of a leaf is
+  // assigned in the depth first iteration over all the nods (negative before
+  // positive).
+  void SetLeafIndices();
+
  private:
   // Root of the decision tree.
   std::unique_ptr<NodeWithChildren> root_;
 };
 
+// A list of trees without specific semantic.
+typedef std::vector<std::unique_ptr<DecisionTree>> DecisionForest;
+
+// Sets the leaf indices of all the trees.
+void SetLeafIndices(DecisionForest* trees);
+
 // Estimate the size (in bytes) of a list of decision trees.
-size_t EstimateSizeInByte(
-    const std::vector<std::unique_ptr<DecisionTree>>& trees);
+size_t EstimateSizeInByte(const DecisionForest& trees);
 
 // Number of nodes in a list of decision trees.
-int64_t NumberOfNodes(const std::vector<std::unique_ptr<DecisionTree>>& trees);
+int64_t NumberOfNodes(const DecisionForest& trees);
 
 bool IsMissingValueConditionResultFollowGlobalImputation(
     const dataset::proto::DataSpecification& data_spec,
-    const std::vector<std::unique_ptr<DecisionTree>>& trees);
+    const DecisionForest& trees);
 
 // Append a human readable semi-graphical description of the model structure.
-void AppendModelStructure(
-    const std::vector<std::unique_ptr<DecisionTree>>& trees,
-    const dataset::proto::DataSpecification& data_spec, const int label_col_idx,
-    std::string* description);
+void AppendModelStructure(const DecisionForest& trees,
+                          const dataset::proto::DataSpecification& data_spec,
+                          const int label_col_idx, std::string* description);
 
 // Gets the number of time each feature is used as root in a set of trees.
 std::vector<model::proto::VariableImportance> StructureNumberOfTimesAsRoot(
-    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
-        decision_trees);
+    const DecisionForest& decision_trees);
 
 // Gets the number of time each feature is used in a set of trees.
 std::vector<model::proto::VariableImportance> StructureNumberOfTimesInNode(
-    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
-        decision_trees);
+    const DecisionForest& decision_trees);
 
 // Gets the average minimum depth of each feature.
 std::vector<model::proto::VariableImportance> StructureMeanMinDepth(
-    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
-        decision_trees,
-    int num_features);
+    const DecisionForest& decision_trees, int num_features);
 
 // Gets the weighted sum of the score (the semantic of the score depends on the
 // loss function) of each feature.
 std::vector<model::proto::VariableImportance> StructureSumScore(
-    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
-        decision_trees);
+    const DecisionForest& decision_trees);
 
 // Append a human readable description of a node condition (i.e. split).
 void AppendConditionDescription(

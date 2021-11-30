@@ -27,6 +27,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -44,6 +45,11 @@ namespace random_forest {
 namespace {
 
 using test::EqualsProto;
+
+std::string TestDataDir() {
+  return file::JoinPath(test::DataRootDirectory(),
+                        "yggdrasil_decision_forests/test_data");
+}
 
 // Build a forest with two decision trees as follow:
 // [a>1]
@@ -170,12 +176,12 @@ TEST(DecisionTree, PredictClassification) {
                              &dataset);
   model.Predict(dataset, 1, &prediction);
   model::proto::Prediction expected_prediction = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         classification {
           value: 0
           distribution { counts: 1 counts: 1 counts: 0 sum: 2 }
         }
-      )");
+      )pb");
   EXPECT_THAT(prediction, EqualsProto(expected_prediction));
 
   dataset::proto::Example example;
@@ -192,9 +198,9 @@ TEST(DecisionTree, PredictRegression) {
   BuildToyModelAndToyDataset(model::proto::Task::REGRESSION, &model, &dataset);
   model.Predict(dataset, 1, &prediction);
   model::proto::Prediction expected_prediction = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         regression { value: 0.5 }
-      )");
+      )pb");
   EXPECT_THAT(prediction, EqualsProto(expected_prediction));
 
   dataset::proto::Example example;
@@ -338,6 +344,36 @@ TEST(DecisionTree, MinNumberObs) {
   BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION, &model,
                              &dataset);
   CHECK_EQ(model.MinNumberObs(), 2);
+}
+
+TEST(RandomForest, GetLeaves) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"), &model));
+
+  dataset::VerticalDataset dataset;
+  EXPECT_OK(dataset::LoadVerticalDataset(
+      absl::StrCat("csv:",
+                   file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
+      model->data_spec(), &dataset));
+
+  auto* df_model = dynamic_cast<model::DecisionForestInterface*>(model.get());
+  if (df_model == nullptr) {
+    LOG(FATAL) << "The model is not a Random Forest.";
+  }
+
+  EXPECT_EQ(df_model->num_trees(), 100);
+
+  std::vector<int32_t> leaves(100);
+  EXPECT_OK(df_model->PredictGetLeaves(dataset, 0, absl::MakeSpan(leaves)));
+
+  EXPECT_EQ(leaves[0], 156);
+  EXPECT_EQ(leaves[1], 119);
+  EXPECT_EQ(leaves[2], 139);
+  EXPECT_EQ(leaves[3], 319);
+  EXPECT_EQ(leaves[4], 215);
+  EXPECT_EQ(leaves[5], 50);
+  EXPECT_EQ(leaves[6], 151);
 }
 
 }  // namespace

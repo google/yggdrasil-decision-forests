@@ -79,6 +79,18 @@ class FastEngine {
   virtual void Predict(const AbstractExampleSet& examples, int num_examples,
                        std::vector<float>* predictions) const = 0;
 
+  // Applies the model on a set of examples and returns the index of the active
+  // leaf of each tree.
+  //
+  // This method should be called with "leaves" containing exactly "num_rows x
+  // num_trees" elements. The leaf indices are stored in example-major
+  // tree-minor.
+  virtual absl::Status GetLeaves(const AbstractExampleSet& examples,
+                                 const int num_examples,
+                                 absl::Span<int32_t> leaves) const {
+    return absl::UnimplementedError("GetLeaves not implemented");
+  }
+
   // Number of dimensions of the output predictions.
   // 1 for regression, ranking and binary classification with compact format.
   // number of classes for classification.

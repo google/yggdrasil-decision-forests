@@ -1510,6 +1510,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
                               config.train_config_link, train_dataset.nrow(),
                               *mdl, absl::Now() - begin_training);
 
+  decision_tree::SetLeafIndices(mdl->mutable_decision_trees());
   return std::move(mdl);
 }
 

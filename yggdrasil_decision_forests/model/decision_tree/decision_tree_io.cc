@@ -78,6 +78,7 @@ absl::Status LoadTreesFromDisk(
   for (int64_t tree_idx = 0; tree_idx < num_trees; tree_idx++) {
     auto decision_tree = absl::make_unique<decision_tree::DecisionTree>();
     RETURN_IF_ERROR(decision_tree->ReadNodes(node_reader.get()));
+    decision_tree->SetLeafIndices();
     trees->push_back(std::move(decision_tree));
   }
   return absl::OkStatus();

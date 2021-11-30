@@ -788,9 +788,9 @@ void DecisionTree::CountFeatureUsage(
   root_->CountFeatureUsage(feature_usage);
 }
 
-const proto::Node& DecisionTree::GetLeaf(
+const NodeWithChildren& DecisionTree::GetLeafAlt(
     const dataset::VerticalDataset& dataset,
-    const dataset::VerticalDataset::row_t row_idx) const {
+    dataset::VerticalDataset::row_t row_idx) const {
   // Go down the tree according to an observation attribute values.
   DCHECK(root_ != nullptr);
   const NodeWithChildren* current_node = root_.get();
@@ -800,7 +800,13 @@ const proto::Node& DecisionTree::GetLeaf(
     current_node = condition_result ? current_node->pos_child()
                                     : current_node->neg_child();
   }
-  return current_node->node();
+  return *current_node;
+}
+
+const proto::Node& DecisionTree::GetLeaf(
+    const dataset::VerticalDataset& dataset,
+    const dataset::VerticalDataset::row_t row_idx) const {
+  return GetLeafAlt(dataset, row_idx).node();
 }
 
 const proto::Node& DecisionTree::GetLeafWithSwappedAttribute(
@@ -884,8 +890,10 @@ void DecisionTree::IterateOnNodes(
 
 void DecisionTree::IterateOnMutableNodes(
     const std::function<void(NodeWithChildren* node, const int depth)>&
-        call_back) {
-  mutable_root()->IterateOnMutableNodes(call_back);
+        call_back,
+    const bool neg_before_pos_child) {
+  mutable_root()->IterateOnMutableNodes(call_back, neg_before_pos_child,
+                                        /*depth=*/0);
 }
 
 void NodeWithChildren::IterateOnNodes(
@@ -902,11 +910,20 @@ void NodeWithChildren::IterateOnNodes(
 void NodeWithChildren::IterateOnMutableNodes(
     const std::function<void(NodeWithChildren* node, const int depth)>&
         call_back,
-    const int depth) {
+    const bool neg_before_pos_child, const int depth) {
   call_back(this, depth);
   if (!IsLeaf()) {
-    mutable_pos_child()->IterateOnMutableNodes(call_back, depth + 1);
-    mutable_neg_child()->IterateOnMutableNodes(call_back, depth + 1);
+    if (neg_before_pos_child) {
+      mutable_neg_child()->IterateOnMutableNodes(
+          call_back, neg_before_pos_child, depth + 1);
+      mutable_pos_child()->IterateOnMutableNodes(
+          call_back, neg_before_pos_child, depth + 1);
+    } else {
+      mutable_pos_child()->IterateOnMutableNodes(
+          call_back, neg_before_pos_child, depth + 1);
+      mutable_neg_child()->IterateOnMutableNodes(
+          call_back, neg_before_pos_child, depth + 1);
+    }
   }
 }
 
@@ -1053,6 +1070,12 @@ void NodeWithChildren::AppendModelStructure(
   }
 }
 
+void SetLeafIndices(DecisionForest* trees) {
+  for (auto& tree : *trees) {
+    tree->SetLeafIndices();
+  }
+}
+
 size_t EstimateSizeInByte(
     const std::vector<std::unique_ptr<DecisionTree>>& trees) {
   size_t size = 0;
@@ -1101,6 +1124,17 @@ int DecisionTree::MaximumDepth() const {
     max_depth = std::max(max_depth, depth);
   });
   return max_depth;
+}
+
+void DecisionTree::SetLeafIndices() {
+  int next_leaf_idx = 0;
+  IterateOnMutableNodes(
+      [&next_leaf_idx](NodeWithChildren* node, const int depth) {
+        if (node->IsLeaf()) {
+          node->set_leaf_idx(next_leaf_idx++);
+        }
+      },
+      /*neg_before_pos_child=*/true);
 }
 
 bool DecisionTree::IsMissingValueConditionResultFollowGlobalImputation(
