@@ -80,6 +80,17 @@ constexpr char kHParamSortingStrategyPresort[] = "PRESORT";
 constexpr char kHParamKeepNonLeafLabelDistribution[] =
     "keep_non_leaf_label_distribution";
 
+constexpr char kHParamUpliftSplitScore[] = "uplift_split_score";
+constexpr char kHParamUpliftMinExamplesInTreatment[] =
+    "uplift_min_examples_in_treatment";
+
+constexpr char kHParamUpliftSplitScoreKL[] = "KULLBACK_LEIBLER";
+constexpr char kHParamUpliftSplitScoreED[] = "EUCLIDEAN_DISTANCE";
+constexpr char kHParamUpliftSplitScoreCS[] = "CHI_SQUARED";
+constexpr char kHParamUpliftSplitScoreKLAlt[] = "KL";
+constexpr char kHParamUpliftSplitScoreEDAlt[] = "ED";
+constexpr char kHParamUpliftSplitScoreCSAlt[] = "CS";
+
 // Fill decision tree specific generic hyper parameter specifications.
 // This function is designed to be called by the learners using decision trees
 // learning.

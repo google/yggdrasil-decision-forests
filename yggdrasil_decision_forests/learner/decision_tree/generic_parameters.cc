@@ -294,6 +294,35 @@ absl::Status GetGenericHyperParameterSpecification(
         R"(Whether to keep the node value (i.e. the distribution of the labels of the training examples) of non-leaf nodes. This information is not used during serving, however it can be used for model interpretation as well as hyper parameter tuning. This can take lots of space, sometimes accounting for half of the model size.)");
   }
 
+  {
+    ASSIGN_OR_RETURN(auto param, get_params(kHParamUpliftSplitScore));
+    param->mutable_categorical()->set_default_value(kHParamUpliftSplitScoreKL);
+
+    for (const auto& value :
+         {kHParamUpliftSplitScoreKL, kHParamUpliftSplitScoreKLAlt,
+          kHParamUpliftSplitScoreED, kHParamUpliftSplitScoreEDAlt,
+          kHParamUpliftSplitScoreCS, kHParamUpliftSplitScoreCSAlt}) {
+      param->mutable_categorical()->add_possible_values(value);
+    }
+
+    param->mutable_documentation()->set_description(
+        R"(For uplift models only. Splitter score i.e. score optimized by the splitters. The scores are introduced in "Decision trees for uplift modeling with single and multiple treatments", Rzepakowski et al. Notation: `p` probability / average value of the positive outcome, `q` probability / average value in the control group.
+- `KULLBACK_LEIBLER` or `KL`: - p log (p/q)
+- `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2
+- `CHI_SQUARED` or `CS`: (p-q)^2/q
+)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(auto param,
+                     get_params(kHParamUpliftMinExamplesInTreatment));
+    param->mutable_integer()->set_default_value(
+        config.uplift().min_examples_in_treatment());
+    param->mutable_integer()->set_minimum(0);
+    param->mutable_documentation()->set_description(
+        R"(For uplift models only. Minimum number of examples per treatment in a node.)");
+  }
+
   return absl::OkStatus();
 }
 
@@ -554,6 +583,39 @@ absl::Status SetHyperParameters(
     if (hparam.has_value()) {
       dt_config->set_keep_non_leaf_label_distribution(
           hparam.value().value().categorical() == "true");
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamUpliftMinExamplesInTreatment);
+    if (hparam.has_value()) {
+      dt_config->mutable_uplift()->set_min_examples_in_treatment(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamUpliftSplitScore);
+    if (hparam.has_value()) {
+      const auto value = hparam.value().value().categorical();
+      if (value == kHParamUpliftSplitScoreKL ||
+          value == kHParamUpliftSplitScoreKLAlt) {
+        dt_config->mutable_uplift()->set_split_score(
+            proto::DecisionTreeTrainingConfig::Uplift::KULLBACK_LEIBLER);
+      } else if (value == kHParamUpliftSplitScoreCS ||
+                 value == kHParamUpliftSplitScoreCSAlt) {
+        dt_config->mutable_uplift()->set_split_score(
+            proto::DecisionTreeTrainingConfig::Uplift::CHI_SQUARED);
+      } else if (value == kHParamUpliftSplitScoreED ||
+                 value == kHParamUpliftSplitScoreEDAlt) {
+        dt_config->mutable_uplift()->set_split_score(
+            proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE);
+      } else {
+        return absl::InvalidArgumentError(
+            absl::StrFormat(R"(Unknown value "%s" for parameter "%s")", value,
+                            kHParamUpliftSplitScore));
+      }
     }
   }
 
