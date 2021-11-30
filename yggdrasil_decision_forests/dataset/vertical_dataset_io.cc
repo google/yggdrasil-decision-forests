@@ -57,11 +57,16 @@ absl::Status LoadVerticalDatasetSingleThread(
   // Read and record the examples.
   ASSIGN_OR_RETURN(auto reader, CreateExampleReader(typed_path, data_spec,
                                                     ensure_non_missing));
+
+  // Number of skipped example because of "config.load_example".
+  std::size_t skipped_examples = 0;
+
   proto::Example example;
   utils::StatusOr<bool> status;
   while ((status = reader->Next(&example)).ok() && status.value()) {
     if (config.load_example.has_value() &&
         !config.load_example.value()(example)) {
+      skipped_examples++;
       continue;
     }
     dataset->AppendExample(example, config.load_columns);
@@ -69,6 +74,16 @@ absl::Status LoadVerticalDatasetSingleThread(
       LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples scanned.");
     }
   }
+
+  dataset->ShrinkToFit();
+
+  LOG_INFO_EVERY_N_SEC(
+      30, _ << dataset->nrow() << " examples read. Memory: "
+            << dataset->MemorySummary() << ". " << skipped_examples << " ("
+            << 100 * skipped_examples /
+                   std::max<size_t>(1, dataset->nrow() + skipped_examples)
+            << "%) examples have been skipped.");
+
   return status.status();
 }
 
@@ -203,6 +218,8 @@ absl::Status LoadVerticalDataset(
   if (loaded_shards != shards.size()) {
     return absl::InternalError("Unexpected number of shards.");
   }
+
+  dataset->ShrinkToFit();
 
   processor.JoinAllAndStopThreads();
   LOG_INFO_EVERY_N_SEC(

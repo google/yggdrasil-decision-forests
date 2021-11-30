@@ -960,5 +960,11 @@ std::string VerticalDataset::MemorySummary() const {
                          reserved / scale);
 }
 
+void VerticalDataset::ShrinkToFit() {
+  for (int col_idx = 0; col_idx < ncol(); col_idx++) {
+    mutable_column(col_idx)->ShrinkToFit();
+  }
+}
+
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

@@ -136,6 +136,9 @@ class VerticalDataset {
     // Used and reserved memory expressed in bytes.
     virtual std::pair<uint64_t, uint64_t> memory_usage() const = 0;
 
+    // Release the reserved but not used memory.
+    virtual void ShrinkToFit() = 0;
+
    private:
     // Unique column name.
     std::string name_;
@@ -165,6 +168,8 @@ class VerticalDataset {
       return std::pair<uint64_t, uint64_t>(values_.size() * sizeof(T),
                                            values_.capacity() * sizeof(T));
     }
+
+    void ShrinkToFit() override { values_.shrink_to_fit(); }
 
    private:
     std::vector<T> values_;
@@ -236,6 +241,11 @@ class VerticalDataset {
               values_.size() * sizeof(std::pair<size_t, size_t>),
           bank_.capacity() * sizeof(T) +
               values_.capacity() * sizeof(std::pair<size_t, size_t>));
+    }
+
+    void ShrinkToFit() override {
+      values_.shrink_to_fit();
+      bank_.shrink_to_fit();
     }
 
    private:
@@ -701,6 +711,12 @@ class VerticalDataset {
 
   // Generates a human readable summary of the memory.
   std::string MemorySummary() const;
+
+  // Release the reserved but not used memory.
+  //
+  // Can be called on a dataset that won't receive new elements.
+  // Calls "shrink_to_fit" on the std::vectors.
+  void ShrinkToFit();
 
  private:
   struct ColumnContainer {
