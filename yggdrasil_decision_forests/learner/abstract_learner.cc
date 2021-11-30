@@ -34,6 +34,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/synchronization/mutex.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -50,6 +51,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/fold_generator.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
+#include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -610,6 +612,39 @@ void InitializeModelWithAbstractTrainingConfig(
       training_config_linking.features().end());
   if (training_config_linking.has_weight_definition()) {
     model->set_weights(training_config_linking.weight_definition());
+  }
+
+  InitializeModelMetadataWithAbstractTrainingConfig(training_config, model);
+}
+
+void InitializeModelMetadataWithAbstractTrainingConfig(
+    const proto::TrainingConfig& training_config, AbstractModel* model) {
+  const auto& src = training_config.metadata();
+  auto& dst = *model->mutable_metadata();
+
+  dst = src;
+
+  // Owner
+  if (!dst.has_owner()) {
+    auto opt_username = utils::UserName();
+    if (opt_username.has_value()) {
+      dst.set_owner(std::move(opt_username).value());
+    }
+  }
+
+  // Date
+  if (!dst.has_created_date()) {
+    dst.set_created_date(absl::ToUnixSeconds(absl::Now()));
+  }
+
+  // UID
+  if (!dst.has_uid()) {
+    dst.set_uid(utils::GenUniqueIdUint64());
+  }
+
+  // Framework
+  if (!dst.has_framework()) {
+    dst.set_framework("Yggdrasil c++");
   }
 }
 

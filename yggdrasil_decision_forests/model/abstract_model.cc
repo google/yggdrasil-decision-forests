@@ -78,6 +78,8 @@ void AbstractModel::ExportProto(const AbstractModel& model,
       model.precomputed_variable_importances_.end());
   proto->set_classification_outputs_probabilities(
       model.classification_outputs_probabilities_);
+
+  *proto->mutable_metadata() = model.metadata();
 }
 
 void AbstractModel::ImportProto(const proto::AbstractModel& proto,
@@ -97,6 +99,8 @@ void AbstractModel::ImportProto(const proto::AbstractModel& proto,
       proto.precomputed_variable_importances().end());
   model->classification_outputs_probabilities_ =
       proto.classification_outputs_probabilities();
+
+  *model->mutable_metadata() = proto.metadata();
 }
 
 metric::proto::EvaluationResults AbstractModel::Evaluate(

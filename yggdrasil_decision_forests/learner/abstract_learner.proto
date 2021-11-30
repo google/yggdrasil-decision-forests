@@ -136,6 +136,11 @@ message TrainingConfig {
   // impact of a medication.
   optional string uplift_treatment = 12;
 
+  // Metadata of the model.
+  // Non specified fields are automatically set. For example, if "metadata.date"
+  // is not set, it will be automatically set to the training date.
+  optional Metadata metadata = 13;
+
   // Learner specific configuration/hyper-parameters.
   // The message/extension is dependent on the "learner". For example, see
   // "yggdrasil_decision_forests/learner/random_forest.proto" for the parameters

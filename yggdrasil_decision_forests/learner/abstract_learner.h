@@ -234,6 +234,10 @@ void InitializeModelWithAbstractTrainingConfig(
     const proto::TrainingConfigLinking& training_config_linking,
     AbstractModel* model);
 
+// Copies or set with the default values the metadata of the model.
+void InitializeModelMetadataWithAbstractTrainingConfig(
+    const proto::TrainingConfig& training_config, AbstractModel* model);
+
 // Copies the part of the training configuration related to the problem
 // definition. Fails if the "dst" already existing configuration is not
 // compatible or contradictory.

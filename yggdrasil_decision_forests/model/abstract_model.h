@@ -358,6 +358,10 @@ class AbstractModel {
   absl::Status PrecomputeVariableImportances(
       const std::vector<std::string>& variable_importances);
 
+  // Metadata accessors.
+  const proto::Metadata& metadata() const { return metadata_; }
+  proto::Metadata* mutable_metadata() { return &metadata_; }
+
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 
@@ -406,6 +410,8 @@ class AbstractModel {
   // be used accordingly (e.g. averaged, clamped to [0,1]). If false, the output
   // of the task=CLASSIFICATION model might not be a probability.
   bool classification_outputs_probabilities_ = true;
+
+  proto::Metadata metadata_;
 
   // Note: New fields should be registered in:
   // - The proto serialization functions.

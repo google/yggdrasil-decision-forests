@@ -35,6 +35,13 @@ inline std::string GenUniqueId() {
       absl::Uniform(bitgen, 0, 0x10000));
 }
 
+// Generates a low quality unique id.
+inline uint64_t GenUniqueIdUint64() {
+  absl::BitGen bitgen;
+  using nl = std::numeric_limits<uint64_t>;
+  return absl::Uniform(bitgen, nl::min(), nl::max());
+}
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
 

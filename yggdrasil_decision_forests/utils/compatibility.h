@@ -27,6 +27,7 @@
 #include <type_traits>
 
 #include "absl/base/attributes.h"
+#include "absl/types/optional.h"
 
 #if defined YGG_ABSL_NO_STATUSOR
 #include "absl/status/status.h"
@@ -36,6 +37,12 @@
 
 namespace yggdrasil_decision_forests {
 namespace utils {
+
+// Name of the user.
+inline absl::optional<std::string> UserName() {
+   // TODO(gbm): Platform specific implementation.
+   return {};
+}
 
 #if defined YGG_ABSL_NO_STATUSOR
 

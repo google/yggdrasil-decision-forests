@@ -577,6 +577,7 @@ cc_library_ydf(
     }),
     deps = [
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:optional",
     ] + select({
         "//yggdrasil_decision_forests:no_absl_statusor": [
             "@com_google_absl//absl/status:status",

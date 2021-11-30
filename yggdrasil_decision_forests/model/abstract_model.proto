@@ -72,6 +72,24 @@ message AbstractModel {
 
   // Index of the "treatment" attribute in the dataspec for uplift problems.
   optional int32 uplift_treatment_col_idx = 9 [default = -1];
+
+  optional Metadata metadata = 10;
+}
+
+// Information about the model.
+message Metadata {
+  // Owner of the model. Default to the user who ran the training code if
+  // available.
+  optional string owner = 1;
+
+  // Unix Timestamp of the model training. Expressed in seconds.
+  optional int64 created_date = 2;
+
+  // Unique identifier of the model.
+  optional uint64 uid = 3;
+
+  // Framework used to create the model.
+  optional string framework = 4;
 }
 
 // Description of the importance of a given attribute. The semantic of

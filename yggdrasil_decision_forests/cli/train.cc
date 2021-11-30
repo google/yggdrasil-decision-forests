@@ -74,6 +74,11 @@ void Train() {
     QCHECK_OK(file::GetTextProto(absl::GetFlag(FLAGS_deployment), &deployment,
                                  file::Defaults()));
   }
+
+  if (!config.metadata().has_framework()) {
+    config.mutable_metadata()->set_framework("Yggdrasil cli");
+  }
+
   LOG(INFO) << "Configuration:\n" << config.DebugString();
   LOG(INFO) << "Deployment:\n" << deployment.DebugString();
 
