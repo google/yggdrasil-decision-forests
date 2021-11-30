@@ -519,7 +519,7 @@ TrainWithCache(
       // Restart this iteration.
       iter_idx--;
     } else if (!iter_status.ok()) {
-      return iter_status;
+      return absl::Status(iter_status);
     }
   }
 

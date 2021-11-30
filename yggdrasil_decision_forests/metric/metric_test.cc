@@ -484,77 +484,87 @@ TEST(Metric, ComputeXAtYMetrics) {
   EXPECT_TRUE(std::isnan(roc.precision_at_recall(0).x_metric_value()));
   EXPECT_TRUE(std::isnan(roc.precision_at_recall(0).threshold()));
 
-  EXPECT_THAT(roc.precision_at_recall(1),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.7
-                x_metric_value: 0.5
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.precision_at_recall(1),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.7
+        x_metric_value: 0.5
+        threshold: 0)pb")));
 
-  EXPECT_THAT(roc.precision_at_recall(2),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.5
-                x_metric_value: 0.8
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.precision_at_recall(2),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.5
+        x_metric_value: 0.8
+        threshold: 0)pb")));
 
-  EXPECT_THAT(roc.precision_at_recall(3),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.3
-                x_metric_value: 0.8
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.precision_at_recall(3),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.3
+        x_metric_value: 0.8
+        threshold: 0)pb")));
 
   // Recall @ fixed Precision
   EXPECT_EQ(roc.recall_at_precision(0).y_metric_constraint(), 0.9);
   EXPECT_TRUE(std::isnan(roc.recall_at_precision(0).x_metric_value()));
   EXPECT_TRUE(std::isnan(roc.recall_at_precision(0).threshold()));
 
-  EXPECT_THAT(roc.recall_at_precision(1),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.6
-                x_metric_value: 0.5
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.recall_at_precision(1),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.6
+        x_metric_value: 0.5
+        threshold: 0)pb")));
 
-  EXPECT_THAT(roc.recall_at_precision(2),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.4
-                x_metric_value: 0.8
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.recall_at_precision(2),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.4
+        x_metric_value: 0.8
+        threshold: 0)pb")));
 
   // Precision @ fixed Volume
-  EXPECT_THAT(roc.precision_at_volume(0),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.5
-                x_metric_value: 0.5
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.precision_at_volume(0),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.5
+        x_metric_value: 0.5
+        threshold: 0)pb")));
 
   EXPECT_EQ(roc.precision_at_volume(1).y_metric_constraint(), 0.9);
   EXPECT_TRUE(std::isnan(roc.recall_at_precision(0).x_metric_value()));
   EXPECT_TRUE(std::isnan(roc.recall_at_precision(0).threshold()));
 
   // Recall @ fixed False positive rate
-  EXPECT_THAT(roc.recall_at_false_positive_rate(0),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.5
-                x_metric_value: 0.5
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.recall_at_false_positive_rate(0),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.5
+        x_metric_value: 0.5
+        threshold: 0)pb")));
 
-  EXPECT_THAT(roc.recall_at_false_positive_rate(1),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.9
-                x_metric_value: 0.8
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.recall_at_false_positive_rate(1),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.9
+        x_metric_value: 0.8
+        threshold: 0)pb")));
 
   // False positive rate @ fixed Recall
-  EXPECT_THAT(roc.false_positive_rate_at_recall(0),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.5
-                x_metric_value: 0.125
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.false_positive_rate_at_recall(0),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.5
+        x_metric_value: 0.125
+        threshold: 0)pb")));
 
-  EXPECT_THAT(roc.false_positive_rate_at_recall(1),
-              EqualsProto((proto::Roc::XAtYMetric)PARSE_TEST_PROTO(R"pb(
-                y_metric_constraint: 0.2
-                x_metric_value: 0.125
-                threshold: 0)pb")));
+  EXPECT_THAT(
+      roc.false_positive_rate_at_recall(1),
+      EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::Roc::XAtYMetric, R"pb(
+        y_metric_constraint: 0.2
+        x_metric_value: 0.125
+        threshold: 0)pb")));
 }
 
 TEST(Metric, AccuracyConfidenceInterval) {

@@ -211,7 +211,7 @@ utils::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
   if (!non_blocking_.status.ok()) {
     LOG(INFO) << "Error in non-blocking loading: "
               << non_blocking_.status.message();
-    return non_blocking_.status;
+    return absl::Status(non_blocking_.status);
   }
 
   for (const int column_idx : non_blocking_.unload_features) {

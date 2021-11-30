@@ -42,7 +42,7 @@ enum Severity { INFO, WARNING, FATAL };
 #define LOG_INFO ::internal::LogMessage(INFO, __FILE__, __LINE__)
 #define LOG_WARNING ::internal::LogMessage(WARNING, __FILE__, __LINE__)
 #define LOG_FATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
-#define LOG_ERROR ::internal::FatalLogMessage(__FILE__, __LINE__)
+#define LOG_ERROR ::internal::LogMessage(WARNING, __FILE__, __LINE__)
 #define LOG_QFATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
 #define LOG_DFATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
 
@@ -68,10 +68,13 @@ enum Severity { INFO, WARNING, FATAL };
 #endif
 
 #ifndef CHECK_OK
-#define CHECK_OK(expr)                                               \
-  const auto COMBINE_TERMS(status_for, __LINE__) = expr;             \
-  if (ABSL_PREDICT_FALSE(!COMBINE_TERMS(status_for, __LINE__).ok())) \
-  LOG(FATAL) << COMBINE_TERMS(status_for, __LINE__)
+#define CHECK_OK(expr)                                                 \
+  {                                                                    \
+    const auto COMBINE_TERMS(status_for, __LINE__) = expr;             \
+    if (ABSL_PREDICT_FALSE(!COMBINE_TERMS(status_for, __LINE__).ok())) \
+      LOG(FATAL) << COMBINE_TERMS(status_for, __LINE__);               \
+  }                                                                    \
+  nullptr
 #endif
 #endif
 

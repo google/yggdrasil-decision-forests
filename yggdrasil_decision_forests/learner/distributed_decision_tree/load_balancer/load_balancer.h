@@ -13,14 +13,16 @@
  * limitations under the License.
  */
 
-// Help balancing the workload in between workers for distributed decision tree
-// learning when workers have non-uniform and dynamically changing working
-// speed.
+// The LoadBalancer class helps balancing the workload among workers for
+// distributed decision tree learning when workers have non-uniform and
+// dynamically changing working speed -- commonly the case on shared
+// cloud servers.
 //
-// Notably, dynamically controls the mapping between features and workers.
+// It achieves that by dynamically controlling the mapping between features
+// and workers.
 //
 // At each iteration, the user calls "AddWorkDurationMeasurement()" to provide
-// the amount of time each worker took the execute the feature dependent tasks
+// the amount of time each worker took to execute the feature dependent tasks
 // i.e. finding the best splits. Following multiple time measures were some
 // workers are significantly slower than the others, the load balancer will
 // propose a set of orders to transfer the ownership of features from the slow
@@ -30,7 +32,7 @@
 // new features), the order can be applied
 // ("ApplyPendingOrder()").
 //
-// Internally, the work balancer algorithm works as follow:
+// Internally, the work balancer algorithm works as follows:
 //
 // 1. The computation speed of each worker is estimated over a rolling period of
 //    time (the last `estimation_window_length` observations).
@@ -56,6 +58,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_LOAD_BALANCER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_LOAD_BALANCER_H_
 
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"

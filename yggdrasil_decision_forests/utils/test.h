@@ -79,7 +79,7 @@ class ParseProtoHelper {
   ParseProtoHelper(absl::string_view text_proto) : text_proto_(text_proto) {}
 
   template <typename T>
-  operator T() {  // NOLINT(runtime/explicit)
+  T call() {
     T message;
     if (!google::protobuf::TextFormat::ParseFromString(text_proto_, &message)) {
       LOG(FATAL) << "Cannot parse proto:\n" << text_proto_;
@@ -87,11 +87,19 @@ class ParseProtoHelper {
     return message;
   }
 
+  template <typename T>
+  operator T() {  // NOLINT(runtime/explicit)
+    return call<T>();
+  }
+
  private:
   std::string text_proto_;
 };
 
 #define PARSE_TEST_PROTO(str) test::ParseProtoHelper(str)
+
+#define PARSE_TEST_PROTO_WITH_TYPE(T, str) \
+  test::ParseProtoHelper(str).call<typename T>()
 
 // Returns a free TCP port.
 int PickUnusedPortOrDie();

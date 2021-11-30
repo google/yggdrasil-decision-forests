@@ -545,7 +545,7 @@ RandomForestModel::GetVariableImportance(absl::string_view key) const {
                                                   data_spec().columns_size());
     }
   }
-  return general_vi;
+  return general_vi.status();
 }
 
 metric::proto::EvaluationResults RandomForestModel::ValidationEvaluation()

@@ -30,6 +30,8 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 
+constexpr char EngineWrapperModel::kRegisteredName[];
+
 void EngineWrapperModel::Predict(const dataset::VerticalDataset& dataset,
                                  dataset::VerticalDataset::row_t row_idx,
                                  model::proto::Prediction* prediction) const {

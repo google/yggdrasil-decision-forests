@@ -171,7 +171,7 @@ class WorkerService final : public proto::Server::Service {
   // or cancel, and destroy the "worker_" object.
   absl::Status BlockingDoneOnWorker() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     stopping_worker_ = true;
-    RETURN_IF_ERROR(AbslStatusToGrpcStatus(worker_->Done()));
+    RETURN_IF_ERROR(worker_->Done());
     LOG(INFO) << "Waiting for the " << num_active_requests_
               << " active request(s) to complete";
     while (num_active_requests_ > 0) {
