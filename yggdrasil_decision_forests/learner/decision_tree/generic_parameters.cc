@@ -243,6 +243,26 @@ absl::Status GetGenericHyperParameterSpecification(
   }
 
   {
+    ASSIGN_OR_RETURN(auto param,
+                     get_params(kHParamSplitAxisSparseObliqueWeights));
+    param->mutable_categorical()->set_default_value(
+        config.sparse_oblique_split().binary_weight()
+            ? kHParamSplitAxisSparseObliqueWeightsBinary
+            : kHParamSplitAxisSparseObliqueWeightsContinuous);
+    param->mutable_categorical()->add_possible_values(
+        kHParamSplitAxisSparseObliqueWeightsBinary);
+    param->mutable_categorical()->add_possible_values(
+        kHParamSplitAxisSparseObliqueWeightsContinuous);
+    param->mutable_conditional()->set_control_field(kHParamSplitAxis);
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        kHParamSplitAxisSparseOblique);
+    param->mutable_documentation()->set_description(
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Possible values:
+- `BINARY`: The oblique weights are sampled in {-1,1} (default).
+- `CONTINUOUS`: The oblique weights are be sampled in [-1,1].)");
+  }
+
+  {
     ASSIGN_OR_RETURN(auto param, get_params(kHParamCategoricalAlgorithm));
     param->mutable_categorical()->set_default_value(kCategoricalAlgorithmCART);
     param->mutable_categorical()->add_possible_values(
@@ -526,6 +546,31 @@ absl::Status SetHyperParameters(
       } else {
         return absl::InvalidArgumentError(
             absl::StrCat(kHParamSplitAxisSparseObliqueNormalization,
+                         " only work with oblique trees"));
+      }
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamSplitAxisSparseObliqueWeights);
+    if (hparam.has_value()) {
+      if (dt_config->has_sparse_oblique_split()) {
+        const auto& value = hparam.value().value().categorical();
+        if (value == kHParamSplitAxisSparseObliqueWeightsBinary) {
+          dt_config->mutable_sparse_oblique_split()->set_binary_weight(true);
+        } else if (value == kHParamSplitAxisSparseObliqueWeightsContinuous) {
+          dt_config->mutable_sparse_oblique_split()->set_binary_weight(false);
+        } else {
+          return absl::InvalidArgumentError(absl::StrCat(
+              "Unknown value for parameter ",
+              kHParamSplitAxisSparseObliqueWeights, ". Possible values are: ",
+              kHParamSplitAxisSparseObliqueWeightsBinary, " and ",
+              kHParamSplitAxisSparseObliqueWeightsContinuous, "."));
+        }
+      } else {
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueWeights,
                          " only work with oblique trees"));
       }
     }

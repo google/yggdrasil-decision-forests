@@ -59,12 +59,18 @@ constexpr char kCategoricalAlgorithmRandom[] = "RANDOM";
 
 // Axis splits.
 constexpr char kHParamSplitAxis[] = "split_axis";
+constexpr char kHParamSplitAxisAxisAligned[] = "AXIS_ALIGNED";
+constexpr char kHParamSplitAxisSparseOblique[] = "SPARSE_OBLIQUE";
+
 constexpr char kHParamSplitAxisSparseObliqueNumProjectionsExponent[] =
     "sparse_oblique_num_projections_exponent";
 constexpr char kHParamSplitAxisSparseObliqueProjectionDensityFactor[] =
     "sparse_oblique_projection_density_factor";
-constexpr char kHParamSplitAxisAxisAligned[] = "AXIS_ALIGNED";
-constexpr char kHParamSplitAxisSparseOblique[] = "SPARSE_OBLIQUE";
+
+constexpr char kHParamSplitAxisSparseObliqueWeights[] =
+    "sparse_oblique_weights";
+constexpr char kHParamSplitAxisSparseObliqueWeightsBinary[] = "BINARY";
+constexpr char kHParamSplitAxisSparseObliqueWeightsContinuous[] = "CONTINUOUS";
 
 constexpr char kHParamSplitAxisSparseObliqueNormalization[] =
     "sparse_oblique_normalization";

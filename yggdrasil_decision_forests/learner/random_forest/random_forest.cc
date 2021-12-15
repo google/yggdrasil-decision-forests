@@ -77,6 +77,10 @@ constexpr char RandomForestLearner::
     kHParamAdaptBootstrapSizeRatioForMaximumTrainingDuration[];
 constexpr char RandomForestLearner::kHParamComputeOOBPerformances[];
 constexpr char RandomForestLearner::kHParamComputeOOBVariableImportance[];
+constexpr char RandomForestLearner::kHParamBootstrapTrainingDataset[];
+constexpr char RandomForestLearner::kHParamBootstrapSizeRatio[];
+constexpr char
+    RandomForestLearner::kHParamNumOOBVariableImportancePermutations[];
 
 RandomForestLearner::RandomForestLearner(
     const model::proto::TrainingConfig& training_config)
@@ -134,6 +138,31 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
       if (rf_config->compute_oob_variable_importances()) {
         rf_config->set_compute_oob_performances(true);
       }
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamBootstrapTrainingDataset);
+    if (hparam.has_value()) {
+      rf_config->set_bootstrap_training_dataset(
+          hparam.value().value().categorical() == "true");
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamNumOOBVariableImportancePermutations);
+    if (hparam.has_value()) {
+      rf_config->set_num_oob_variable_importances_permutations(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamBootstrapSizeRatio);
+    if (hparam.has_value()) {
+      rf_config->set_bootstrap_size_ratio(hparam.value().value().real());
     }
   }
 
@@ -245,6 +274,39 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
         R"(If true, compute the Out-of-bag feature importance (then available in the summary and model inspector). Note that the OOB feature importance can be expensive to compute.)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamBootstrapTrainingDataset);
+    param.mutable_categorical()->set_default_value(
+        rf_config.bootstrap_training_dataset() ? "true" : "false");
+    param.mutable_categorical()->add_possible_values("true");
+    param.mutable_categorical()->add_possible_values("false");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(If true (default), each tree is trained on a separate dataset sampled with replacement from the original dataset. If false, all the trees are trained on the entire same dataset. If bootstrap_training_dataset:false, OOB metrics are not available. bootstrap_training_dataset=false is used in "Extremely randomized trees" (https://link.springer.com/content/pdf/10.1007%2Fs10994-006-6226-1.pdf).)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamNumOOBVariableImportancePermutations);
+    param.mutable_integer()->set_minimum(1);
+    param.mutable_integer()->set_default_value(
+        rf_config.num_oob_variable_importances_permutations());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Number of time the dataset is re-shuffled to compute the permutation variable importances. Increasing this value increase the training time (if "compute_oob_variable_importances:true") as well as the stability of the oob variable importance metrics.)");
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamBootstrapSizeRatio);
+    param.mutable_real()->set_minimum(0);
+    param.mutable_real()->set_default_value(rf_config.bootstrap_size_ratio());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Number of examples used to train each trees; expressed as a ratio of the training dataset size.)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(

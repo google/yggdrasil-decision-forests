@@ -65,6 +65,12 @@ class RandomForestLearner : public AbstractLearner {
   static constexpr char kHParamComputeOOBVariableImportance[] =
       "compute_oob_variable_importances";
 
+  static constexpr char kHParamBootstrapTrainingDataset[] =
+      "bootstrap_training_dataset";
+  static constexpr char kHParamBootstrapSizeRatio[] = "bootstrap_size_ratio";
+  static constexpr char kHParamNumOOBVariableImportancePermutations[] =
+      "num_oob_variable_importances_permutations";
+
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
