@@ -619,32 +619,30 @@ void InitializeModelWithAbstractTrainingConfig(
 
 void InitializeModelMetadataWithAbstractTrainingConfig(
     const proto::TrainingConfig& training_config, AbstractModel* model) {
-  const auto& src = training_config.metadata();
-  auto& dst = *model->mutable_metadata();
-
-  dst = src;
+  auto* dst = model->mutable_metadata();
+  dst->Import(training_config.metadata());
 
   // Owner
-  if (!dst.has_owner()) {
+  if (dst->owner().empty()) {
     auto opt_username = utils::UserName();
     if (opt_username.has_value()) {
-      dst.set_owner(std::move(opt_username).value());
+      dst->set_owner(std::move(opt_username).value());
     }
   }
 
   // Date
-  if (!dst.has_created_date()) {
-    dst.set_created_date(absl::ToUnixSeconds(absl::Now()));
+  if (dst->created_date() == 0) {
+    dst->set_created_date(absl::ToUnixSeconds(absl::Now()));
   }
 
   // UID
-  if (!dst.has_uid()) {
-    dst.set_uid(utils::GenUniqueIdUint64());
+  if (dst->uid() == 0) {
+    dst->set_uid(utils::GenUniqueIdUint64());
   }
 
   // Framework
-  if (!dst.has_framework()) {
-    dst.set_framework("Yggdrasil c++");
+  if (dst->framework().empty()) {
+    dst->set_framework("Yggdrasil c++");
   }
 }
 

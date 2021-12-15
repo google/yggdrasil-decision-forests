@@ -37,6 +37,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
+#include "yggdrasil_decision_forests/model/metadata.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -359,8 +360,11 @@ class AbstractModel {
       const std::vector<std::string>& variable_importances);
 
   // Metadata accessors.
-  const proto::Metadata& metadata() const { return metadata_; }
-  proto::Metadata* mutable_metadata() { return &metadata_; }
+  //
+  // Note: The use of "MetaData" (instead of "proto::MetaData") is a temporary
+  // change. Do not depend on it.
+  const MetaData& metadata() const { return metadata_; }
+  MetaData* mutable_metadata() { return &metadata_; }
 
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
@@ -411,7 +415,9 @@ class AbstractModel {
   // of the task=CLASSIFICATION model might not be a probability.
   bool classification_outputs_probabilities_ = true;
 
-  proto::Metadata metadata_;
+  // TODO(gbm): Use proto::Metadata.
+  // Note: Cannot use proto::Metadata with the version of protobuf linked by TF.
+  MetaData metadata_;
 
   // Note: New fields should be registered in:
   // - The proto serialization functions.

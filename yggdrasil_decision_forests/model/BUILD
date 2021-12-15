@@ -26,10 +26,12 @@ cc_library_ydf(
     srcs = [
         "abstract_model.cc",
         "fast_engine_factory.cc",
+        "metadata.cc",
     ],
     hdrs = [
         "abstract_model.h",
         "fast_engine_factory.h",
+        "metadata.h",
     ],
     deps = [
         ":abstract_model_cc_proto",

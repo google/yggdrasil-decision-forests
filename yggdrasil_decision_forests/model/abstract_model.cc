@@ -79,7 +79,7 @@ void AbstractModel::ExportProto(const AbstractModel& model,
   proto->set_classification_outputs_probabilities(
       model.classification_outputs_probabilities_);
 
-  *proto->mutable_metadata() = model.metadata();
+  model.metadata().Export(proto->mutable_metadata());
 }
 
 void AbstractModel::ImportProto(const proto::AbstractModel& proto,
@@ -100,7 +100,7 @@ void AbstractModel::ImportProto(const proto::AbstractModel& proto,
   model->classification_outputs_probabilities_ =
       proto.classification_outputs_probabilities();
 
-  *model->mutable_metadata() = proto.metadata();
+  model->mutable_metadata()->Import(proto.metadata());
 }
 
 metric::proto::EvaluationResults AbstractModel::Evaluate(
