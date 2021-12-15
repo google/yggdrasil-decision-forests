@@ -18,7 +18,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_READER_INTERFACE_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_READER_INTERFACE_H_
 
-#include <optional>
 #include <vector>
 
 #include "absl/status/status.h"

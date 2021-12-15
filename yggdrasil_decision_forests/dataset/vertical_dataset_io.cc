@@ -16,7 +16,6 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 
 #include <memory>
-#include <optional>
 #include <type_traits>
 #include <vector>
 

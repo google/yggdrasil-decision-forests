@@ -19,6 +19,12 @@
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 
+namespace yggdrasil_decision_forests {
+namespace logging {
+int logging_level = 2;
+}
+}  // namespace yggdrasil_decision_forests
+
 ABSL_FLAG(bool, alsologtostderr, true,
          "If true, stream the logs to std::clog. If false, ignore the logs.");
 

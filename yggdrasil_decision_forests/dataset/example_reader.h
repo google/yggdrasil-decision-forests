@@ -38,7 +38,6 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_READER_H_
 
 #include <memory>
-#include <optional>
 #include <vector>
 
 #include "absl/strings/string_view.h"

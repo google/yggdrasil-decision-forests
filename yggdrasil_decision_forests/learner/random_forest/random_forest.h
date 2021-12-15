@@ -22,7 +22,6 @@
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_RANDOM_FOREST_H_
 
 #include <memory>
-#include <optional>
 #include <random>
 #include <vector>
 

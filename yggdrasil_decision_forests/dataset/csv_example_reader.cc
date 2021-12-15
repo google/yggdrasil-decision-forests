@@ -16,7 +16,6 @@
 #include "yggdrasil_decision_forests/dataset/csv_example_reader.h"
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>

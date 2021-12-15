@@ -58,11 +58,16 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@farmhash_archive//:farmhash",
-        "@org_tensorflow//tensorflow/core:protos_all_cc",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:regex",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+    }),
 )
 
 cc_library_ydf(
@@ -206,12 +211,17 @@ cc_library_ydf(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@org_tensorflow//tensorflow/core/example:protos_all_cc",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+    }),
 )
 
 cc_library_ydf(
@@ -297,13 +307,18 @@ cc_library_ydf(
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@org_tensorflow//tensorflow/core:protos_all_cc",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:registration",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+    }),
 )
 
 cc_library_ydf(
@@ -323,12 +338,17 @@ cc_library_ydf(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@org_tensorflow//tensorflow/core:protos_all_cc",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:sharded_io_tfrecord",
     ] + select({
-        "//yggdrasil_decision_forests:tensorflow_with_header_lib": ["@org_tensorflow//tensorflow/core:framework_headers_lib"],
-        "//conditions:default": ["@org_tensorflow//tensorflow/core:lib"],
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": [
+            "@org_tensorflow//tensorflow/core:lib",
+            "@org_tensorflow//tensorflow/core:protos_all_cc",
+        ],
     }),
     alwayslink = 1,
 )
@@ -372,11 +392,16 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@farmhash_archive//:farmhash",
-        "@org_tensorflow//tensorflow/core/example:example_protos_cc",
         "//yggdrasil_decision_forests/utils:csv",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:random",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+    }),
 )
 
 # Proto
@@ -437,11 +462,16 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@org_tensorflow//tensorflow/core/example:protos_all_cc",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+    }),
 )
 
 cc_test(
@@ -528,12 +558,17 @@ cc_test(
         "@com_google_absl//absl/status",
         "//yggdrasil_decision_forests/utils:compatibility",
         "@com_google_absl//absl/strings",
-        "@org_tensorflow//tensorflow/core/example:protos_all_cc",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:test",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+    }),
 )
 
 cc_test(
@@ -576,11 +611,16 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/utils:compatibility",
         "@com_google_absl//absl/strings",
-        "@org_tensorflow//tensorflow/core/example:protos_all_cc",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:test",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+    }),
 )
 
 cc_test(

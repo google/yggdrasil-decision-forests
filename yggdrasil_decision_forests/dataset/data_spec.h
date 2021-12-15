@@ -19,7 +19,6 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_DATA_SPEC_H_
 
 #include <limits>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>

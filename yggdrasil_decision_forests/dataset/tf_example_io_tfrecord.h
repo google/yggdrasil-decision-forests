@@ -19,7 +19,6 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_TF_EXAMPLE_IO_TFRECORD_H_
 
 #include <memory>
-#include <optional>
 #include <vector>
 
 #include "absl/memory/memory.h"

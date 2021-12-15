@@ -22,7 +22,6 @@
 #define YGGDRASIL_DECISION_FORESTS_MODEL_ABSTRACT_MODEL_H_
 
 #include <memory>
-#include <optional>
 #include <random>
 #include <string>
 #include <vector>

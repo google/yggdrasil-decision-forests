@@ -28,9 +28,12 @@
 //     return absl::OKStatus();
 //   }
 #ifndef RETURN_IF_ERROR
-#define RETURN_IF_ERROR(expr)                                   \
-  if (auto _status = expr; ABSL_PREDICT_FALSE(!_status.ok())) { \
-    return _status;                                             \
+#define RETURN_IF_ERROR(expr)                \
+  {                                          \
+    auto _status = (expr);                   \
+    if (ABSL_PREDICT_FALSE(!_status.ok())) { \
+      return _status;                        \
+    }                                        \
   }
 #endif
 

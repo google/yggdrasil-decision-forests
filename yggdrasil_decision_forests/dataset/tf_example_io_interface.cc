@@ -17,7 +17,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>

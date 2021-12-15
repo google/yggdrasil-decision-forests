@@ -694,7 +694,7 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingSampling) {
   const auto sharded_sampled_evaluation =
       sharded_sampled_model->Evaluate(test_ds_, {}, &rnd);
 
-  EXPECT_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.86180, 0.005);
+  EXPECT_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.86180, 0.006);
 }
 
 // Model trained with the sharded algorithm and sampling.

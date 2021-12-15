@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <iterator>
 #include <memory>
-#include <optional>
 #include <random>
 #include <string>
 #include <utility>

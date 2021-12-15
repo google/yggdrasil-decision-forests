@@ -49,7 +49,7 @@ enum Severity { INFO, WARNING, FATAL };
 namespace yggdrasil_decision_forests {
 namespace logging {
 
-inline int logging_level = 2;
+extern int logging_level;
 
 // Sets the amount of logging:
 // 0: Only fatal i.e. before a crash of the program.

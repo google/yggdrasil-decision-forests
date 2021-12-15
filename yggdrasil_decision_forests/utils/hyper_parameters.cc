@@ -15,7 +15,6 @@
 
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
-#include <optional>
 #include <string>
 #include <utility>
 

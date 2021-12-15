@@ -17,7 +17,6 @@
 #define YGGDRASIL_DECISION_FORESTS_TOOL_FEATURE_IMPORTANCE_H_
 
 #include <functional>
-#include <optional>
 #include <random>
 #include <vector>
 

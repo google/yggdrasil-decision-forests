@@ -18,7 +18,6 @@
 #include <algorithm>
 #include <functional>
 #include <numeric>
-#include <optional>
 #include <random>
 #include <string>
 #include <vector>

@@ -19,7 +19,6 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_CSV_EXAMPLE_READER_H_
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 

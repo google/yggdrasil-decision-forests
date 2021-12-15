@@ -16,7 +16,6 @@
 #include "yggdrasil_decision_forests/dataset/example_reader.h"
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>

@@ -16,7 +16,6 @@
 #include "yggdrasil_decision_forests/utils/test_utils.h"
 
 #include <memory>
-#include <optional>
 #include <random>
 #include <string>
 #include <utility>

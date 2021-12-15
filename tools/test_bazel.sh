@@ -16,19 +16,18 @@
 
 # Compile and runs the unit tests.
 
-set -x
-set -e
+set -xev
 
 # Without TensorFlow IO (c++17)
 FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link"
-bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
-bazel test //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc ${FLAGS}
+time bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+time bazel test //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc ${FLAGS}
 
 # With TensorFlow IO, without StatusOr (c++14 with gcc8)
 FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io --define=no_absl_statusor=1 --repo_env=CC=gcc-8"
-bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+time bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
 
 # With TensorFlow IO (c++17)
 FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io"
-bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
-bazel test //yggdrasil_decision_forests/...:all //examples:beginner_cc ${FLAGS}
+time bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+time bazel test //yggdrasil_decision_forests/...:all //examples:beginner_cc ${FLAGS}

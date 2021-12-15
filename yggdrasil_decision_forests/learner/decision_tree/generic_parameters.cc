@@ -15,7 +15,6 @@
 
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 
-#include <optional>
 #include <string>
 #include <type_traits>
 

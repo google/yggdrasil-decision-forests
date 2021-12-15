@@ -111,10 +111,13 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
-        "@org_tensorflow//tensorflow/core/platform:path",
     ] + select({
-        "//yggdrasil_decision_forests:tensorflow_with_header_lib": ["@org_tensorflow//tensorflow/core:framework_headers_lib"],
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
         "//conditions:default": [
+            "@org_tensorflow//tensorflow/core/platform:path",
             "@org_tensorflow//tensorflow/core:framework",
             "@org_tensorflow//tensorflow/core:lib",
         ],
@@ -170,7 +173,10 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ] + select({
-        "//yggdrasil_decision_forests:tensorflow_with_header_lib": ["@org_tensorflow//tensorflow/core:framework_headers_lib"],
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
         "//conditions:default": ["@org_tensorflow//tensorflow/core:lib"],
     }),
 )
@@ -564,8 +570,13 @@ cc_library_ydf(
     deps = [
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@org_tensorflow//tensorflow/core/platform:status",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": ["@org_tensorflow//tensorflow/core/platform:status"],
+    }),
 )
 
 cc_library_ydf(

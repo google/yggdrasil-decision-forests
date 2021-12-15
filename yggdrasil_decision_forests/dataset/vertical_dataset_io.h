@@ -22,7 +22,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_VERTICAL_DATASET_IO_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_VERTICAL_DATASET_IO_H_
 
-#include <optional>
 #include <vector>
 
 #include "absl/status/status.h"

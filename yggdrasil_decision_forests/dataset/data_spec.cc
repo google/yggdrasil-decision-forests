@@ -22,7 +22,6 @@
 #include <limits>
 #include <map>
 #include <numeric>
-#include <optional>
 #include <regex>  // NOLINT
 #include <string>
 #include <utility>

@@ -40,7 +40,6 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_TF_EXAMPLE_IO_INTERFACE_H_
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 

@@ -16,7 +16,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_HYPER_PARAMETERS_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_HYPER_PARAMETERS_H_
 
-#include <optional>
 #include <string>
 
 #include "absl/container/flat_hash_map.h"

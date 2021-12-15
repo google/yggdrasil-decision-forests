@@ -40,7 +40,6 @@
 #define YGGDRASIL_DECISION_FORESTS_TOOL_TEST_UTILS_H_
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
