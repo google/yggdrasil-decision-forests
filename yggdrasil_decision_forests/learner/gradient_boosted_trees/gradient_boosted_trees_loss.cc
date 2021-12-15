@@ -570,13 +570,7 @@ absl::Status BinomialLogLikelihoodLoss::Loss(
 MeanSquaredErrorLoss::MeanSquaredErrorLoss(
     const proto::GradientBoostedTreesTrainingConfig& gbt_config,
     const model::proto::Task task, const dataset::proto::Column& label_column)
-    : task_(task), gbt_config_(gbt_config) {
-  if (task != model::proto::Task::REGRESSION &&
-      task != model::proto::Task::RANKING) {
-    LOG(FATAL) << "Mean squared error loss is only compatible with a "
-                  "regression or ranking task";
-  }
-}
+    : task_(task), gbt_config_(gbt_config) {}
 
 absl::Status MeanSquaredErrorLoss::Status() const {
   if (task_ != model::proto::Task::REGRESSION &&

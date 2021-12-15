@@ -114,6 +114,7 @@ constexpr char GradientBoostedTreesLearner::kHParamApplyLinkFunction[];
 constexpr char
     GradientBoostedTreesLearner::kHParamComputePermutationVariableImportance[];
 constexpr char GradientBoostedTreesLearner::kHParamValidationIntervalInTrees[];
+constexpr char GradientBoostedTreesLearner::kHParamLoss[];
 
 using dataset::VerticalDataset;
 using CategoricalColumn = VerticalDataset::CategoricalColumn;
@@ -1527,6 +1528,19 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
       generic_hyper_params));
 
   {
+    const auto hparam = generic_hyper_params->Get(kHParamLoss);
+    if (hparam.has_value()) {
+      const auto& str_loss = hparam.value().value().categorical();
+      model::gradient_boosted_trees::proto::Loss loss;
+      if (!model::gradient_boosted_trees::proto::Loss_Parse(str_loss, &loss)) {
+        return absl::InvalidArgumentError(
+            absl::Substitute("The loss value \"$0\" is unknown.", str_loss));
+      }
+      gbt_config->set_loss(loss);
+    }
+  }
+
+  {
     const auto hparam = generic_hyper_params->Get(kHParamNumTrees);
     if (hparam.has_value()) {
       gbt_config->set_num_trees(hparam.value().value().integer());
@@ -1932,6 +1946,30 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
   RETURN_IF_ERROR(SetDefaultHyperParameters(&config));
   const auto& gbt_config = config.GetExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](kHParamLoss);
+    param.mutable_categorical()->set_default_value(
+        proto::Loss_Name(gbt_config.loss()));
+
+    for (int loss_idx = 0; loss_idx < proto::Loss_ARRAYSIZE; loss_idx++) {
+      if (proto::Loss_IsValid(loss_idx)) {
+        param.mutable_categorical()->add_possible_values(
+            proto::Loss_Name(loss_idx));
+      }
+    }
+
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(The loss optimized by the model. If not specified (DEFAULT) the loss is selected automatically according to the \"task\" and label statistics. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:
+- `DEFAULT`: Select the loss automatically according to the task and label statistics.
+- `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.
+- `SQUARED_ERROR`: Least square loss. Only valid for regression.
+- `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.
+- `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5.
+- `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.
+)");
+  }
 
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamNumTrees);
