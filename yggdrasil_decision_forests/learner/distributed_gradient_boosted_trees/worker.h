@@ -205,7 +205,7 @@ class DistributedGradientBoostedTreesWorker
 
   // The worker received the initial model predictions from the manager.
   // Initialized with the "SetInitialPredictions" message.
-  bool received_initial_predictions_ = false;
+  std::atomic<bool> received_initial_predictions_{false};
 
   utils::RandomEngine random_;
 

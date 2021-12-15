@@ -924,12 +924,11 @@ void PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
                            &partial_meta_data, file::Defaults()));
 
   std::vector<int64_t> num_examples_per_columns(data_spec->columns_size(), 0);
+  absl::Mutex mutex_data;
   {
     utils::concurrency::ThreadPool thread_pool("InferDataspec",
                                                /*num_threads=*/20);
     thread_pool.StartWorkers();
-    absl::Mutex mutex_data;
-
     for (int col_idx = 0; col_idx < data_spec->columns_size(); col_idx++) {
       for (int shard_idx = 0; shard_idx < partial_meta_data.num_shards();
            shard_idx++) {
@@ -941,6 +940,7 @@ void PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
           PartialColumnShardMetadata shard_meta_data;
           CHECK_OK(file::GetBinaryProto(shard_meta_data_path, &shard_meta_data,
                                         file::Defaults()));
+
           absl::MutexLock l(&mutex_data);
 
           num_examples_per_columns[col_idx] += shard_meta_data.num_examples();

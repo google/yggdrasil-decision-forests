@@ -628,6 +628,7 @@ RandomForestLearner::TrainWithStatus(
                                     bootstrap_size_ratio_factor);
             }
             if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
+              absl::MutexLock lock2(&mutex_max_total_num_nodes);
               absl::StrAppendFormat(&snippet, " model-size:%d bytes",
                                     model_size_in_bytes);
             }

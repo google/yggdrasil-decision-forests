@@ -392,7 +392,7 @@ absl::Status PruneTreeRegression(
 
    private:
     double sum_squared_error_ = 0;
-    double sum_weights_;
+    double sum_weights_ = 0;
   };
 
   std::vector<float> predictions(dataset.nrow());
