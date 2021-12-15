@@ -183,7 +183,7 @@ class StatusOr {
   }
 
  private:
-  absl::Status status_;
+  absl::Status status_{absl::InternalError("")};
 
   union {
     // "data_" is initialized iif. "status_.ok()" is true.
