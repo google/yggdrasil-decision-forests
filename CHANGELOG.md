@@ -8,6 +8,7 @@
     meta-data. Note: The CART learner outputs a Random Forest model with a
     single tree.
 -   The Random Forest and CART learners support the `CATEGORICAL_UPLIFT` task.
+-   Add `SetLoggingLevel` to control the amount of logging.
 
 ### Fixes
 

@@ -46,7 +46,37 @@ enum Severity { INFO, WARNING, FATAL };
 #define LOG_QFATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
 #define LOG_DFATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
 
-// Evaluates an expression returning a absl::Status. If the status is not "OK"
+namespace yggdrasil_decision_forests {
+namespace logging {
+
+inline int logging_level = 2;
+
+// Sets the amount of logging:
+// 0: Only fatal i.e. before a crash of the program.
+// 1: Only warning and fatal.
+// 2: Info, warning and fatal i.e. all logging. Default.
+inline void SetLoggingLevel(int level) { logging_level = level; }
+
+// Tests if a given logging level should be visible.
+inline bool IsLoggingEnabled(Severity severity) {
+  if (!absl::GetFlag(FLAGS_alsologtostderr)) {
+    return false;
+  }
+
+  switch (severity) {
+    case Severity::INFO:
+      return logging_level >= 2;
+    case Severity::WARNING:
+      return logging_level >= 1;
+    case Severity::FATAL:
+      return true;
+  }
+}
+
+}  // namespace logging
+}  // namespace yggdrasil_decision_forests
+
+// Evaluates an expression returning an absl::Status. If the status is not "OK"
 // emit a fatal error message.
 //
 // Usage example:
@@ -149,9 +179,10 @@ inline absl::string_view ExtractFilename(absl::string_view path) {
 class LogMessage {
  public:
   LogMessage(Severity sev, absl::string_view file, int line) : sev_(sev) {
-    if (!absl::GetFlag(FLAGS_alsologtostderr)) {
+    if (!yggdrasil_decision_forests::logging::IsLoggingEnabled(sev)) {
       return;
     }
+
     std::clog << "[";
     switch (sev) {
       case INFO:
@@ -171,7 +202,7 @@ class LogMessage {
   }
 
   virtual ~LogMessage() {
-    if (!absl::GetFlag(FLAGS_alsologtostderr)) {
+    if (!yggdrasil_decision_forests::logging::IsLoggingEnabled(sev_)) {
       return;
     }
     std::clog << std::endl;
@@ -179,7 +210,7 @@ class LogMessage {
 
   template <typename T>
   LogMessage& operator<<(const T& v) {
-    if (!absl::GetFlag(FLAGS_alsologtostderr)) {
+    if (!yggdrasil_decision_forests::logging::IsLoggingEnabled(sev_)) {
       return *this;
     }
     std::clog << v;
@@ -196,7 +227,7 @@ class FatalLogMessage : public LogMessage {
       : LogMessage(FATAL, file, line) {}
 
   [[noreturn]] ~FatalLogMessage() {
-    if (absl::GetFlag(FLAGS_alsologtostderr)) {
+    if (yggdrasil_decision_forests::logging::IsLoggingEnabled(sev_)) {
       std::clog << std::endl;
       std::clog.flush();
     }
