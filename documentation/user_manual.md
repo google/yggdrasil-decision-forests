@@ -38,8 +38,6 @@ It is complementary to the beginner example available in `examples/`.
         *   [Fast engine](#fast-engine)
     *   [Advanced features](#advanced-features)
 
-<!-- Added by: gbm, at: Mon 31 May 2021 06:16:20 PM CEST -->
-
 <!--te-->
 
 ## Interfaces

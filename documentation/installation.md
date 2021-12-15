@@ -18,8 +18,6 @@ interfaces.
     *   [Using the C++ library](#using-the-c-library)
     *   [Troubleshooting](#troubleshooting)
 
-<!-- Added by: gbm, at: Mon 31 May 2021 06:16:20 PM CEST -->
-
 <!--te-->
 
 ## Installation pre-compiled command-line-interface

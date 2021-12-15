@@ -181,6 +181,14 @@ the gradient of the loss relative to the model output).
 -   Lambda regularization applied to certain training loss functions. Only for
     NDCG loss.
 
+#### [loss](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:loss)
+
+-   **Type:** Categorical **Default:** DEFAULT **Possible values:** DEFAULT,
+    BINOMIAL_LOG_LIKELIHOOD, SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD,
+    LAMBDA_MART_NDCG5, XE_NDCG_MART
+
+-   The loss optimized by the model. If not specified (DEFAULT) the loss is selected automatically according to the \"task\" and label statistics. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:<br>- `DEFAULT`: Select the loss automatically according to the task and label statistics.<br>- `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.<br>- `SQUARED_ERROR`: Least square loss. Only valid for regression.<br>- `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.<br>- `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5.<br>- `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.<br>
+
 #### [max_depth](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:max_depth)
 
 -   **Type:** Integer **Default:** 6 **Possible values:** min:-1
@@ -315,6 +323,13 @@ the gradient of the loss relative to the model output).
     number of random projections to test at each node as
     `num_features^num_projections_exponent`.
 
+#### [sparse_oblique_weights](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_weights)
+
+-   **Type:** Categorical **Default:** BINARY **Possible values:** BINARY,
+    CONTINUOUS
+
+-   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Possible values:<br>- `BINARY`: The oblique weights are sampled in {-1,1} (default).<br>- `CONTINUOUS`: The oblique weights are be sampled in [-1,1].
+
 #### [split_axis](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:split_axis)
 
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
@@ -328,6 +343,19 @@ the gradient of the loss relative to the model output).
 
 -   Ratio of the dataset (sampling without replacement) used to train individual
     trees for the random sampling method.
+
+#### [uplift_min_examples_in_treatment](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_min_examples_in_treatment)
+
+-   **Type:** Integer **Default:** 5 **Possible values:** min:0
+
+-   For uplift models only. Minimum number of examples per treatment in a node.
+
+#### [uplift_split_score](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_split_score)
+
+-   **Type:** Categorical **Default:** KULLBACK_LEIBLER **Possible values:**
+    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS
+
+-   For uplift models only. Splitter score i.e. score optimized by the splitters. The scores are introduced in "Decision trees for uplift modeling with single and multiple treatments", Rzepakowski et al. Notation: `p` probability / average value of the positive outcome, `q` probability / average value in the control group.<br>- `KULLBACK_LEIBLER` or `KL`: - p log (p/q)<br>- `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2<br>- `CHI_SQUARED` or `CS`: (p-q)^2/q<br>
 
 #### [use_goss](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:use_goss)
 
@@ -398,6 +426,24 @@ It is probably the most well-known of the Decision Forest training algorithms.
 
 -   If true, the tree training evaluates conditions of the type `X is NA` i.e.
     `X is missing`.
+
+#### [bootstrap_size_ratio](../yggdrasil_decision_forests/learner/random_forest/random_forest.proto?q=symbol:bootstrap_size_ratio)
+
+-   **Type:** Real **Default:** 1 **Possible values:** min:0
+
+-   Number of examples used to train each trees; expressed as a ratio of the
+    training dataset size.
+
+#### [bootstrap_training_dataset](../yggdrasil_decision_forests/learner/random_forest/random_forest.proto?q=symbol:bootstrap_training_dataset)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   If true (default), each tree is trained on a separate dataset sampled with
+    replacement from the original dataset. If false, all the trees are trained
+    on the entire same dataset. If bootstrap_training_dataset:false, OOB metrics
+    are not available. bootstrap_training_dataset=false is used in "Extremely
+    randomized trees"
+    (https://link.springer.com/content/pdf/10.1007%2Fs10994-006-6226-1.pdf).
 
 #### [categorical_algorithm](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:categorical_algorithm)
 
@@ -540,6 +586,15 @@ It is probably the most well-known of the Decision Forest training algorithms.
     as well as -1. If not set or equal to -1, the `num_candidate_attributes` is
     used.
 
+#### [num_oob_variable_importances_permutations](../yggdrasil_decision_forests/learner/random_forest/random_forest.proto?q=symbol:num_oob_variable_importances_permutations)
+
+-   **Type:** Integer **Default:** 1 **Possible values:** min:1
+
+-   Number of time the dataset is re-shuffled to compute the permutation
+    variable importances. Increasing this value increase the training time (if
+    "compute_oob_variable_importances:true") as well as the stability of the oob
+    variable importance metrics.
+
 #### [num_trees](../yggdrasil_decision_forests/learner/random_forest/random_forest.proto?q=symbol:num_trees)
 
 -   **Type:** Integer **Default:** 300 **Possible values:** min:1
@@ -585,12 +640,32 @@ It is probably the most well-known of the Decision Forest training algorithms.
     number of random projections to test at each node as
     `num_features^num_projections_exponent`.
 
+#### [sparse_oblique_weights](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_weights)
+
+-   **Type:** Categorical **Default:** BINARY **Possible values:** BINARY,
+    CONTINUOUS
+
+-   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Possible values:<br>- `BINARY`: The oblique weights are sampled in {-1,1} (default).<br>- `CONTINUOUS`: The oblique weights are be sampled in [-1,1].
+
 #### [split_axis](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:split_axis)
 
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
     AXIS_ALIGNED, SPARSE_OBLIQUE
 
 -   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.
+
+#### [uplift_min_examples_in_treatment](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_min_examples_in_treatment)
+
+-   **Type:** Integer **Default:** 5 **Possible values:** min:0
+
+-   For uplift models only. Minimum number of examples per treatment in a node.
+
+#### [uplift_split_score](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_split_score)
+
+-   **Type:** Categorical **Default:** KULLBACK_LEIBLER **Possible values:**
+    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS
+
+-   For uplift models only. Splitter score i.e. score optimized by the splitters. The scores are introduced in "Decision trees for uplift modeling with single and multiple treatments", Rzepakowski et al. Notation: `p` probability / average value of the positive outcome, `q` probability / average value in the control group.<br>- `KULLBACK_LEIBLER` or `KL`: - p log (p/q)<br>- `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2<br>- `CHI_SQUARED` or `CS`: (p-q)^2/q<br>
 
 #### [winner_take_all](../yggdrasil_decision_forests/learner/random_forest/random_forest.proto?q=symbol:winner_take_all_inference)
 
@@ -788,12 +863,32 @@ used to grow the tree while the second is used to prune the tree.
     number of random projections to test at each node as
     `num_features^num_projections_exponent`.
 
+#### [sparse_oblique_weights](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sparse_oblique_weights)
+
+-   **Type:** Categorical **Default:** BINARY **Possible values:** BINARY,
+    CONTINUOUS
+
+-   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Possible values:<br>- `BINARY`: The oblique weights are sampled in {-1,1} (default).<br>- `CONTINUOUS`: The oblique weights are be sampled in [-1,1].
+
 #### [split_axis](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:split_axis)
 
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
     AXIS_ALIGNED, SPARSE_OBLIQUE
 
 -   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.
+
+#### [uplift_min_examples_in_treatment](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_min_examples_in_treatment)
+
+-   **Type:** Integer **Default:** 5 **Possible values:** min:0
+
+-   For uplift models only. Minimum number of examples per treatment in a node.
+
+#### [uplift_split_score](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_split_score)
+
+-   **Type:** Categorical **Default:** KULLBACK_LEIBLER **Possible values:**
+    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS
+
+-   For uplift models only. Splitter score i.e. score optimized by the splitters. The scores are introduced in "Decision trees for uplift modeling with single and multiple treatments", Rzepakowski et al. Notation: `p` probability / average value of the positive outcome, `q` probability / average value in the control group.<br>- `KULLBACK_LEIBLER` or `KL`: - p log (p/q)<br>- `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2<br>- `CHI_SQUARED` or `CS`: (p-q)^2/q<br>
 
 #### [validation_ratio](../yggdrasil_decision_forests/learner/cart/cart.proto?q=symbol:validation_ratio)
 

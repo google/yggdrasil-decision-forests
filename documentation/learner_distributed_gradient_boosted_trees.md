@@ -16,8 +16,6 @@
         *   [IO](#io)
     *   [Limitations](#limitations)
 
-<!-- Added by: gbm, at: Fri 08 Oct 2021 02:54:48 PM CEST -->
-
 <!--te-->
 
 ## Introduction

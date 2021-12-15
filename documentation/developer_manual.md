@@ -12,8 +12,6 @@
     *   [How to test the code](#how-to-test-the-code)
     *   [Models and Learners](#models-and-learners)
 
-<!-- Added by: gbm, at: Mon 31 May 2021 06:16:20 PM CEST -->
-
 <!--te-->
 
 ## Design principles
