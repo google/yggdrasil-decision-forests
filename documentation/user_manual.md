@@ -36,6 +36,7 @@ It is complementary to the beginner example available in `examples/`.
     *   [Feature Engineering](#feature-engineering)
     *   [Model Inference](#model-inference)
         *   [Fast engine](#fast-engine)
+        *   [Serving TensorFlow Decision Forests model](#serving-tensorflow-decision-forests-model)
     *   [Advanced features](#advanced-features)
 
 <!--te-->
@@ -795,9 +796,68 @@ to include all the canonical ones using helpers):
 Note: If you get the following error: `No compatible engine available for model
 RANDOM_FOREST. 1) Make sure the corresponding engine is added as a dependency,
 
-2) use the (slow) generic engine (i.e. "model.Predict()") or 3) use one of the
-fast non-generic engines available in ../serving.`, you likely did not link a
-compatible engine.
+The input example can be specified in different ways:
+
+-   Feature by feature using the `examples->Set{Type}(example_idx, feature,
+    value)` methods (like in the example above).
+
+-   From an Yggdrasil example proto (i.e.
+    `yggdrasil_decision_forests::dataset::proto::Example`) and using the
+    `examples->FromProtoExample(example_proto)` method.
+
+-   From a TensorFlow example proto (i.e. `tensorflow::Example`) and using the
+    `examples->FromTensorflowExample(tf_example_proto)` method.
+
+Note: TensorFlow example proto are inefficient. If inference speed is important
+to you, the other methods are more suited.
+
+### Serving TensorFlow Decision Forests model
+
+[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests)
+models are TensorFlow Saved model containing an Yggdrasil Decision Forests in
+their `assets` subdirectory. Therefore, the Yggdrasil C++ API can be used to run
+TF-DF models directly.
+
+Following is a Colab example that trains a TF-DF model, and use it with the
+Yggdrasil DF toolbox.
+
+```python
+import tensorflow_decision_forests as tfdf
+
+# Train a TF-DF model (without any pre-processing)
+model = tfdf.keras.GradientBoostedTreesModel()
+model.fit(...)
+
+# Export the model as a TF Saved Model
+# Note: /tmp/model/assets is an Yggdrasil Decision Forests model
+model.save("/tmp/model")
+
+# Show the structure of the TF SavedModel.
+!tree /tmp/model
+# /tmp/model
+# ├── assets
+# │   ├── data_spec.pb
+# │   ├── done
+# │   ├── gradient_boosted_trees_header.pb
+# │   ├── header.pb
+# │   └── nodes-00000-of-00001
+# ├── keras_metadata.pb
+# ├── saved_model.pb
+# └── variables
+#     ├── variables.data-00000-of-00001
+#     └── variables.index
+
+# Show the model structure using Yggdrasil tool box
+!yggdrasil_decision_forests/cli/show_model --model=/tmp/model/assets
+```
+
+Note that the Yggdrasil model in a TF-DF model does not include any of the
+pre-processing done in the TensorFlow graph. If any pre-processing is applied,
+you have feed the pre-processed example to the Yggdrasil C++ API.
+
+For example, if a TF-DF model is trained with a TF-Hub text embedding module in
+the pre-processing stage, you have to feed the embeddings to the Yggdrasil C++
+API.
 
 ## Advanced features
 
