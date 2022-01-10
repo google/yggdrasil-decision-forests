@@ -70,9 +70,13 @@ cc_library_ydf(
         "filesystem.h",
         "filesystem_default.h",
     ],
-    copts = ["-fexceptions"],
+    copts = ["-fexceptions"],  # The code does not rely on exceptions.
     defines = ["YGG_FILESYSTEM_USES_DEFAULT"],
     features = ["-use_header_modules"],  # Incompatible with -fexceptions.
+    linkopts = select({
+        "@platforms//os:linux": ["-lstdc++fs"],  # Required for gcc<=8.
+        "//conditions:default": [],
+    }),
     deps = [
         ":bytestream",
         ":compatibility",

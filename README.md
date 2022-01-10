@@ -97,8 +97,8 @@ and then run `examples/beginner.{sh,bat}`.
 
 ## Installation from Source
 
-Install [Bazel](https://docs.bazel.build/versions/4.0.0/getting-started.html)
-and run:
+On linux, install
+[Bazel](https://docs.bazel.build/versions/4.0.0/getting-started.html) and run:
 
 ```shell
 git clone https://github.com/google/yggdrasil-decision-forests.git
@@ -111,6 +111,21 @@ examples/beginner.sh
 
 See the [installation](documentation/installation.md) page for more details,
 troubleshooting and alternative installation solutions.
+
+Yggdrasil was successfully compiled and run on:
+
+-   Linux Debian 5
+-   Windows 10
+-   MacOS 10
+-   Raspberry Pi 4 Rev 2
+
+Inference of Yggdrasil models is also available on:
+
+-   *[Experimental; No support]* Arduino Uno R3 (see
+    [project](https://github.com/achoum/ardwino-tensorflow-decision-forests))
+
+**Note:** Tell us if you were able to compile and run Yggdrasil on any other
+architecture :).
 
 ## Long-time-support commitments
 
