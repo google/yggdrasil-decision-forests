@@ -216,7 +216,7 @@ void GradientBoostedTreesModel::Predict(
     const dataset::VerticalDataset& dataset,
     dataset::VerticalDataset::row_t row_idx,
     model::proto::Prediction* prediction) const {
-  utils::usage::OnInference(1);
+  utils::usage::OnInference(1, metadata());
   switch (loss_) {
     case proto::Loss::BINOMIAL_LOG_LIKELIHOOD: {
       double accumulator = initial_predictions_[0];
@@ -338,7 +338,7 @@ void GradientBoostedTreesModel::Predict(
 void GradientBoostedTreesModel::Predict(
     const dataset::proto::Example& example,
     model::proto::Prediction* prediction) const {
-  utils::usage::OnInference(1);
+  utils::usage::OnInference(1, metadata());
   switch (loss_) {
     case proto::Loss::BINOMIAL_LOG_LIKELIHOOD: {
       double accumulator = initial_predictions_[0];

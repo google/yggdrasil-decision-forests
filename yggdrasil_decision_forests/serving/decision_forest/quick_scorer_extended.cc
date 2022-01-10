@@ -546,7 +546,7 @@ void PredictQuickScorerMajorFeatureOffset(
     const std::vector<Rangei32>& categorical_set_begins_and_ends,
     const std::vector<int32_t>& categorical_item_buffer, const int num_examples,
     const int major_feature_offset, std::vector<float>* predictions) {
-  utils::usage::OnInference(num_examples);
+  utils::usage::OnInference(num_examples, model.metadata);
   predictions->resize(num_examples);
 
   // "kNumParallelExamples" examples are treated in parallel using SIMD
@@ -828,6 +828,8 @@ absl::Status BaseGenericToSpecializedModel(const AbstractModel& src,
   if (src.task() != CompiledModel::kTask) {
     return absl::InvalidArgumentError("Wrong model class.");
   }
+
+  src.metadata().Export(&dst->metadata);
 
   typename CompiledModel::BuildingAccumulator accumulator;
 

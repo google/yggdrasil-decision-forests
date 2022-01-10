@@ -264,7 +264,7 @@ absl::Status RandomForestModel::PredictGetLeaves(
 void RandomForestModel::Predict(const dataset::VerticalDataset& dataset,
                                 dataset::VerticalDataset::row_t row_idx,
                                 model::proto::Prediction* prediction) const {
-  utils::usage::OnInference(1);
+  utils::usage::OnInference(1, metadata());
   switch (task_) {
     case model::proto::Task::CLASSIFICATION:
       PredictClassification(dataset, row_idx, prediction);
@@ -283,7 +283,7 @@ void RandomForestModel::Predict(const dataset::VerticalDataset& dataset,
 
 void RandomForestModel::Predict(const dataset::proto::Example& example,
                                 model::proto::Prediction* prediction) const {
-  utils::usage::OnInference(1);
+  utils::usage::OnInference(1, metadata());
   switch (task_) {
     case model::proto::Task::CLASSIFICATION:
       PredictClassification(example, prediction);

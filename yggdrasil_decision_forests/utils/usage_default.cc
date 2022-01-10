@@ -35,7 +35,12 @@ void OnTrainingEnd(const dataset::proto::DataSpecification& data_spec,
   // Add usage tracking here.
 }
 
-void OnInference(const int64_t num_examples) {
+void OnInference(const int64_t num_examples,
+                 const model::proto::Metadata& metadata) {
+  // Add usage tracking here.
+}
+
+void OnInference(int64_t num_examples, const model::MetaData& metadata) {
   // Add usage tracking here.
 }
 

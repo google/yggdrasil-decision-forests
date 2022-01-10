@@ -13,7 +13,11 @@
  * limitations under the License.
  */
 
-// Tracks simpleML usage.
+// Tracks learner and model usage for accounting.
+//
+// Those methods are called whenever the corresponding action occurs. For
+// example, "OnTrainingStart" is called whenever the training of a new model
+// starts.
 
 #ifndef YGGDRASIL_DECISION_FORESTS_TOOL_USAGE_H_
 #define YGGDRASIL_DECISION_FORESTS_TOOL_USAGE_H_
@@ -22,6 +26,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/metadata.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -43,9 +48,15 @@ void OnTrainingEnd(const dataset::proto::DataSpecification& data_spec,
                    int64_t num_examples, const model::AbstractModel& model,
                    absl::Duration training_duration);
 
-// Inference of simpleML model. Meta-models (i.e. models composed of models) do
-// no count as inference.
-void OnInference(int64_t num_examples);
+// Inference of a model.
+//
+// The inference on model containing other models (e.g. the ensembler or the
+// calibrator) might or might not be counted multiple times depending on the
+// specific model implementation.
+//
+// TODO: Merge the two functions when model::Metadata is removed.
+void OnInference(int64_t num_examples, const model::proto::Metadata& metadata);
+void OnInference(int64_t num_examples, const model::MetaData& metadata);
 
 }  // namespace usage
 }  // namespace utils

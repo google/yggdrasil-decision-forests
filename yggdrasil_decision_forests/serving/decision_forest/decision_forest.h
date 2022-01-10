@@ -248,6 +248,8 @@ struct FlatNodeModel {
   // documentation about these fields.
   std::vector<float> oblique_weights;
   std::vector<typename Node::FeatureIdx> oblique_internal_feature_idxs;
+
+  model::proto::Metadata metadata;
 };
 
 // Specialized models.

@@ -229,10 +229,12 @@ struct QuickScorerExtendedModel {
     std::unordered_map<int, SparseContainsConditions>
         categoricalset_contains_conditions;
   };
+
+  model::proto::Metadata metadata;
 };
 
 // ANDs a "mask" on a value contained in a map (specified by a key) i.e.
-// "map[key] &= mask". If the map does not contains the key, set it to the
+// "map[key] &= mask". If the map does not contain the key, set it to the
 // "mask" value i.e. "map[key] = mask".
 template <typename Map>
 void AndMaskMap(const typename Map::key_type& key,

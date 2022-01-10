@@ -670,6 +670,7 @@ absl::Status GenericToSpecializedModelHelper(
   if (src_model.task() != SpecializedModel::kTask) {
     return absl::InvalidArgumentError("Wrong model class.");
   }
+  src_model.metadata().Export(&dst_model->metadata);
 
   RETURN_IF_ERROR(InitializeFlatNodeModel(src_model, dst_model));
 
@@ -1308,7 +1309,7 @@ template <typename Model,
 inline void PredictHelper(
     const Model& model, const std::vector<typename Model::ValueType>& examples,
     int num_examples, std::vector<float>* predictions) {
-  utils::usage::OnInference(num_examples);
+  utils::usage::OnInference(num_examples, model.metadata);
   const int num_features = model.features().fixed_length_features().size();
   predictions->resize(num_examples);
   for (int example_idx = 0; example_idx < num_examples; ++example_idx) {
@@ -1332,7 +1333,7 @@ template <typename Model,
 inline void PredictHelper(const Model& model,
                           const typename Model::ExampleSet& examples,
                           int num_examples, std::vector<float>* predictions) {
-  utils::usage::OnInference(num_examples);
+  utils::usage::OnInference(num_examples, model.metadata);
   predictions->resize(num_examples);
   for (int example_idx = 0; example_idx < num_examples; ++example_idx) {
     float output = 0.f;
@@ -1354,7 +1355,7 @@ template <typename Model,
 inline void PredictHelperMultiDimensionTrees(
     const Model& model, const typename Model::ExampleSet& examples,
     int num_examples, std::vector<float>* predictions) {
-  utils::usage::OnInference(num_examples);
+  utils::usage::OnInference(num_examples, model.metadata);
   predictions->assign(num_examples * model.num_classes, 0.f);
   float* cur_predictions = &(*predictions)[0];
   for (int example_idx = 0; example_idx < num_examples; ++example_idx) {
@@ -1409,7 +1410,7 @@ template <typename Model,
 inline void PredictHelperOptimizedV1(
     const Model& model, const std::vector<typename Model::ValueType>& examples,
     int num_examples, std::vector<float>* predictions) {
-  utils::usage::OnInference(num_examples);
+  utils::usage::OnInference(num_examples, model.metadata);
   // A Group of "kTreeBatchSize" trees is called a "tree batch".
   predictions->resize(num_examples);
 
