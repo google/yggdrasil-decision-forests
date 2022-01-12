@@ -70,6 +70,9 @@ namespace {
 
 using test::EqualsProto;
 using testing::ElementsAre;
+using testing::SizeIs;
+using testing::FloatNear;
+using testing::NotNull;
 
 std::string DatasetDir() {
   return file::JoinPath(
@@ -305,6 +308,98 @@ TEST(GradientBoostedTrees, UpdateGradientsBinomialLogLikelihood) {
       /*ranking_index=*/nullptr, &gradients, &random));
 
   EXPECT_THAT(gradients.front().gradient, ElementsAre(-0.5f, 0.5, -0.5f, 0.5f));
+}
+
+TEST(GradientBoostedTrees, UpdateGradientsBinaryFocalLoss) {
+  const auto dataset = CreateToyDataset();
+  std::vector<float> weights(dataset.nrow(), 1.f);
+
+  dataset::VerticalDataset gradient_dataset;
+  std::vector<GradientData> gradients;
+  std::vector<float> predictions;
+  proto::GradientBoostedTreesTrainingConfig config;
+  config.set_use_hessian_gain(true);
+  const auto loss_imp =
+      BinaryFocalLoss(config, model::proto::Task::CLASSIFICATION,
+                      dataset.data_spec().columns(1));
+  CHECK_OK(internal::CreateGradientDataset(
+      dataset, proto::Loss::BINARY_FOCAL_LOSS,
+      /* label_col_idx= */ 1,
+      /*hessian_splits=*/false, loss_imp, &gradient_dataset, &gradients,
+      &predictions));
+
+  internal::SetInitialPredictions(
+      loss_imp
+          .InitialPredictions(dataset,
+                              /* label_col_idx =*/1, weights)
+          .value(),
+      dataset.nrow(), &predictions);
+
+  utils::RandomEngine random(1234);
+  CHECK_OK(loss_imp.UpdateGradients(
+      gradient_dataset, /* label_col_idx= */ 1, predictions,
+      /*ranking_index=*/nullptr, &gradients, &random));
+
+  const float test_prec = 0.000001f;
+
+  // TODO(gbm): Implement and use "AllElementsNear" matcher.
+  ASSERT_THAT(gradients.front().gradient, SizeIs(4));
+  // Values validated with tensorflow focal loss implementation
+  // (tfa.losses.sigmoid_focal_crossentropy).
+  EXPECT_THAT(gradients.front().gradient[0], FloatNear(-0.149143f, test_prec));
+  EXPECT_THAT(gradients.front().gradient[1], FloatNear(0.149143f, test_prec));
+  EXPECT_THAT(gradients.front().gradient[2], FloatNear(-0.149143f, test_prec));
+  EXPECT_THAT(gradients.front().gradient[3], FloatNear(0.149143f, test_prec));
+
+  ASSERT_THAT(gradients.front().hessian, NotNull());
+  const std::vector<float>& hessian = *gradients.front().hessian;
+  EXPECT_THAT(hessian, SizeIs(4));
+  EXPECT_THAT(hessian[0], FloatNear(0.199572f, test_prec));
+  EXPECT_THAT(hessian[1], FloatNear(0.199572f, test_prec));
+  EXPECT_THAT(hessian[2], FloatNear(0.199572f, test_prec));
+  EXPECT_THAT(hessian[3], FloatNear(0.199572f, test_prec));
+}
+
+TEST(GradientBoostedTrees, UpdateGradientsBinaryFocalLossCustomPredictions) {
+  const auto dataset = CreateToyDataset();
+  std::vector<float> weights(dataset.nrow(), 1.f);
+
+  dataset::VerticalDataset gradient_dataset;
+  std::vector<GradientData> gradients;
+  std::vector<float> predictions;
+  proto::GradientBoostedTreesTrainingConfig config;
+  config.set_use_hessian_gain(true);
+  const auto loss_imp =
+      BinaryFocalLoss(config, model::proto::Task::CLASSIFICATION,
+                      dataset.data_spec().columns(1));
+  CHECK_OK(internal::CreateGradientDataset(
+      dataset, proto::Loss::BINARY_FOCAL_LOSS,
+      /* label_col_idx= */ 1,
+      /*hessian_splits=*/false, loss_imp, &gradient_dataset, &gradients,
+      &predictions));
+
+  const double test_prec = 0.000001f;
+
+  predictions = {2.0, 2.0, -1.0, -1.0};
+
+  utils::RandomEngine random(1234);
+  CHECK_OK(loss_imp.UpdateGradients(
+      gradient_dataset, /* label_col_idx= */ 1, predictions,
+      /*ranking_index=*/nullptr, &gradients, &random));
+
+  ASSERT_THAT(gradients.front().gradient, SizeIs(4));
+  EXPECT_THAT(gradients.front().gradient[0], FloatNear(-0.538357f, test_prec));
+  EXPECT_THAT(gradients.front().gradient[1], FloatNear(0.00243547f, test_prec));
+  EXPECT_THAT(gradients.front().gradient[2], FloatNear(-0.0262906f, test_prec));
+  EXPECT_THAT(gradients.front().gradient[3], FloatNear(0.384117f, test_prec));
+
+  ASSERT_THAT(gradients.front().hessian, NotNull());
+  const std::vector<float>& hessian = *gradients.front().hessian;
+  EXPECT_THAT(hessian, SizeIs(4));
+  EXPECT_THAT(hessian[0], FloatNear(0.0772814f, test_prec));
+  EXPECT_THAT(hessian[1], FloatNear(0.00633879f, test_prec));
+  EXPECT_THAT(hessian[2], FloatNear(0.0553163f, test_prec));
+  EXPECT_THAT(hessian[3], FloatNear(0.226232f, test_prec));
 }
 
 TEST(GradientBoostedTrees, UpdateGradientsSquaredError) {
@@ -577,6 +672,86 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
   EXPECT_TRUE(gbt_model->IsMissingValueConditionResultFollowGlobalImputation());
+}
+
+// Train and test a model on the adult dataset with focal loss, but with gamma
+// equals zero, which equals to log loss.
+TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaZero) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::Loss::BINARY_FOCAL_LOSS);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
+  gbt_config->mutable_binary_focal_loss_options()->set_misprediction_exponent(
+      0.0f);
+  TrainAndEvaluateModel();
+
+  // Similar metrics as with log loss.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8602, 0.0008);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.3178, 0.004);
+}
+
+// Train and test a model on the adult dataset with focal loss, now with
+// an effective gamma of 0.5.
+TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaHalf) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::Loss::BINARY_FOCAL_LOSS);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
+  gbt_config->mutable_binary_focal_loss_options()->set_misprediction_exponent(
+      0.5f);
+  TrainAndEvaluateModel();
+
+  // Slighly better accuracy, but worse log loss; we are not
+  // optimizing for log loss directly any more.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0008);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.3310, 0.004);
+}
+
+// Train and test a model on the adult dataset with focal loss, now with
+// an effective gamma of 2.
+TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaTwo) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::Loss::BINARY_FOCAL_LOSS);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
+  gbt_config->mutable_binary_focal_loss_options()->set_misprediction_exponent(
+      2.0f);
+  TrainAndEvaluateModel();
+
+  // Even slightly better accuracy (could be just noise, but illustrative),
+  // log loss deviates even more
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8608, 0.0008);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4192, 0.004);
+}
+
+// Train and test a model on the adult dataset with focal loss, adding a
+// non-default, 0.25 alpha parameter to the gamma of 2.0
+TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaTwoAlphaQuarter) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::Loss::BINARY_FOCAL_LOSS);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
+  gbt_config->mutable_binary_focal_loss_options()->set_misprediction_exponent(
+      2.0f);
+  gbt_config->mutable_binary_focal_loss_options()
+      ->set_positive_sample_coefficient(0.25f);
+  TrainAndEvaluateModel();
+
+  // Worse accuracy but smaller log loss due to low alpha
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8300, 0.0008);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4032, 0.004);
 }
 
 // Train a GBT with a validation dataset provided as a VerticalDataset.

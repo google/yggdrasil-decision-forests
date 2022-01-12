@@ -873,11 +873,12 @@ template <>
 absl::Status GenericToSpecializedModel(
     const model::gradient_boosted_trees::GradientBoostedTreesModel& src,
     GradientBoostedTreesBinaryClassificationQuickScorerExtended* dst) {
-  if (src.loss() != Loss::BINOMIAL_LOG_LIKELIHOOD ||
+  if ((src.loss() != Loss::BINOMIAL_LOG_LIKELIHOOD &&
+       src.loss() != Loss::BINARY_FOCAL_LOSS) ||
       src.initial_predictions().size() != 1) {
     return absl::InvalidArgumentError(
         "The GBDT is not trained for binary classification with binomial log "
-        "likelihood loss.");
+        "likelihood or binary focal loss.");
   }
   return BaseGenericToSpecializedModel(src, dst);
 }

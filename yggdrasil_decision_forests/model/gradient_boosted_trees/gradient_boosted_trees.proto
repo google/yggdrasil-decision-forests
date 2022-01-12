@@ -59,6 +59,9 @@ enum Loss {
   LAMBDA_MART_NDCG5 = 4;
   // XE_NDCG_MART [arxiv.org/abs/1911.09798]
   XE_NDCG_MART = 5;
+  // EXPERIMENTAl. Focal loss. Only valid for binary classification.
+  // [https://arxiv.org/pdf/1708.02002.pdf]
+  BINARY_FOCAL_LOSS = 6;
 }
 
 // Log of the training. This proto is generated during the training of the

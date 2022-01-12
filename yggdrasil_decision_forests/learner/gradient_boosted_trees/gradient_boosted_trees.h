@@ -122,6 +122,10 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamValidationIntervalInTrees[] =
       "validation_interval_in_trees";
   static constexpr char kHParamLoss[] = "loss";
+  static constexpr char kHParamFocalLossGamma[] =
+      "focal_loss_gamma";
+  static constexpr char kHParamFocalLossAlpha[] =
+      "focal_loss_alpha";
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,

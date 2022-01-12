@@ -141,7 +141,8 @@ absl::Status GradientBoostedTreesModel::Validate() const {
       if (loss_ == proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD) {
         expected_initial_predictions_size =
             label_col_spec().categorical().number_of_unique_values() - 1;
-      } else if (loss_ == proto::Loss::BINOMIAL_LOG_LIKELIHOOD) {
+      } else if (loss_ == proto::Loss::BINOMIAL_LOG_LIKELIHOOD ||
+                 loss_ == proto::Loss::BINARY_FOCAL_LOSS) {
         expected_initial_predictions_size = 1;
       } else {
         return absl::InvalidArgumentError("Invalid loss in GBDT");
@@ -218,7 +219,8 @@ void GradientBoostedTreesModel::Predict(
     model::proto::Prediction* prediction) const {
   utils::usage::OnInference(1, metadata());
   switch (loss_) {
-    case proto::Loss::BINOMIAL_LOG_LIKELIHOOD: {
+    case proto::Loss::BINOMIAL_LOG_LIKELIHOOD:
+    case proto::Loss::BINARY_FOCAL_LOSS: {
       double accumulator = initial_predictions_[0];
       CallOnAllLeafs(dataset, row_idx,
                      [&accumulator](const decision_tree::proto::Node& node) {

@@ -23,7 +23,7 @@ import "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted
 
 // Training configuration for the Gradient Boosted Trees algorithm.
 message GradientBoostedTreesTrainingConfig {
-  // Next ID: 36
+  // Next ID: 37
 
   // Basic parameters.
 
@@ -164,6 +164,7 @@ message GradientBoostedTreesTrainingConfig {
   oneof loss_options {
     LambdaMartNdcg lambda_mart_ndcg = 12;
     XeNdcg xe_ndcg = 26;
+    BinaryFocalLossOptions binary_focal_loss_options = 36;
   }
 
   message LambdaMartNdcg {
@@ -183,6 +184,22 @@ message GradientBoostedTreesTrainingConfig {
       ONE = 2;
     }
     optional Gamma gamma = 1 [default = UNIFORM];
+  }
+
+  message BinaryFocalLossOptions {
+    // Exponent of the misprediction multiplier in focal loss.
+    // Corresponds to the gamma parameter in
+    // https://arxiv.org/pdf/1708.02002.pdf
+    optional float misprediction_exponent = 1 [default = 2.0];
+
+    // A hypertuning coefficient to multiply the loss and its gradient(s) in
+    // case of a positive sample.
+    // Loss and gradient on positive samples will be multipled by
+    // positive_sample_coefficient, on negative samples will be multiplied
+    // by (1 - positive_sample_coefficient)
+    // Corresponds to the 'alpha' parameter in
+    // https://arxiv.org/pdf/1708.02002.pdf
+    optional float positive_sample_coefficient = 2 [default = 0.5];
   }
 
   // L2 regularization on the tree predictions i.e. on the value of the leaf.

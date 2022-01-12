@@ -114,6 +114,8 @@ constexpr char
     GradientBoostedTreesLearner::kHParamComputePermutationVariableImportance[];
 constexpr char GradientBoostedTreesLearner::kHParamValidationIntervalInTrees[];
 constexpr char GradientBoostedTreesLearner::kHParamLoss[];
+constexpr char GradientBoostedTreesLearner::kHParamFocalLossGamma[];
+constexpr char GradientBoostedTreesLearner::kHParamFocalLossAlpha[];
 
 using dataset::VerticalDataset;
 using CategoricalColumn = VerticalDataset::CategoricalColumn;
@@ -1756,6 +1758,23 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamFocalLossGamma);
+    if (hparam.has_value()) {
+      gbt_config->mutable_binary_focal_loss_options()
+          ->set_misprediction_exponent(hparam.value().value().real());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamFocalLossAlpha);
+    if (hparam.has_value()) {
+      gbt_config->mutable_binary_focal_loss_options()
+          ->set_positive_sample_coefficient(hparam.value().value().real());
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -2217,6 +2236,29 @@ For example, in the case of binary classification, the pre-link function output 
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
         R"(If true, compute the permutation variable importance of the model at the end of the training using the validation dataset. Enabling this feature can increase the training time significantly.)");
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamFocalLossGamma);
+    param.mutable_real()->set_minimum(0.f);
+    param.mutable_real()->set_default_value(
+        gbt_config.binary_focal_loss_options().misprediction_exponent());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(EXPERIMENTAL. Exponent of the misprediction exponent term in focal Loss, corresponds to gamma parameter in https://arxiv.org/pdf/1708.02002.pdf. Only used with Focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamFocalLossAlpha);
+    param.mutable_real()->set_minimum(0.f);
+    param.mutable_real()->set_maximum(1.f);
+    param.mutable_real()->set_default_value(
+        gbt_config.binary_focal_loss_options().positive_sample_coefficient());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(EXPERIMENTAL. Wighting parameter for focal loss, positive samples weighted by alpha, negative samples by (1-alpha). The default 0.5 value means no active class-level weighting. Only used with Focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
