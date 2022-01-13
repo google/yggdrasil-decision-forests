@@ -592,7 +592,7 @@ absl::Status RunIteration(
   monitoring->NewIter();
   ASSIGN_OR_RETURN(
       const auto weak_learner_label_statistics,
-      EmitStartNewIter(iter_idx, random(), distribute_manager, monitoring));
+      EmitStartNewIter(iter_idx, (*rnd)(), distribute_manager, monitoring));
 
   WeakModels weak_models(model->num_trees_per_iter());
   for (int weak_model_idx = 0; weak_model_idx < weak_models.size();
