@@ -1069,7 +1069,7 @@ TemplatedFindBestSplitsWithDiscretizedNumericalFeatureMultiThreading(
       num_threads);
 
   absl::Status status;
-  absl::Mutex mutex_status;
+  utils::concurrency::Mutex mutex_status;
 
   {
     utils::concurrency::ThreadPool thread_pool("splitter", num_threads);
@@ -1101,7 +1101,7 @@ TemplatedFindBestSplitsWithDiscretizedNumericalFeatureMultiThreading(
             /*num_feature_values=*/num_discretized_values, begin_idx, end_idx,
             &example_bucket_set_per_node[thread_idx]);
 
-        absl::MutexLock l(&mutex_status);
+        utils::concurrency::MutexLock l(&mutex_status);
         status.Update(local_status);
       });
 

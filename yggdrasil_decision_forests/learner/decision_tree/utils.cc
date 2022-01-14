@@ -19,7 +19,7 @@
 #include <utility>
 #include <vector>
 
-#include "absl/synchronization/blocking_counter.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -91,7 +91,7 @@ void ConcurrentForLoop(
     function(0, 0, num_items);
     return;
   }
-  absl::BlockingCounter blocker(num_blocks);
+  utils::concurrency::BlockingCounter blocker(num_blocks);
   size_t begin_idx = 0;
   const size_t block_size = (num_items + num_blocks - 1) / num_blocks;
   for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {

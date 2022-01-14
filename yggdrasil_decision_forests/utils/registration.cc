@@ -19,7 +19,7 @@ namespace yggdrasil_decision_forests {
 namespace registration {
 namespace internal {
 
-ABSL_CONST_INIT absl::Mutex registration_mutex(absl::kConstInit);
+GLOBAL_MUTEX(registration_mutex);
 
 }  // namespace internal
 }  // namespace registration

@@ -224,7 +224,7 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
       request.output_directory(), kFilenameTmp, utils::GenUniqueId());
   RETURN_IF_ERROR(file::RecursivelyCreateDir(temp_directory, file::Defaults()));
 
-  absl::Mutex mutex_worker_status;
+  utils::concurrency::Mutex mutex_worker_status;
   absl::Status worker_status;
   int exported_columns = 0;
 
@@ -234,7 +234,7 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
     for (const auto column_idx : request.columns()) {
       thread_pool.Schedule([&, column_idx]() {
         {
-          absl::MutexLock l(&mutex_worker_status);
+          utils::concurrency::MutexLock l(&mutex_worker_status);
           if (!worker_status.ok()) {
             return;
           }
@@ -247,7 +247,7 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
             dataset, column_idx, request.shard_idx(), request.num_shards(),
             temp_directory, request.output_directory());
         {
-          absl::MutexLock l(&mutex_worker_status);
+          utils::concurrency::MutexLock l(&mutex_worker_status);
           worker_status.Update(local_status);
           exported_columns++;
         }

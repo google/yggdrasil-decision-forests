@@ -61,11 +61,11 @@ cc_library_ydf(
         "utils.h",
     ],
     deps = [
-        "@com_google_absl//absl/synchronization",
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/utils:bitmap",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:synchronization_primitives",
     ],
 )
 

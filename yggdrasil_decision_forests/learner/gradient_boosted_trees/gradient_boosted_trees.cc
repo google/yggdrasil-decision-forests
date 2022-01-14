@@ -594,12 +594,12 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     // Amount of time spent waiting for the preparation thread (IO + parsing +
     // preprocess).
     absl::Duration sum_duration_wait_prepare;
-    absl::Mutex mutex_sum_duration;
+    utils::concurrency::Mutex mutex_sum_duration;
     // Amount of time in the shard loading logic (IO + parsing).
-    absl::Duration sum_duration_load ABSL_GUARDED_BY(mutex_sum_duration);
+    absl::Duration sum_duration_load GUARDED_BY(mutex_sum_duration);
     // Amount of time in the shard preprocess logic (running the previously
     // learned trees).
-    absl::Duration sum_duration_preprocess ABSL_GUARDED_BY(mutex_sum_duration);
+    absl::Duration sum_duration_preprocess GUARDED_BY(mutex_sum_duration);
   } time_accumulators;
 
   // Fast version of the model. The fast engine is cheaper to run but more
@@ -610,7 +610,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   // Load a random sample of training data, prepare it for the weak learner
   // training, and compute the cached predictions with "trees".
   utils::RandomEngine shard_random(random());
-  absl::Mutex shard_random_mutex;
+  utils::concurrency::Mutex shard_random_mutex;
   auto load_and_prepare_next_sample =
       [&training_shards, num_sample_train_shards, &shard_random,
        &shard_random_mutex, &dataset_prefix, &data_spec, &config, &mdl,
@@ -621,7 +621,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     auto time_begin_load = absl::Now();
     std::vector<std::string> selected_shards;
     {
-      absl::MutexLock lock(&shard_random_mutex);
+      utils::concurrency::MutexLock lock(&shard_random_mutex);
       selected_shards = SampleTrainingShards(
           training_shards, num_sample_train_shards, &shard_random);
     }
@@ -640,7 +640,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 
     auto time_end_all = absl::Now();
     {
-      absl::MutexLock results_lock(&time_accumulators.mutex_sum_duration);
+      utils::concurrency::MutexLock results_lock(
+          &time_accumulators.mutex_sum_duration);
       time_accumulators.sum_duration_load +=
           time_begin_predict - time_begin_load;
       time_accumulators.sum_duration_preprocess +=
@@ -674,7 +675,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 
   // Amount of time spend in preprocessing in the preparation of the shards.
   const auto get_ratio_prepare_in_shard_preparation = [&]() {
-    absl::MutexLock results_lock(&time_accumulators.mutex_sum_duration);
+    utils::concurrency::MutexLock results_lock(
+        &time_accumulators.mutex_sum_duration);
     const auto denominator =
         absl::ToDoubleSeconds(time_accumulators.sum_duration_preprocess +
                               time_accumulators.sum_duration_load);

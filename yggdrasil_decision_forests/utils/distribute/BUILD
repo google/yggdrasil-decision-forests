@@ -108,6 +108,7 @@ cc_library_ydf(
         ":core",
         "@com_google_absl//absl/synchronization",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:synchronization_primitives",
     ],
     alwayslink = 1,
 )

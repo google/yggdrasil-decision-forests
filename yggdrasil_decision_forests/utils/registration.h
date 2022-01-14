@@ -43,8 +43,8 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/substitute.h"
-#include "absl/synchronization/mutex.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 // Build the registration pool name from the interface class name.
 #define INTERNAL_REGISTERER_CLASSNAME(INTERFACE) INTERFACE##Registerer
@@ -64,8 +64,9 @@
     static ::yggdrasil_decision_forests::registration::internal::Empty       \
     Register(const absl::string_view key) {                                  \
       if (IsName(key)) return {};                                            \
-      absl::MutexLock l(&::yggdrasil_decision_forests::registration::        \
-                            internal::registration_mutex);                   \
+      utils::concurrency::MutexLock l(                                       \
+          &::yggdrasil_decision_forests::registration::internal::            \
+              registration_mutex);                                           \
       InternalGetItems()->push_back(                                         \
           absl::make_unique<                                                 \
               ::yggdrasil_decision_forests::registration::internal::Creator< \
@@ -84,8 +85,8 @@ namespace yggdrasil_decision_forests {
 namespace registration {
 namespace internal {
 
-// Mutex for all user registration operations.
-extern absl::Mutex registration_mutex;
+// utils::concurrency::Mutex for all user registration operations.
+extern utils::concurrency::Mutex registration_mutex;
 
 struct Empty {};
 
@@ -121,12 +122,12 @@ class ClassPool {
   }
 
   static std::vector<std::string> GetNames() {
-    absl::MutexLock l(&registration_mutex);
+    utils::concurrency::MutexLock l(&registration_mutex);
     return InternalGetNames();
   }
 
   static bool IsName(absl::string_view name) {
-    absl::MutexLock l(&registration_mutex);
+    utils::concurrency::MutexLock l(&registration_mutex);
     auto& items = *InternalGetItems();
     for (const auto& item : items) {
       if (name == item->name()) {
@@ -138,7 +139,7 @@ class ClassPool {
 
   static utils::StatusOr<std::unique_ptr<Interface>> Create(
       absl::string_view name, Args... args) {
-    absl::MutexLock l(&registration_mutex);
+    utils::concurrency::MutexLock l(&registration_mutex);
     auto& items = *InternalGetItems();
     for (const auto& item : items) {
       if (name != item->name()) {

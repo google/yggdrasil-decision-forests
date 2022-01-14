@@ -17,7 +17,7 @@
 #define YGGDRASIL_DECISION_FORESTS_TOOL_ADAPTIVE_WORK_H_
 
 #include "absl/base/thread_annotations.h"
-#include "absl/synchronization/mutex.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -42,9 +42,9 @@ class AdaptativeWork {
 
   // Reports a newly completed task.
   void ReportTaskDone(double approximation_factor, double consumed_budget)
-      ABSL_LOCKS_EXCLUDED(mu_);
+      LOCKS_EXCLUDED(mu_);
 
-  double OptimalApproximationFactor() const ABSL_LOCKS_EXCLUDED(mu_);
+  double OptimalApproximationFactor() const LOCKS_EXCLUDED(mu_);
 
  private:
   // Note: See constructor documentation.
@@ -54,13 +54,13 @@ class AdaptativeWork {
   const double min_factor_;
 
   // Total consumed budget so far.
-  double consumed_budget_ ABSL_GUARDED_BY(mu_) = 0.0;
+  double consumed_budget_ GUARDED_BY(mu_) = 0.0;
   // Number of tasks ran so far.
-  int num_ran_tasks_ ABSL_GUARDED_BY(mu_) = 0;
+  int num_ran_tasks_ GUARDED_BY(mu_) = 0;
   // Sum of consumed_budget / approximation_factor for the completed tasks.
-  double sum_consumed_budget_div_approximation_factor_ ABSL_GUARDED_BY(mu_) =
+  double sum_consumed_budget_div_approximation_factor_ GUARDED_BY(mu_) =
       0.0;
-  mutable absl::Mutex mu_;
+  mutable utils::concurrency::Mutex mu_;
 };
 
 }  // namespace utils

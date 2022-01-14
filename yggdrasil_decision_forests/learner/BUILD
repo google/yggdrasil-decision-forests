@@ -72,7 +72,6 @@ cc_library_ydf(
         ":types",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:optional",
         "//yggdrasil_decision_forests/dataset:data_spec",
@@ -90,6 +89,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:fold_generator",
         "//yggdrasil_decision_forests/utils:fold_generator_cc_proto",
         "//yggdrasil_decision_forests/utils:hyper_parameters",
+        "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "//yggdrasil_decision_forests/utils:uid",
     ],
 )

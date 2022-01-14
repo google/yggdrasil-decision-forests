@@ -26,11 +26,11 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
-#include "absl/synchronization/mutex.h"
 #include "yggdrasil_decision_forests/utils/bitmap.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -402,7 +402,7 @@ absl::Status ShardedMultiBitmap::SaveToFile(const std::string& base_path,
       absl::StrCat(base_path, kShardedMultiBitmapFileHeaderSuffix), header,
       file::Defaults()));
   absl::Status status;
-  absl::Mutex status_mutex;
+  utils::concurrency::Mutex status_mutex;
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         "ShardedMultiBitmap::SaveToFile", num_threads);
@@ -414,7 +414,7 @@ absl::Status ShardedMultiBitmap::SaveToFile(const std::string& base_path,
                          shard_idx),
             shards_[shard_idx]);
         if (!local_status.ok()) {
-          absl::MutexLock lock(&status_mutex);
+          utils::concurrency::MutexLock lock(&status_mutex);
           status.Update(local_status);
         }
       });

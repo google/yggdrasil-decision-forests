@@ -19,6 +19,7 @@
 #include "absl/synchronization/barrier.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {

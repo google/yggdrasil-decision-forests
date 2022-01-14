@@ -29,7 +29,6 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
-#include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -60,6 +59,7 @@
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
@@ -442,7 +442,8 @@ RandomForestLearner::TrainWithStatus(
   }
 
   // OOB (out-of-bag) predictions.
-  absl::Mutex oob_metrics_mutex;  // Protects all the "oob_*" fields.
+  utils::concurrency::Mutex
+      oob_metrics_mutex;  // Protects all the "oob_*" fields.
 
   // Prediction accumulator for each example in the training dataset
   // (oob_predictions.size()==training_dataset.nrow()).
@@ -515,7 +516,7 @@ RandomForestLearner::TrainWithStatus(
   // "total_max_num_nodes" parameter.
   //
   // Protects all the following variables.
-  absl::Mutex mutex_max_total_num_nodes;
+  utils::concurrency::Mutex mutex_max_total_num_nodes;
   // Number of nodes in the "completed" trees.
   std::vector<int64_t> num_nodes_completed_trees(rf_config.num_trees(), -1);
   // Number of nodes in the accounted trees i.e. the first
@@ -566,7 +567,7 @@ RandomForestLearner::TrainWithStatus(
 
         // Maximum model size.
         if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
-          absl::MutexLock lock(&mutex_max_total_num_nodes);
+          utils::concurrency::MutexLock lock(&mutex_max_total_num_nodes);
           if (model_size_in_bytes >
               training_config().maximum_model_size_in_memory_in_bytes()) {
             return;
@@ -574,7 +575,7 @@ RandomForestLearner::TrainWithStatus(
         }
 
         if (rf_config.total_max_num_nodes() > 0) {
-          absl::MutexLock lock(&mutex_max_total_num_nodes);
+          utils::concurrency::MutexLock lock(&mutex_max_total_num_nodes);
           if (total_num_nodes_accounted > rf_config.total_max_num_nodes()) {
             // The num node limits is already exceeded.
             return;
@@ -636,7 +637,7 @@ RandomForestLearner::TrainWithStatus(
         if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
           const auto tree_size_in_bytes =
               decision_tree->EstimateModelSizeInBytes();
-          absl::MutexLock lock(&mutex_max_total_num_nodes);
+          utils::concurrency::MutexLock lock(&mutex_max_total_num_nodes);
           model_size_in_bytes += tree_size_in_bytes;
           // Note: A model should contain at least one tree.
           if (num_trained_trees > 0 &&
@@ -659,7 +660,7 @@ RandomForestLearner::TrainWithStatus(
         const auto current_num_trained_trees = ++num_trained_trees;
 
         if (rf_config.total_max_num_nodes() > 0) {
-          absl::MutexLock lock(&mutex_max_total_num_nodes);
+          utils::concurrency::MutexLock lock(&mutex_max_total_num_nodes);
           num_nodes_completed_trees[tree_idx] = decision_tree->NumNodes();
           while (next_tree_idx_to_account < num_nodes_completed_trees.size() &&
                  num_nodes_completed_trees[next_tree_idx_to_account] >= 0) {
@@ -685,7 +686,7 @@ RandomForestLearner::TrainWithStatus(
 
         // OOB Metrics.
         if (compute_oob_performances) {
-          absl::MutexLock lock(&oob_metrics_mutex);
+          utils::concurrency::MutexLock lock(&oob_metrics_mutex);
           // Update the prediction accumulator.
           internal::UpdateOOBPredictionsWithNewTree(
               train_dataset, config_with_default, selected_examples,
@@ -727,7 +728,7 @@ RandomForestLearner::TrainWithStatus(
                                     bootstrap_size_ratio_factor);
             }
             if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
-              absl::MutexLock lock2(&mutex_max_total_num_nodes);
+              utils::concurrency::MutexLock lock2(&mutex_max_total_num_nodes);
               absl::StrAppendFormat(&snippet, " model-size:%d bytes",
                                     model_size_in_bytes);
             }

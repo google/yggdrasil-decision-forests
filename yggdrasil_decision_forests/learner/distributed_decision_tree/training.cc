@@ -88,7 +88,7 @@ absl::Status TemplatedAggregateLabelStatistics(
       });
 
   /*
-    absl::BlockingCounter blocker(num_threads);
+   utils::concurrency::BlockingCounter blocker(num_threads);
     size_t begin_idx = 0;
     const size_t block_size = (num_examples + num_threads - 1) / num_threads;
     for (size_t thread_idx = 0; thread_idx < num_threads; thread_idx++) {
@@ -223,8 +223,9 @@ absl::Status TreeBuilder::FindBestSplits(
 absl::Status TreeBuilder::FindBestSplitsWithThreadPool(
     const FindBestSplitsCommonArgs& common,
     const std::vector<int>& unique_active_features,
-    utils::concurrency::ThreadPool* thread_pool, absl::Mutex* mutex,
-    absl::BlockingCounter* counter, absl::Status* status) const {
+    utils::concurrency::ThreadPool* thread_pool,
+    utils::concurrency::Mutex* mutex,
+    utils::concurrency::BlockingCounter* counter, absl::Status* status) const {
   if (open_nodes_.size() != common.features_per_open_node.size()) {
     return absl::InternalError("Wrong number of elements");
   }
@@ -249,7 +250,7 @@ absl::Status TreeBuilder::FindBestSplitsWithThreadPool(
                            sub_num_threads]() {
       // Did another worker already failed?
       {
-        absl::MutexLock l(mutex);
+        utils::concurrency::MutexLock l(mutex);
         if (!status->ok()) {
           return;
         }
@@ -268,7 +269,7 @@ absl::Status TreeBuilder::FindBestSplitsWithThreadPool(
 
       // Merge the result.
       {
-        absl::MutexLock l(mutex);
+        utils::concurrency::MutexLock l(mutex);
         status->Update(local_status);
         if (local_status.ok()) {
           status->Update(
@@ -769,15 +770,15 @@ absl::Status EvaluateSplits(const ExampleToNodeMap& example_to_node,
     return absl::OkStatus();
   };
 
-  absl::Mutex mutex;
-  absl::BlockingCounter blocker(split_per_feature.size());
+  utils::concurrency::Mutex mutex;
+  utils::concurrency::BlockingCounter blocker(split_per_feature.size());
   absl::Status status;
   for (const auto& feature_and_split_idx : split_per_feature) {
     thread_pool->Schedule([&, feature_idx = feature_and_split_idx.first,
                            &splits = feature_and_split_idx.second]() {
       auto local_status = process(feature_idx, splits);
       {
-        absl::MutexLock l(&mutex);
+        utils::concurrency::MutexLock l(&mutex);
         status.Update(local_status);
       }
       blocker.DecrementCount();

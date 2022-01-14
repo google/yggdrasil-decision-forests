@@ -84,14 +84,14 @@ utils::StatusOr<distribute::Blob>
 DistributedGradientBoostedTreesWorker::RunRequest(
     distribute::Blob serialized_request) {
   {
-    absl::MutexLock l(&mutex_num_running_requests_);
+    utils::concurrency::MutexLock l(&mutex_num_running_requests_);
     num_running_requests_++;
   }
 
   auto status_or = RunRequestImp(std::move(serialized_request));
 
   {
-    absl::MutexLock l(&mutex_num_running_requests_);
+    utils::concurrency::MutexLock l(&mutex_num_running_requests_);
     num_running_requests_--;
     if (stop_) {
       if (num_running_requests_ == 0) {
@@ -503,8 +503,8 @@ absl::Status DistributedGradientBoostedTreesWorker::FindSplits(
   std::vector<distributed_decision_tree::SplitPerOpenNode>
       splits_per_weak_models(weak_models_.size());
 
-  absl::Mutex mutex_splits_per_weak_models;
-  absl::BlockingCounter done_find_splits(
+  utils::concurrency::Mutex mutex_splits_per_weak_models;
+  utils::concurrency::BlockingCounter done_find_splits(
       num_unique_active_features_across_weak_models);
   absl::Status worker_status;
 
@@ -526,7 +526,7 @@ absl::Status DistributedGradientBoostedTreesWorker::FindSplits(
   }
 
   done_find_splits.Wait();
-  absl::MutexLock l(&mutex_splits_per_weak_models);
+  utils::concurrency::MutexLock l(&mutex_splits_per_weak_models);
   RETURN_IF_ERROR(worker_status);
 
   // Save the best splits into the reply.

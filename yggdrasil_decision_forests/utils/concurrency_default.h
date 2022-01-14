@@ -20,8 +20,8 @@
 #include <string>
 #include <thread>
 
-#include "absl/synchronization/mutex.h"
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {

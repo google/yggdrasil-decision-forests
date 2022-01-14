@@ -23,8 +23,8 @@
 #include <queue>
 #include <string>
 
-#include "absl/synchronization/mutex.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -37,14 +37,14 @@ class Channel {
  public:
   // Close the channel. No new items can be push in the channel.
   void Close() {
-    absl::MutexLock results_lock(&mutex_);
+    MutexLock results_lock(&mutex_);
     close_channel_ = true;
     cond_var_.SignalAll();
   }
 
   // Re-open a previously closed channel.
   void Reopen() {
-    absl::MutexLock results_lock(&mutex_);
+    MutexLock results_lock(&mutex_);
     close_channel_ = false;
     cond_var_.SignalAll();
   }
@@ -55,7 +55,7 @@ class Channel {
       LOG(ERROR) << "Ignoring value added to closed channel.";
       return;
     }
-    absl::MutexLock results_lock(&mutex_);
+    MutexLock results_lock(&mutex_);
     content_.push(std::move(item));
     cond_var_.Signal();
   }
@@ -68,9 +68,9 @@ class Channel {
   // "Pop" results returned so far. The number of pops returned by
   // "PopAndNumPop" is guaranteed to be unique, dense and in order.
   absl::optional<Input> Pop(int64_t* get_num_pop = nullptr) {
-    absl::MutexLock results_lock(&mutex_);
+    MutexLock results_lock(&mutex_);
     while (content_.empty() && !close_channel_) {
-      cond_var_.Wait(&mutex_);
+      cond_var_.Wait(&mutex_, &results_lock);
     }
     if (close_channel_ && content_.empty()) {
       return {};
@@ -85,11 +85,11 @@ class Channel {
   }
 
  private:
-  std::queue<Input> content_ ABSL_GUARDED_BY(mutex_);
-  bool close_channel_ ABSL_GUARDED_BY(mutex_) = false;
-  uint64_t num_pops_ ABSL_GUARDED_BY(mutex_) = 0;
-  absl::CondVar cond_var_;
-  absl::Mutex mutex_;
+  std::queue<Input> content_ GUARDED_BY(mutex_);
+  bool close_channel_ GUARDED_BY(mutex_) = false;
+  uint64_t num_pops_ GUARDED_BY(mutex_) = 0;
+  CondVar cond_var_;
+  Mutex mutex_;
 };
 
 }  // namespace concurrency

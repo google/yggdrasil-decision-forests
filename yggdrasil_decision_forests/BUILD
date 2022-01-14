@@ -29,6 +29,13 @@ config_setting(
     values = {"define": "no_absl_statusor=1"},
 )
 
+# If not set (default), use absl concurrency primitives (e.g. absl::Mutex).
+# If set, use the std concurrency primitives (e.g. std::mutex)
+config_setting(
+    name = "std_synchronization_primitives",
+    values = {"define": "std_synchronization_primitives=1"},
+)
+
 # Number of bits required to represent the number of examples in a training
 # dataset for "{Unsigned,Signed}ExampleIdx" in "learner/types.h".
 #

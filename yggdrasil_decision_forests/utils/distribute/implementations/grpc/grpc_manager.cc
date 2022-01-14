@@ -19,12 +19,12 @@
 
 #include "grpcpp/create_channel.h"
 #include "grpcpp/support/channel_arguments.h"
-#include "absl/synchronization/notification.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {

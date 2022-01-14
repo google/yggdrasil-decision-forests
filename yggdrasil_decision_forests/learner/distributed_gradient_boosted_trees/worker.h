@@ -221,7 +221,7 @@ class DistributedGradientBoostedTreesWorker
 
   // Number of running "RunRequest".
   int num_running_requests_ = 0;
-  absl::Mutex mutex_num_running_requests_;
+  utils::concurrency::Mutex mutex_num_running_requests_;
 
   // Time taken to load the features of the dataset in memory.
   absl::Duration dataset_feature_duration_;

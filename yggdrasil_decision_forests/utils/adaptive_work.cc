@@ -18,9 +18,9 @@
 #include <algorithm>
 #include <limits>
 
-#include "absl/synchronization/mutex.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -39,7 +39,7 @@ AdaptativeWork::AdaptativeWork(const int num_tasks, const double total_budget,
 
 void AdaptativeWork::ReportTaskDone(const double approximation_factor,
                                     const double consumed_budget) {
-  absl::MutexLock lock(&mu_);
+  utils::concurrency::MutexLock lock(&mu_);
   CHECK_GT(approximation_factor, 0.0);
   CHECK_LE(approximation_factor, 1.0);
   consumed_budget_ += consumed_budget;
@@ -49,7 +49,7 @@ void AdaptativeWork::ReportTaskDone(const double approximation_factor,
 }
 
 double AdaptativeWork::OptimalApproximationFactor() const {
-  absl::MutexLock lock(&mu_);
+  utils::concurrency::MutexLock lock(&mu_);
   if (consumed_budget_ < warming_up_budget_ || num_ran_tasks_ == 0) {
     return 1.;
   }

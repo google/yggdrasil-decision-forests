@@ -16,9 +16,9 @@
 // Various concurrency tools.
 //
 //   ThreadPool: Parallel execution of jobs (std::function<void(void)>) on a
-//     pre-determined number of threads. Does not implements a maximum capacity.
+//     pre-determined number of threads. Does not implement a maximum capacity.
 //   StreamProcessor: Parallel processing of a stream of "Input" into a stream
-//     of "Output" using a pre-determined number of threads. Does not implements
+//     of "Output" using a pre-determined number of threads. Does not implement
 //     a maximum capacity.
 //
 // Usage examples:
@@ -44,6 +44,8 @@
 
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_CONCURRENCY_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_CONCURRENCY_H_
+
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 #include "yggdrasil_decision_forests/utils/concurrency_default.h"
 

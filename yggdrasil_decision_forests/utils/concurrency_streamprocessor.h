@@ -20,7 +20,7 @@
 #include <queue>
 #include <string>
 
-#include "absl/synchronization/mutex.h"
+
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 
@@ -86,13 +86,13 @@ class StreamProcessor {
   // Should the results be returned in order.
   const bool result_in_order_;
   // Id of the next query to return with "GetResult" if result_in_order_=true.
-  int64_t next_query_id ABSL_GUARDED_BY(mutex_) = 0;
+  int64_t next_query_id GUARDED_BY(mutex_) = 0;
   // Cond variable for the threads returning in order results.
-  absl::CondVar cond_var_;
+  CondVar cond_var_;
   // Number of threads still running.
-  int num_active_threads_ ABSL_GUARDED_BY(mutex_) = 0;
+  int num_active_threads_ GUARDED_BY(mutex_) = 0;
 
-  absl::Mutex mutex_;
+  Mutex mutex_;
 };
 
 template <typename Input, typename Output>
@@ -112,7 +112,7 @@ StreamProcessor<Input, Output>::~StreamProcessor() {
 template <typename Input, typename Output>
 void StreamProcessor<Input, Output>::StartWorkers() {
   {
-    absl::MutexLock results_lock(&mutex_);
+    MutexLock results_lock(&mutex_);
     num_active_threads_ = num_threads_;
   }
   while (threads_.size() < num_threads_) {
@@ -149,10 +149,10 @@ void StreamProcessor<Input, Output>::ThreadLoop() {
 
     if (result_in_order_) {
       // The results should be returned in order.
-      absl::MutexLock results_lock(&mutex_);
+      MutexLock results_lock(&mutex_);
       while (query_id != next_query_id) {
         // Not my turn yet.
-        cond_var_.Wait(&mutex_);
+        cond_var_.Wait(&mutex_, &results_lock);
       }
 
       next_query_id++;
@@ -165,7 +165,7 @@ void StreamProcessor<Input, Output>::ThreadLoop() {
     }
   }
 
-  absl::MutexLock results_lock(&mutex_);
+  MutexLock results_lock(&mutex_);
   num_active_threads_--;
   if (num_active_threads_ == 0) {
     output_channel_.Close();

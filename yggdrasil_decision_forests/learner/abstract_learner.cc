@@ -32,7 +32,6 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/synchronization/mutex.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -50,6 +49,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/fold_generator.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
@@ -543,7 +543,7 @@ metric::proto::EvaluationResults EvaluateLearner(
   const auto& label_col_spec = dataset.data_spec().columns(label_col_idx);
 
   // Protects "aggregated_evaluation".
-  absl::Mutex evaluation_mutex;
+  utils::concurrency::Mutex evaluation_mutex;
   metric::proto::EvaluationResults aggregated_evaluation;
 
   // Trains and evaluates a single model on the "fold_idx".
@@ -566,7 +566,7 @@ metric::proto::EvaluationResults EvaluateLearner(
         model->AppendEvaluation(testing_dataset, evaluation_options, rnd,
                                 &evaluation);
         // Aggregate the evaluations.
-        absl::MutexLock lock(&evaluation_mutex);
+        utils::concurrency::MutexLock lock(&evaluation_mutex);
         metric::MergeEvaluation(evaluation_options, evaluation,
                                 &aggregated_evaluation);
       };

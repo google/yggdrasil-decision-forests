@@ -20,7 +20,6 @@
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/channel_arguments.h"
-#include "absl/synchronization/notification.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
@@ -28,6 +27,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -46,7 +46,7 @@ grpc::Status AbslStatusToGrpcStatus(const absl::Status& src) {
 
 class WorkerService final : public proto::Server::Service {
  public:
-  WorkerService(absl::Notification* stop_server, bool use_loas)
+  WorkerService(utils::concurrency::Notification* stop_server, bool use_loas)
       : stop_server_(stop_server), use_loas_(use_loas), hook_(this) {}
 
   void ShutDown() { FinalizeIntraWorkerCommunication(); }
@@ -95,17 +95,17 @@ class WorkerService final : public proto::Server::Service {
   grpc::Status Run(grpc::ServerContext* context, const proto::Query* request,
                    proto::Answer* reply) override {
     {
-      absl::MutexLock l(&mutex_);
+      utils::concurrency::MutexLock l(&mutex_);
       RETURN_IF_ERROR(AbslStatusToGrpcStatus(
           EnsureReadyWorker(request->manager_uid(), request->config_path(),
-                            request->worker_idx())));
+                            request->worker_idx(), &l)));
       num_active_requests_++;
     }
 
     auto result_or = worker_->RunRequest(request->blob());
 
     {
-      absl::MutexLock l(&mutex_);
+      utils::concurrency::MutexLock l(&mutex_);
       num_active_requests_--;
       if (stopping_worker_) {
         LOG(INFO) << "Still " << num_active_requests_ << " active requests";
@@ -150,9 +150,9 @@ class WorkerService final : public proto::Server::Service {
                         const proto::ShutdownQuery* request,
                         proto::Empty* reply) override {
     LOG(INFO) << "Shutdown worker";
-    absl::MutexLock l(&mutex_);
+    utils::concurrency::MutexLock l(&mutex_);
     if (worker_) {
-      RETURN_IF_ERROR(AbslStatusToGrpcStatus(BlockingDoneOnWorker()));
+      RETURN_IF_ERROR(AbslStatusToGrpcStatus(BlockingDoneOnWorker(&l)));
       stopping_worker_ = false;
     }
     if (request->kill_worker_manager() && !stop_server_->HasBeenNotified()) {
@@ -169,13 +169,14 @@ class WorkerService final : public proto::Server::Service {
 
   // Calls "Done" on the worker, wait for all the pending operation to be done
   // or cancel, and destroy the "worker_" object.
-  absl::Status BlockingDoneOnWorker() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+  absl::Status BlockingDoneOnWorker(utils::concurrency::MutexLock* lock)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     stopping_worker_ = true;
     RETURN_IF_ERROR(worker_->Done());
     LOG(INFO) << "Waiting for the " << num_active_requests_
               << " active request(s) to complete";
     while (num_active_requests_ > 0) {
-      request_done_cv_.Wait(&mutex_);
+      request_done_cv_.Wait(&mutex_, lock);
     }
     FinalizeIntraWorkerCommunication();
     worker_.reset();
@@ -186,8 +187,9 @@ class WorkerService final : public proto::Server::Service {
   // This method should be called before any request.
   absl::Status EnsureReadyWorker(uint64_t manager_uid,
                                  absl::string_view config_path,
-                                 const int worker_idx)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+                                 const int worker_idx,
+                                 utils::concurrency::MutexLock* lock)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
     if (worker_) {
       if (manager_uid_ != manager_uid) {
         // The manager has changed e.g. the managed was killed and rescheduled.
@@ -195,10 +197,10 @@ class WorkerService final : public proto::Server::Service {
         if (stopping_worker_) {
           // Another call is changing the worker.
           while (stopping_worker_) {
-            stopping_worker_done_cv_.Wait(&mutex_);
+            stopping_worker_done_cv_.Wait(&mutex_, lock);
           }
         } else {
-          RETURN_IF_ERROR(BlockingDoneOnWorker());
+          RETURN_IF_ERROR(BlockingDoneOnWorker(lock));
           stopping_worker_ = false;
           stopping_worker_done_cv_.SignalAll();
         }
@@ -361,7 +363,7 @@ class WorkerService final : public proto::Server::Service {
   }
 
   // Non owning pointer to the notification that stops the server.
-  absl::Notification* stop_server_ = nullptr;
+  utils::concurrency::Notification* stop_server_ = nullptr;
 
   // Active worker implementation.
   std::unique_ptr<AbstractWorker> worker_;
@@ -394,24 +396,24 @@ class WorkerService final : public proto::Server::Service {
 
   std::unique_ptr<InterWorkerCommunication> intra_worker_communication_;
 
-  // Mutex protecting the initialization of the worker.
-  absl::Mutex mutex_ ABSL_GUARDED_BY(mutex_);
+  // utils::concurrency::Mutex protecting the initialization of the worker.
+  utils::concurrency::Mutex mutex_ GUARDED_BY(mutex_);
 
   // True when the worker is being stopped (i.e. waiting for all the requests to
   // be completed) because the user called "Done" on the manager, or because the
   // manager have changed.
-  bool stopping_worker_ ABSL_GUARDED_BY(mutex_) = false;
+  bool stopping_worker_ GUARDED_BY(mutex_) = false;
 
   // Signal when the worker are done beeing stopped i.e. stopping_worker_ goes
   // from true to false.
-  absl::CondVar stopping_worker_done_cv_;
+  utils::concurrency::CondVar stopping_worker_done_cv_;
 
   // Signal are the end of a request execution when not other request are
   // running (i.e. num_active_requests_=0).
-  absl::CondVar request_done_cv_;
+  utils::concurrency::CondVar request_done_cv_;
 
   // Number of requests currently beeing processed.
-  int num_active_requests_ ABSL_GUARDED_BY(mutex_) = 0;
+  int num_active_requests_ GUARDED_BY(mutex_) = 0;
 
   // Does the worker uses LOAS.
   bool use_loas_;
@@ -423,7 +425,7 @@ class WorkerService final : public proto::Server::Service {
 }  // namespace
 
 absl::Status GRPCWorkerMainWorkerMain(const int port, bool use_loas) {
-  absl::Notification stop_server;
+  utils::concurrency::Notification stop_server;
   WorkerService service(&stop_server, use_loas);
 
   std::shared_ptr<grpc::ServerCredentials> credential;

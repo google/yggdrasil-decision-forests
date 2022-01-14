@@ -228,7 +228,7 @@ cc_library_ydf(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
+        "//yggdrasil_decision_forests/utils:synchronization_primitives",
     ],
 )
 
@@ -294,9 +294,27 @@ cc_library_ydf(
     defines = ["YGG_CONCURRENCY_USES_DEFAULT"],
     deps = [
         ":logging",
+        ":synchronization_primitives",
         "@com_google_absl//absl/status",
-        "@com_google_absl//absl/synchronization",
     ],
+)
+
+cc_library_ydf(
+    name = "synchronization_primitives",
+    hdrs = [
+        "synchronization_primitives.h",
+    ],
+    defines = select({
+        "//yggdrasil_decision_forests:std_synchronization_primitives": [
+            "YGG_STD_MUTEX",
+            "YGG_STD_BLOCKING_COUNTER_AND_NOTIFICATION",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "//yggdrasil_decision_forests:std_synchronization_primitives": [],
+        "//conditions:default": ["@com_google_absl//absl/synchronization"],
+    }),
 )
 
 cc_library_ydf(
@@ -395,7 +413,7 @@ cc_library_ydf(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
+        "//yggdrasil_decision_forests/utils:synchronization_primitives",
     ],
 )
 
@@ -421,7 +439,7 @@ cc_library_ydf(
         ":compatibility",
         ":logging",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/synchronization",
+        "//yggdrasil_decision_forests/utils:synchronization_primitives",
     ],
 )
 

@@ -334,7 +334,8 @@ void AbstractModel::AppendEvaluation(
 
     // Evaluate each shard in a separate thread.
     {
-      absl::Mutex mutex;  // Guards "num_evaluated_shards" and "eval".
+      utils::concurrency::Mutex
+          mutex;  // Guards "num_evaluated_shards" and "eval".
       int num_evaluated_shards = 0;
 
       const int num_threads = std::min<int>(shards.size(), 20);
@@ -357,7 +358,7 @@ void AbstractModel::AppendEvaluation(
           AppendEvaluationWithEngine(dataset, option, weight_links, *engine,
                                      &sub_rnd, nullptr, &sub_evaluation);
 
-          absl::MutexLock lock(&mutex);
+          utils::concurrency::MutexLock lock(&mutex);
           metric::MergeEvaluation(option, sub_evaluation, eval);
           num_evaluated_shards++;
           LOG_INFO_EVERY_N_SEC(30, _ << num_evaluated_shards << "/"

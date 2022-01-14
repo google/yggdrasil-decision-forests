@@ -237,7 +237,7 @@ class DatasetCacheReader {
     std::atomic_bool is_running{false};
 
     absl::Status status;
-    absl::Mutex status_mutex;
+    utils::concurrency::Mutex status_mutex;
 
     // Features being loaded / unloaded.
     std::vector<int> load_features;

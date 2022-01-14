@@ -36,7 +36,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_TRAINING_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_TRAINING_H_
 
-#include "absl/synchronization/blocking_counter.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
@@ -157,8 +156,8 @@ class TreeBuilder {
   //
   // Usage example:
   //
-  //   absl::BlockingCounter counter(2);
-  //   absl::Mutex mutex_1, mutex_2;
+  //  utils::concurrency::BlockingCounter counter(2);
+  //  utils::concurrency::Mutex mutex_1, mutex_2;
   //   FindBestSplitsWithThreadPool({&splits_1}, ..., &mutex_1, &counter,...);
   //   FindBestSplitsWithThreadPool({&splits_2}, ..., &mutex_2, &counter,...);
   //   // The two "FindBestSplitsWithThreadPool" are running in parallel. In
@@ -169,8 +168,8 @@ class TreeBuilder {
   //
   // Other example (using the same mutex and splits):
   //
-  //   absl::BlockingCounter counter(2);
-  //   absl::Mutex mutex;
+  //  utils::concurrency::BlockingCounter counter(2);
+  //  utils::concurrency::Mutex mutex;
   //   FindBestSplitsWithThreadPool({&splits}, ..., &mutex, &counter,...);
   //   FindBestSplitsWithThreadPool({&splits}, ..., &mutex, &counter,...);
   //   // The two "FindBestSplitsWithThreadPool" are running in parallel. In
@@ -192,8 +191,9 @@ class TreeBuilder {
   absl::Status FindBestSplitsWithThreadPool(
       const FindBestSplitsCommonArgs& common,
       const std::vector<int>& unique_active_features,
-      utils::concurrency::ThreadPool* thread_pool, absl::Mutex* mutex,
-      absl::BlockingCounter* counter, absl::Status* status) const;
+      utils::concurrency::ThreadPool* thread_pool,
+      utils::concurrency::Mutex* mutex,
+      utils::concurrency::BlockingCounter* counter, absl::Status* status) const;
 
   // Applies a list of splits (one for each open node) to the tree structure.
   utils::StatusOr<NodeRemapping> ApplySplitToTree(
