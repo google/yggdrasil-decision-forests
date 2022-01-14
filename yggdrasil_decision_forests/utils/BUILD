@@ -655,6 +655,16 @@ cc_library_ydf(
     hdrs = ["math.h"],
 )
 
+cc_library_ydf(
+    name = "hash",
+    hdrs = ["hash.h"],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ] + [
+        "@farmhash_archive//:farmhash",
+    ],
+)
+
 # Bzl Libraries
 # =============
 

@@ -57,10 +57,10 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
-        "@farmhash_archive//:farmhash",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:regex",
+        "//yggdrasil_decision_forests/utils:hash",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
             "@tensorflow_pypi//:libtensorflow_framework",
@@ -391,7 +391,7 @@ cc_library_ydf(
         ":vertical_dataset",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@farmhash_archive//:farmhash",
+        "//yggdrasil_decision_forests/utils:hash",
         "//yggdrasil_decision_forests/utils:csv",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:random",

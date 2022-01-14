@@ -55,7 +55,6 @@
 #include <random>
 
 #include "absl/strings/str_replace.h"
-#include "src/farmhash.h"
 #include "tensorflow/core/example/example.pb.h"
 #include "tensorflow/core/example/feature.pb.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
@@ -64,6 +63,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/hash.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
@@ -129,8 +129,10 @@ utils::RandomEngine CreateRandomGenerator(
   return rnd;
 }
 
-// Hashing of a integer that is stable for two executions of the library.
-uint64_t StableHash(uint64_t value) { return util::Fingerprint(value); }
+// Hashing of an integer that is stable for two executions of the library.
+uint64_t StableHash(uint64_t value) {
+  return utils::hash::HashInt64ToUint64(value);
+}
 
 // Creates a decreasing weight for a list of features.
 float DecreasingWeight(const int feature_idx, const int num_features) {

@@ -26,12 +26,12 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "src/farmhash.h"
 #include "tensorflow/core/example/example.pb.h"
 #include "tensorflow/core/example/feature.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/hash.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -221,11 +221,11 @@ std::string EscapeTrainingConfigFeatureName(absl::string_view feature_name);
 
 // Hashing function for HASH columns.
 inline uint64_t HashColumnString(absl::string_view value) {
-  return util::Fingerprint64(value);
+  return utils::hash::HashStringViewToUint64(value);
 }
 
 inline uint64_t HashColumnInteger(int64_t value) {
-  return util::Fingerprint(value);
+  return utils::hash::HashInt64ToUint64(value);
 }
 
 // Name of an unrolled column.
