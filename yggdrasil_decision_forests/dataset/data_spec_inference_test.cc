@@ -88,7 +88,7 @@ void SortColumnByName(proto::DataSpecification* data_spec) {
 
 proto::DataSpecificationGuide ToyDatasetGuide1() {
   proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         default_column_guide { categorial { min_vocab_frequency: 2 } }
         column_guides {
           type: CATEGORICAL
@@ -98,41 +98,41 @@ proto::DataSpecificationGuide ToyDatasetGuide1() {
             number_of_already_integerized_values: 10
           }
         }
-      )");
+      )pb");
   return guide;
 }
 
 proto::DataSpecificationGuide ToyDatasetGuide2() {
   proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         column_guides { column_name_pattern: "Num.*" type: STRING }
-      )");
+      )pb");
   return guide;
 }
 
 proto::DataSpecificationGuide ToyDatasetGuide3() {
   proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         column_guides {
           column_name_pattern: "Num.*"
           type: DISCRETIZED_NUMERICAL
         }
         ignore_columns_without_guides: true
-      )");
+      )pb");
   return guide;
 }
 
 proto::DataSpecificationGuide ToyDatasetGuideIgnoreColumn() {
   proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         column_guides { column_name_pattern: "Num.*" ignore_column: true }
-      )");
+      )pb");
   return guide;
 }
 
 proto::DataSpecification ToyDatasetExpectedDataSpecTypeOnlyNoGuide() {
   proto::DataSpecification data_spec_type_only = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns { type: NUMERICAL name: "Num_1" is_manual_type: false }
         columns { type: NUMERICAL name: "Num_2" is_manual_type: false }
         columns { type: CATEGORICAL name: "Cat_1" is_manual_type: false }
@@ -150,13 +150,13 @@ proto::DataSpecification ToyDatasetExpectedDataSpecTypeOnlyNoGuide() {
         columns { type: BOOLEAN name: "Bool_1" is_manual_type: false }
         columns { type: BOOLEAN name: "Bool_2" is_manual_type: false }
         columns { type: NUMERICAL name: "Cat_3" is_manual_type: false }
-      )");
+      )pb");
   return data_spec_type_only;
 }
 
 proto::DataSpecification ToyDatasetExpectedDataSpecTypeOnlyGuide2() {
   proto::DataSpecification data_spec_type_only = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns { type: STRING name: "Num_1" is_manual_type: true }
         columns { type: STRING name: "Num_2" is_manual_type: true }
         columns { type: CATEGORICAL name: "Cat_1" is_manual_type: false }
@@ -174,13 +174,13 @@ proto::DataSpecification ToyDatasetExpectedDataSpecTypeOnlyGuide2() {
         columns { type: BOOLEAN name: "Bool_1" is_manual_type: false }
         columns { type: BOOLEAN name: "Bool_2" is_manual_type: false }
         columns { type: NUMERICAL name: "Cat_3" is_manual_type: false }
-      )");
+      )pb");
   return data_spec_type_only;
 }
 
 proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
   proto::DataSpecification data_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         created_num_rows: 4
         columns {
           type: NUMERICAL
@@ -314,13 +314,13 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
             is_already_integerized: true
           }
         }
-      )");
+      )pb");
   return data_spec;
 }
 
 proto::DataSpecification ToyDatasetExpectedDataSpecGuide3() {
   proto::DataSpecification data_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         created_num_rows: 4
         columns {
           type: DISCRETIZED_NUMERICAL
@@ -357,13 +357,13 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide3() {
             min_obs_in_bins: 3
           }
         }
-      )");
+      )pb");
   return data_spec;
 }
 
 proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
   proto::DataSpecification data_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns {
           type: CATEGORICAL
           name: "Cat_1"
@@ -443,20 +443,20 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
           }
         }
         created_num_rows: 4
-      )");
+      )pb");
   return data_spec;
 }
 
 TEST(Dataset, MergeColumnGuideTest1) {
   proto::ColumnGuide src = PARSE_TEST_PROTO(
-      R"(
-      )");
+      R"pb(
+      )pb");
   proto::ColumnGuide dst = PARSE_TEST_PROTO(
-      R"(
-      )");
+      R"pb(
+      )pb");
   proto::ColumnGuide expected_result = PARSE_TEST_PROTO(
-      R"(
-      )");
+      R"pb(
+      )pb");
   proto::ColumnGuide result;
   MergeColumnGuide(src, &dst);
   EXPECT_THAT(dst, EqualsProto(expected_result));
@@ -464,16 +464,16 @@ TEST(Dataset, MergeColumnGuideTest1) {
 
 TEST(Dataset, MergeColumnGuideTest2) {
   proto::ColumnGuide src = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: NUMERICAL
-      )");
+      )pb");
   proto::ColumnGuide dst = PARSE_TEST_PROTO(
-      R"(
-      )");
+      R"pb(
+      )pb");
   proto::ColumnGuide expected_result = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: NUMERICAL
-      )");
+      )pb");
   proto::ColumnGuide result;
   MergeColumnGuide(src, &dst);
   EXPECT_THAT(dst, EqualsProto(expected_result));
@@ -481,16 +481,16 @@ TEST(Dataset, MergeColumnGuideTest2) {
 
 TEST(Dataset, MergeColumnGuideTest3) {
   proto::ColumnGuide src = PARSE_TEST_PROTO(
-      R"(
-      )");
+      R"pb(
+      )pb");
   proto::ColumnGuide dst = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: NUMERICAL
-      )");
+      )pb");
   proto::ColumnGuide expected_result = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: NUMERICAL
-      )");
+      )pb");
   proto::ColumnGuide result;
   MergeColumnGuide(src, &dst);
   EXPECT_THAT(dst, EqualsProto(expected_result));
@@ -498,17 +498,17 @@ TEST(Dataset, MergeColumnGuideTest3) {
 
 TEST(Dataset, MergeColumnGuideTest4) {
   proto::ColumnGuide src = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: STRING
-      )");
+      )pb");
   proto::ColumnGuide dst = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: NUMERICAL
-      )");
+      )pb");
   proto::ColumnGuide expected_result = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: STRING
-      )");
+      )pb");
   proto::ColumnGuide result;
   MergeColumnGuide(src, &dst);
   EXPECT_THAT(dst, EqualsProto(expected_result));
@@ -516,17 +516,17 @@ TEST(Dataset, MergeColumnGuideTest4) {
 
 TEST(Dataset, MergeColumnGuideTest5) {
   proto::ColumnGuide src = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         categorial { max_vocab_count: 8 }
-      )");
+      )pb");
   proto::ColumnGuide dst = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         categorial { max_vocab_count: 10 }
-      )");
+      )pb");
   proto::ColumnGuide expected_result = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         categorial { max_vocab_count: 8 }
-      )");
+      )pb");
   proto::ColumnGuide result;
   MergeColumnGuide(src, &dst);
   EXPECT_THAT(dst, EqualsProto(expected_result));
@@ -610,10 +610,9 @@ TEST(Dataset, CreateLocalDataSpecFromCsvAllHash) {
   col_guide->set_type(proto::ColumnType::HASH);
   proto::DataSpecification data_spec;
   CreateDataSpec(ToyDatasetTypedPathCsv(), false, guide, &data_spec);
-  EXPECT_THAT(
-      data_spec,
-      EqualsProto((proto::DataSpecification)PARSE_TEST_PROTO(
-          R"(
+  EXPECT_THAT(data_spec,
+              EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::DataSpecification,
+                                                     R"(
             columns { type: HASH name: "Num_1" is_manual_type: true }
             columns {
               type: HASH
@@ -669,10 +668,9 @@ TEST(Dataset, CreateLocalDataSpecFromTFExampleTFRecordAllHash) {
   auto target = ToyDatasetExpectedDataSpecGuide1();
   SortColumnByName(&data_spec);
   SortColumnByName(&target);
-  EXPECT_THAT(
-      data_spec,
-      EqualsProto((proto::DataSpecification)PARSE_TEST_PROTO(
-          R"(
+  EXPECT_THAT(data_spec,
+              EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::DataSpecification,
+                                                     R"(
             columns { type: HASH name: "Bool_1" is_manual_type: true }
             columns {
               type: HASH
