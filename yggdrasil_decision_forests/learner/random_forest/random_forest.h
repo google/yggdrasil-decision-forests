@@ -70,6 +70,9 @@ class RandomForestLearner : public AbstractLearner {
   static constexpr char kHParamNumOOBVariableImportancePermutations[] =
       "num_oob_variable_importances_permutations";
 
+  static constexpr char kHParamSamplingWithReplacement[] =
+      "sampling_with_replacement";
+
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
@@ -168,7 +171,7 @@ void ComputeVariableImportancesFromAccumulatedPredictions(
 void SampleTrainingExamples(
     const dataset::VerticalDataset::row_t num_examples,
     const dataset::VerticalDataset::row_t num_samples,
-    utils::RandomEngine* random,
+    const bool with_replacement, utils::RandomEngine* random,
     std::vector<dataset::VerticalDataset::row_t>* selected);
 
 }  // namespace internal

@@ -203,8 +203,14 @@ struct PerThreadCache {
   std::vector<int32_t> candidate_attributes;
 
   struct PerDepth {
+    // Indices of the positive and negative examples a split.
     std::vector<dataset::VerticalDataset::row_t> positive_examples;
     std::vector<dataset::VerticalDataset::row_t> negative_examples;
+
+    // Indices of the positive and negative examples used only for the leaf
+    // values in a split.
+    std::vector<dataset::VerticalDataset::row_t> positive_node_only_examples;
+    std::vector<dataset::VerticalDataset::row_t> negative_node_only_examples;
   };
   // Cache per depth.
   // Note: We use a unique pointer to guaranty stability of content.
@@ -826,6 +832,7 @@ void GenerateRandomImputationOnColumn(
 absl::Status GrowTreeBestFirstGlobal(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<dataset::VerticalDataset::row_t>& train_example_idxs,
+    const std::vector<dataset::VerticalDataset::row_t>* optional_leaf_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -837,16 +844,24 @@ absl::Status GrowTreeBestFirstGlobal(
 
 // The core training logic that is the same between single-threaded execution
 // and concurrent execution.
+//
+// If "leaf_examples" is non null, it contains the examples to use to determine
+// the value of the leaves while "selected_examples" contains the examples to
+// use to determine the structure of the tree. If "leaf_examples" is null, the
+// examples "selected_examples" are used for both.
 absl::Status DecisionTreeCoreTrain(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<dataset::VerticalDataset::row_t>* optional_leaf_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const model::proto::DeploymentConfig& deployment,
     const SplitterConcurrencySetup& splitter_concurrency_setup,
     const std::vector<float>& weights, utils::RandomEngine* random,
-    const InternalTrainConfig& internal_config, DecisionTree* dt);
+    const InternalTrainConfig& internal_config,
+
+    DecisionTree* dt);
 
 // Train the tree. Fails if the tree is not empty.
 absl::Status DecisionTreeTrain(
@@ -865,6 +880,7 @@ constexpr auto Train = DecisionTreeTrain;
 absl::Status NodeTrain(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<dataset::VerticalDataset::row_t>* optional_leaf_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,

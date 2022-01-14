@@ -80,6 +80,7 @@ constexpr char RandomForestLearner::kHParamBootstrapTrainingDataset[];
 constexpr char RandomForestLearner::kHParamBootstrapSizeRatio[];
 constexpr char
     RandomForestLearner::kHParamNumOOBVariableImportancePermutations[];
+constexpr char RandomForestLearner::kHParamSamplingWithReplacement[];
 
 RandomForestLearner::RandomForestLearner(
     const model::proto::TrainingConfig& training_config)
@@ -162,6 +163,15 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
     const auto hparam = generic_hyper_params->Get(kHParamBootstrapSizeRatio);
     if (hparam.has_value()) {
       rf_config->set_bootstrap_size_ratio(hparam.value().value().real());
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamSamplingWithReplacement);
+    if (hparam.has_value()) {
+      rf_config->set_sampling_with_replacement(
+          hparam.value().value().categorical() == "true");
     }
   }
 
@@ -306,6 +316,18 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
         R"(Number of examples used to train each trees; expressed as a ratio of the training dataset size.)");
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamSamplingWithReplacement);
+    param.mutable_categorical()->set_default_value(
+        rf_config.sampling_with_replacement() ? "true" : "false");
+    param.mutable_categorical()->add_possible_values("true");
+    param.mutable_categorical()->add_possible_values("false");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(If true, the training examples are sampled with replacement. If false, the training samples are sampled without replacement. Only used when "bootstrap_training_dataset=true". If false (sampling without replacement) and if "bootstrap_size_ratio=1" (default), all the examples are used to train all the trees (you probably do not want that).)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
@@ -567,13 +589,29 @@ RandomForestLearner::TrainWithStatus(
         std::vector<row_t> selected_examples;
         auto& decision_tree = (*mdl->mutable_decision_trees())[tree_idx];
         if (rf_config.bootstrap_training_dataset()) {
+          if (!rf_config.sampling_with_replacement() &&
+              rf_config.bootstrap_size_ratio() == 1.f) {
+            static bool already_shown = false;
+            if (!already_shown) {
+              already_shown = true;
+              LOG(WARNING)
+                  << "Example sampling without replacement "
+                     "(sampling_with_replacement=false) with a sampling ratio "
+                     "of 1 (bootstrap_size_ratio=1). All the examples "
+                     "will be used for all the trees. You likely want to "
+                     "reduce the sampling ratio e.g. bootstrap_size_ratio=0.5.";
+            }
+          }
+
           const auto num_samples = std::max(
               int64_t{1},
               static_cast<int64_t>(static_cast<double>(train_dataset.nrow()) *
                                    rf_config.bootstrap_size_ratio() *
                                    bootstrap_size_ratio_factor));
-          internal::SampleTrainingExamples(train_dataset.nrow(), num_samples,
-                                           &random, &selected_examples);
+          internal::SampleTrainingExamples(
+              train_dataset.nrow(), num_samples,
+              rf_config.sampling_with_replacement(), &random,
+              &selected_examples);
         } else {
           selected_examples.resize(train_dataset.nrow());
           std::iota(selected_examples.begin(), selected_examples.end(), 0);
@@ -987,14 +1025,36 @@ void InitializeModelWithTrainingConfig(
 }
 
 void SampleTrainingExamples(const row_t num_examples, const row_t num_samples,
+                            const bool with_replacement,
                             utils::RandomEngine* random,
                             std::vector<row_t>* selected) {
   selected->resize(num_samples);
-  std::uniform_int_distribution<row_t> example_idx_distrib(0, num_examples - 1);
-  for (row_t sample_idx = 0; sample_idx < num_samples; sample_idx++) {
-    (*selected)[sample_idx] = example_idx_distrib(*random);
+
+  if (with_replacement) {
+    selected->resize(num_samples);
+    // Sampling with replacement.
+    std::uniform_int_distribution<row_t> example_idx_distrib(0,
+                                                             num_examples - 1);
+    for (row_t sample_idx = 0; sample_idx < num_samples; sample_idx++) {
+      (*selected)[sample_idx] = example_idx_distrib(*random);
+    }
+    std::sort(selected->begin(), selected->end());
+  } else {
+    selected->clear();
+    selected->reserve(num_samples);
+    // Sampling without replacement.
+    std::uniform_real_distribution<float> dist_01;
+    for (row_t example_idx = 0; example_idx < num_examples; example_idx++) {
+      // The probability of selection is p/n where p is the remaining number of
+      // items to sample, and n the remaining number of items to test.
+      const float proba_select =
+          static_cast<float>(num_samples - selected->size()) /
+          (num_examples - example_idx);
+      if (dist_01(*random) < proba_select) {
+        selected->push_back(example_idx);
+      }
+    }
   }
-  std::sort(selected->begin(), selected->end());
 }
 
 }  // namespace internal

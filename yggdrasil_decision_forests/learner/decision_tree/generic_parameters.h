@@ -97,6 +97,8 @@ constexpr char kHParamUpliftSplitScoreKLAlt[] = "KL";
 constexpr char kHParamUpliftSplitScoreEDAlt[] = "ED";
 constexpr char kHParamUpliftSplitScoreCSAlt[] = "CS";
 
+constexpr char kHParamHonest[] = "honest";
+
 // Fill decision tree specific generic hyper parameter specifications.
 // This function is designed to be called by the learners using decision trees
 // learning.

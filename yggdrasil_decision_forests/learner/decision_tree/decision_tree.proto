@@ -21,7 +21,7 @@ import "yggdrasil_decision_forests/utils/distribution.proto";
 
 // Training configuration for the Random Forest algorithm.
 message DecisionTreeTrainingConfig {
-  // Next ID: 23
+  // Next ID: 24
 
   // Basic parameters.
 
@@ -248,6 +248,29 @@ message DecisionTreeTrainingConfig {
     }
 
     optional SplitScore split_score = 2 [default = KULLBACK_LEIBLER];
+  }
+
+  // If set, the decision tree is trained to be honest.
+  //
+  // In honest trees, different training examples are used to infer the
+  // structure and the leaf values. This regularization technique trades
+  // examples for bias estimates. It might increase or reduce the quality of the
+  // model.
+  //
+  // See "Generalized Random Forests", Athey et al. In this paper, Honest tree
+  // are trained with the Random Forest algorithm with a sampling without
+  // replacement.
+
+  optional Honest honest = 24;
+
+  message Honest {
+    // Ratio of examples used to set the leaf values.
+    optional float ratio_leaf_examples = 1 [default = 0.5];
+
+    // If true, a new random separation is generated for each tree.
+    // If false, the same separation is used for all the trees (for examples,
+    // in a Gradient Boosted Trees containing multiple trees).
+    optional bool fixed_separation = 2 [default = false];
   }
 
   // Internal knobs of the algorithm that don't impact the final model.

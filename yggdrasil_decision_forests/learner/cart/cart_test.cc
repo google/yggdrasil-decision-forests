@@ -244,6 +244,14 @@ TEST_F(CartOnSimPTE, Base) {
   EXPECT_GT(rf_model->NumNodes(), 20);
 }
 
+TEST_F(CartOnSimPTE, Honest) {
+  auto* config = train_config_.MutableExtension(cart::proto::cart_config);
+  config->mutable_decision_tree()->mutable_honest();
+
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.05047, 0.01);
+}
+
 }  // namespace
 }  // namespace cart
 }  // namespace model

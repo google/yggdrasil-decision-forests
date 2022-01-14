@@ -898,7 +898,7 @@ void MultinomialLogLikelihoodLoss::SetLeaf(
   //  (dim-1) / dim * ( \sum_i weight[i] grad[i] ) / (\sum_i |grad[i]| *
   //  (1-|grad[i]|))
   //
-  // Note: The leaf value does not depends on the label value (directly).
+  // Note: The leaf value does not depend on the label value (directly).
   const auto& grad =
       train_dataset
           .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(

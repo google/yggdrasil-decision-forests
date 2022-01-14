@@ -342,6 +342,16 @@ absl::Status GetGenericHyperParameterSpecification(
         R"(For uplift models only. Minimum number of examples per treatment in a node.)");
   }
 
+  {
+    ASSIGN_OR_RETURN(auto param, get_params(kHParamHonest));
+    param->mutable_categorical()->set_default_value(
+        config.has_honest() ? "true" : "false");
+    param->mutable_categorical()->add_possible_values("true");
+    param->mutable_categorical()->add_possible_values("false");
+    param->mutable_documentation()->set_description(
+        R"(In honest trees, different training examples are used to infer the structure and the leaf values. This regularization technique trades examples for bias estimates. It might increase or reduce the quality of the model. See "Generalized Random Forests", Athey et al. In this paper, Honest tree are trained with the Random Forest algorithm with a sampling without replacement.)");
+  }
+
   return absl::OkStatus();
 }
 
@@ -659,6 +669,17 @@ absl::Status SetHyperParameters(
         return absl::InvalidArgumentError(
             absl::StrFormat(R"(Unknown value "%s" for parameter "%s")", value,
                             kHParamUpliftSplitScore));
+      }
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamHonest);
+    if (hparam.has_value()) {
+      if (hparam.value().value().categorical() == "true") {
+        dt_config->mutable_honest();
+      } else {
+        dt_config->clear_honest();
       }
     }
   }

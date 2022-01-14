@@ -663,8 +663,8 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
   gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
   TrainAndEvaluateModel();
 
-  // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
-  // is significantly better (which is expected as, unlike RF,  GBT is
+  // Note: Accuracy is similar as RF (see :random_forest_test). However, logloss
+  // is significantly better (which is expected as, unlike RF, GBT is
   // calibrated).
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
@@ -754,8 +754,16 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaTwoAlphaQuarter) {
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4032, 0.004);
 }
 
+// Separate the examples used for the structure and the leaves of the model.
+TEST_F(GradientBoostedTreesOnAdult, Honest) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_decision_tree()->mutable_honest();
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8556, 0.004);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.30955, 0.04);
+}
 // Train a GBT with a validation dataset provided as a VerticalDataset.
-
 TEST_F(GradientBoostedTreesOnAdult, ValidVerticalDataset) {
   pass_validation_dataset_ = true;
   TrainAndEvaluateModel();

@@ -22,7 +22,7 @@ import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
 
 // Training configuration for the Random Forest algorithm.
 message RandomForestTrainingConfig {
-  // Next ID: 15
+  // Next ID: 16
 
   // Basic parameters.
 
@@ -81,6 +81,15 @@ message RandomForestTrainingConfig {
   // forest algorithms (e.g. "Extremely randomized trees"
   // https://link.springer.com/content/pdf/10.1007%2Fs10994-006-6226-1.pdf).
   optional bool bootstrap_training_dataset = 8 [default = true];
+
+  // If true, the training examples are sampled with replacement. If false, the
+  // training samples are sampled without replacement. Only used when
+  // "bootstrap_training_dataset=true".
+  //
+  // If false (sampling without replacement) and if "bootstrap_size_ratio=1"
+  // (default), all the examples are used to train all the trees (you probably
+  // do not want that).
+  optional bool sampling_with_replacement = 15 [default = true];
 
   // Number of example in each bootstrap expressed as a ratio of the training
   // dataset size.

@@ -268,6 +268,19 @@ TEST_F(RandomForestOnAdult, Base) {
   CHECK_NE(description.find("Label: \"income\""), -1);
 }
 
+// Separate the examples used for the structure and the leaves of the model.
+TEST_F(RandomForestOnAdult, Honest) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->mutable_decision_tree()->mutable_honest();
+  rf_config->set_sampling_with_replacement(false);
+  rf_config->set_bootstrap_size_ratio(0.5);
+
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8504, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
+}
+
 // Extremely Randomize Trees on Adult.
 TEST_F(RandomForestOnAdult, ExtremelyRandomizeTrees) {
   auto* rf_config = train_config_.MutableExtension(
@@ -1025,6 +1038,38 @@ TEST_F(RandomForestOnSimPTE, Base) {
       file::JoinPath(test::TmpDirectory(), "uplift_pred.csv");
   CHECK_OK(utils::ExportUpliftPredictionsToTFUpliftCsvFormat(
       *model_, test_dataset_, uplift_pred_csv_path));
+}
+
+TEST_F(RandomForestOnSimPTE, Honest) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->mutable_decision_tree()->mutable_honest();
+  rf_config->set_sampling_with_replacement(false);
+  rf_config->set_bootstrap_size_ratio(0.5);
+
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.106705, 0.001);
+}
+
+TEST(SampleTrainingExamples, WithReplacement) {
+  utils::RandomEngine random;
+  std::vector<dataset::VerticalDataset::row_t> examples;
+  internal::SampleTrainingExamples(100, 50, /*with_replacement=*/true, &random,
+                                   &examples);
+  EXPECT_EQ(examples.size(), 50);
+  EXPECT_TRUE(std::is_sorted(examples.begin(), examples.end()));
+}
+
+TEST(SampleTrainingExamples, WithoutReplacement) {
+  utils::RandomEngine random;
+  std::vector<dataset::VerticalDataset::row_t> examples;
+  internal::SampleTrainingExamples(100, 50, /*with_replacement=*/false, &random,
+                                   &examples);
+  EXPECT_EQ(examples.size(), 50);
+  EXPECT_TRUE(std::is_sorted(examples.begin(), examples.end()));
+  // Values are unique.
+  EXPECT_TRUE(std::adjacent_find(examples.begin(), examples.end()) ==
+              examples.end());
 }
 
 }  // namespace

@@ -3064,6 +3064,7 @@ S& Container(std::priority_queue<T, S, C>& q) {
 absl::Status GrowTreeBestFirstGlobal(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<row_t>& train_example_idxs,
+    const std::vector<row_t>* optional_leaf_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -3072,6 +3073,12 @@ absl::Status GrowTreeBestFirstGlobal(
     const std::vector<float>& weights,
     const InternalTrainConfig& internal_config, NodeWithChildren* root,
     utils::RandomEngine* random) {
+  if (optional_leaf_examples) {
+    return absl::InvalidArgumentError(
+        "honest trees are not (yet) supported with "
+        "growing_strategy_best_first_global strategy.");
+  }
+
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::RANDOM_LOCAL_IMPUTATION) {
     return absl::InvalidArgumentError(
@@ -3206,6 +3213,47 @@ absl::Status DecisionTreeTrain(
     DecisionTree* dt, const InternalTrainConfig& internal_config) {
   // Decide if execution should happen in single-thread or concurrent mode.
 
+  const std::vector<row_t>* effective_selected_examples;
+  const std::vector<row_t>* leaf_examples;
+  std::vector<row_t> selected_examples_buffer;
+  std::vector<row_t> leaf_examples_buffer;
+
+  if (dt_config.has_honest()) {
+    // Split the examples in two parts. One ("selected_examples_buffer") will be
+    // used to infer the structure of the trees while the second
+    // ("leaf_examples_buffer") will be used to determine the leaf values (i.e.
+    // the predictions).
+
+    const float leaf_rate = dt_config.honest().ratio_leaf_examples();
+    std::uniform_real_distribution<float> dist_01;
+
+    // Reduce the risk of std::vector re-allocations.
+    const float error_margin = 1.1f;
+    leaf_examples_buffer.reserve(selected_examples.size() * leaf_rate *
+                                 error_margin);
+    selected_examples_buffer.reserve(selected_examples.size() *
+                                     (1.f - leaf_rate) * error_margin);
+
+    auto* effective_random = random;
+    utils::RandomEngine fixed_random(12345678);
+    if (dt_config.honest().fixed_separation()) {
+      effective_random = &fixed_random;
+    }
+
+    for (const auto& example : selected_examples) {
+      if (dist_01(*effective_random) < leaf_rate) {
+        leaf_examples_buffer.push_back(example);
+      } else {
+        selected_examples_buffer.push_back(example);
+      }
+    }
+    effective_selected_examples = &selected_examples_buffer;
+    leaf_examples = &leaf_examples_buffer;
+  } else {
+    effective_selected_examples = &selected_examples;
+    leaf_examples = nullptr;
+  }
+
   const bool force_single_thread =
       internal_config.num_threads > 1 &&
       dt_config.split_axis_case() ==
@@ -3214,10 +3262,10 @@ absl::Status DecisionTreeTrain(
   SplitterConcurrencySetup splitter_concurrency_setup;
   if (internal_config.num_threads <= 1 || force_single_thread) {
     splitter_concurrency_setup.concurrent_execution = false;
-    return DecisionTreeCoreTrain(train_dataset, selected_examples, config,
-                                 config_link, dt_config, deployment,
-                                 splitter_concurrency_setup, weights, random,
-                                 internal_config, dt);
+    return DecisionTreeCoreTrain(train_dataset, *effective_selected_examples,
+                                 leaf_examples, config, config_link, dt_config,
+                                 deployment, splitter_concurrency_setup,
+                                 weights, random, internal_config, dt);
   } else {
     splitter_concurrency_setup.concurrent_execution = true;
     splitter_concurrency_setup.num_threads = internal_config.num_threads;
@@ -3233,15 +3281,16 @@ absl::Status DecisionTreeTrain(
           });
   splitter_concurrency_setup.split_finder_processor->StartWorkers();
 
-  return DecisionTreeCoreTrain(train_dataset, selected_examples, config,
-                               config_link, dt_config, deployment,
-                               splitter_concurrency_setup, weights, random,
-                               internal_config, dt);
+  return DecisionTreeCoreTrain(train_dataset, *effective_selected_examples,
+                               leaf_examples, config, config_link, dt_config,
+                               deployment, splitter_concurrency_setup, weights,
+                               random, internal_config, dt);
 }
 
 absl::Status DecisionTreeCoreTrain(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<row_t>& selected_examples,
+    const std::vector<dataset::VerticalDataset::row_t>* optional_leaf_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -3254,16 +3303,16 @@ absl::Status DecisionTreeCoreTrain(
   switch (dt_config.growing_strategy_case()) {
     case proto::DecisionTreeTrainingConfig::GROWING_STRATEGY_NOT_SET:
     case proto::DecisionTreeTrainingConfig::kGrowingStrategyLocal:
-      return NodeTrain(train_dataset, selected_examples, config, config_link,
-                       dt_config, deployment, splitter_concurrency_setup,
-                       weights, 1, internal_config, dt->mutable_root(), random,
-                       &cache);
+      return NodeTrain(train_dataset, selected_examples, optional_leaf_examples,
+                       config, config_link, dt_config, deployment,
+                       splitter_concurrency_setup, weights, 1, internal_config,
+                       dt->mutable_root(), random, &cache);
       break;
     case proto::DecisionTreeTrainingConfig::kGrowingStrategyBestFirstGlobal:
       return GrowTreeBestFirstGlobal(
-          train_dataset, selected_examples, config, config_link, dt_config,
-          deployment, splitter_concurrency_setup, weights, internal_config,
-          dt->mutable_root(), random);
+          train_dataset, selected_examples, optional_leaf_examples, config,
+          config_link, dt_config, deployment, splitter_concurrency_setup,
+          weights, internal_config, dt->mutable_root(), random);
       break;
   }
 }
@@ -3271,6 +3320,7 @@ absl::Status DecisionTreeCoreTrain(
 absl::Status NodeTrain(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<row_t>& selected_examples,
+    const std::vector<row_t>* optional_leaf_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -3287,11 +3337,19 @@ absl::Status NodeTrain(
                                          weights, config, config_link, node);
   node->mutable_node()->set_num_pos_training_examples_without_weight(
       selected_examples.size());
+
   if (selected_examples.size() < dt_config.min_examples() ||
       (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth()) ||
       (internal_config.timeout.has_value() &&
        internal_config.timeout < absl::Now())) {
-    // Stop the grow of the branch.
+    if (optional_leaf_examples) {
+      // Override the leaf values.
+      internal_config.set_leaf_value_functor(train_dataset,
+                                             *optional_leaf_examples, weights,
+                                             config, config_link, node);
+    }
+
+    // Stop the growth of the branch.
     node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
     return absl::OkStatus();
   }
@@ -3343,30 +3401,45 @@ absl::Status NodeTrain(
   node->FinalizeAsNonLeaf(dt_config.keep_non_leaf_label_distribution(),
                           dt_config.store_detailed_label_distribution());
 
-  // Split examples.
+  // Ensure the per-depth cache is allocated.
   while (cache->per_depth.size() < depth) {
     cache->per_depth.push_back(absl::make_unique<PerThreadCache::PerDepth>());
   }
-  std::vector<row_t>& positive_examples =
-      cache->per_depth[depth - 1]->positive_examples;
-  std::vector<row_t>& negative_examples =
-      cache->per_depth[depth - 1]->negative_examples;
+
+  // Separate the positive and negative examples.
+  auto& per_depth_cache = *cache->per_depth[depth - 1];
+  std::vector<row_t>& positive_examples = per_depth_cache.positive_examples;
+  std::vector<row_t>& negative_examples = per_depth_cache.negative_examples;
   RETURN_IF_ERROR(internal::SplitExamples(
       *local_train_dataset, selected_examples, node->node().condition(),
       local_train_dataset_is_compact,
       dt_config.internal_error_on_wrong_splitter_statistics(),
       &positive_examples, &negative_examples));
 
+  // Separate the positive and negative examples used only to determine the node
+  // value.
+  std::vector<row_t>* positive_node_only_examples = nullptr;
+  std::vector<row_t>* negative_node_only_examples = nullptr;
+  if (optional_leaf_examples) {
+    positive_node_only_examples = &per_depth_cache.positive_node_only_examples;
+    negative_node_only_examples = &per_depth_cache.negative_node_only_examples;
+    RETURN_IF_ERROR(internal::SplitExamples(
+        train_dataset, *optional_leaf_examples, node->node().condition(), false,
+        dt_config.internal_error_on_wrong_splitter_statistics(),
+        positive_node_only_examples, negative_node_only_examples,
+        /*examples_are_training_examples=*/false));
+  }
+
   // Positive child.
   RETURN_IF_ERROR(NodeTrain(
-      train_dataset, positive_examples, config, config_link, dt_config,
-      deployment, splitter_concurrency_setup, weights, depth + 1,
-      internal_config, node->mutable_pos_child(), random, cache));
+      train_dataset, positive_examples, positive_node_only_examples, config,
+      config_link, dt_config, deployment, splitter_concurrency_setup, weights,
+      depth + 1, internal_config, node->mutable_pos_child(), random, cache));
   // Negative child.
   RETURN_IF_ERROR(NodeTrain(
-      train_dataset, negative_examples, config, config_link, dt_config,
-      deployment, splitter_concurrency_setup, weights, depth + 1,
-      internal_config, node->mutable_neg_child(), random, cache));
+      train_dataset, negative_examples, negative_node_only_examples, config,
+      config_link, dt_config, deployment, splitter_concurrency_setup, weights,
+      depth + 1, internal_config, node->mutable_neg_child(), random, cache));
   return absl::OkStatus();
 }
 
