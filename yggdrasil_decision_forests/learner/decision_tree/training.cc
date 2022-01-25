@@ -879,7 +879,8 @@ SplitSearchResult FindBestCondition(
               .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
                   attribute_idx)
               ->values();
-      const auto na_replacement = attribute_column_spec.numerical().mean();
+      const auto na_replacement =
+          attribute_column_spec.categorical().most_frequent_value();
       const auto num_attribute_classes =
           attribute_column_spec.categorical().number_of_unique_values();
 
