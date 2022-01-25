@@ -77,6 +77,8 @@ class FakeModelWithEngine : public AbstractModel {
   }
 };
 
+constexpr char FakeModelWithEngine::kRegisteredName[];
+
 class Engine1 : public serving::FastEngine {
  public:
   std::unique_ptr<serving::AbstractExampleSet> AllocateExamples(
@@ -209,6 +211,8 @@ class FakeModelWithoutEngine : public AbstractModel {
     LOG(FATAL) << "Not implemented";
   }
 };
+
+constexpr char FakeModelWithoutEngine::kRegisteredName[];
 
 TEST(AbstractLearner, MergeVariableImportance) {
   std::vector<proto::VariableImportance> a;

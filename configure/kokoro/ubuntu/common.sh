@@ -76,7 +76,7 @@ BAZEL=bazel
 which ${BAZEL}
 ${BAZEL} version
 
-# Without TensorFlow IO, cpp17 and with abslStatusOr
+# Without TensorFlow IO, c++17 and with abslStatusOr.
 FLAGS="--config=linux_cpp17 --config=linux_avx2"
 bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
 
@@ -84,12 +84,19 @@ if [ "${RUN_TESTS}" = 1 ]; then
   bazel test //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc ${FLAGS}
 fi
 
-# With TensorFlow IO, cpp14 and without abslStatusOr
+# With TensorFlow IO, c++14 and without abslStatusOr.
 FLAGS="--config=linux_cpp14 --config=linux_avx2 --config=use_tensorflow_io --define=no_absl_statusor=1"
 bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
 
 if [ "${RUN_TESTS}" = 1 ]; then
-  bazel test //yggdrasil_decision_forests/...:all //examples:beginner_cc ${FLAGS}
+  bazel test //yggdrasil_decision_forests/{cli,dataset,learner,metric,model,serving}/...:all //examples:beginner_cc ${FLAGS}
+fi
+
+# With TensorFlow IO, c++17 and with abslStatusOr (the most complete way).
+FLAGS="--config=linux_cpp17 --config=linux_avx2 --config=use_tensorflow_io"
+bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+if [ "${RUN_TESTS}" = 1 ]; then
+  bazel test //yggdrasil_decision_forests/...:all ${FLAGS}
 fi
 
 # Export back the binary
