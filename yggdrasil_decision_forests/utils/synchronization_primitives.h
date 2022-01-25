@@ -24,7 +24,7 @@
 #ifdef YGG_STD_MUTEX
 #include <condition_variable>  // c++11
 #include <mutex>               // c++11
-#include <shared_mutex>        // c++17
+#include <shared_mutex>        // c++14 and c++17
 #else
 #include "absl/synchronization/mutex.h"
 #endif
@@ -41,6 +41,14 @@ namespace utils {
 namespace concurrency {
 
 #ifdef YGG_STD_MUTEX
+
+#if _LIBCPP_STD_VER >= 17
+// shared_mutex was introduced in c++17.
+using std_shared_mutex = std::shared_mutex;
+#else
+using std_shared_mutex = std::shared_timed_mutex;
+#endif
+
 class Mutex {
  public:
   std::mutex& std() { return mu_; }
@@ -51,10 +59,10 @@ class Mutex {
 
 class SharedMutex {
  public:
-  std::shared_mutex& std() { return mu_; }
+  std_shared_mutex& std() { return mu_; }
 
  private:
-  std::shared_mutex mu_;
+  std_shared_mutex mu_;
 };
 
 class MutexLock {
@@ -69,19 +77,19 @@ class MutexLock {
 class WriterMutexLock {
  public:
   WriterMutexLock(SharedMutex* mutex) : lock_(mutex->std()) {}
-  std::unique_lock<std::shared_mutex>& std() { return lock_; }
+  std::unique_lock<std_shared_mutex>& std() { return lock_; }
 
  private:
-  std::unique_lock<std::shared_mutex> lock_;
+  std::unique_lock<std_shared_mutex> lock_;
 };
 
 class ReaderMutexLock {
  public:
   ReaderMutexLock(SharedMutex* mutex) : lock_(mutex->std()) {}
-  std::shared_lock<std::shared_mutex>& std() { return lock_; }
+  std::shared_lock<std_shared_mutex>& std() { return lock_; }
 
  private:
-  std::shared_lock<std::shared_mutex> lock_;
+  std::shared_lock<std_shared_mutex> lock_;
 };
 
 class CondVar {
