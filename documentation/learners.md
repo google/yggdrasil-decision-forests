@@ -105,6 +105,23 @@ the gradient of the loss relative to the model output).
 -   Rolling number of trees used to detect validation loss increase and trigger
     early stopping.
 
+#### [focal_loss_alpha](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:focal_loss_alpha)
+
+-   **Type:** Real **Default:** 0.5 **Possible values:** min:0 max:1
+
+-   EXPERIMENTAL. Wighting parameter for focal loss, positive samples weighted
+    by alpha, negative samples by (1-alpha). The default 0.5 value means no
+    active class-level weighting. Only used with Focal loss i.e.
+    `loss="BINARY_FOCAL_LOSS"`
+
+#### [focal_loss_gamma](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:focal_loss_gamma)
+
+-   **Type:** Real **Default:** 2 **Possible values:** min:0
+
+-   EXPERIMENTAL. Exponent of the misprediction exponent term in focal Loss,
+    corresponds to gamma parameter in https://arxiv.org/pdf/1708.02002.pdf. Only
+    used with Focal loss i.e. `loss="BINARY_FOCAL_LOSS"`
+
 #### [forest_extraction](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:forest_extraction)
 
 -   **Type:** Categorical **Default:** MART **Possible values:** MART, DART
@@ -132,6 +149,17 @@ the gradient of the loss relative to the model output).
     BEST_FIRST_GLOBAL
 
 -   How to grow the tree.<br>- `LOCAL`: Each node is split independently of the other nodes. In other words, as long as a node satisfy the splits "constraints (e.g. maximum depth, minimum number of observations), the node will be split. This is the "classical" way to grow decision trees.<br>- `BEST_FIRST_GLOBAL`: The node with the best loss reduction among all the nodes of the tree is selected for splitting. This method is also called "best first" or "leaf-wise growth". See "Best-first decision tree learning", Shi and "Additive logistic regression : A statistical view of boosting", Friedman for more details.
+
+#### [honest](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:honest)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   In honest trees, different training examples are used to infer the structure
+    and the leaf values. This regularization technique trades examples for bias
+    estimates. It might increase or reduce the quality of the model. See
+    "Generalized Random Forests", Athey et al. In this paper, Honest tree are
+    trained with the Random Forest algorithm with a sampling without
+    replacement.
 
 #### [in_split_min_examples_check](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
 
@@ -185,7 +213,7 @@ the gradient of the loss relative to the model output).
 
 -   **Type:** Categorical **Default:** DEFAULT **Possible values:** DEFAULT,
     BINOMIAL_LOG_LIKELIHOOD, SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD,
-    LAMBDA_MART_NDCG5, XE_NDCG_MART
+    LAMBDA_MART_NDCG5, XE_NDCG_MART, BINARY_FOCAL_LOSS
 
 -   The loss optimized by the model. If not specified (DEFAULT) the loss is selected automatically according to the \"task\" and label statistics. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:<br>- `DEFAULT`: Select the loss automatically according to the task and label statistics.<br>- `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.<br>- `SQUARED_ERROR`: Least square loss. Only valid for regression.<br>- `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.<br>- `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5.<br>- `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.<br>
 
@@ -501,6 +529,17 @@ It is probably the most well-known of the Decision Forest training algorithms.
 
 -   How to grow the tree.<br>- `LOCAL`: Each node is split independently of the other nodes. In other words, as long as a node satisfy the splits "constraints (e.g. maximum depth, minimum number of observations), the node will be split. This is the "classical" way to grow decision trees.<br>- `BEST_FIRST_GLOBAL`: The node with the best loss reduction among all the nodes of the tree is selected for splitting. This method is also called "best first" or "leaf-wise growth". See "Best-first decision tree learning", Shi and "Additive logistic regression : A statistical view of boosting", Friedman for more details.
 
+#### [honest](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:honest)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   In honest trees, different training examples are used to infer the structure
+    and the leaf values. This regularization technique trades examples for bias
+    estimates. It might increase or reduce the quality of the model. See
+    "Generalized Random Forests", Athey et al. In this paper, Honest tree are
+    trained with the Random Forest algorithm with a sampling without
+    replacement.
+
 #### [in_split_min_examples_check](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
 
 -   **Type:** Categorical **Default:** true **Possible values:** true, false
@@ -609,6 +648,16 @@ It is probably the most well-known of the Decision Forest training algorithms.
 
 -   Random seed for the training of the model. Learners are expected to be
     deterministic by the random seed.
+
+#### [sampling_with_replacement](../yggdrasil_decision_forests/learner/random_forest/random_forest.proto?q=symbol:sampling_with_replacement)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   If true, the training examples are sampled with replacement. If false, the
+    training samples are sampled without replacement. Only used when
+    "bootstrap_training_dataset=true". If false (sampling without replacement)
+    and if "bootstrap_size_ratio=1" (default), all the examples are used to
+    train all the trees (you probably do not want that).
 
 #### [sorting_strategy](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:sorting_strategy)
 
@@ -740,6 +789,17 @@ used to grow the tree while the second is used to prune the tree.
     BEST_FIRST_GLOBAL
 
 -   How to grow the tree.<br>- `LOCAL`: Each node is split independently of the other nodes. In other words, as long as a node satisfy the splits "constraints (e.g. maximum depth, minimum number of observations), the node will be split. This is the "classical" way to grow decision trees.<br>- `BEST_FIRST_GLOBAL`: The node with the best loss reduction among all the nodes of the tree is selected for splitting. This method is also called "best first" or "leaf-wise growth". See "Best-first decision tree learning", Shi and "Additive logistic regression : A statistical view of boosting", Friedman for more details.
+
+#### [honest](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:honest)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   In honest trees, different training examples are used to infer the structure
+    and the leaf values. This regularization technique trades examples for bias
+    estimates. It might increase or reduce the quality of the model. See
+    "Generalized Random Forests", Athey et al. In this paper, Honest tree are
+    trained with the Random Forest algorithm with a sampling without
+    replacement.
 
 #### [in_split_min_examples_check](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
 

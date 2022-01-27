@@ -15,6 +15,11 @@ interfaces.
         *   [Linux / MacOS](#linux--macos)
         *   [Windows](#windows)
     *   [Running a minimal example](#running-a-minimal-example)
+    *   [Compilation on and for Raspberry Pi](#compilation-on-and-for-raspberry-pi)
+        *   [Install requirements](#install-requirements)
+        *   [Compile Bazel](#compile-bazel)
+        *   [Compile YDF](#compile-ydf)
+        *   [Test YDF](#test-ydf)
     *   [Using the C++ library](#using-the-c-library)
     *   [Troubleshooting](#troubleshooting)
 
