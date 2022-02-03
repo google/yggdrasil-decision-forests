@@ -54,7 +54,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees_loss.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -214,10 +214,9 @@ absl::Status ExtractValidationDataset(const dataset::VerticalDataset& dataset,
 // "gradients" is initialized with the name of the gradient columns as well as a
 // non-owning pointer to the gradient data in "gradient_dataset".
 //
-// "predictions" is initialized to to contain the predictions.
+// "predictions" is initialized to contain the predictions.
 absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
-                                   proto::Loss loss, int label_col_idx,
-                                   bool hessian_splits,
+                                   int label_col_idx, bool hessian_splits,
                                    const AbstractLoss& loss_impl,
                                    dataset::VerticalDataset* gradient_dataset,
                                    std::vector<GradientData>* gradients,

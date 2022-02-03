@@ -13,13 +13,14 @@ cc_library_ydf(
     srcs = [
         "gradient_boosted_trees.cc",
         "gradient_boosted_trees_hparams_templates.cc",
-        "gradient_boosted_trees_loss.cc",
     ],
     hdrs = [
         "gradient_boosted_trees.h",
-        "gradient_boosted_trees_loss.h",
     ],
     deps = [
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:all_implementations",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_interface",
         ":gradient_boosted_trees_cc_proto",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/container:fixed_array",
@@ -113,6 +114,7 @@ cc_test(
         "//yggdrasil_decision_forests/learner:learner_library",
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:report",
         "//yggdrasil_decision_forests/model:abstract_model",

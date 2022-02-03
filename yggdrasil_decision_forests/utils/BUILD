@@ -25,6 +25,7 @@ cc_library_ydf(
         "logging.h",
         "logging_default.h",
     ],
+    visibility = ["//visibility:private"],
     deps = [
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
@@ -46,6 +47,7 @@ cc_library_ydf(
         "status_macros.h",
         "status_macros_default.h",
     ],
+    visibility = ["//visibility:private"],
     deps = [
         ":logging",
     ],
@@ -73,6 +75,7 @@ cc_library_ydf(
     copts = ["-fexceptions"],  # The code does not rely on exceptions.
     defines = ["YGG_FILESYSTEM_USES_DEFAULT"],
     features = ["-use_header_modules"],  # Incompatible with -fexceptions.
+    visibility = ["//visibility:private"],
     linkopts = select({
         "@platforms//os:linux": ["-lstdc++fs"],  # Required for gcc<=8.
         "//conditions:default": [],
@@ -106,6 +109,7 @@ cc_library_ydf(
         "YGG_FILESYSTEM_USES_TENSORFLOW",
     ],
     features = ["-use_header_modules"],  # Incompatible with -fexceptions.
+    visibility = ["//visibility:private"],
     deps = [
         ":compatibility",
         ":bytestream",
@@ -292,6 +296,7 @@ cc_library_ydf(
         "concurrency_streamprocessor.h",
     ],
     defines = ["YGG_CONCURRENCY_USES_DEFAULT"],
+    visibility = ["//visibility:private"],
     deps = [
         ":logging",
         ":synchronization_primitives",
@@ -469,6 +474,7 @@ cc_library_ydf(
     name = "usage_default",
     srcs = ["usage_default.cc"],
     hdrs = ["usage.h"],
+    visibility = ["//visibility:private"],
     deps = [
         "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",

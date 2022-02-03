@@ -47,7 +47,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees_loss.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/metric/ranking_ndcg.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -1070,7 +1070,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
   std::vector<float> sub_train_predictions;
   // Initialize the gradient dataset.
   RETURN_IF_ERROR(internal::CreateGradientDataset(
-      sub_train_dataset, mdl->loss(), config.train_config_link.label(),
+      sub_train_dataset, config.train_config_link.label(),
       config.gbt_config->use_hessian_gain(), *config.loss,
       &gradient_sub_train_dataset, &gradients, &sub_train_predictions));
   // Note: At each iteration, one tree is created for each gradient dimensions.
@@ -1079,7 +1079,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
   dataset::VerticalDataset gradient_validation_dataset;
   std::vector<float> validation_predictions;
   RETURN_IF_ERROR(internal::CreateGradientDataset(
-      validation_dataset, mdl->loss(), config.train_config_link.label(),
+      validation_dataset, config.train_config_link.label(),
       config.gbt_config->use_hessian_gain(), *config.loss,
       &gradient_validation_dataset,
       /*gradients=*/nullptr, &validation_predictions));
@@ -1761,8 +1761,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamFocalLossGamma);
+    const auto hparam = generic_hyper_params->Get(kHParamFocalLossGamma);
     if (hparam.has_value()) {
       gbt_config->mutable_binary_focal_loss_options()
           ->set_misprediction_exponent(hparam.value().value().real());
@@ -2319,7 +2318,7 @@ LoadCompleteDatasetForWeakLearner(
                                       &complete_dataset->weights));
 
   RETURN_IF_ERROR(internal::CreateGradientDataset(
-      complete_dataset->dataset, mdl->loss(), config.train_config_link.label(),
+      complete_dataset->dataset, config.train_config_link.label(),
       config.gbt_config->use_hessian_gain(), *config.loss,
       &complete_dataset->gradient_dataset,
       allocate_gradient ? &complete_dataset->gradients : nullptr,
@@ -2420,11 +2419,13 @@ absl::Status ExtractValidationDataset(const VerticalDataset& dataset,
   return absl::OkStatus();
 }
 
-absl::Status CreateGradientDataset(
-    const dataset::VerticalDataset& dataset, const proto::Loss loss,
-    const int label_col_idx, const bool hessian_splits,
-    const AbstractLoss& loss_impl, dataset::VerticalDataset* gradient_dataset,
-    std::vector<GradientData>* gradients, std::vector<float>* predictions) {
+absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
+                                   const int label_col_idx,
+                                   const bool hessian_splits,
+                                   const AbstractLoss& loss_impl,
+                                   dataset::VerticalDataset* gradient_dataset,
+                                   std::vector<GradientData>* gradients,
+                                   std::vector<float>* predictions) {
   const auto loss_shape = loss_impl.Shape();
   *gradient_dataset = dataset.ShallowNonOwningClone();
 
