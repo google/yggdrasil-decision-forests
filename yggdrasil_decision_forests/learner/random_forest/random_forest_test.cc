@@ -1048,7 +1048,7 @@ TEST_F(RandomForestOnSimPTE, Honest) {
   rf_config->set_bootstrap_size_ratio(0.5);
 
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Qini(evaluation_), 0.106705, 0.001);
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.106705, 0.002);
 }
 
 TEST(SampleTrainingExamples, WithReplacement) {

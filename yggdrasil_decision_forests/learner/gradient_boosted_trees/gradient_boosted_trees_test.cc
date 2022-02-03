@@ -689,7 +689,7 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaZero) {
   TrainAndEvaluateModel();
 
   // Similar metrics as with log loss.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8602, 0.0008);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8602, 0.003);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.3178, 0.004);
 }
 
@@ -709,7 +709,7 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaHalf) {
 
   // Slighly better accuracy, but worse log loss; we are not
   // optimizing for log loss directly any more.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0008);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.003);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.3310, 0.004);
 }
 
@@ -729,8 +729,8 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaTwo) {
 
   // Even slightly better accuracy (could be just noise, but illustrative),
   // log loss deviates even more
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8608, 0.0008);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4192, 0.004);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8608, 0.003);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4192, 0.009);
 }
 
 // Train and test a model on the adult dataset with focal loss, adding a
@@ -750,8 +750,8 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaTwoAlphaQuarter) {
   TrainAndEvaluateModel();
 
   // Worse accuracy but smaller log loss due to low alpha
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8300, 0.0008);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4032, 0.004);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8300, 0.004);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4032, 0.02);
 }
 
 // Separate the examples used for the structure and the leaves of the model.
