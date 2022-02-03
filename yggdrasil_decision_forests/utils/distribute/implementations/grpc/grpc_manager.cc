@@ -358,8 +358,12 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
   async_pending_queries_.Close();
   async_pending_answers_.Close();
 
+  async_pending_queries_.Clear();
+  async_pending_answers_.Clear();
+
   for (auto& worker : workers_) {
     worker->async_pending_queries_.Close();
+    worker->async_pending_queries_.Clear();
   }
 
   JoinWorkers();

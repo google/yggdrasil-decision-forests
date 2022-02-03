@@ -42,6 +42,12 @@ class Channel {
     cond_var_.SignalAll();
   }
 
+  // Clear the content of a channel.
+  void Clear() {
+    MutexLock results_lock(&mutex_);
+    std::queue<Input>().swap(content_);
+  }
+
   // Re-open a previously closed channel.
   void Reopen() {
     MutexLock results_lock(&mutex_);

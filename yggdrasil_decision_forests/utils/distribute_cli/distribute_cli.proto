@@ -1,0 +1,70 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.utils.distribute_cli.proto;
+
+import "yggdrasil_decision_forests/utils/distribute/distribute.proto";
+
+message Config {
+  // If true, skips the commands that were already run successfully.
+  // If false and if the manager process restarts, commands will be re-executed.
+  optional bool skip_already_run_commands = 1 [default = true];
+
+  // Number of commands that a single worker can execute in parallel.
+  optional int32 parallel_execution_per_worker = 2 [default = 1];
+
+  optional distribute.proto.Config distribute_config = 3;
+
+  // If true, the workers print logs on the stdout / stderr / LOG. This is the
+  // recommended way of working for distributed execution. If false, the workers
+  // does not print anything. This is the recommended way of working for local
+  // execution.
+  // In all cases, the manager will display workers progress and the worker
+  // errors.
+  optional bool display_worker_output = 4 [default = true];
+}
+
+message Welcome {
+  optional string log_dir = 1;
+  optional bool display_output = 2;
+}
+
+message Request {
+  optional string request_id = 1;
+
+  oneof type {
+    Command command = 2;
+  }
+
+  message Command {
+    optional string command = 1;
+
+    // Unique identifier of the command. Computed with the "CommandToCommandId"
+    // function in "common.h".
+    optional string internal_command_id = 2;
+  }
+}
+
+message Result {
+  optional string request_id = 1;
+
+  oneof type {
+    Command command = 2;
+  }
+
+  message Command {}
+}
