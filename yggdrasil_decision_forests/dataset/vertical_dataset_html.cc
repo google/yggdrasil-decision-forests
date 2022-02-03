@@ -76,9 +76,16 @@ void AppendVerticalDatasetToHtml(const VerticalDataset& dataset,
 
   h::Html content;
   if (options.interactive_column_sorting) {
-    content.Append(h::Table(a::Class("sortable"), rows));
+    if (options.id.empty()) {
+      LOG(WARNING) << "sortable tables require a id.";
+    }
+    content.Append(h::Table(a::Class("sortable"), a::Id(options.id), rows));
   } else {
-    content.Append(h::Table(rows));
+    if (!options.id.empty()) {
+      content.Append(h::Table(a::Id(options.id), rows));
+    } else {
+      content.Append(h::Table(rows));
+    }
   }
 
   // Column selector

@@ -18,6 +18,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_VERTICAL_DATASET_HTML_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_VERTICAL_DATASET_HTML_H_
 
+#include <string>
+
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 
 namespace yggdrasil_decision_forests {
@@ -34,6 +36,8 @@ struct AppendHtmlOptions {
   // If true, the html should include vertical_dataset.js defined in
   // "yggdrasil_decision_forests/data:html_report".
   bool interactive_column_selection = false;
+  // Html id of the table.
+  std::string id = "";
 };
 
 void AppendVerticalDatasetToHtml(const VerticalDataset& dataset,

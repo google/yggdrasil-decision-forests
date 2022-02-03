@@ -1543,6 +1543,18 @@ double GetMetricRanking(const proto::EvaluationResults& evaluation,
   switch (metric.Type_case()) {
     case proto::MetricAccessor::Ranking::kNdcg:
       return NDCG(evaluation);
+    case proto::MetricAccessor::Ranking::kMrr:
+      return MRR(evaluation);
+    default:
+      LOG(FATAL) << "Not implemented";
+  }
+}
+
+double GetMetricUplift(const proto::EvaluationResults& evaluation,
+                       const proto::MetricAccessor::Uplift& metric) {
+  switch (metric.type_case()) {
+    case proto::MetricAccessor::Uplift::kQini:
+      return Qini(evaluation);
     default:
       LOG(FATAL) << "Not implemented";
   }
@@ -1587,6 +1599,11 @@ double GetMetric(const proto::EvaluationResults& evaluation,
         GetMetricFatalMissing("ranking", evaluation, metric);
       }
       return GetMetricRanking(evaluation, metric.ranking());
+    case proto::MetricAccessor::kUplift:
+      if (!evaluation.has_uplift()) {
+        GetMetricFatalMissing("uplift", evaluation, metric);
+      }
+      return GetMetricUplift(evaluation, metric.uplift());
     case proto::MetricAccessor::TASK_NOT_SET:
       LOG(FATAL) << "Non set metric accessor proto";
   }

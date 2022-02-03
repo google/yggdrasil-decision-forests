@@ -77,9 +77,10 @@ absl::Status Worker::RunCommand(const absl::string_view command,
   }
 
   std::string error_message = absl::Substitute(
-      "The following command failed:\n\n$0\n\nLog files: $1\n\nLast 5k "
+      "The following command failed with code $3:\n\n$0\n\nLog files: "
+      "$1\n\nLast 5k "
       "characters of logs:\n\n$2",
-      command, log_path, end_of_logs);
+      command, log_path, end_of_logs, error);
   return absl::InvalidArgumentError(error_message);
 }
 

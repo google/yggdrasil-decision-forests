@@ -237,6 +237,7 @@ message MetricAccessor {
     Regression regression = 2;
     Loss loss = 3;
     Ranking ranking = 4;
+    Uplift uplift = 5;
   }
 
   message Classification {
@@ -296,6 +297,13 @@ message MetricAccessor {
     }
     message NDCG {}
     message MRR {}
+  }
+
+  message Uplift {
+    oneof type {
+      Qini qini = 1;
+    }
+    message Qini {}
   }
 }
 

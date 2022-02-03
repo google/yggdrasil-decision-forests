@@ -237,6 +237,10 @@ inline internal::Attr Class(absl::string_view value) {
   return internal::Attr("class", value);
 }
 
+inline internal::Attr Id(absl::string_view value) {
+  return internal::Attr("id", value);
+}
+
 inline internal::Attr Align(absl::string_view value) {
   return internal::Attr("align", value);
 }
