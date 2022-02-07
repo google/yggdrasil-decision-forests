@@ -349,7 +349,7 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_categorical()->add_possible_values("true");
     param->mutable_categorical()->add_possible_values("false");
     param->mutable_documentation()->set_description(
-        R"(In honest trees, different training examples are used to infer the structure and the leaf values. This regularization technique trades examples for bias estimates. It might increase or reduce the quality of the model. See "Generalized Random Forests", Athey et al. In this paper, Honest tree are trained with the Random Forest algorithm with a sampling without replacement.)");
+        R"(In honest trees, different training examples are used to infer the structure and the leaf values. This regularization technique trades examples for bias estimates. It might increase or reduce the quality of the model. See "Generalized Random Forests", Athey et al. In this paper, Honest trees are trained with the Random Forest algorithm with a sampling without replacement.)");
   }
 
   return absl::OkStatus();

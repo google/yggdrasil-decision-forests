@@ -109,18 +109,18 @@ the gradient of the loss relative to the model output).
 
 -   **Type:** Real **Default:** 0.5 **Possible values:** min:0 max:1
 
--   EXPERIMENTAL. Wighting parameter for focal loss, positive samples weighted
+-   EXPERIMENTAL. Weighting parameter for focal loss, positive samples weighted
     by alpha, negative samples by (1-alpha). The default 0.5 value means no
-    active class-level weighting. Only used with Focal loss i.e.
+    active class-level weighting. Only used with focal loss i.e.
     `loss="BINARY_FOCAL_LOSS"`
 
 #### [focal_loss_gamma](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:focal_loss_gamma)
 
 -   **Type:** Real **Default:** 2 **Possible values:** min:0
 
--   EXPERIMENTAL. Exponent of the misprediction exponent term in focal Loss,
+-   EXPERIMENTAL. Exponent of the misprediction exponent term in focal loss,
     corresponds to gamma parameter in https://arxiv.org/pdf/1708.02002.pdf. Only
-    used with Focal loss i.e. `loss="BINARY_FOCAL_LOSS"`
+    used with focal loss i.e. `loss="BINARY_FOCAL_LOSS"`
 
 #### [forest_extraction](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:forest_extraction)
 
@@ -157,7 +157,7 @@ the gradient of the loss relative to the model output).
 -   In honest trees, different training examples are used to infer the structure
     and the leaf values. This regularization technique trades examples for bias
     estimates. It might increase or reduce the quality of the model. See
-    "Generalized Random Forests", Athey et al. In this paper, Honest tree are
+    "Generalized Random Forests", Athey et al. In this paper, Honest trees are
     trained with the Random Forest algorithm with a sampling without
     replacement.
 
@@ -536,7 +536,7 @@ It is probably the most well-known of the Decision Forest training algorithms.
 -   In honest trees, different training examples are used to infer the structure
     and the leaf values. This regularization technique trades examples for bias
     estimates. It might increase or reduce the quality of the model. See
-    "Generalized Random Forests", Athey et al. In this paper, Honest tree are
+    "Generalized Random Forests", Athey et al. In this paper, Honest trees are
     trained with the Random Forest algorithm with a sampling without
     replacement.
 
@@ -797,7 +797,7 @@ used to grow the tree while the second is used to prune the tree.
 -   In honest trees, different training examples are used to infer the structure
     and the leaf values. This regularization technique trades examples for bias
     estimates. It might increase or reduce the quality of the model. See
-    "Generalized Random Forests", Athey et al. In this paper, Honest tree are
+    "Generalized Random Forests", Athey et al. In this paper, Honest trees are
     trained with the Random Forest algorithm with a sampling without
     replacement.
 

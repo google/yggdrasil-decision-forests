@@ -2247,7 +2247,7 @@ For example, in the case of binary classification, the pre-link function output 
         gbt_config.binary_focal_loss_options().misprediction_exponent());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(EXPERIMENTAL. Exponent of the misprediction exponent term in focal Loss, corresponds to gamma parameter in https://arxiv.org/pdf/1708.02002.pdf. Only used with Focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
+        R"(EXPERIMENTAL. Exponent of the misprediction exponent term in focal loss, corresponds to gamma parameter in https://arxiv.org/pdf/1708.02002.pdf. Only used with focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
   }
 
   {
@@ -2259,7 +2259,7 @@ For example, in the case of binary classification, the pre-link function output 
         gbt_config.binary_focal_loss_options().positive_sample_coefficient());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(EXPERIMENTAL. Wighting parameter for focal loss, positive samples weighted by alpha, negative samples by (1-alpha). The default 0.5 value means no active class-level weighting. Only used with Focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
+        R"(EXPERIMENTAL. Weighting parameter for focal loss, positive samples weighted by alpha, negative samples by (1-alpha). The default 0.5 value means no active class-level weighting. Only used with focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
