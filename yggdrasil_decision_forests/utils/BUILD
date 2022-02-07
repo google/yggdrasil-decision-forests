@@ -568,6 +568,7 @@ cc_library_ydf(
         ":compatibility",
         ":distribution_cc_proto",
         ":status_macros",
+        ":distribution",
         "@com_google_absl//absl/status",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",

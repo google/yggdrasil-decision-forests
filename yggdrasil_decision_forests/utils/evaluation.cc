@@ -20,6 +20,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
+#include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/evaluation.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -96,9 +97,97 @@ absl::Status PredictionToExample(
       prediction_as_example->add_attributes()->set_numerical(
           prediction.ranking().relevance());
       break;
+    case model::proto::Task::CATEGORICAL_UPLIFT: {
+      const int num_label_values =
+          static_cast<int>(label_col.categorical().number_of_unique_values());
+      if (num_label_values - 2 != prediction.uplift().treatment_effect_size()) {
+        return absl::InvalidArgumentError("Wrong number of effects.");
+      }
+      // There are two excluded label values:
+      // 0: Out-of-vocabulary.
+      // 1: Treatement.
+      for (int label_value = 2; label_value < num_label_values; label_value++) {
+        const int effect_idx = label_value - 2;
+        prediction_as_example->add_attributes()->set_numerical(
+            prediction.uplift().treatment_effect(effect_idx));
+      }
+    } break;
     default:
       return absl::InvalidArgumentError("Non supported class");
   }
+  return absl::OkStatus();
+}
+
+absl::Status ExampleToPrediction(
+    model::proto::Task task, const dataset::proto::Column& label_col,
+    const dataset::proto::Example& prediction_as_example,
+    model::proto::Prediction* prediction) {
+  switch (task) {
+    case model::proto::Task::CLASSIFICATION: {
+      utils::IntegerDistributionFloat distribution;
+      const int num_label_values =
+          static_cast<int>(label_col.categorical().number_of_unique_values());
+      distribution.SetNumClasses(num_label_values);
+      if (prediction_as_example.attributes_size() != num_label_values - 1) {
+        return absl::InvalidArgumentError("Wrong number of predictions.");
+      }
+      // Skip the out-of-vocabulary (0) item.
+      for (int label_value = 1; label_value < num_label_values; label_value++) {
+        const int score_col_idx = label_value - 1;
+        if (!prediction_as_example.attributes(score_col_idx).has_numerical()) {
+          return absl::InvalidArgumentError("The prediction is not numerical");
+        }
+        const float score =
+            prediction_as_example.attributes(score_col_idx).numerical();
+        distribution.Add(label_value, score);
+      }
+      prediction->mutable_classification()->set_value(distribution.TopClass());
+      distribution.Save(
+          prediction->mutable_classification()->mutable_distribution());
+    } break;
+    case model::proto::Task::REGRESSION:
+      if (prediction_as_example.attributes_size() != 1) {
+        return absl::InvalidArgumentError("Wrong number of predictions.");
+      }
+      if (!prediction_as_example.attributes(0).has_numerical()) {
+        return absl::InvalidArgumentError("The prediction is not numerical");
+      }
+      prediction->mutable_regression()->set_value(
+          prediction_as_example.attributes(0).numerical());
+      break;
+    case model::proto::Task::RANKING:
+      if (prediction_as_example.attributes_size() != 1) {
+        return absl::InvalidArgumentError("Wrong number of predictions.");
+      }
+      if (!prediction_as_example.attributes(0).has_numerical()) {
+        return absl::InvalidArgumentError("The prediction is not numerical");
+      }
+      prediction->mutable_ranking()->set_relevance(
+          prediction_as_example.attributes(0).numerical());
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT: {
+      const int num_label_values =
+          static_cast<int>(label_col.categorical().number_of_unique_values());
+      prediction->mutable_uplift()->clear_treatment_effect();
+      if (prediction_as_example.attributes_size() != num_label_values - 2) {
+        return absl::InvalidArgumentError("Wrong number of predictions.");
+      }
+      // Skip the out-of-vocabulary (0) and control (1) item.
+      for (int label_value = 2; label_value < num_label_values; label_value++) {
+        const int effect_idx = label_value - 2;
+        if (!prediction_as_example.attributes(effect_idx).has_numerical()) {
+          return absl::InvalidArgumentError("The prediction is not numerical");
+        }
+        const float effect =
+            prediction_as_example.attributes(effect_idx).numerical();
+        prediction->mutable_uplift()->add_treatment_effect(effect);
+      }
+    } break;
+    default:
+      LOG(FATAL) << "Non supported task.";
+      break;
+  }
+
   return absl::OkStatus();
 }
 
@@ -123,6 +212,18 @@ utils::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
       dataset::AddColumn(label_col.name(),
                          dataset::proto::ColumnType::NUMERICAL, &dataspec);
       break;
+    case model::proto::Task::CATEGORICAL_UPLIFT: {
+      const int num_label_values =
+          static_cast<int>(label_col.categorical().number_of_unique_values());
+      // There are two excluded label values:
+      // 0: Out-of-vocabulary.
+      // 1: Control.
+      for (int label_value = 2; label_value < num_label_values; label_value++) {
+        dataset::AddColumn(absl::StrCat(dataset::CategoricalIdxToRepresentation(
+                               label_col, label_value)),
+                           dataset::proto::ColumnType::NUMERICAL, &dataspec);
+      }
+    } break;
     default:
       LOG(FATAL) << "Non supported task.";
       break;
