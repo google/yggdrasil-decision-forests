@@ -15,8 +15,11 @@
 
 #include "yggdrasil_decision_forests/utils/distribute_cli/distribute_cli.h"
 
+#include <algorithm>
+
 #include "yggdrasil_decision_forests/utils/distribute_cli/common.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/hash.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
@@ -79,14 +82,33 @@ absl::Status DistributeCLIManager::Initialize() {
   return absl::OkStatus();
 }
 
-absl::Status DistributeCLIManager::Schedule(const absl::string_view command) {
+absl::Status DistributeCLIManager::Schedule(
+    const absl::string_view command, const absl::optional<std::string>& uid) {
   if (config_.distribute_config().verbosity() >= 2) {
     LOG(INFO) << "Schedule command: " << command;
   }
+  if (config_.shuffle_commands()) {
+    waiting_commands_.push_back(
+        {/*command=*/std::string(command), /*uid=*/uid});
+  } else {
+    // Schedule the command immediately.
+    return ScheduleNow(command, uid);
+  }
+  return absl::OkStatus();
+}
+
+absl::Status DistributeCLIManager::ScheduleNow(
+    const absl::string_view command, const absl::optional<std::string>& uid) {
   proto::Request generic_request;
   auto& request = *generic_request.mutable_command();
   *request.mutable_command() = command;
-  *request.mutable_internal_command_id() = CommandToInternalCommandId(command);
+  if (uid.has_value()) {
+    *request.mutable_internal_command_id() =
+        absl::StrCat(utils::hash::HashStringViewToUint64(uid.value()));
+  } else {
+    *request.mutable_internal_command_id() =
+        CommandToInternalCommandId(command);
+  }
 
   const auto status =
       distribute_manager_->AsynchronousProtoRequest(std::move(generic_request));
@@ -100,6 +122,18 @@ absl::Status DistributeCLIManager::WaitCompletion() {
   if (config_.distribute_config().verbosity() >= 1) {
     LOG(INFO) << "Running " << pending_commands_ << " commands";
   }
+
+  // Starting any waiting commands.
+  if (!waiting_commands_.empty()) {
+    std::random_device random_initializer;
+    std::mt19937 random(random_initializer());
+    std::shuffle(waiting_commands_.begin(), waiting_commands_.end(), random);
+    for (const auto& command : waiting_commands_) {
+      RETURN_IF_ERROR(ScheduleNow(command.command, command.uid));
+    }
+    waiting_commands_.clear();
+  }
+
   const auto num_commands = pending_commands_;
   while (pending_commands_ > 0) {
     ASSIGN_OR_RETURN(

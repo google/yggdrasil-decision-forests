@@ -75,7 +75,12 @@ class DistributeCLIManager {
   absl::Status Initialize();
 
   // Schedules a new commands.
-  absl::Status Schedule(const absl::string_view command);
+  // Args:
+  //   uid: Unique identifier of the command to skip already executed commands
+  //     is "skip_already_run_commands=true". If not specified, the uid is
+  //     "command".
+  absl::Status Schedule(const absl::string_view command,
+                        const absl::optional<std::string>& uid = {});
 
   // Waits for all the previously scheduled commands to run. If a command fails,
   // returns immediately with the error. Following an error, the manager can be
@@ -89,9 +94,20 @@ class DistributeCLIManager {
   absl::Status Shutdown();
 
  private:
+  // Schedules a new commands immediately.
+  absl::Status ScheduleNow(const absl::string_view command,
+                           const absl::optional<std::string>& uid);
+
   std::unique_ptr<distribute::AbstractManager> distribute_manager_;
   proto::Config config_;
   std::string log_dir_;
+
+  // Commands sent to the workers when "WaitCompletion" is called.
+  struct WaitingCommand {
+    std::string command;
+    absl::optional<std::string> uid;
+  };
+  std::vector<WaitingCommand> waiting_commands_;
 
   // Number of scheduled commands.
   int pending_commands_ = 0;

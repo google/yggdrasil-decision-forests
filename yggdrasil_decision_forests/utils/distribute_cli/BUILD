@@ -26,6 +26,7 @@ cc_library_ydf(
         ":distribute_cli_cc_proto",
         "@com_google_absl//absl/status",
         "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:hash",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:uid",
         "//yggdrasil_decision_forests/utils/distribute",

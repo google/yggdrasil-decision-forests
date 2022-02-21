@@ -1437,16 +1437,22 @@ namespace {
 double GetMetricClassificationOneVsOthers(
     const proto::EvaluationResults& evaluation,
     const proto::MetricAccessor::Classification::OneVsOther& metric) {
+  const int num_label_classes =
+      evaluation.label_column().categorical().number_of_unique_values();
+
   int positive_class_idx;
   if (!metric.has_positive_class()) {
-    positive_class_idx =
-        evaluation.label_column().categorical().number_of_unique_values() - 1;
-    LOG(WARNING)
-        << "The \"positive_class\" was not provided. Using positive_class_idx="
-        << positive_class_idx << "=\""
-        << dataset::CategoricalIdxToRepresentation(evaluation.label_column(),
-                                                   positive_class_idx)
-        << "\" instead.";
+    // If "metric.positive_class()" is not set, the last class (i.e. the class
+    // with the higher index) is considered the positive class.
+    positive_class_idx = num_label_classes - 1;
+    if (num_label_classes > 3) {
+      LOG(WARNING) << "The \"positive_class\" was not provided. Using "
+                      "positive_class_idx="
+                   << positive_class_idx << "=\""
+                   << dataset::CategoricalIdxToRepresentation(
+                          evaluation.label_column(), positive_class_idx)
+                   << "\" instead.";
+    }
   } else {
     positive_class_idx = dataset::CategoricalStringToValue(
         metric.positive_class(), evaluation.label_column());

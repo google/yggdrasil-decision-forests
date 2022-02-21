@@ -36,6 +36,12 @@ message Config {
   // In all cases, the manager will display workers progress and the worker
   // errors.
   optional bool display_worker_output = 4 [default = true];
+
+  // If true, the commands are executed in random order when "WaitCompletion"
+  // is called. This can help distributing the charde among the workers is
+  // parallel_execution_per_worker>1. If false, the commands are started in
+  // order when they are scheduled (with "Schedule").
+  optional bool shuffle_commands = 5 [default = true];
 }
 
 message Welcome {

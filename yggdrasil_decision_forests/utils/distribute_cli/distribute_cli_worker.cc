@@ -118,8 +118,9 @@ absl::Status Worker::Command(const proto::Request::Command& request,
   // Effectively run the command.
   if (welcome_.display_output()) {
     LOG(INFO) << "Running command " << request.internal_command_id() << ":\n"
-              << request.command();
+              << request.command() << "\nwith logs in: " << log_path;
   }
+  const auto begin_time = absl::Now();
 
   const auto status = RunCommand(request.command(),
                                  /*log_path*/ log_path);
@@ -128,14 +129,15 @@ absl::Status Worker::Command(const proto::Request::Command& request,
     if (welcome_.display_output()) {
       LOG(INFO) << "The command " << request.internal_command_id()
                 << " failed.\nThe full command was:\n\n"
-                << request.command() << "\n\n";
+                << request.command() << "\n\nwith logs in: " << log_path;
     }
     RETURN_IF_ERROR(file::SetContent(fail_path, "fail"));
     return status;
   }
 
   if (welcome_.display_output()) {
-    LOG(INFO) << "The command " << request.internal_command_id() << " worked";
+    LOG(INFO) << "The command " << request.internal_command_id()
+              << " completed in " << (absl::Now() - begin_time);
   }
   RETURN_IF_ERROR(file::SetContent(done_path, "done"));
   return absl::OkStatus();
