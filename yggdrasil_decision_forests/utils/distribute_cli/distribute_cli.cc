@@ -119,10 +119,6 @@ absl::Status DistributeCLIManager::ScheduleNow(
 }
 
 absl::Status DistributeCLIManager::WaitCompletion() {
-  if (config_.distribute_config().verbosity() >= 1) {
-    LOG(INFO) << "Running " << pending_commands_ << " commands";
-  }
-
   // Starting any waiting commands.
   if (!waiting_commands_.empty()) {
     std::random_device random_initializer;
@@ -132,6 +128,10 @@ absl::Status DistributeCLIManager::WaitCompletion() {
       RETURN_IF_ERROR(ScheduleNow(command.command, command.uid));
     }
     waiting_commands_.clear();
+  }
+
+  if (config_.distribute_config().verbosity() >= 1) {
+    LOG(INFO) << "Running " << pending_commands_ << " commands";
   }
 
   const auto num_commands = pending_commands_;
@@ -159,6 +159,13 @@ absl::Status DistributeCLIManager::Shutdown() {
   RETURN_IF_ERROR(distribute_manager_->Done());
   distribute_manager_.reset();
   return absl::OkStatus();
+}
+
+std::string DistributeCLIManager::LogPathFromUid(const absl::string_view uid) {
+  std::string internal_command_id =
+      absl::StrCat(utils::hash::HashStringViewToUint64(uid));
+  const auto base_path = file::JoinPath(log_dir_, internal_command_id);
+  return absl::StrCat(base_path, ".log");
 }
 
 }  // namespace distribute_cli

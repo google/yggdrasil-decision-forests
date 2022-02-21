@@ -42,7 +42,7 @@ TEST(Html, Style) {
   class Style style;
   style.BackgroundColorHSL(0.5f, 0.5f, 0.5f);
   style.AddRaw("a", "b");
-  EXPECT_EQ(style.content(), "background-color=hsl(180, 50%, 50%);a=b;");
+  EXPECT_EQ(style.content(), "background-color:hsl(180, 50%, 50%);a:b;");
 }
 
 }  // namespace

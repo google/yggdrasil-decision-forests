@@ -370,13 +370,13 @@ TEST(Distribution, IntegersConfusionMatrix_AppendHtmlReport) {
 </tr>
 <tr>
 <th align="right">a</th>
-<td align="right" style="background-color=hsl(100, 50%, 98%);">1</td>
-<td align="right" style="background-color=hsl(100, 50%, 90%);">5</td>
+<td align="right" style="background-color:hsl(100, 50%, 98%);">1</td>
+<td align="right" style="background-color:hsl(100, 50%, 90%);">5</td>
 </tr>
 <tr>
 <th align="right">bb</th>
-<td align="right" style="background-color=hsl(100, 50%, 84%);">8</td>
-<td align="right" style="background-color=hsl(100, 50%, 76%);">12</td>
+<td align="right" style="background-color:hsl(100, 50%, 84%);">8</td>
+<td align="right" style="background-color:hsl(100, 50%, 76%);">12</td>
 </tr>
 </table>
 <p>Total: 26</p>

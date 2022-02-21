@@ -42,7 +42,7 @@ void Style::BackgroundColorHSL(float h, float s, float l) {
 
 void Style::AddRaw(absl::string_view key, absl::string_view value) {
   content_.Append(key);
-  content_.Append("=");
+  content_.Append(":");
   content_.Append(value);
   content_.Append(";");
 }

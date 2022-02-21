@@ -93,6 +93,9 @@ class DistributeCLIManager {
   // ignored.
   absl::Status Shutdown();
 
+  // Paths to the file that will contain the execution log of a command.
+  std::string LogPathFromUid(const absl::string_view uid);
+
  private:
   // Schedules a new commands immediately.
   absl::Status ScheduleNow(const absl::string_view command,
