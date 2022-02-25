@@ -31,6 +31,9 @@ ThreadPool::ThreadPool(std::string name, int num_threads)
 ThreadPool::~ThreadPool() { JoinAllAndStopThreads(); }
 
 void ThreadPool::JoinAllAndStopThreads() {
+  if (num_threads_ == 0) {
+    return;
+  }
   jobs_.Close();
   for (auto& thread : threads_) {
     thread.join();
@@ -45,7 +48,11 @@ void ThreadPool::StartWorkers() {
 }
 
 void ThreadPool::Schedule(std::function<void()> callback) {
-  jobs_.Push(std::move(callback));
+  if (num_threads_ == 0) {
+    callback();
+  } else {
+    jobs_.Push(std::move(callback));
+  }
 }
 
 void ThreadPool::ThreadLoop() {

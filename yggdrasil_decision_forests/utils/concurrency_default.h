@@ -40,6 +40,8 @@ class Thread {
 class ThreadPool {
  public:
   // Creates the thread pool. Don't start any thread yet.
+  // If "num_threads==0", callback are executed synchronously without threading
+  // during "Schedule" calls.
   ThreadPool(std::string name, int num_threads);
 
   // Ensure all the jobs are done and all the threads have been joined.
@@ -50,6 +52,7 @@ class ThreadPool {
 
   // Schedules a new job. Returns immediately i.e. does not wait for the job to
   // be executed.
+  // If "num_threads==0", execute "callback" synchronously.
   void Schedule(std::function<void()> callback);
 
   // Number of threads configured in the constructor.

@@ -59,9 +59,13 @@ inline void SetLoggingLevel(int level) { logging_level = level; }
 
 // Tests if a given logging level should be visible.
 inline bool IsLoggingEnabled(Severity severity) {
+#ifdef YDF_ALWAYS_LOG
+  return true;
+#else
   if (!absl::GetFlag(FLAGS_alsologtostderr)) {
     return false;
   }
+#endif
 
   switch (severity) {
     case Severity::INFO:

@@ -25,6 +25,13 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
+// Converts a absl::string_view into an object compatible with std::filesystem.
+#ifdef ABSL_USES_STD_STRING_VIEW
+#define SV_ABSL_TO_STD(X) X
+#else
+#define SV_ABSL_TO_STD(X) std::string(X)
+#endif
+
 namespace file {
 
 namespace ygg = ::yggdrasil_decision_forests;
@@ -32,7 +39,7 @@ namespace ygg = ::yggdrasil_decision_forests;
 std::string JoinPathList(std::initializer_list<absl::string_view> paths) {
   std::filesystem::path all_paths;
   for (const auto& path : paths) {
-    all_paths /= path;
+    all_paths /= SV_ABSL_TO_STD(path);
   }
   return all_paths.string();
 }
@@ -71,8 +78,10 @@ bool GenerateShardedFilenames(absl::string_view spec,
 absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
                    const int options) {
   try {
-    const auto search_dir = std::filesystem::path(pattern).parent_path();
-    const auto filename = std::filesystem::path(pattern).filename().string();
+    const auto search_dir =
+        std::filesystem::path(SV_ABSL_TO_STD(pattern)).parent_path();
+    const auto filename =
+        std::filesystem::path(SV_ABSL_TO_STD(pattern)).filename().string();
     std::string regexp_filename =
         absl::StrReplaceAll(filename, {{".", "\\."}, {"*", ".*"}, {"?", "."}});
     std::regex regexp_pattern(regexp_filename);
@@ -90,7 +99,7 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
 
 absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
   try {
-    std::filesystem::create_directories(path);
+    std::filesystem::create_directories(SV_ABSL_TO_STD(path));
     return absl::OkStatus();
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
@@ -100,7 +109,7 @@ absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
 // Delete the directory "path".
 absl::Status RecursivelyDelete(absl::string_view path, int options) {
   try {
-    std::filesystem::remove(path);
+    std::filesystem::remove(SV_ABSL_TO_STD(path));
     return absl::OkStatus();
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
@@ -210,12 +219,12 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
 
 yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
     absl::string_view path) {
-  return std::filesystem::exists(path);
+  return std::filesystem::exists(SV_ABSL_TO_STD(path));
 }
 
 absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
   try {
-    std::filesystem::rename(from, to);
+    std::filesystem::rename(SV_ABSL_TO_STD(from), SV_ABSL_TO_STD(to));
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
   }
