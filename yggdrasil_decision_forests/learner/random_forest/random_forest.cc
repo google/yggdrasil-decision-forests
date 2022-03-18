@@ -532,6 +532,7 @@ RandomForestLearner::TrainWithStatus(
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         "TrainRF", deployment().num_threads());
+
     pool.StartWorkers();
     for (int tree_idx = 0; tree_idx < rf_config.num_trees(); tree_idx++) {
       pool.Schedule([&, tree_idx]() {
