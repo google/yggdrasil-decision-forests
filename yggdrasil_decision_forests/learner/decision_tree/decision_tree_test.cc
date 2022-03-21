@@ -2384,7 +2384,8 @@ TEST(DecisionTree, FindBestSplitCategoricalFeatureTaskCategoricalUplift) {
   EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 4);
   EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 4);
-  EXPECT_EQ(best_condition.na_value(), false);
+  // Both the splits of attribute values [neg={1,2}, pos={3,4}] and [pos={1,2},
+  // neg={3,4}] are equivalent and acceptable.
   EXPECT_NEAR(best_condition.split_score(), 1.f * 0.5f + 0.f * 0.5f - 0.25f,
               0.0001);
 }
