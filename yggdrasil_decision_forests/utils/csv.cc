@@ -191,7 +191,7 @@ absl::Status Reader::ConsumeChar() {
 }
 
 void Reader::NewRowCache() {
-  num_rows = 1;
+  num_rows += 1;
   cached_row_.clear();
   cached_fields_.clear();
   cached_field_size_.assign(1, 0);
