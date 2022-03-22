@@ -768,6 +768,22 @@ TEST(Dataset, CreateLocalDataSpecFromSyntheticTFExample) {
   CreateDataSpec(path, false, {}, &data_spec);
 }
 
+TEST(Dataset, UnknownType) {
+  const auto dataset_path =
+      file::JoinPath(test::TmpDirectory(), "dataset_with_unknown_type.csv");
+  CHECK_OK(file::SetContent(dataset_path, "a,b\n1,\n2,\n"));
+  proto::DataSpecificationGuide guide;
+  guide.set_ignore_unknown_type_columns(true);
+  proto::DataSpecification data_spec;
+  InferDataSpecType(absl::StrCat("csv:", dataset_path), guide, &data_spec);
+  // The column "b" is ignored.
+  proto::DataSpecification target = PARSE_TEST_PROTO(
+      R"pb(
+        columns { type: NUMERICAL name: "a" is_manual_type: false }
+      )pb");
+  EXPECT_THAT(data_spec, EqualsProto(target));
+}
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

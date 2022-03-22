@@ -307,6 +307,9 @@ message DataSpecificationGuide {
   // list of numerical values with always the same size and semantic per
   // dimension.
   optional bool unstack_numerical_set_as_numericals = 8 [default = true];
+  // Remove columns of unknown type. For example, if the column has no values
+  // (all the values are missing) and its type is not specified by the user.
+  optional bool ignore_unknown_type_columns = 9 [default = false];
 }
 
 message ColumnGuide {

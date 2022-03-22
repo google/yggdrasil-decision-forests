@@ -428,11 +428,15 @@ void FinalizeInferTypes(const proto::DataSpecificationGuide& guide,
     }
   }
 
-  // Remove the unstacked columns.
+  // Remove the unstacked and unknown columns.
   auto saved_columns = std::move(*data_spec->mutable_columns());
   data_spec->mutable_columns()->Clear();
   for (auto& column : saved_columns) {
     if (columns_to_remove.find(column.name()) != columns_to_remove.end()) {
+      continue;
+    }
+    if (guide.ignore_unknown_type_columns() &&
+        column.type() == proto::ColumnType::UNKNOWN) {
       continue;
     }
     data_spec->mutable_columns()->Add(std::move(column));
