@@ -58,10 +58,15 @@ absl::Status GetWeights(const VerticalDataset& dataset,
 
 // Helper function on top of GetWeights(weight_definition). If
 // "weight_definition" is not set, all the weights are set to 1.
+//
+// If `use_optimized_unit_weights` is set, `weights` becomes an empty vector if
+// and only if no weight definition is given or all given weights are equal
+// to 1.
 absl::Status GetWeights(
     const VerticalDataset& dataset,
     const model::proto::TrainingConfigLinking& train_config_link,
-    std::vector<float>* weights);
+    std::vector<float>* weights,
+    bool use_optimized_unit_weights = false);
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

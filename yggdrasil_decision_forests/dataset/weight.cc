@@ -258,11 +258,22 @@ absl::Status GetWeights(const VerticalDataset& dataset,
 absl::Status GetWeights(
     const VerticalDataset& dataset,
     const model::proto::TrainingConfigLinking& train_config_link,
-    std::vector<float>* weights) {
+    std::vector<float>* weights, bool use_optimized_unit_weights) {
   if (train_config_link.has_weight_definition()) {
-    return GetWeights(dataset, train_config_link.weight_definition(), weights);
+    RETURN_IF_ERROR(
+        GetWeights(dataset, train_config_link.weight_definition(), weights));
+    // Check if all values are identical.
+    if (use_optimized_unit_weights &&
+        std::all_of(weights->cbegin(), weights->cend(),
+                    [](const float value) { return value == 1.f; })) {
+      weights->clear();
+    }
   } else {
-    weights->assign(dataset.nrow(), 1.f);
+    if (use_optimized_unit_weights) {
+      weights->clear();
+    } else {
+      weights->assign(dataset.nrow(), 1.f);
+    }
   }
   return absl::OkStatus();
 }

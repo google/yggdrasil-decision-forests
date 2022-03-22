@@ -98,7 +98,12 @@ void SetClassificationLabelDistribution(
                                   .number_of_unique_values();
   label_distribution.SetNumClasses(num_classes);
   for (const row_t example_idx : selected_examples) {
-    label_distribution.Add(labels->values()[example_idx], weights[example_idx]);
+    if (weights.empty()) {
+      label_distribution.Add(labels->values()[example_idx]);
+    } else {
+      label_distribution.Add(labels->values()[example_idx],
+                             weights[example_idx]);
+    }
   }
   label_distribution.Save(node->mutable_classifier()->mutable_distribution());
   node->mutable_classifier()->set_top_value(label_distribution.TopClass());
@@ -109,6 +114,7 @@ void SetUpliftLabelDistribution(
     const std::vector<row_t>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
+  DCHECK(!weights.empty());
   const auto* const outcomes =
       dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
           config_link.label());
@@ -216,7 +222,7 @@ void LocalImputationForNumericalAttribute(
   double na_replacement_weight_accumulator = 0;
   for (const auto example_idx : selected_examples) {
     const float attribute = attributes[example_idx];
-    const float weight = weights[example_idx];
+    const float weight = weights.empty() ? 1.f : weights[example_idx];
     if (!std::isnan(attribute)) {
       na_replacement_value_accumulator += attribute * weight;
       na_replacement_weight_accumulator += weight;
@@ -240,7 +246,8 @@ void LocalImputationForCategoricalAttribute(
     const auto attribute_value = attributes[example_idx];
     if (attribute_value !=
         dataset::VerticalDataset::CategoricalColumn::kNaValue) {
-      attribute_distribution.Add(attribute_value, weights[example_idx]);
+      const float weight = weights.empty() ? 1.f : weights[example_idx];
+      attribute_distribution.Add(attribute_value, weight);
     }
   }
   if (attribute_distribution.NumObservations() > 0) {
@@ -254,12 +261,14 @@ void LocalImputationForBooleanAttribute(
     const std::vector<row_t>& selected_examples,
     const std::vector<float>& weights, const std::vector<char>& attributes,
     bool* na_replacement) {
+  DCHECK(!weights.empty());
   utils::IntegerDistributionDouble attribute_distribution;
   attribute_distribution.SetNumClasses(2);
   for (const auto example_idx : selected_examples) {
     const auto attribute_value = attributes[example_idx];
     if (attribute_value != dataset::VerticalDataset::BooleanColumn::kNaValue) {
-      attribute_distribution.Add(attribute_value, weights[example_idx]);
+      const float weight = weights.empty() ? 1.f : weights[example_idx];
+      attribute_distribution.Add(attribute_value, weight);
     }
   }
   if (attribute_distribution.NumObservations() > 0) {
@@ -303,6 +312,7 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
     const std::vector<float>& labels, const double initial_variance,
     std::vector<dataset::VerticalDataset::row_t>* running_attr_bank_idx,
     std::vector<bool>* candidate_attributes_bitmap) {
+  DCHECK_EQ(weights.size(), labels.size());
   // Search for the attribute item that maximize the variance reduction. Note:
   // We ignore attribute that reduce the current variance reduction.
   double best_candidate_variance_reduction = variance_reduction;
@@ -1473,7 +1483,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalHistogram(
   // Compute the split score of each threshold.
   for (const auto example_idx : selected_examples) {
     const int32_t label = labels[example_idx];
-    const float weight = weights[example_idx];
+    const float weight = weights.empty() ? 1.f : weights[example_idx];
     float attribute = attributes[example_idx];
     if (std::isnan(attribute)) {
       attribute = na_replacement;
@@ -1566,40 +1576,79 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
   // False, True).
   if (num_label_classes == 3) {
     // Binary classification.
-    LabelBinaryCategoricalOneValueBucket::Filler label_filler(labels, weights);
-    LabelBinaryCategoricalOneValueBucket::Initializer initializer(
-        label_distribution);
+    if (weights.empty()) {
+      LabelUnweightedBinaryCategoricalOneValueBucket::Filler label_filler(
+          labels);
+      LabelUnweightedBinaryCategoricalOneValueBucket::Initializer initializer(
+          label_distribution);
 
-    if (sorting_strategy ==
-            proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-        sorting_strategy ==
-            proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
-      if (!internal_config.preprocessing) {
-        LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                      "strategy";
-      }
       if (sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
-          IsPresortingOnNumericalSplitMoreEfficient(
-              selected_examples.size(),
-              internal_config.preprocessing->num_examples())) {
-        const auto& sorted_attributes =
-            internal_config.preprocessing
-                ->presorted_numerical_features()[attribute_idx];
-        return ScanSplitsPresortedSparse<
-            FeatureNumericalLabelBinaryCategoricalOneValue,
-            LabelBinaryCategoricalScoreAccumulator>(
-            internal_config.preprocessing->num_examples(), selected_examples,
-            sorted_attributes.items, feature_filler, label_filler, initializer,
-            min_num_obs, attribute_idx,
-            internal_config.duplicated_selected_examples, condition,
-            &cache->cache_v2);
+              proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+          sorting_strategy ==
+              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+        if (!internal_config.preprocessing) {
+          LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                        "strategy";
+        }
+        if (sorting_strategy ==
+                proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
+            IsPresortingOnNumericalSplitMoreEfficient(
+                selected_examples.size(),
+                internal_config.preprocessing->num_examples())) {
+          const auto& sorted_attributes =
+              internal_config.preprocessing
+                  ->presorted_numerical_features()[attribute_idx];
+          return ScanSplitsPresortedSparse<
+              FeatureNumericalLabelUnweightedBinaryCategoricalOneValue,
+              LabelBinaryCategoricalScoreAccumulator>(
+              internal_config.preprocessing->num_examples(), selected_examples,
+              sorted_attributes.items, feature_filler, label_filler,
+              initializer, min_num_obs, attribute_idx,
+              internal_config.duplicated_selected_examples, condition,
+              &cache->cache_v2);
+        }
       }
-    }
+
+      return FindBestSplit_LabelUnweightedBinaryClassificationFeatureNumerical(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    } else {
+      LabelBinaryCategoricalOneValueBucket::Filler label_filler(labels,
+                                                                weights);
+      LabelBinaryCategoricalOneValueBucket::Initializer initializer(
+          label_distribution);
+
+      if (sorting_strategy ==
+              proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+          sorting_strategy ==
+              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+        if (!internal_config.preprocessing) {
+          LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                        "strategy";
+        }
+        if (sorting_strategy ==
+                proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
+            IsPresortingOnNumericalSplitMoreEfficient(
+                selected_examples.size(),
+                internal_config.preprocessing->num_examples())) {
+          const auto& sorted_attributes =
+              internal_config.preprocessing
+                  ->presorted_numerical_features()[attribute_idx];
+          return ScanSplitsPresortedSparse<
+              FeatureNumericalLabelBinaryCategoricalOneValue,
+              LabelBinaryCategoricalScoreAccumulator>(
+              internal_config.preprocessing->num_examples(), selected_examples,
+              sorted_attributes.items, feature_filler, label_filler,
+              initializer, min_num_obs, attribute_idx,
+              internal_config.duplicated_selected_examples, condition,
+              &cache->cache_v2);
+        }
+      }
 
     return FindBestSplit_LabelBinaryClassificationFeatureNumerical(
         selected_examples, feature_filler, label_filler, initializer,
         min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    }
   } else {
     // Multi-class classification.
     LabelCategoricalOneValueBucket::Filler label_filler(labels, weights);
@@ -1653,13 +1702,24 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
       num_bins, na_replacement, attributes);
   if (num_label_classes == 3) {
     // Binary classification.
-    LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
-                                                      label_distribution);
-    LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+    if (weights.empty()) {
+      LabelUnweightedBinaryCategoricalBucket::Filler label_filler(
+          labels, {}, label_distribution);
+      LabelUnweightedBinaryCategoricalBucket::Initializer initializer(
+          label_distribution);
 
-    return FindBestSplit_LabelBinaryClassificationFeatureDiscretizedNumerical(
-        selected_examples, feature_filler, label_filler, initializer,
-        min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      return FindBestSplit_LabelUnweightedBinaryClassificationFeatureDiscretizedNumerical(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    } else {
+      LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
+                                                        label_distribution);
+      LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+
+      return FindBestSplit_LabelBinaryClassificationFeatureDiscretizedNumerical(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    }
   } else {
     // Multi-class classification.
     LabelCategoricalBucket::Filler label_filler(labels, weights,
@@ -1682,6 +1742,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
     const int32_t attribute_idx, utils::RandomEngine* random,
     proto::NodeCondition* condition) {
   DCHECK(condition != nullptr);
+  DCHECK_EQ(weights.size(), labels.size());
 
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
@@ -1974,14 +2035,26 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
   FeatureIsMissingBucket::Filler feature_filler(attributes);
   if (num_label_classes == 3) {
     // Binary classification.
-    LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
-                                                      label_distribution);
+    if (weights.empty()) {
+      LabelUnweightedBinaryCategoricalBucket::Filler label_filler(
+          labels, {}, label_distribution);
 
-    LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+      LabelUnweightedBinaryCategoricalBucket::Initializer initializer(
+          label_distribution);
 
-    return FindBestSplit_LabelBinaryClassificationFeatureNACart(
-        selected_examples, feature_filler, label_filler, initializer,
-        min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      return FindBestSplit_LabelUnweightedBinaryClassificationFeatureNACart(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    } else {
+      LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
+                                                        label_distribution);
+
+      LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+
+      return FindBestSplit_LabelBinaryClassificationFeatureNACart(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    }
   } else {
     // Multi-class classification.
     LabelCategoricalBucket::Filler label_filler(labels, weights,
@@ -2060,14 +2133,27 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
 
   if (num_label_classes == 3) {
     // Binary classification.
-    LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
-                                                      label_distribution);
+    if (weights.empty()) {
+      // Unweighted classes
+      LabelUnweightedBinaryCategoricalBucket::Filler label_filler(
+          labels, {}, label_distribution);
 
-    LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+      LabelUnweightedBinaryCategoricalBucket::Initializer initializer(
+          label_distribution);
 
-    return FindBestSplit_LabelBinaryClassificationFeatureBooleanCart(
-        selected_examples, feature_filler, label_filler, initializer,
-        min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      return FindBestSplit_LabelUnweightedBinaryClassificationFeatureBooleanCart(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    } else {
+      LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
+                                                        label_distribution);
+
+      LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+
+      return FindBestSplit_LabelBinaryClassificationFeatureBooleanCart(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    }
   } else {
     // Multi-class classification.
     LabelCategoricalBucket::Filler label_filler(labels, weights,
@@ -2380,10 +2466,11 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
           num_preset_in_negative_set++;
           // Add the example to the positive set and remove it from the
           // negative.
+          float weight = weights.empty() ? 1.f : weights[example_idx];
           candidate_split_label_distribution.mutable_pos()->Add(
-              labels[example_idx], weights[example_idx]);
+              labels[example_idx], weight);
           candidate_split_label_distribution.mutable_neg()->Add(
-              labels[example_idx], -weights[example_idx]);
+              labels[example_idx], -weight);
         } else {
           num_absent_in_negative_set++;
         }
@@ -2429,10 +2516,11 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
               best_attr_value);
       if (match) {
         positive_selected_example_bitmap[select_idx] = true;
+        float weight = weights.empty() ? 1.f : weights[example_idx];
         split_label_distribution.mutable_pos()->Add(labels[example_idx],
-                                                    weights[example_idx]);
+                                                    weight);
         split_label_distribution.mutable_neg()->Add(labels[example_idx],
-                                                    -weights[example_idx]);
+                                                    -weight);
         split_label_distribution_no_weights.mutable_pos()->Add(
             labels[example_idx], 1);
         split_label_distribution_no_weights.mutable_neg()->Add(
@@ -2468,6 +2556,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
     utils::RandomEngine* random) {
+  DCHECK_EQ(weights.size(), labels.size());
   // Bitmap of available attribute values. During the course of the algorithm,
   // an attribute value is available if:
   //  - It is selected by the initial random sampling of candidate attribute
@@ -2798,12 +2887,23 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
 
   if (num_label_classes == 3) {
     // Binary classification.
-    return FindSplitLabelClassificationFeatureCategorical<
-        LabelBinaryCategoricalBucket, FeatureCategoricalLabelBinaryCategorical,
-        LabelBinaryCategoricalScoreAccumulator>(
-        selected_examples, weights, attributes, labels, num_attribute_classes,
-        num_label_classes, na_replacement, min_num_obs, dt_config,
-        label_distribution, attribute_idx, random, condition, cache);
+    if (weights.empty()) {
+      return FindSplitLabelClassificationFeatureCategorical<
+          LabelUnweightedBinaryCategoricalBucket,
+          FeatureCategoricalLabelUnweightedBinaryCategorical,
+          LabelBinaryCategoricalScoreAccumulator>(
+          selected_examples, weights, attributes, labels, num_attribute_classes,
+          num_label_classes, na_replacement, min_num_obs, dt_config,
+          label_distribution, attribute_idx, random, condition, cache);
+    } else {
+      return FindSplitLabelClassificationFeatureCategorical<
+          LabelBinaryCategoricalBucket,
+          FeatureCategoricalLabelBinaryCategorical,
+          LabelBinaryCategoricalScoreAccumulator>(
+          selected_examples, weights, attributes, labels, num_attribute_classes,
+          num_label_classes, na_replacement, min_num_obs, dt_config,
+          label_distribution, attribute_idx, random, condition, cache);
+    }
   } else {
     // Multi-class classification.
     return FindSplitLabelClassificationFeatureCategorical<
@@ -3008,6 +3108,7 @@ void SetRegressionLabelDistribution(
     const std::vector<row_t>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
+  DCHECK(!weights.empty());
   const auto* const labels =
       dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
           config_link.label());

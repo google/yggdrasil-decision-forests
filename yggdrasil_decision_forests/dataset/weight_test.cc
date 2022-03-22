@@ -35,6 +35,7 @@ namespace {
 using test::EqualsProto;
 using test::StatusIs;
 using testing::ElementsAre;
+using testing::SizeIs;
 
 TEST(Weight, BadWeightLinking) {
   const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
@@ -237,6 +238,7 @@ TEST(Weight, GetWeightCategorical) {
           }
         }
       )");
+  ASSERT_FALSE(HasFailure()) << "error during proto parsing";
   proto::LinkedWeightDefinition weight_link;
   CHECK_OK(GetLinkedWeightDefinition(weight_def, data_spec, &weight_link));
   VerticalDataset dataset;
@@ -264,6 +266,94 @@ TEST(Weight, GetWeightCategorical) {
   dataset.AppendExample({{"Cat_1", "NA"}});
   EXPECT_THAT(GetWeights(dataset, weight_link, &weights),
               StatusIs(absl::StatusCode::kInvalidArgument, "Found NA value"));
+}
+
+TEST(Weight, OptimizedUnspecifiedWeightsAreEmpty) {
+  const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+      R"pb(
+        columns { type: NUMERICAL name: "Num_1" is_manual_type: true }
+      )pb");
+  VerticalDataset dataset;
+  dataset.set_data_spec(data_spec);
+  CHECK_OK(dataset.CreateColumnsFromDataspec());
+  dataset.AppendExample({{"Num_1", "0"}});
+  dataset.AppendExample({{"Num_1", "1"}});
+  dataset.AppendExample({{"Num_1", "2"}});
+
+  model::proto::TrainingConfigLinking config_link;
+
+  std::vector<float> optimized_weights;
+  EXPECT_OK(GetWeights(dataset, config_link, &optimized_weights,
+                       /*use_optimized_unit_weights=*/true));
+  EXPECT_THAT(optimized_weights, SizeIs(0));
+
+  std::vector<float> non_optimized_weights;
+  EXPECT_OK(GetWeights(dataset, config_link, &non_optimized_weights,
+                       /*use_optimized_unit_weights=*/false));
+  EXPECT_THAT(non_optimized_weights, SizeIs(3));
+}
+
+TEST(Weight, OptimizedUnitWeightsAreEmpty) {
+  const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+      R"pb(
+        columns { type: NUMERICAL name: "Num_1" is_manual_type: true }
+      )pb");
+  VerticalDataset dataset;
+  dataset.set_data_spec(data_spec);
+  CHECK_OK(dataset.CreateColumnsFromDataspec());
+  dataset.AppendExample({{"Num_1", "1"}});
+  dataset.AppendExample({{"Num_1", "1"}});
+  dataset.AppendExample({{"Num_1", "1"}});
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.mutable_weight_definition()->set_attribute_idx(0);
+  config_link.mutable_weight_definition()->mutable_numerical();
+
+  std::vector<float> optimized_weights;
+  EXPECT_OK(GetWeights(dataset, config_link, &optimized_weights,
+                       /*use_optimized_unit_weights=*/true));
+  EXPECT_THAT(optimized_weights, SizeIs(0));
+
+  std::vector<float> non_optimized_weights;
+  EXPECT_OK(GetWeights(dataset, config_link, &non_optimized_weights,
+                       /*use_optimized_unit_weights=*/false));
+  EXPECT_THAT(non_optimized_weights, SizeIs(3));
+}
+
+TEST(Weight, OptimizedNonunitWeightsAreUnchanged) {
+  const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+      R"pb(
+        columns { type: NUMERICAL name: "Num_1" is_manual_type: true }
+      )pb");
+  VerticalDataset dataset_nonequal_weights;
+  dataset_nonequal_weights.set_data_spec(data_spec);
+  CHECK_OK(dataset_nonequal_weights.CreateColumnsFromDataspec());
+  dataset_nonequal_weights.AppendExample({{"Num_1", "1"}});
+  dataset_nonequal_weights.AppendExample({{"Num_1", "2"}});
+  dataset_nonequal_weights.AppendExample({{"Num_1", "3"}});
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.mutable_weight_definition()->set_attribute_idx(0);
+  config_link.mutable_weight_definition()->mutable_numerical();
+
+  std::vector<float> optimized_nonequal_weights;
+  EXPECT_OK(GetWeights(dataset_nonequal_weights, config_link,
+                       &optimized_nonequal_weights,
+                       /*use_optimized_unit_weights=*/true));
+  EXPECT_THAT(optimized_nonequal_weights, ElementsAre(1, 2, 3));
+
+  VerticalDataset dataset_nonunit_weights;
+  dataset_nonunit_weights.set_data_spec(data_spec);
+  CHECK_OK(dataset_nonunit_weights.CreateColumnsFromDataspec());
+  dataset_nonunit_weights.AppendExample({{"Num_1", "2"}});
+  dataset_nonunit_weights.AppendExample({{"Num_1", "2"}});
+  dataset_nonunit_weights.AppendExample({{"Num_1", "2"}});
+
+  std::vector<float> optimized_nonunit_weights;
+  EXPECT_OK(GetWeights(dataset_nonunit_weights, config_link,
+                       &optimized_nonunit_weights,
+                       /*use_optimized_unit_weights=*/true));
+  EXPECT_THAT(optimized_nonunit_weights, ElementsAre(2, 2, 2));
 }
 
 }  // namespace

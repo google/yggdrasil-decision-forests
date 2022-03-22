@@ -177,6 +177,29 @@ using FeatureBooleanLabelBinaryCategorical = ExampleBucketSet<
 using FeatureIsMissingLabelBinaryCategorical = ExampleBucketSet<
     ExampleBucket<FeatureIsMissingBucket, LabelBinaryCategoricalBucket>>;
 
+// Label: Unweighted Binary Categorical.
+
+using FeatureNumericalLabelUnweightedBinaryCategoricalOneValue =
+    ExampleBucketSet<
+        ExampleBucket<FeatureNumericalBucket,
+                      LabelUnweightedBinaryCategoricalOneValueBucket>>;
+
+using FeatureDiscretizedNumericalLabelUnweightedBinaryCategorical =
+    ExampleBucketSet<ExampleBucket<FeatureDiscretizedNumericalBucket,
+                                   LabelUnweightedBinaryCategoricalBucket>>;
+
+using FeatureCategoricalLabelUnweightedBinaryCategorical =
+    ExampleBucketSet<ExampleBucket<FeatureCategoricalBucket,
+                                   LabelUnweightedBinaryCategoricalBucket>>;
+
+using FeatureBooleanLabelUnweightedBinaryCategorical =
+    ExampleBucketSet<ExampleBucket<FeatureBooleanBucket,
+                                   LabelUnweightedBinaryCategoricalBucket>>;
+
+using FeatureIsMissingLabelUnweightedBinaryCategorical =
+    ExampleBucketSet<ExampleBucket<FeatureIsMissingBucket,
+                                   LabelUnweightedBinaryCategoricalBucket>>;
+
 // Label: Uplift categorical.
 
 using FeatureNumericalLabelUpliftCategoricalOneValue =
@@ -217,6 +240,14 @@ struct PerThreadCacheV2 {
   FeatureCategoricalLabelBinaryCategorical example_bucket_set_bcat_2;
   FeatureIsMissingLabelBinaryCategorical example_bucket_set_bcat_3;
   FeatureBooleanLabelBinaryCategorical example_bucket_set_bcat_4;
+
+  FeatureNumericalLabelUnweightedBinaryCategoricalOneValue
+      example_bucket_set_ubcat_1;
+  FeatureDiscretizedNumericalLabelUnweightedBinaryCategorical
+      example_bucket_set_ubcat_5;
+  FeatureCategoricalLabelUnweightedBinaryCategorical example_bucket_set_ubcat_2;
+  FeatureIsMissingLabelUnweightedBinaryCategorical example_bucket_set_ubcat_3;
+  FeatureBooleanLabelUnweightedBinaryCategorical example_bucket_set_ubcat_4;
 
   FeatureNumericalLabelUpliftCategoricalOneValue example_bucket_set_ul_1;
   FeatureCategoricalLabelUpliftCategorical example_bucket_set_ul_2;
@@ -319,6 +350,27 @@ auto* GetCachedExampleBucketSet(PerThreadCacheV2* cache) {
   } else if constexpr (is_same_v<ExampleBucketSet,
                                  FeatureBooleanLabelBinaryCategorical>) {
     return &cache->example_bucket_set_bcat_4;
+  } else if constexpr (
+      is_same_v<ExampleBucketSet,
+                FeatureNumericalLabelUnweightedBinaryCategoricalOneValue>) {
+    // Unweighted Binary Categorical.
+    return &cache->example_bucket_set_ubcat_1;
+  } else if constexpr (
+      is_same_v<ExampleBucketSet,
+                FeatureDiscretizedNumericalLabelUnweightedBinaryCategorical>) {
+    return &cache->example_bucket_set_ubcat_5;
+  } else if constexpr (
+      is_same_v<ExampleBucketSet,
+                FeatureCategoricalLabelUnweightedBinaryCategorical>) {
+    return &cache->example_bucket_set_ubcat_2;
+  } else if constexpr (is_same_v<
+                           ExampleBucketSet,
+                           FeatureIsMissingLabelUnweightedBinaryCategorical>) {
+    return &cache->example_bucket_set_ubcat_3;
+  } else if constexpr (is_same_v<
+                           ExampleBucketSet,
+                           FeatureBooleanLabelUnweightedBinaryCategorical>) {
+    return &cache->example_bucket_set_ubcat_4;
   } else if constexpr (is_same_v<
                            ExampleBucketSet,
                            FeatureNumericalLabelUpliftCategoricalOneValue>) {
@@ -1173,6 +1225,37 @@ constexpr auto FindBestSplit_LabelBinaryClassificationFeatureBooleanCart =
 
 constexpr auto FindBestSplit_LabelBinaryClassificationFeatureNACart =
     FindBestSplit<FeatureIsMissingLabelBinaryCategorical,
+                  LabelBinaryCategoricalScoreAccumulator,
+                  /*require_label_sorting*/ false>;
+
+constexpr auto
+    FindBestSplit_LabelUnweightedBinaryClassificationFeatureNumerical =
+        FindBestSplit<FeatureNumericalLabelUnweightedBinaryCategoricalOneValue,
+                      LabelBinaryCategoricalScoreAccumulator,
+                      /*require_label_sorting*/ false>;
+
+constexpr auto
+    FindBestSplit_LabelUnweightedBinaryClassificationFeatureDiscretizedNumerical =
+        FindBestSplit<
+            FeatureDiscretizedNumericalLabelUnweightedBinaryCategorical,
+            LabelBinaryCategoricalScoreAccumulator,
+            /*require_label_sorting*/ false,
+            /*bucket_interpolation=*/true>;
+
+constexpr auto
+    FindBestSplit_LabelUnweightedBinaryClassificationFeatureCategoricalCart =
+        FindBestSplit<FeatureCategoricalLabelUnweightedBinaryCategorical,
+                      LabelBinaryCategoricalScoreAccumulator,
+                      /*require_label_sorting*/ false>;
+
+constexpr auto
+    FindBestSplit_LabelUnweightedBinaryClassificationFeatureBooleanCart =
+        FindBestSplit<FeatureBooleanLabelUnweightedBinaryCategorical,
+                      LabelBinaryCategoricalScoreAccumulator,
+                      /*require_label_sorting*/ false>;
+
+constexpr auto FindBestSplit_LabelUnweightedBinaryClassificationFeatureNACart =
+    FindBestSplit<FeatureIsMissingLabelUnweightedBinaryCategorical,
                   LabelBinaryCategoricalScoreAccumulator,
                   /*require_label_sorting*/ false>;
 

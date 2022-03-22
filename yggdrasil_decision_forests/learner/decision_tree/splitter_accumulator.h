@@ -811,7 +811,9 @@ struct LabelNumericalOneValueBucket {
   class Filler {
    public:
     Filler(const std::vector<float>& label, const std::vector<float>& weights)
-        : label_(label), weights_(weights) {}
+        : label_(label), weights_(weights) {
+      DCHECK_EQ(weights.size(), label.size());
+    }
 
     void InitializeAndZero(LabelNumericalOneValueBucket* acc) const {}
 
@@ -933,7 +935,9 @@ struct LabelHessianNumericalOneValueBucket {
           hessians_(hessians),
           weights_(weights),
           hessian_l1_(hessian_l1),
-          hessian_l2_(hessian_l2) {}
+          hessian_l2_(hessian_l2) {
+      DCHECK(!weights.empty());
+    }
 
     void InitializeAndZero(LabelHessianNumericalOneValueBucket* acc) const {}
 
@@ -1052,7 +1056,9 @@ struct LabelCategoricalOneValueBucket {
   class Filler {
    public:
     Filler(const std::vector<int>& label, const std::vector<float>& weights)
-        : label_(label), weights_(weights) {}
+        : label_(label), weights_(weights) {
+      DCHECK_EQ(weights.size(), label.size());
+    }
 
     void InitializeAndZero(LabelCategoricalOneValueBucket* acc) const {}
 
@@ -1169,7 +1175,9 @@ struct LabelBinaryCategoricalOneValueBucket {
   class Filler {
    public:
     Filler(const std::vector<int>& label, const std::vector<float>& weights)
-        : label_(label), weights_(weights) {}
+        : label_(label), weights_(weights) {
+      DCHECK_EQ(weights.size(), label.size());
+        }
 
     void InitializeAndZero(LabelBinaryCategoricalOneValueBucket* acc) const {}
 
@@ -1230,6 +1238,121 @@ inline std::ostream& operator<<(
     std::ostream& os, const LabelBinaryCategoricalOneValueBucket& data) {
   os << "value:" << data.value << " weight:" << data.weight
      << " count:" << data.count;
+  return os;
+}
+
+struct LabelUnweightedBinaryCategoricalOneValueBucket {
+  bool value;
+
+  // Not called "kCount" because this is used as a template parameter and
+  // expects the name to be `count` (in other such structs it is not a
+  // constant).
+  static constexpr int count = 1;  // NOLINT
+
+  void AddToScoreAcc(LabelBinaryCategoricalScoreAccumulator* acc) const {
+    acc->AddOne(value, 1.f);
+  }
+
+  void SubToScoreAcc(LabelBinaryCategoricalScoreAccumulator* acc) const {
+    acc->SubOne(value, 1.f);
+  }
+
+  class Initializer {
+   public:
+    Initializer(const utils::IntegerDistributionDouble& label_distribution) {
+      DCHECK_EQ(label_distribution.NumClasses(), 3);
+      label_distribution_trues_ = label_distribution.count(2);
+      label_distribution_counts_ = label_distribution.NumObservations();
+      initial_entropy_ = utils::BinaryDistributionEntropyF(
+          label_distribution_trues_ / label_distribution_counts_);
+      DCHECK(std::abs(initial_entropy_ - label_distribution.Entropy()) <=
+             0.0001);
+    }
+
+    void InitEmpty(LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->Clear();
+    }
+
+    void InitFull(LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->Set(label_distribution_trues_, label_distribution_counts_);
+    }
+
+    double NormalizeScore(const double score) const {
+      return initial_entropy_ - score;
+    }
+
+    bool IsValidSplit(const LabelBinaryCategoricalScoreAccumulator& neg,
+                      const LabelBinaryCategoricalScoreAccumulator& pos) const {
+      return true;
+    }
+
+   private:
+    double label_distribution_trues_;
+    double label_distribution_counts_;
+    double initial_entropy_;
+  };
+
+  class Filler {
+   public:
+    Filler(const std::vector<int>& label) : label_(label) {}
+
+    void InitializeAndZero(
+        LabelUnweightedBinaryCategoricalOneValueBucket* acc) const {}
+
+    void Finalize(LabelUnweightedBinaryCategoricalOneValueBucket* acc) const {}
+
+    void ConsumeExample(
+        const row_t example_idx,
+        LabelUnweightedBinaryCategoricalOneValueBucket* acc) const {
+      acc->value = label_[example_idx] == 2;
+    }
+
+    template <typename ExampleIdx>
+    void AddDirectToScoreAcc(
+        const ExampleIdx example_idx,
+        LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->AddOne(label_[example_idx] == 2, 1.f);
+    }
+
+    template <typename ExampleIdx>
+    void SubDirectToScoreAcc(
+        const ExampleIdx example_idx,
+        LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->SubOne(label_[example_idx] == 2, 1.f);
+    }
+
+    template <typename ExampleIdx>
+    void AddDirectToScoreAccWithDuplicates(
+        const ExampleIdx example_idx, const int num_duplicates,
+        LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->AddOne(label_[example_idx] == 2, 1.f * num_duplicates);
+    }
+
+    template <typename ExampleIdx>
+    void SubDirectToScoreAccWithDuplicates(
+        const ExampleIdx example_idx, const int num_duplicates,
+        LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->SubOne(label_[example_idx] == 2, 1.f * num_duplicates);
+    }
+
+    template <typename ExampleIdx>
+    void Prefetch(const ExampleIdx example_idx) const {
+      PREFETCH(&label_[example_idx]);
+    }
+
+   private:
+    const std::vector<int>& label_;
+  };
+
+  friend std::ostream& operator<<(
+      std::ostream& os,
+      const LabelUnweightedBinaryCategoricalOneValueBucket& data);
+};
+
+inline std::ostream& operator<<(
+    std::ostream& os,
+    const LabelUnweightedBinaryCategoricalOneValueBucket& data) {
+  os << "value:" << data.value << " count:" << data.count;
   return os;
 }
 
@@ -1294,7 +1417,9 @@ struct LabelNumericalBucket {
   class Filler {
    public:
     Filler(const std::vector<float>& label, const std::vector<float>& weights)
-        : label_(label), weights_(weights) {}
+        : label_(label), weights_(weights) {
+      DCHECK_EQ(weights.size(), label.size());
+    }
 
     void InitializeAndZero(LabelNumericalBucket* acc) const {
       acc->value.Clear();
@@ -1469,7 +1594,9 @@ struct LabelHessianNumericalBucket {
           hessians_(hessians),
           weights_(weights),
           hessian_l1_(hessian_l1),
-          hessian_l2_(hessian_l2) {}
+          hessian_l2_(hessian_l2) {
+      DCHECK(!weights.empty());
+    }
 
     void InitializeAndZero(LabelHessianNumericalBucket* acc) const {
       acc->sum_gradient = 0;
@@ -1591,7 +1718,9 @@ struct LabelCategoricalBucket {
            const utils::IntegerDistributionDouble& label_distribution)
         : label_(label),
           weights_(weights),
-          num_classes_(label_distribution.NumClasses()) {}
+          num_classes_(label_distribution.NumClasses()) {
+      DCHECK_EQ(weights.size(), label.size());
+    }
 
     void InitializeAndZero(LabelCategoricalBucket* acc) const {
       acc->value.Clear();
@@ -1689,7 +1818,9 @@ struct LabelBinaryCategoricalBucket {
    public:
     Filler(const std::vector<int>& label, const std::vector<float>& weights,
            const utils::IntegerDistributionDouble& label_distribution)
-        : label_(label), weights_(weights) {}
+        : label_(label), weights_(weights) {
+      DCHECK_EQ(weights.size(), label.size());
+        }
 
     void InitializeAndZero(LabelBinaryCategoricalBucket* acc) const {
       acc->sum_trues = 0;
@@ -1720,6 +1851,102 @@ inline std::ostream& operator<<(std::ostream& os,
                                 const LabelBinaryCategoricalBucket& data) {
   os << "value:{trues:" << data.sum_trues << " weights:" << data.sum_weights
      << "} count:" << data.count;
+  return os;
+}
+
+struct LabelUnweightedBinaryCategoricalBucket {
+  double sum_trues;
+  double count;
+
+  void AddToScoreAcc(LabelBinaryCategoricalScoreAccumulator* acc) const {
+    acc->AddMany(sum_trues, count);
+  }
+
+  void SubToScoreAcc(LabelBinaryCategoricalScoreAccumulator* acc) const {
+    acc->SubMany(sum_trues, count);
+  }
+
+  float SafeProportionOrMinusInfinity(int idx) const {
+    if (count > 0) {
+      DCHECK(idx == 1 || idx == 2);
+      if (idx == 2) {
+        return sum_trues / count;
+      } else {
+        return 1.f - sum_trues / count;
+      }
+    } else {
+      return -std::numeric_limits<float>::infinity();
+    }
+  }
+
+  class Initializer {
+   public:
+    Initializer(const utils::IntegerDistributionDouble& label_distribution) {
+      DCHECK_EQ(label_distribution.NumClasses(), 3);
+      label_distribution_trues_ = label_distribution.count(2);
+      label_distribution_counts_ = label_distribution.NumObservations();
+      initial_entropy_ = utils::BinaryDistributionEntropyF(
+          label_distribution_trues_ / label_distribution_counts_);
+      DCHECK(std::abs(initial_entropy_ - label_distribution.Entropy()) <=
+             0.0001);
+    }
+
+    void InitEmpty(LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->Clear();
+    }
+
+    void InitFull(LabelBinaryCategoricalScoreAccumulator* acc) const {
+      acc->Set(label_distribution_trues_, label_distribution_counts_);
+    }
+
+    double NormalizeScore(const double score) const {
+      return initial_entropy_ - score;
+    }
+
+    bool IsValidSplit(const LabelBinaryCategoricalScoreAccumulator& neg,
+                      const LabelBinaryCategoricalScoreAccumulator& pos) const {
+      return true;
+    }
+
+   private:
+    double label_distribution_trues_;
+    double label_distribution_counts_;
+    double initial_entropy_;
+  };
+
+  class Filler {
+   public:
+    // The second argument of the constructor is needed when the filler used in
+    // templated functions.
+    Filler(const std::vector<int>& label, const std::vector<float>&,
+           const utils::IntegerDistributionDouble& label_distribution)
+        : label_(label) {}
+
+    void InitializeAndZero(LabelUnweightedBinaryCategoricalBucket* acc) const {
+      acc->sum_trues = 0;
+      acc->count = 0;
+    }
+
+    void Finalize(LabelUnweightedBinaryCategoricalBucket* acc) const {}
+
+    void ConsumeExample(const row_t example_idx,
+                        LabelUnweightedBinaryCategoricalBucket* acc) const {
+      static float table[] = {0.f, 1.f};
+      acc->sum_trues += table[label_[example_idx] == 2];
+      acc->count++;
+    }
+
+   private:
+    const std::vector<int>& label_;
+  };
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const LabelNumericalBucket& data);
+};
+
+inline std::ostream& operator<<(
+    std::ostream& os, const LabelUnweightedBinaryCategoricalBucket& data) {
+  os << "value:{trues:" << data.sum_trues << "} count:" << data.count;
   return os;
 }
 
