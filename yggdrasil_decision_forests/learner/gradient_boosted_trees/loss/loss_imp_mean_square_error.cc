@@ -194,10 +194,7 @@ MeanSquaredErrorLoss::SetLeafFunctorFromLabelStatistics() const {
         (label_stats.regression().labels().sum() /
          (denominator + gbt_config_.l2_regularization() / 2));
 
-    node->mutable_regressor()->set_top_value(
-        utils::clamp(leaf_value, -gbt_config_.clamp_leaf_logit(),
-                     gbt_config_.clamp_leaf_logit()));
-
+    node->mutable_regressor()->set_top_value(leaf_value);
     return absl::OkStatus();
   };
 }
