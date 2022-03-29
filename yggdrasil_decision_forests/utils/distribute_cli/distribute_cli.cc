@@ -17,6 +17,8 @@
 
 #include <algorithm>
 
+#include "absl/status/status.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/distribute_cli/common.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hash.h"
@@ -72,6 +74,8 @@ absl::Status DistributeCLIManager::Initialize() {
   proto::Welcome welcome;
   welcome.set_log_dir(log_dir_);
   welcome.set_display_output(config_.display_worker_output());
+  welcome.set_display_commands_output(config_.display_commands_output());
+
   ASSIGN_OR_RETURN(
       distribute_manager_,
       distribute::CreateManager(config_.distribute_config(),
@@ -104,11 +108,21 @@ absl::Status DistributeCLIManager::ScheduleNow(
   *request.mutable_command() = command;
   if (uid.has_value()) {
     *request.mutable_internal_command_id() =
-        absl::StrCat(utils::hash::HashStringViewToUint64(uid.value()));
+        CommandToInternalCommandId(uid.value());
   } else {
     *request.mutable_internal_command_id() =
         CommandToInternalCommandId(command);
   }
+
+  if (past_commands_.find(request.internal_command_id()) !=
+      past_commands_.end()) {
+    return absl::InvalidArgumentError(absl::Substitute(
+        "The command $0 with uid $1 was scheduled multiple times. To allow the "
+        "repetition of commands in different WaitComplete blocks, set "
+        "can_repeat_command=true.",
+        request.command(), request.internal_command_id()));
+  }
+  past_commands_.insert(request.internal_command_id());
 
   const auto status =
       distribute_manager_->AsynchronousProtoRequest(std::move(generic_request));
@@ -130,20 +144,37 @@ absl::Status DistributeCLIManager::WaitCompletion() {
     waiting_commands_.clear();
   }
 
-  if (config_.distribute_config().verbosity() >= 1) {
-    LOG(INFO) << "Running " << pending_commands_ << " commands";
+  // Clear the buffer to detect duplicated commands.
+  if (config_.can_repeat_command()) {
+    past_commands_.clear();
   }
 
+  if (config_.distribute_config().verbosity() >= 1) {
+    LOG(INFO) << "Running " << pending_commands_ << " commands";
+    LOG(INFO) << "\tlegend: w=worker t=time l=log";
+  }
+
+  absl::Time next_log = absl::Now();
+  int finished_commands_since_last_log = 0;
   const auto num_commands = pending_commands_;
+
   while (pending_commands_ > 0) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
         distribute_manager_->NextAsynchronousProtoAnswer<proto::Result>());
     pending_commands_--;
-    if (config_.distribute_config().verbosity() >= 1) {
-      LOG_INFO_EVERY_N_SEC(30, _ << "\t" << (num_commands - pending_commands_)
-                                 << " / " << num_commands
-                                 << " commands completed");
+    finished_commands_since_last_log++;
+    if (config_.distribute_config().verbosity() >= 1 &&
+        absl::Now() >= next_log) {
+      next_log = absl::Now() + absl::Seconds(30);
+      LOG(INFO) << (num_commands - pending_commands_) << " / " << num_commands
+                << " [+" << finished_commands_since_last_log
+                << "] Last: w:" << generic_result.worker()
+                << " t:" << absl::Seconds(std::round(generic_result.duration()))
+                << " l:"
+                << LogPathFromInternalUid(
+                       generic_result.command().internal_command_id());
+      finished_commands_since_last_log = 0;
     }
   }
   if (config_.distribute_config().verbosity() >= 1) {
@@ -162,10 +193,16 @@ absl::Status DistributeCLIManager::Shutdown() {
 }
 
 std::string DistributeCLIManager::LogPathFromUid(const absl::string_view uid) {
-  std::string internal_command_id =
-      absl::StrCat(utils::hash::HashStringViewToUint64(uid));
-  const auto base_path = file::JoinPath(log_dir_, internal_command_id);
-  return absl::StrCat(base_path, ".log");
+  std::string internal_command_id = CommandToInternalCommandId(uid);
+  return LogPathFromInternalUid(internal_command_id);
+}
+
+std::string DistributeCLIManager::LogPathFromInternalUid(
+    const absl::string_view internal_command_id) {
+  std::string output_dir;
+  std::string output_base_filename;
+  BaseOutput(log_dir_, internal_command_id, &output_dir, &output_base_filename);
+  return absl::StrCat(file::JoinPath(output_dir, output_base_filename), ".log");
 }
 
 }  // namespace distribute_cli

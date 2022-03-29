@@ -67,7 +67,9 @@ class GenericFileCloser {
 
   absl::Status Close() {
     if (stream_) {
-      RETURN_IF_ERROR(stream_->Close());
+      // If "Close" fails, it will not be called again in the destructor.
+      auto stream = std::move(stream_);
+      RETURN_IF_ERROR(stream->Close());
       stream_.reset();
     }
     return absl::OkStatus();

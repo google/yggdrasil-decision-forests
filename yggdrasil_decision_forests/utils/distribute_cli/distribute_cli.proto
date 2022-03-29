@@ -29,24 +29,37 @@ message Config {
 
   optional distribute.proto.Config distribute_config = 3;
 
-  // If true, the workers print logs on the stdout / stderr / LOG. This is the
-  // recommended way of working for distributed execution. If false, the workers
-  // does not print anything. This is the recommended way of working for local
-  // execution.
-  // In all cases, the manager will display workers progress and the worker
-  // errors.
+  // If true, the workers print information about starting and stopping
+  // commands.
   optional bool display_worker_output = 4 [default = true];
+
+  // If true, command outputs are displayed by the worker. If false, the command
+  // outputs are only exported to the log file.
+  optional bool display_commands_output = 6 [default = false];
+
+  // For remote distributed execution, using display_worker_output=true and
+  // display_commands_output=false generally works well. For local execution,
+  // using display_worker_output=false and display_commands_output=false
+  // generally works well. For local exeuction of a single task at a time (e.g.
+  // for debugging), using display_worker_output=true and
+  // display_commands_output=true generally works well.
 
   // If true, the commands are executed in random order when "WaitCompletion"
   // is called. This can help distributing the charde among the workers is
   // parallel_execution_per_worker>1. If false, the commands are started in
   // order when they are scheduled (with "Schedule").
   optional bool shuffle_commands = 5 [default = true];
+
+  // If false, a same command can be executed multiple times in different
+  // "WaitCompletion" blocks. If true, a same command cannot be executed
+  // multiple time.
+  optional bool can_repeat_command = 7 [default = false];
 }
 
 message Welcome {
   optional string log_dir = 1;
   optional bool display_output = 2;
+  optional bool display_commands_output = 3;
 }
 
 message Request {
@@ -72,5 +85,12 @@ message Result {
     Command command = 2;
   }
 
-  message Command {}
+  // Duration of the execution of the command in seconds.
+  optional double duration = 3;
+  // Execution worker.
+  optional int32 worker = 4;
+
+  message Command {
+    optional string internal_command_id = 1;
+  }
 }

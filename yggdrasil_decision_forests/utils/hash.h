@@ -33,6 +33,12 @@ inline uint64_t HashStringViewToUint64(const absl::string_view value) {
   return ::farmhash_namespace::Fingerprint64(value);
 }
 
+inline absl::uint128 HashStringViewToUint128(const absl::string_view value) {
+  const auto sign_fh = ::farmhash_namespace::Fingerprint128(value);
+  return absl::MakeUint128(::farmhash_namespace::Uint128Low64(sign_fh),
+                           ::farmhash_namespace::Uint128High64(sign_fh));
+}
+
 inline uint64_t HashInt64ToUint64(int64_t value) {
   return ::farmhash_namespace::Fingerprint(value);
 }

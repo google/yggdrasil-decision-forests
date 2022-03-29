@@ -116,6 +116,9 @@ float LogLoss(const proto::EvaluationResults& eval);
 float RMSE(const proto::EvaluationResults& eval);
 float ErrorRate(const proto::EvaluationResults& eval);
 
+// Loss of the model. Can have different semantic for different models.
+float Loss(const proto::EvaluationResults& eval);
+
 // Normalized Discounted Cumulative Gain.
 float NDCG(const proto::EvaluationResults& eval);
 

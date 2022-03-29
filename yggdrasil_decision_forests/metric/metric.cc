@@ -931,12 +931,18 @@ void FinalizeEvaluation(const proto::EvaluationOptions& option,
 }
 
 float Accuracy(const proto::EvaluationResults& eval) {
-  if (eval.count_predictions() == 0) {
-    return std::numeric_limits<float>::quiet_NaN();
+  if (eval.classification().has_confusion()) {
+    if (eval.count_predictions() == 0) {
+      return std::numeric_limits<float>::quiet_NaN();
+    }
+    const double diagonal =
+        utils::ConfusionMatrixProtoTrace(eval.classification().confusion());
+    return diagonal / eval.count_predictions();
   }
-  const double diagonal =
-      utils::ConfusionMatrixProtoTrace(eval.classification().confusion());
-  return diagonal / eval.count_predictions();
+  if (eval.classification().has_accuracy()) {
+    return eval.classification().accuracy();
+  }
+  return std::numeric_limits<float>::quiet_NaN();
 }
 
 float ErrorRate(const proto::EvaluationResults& eval) {
@@ -948,6 +954,19 @@ float LogLoss(const proto::EvaluationResults& eval) {
     return std::numeric_limits<float>::quiet_NaN();
   }
   return eval.classification().sum_log_loss() / eval.count_predictions();
+}
+
+float Loss(const proto::EvaluationResults& eval) {
+  if (eval.has_loss_value()) {
+    return eval.loss_value();
+  } else if (eval.classification().has_sum_log_loss()) {
+    if (eval.count_predictions() == 0) {
+      return std::numeric_limits<float>::quiet_NaN();
+    }
+    return eval.classification().sum_log_loss() / eval.count_predictions();
+  } else {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
 }
 
 float RMSE(const proto::EvaluationResults& eval) {

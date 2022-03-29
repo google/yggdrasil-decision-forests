@@ -481,6 +481,37 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
   metric::proto::EvaluationResults validation_evaluation;
   validation_evaluation.set_loss_value(validation_loss_);
   validation_evaluation.set_loss_name(proto::Loss_Name(loss_));
+
+  for (const auto& log : training_logs_.entries()) {
+    if (log.number_of_trees() !=
+        training_logs_.number_of_trees_in_final_model()) {
+      continue;
+    }
+    // "log" is the training log that correspond to the model.
+    for (int metrix_idx = 0;
+         metrix_idx < training_logs_.secondary_metric_names_size();
+         metrix_idx++) {
+      const auto& metric_name =
+          training_logs_.secondary_metric_names(metrix_idx);
+      const auto metric_value = log.validation_secondary_metrics(metrix_idx);
+      // Some classical metric names.
+      if (metric_name == "accuracy") {
+        validation_evaluation.mutable_classification()->set_accuracy(
+            metric_value);
+      } else if (metric_name == "rmse") {
+        validation_evaluation.mutable_regression()->set_sum_square_error(
+            metric_value);
+        validation_evaluation.set_count_predictions(1.f);
+      } else if (metric_name == "NDCG@5") {
+        validation_evaluation.mutable_ranking()->mutable_ndcg()->set_value(
+            metric_value);
+        validation_evaluation.mutable_ranking()->set_ndcg_truncation(5);
+      } else {
+        LOG(WARNING) << "Unknown metric name:" << metric_name;
+      }
+    }
+  }
+
   return validation_evaluation;
 }
 

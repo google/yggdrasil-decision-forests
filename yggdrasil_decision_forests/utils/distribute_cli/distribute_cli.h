@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"
@@ -97,6 +98,10 @@ class DistributeCLIManager {
   std::string LogPathFromUid(const absl::string_view uid);
 
  private:
+  // Paths to the file that will contain the execution log of a command.
+  std::string LogPathFromInternalUid(
+      const absl::string_view internal_command_id);
+
   // Schedules a new commands immediately.
   absl::Status ScheduleNow(const absl::string_view command,
                            const absl::optional<std::string>& uid);
@@ -114,6 +119,8 @@ class DistributeCLIManager {
 
   // Number of scheduled commands.
   int pending_commands_ = 0;
+
+  absl::flat_hash_set<std::string> past_commands_;
 };
 
 }  // namespace distribute_cli

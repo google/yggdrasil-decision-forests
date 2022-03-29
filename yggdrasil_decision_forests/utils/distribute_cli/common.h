@@ -18,6 +18,7 @@
 
 #include <string>
 
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 
 namespace yggdrasil_decision_forests {
@@ -30,6 +31,15 @@ extern const char kWorkerKey[];
 // Unique identifier for the command i.e. hash.
 // Used as filename for the log and execution status files.
 std::string CommandToInternalCommandId(const absl::string_view command);
+
+// Output directory and base-filename for the command execution output.
+//
+// Split the "internal_command_id" into sub_directories with names of 3
+// characters. Note: CNS has a limit of 100k files per directories; and up to 4
+// files can be created with the same base output.
+void BaseOutput(const absl::string_view log_dir,
+                const absl::string_view internal_command_id,
+                std::string* output_dir, std::string* output_base_filename);
 
 }  // namespace distribute_cli
 }  // namespace utils
