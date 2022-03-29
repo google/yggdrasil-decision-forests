@@ -1884,7 +1884,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
 
   LabelHessianNumericalOneValueBucket::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
-      internal_config.hessian_l2_numerical);
+      internal_config.hessian_l2_numerical,
+      dt_config.internal().hessian_split_score_subtract_parent());
 
   if (dt_config.internal().sorting_strategy() ==
           proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -1939,7 +1940,8 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
 
   LabelHessianNumericalBucket::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
-      internal_config.hessian_l2_categorical);
+      internal_config.hessian_l2_categorical,
+      dt_config.internal().hessian_split_score_subtract_parent());
 
   return FindBestSplit_LabelHessianRegressionFeatureDiscretizedNumerical(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
@@ -2107,7 +2109,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
 
   LabelHessianNumericalBucket::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
-      internal_config.hessian_l2_numerical);
+      internal_config.hessian_l2_numerical,
+      dt_config.internal().hessian_split_score_subtract_parent());
 
   return FindBestSplit_LabelHessianRegressionFeatureNACart(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
@@ -2214,7 +2217,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
 
   LabelHessianNumericalBucket::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
-      internal_config.hessian_l2_numerical);
+      internal_config.hessian_l2_numerical,
+      dt_config.internal().hessian_split_score_subtract_parent());
 
   return FindBestSplit_LabelHessianRegressionFeatureBooleanCart(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
@@ -2247,7 +2251,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
 
   LabelHessianNumericalBucket::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
-      internal_config.hessian_l2_categorical);
+      internal_config.hessian_l2_categorical,
+      dt_config.internal().hessian_split_score_subtract_parent());
 
   const auto algorithm =
       (num_attribute_classes < dt_config.categorical().arity_limit_for_random())

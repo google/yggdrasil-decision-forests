@@ -292,6 +292,8 @@ struct LabelUpliftCategoricalOneValueBucket {
                  min_examples_per_treatment_;
     }
 
+    double MinimumScore() const { return 0; }
+
    private:
     const UpliftCategoricalLabelDistribution& label_distribution_;
     const double initial_uplift_;
@@ -377,6 +379,8 @@ struct LabelUpliftCategoricalBucket {
              pos.label.MinNumExamplesPerTreatment() >=
                  min_examples_per_treatment_;
     }
+
+    double MinimumScore() const { return 0; }
 
    private:
     const UpliftCategoricalLabelDistribution& label_distribution_;

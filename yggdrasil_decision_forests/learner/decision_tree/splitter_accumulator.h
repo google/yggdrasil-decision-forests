@@ -802,6 +802,8 @@ struct LabelNumericalOneValueBucket {
       return true;
     }
 
+    double MinimumScore() const { return 0; }
+
    private:
     const utils::NormalDistributionDouble& label_distribution_;
     const double initial_variance_time_weight_;
@@ -893,12 +895,24 @@ struct LabelHessianNumericalOneValueBucket {
    public:
     Initializer(const double sum_gradient, const double sum_hessian,
                 const double sum_weights, const double hessian_l1,
-                const double hessian_l2)
+                const double hessian_l2,
+                const bool hessian_split_score_subtract_parent)
         : sum_gradient_(sum_gradient),
           sum_hessian_(sum_hessian),
           sum_weights_(sum_weights),
           hessian_l1_(hessian_l1),
-          hessian_l2_(hessian_l2) {}
+          hessian_l2_(hessian_l2) {
+      const double sum_gradient_l1 = l1_threshold(sum_gradient, hessian_l1);
+      const auto parent_score =
+          (sum_gradient_l1 * sum_gradient_l1) / (sum_hessian + hessian_l2);
+      if (hessian_split_score_subtract_parent) {
+        parent_score_ = parent_score;
+        min_score_ = 0;
+      } else {
+        parent_score_ = 0;
+        min_score_ = parent_score;
+      }
+    }
 
     void InitEmpty(LabelHessianNumericalScoreAccumulator* acc) const {
       acc->Clear();
@@ -910,12 +924,16 @@ struct LabelHessianNumericalOneValueBucket {
       acc->SetRegularization(hessian_l1_, hessian_l2_);
     }
 
-    double NormalizeScore(const double score) const { return score; }
+    double NormalizeScore(const double score) const {
+      return score - parent_score_;
+    }
 
     bool IsValidSplit(const LabelHessianNumericalScoreAccumulator& neg,
                       const LabelHessianNumericalScoreAccumulator& pos) const {
       return true;
     }
+
+    double MinimumScore() const { return min_score_; }
 
    private:
     const double sum_gradient_;
@@ -923,6 +941,8 @@ struct LabelHessianNumericalOneValueBucket {
     const double sum_weights_;
     const double hessian_l1_;
     const double hessian_l2_;
+    double parent_score_;
+    double min_score_;
   };
 
   class Filler {
@@ -1048,6 +1068,8 @@ struct LabelCategoricalOneValueBucket {
       return true;
     }
 
+    double MinimumScore() const { return 0; }
+
    private:
     const utils::IntegerDistributionDouble& label_distribution_;
     const double initial_entropy_;
@@ -1166,6 +1188,8 @@ struct LabelBinaryCategoricalOneValueBucket {
       return true;
     }
 
+    double MinimumScore() const { return 0; }
+
    private:
     double label_distribution_trues_;
     double label_distribution_weights_;
@@ -1177,7 +1201,7 @@ struct LabelBinaryCategoricalOneValueBucket {
     Filler(const std::vector<int>& label, const std::vector<float>& weights)
         : label_(label), weights_(weights) {
       DCHECK_EQ(weights.size(), label.size());
-        }
+    }
 
     void InitializeAndZero(LabelBinaryCategoricalOneValueBucket* acc) const {}
 
@@ -1285,6 +1309,8 @@ struct LabelUnweightedBinaryCategoricalOneValueBucket {
                       const LabelBinaryCategoricalScoreAccumulator& pos) const {
       return true;
     }
+
+    double MinimumScore() const { return 0; }
 
    private:
     double label_distribution_trues_;
@@ -1408,6 +1434,8 @@ struct LabelNumericalBucket {
       return true;
     }
 
+    double MinimumScore() const { return 0; }
+
    private:
     utils::NormalDistributionDouble label_distribution_;
     double initial_variance_time_weight_;
@@ -1504,6 +1532,8 @@ struct LabelNumericalWithHessianBucket {
       return true;
     }
 
+    double MinimumScore() const { return 0; }
+
    private:
     utils::NormalDistributionDouble label_distribution_;
     double initial_variance_time_weight_;
@@ -1551,12 +1581,24 @@ struct LabelHessianNumericalBucket {
    public:
     Initializer(const double sum_gradient, const double sum_hessian,
                 const double sum_weights, const double hessian_l1,
-                const double hessian_l2)
+                const double hessian_l2,
+                const bool hessian_split_score_subtract_parent)
         : sum_gradient_(sum_gradient),
           sum_hessian_(sum_hessian),
           sum_weights_(sum_weights),
           hessian_l1_(hessian_l1),
-          hessian_l2_(hessian_l2) {}
+          hessian_l2_(hessian_l2) {
+      const double sum_gradient_l1 = l1_threshold(sum_gradient, hessian_l1);
+      const auto parent_score =
+          (sum_gradient_l1 * sum_gradient_l1) / (sum_hessian + hessian_l2);
+      if (hessian_split_score_subtract_parent) {
+        parent_score_ = parent_score;
+        min_score_ = 0;
+      } else {
+        parent_score_ = 0;
+        min_score_ = parent_score;
+      }
+    }
 
     void InitEmpty(LabelHessianNumericalScoreAccumulator* acc) const {
       acc->Clear();
@@ -1568,20 +1610,25 @@ struct LabelHessianNumericalBucket {
       acc->SetRegularization(hessian_l1_, hessian_l2_);
     }
 
-    double NormalizeScore(const double score) const { return score; }
+    double NormalizeScore(const double score) const {
+      return score - parent_score_;
+    }
 
     bool IsValidSplit(const LabelHessianNumericalScoreAccumulator& neg,
                       const LabelHessianNumericalScoreAccumulator& pos) const {
       return true;
     }
 
+    double MinimumScore() const { return min_score_; }
+
    private:
     const double sum_gradient_;
     const double sum_hessian_;
     const double sum_weights_;
-
     const double hessian_l1_;
     const double hessian_l2_;
+    double parent_score_;
+    double min_score_;
   };
 
   class Filler {
@@ -1705,6 +1752,8 @@ struct LabelCategoricalBucket {
       return true;
     }
 
+    double MinimumScore() const { return 0; }
+
    private:
     const utils::IntegerDistributionDouble* non_owned_label_distribution_ =
         nullptr;
@@ -1808,6 +1857,8 @@ struct LabelBinaryCategoricalBucket {
       return true;
     }
 
+    double MinimumScore() const { return 0; }
+
    private:
     double label_distribution_trues_;
     double label_distribution_weights_;
@@ -1820,7 +1871,7 @@ struct LabelBinaryCategoricalBucket {
            const utils::IntegerDistributionDouble& label_distribution)
         : label_(label), weights_(weights) {
       DCHECK_EQ(weights.size(), label.size());
-        }
+    }
 
     void InitializeAndZero(LabelBinaryCategoricalBucket* acc) const {
       acc->sum_trues = 0;
@@ -1907,6 +1958,8 @@ struct LabelUnweightedBinaryCategoricalBucket {
                       const LabelBinaryCategoricalScoreAccumulator& pos) const {
       return true;
     }
+
+    double MinimumScore() const { return 0; }
 
    private:
     double label_distribution_trues_;

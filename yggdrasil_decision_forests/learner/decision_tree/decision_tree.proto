@@ -295,6 +295,33 @@ message DecisionTreeTrainingConfig {
       FORCE_PRESORTED = 2;
     }
     optional SortingStrategy sorting_strategy = 21 [default = PRESORTED];
+
+    // If false, the score of a hessian split is:
+    //   score \approx \sum_{children} sum_grad^2/sum_hessian
+    //
+    // If true, the score of a hessian split is:
+    //   score \approx (\sum_{children} sum_grad^2/sum_hessian) -
+    //     sum_grad_parent^2/sum_hessian_parent.
+    //
+    // This flag has two effects:
+    // - The absolute value of the score is different (e.g. when looking at the
+    //   variable importance).
+    // - When growing the tree with global optimization, the structure of the
+    //   tree might differ (however there is not impact on the structure when
+    //   using the divide and conquer strategy).
+    //
+    // YDF used implicitly hessian_split_score_subtract_parent=false. XGBoost
+    // uses hessian_split_score_subtract_parent=true but the paper is explicit
+    // that this is just a possible solution. Both versions make sense (and
+    // produce similar results). Another possible version would be subtracting
+    // the parent gradient before the square.
+    //
+    // An experiment was conducted on 68 datasets, 10 folds CV, and 3 times
+    // repetitions to evaluate the effect of this flags. Both methods produce
+    // close models. However, in average accuracy, average auc and average
+    // rank, the "false" method is better than the "true" one by a small but
+    // visible margin.
+    optional bool hessian_split_score_subtract_parent = 22 [default = false];
   }
 
   // Deprecated tag numbers.

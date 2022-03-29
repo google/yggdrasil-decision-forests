@@ -523,7 +523,8 @@ SplitSearchResult ScanSplits(
   const double weighted_num_examples = pos.WeightedNumExamples();
   const int end_bucket_idx = example_bucket_set.items.size() - 1;
 
-  double best_score = condition->split_score();
+  double best_score =
+      std::max<double>(condition->split_score(), initializer.MinimumScore());
   int best_bucket_idx = -1;
   int best_bucket_interpolation_idx = -1;
 
@@ -656,7 +657,8 @@ SplitSearchResult ScanSplitsCustomOrder(
 
   const double weighted_num_examples = pos.WeightedNumExamples();
 
-  double best_score = condition->split_score();
+  double best_score =
+      std::max<double>(condition->split_score(), initializer.MinimumScore());
 
   int best_bucket_idx = -1;
   int best_order_idx = -1;
@@ -801,7 +803,8 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   const double weighted_num_examples = pos.WeightedNumExamples();
 
   // Statistics of the best split found so far.
-  double best_score = condition->split_score();
+  double best_score =
+      std::max<double>(condition->split_score(), initializer.MinimumScore());
   int64_t best_num_pos_training_examples_without_weight;
   int64_t best_num_pos_training_examples_with_weight;
   int64_t best_sorted_example_idx = -1;
@@ -993,7 +996,8 @@ SplitSearchResult ScanSplitsRandomBuckets(
 
   const double weighted_num_examples = pos.WeightedNumExamples();
 
-  double best_score = condition->split_score();
+  double best_score =
+      std::max<double>(condition->split_score(), initializer.MinimumScore());
   std::vector<int>& best_pos_buckets = cache->buckets_1;
   std::vector<int>& pos_buckets = cache->buckets_2;
   std::vector<int>& active_bucket_idxs = cache->categorical_attribute;

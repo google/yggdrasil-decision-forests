@@ -1,5 +1,14 @@
 # Changelog
 
+## ???? - ????
+
+### Features
+
+-   Discard hessian splits with score lower than the parents. This change has
+    little effect on the model quality, but it can reduce its size.
+-   Add internal flag `hessian_split_score_subtract_parent` to subtract the
+    parent score in the computation of an hessian split score.
+
 ## 0.2.3 - 2021-01-27
 
 ### Features
