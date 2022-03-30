@@ -108,7 +108,8 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const model::proto::HyperParameterSpace& search_space,
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset) const;
+          valid_dataset,
+      std::unique_ptr<AbstractModel>* best_model) const;
 
   // Searches for the best hyperparameter using distributed training from a disk
   // dataset.
@@ -121,6 +122,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const absl::string_view typed_train_path,
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path,
+      std::unique_ptr<AbstractModel>* best_model,
       distribute::AbstractManager* manager) const;
 
   // If true, the metric needs to be maximized. If false, the metric needs to be
@@ -137,7 +139,8 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const model::proto::TrainingConfigLinking& config_link,
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset) const;
+          valid_dataset,
+      std::unique_ptr<AbstractModel>* model) const;
 
   // Creates an initialized distribute manager with "GENERIC_WORKER" workers.
   utils::StatusOr<std::unique_ptr<distribute::AbstractManager>>

@@ -206,23 +206,31 @@ HyperParameterOptimizerLearner::TrainWithStatus(
   LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
 
   // Select the best hyperparameters.
+  std::unique_ptr<AbstractModel> best_model;
   ASSIGN_OR_RETURN(const auto best_params,
                    SearchBestHyperparameterInProcess(
                        spe_config, config_link, search_space_spec, search_space,
-                       train_dataset, valid_dataset));
+                       train_dataset, valid_dataset, &best_model));
   LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
 
   // TODO(gbm): Record the logs.
 
-  // Train a model on the entire train dataset using the best hyperparameters.
-  LOG(INFO) << "Training a model on the best hyper parameters.";
-  RETURN_IF_ERROR(base_learner->SetHyperParameters(best_params));
-  ASSIGN_OR_RETURN(auto mdl,
-                   base_learner->TrainWithStatus(train_dataset, valid_dataset));
-  utils::usage::OnTrainingEnd(train_dataset.data_spec(), training_config(),
-                              config_link, train_dataset.nrow(), *mdl,
-                              absl::Now() - begin_training);
-  return mdl;
+  if (spe_config.retrain_final_model()) {
+    // Train a model on the entire train dataset using the best hyperparameters.
+    LOG(INFO) << "Training a model on the best hyper parameters.";
+    RETURN_IF_ERROR(base_learner->SetHyperParameters(best_params));
+    ASSIGN_OR_RETURN(
+        auto mdl, base_learner->TrainWithStatus(train_dataset, valid_dataset));
+    utils::usage::OnTrainingEnd(train_dataset.data_spec(), training_config(),
+                                config_link, train_dataset.nrow(), *mdl,
+                                absl::Now() - begin_training);
+    return mdl;
+  } else {
+    if (!best_model) {
+      return absl::InternalError("Missing model");
+    }
+    return best_model;
+  }
 }
 
 absl::Status HyperParameterOptimizerLearner::GetEffectiveConfiguration(
@@ -296,26 +304,34 @@ HyperParameterOptimizerLearner::TrainWithStatus(
   LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
 
   // Select the best hyperparameters.
-  ASSIGN_OR_RETURN(const auto best_params,
-                   SearchBestHyperparameterDistributed(
-                       spe_config, config_link, search_space_spec, search_space,
-                       typed_path, data_spec, typed_valid_path, manager.get()));
+  std::unique_ptr<AbstractModel> best_model;
+  ASSIGN_OR_RETURN(
+      const auto best_params,
+      SearchBestHyperparameterDistributed(
+          spe_config, config_link, search_space_spec, search_space, typed_path,
+          data_spec, typed_valid_path, &best_model, manager.get()));
   LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
 
   // TODO(gbm): Record the logs.
 
-  // Train a model on the entire train dataset using the best hyperparameters.
-  LOG(INFO) << "Training a model on the best hyper parameters.";
-  ASSIGN_OR_RETURN(
-      auto model,
-      TrainRemoteModel(spe_config.base_learner(), config_link,
-                       spe_config.base_learner_deployment(), best_params,
-                       typed_path, data_spec, typed_valid_path, manager.get()));
+  if (spe_config.retrain_final_model()) {
+    // Train a model on the entire train dataset using the best hyperparameters.
+    LOG(INFO) << "Training a model on the best hyper parameters.";
+    ASSIGN_OR_RETURN(auto model,
+                     TrainRemoteModel(spe_config.base_learner(), config_link,
+                                      spe_config.base_learner_deployment(),
+                                      best_params, typed_path, data_spec,
+                                      typed_valid_path, manager.get()));
 
-  utils::usage::OnTrainingEnd(data_spec, training_config(), config_link, -1,
-                              *model, absl::Now() - begin_training);
-
-  return model;
+    utils::usage::OnTrainingEnd(data_spec, training_config(), config_link, -1,
+                                *model, absl::Now() - begin_training);
+    return model;
+  } else {
+    if (!best_model) {
+      return absl::InternalError("Missing model");
+    }
+    return best_model;
+  }
 }
 
 utils::StatusOr<std::unique_ptr<AbstractModel>>
@@ -415,7 +431,8 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
     const model::proto::HyperParameterSpace& search_space,
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-        valid_dataset) const {
+        valid_dataset,
+    std::unique_ptr<AbstractModel>* best_model) const {
   const auto begin_optimization = absl::Now();
 
   // Instantiate the optimizer.
@@ -428,18 +445,21 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
   struct Output {
     double score;
     model::proto::GenericHyperParameters candidate;
+    std::unique_ptr<AbstractModel> model;
   };
   utils::concurrency::StreamProcessor<model::proto::GenericHyperParameters,
                                       utils::StatusOr<Output>>
-      async_evaluator("evaluator", deployment().num_threads(),
-                      [&](const model::proto::GenericHyperParameters& candidate)
-                          -> utils::StatusOr<Output> {
-                        ASSIGN_OR_RETURN(const auto score,
-                                         EvaluateCandidateLocally(
-                                             candidate, spe_config, config_link,
-                                             train_dataset, valid_dataset));
-                        return Output{score, candidate};
-                      });
+      async_evaluator(
+          "evaluator", deployment().num_threads(),
+          [&](const model::proto::GenericHyperParameters& candidate)
+              -> utils::StatusOr<Output> {
+            std::unique_ptr<AbstractModel> model;
+            ASSIGN_OR_RETURN(
+                const auto score,
+                EvaluateCandidateLocally(candidate, spe_config, config_link,
+                                         train_dataset, valid_dataset, &model));
+            return Output{score, candidate, std::move(model)};
+          });
 
   LOG(INFO) << "Start local tuner with " << deployment().num_threads()
             << " thread(s)";
@@ -488,7 +508,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
       }
     }
 
-    const auto maybe_output = async_evaluator.GetResult();
+    auto maybe_output = async_evaluator.GetResult();
     if (!maybe_output.has_value()) {
       // Stop the optimization.
       if (!exploration_is_done) {
@@ -501,7 +521,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
     if (!maybe_output->ok()) {
       return maybe_output->status();
     }
-    const auto& output = maybe_output.value();
+    auto& output = maybe_output.value();
     pending_evaluation--;
 
     RETURN_IF_ERROR(
@@ -509,6 +529,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
 
     if (std::isnan(logging_best_score) || output->score > logging_best_score) {
       logging_best_score = output->score;
+      *best_model = std::move(output->model);
     }
     LOG(INFO) << "[" << round_idx + 1 << "/" << optimizer->NumExpectedRounds()
               << "] Score: " << output->score << " / " << logging_best_score
@@ -541,6 +562,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
     const absl::string_view typed_train_path,
     const dataset::proto::DataSpecification& data_spec,
     const absl::optional<std::string>& typed_valid_path,
+    std::unique_ptr<AbstractModel>* best_model,
     distribute::AbstractManager* manager) const {
   const auto begin_optimization = absl::Now();
 
@@ -564,6 +586,9 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
   bool exploration_is_done = false;
 
   double logging_best_score = std::numeric_limits<double>::quiet_NaN();
+
+  // Path to the best model so far.
+  std::string best_model_path;
 
   while (true) {
     // Generate as many candidates as possible.
@@ -643,6 +668,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
 
     if (std::isnan(logging_best_score) || score > logging_best_score) {
       logging_best_score = score;
+      best_model_path = evaluator_result.train_model().model_path();
     }
     LOG(INFO) << "[" << round_idx + 1 << "/" << optimizer->NumExpectedRounds()
               << "] Score: " << score << " / " << logging_best_score
@@ -662,6 +688,12 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
   model::proto::GenericHyperParameters best_params;
   double best_score;
   std::tie(best_params, best_score) = optimizer->BestParameters();
+
+  if (!spe_config.retrain_final_model()) {
+    // If the best model is needed, load it.
+    RETURN_IF_ERROR(model::LoadModel(best_model_path, best_model));
+  }
+
   return best_params;
 }
 
@@ -672,7 +704,8 @@ HyperParameterOptimizerLearner::EvaluateCandidateLocally(
     const model::proto::TrainingConfigLinking& config_link,
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-        valid_dataset) const {
+        valid_dataset,
+    std::unique_ptr<AbstractModel>* model) const {
   ASSIGN_OR_RETURN(const auto base_learner, BuildBaseLearner(spe_config, true));
   RETURN_IF_ERROR(base_learner->SetHyperParameters(candidate));
 
@@ -682,9 +715,9 @@ HyperParameterOptimizerLearner::EvaluateCandidateLocally(
     case proto::Evaluation::SourceCase::kSelfModelEvaluation:
 
       // Simple training + get the model self evaluation.
-      ASSIGN_OR_RETURN(const auto model, base_learner->TrainWithStatus(
-                                             train_dataset, valid_dataset));
-      evaluation = model->ValidationEvaluation();
+      ASSIGN_OR_RETURN(
+          *model, base_learner->TrainWithStatus(train_dataset, valid_dataset));
+      evaluation = (*model)->ValidationEvaluation();
       break;
   }
 

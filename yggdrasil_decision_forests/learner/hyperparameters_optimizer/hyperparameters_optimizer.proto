@@ -45,6 +45,16 @@ message HyperParametersOptimizerLearnerTrainingConfig {
   // remote workers. The format IO library should be registered both to the
   // learner and the workers.
   optional string serialized_dataset_format = 6 [default = "tfrecord+tfe"];
+
+  // If true, the final model is re-trained using the best found
+  // hyper-parameters. If false, the best model found during optimization is
+  // returned.
+  //
+  // Model re-training is more expensive and can both improve or hurt the
+  // quality of the final model.
+  //
+  // This option has not impact if the training is deterministic.
+  optional bool retrain_final_model = 7 [default = false];
 }
 
 message Evaluation {

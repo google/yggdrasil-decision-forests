@@ -38,6 +38,8 @@ class OnAdult : public utils::TrainAndTestTester {
       [yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto
            .hyperparameters_optimizer_config] {
 
+        retrain_final_model: true
+
         optimizer {
           optimizer_key: "RANDOM"
           [yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto
@@ -166,6 +168,29 @@ TEST_F(OnAdult, RandomTuner_MemoryDataset_DistributedTraining) {
 }
 
 TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining) {
+  SetDistributedTraining();
+  pass_training_dataset_as_path_ = true;
+  TrainAndEvaluateModel();
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+}
+
+TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTraining_NoRetrain) {
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+  spe_config->set_retrain_final_model(false);
+
+  SetLocalTraining();
+  TrainAndEvaluateModel();
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+}
+
+TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining_NoRetrain) {
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+  spe_config->set_retrain_final_model(false);
+
   SetDistributedTraining();
   pass_training_dataset_as_path_ = true;
   TrainAndEvaluateModel();
