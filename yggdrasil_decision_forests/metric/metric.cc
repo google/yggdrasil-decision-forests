@@ -1634,6 +1634,60 @@ double GetMetric(const proto::EvaluationResults& evaluation,
   }
 }
 
+utils::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric) {
+  switch (metric.Task_case()) {
+    case proto::MetricAccessor::kClassification:
+      switch (metric.classification().Type_case()) {
+        case proto::MetricAccessor::Classification::kAccuracy:
+          return true;
+        case proto::MetricAccessor::Classification::kLogloss:
+          return false;
+        case proto::MetricAccessor::Classification::kOneVsOther:
+          return true;
+        default:
+          break;
+      }
+      break;
+
+    case proto::MetricAccessor::kRegression:
+      switch (metric.regression().Type_case()) {
+        case proto::MetricAccessor::Regression::kRmse:
+          return false;
+        default:
+          break;
+      }
+      break;
+
+    case proto::MetricAccessor::kLoss:
+      return false;
+
+    case proto::MetricAccessor::kRanking:
+      switch (metric.ranking().Type_case()) {
+        case proto::MetricAccessor::Uplift::kQini:
+          return true;
+        default:
+          break;
+      }
+      break;
+
+    case proto::MetricAccessor::kUplift:
+      switch (metric.uplift().type_case()) {
+        case proto::MetricAccessor::Uplift::kQini:
+          return true;
+        default:
+          break;
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unknown if the metric should be maximized or minimized: ",
+                   metric.DebugString()));
+}
+
 std::pair<float, float> RMSEConfidenceInterval(
     const proto::EvaluationResults& eval, const float confidence_level) {
   const double sampled_sd = RMSE(eval);

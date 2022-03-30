@@ -8,6 +8,7 @@
     little effect on the model quality, but it can reduce its size.
 -   Add internal flag `hessian_split_score_subtract_parent` to subtract the
     parent score in the computation of an hessian split score.
+-   Add the hyper-parameter optimizer as one of the meta-learner.
 
 ## 0.2.3 - 2021-01-27
 

@@ -1,0 +1,82 @@
+/*
+ * Copyright 2021 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto;
+
+import "yggdrasil_decision_forests/learner/abstract_learner.proto";
+import "yggdrasil_decision_forests/metric/metric.proto";
+
+message HyperParametersOptimizerLearnerTrainingConfig {
+  // Definition of the machine learning algorithm to tune as well as the value
+  // hyper parameters that are not tuned.
+  optional model.proto.TrainingConfig base_learner = 1;
+
+  // Optimization method.
+  optional Optimizer optimizer = 2;
+
+  // Control how to evaluate a candidate set of hyper parameters.
+  optional Evaluation evaluation = 3;
+
+  // Manually define the space of hyper-parameters. Fields defined in
+  // "hyper_parameter_space" override the pre-defined space specified in
+  // "predefined_hyper_parameter_space" (if "predefined_hyper_parameter_space"
+  // is set).
+  optional model.proto.HyperParameterSpace search_space = 4;
+
+  // Deployment configuration (i.e. computing resources) for the base learner.
+  optional model.proto.DeploymentConfig base_learner_deployment = 5;
+
+  // Format used to serialize the dataset if the dataset is provided as a
+  // VerticalDataset (i.e. in memory dataset) and should be communicated to
+  // remote workers. The format IO library should be registered both to the
+  // learner and the workers.
+  optional string serialized_dataset_format = 6 [default = "tfrecord+tfe"];
+}
+
+message Evaluation {
+  // Evaluation metric to optimize.
+  // If not set, uses the first available metric in the list:
+  // loss > auc (binary classification only) > accuracy > rmse ndcg > qini.
+  // Fails if none of those metrics are defined.
+  optional metric.proto.MetricAccessor metric = 1;
+
+  // If true, maximize the metric value. If false, minimize the metric value. If
+  // not set, uses the metric definition e.g. maximize accuracy and minimize
+  // loss.
+  optional bool maximize_metric = 2;
+
+  oneof source {
+    // Uses the self reported model evaluation e.g. validation score or OOB
+    // evaluation. Default.
+    SelfEvaluation self_model_evaluation = 3;
+  }
+
+  message SelfEvaluation {}
+}
+
+message Optimizer {
+  // Registered name of the optimizer.
+  optional string optimizer_key = 1;
+
+  // Optimizer specific options.
+  extensions 1000 to max;
+}
+
+extend model.proto.TrainingConfig {
+  optional HyperParametersOptimizerLearnerTrainingConfig
+      hyperparameters_optimizer_config = 430915684;
+}

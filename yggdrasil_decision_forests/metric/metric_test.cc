@@ -1505,6 +1505,24 @@ TEST(Metric, MergeEvaluationClassification) {
   EXPECT_THAT(dst, EqualsProto(expected_dst));
 }
 
+TEST(Metric, HigherIsBetter) {
+  {
+    const proto::MetricAccessor accessor = PARSE_TEST_PROTO(
+        R"pb(
+          classification { accuracy {} }
+        )pb");
+    EXPECT_TRUE(HigherIsBetter(accessor).value());
+  }
+
+  {
+    const proto::MetricAccessor accessor = PARSE_TEST_PROTO(
+        R"pb(
+          loss {}
+        )pb");
+    EXPECT_FALSE(HigherIsBetter(accessor).value());
+  }
+}
+
 }  // namespace
 }  // namespace metric
 }  // namespace yggdrasil_decision_forests

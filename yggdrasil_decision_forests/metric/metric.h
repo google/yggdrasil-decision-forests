@@ -215,6 +215,11 @@ std::string GetPerClassComparisonMetricLabel(
 double GetMetric(const proto::EvaluationResults& evaluation,
                  const proto::MetricAccessor& metric);
 
+// If true, a higher value for the metric is generally preferable (e.g.
+// accuracy). If false, a lower value is preferable (e.g. loss). Fails if
+// unknown.
+utils::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric);
+
 // Computes the minimum and maximum value of a stream of values.
 template <typename T>
 class MinMaxStream {
