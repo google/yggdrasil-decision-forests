@@ -30,11 +30,11 @@ RandomOptimizer::RandomOptimizer(const proto::Optimizer& config,
                                  const model::proto::HyperParameterSpace& space)
     : OptimizerInterface(config, space), space_(space) {
   config_ = config.GetExtension(proto::random);
+  constructor_status_ = internal::UpdateWeights(&space_);
 }
 
 int RandomOptimizer::NumExpectedRounds() { return config_.num_trials(); }
 
-// TODO(gbm): Weight by the number of children combinations.
 absl::Status RandomOptimizer::BuildRandomSet(
     const model::proto::HyperParameterSpace::Field& field,
     model::proto::GenericHyperParameters* candidate) {
@@ -47,9 +47,12 @@ absl::Status RandomOptimizer::BuildRandomSet(
   switch (field.Type_case()) {
     case model::proto::HyperParameterSpace::Field::TypeCase::
         kDiscreteCandidates: {
-      std::uniform_int_distribution<int> dist(
-          0, field.discrete_candidates().possible_values().size() - 1);
-      value = field.discrete_candidates().possible_values(dist(rnd_));
+      std::vector<float> sampling_weight{
+          field.discrete_candidates().weights().begin(),
+          field.discrete_candidates().weights().end()};
+      ASSIGN_OR_RETURN(const auto selected_value_idx,
+                       internal::Sample(sampling_weight, &rnd_));
+      value = field.discrete_candidates().possible_values(selected_value_idx);
     } break;
     default:
       return absl::InvalidArgumentError("Type of search space not supported");
@@ -74,6 +77,8 @@ absl::Status RandomOptimizer::BuildRandomSet(
 
 utils::StatusOr<NextCandidateStatus> RandomOptimizer::NextCandidate(
     model::proto::GenericHyperParameters* candidate) {
+  RETURN_IF_ERROR(constructor_status_);
+
   if (observed_evaluations_ >= config_.num_trials()) {
     return NextCandidateStatus::kExplorationIsDone;
   }
@@ -135,7 +140,96 @@ std::pair<model::proto::GenericHyperParameters, double>
 RandomOptimizer::BestParameters() {
   return std::make_pair(best_params_, best_score_);
 }
+namespace internal {
 
+absl::Status UpdateWeights(model::proto::HyperParameterSpace* space) {
+  for (auto& field : *space->mutable_fields()) {
+    RETURN_IF_ERROR(UpdateWeights(&field).status());
+  }
+  return absl::OkStatus();
+}
+
+utils::StatusOr<double> UpdateWeights(
+    model::proto::HyperParameterSpace::Field* field) {
+  if (!field->has_discrete_candidates()) {
+    return absl::InvalidArgumentError("Discrete candidate missing");
+  }
+
+  const bool has_weights = field->discrete_candidates().weights_size() != 0;
+  if (has_weights) {
+    if (field->discrete_candidates().weights_size() !=
+        field->discrete_candidates().possible_values_size()) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "The number of weights of the field ", field->name(),
+          " does not match the number of possible discret candidates"));
+    }
+  } else {
+    // Allocate the weights.
+    field->mutable_discrete_candidates()->mutable_weights()->Resize(
+        field->discrete_candidates().possible_values_size(), 1.0);
+  }
+
+  // Recursively update the weight of the children, and collect the number of
+  // combinations in each children.
+  std::vector<double> children_weights(field->children_size());
+  for (int child_idx = 0; child_idx < field->children_size(); child_idx++) {
+    auto& child = *field->mutable_children(child_idx);
+    ASSIGN_OR_RETURN(children_weights[child_idx], UpdateWeights(&child));
+  }
+
+  // Number of combination for "field".
+  double field_weight = 0.0;
+
+  for (int value_idx = 0;
+       value_idx < field->discrete_candidates().possible_values_size();
+       value_idx++) {
+    // Number of combinations for this specific field value.
+    auto& value_weight =
+        *field->mutable_discrete_candidates()->mutable_weights()->Mutable(
+            value_idx);
+
+    // Count the number of comination in the children.
+    const auto& value = field->discrete_candidates().possible_values(value_idx);
+    for (int child_idx = 0; child_idx < field->children_size(); child_idx++) {
+      // Check if the child is compatible with this specific value.
+      const auto& child = field->children(child_idx);
+      bool match_child = false;
+      for (const auto& match_value :
+           child.parent_discrete_values().possible_values()) {
+        if (match_value.DebugString() == value.DebugString()) {
+          match_child = true;
+          break;
+        }
+      }
+      if (match_child) {
+        value_weight *= children_weights[child_idx];
+      }
+    }
+
+    field_weight += value_weight;
+  }
+
+  return field_weight;
+}
+
+utils::StatusOr<size_t> Sample(std::vector<float>& weights,
+                               utils::RandomEngine* random) {
+  const double sum = std::accumulate(weights.begin(), weights.end(), 0.0);
+  if (sum <= 0) {
+    return absl::InvalidArgumentError("Zero weight sum");
+  }
+  const double sample = std::uniform_real_distribution<double>(0, sum)(*random);
+  double acc_sum = 0;
+  for (size_t idx = 0; idx < weights.size(); idx++) {
+    acc_sum += weights[idx];
+    if (sample < acc_sum) {
+      return idx;
+    }
+  }
+  return weights.size() - 1;
+}
+
+}  // namespace internal
 }  // namespace hyperparameters_optimizer_v2
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

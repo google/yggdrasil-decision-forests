@@ -358,6 +358,16 @@ message HyperParameterSpace {
 
   message DiscreteCandidates {
     repeated GenericHyperParameters.Value possible_values = 1;
+
+    // If set, "weights" has the same number of elements as "possible_values".
+    // "weights[i]" is the weight of this specific value for the optimizer.
+    // Different optimizers can use this weight differently.
+    //
+    // Random optimizer: Weight of the field during random sampling. If not
+    //   specified, all the hyper-parameter combination have the same
+    //   probability of sampling. It means that a possible values with
+    //   conditionnal children will be more likely to be sampled.
+    repeated double weights = 2;
   }
 }
 

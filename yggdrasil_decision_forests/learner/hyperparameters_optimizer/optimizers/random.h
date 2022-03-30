@@ -56,7 +56,7 @@ class RandomOptimizer : public OptimizerInterface {
   proto::RandomOptimizerConfig config_;
 
   // Search space.
-  const model::proto::HyperParameterSpace space_;
+  model::proto::HyperParameterSpace space_;
 
   // Best hyper-parameter found so far.
   model::proto::GenericHyperParameters best_params_;
@@ -81,10 +81,28 @@ class RandomOptimizer : public OptimizerInterface {
   // could be generated, the optimizer considers that no new candidates are
   // available.
   const int num_tries_per_candidates_ = 512;
+
+  absl::Status constructor_status_;
 };
 
 REGISTER_AbstractHyperParametersOptimizer(RandomOptimizer,
                                           RandomOptimizer::kRegisteredName);
+
+namespace internal {
+
+// Computes the "weight" (set in the "weight" field) of each field in the
+// hyper-parameter space. If "weight" is not already specified, all the
+// hyper-parameter combination have the same probability of sampling. If
+// "weight" is specified, it is applied as a coefficient factor over the uniform
+// sampling.
+absl::Status UpdateWeights(model::proto::HyperParameterSpace* space);
+utils::StatusOr<double> UpdateWeights(
+    model::proto::HyperParameterSpace::Field* field);
+
+utils::StatusOr<size_t> Sample(std::vector<float>& weights,
+                               utils::RandomEngine* random);
+
+}  // namespace internal
 
 }  // namespace hyperparameters_optimizer_v2
 }  // namespace model

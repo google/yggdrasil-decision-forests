@@ -34,6 +34,8 @@ namespace model {
 namespace hyperparameters_optimizer_v2 {
 namespace {
 
+using test::EqualsProto;
+
 TEST(Random, Base) {
   model::proto::HyperParameterSpace search_space = PARSE_TEST_PROTO(R"pb(
     fields {
@@ -111,6 +113,118 @@ TEST(Random, Base) {
 
   LOG(INFO) << "trial_idx: " << trial_idx << " score: " << best_score
             << " params: " << best_params.DebugString();
+}
+
+TEST(Random, UpdateWeights) {
+  model::proto::HyperParameterSpace space = PARSE_TEST_PROTO(R"pb(
+    fields {
+      name: "a"
+      discrete_candidates {
+        possible_values { integer: 1 }
+        possible_values { integer: 2 }
+      }
+    }
+    fields {
+      name: "b"
+      discrete_candidates {
+        possible_values { integer: 3 }
+        possible_values { integer: 4 }
+        possible_values { integer: 5 }
+        possible_values { integer: 6 }
+      }
+      children {
+        parent_discrete_values {
+          possible_values { integer: 3 }
+          possible_values { integer: 4 }
+        }
+        name: "c"
+        discrete_candidates {
+          possible_values { integer: 1 }
+          possible_values { integer: 2 }
+        }
+      }
+      children {
+        parent_discrete_values {
+          possible_values { integer: 4 }
+          possible_values { integer: 5 }
+        }
+        name: "d"
+        discrete_candidates {
+          possible_values { integer: 1 }
+          possible_values { integer: 2 }
+        }
+      }
+    }
+  )pb");
+  CHECK_OK(internal::UpdateWeights(&space));
+
+  const model::proto::HyperParameterSpace expected_space = PARSE_TEST_PROTO(
+      R"pb(
+        fields {
+          name: "a"
+          discrete_candidates {
+            possible_values { integer: 1 }
+            possible_values { integer: 2 }
+            weights: 1.0
+            weights: 1.0
+          }
+        }
+        fields {
+          name: "b"
+          discrete_candidates {
+            possible_values { integer: 3 }
+            possible_values { integer: 4 }
+            possible_values { integer: 5 }
+            possible_values { integer: 6 }
+            weights: 2.0
+            weights: 4.0
+            weights: 2.0
+            weights: 1.0
+          }
+          children {
+            parent_discrete_values {
+              possible_values { integer: 3 }
+              possible_values { integer: 4 }
+            }
+            name: "c"
+            discrete_candidates {
+              possible_values { integer: 1 }
+              possible_values { integer: 2 }
+              weights: 1.0
+              weights: 1.0
+            }
+          }
+          children {
+            parent_discrete_values {
+              possible_values { integer: 4 }
+              possible_values { integer: 5 }
+            }
+            name: "d"
+            discrete_candidates {
+              possible_values { integer: 1 }
+              possible_values { integer: 2 }
+              weights: 1.0
+              weights: 1.0
+            }
+          }
+        }
+      )pb");
+  EXPECT_THAT(space, EqualsProto(expected_space));
+}
+
+TEST(Benchmark, Sample) {
+  utils::RandomEngine random;
+  std::vector<float> weights{0, 0.5, 0, 1.0};
+  for (int i = 0; i < 100; i++) {
+    int sample = internal::Sample(weights, &random).value();
+    EXPECT_TRUE(sample == 1 || sample == 3);
+  }
+
+  std::vector<float> weights_2{1.0, 1.0, 1.0, 1.0};
+  for (int i = 0; i < 100; i++) {
+    int sample_2 = internal::Sample(weights, &random).value();
+    EXPECT_TRUE(sample_2 == 1 || sample_2 == 3);
+  }
 }
 
 }  // namespace
