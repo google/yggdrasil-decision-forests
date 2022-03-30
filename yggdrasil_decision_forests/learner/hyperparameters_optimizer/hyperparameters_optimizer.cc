@@ -18,12 +18,14 @@
 #include <cmath>
 #include <limits>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.pb.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
+#include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
@@ -126,6 +128,9 @@ HyperParameterOptimizerLearner::TrainFromFileOnMemoryDataset(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
+  LOG(INFO) << "Serialize memory dataset to disk. To skip this stage and a "
+               "more efficient training, provide the dataset as a path instead "
+               "of as a VerticalDataset";
   const auto& serialized_dataset_format =
       training_config_.GetExtension(proto::hyperparameters_optimizer_config)
           .serialized_dataset_format();
@@ -179,8 +184,8 @@ HyperParameterOptimizerLearner::TrainWithStatus(
   // of the label name).
   model::proto::TrainingConfig effective_config;
   model::proto::TrainingConfigLinking config_link;
-  RETURN_IF_ERROR(GetEffectiveConfiguration(train_dataset, &effective_config,
-                                            &config_link));
+  RETURN_IF_ERROR(GetEffectiveConfiguration(train_dataset.data_spec(),
+                                            &effective_config, &config_link));
   const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config =
       effective_config.GetExtension(proto::hyperparameters_optimizer_config);
 
@@ -221,7 +226,7 @@ HyperParameterOptimizerLearner::TrainWithStatus(
 }
 
 absl::Status HyperParameterOptimizerLearner::GetEffectiveConfiguration(
-    const dataset::VerticalDataset& dataset,
+    const dataset::proto::DataSpecification& data_spec,
     model::proto::TrainingConfig* effective_config,
     model::proto::TrainingConfigLinking* effective_config_link) const {
   // Apply the default values.
@@ -232,9 +237,9 @@ absl::Status HyperParameterOptimizerLearner::GetEffectiveConfiguration(
 
   // Solve the symbols in the configuration.
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
-      *effective_config, dataset.data_spec(), effective_config_link));
+      *effective_config, data_spec, effective_config_link));
 
-  RETURN_IF_ERROR(CheckConfiguration(dataset.data_spec(), *effective_config,
+  RETURN_IF_ERROR(CheckConfiguration(data_spec, *effective_config,
                                      *effective_config_link, deployment_));
   return absl::OkStatus();
 }
@@ -259,7 +264,119 @@ HyperParameterOptimizerLearner::TrainWithStatus(
         "deployment configs.");
   }
 
-  return absl::InvalidArgumentError("Training on file not implemented");
+  const auto begin_training = absl::Now();
+
+  // Initialize the remote workers.
+  ASSIGN_OR_RETURN(auto manager, CreateDistributeManager());
+
+  // The effective configuration is the user configuration + the default value +
+  // the automatic configuration (if enabled) + the copy of the non-specified
+  // training configuration field from the learner to the sub-learner (e.g. copy
+  // of the label name).
+  model::proto::TrainingConfig effective_config;
+  model::proto::TrainingConfigLinking config_link;
+  RETURN_IF_ERROR(
+      GetEffectiveConfiguration(data_spec, &effective_config, &config_link));
+  const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config =
+      effective_config.GetExtension(proto::hyperparameters_optimizer_config);
+
+  utils::usage::OnTrainingStart(data_spec, effective_config, config_link, -1);
+
+  // Initialize the learner with the base hyperparameters.
+  ASSIGN_OR_RETURN(auto base_learner,
+                   BuildBaseLearner(spe_config, /*for_tuning=*/true));
+
+  // Hyperparameters of the base learner.TrainWithStatus().
+  ASSIGN_OR_RETURN(const auto search_space_spec,
+                   base_learner->GetGenericHyperParameterSpecification());
+
+  // Build the effective space to optimize.
+  ASSIGN_OR_RETURN(const auto search_space,
+                   BuildSearchSpace(spe_config, *base_learner));
+  LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
+
+  // Select the best hyperparameters.
+  ASSIGN_OR_RETURN(const auto best_params,
+                   SearchBestHyperparameterDistributed(
+                       spe_config, config_link, search_space_spec, search_space,
+                       typed_path, data_spec, typed_valid_path, manager.get()));
+  LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
+
+  // TODO(gbm): Record the logs.
+
+  // Train a model on the entire train dataset using the best hyperparameters.
+  LOG(INFO) << "Training a model on the best hyper parameters.";
+  ASSIGN_OR_RETURN(
+      auto model,
+      TrainRemoteModel(spe_config.base_learner(), config_link,
+                       spe_config.base_learner_deployment(), best_params,
+                       typed_path, data_spec, typed_valid_path, manager.get()));
+
+  utils::usage::OnTrainingEnd(data_spec, training_config(), config_link, -1,
+                              *model, absl::Now() - begin_training);
+
+  return model;
+}
+
+utils::StatusOr<std::unique_ptr<AbstractModel>>
+HyperParameterOptimizerLearner::TrainRemoteModel(
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const model::proto::DeploymentConfig& deployment_config,
+    const model::proto::GenericHyperParameters& generic_hyper_params,
+    const absl::string_view typed_train_path,
+    const dataset::proto::DataSpecification& data_spec,
+    const absl::optional<std::string>& typed_valid_path,
+    distribute::AbstractManager* manager) const {
+  generic_worker::proto::Request generic_request;
+  auto& train_request = *generic_request.mutable_train_model();
+
+  *train_request.mutable_train_config() = config;
+  *train_request.mutable_deployment_config() = deployment_config;
+  *train_request.mutable_generic_hyper_parameters() = generic_hyper_params;
+
+  train_request.set_dataset_path(typed_train_path);
+  if (typed_valid_path.has_value()) {
+    train_request.set_valid_dataset_path(typed_valid_path.value());
+  }
+
+  *train_request.mutable_dataspec() = data_spec;
+  train_request.set_model_base_path(
+      file::JoinPath(deployment().cache_path(), "models"));
+
+  ASSIGN_OR_RETURN(auto result,
+                   manager->BlockingProtoRequest<generic_worker::proto::Result>(
+                       generic_request));
+
+  std::unique_ptr<model::AbstractModel> model;
+  RETURN_IF_ERROR(model::LoadModel(result.train_model().model_path(), &model));
+  return model;
+}
+
+utils::StatusOr<std::unique_ptr<distribute::AbstractManager>>
+HyperParameterOptimizerLearner::CreateDistributeManager() const {
+  // Configure the working directory.
+  if (deployment().cache_path().empty()) {
+    return absl::InvalidArgumentError(
+        "deployment.cache_path is empty. Please provide a cache directory with "
+        "ensemble distributed training.");
+  }
+
+  if (!deployment().distribute().working_directory().empty()) {
+    return absl::InvalidArgumentError(
+        "deployment.distribute.working_directory should be empty. Use "
+        "deployment.cache_path to specify the cache directory.");
+  }
+
+  // Initialize the distribute manager.
+  auto distribute_config = deployment_.distribute();
+  distribute_config.set_working_directory(
+      file::JoinPath(deployment_.cache_path(), "distribute"));
+  generic_worker::proto::Welcome welcome;
+  welcome.set_temporary_directory(
+      file::JoinPath(deployment_.cache_path(), "workers"));
+  return distribute::CreateManager(distribute_config, "GENERIC_WORKER",
+                                   welcome.SerializeAsString());
 }
 
 utils::StatusOr<std::unique_ptr<AbstractLearner>>
@@ -415,6 +532,139 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
   return best_params;
 }
 
+utils::StatusOr<model::proto::GenericHyperParameters>
+HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
+    const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const model::proto::GenericHyperParameterSpecification& search_space_spec,
+    const model::proto::HyperParameterSpace& search_space,
+    const absl::string_view typed_train_path,
+    const dataset::proto::DataSpecification& data_spec,
+    const absl::optional<std::string>& typed_valid_path,
+    distribute::AbstractManager* manager) const {
+  const auto begin_optimization = absl::Now();
+
+  // Instantiate the optimizer.
+  ASSIGN_OR_RETURN(auto optimizer, OptimizerInterfaceRegisterer::Create(
+                                       spe_config.optimizer().optimizer_key(),
+                                       spe_config.optimizer(), search_space));
+
+  // Mapping between request_id and hyperparameter of the currently running
+  // evaluations.
+  absl::flat_hash_map<std::string, model::proto::GenericHyperParameters>
+      pending_hyperparameters;
+
+  // Number of evaluated and processed candidates.
+  int round_idx = 0;
+
+  // Id of the next request.
+  int next_request_id = 0;
+
+  // True iff. the optimizer is done generating new candidates.
+  bool exploration_is_done = false;
+
+  double logging_best_score = std::numeric_limits<double>::quiet_NaN();
+
+  while (true) {
+    // Generate as many candidates as possible.
+    while (true) {
+      model::proto::GenericHyperParameters candidate;
+      ASSIGN_OR_RETURN(const auto optimizer_status,
+                       optimizer->NextCandidate(&candidate));
+      if (optimizer_status == NextCandidateStatus::kExplorationIsDone) {
+        // The optimization can stop.
+        exploration_is_done = true;
+        if (!pending_hyperparameters.empty()) {
+          return absl::InternalError(
+              "The optimizer stopped the optimization while some evaluations "
+              "are still running.");
+        }
+        break;
+      } else if (optimizer_status == NextCandidateStatus::kWaitForEvaluation) {
+        // Wait for some evaluation to finish.
+        if (pending_hyperparameters.empty()) {
+          return absl::InternalError(
+              "The optimizer requested an evaluation while not evaluation is "
+              "currently pending.");
+        }
+        break;
+      } else if (optimizer_status ==
+                 NextCandidateStatus::kNewCandidateAvailable) {
+        // Start evaluating this new candidate.
+        generic_worker::proto::Request generic_request;
+        auto& train_request = *generic_request.mutable_train_model();
+        train_request.set_return_model_validation(true);
+
+        *train_request.mutable_train_config() = spe_config.base_learner();
+        *train_request.mutable_deployment_config() =
+            spe_config.base_learner_deployment();
+        *train_request.mutable_generic_hyper_parameters() = candidate;
+
+        train_request.set_dataset_path(typed_train_path);
+        if (typed_valid_path.has_value()) {
+          train_request.set_valid_dataset_path(typed_valid_path.value());
+        }
+
+        *train_request.mutable_dataspec() = data_spec;
+        train_request.set_model_base_path(
+            file::JoinPath(deployment().cache_path(), "models"));
+
+        std::string request_id = absl::StrCat(next_request_id++);
+        generic_request.set_request_id(request_id);
+        pending_hyperparameters[request_id] = std::move(candidate);
+
+        RETURN_IF_ERROR(manager->AsynchronousProtoRequest(generic_request));
+      }
+    }
+
+    if (exploration_is_done && pending_hyperparameters.empty()) {
+      break;
+    }
+
+    ASSIGN_OR_RETURN(
+        auto evaluator_result,
+        manager->NextAsynchronousProtoAnswer<generic_worker::proto::Result>());
+
+    ASSIGN_OR_RETURN(
+        const auto score,
+        EvaluationToScore(
+            spe_config,
+            evaluator_result.train_model().validation_evaluation()));
+
+    auto it_hyperparameter =
+        pending_hyperparameters.find(evaluator_result.request_id());
+    if (it_hyperparameter == pending_hyperparameters.end()) {
+      return absl::InternalError("Unknown request id");
+    }
+    const auto candidate = std::move(it_hyperparameter->second);
+    pending_hyperparameters.erase(it_hyperparameter);
+
+    RETURN_IF_ERROR(optimizer->ConsumeEvaluation(candidate, score));
+
+    if (std::isnan(logging_best_score) || score > logging_best_score) {
+      logging_best_score = score;
+    }
+    LOG(INFO) << "[" << round_idx + 1 << "/" << optimizer->NumExpectedRounds()
+              << "] Score: " << score << " / " << logging_best_score
+              << " HParams: " << candidate.ShortDebugString();
+
+    if (training_config().has_maximum_training_duration_seconds() &&
+        (absl::Now() - begin_optimization) >
+            absl::Seconds(
+                training_config().maximum_training_duration_seconds())) {
+      LOG(INFO)
+          << "Stop optimization because of the maximum training duration.";
+      break;
+    }
+    round_idx++;
+  }
+
+  model::proto::GenericHyperParameters best_params;
+  double best_score;
+  std::tie(best_params, best_score) = optimizer->BestParameters();
+  return best_params;
+}
+
 utils::StatusOr<double>
 HyperParameterOptimizerLearner::EvaluateCandidateLocally(
     const model::proto::GenericHyperParameters& candidate,
@@ -438,6 +688,12 @@ HyperParameterOptimizerLearner::EvaluateCandidateLocally(
       break;
   }
 
+  return EvaluationToScore(spe_config, evaluation);
+}
+
+utils::StatusOr<float> HyperParameterOptimizerLearner::EvaluationToScore(
+    const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
+    const metric::proto::EvaluationResults& evaluation) const {
   // Extract the metric to optimize from the evaluation.
   metric::proto::MetricAccessor target_metric;
   if (spe_config.evaluation().has_metric()) {

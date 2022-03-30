@@ -27,11 +27,13 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizer_interface.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
 namespace yggdrasil_decision_forests {
@@ -82,7 +84,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
   // Aggregates the user inputs and automated logic output and returns the
   // effectively training configuration effectively used for training.
   absl::Status GetEffectiveConfiguration(
-      const dataset::VerticalDataset& dataset,
+      const dataset::proto::DataSpecification& data_spec,
       model::proto::TrainingConfig* effective_config,
       model::proto::TrainingConfigLinking* effective_config_link) const;
 
@@ -108,6 +110,19 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset) const;
 
+  // Searches for the best hyperparameter using distributed training from a disk
+  // dataset.
+  utils::StatusOr<model::proto::GenericHyperParameters>
+  SearchBestHyperparameterDistributed(
+      const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
+      const model::proto::TrainingConfigLinking& config_link,
+      const model::proto::GenericHyperParameterSpecification& search_space_spec,
+      const model::proto::HyperParameterSpace& search_space,
+      const absl::string_view typed_train_path,
+      const dataset::proto::DataSpecification& data_spec,
+      const absl::optional<std::string>& typed_valid_path,
+      distribute::AbstractManager* manager) const;
+
   // If true, the metric needs to be maximized. If false, the metric needs to be
   // minimized.
   utils::StatusOr<bool> IsMaximization(
@@ -123,6 +138,27 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset) const;
+
+  // Creates an initialized distribute manager with "GENERIC_WORKER" workers.
+  utils::StatusOr<std::unique_ptr<distribute::AbstractManager>>
+  CreateDistributeManager() const;
+
+  // Trains a model remotely.
+  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainRemoteModel(
+      const model::proto::TrainingConfig& config,
+      const model::proto::TrainingConfigLinking& config_link,
+      const model::proto::DeploymentConfig& deployment_config,
+      const model::proto::GenericHyperParameters& generic_hyper_params,
+      const absl::string_view typed_train_path,
+      const dataset::proto::DataSpecification& data_spec,
+      const absl::optional<std::string>& typed_valid_path,
+      distribute::AbstractManager* manager) const;
+
+  // Extracts the score from an evaluation. For scores, larger is always better.
+  // Scores can be negative.
+  utils::StatusOr<float> EvaluationToScore(
+      const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
+      const metric::proto::EvaluationResults& evaluation) const;
 };
 
 REGISTER_AbstractLearner(HyperParameterOptimizerLearner,

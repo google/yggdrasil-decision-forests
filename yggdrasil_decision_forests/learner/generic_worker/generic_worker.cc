@@ -42,6 +42,7 @@ absl::Status GenericWorker::TrainModel(
   LOG(INFO) << "Configuration:\n" << request.train_config().DebugString();
   LOG(INFO) << "Deployment:\n" << request.deployment_config().DebugString();
   LOG(INFO) << "Dataset: " << request.dataset_path();
+  LOG(INFO) << "Valid dataset: " << request.valid_dataset_path();
 
   result->set_model_path(
       file::JoinPath(request.model_base_path(), utils::GenUniqueId()));
@@ -61,12 +62,23 @@ absl::Status GenericWorker::TrainModel(
 
   learner->set_stop_training_trigger(&done_was_called_);
 
+  absl::optional<std::string> valid_dataset;
+  if (request.has_valid_dataset_path()) {
+    valid_dataset = request.valid_dataset_path();
+  }
+
   LOG(INFO) << "Start training model";
-  ASSIGN_OR_RETURN(auto model, learner->TrainWithStatus(request.dataset_path(),
-                                                        request.dataspec()));
+  ASSIGN_OR_RETURN(auto model,
+                   learner->TrainWithStatus(request.dataset_path(),
+                                            request.dataspec(), valid_dataset));
+
+  if (request.return_model_validation()) {
+    *result->mutable_validation_evaluation() = model->ValidationEvaluation();
+  }
 
   LOG(INFO) << "Save model to " << result->model_path();
   RETURN_IF_ERROR(model::SaveModel(result->model_path(), model.get()));
+
   return absl::OkStatus();
 }
 

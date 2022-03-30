@@ -47,6 +47,12 @@ message Request {
     optional string model_base_path = 5;
     optional string log_directory = 6;
     optional model.proto.GenericHyperParameters generic_hyper_parameters = 7;
+    optional string valid_dataset_path = 8;
+
+    // If true, populate the "validation_evaluation" field with the model
+    // self-evaluation. This is equivalent (but more efficient), that loading
+    // the entire model and extracting the self evaluation.
+    optional bool return_model_validation = 9 [default = false];
   }
 
   message EvaluateModel {
@@ -67,6 +73,7 @@ message Result {
 
   message TrainModel {
     optional string model_path = 1;
+    optional metric.proto.EvaluationResults validation_evaluation = 2;
   }
 
   message EvaluateModel {

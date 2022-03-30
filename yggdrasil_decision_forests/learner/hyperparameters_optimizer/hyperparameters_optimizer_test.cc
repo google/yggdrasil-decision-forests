@@ -115,10 +115,59 @@ class OnAdult : public utils::TrainAndTestTester {
     train_config_.set_label("income");
     train_config_.add_features(".*");
     dataset_filename_ = "adult.csv";
+
+    deployment_config_.set_cache_path(
+        file::JoinPath(test::TmpDirectory(), "working_directory"));
+  }
+
+ public:
+  void SetLocalTraining() {
+    deployment_config_.set_num_threads(4);
+    deployment_config_.clear_distribute();
+  }
+
+  void SetDistributedTraining(const int num_workers = 2) {
+    // Note: This test effectively using local mult-threaded training. However,
+    // because we use the "distribute" API, this would behave the same way as
+    // with distributed training.
+    deployment_config_.set_num_threads(2);
+    *deployment_config_.mutable_distribute() =
+        PARSE_TEST_PROTO(absl::Substitute(
+            R"pb(
+              implementation_key: "MULTI_THREAD"
+              [yggdrasil_decision_forests.distribute.proto.multi_thread] {
+                num_workers: $0
+              }
+            )pb",
+            num_workers));
   }
 };
 
-TEST_F(OnAdult, Random) {
+TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTraining) {
+  SetLocalTraining();
+  TrainAndEvaluateModel();
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+}
+
+TEST_F(OnAdult, RandomTuner_FileDataset_LocalTraining) {
+  pass_training_dataset_as_path_ = true;
+  SetLocalTraining();
+  TrainAndEvaluateModel();
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+}
+
+TEST_F(OnAdult, RandomTuner_MemoryDataset_DistributedTraining) {
+  SetDistributedTraining();
+  TrainAndEvaluateModel();
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+}
+
+TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining) {
+  SetDistributedTraining();
+  pass_training_dataset_as_path_ = true;
   TrainAndEvaluateModel();
   EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
