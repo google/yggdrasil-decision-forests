@@ -65,6 +65,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:hash",
+        "//yggdrasil_decision_forests/utils:logging",
     ],
 )
 
