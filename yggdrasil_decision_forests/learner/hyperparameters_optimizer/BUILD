@@ -25,6 +25,7 @@ cc_library_ydf(
         ":optimizer_interface",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner:abstract_learner",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
@@ -63,6 +64,7 @@ all_proto_library(
     deps = [
         "//yggdrasil_decision_forests/learner:abstract_learner_proto",
         "//yggdrasil_decision_forests/metric:metric_proto",
+        "//yggdrasil_decision_forests/model:hyperparameter_proto",
     ],
 )
 

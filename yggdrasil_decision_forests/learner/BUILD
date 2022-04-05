@@ -139,10 +139,12 @@ cc_library_ydf(
 all_proto_library(
     name = "abstract_learner_proto",
     srcs = ["abstract_learner.proto"],
+    exports = ["//yggdrasil_decision_forests/model:hyperparameter_proto"],
     deps = [
         "//yggdrasil_decision_forests/dataset:data_spec_proto",
         "//yggdrasil_decision_forests/dataset:weight_proto",
         "//yggdrasil_decision_forests/model:abstract_model_proto",
+        "//yggdrasil_decision_forests/model:hyperparameter_proto",
         "//yggdrasil_decision_forests/utils/distribute:distribute_proto",
     ],
 )

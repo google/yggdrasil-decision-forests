@@ -109,7 +109,8 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset,
-      std::unique_ptr<AbstractModel>* best_model) const;
+      std::unique_ptr<AbstractModel>* best_model,
+      model::proto::HyperparametersOptimizerLogs* logs) const;
 
   // Searches for the best hyperparameter using distributed training from a disk
   // dataset.
@@ -123,7 +124,8 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path,
       std::unique_ptr<AbstractModel>* best_model,
-      distribute::AbstractManager* manager) const;
+      distribute::AbstractManager* manager,
+      model::proto::HyperparametersOptimizerLogs* logs) const;
 
   // If true, the metric needs to be maximized. If false, the metric needs to be
   // minimized.

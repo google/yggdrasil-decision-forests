@@ -45,6 +45,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
+#include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
@@ -79,6 +80,11 @@ void AbstractModel::ExportProto(const AbstractModel& model,
       model.classification_outputs_probabilities_);
 
   model.metadata().Export(proto->mutable_metadata());
+
+  if (model.hyperparameter_optimizer_logs_.has_value()) {
+    *proto->mutable_hyperparameter_optimizer_logs() =
+        model.hyperparameter_optimizer_logs_.value();
+  }
 }
 
 void AbstractModel::ImportProto(const proto::AbstractModel& proto,
@@ -100,6 +106,11 @@ void AbstractModel::ImportProto(const proto::AbstractModel& proto,
       proto.classification_outputs_probabilities();
 
   model->mutable_metadata()->Import(proto.metadata());
+
+  if (proto.has_hyperparameter_optimizer_logs()) {
+    model->hyperparameter_optimizer_logs_ =
+        proto.hyperparameter_optimizer_logs();
+  }
 }
 
 metric::proto::EvaluationResults AbstractModel::Evaluate(
@@ -678,6 +689,68 @@ void AbstractModel::AppendDescriptionAndStatistics(
   absl::StrAppend(description, "\n");
   AppendAllVariableImportanceDescription(description);
   absl::StrAppend(description, "\n");
+
+  if (hyperparameter_optimizer_logs_.has_value()) {
+    AppendHyperparameterOptimizerLogs(description);
+  }
+}
+
+void AbstractModel::AppendHyperparameterOptimizerLogs(
+    std::string* description) const {
+  // Converts an hyperparameter set into an inlined human readable
+  // representation of the form: "{<field nam>:<value>}+}.
+  const auto hyperparameter_to_string =
+      [](const proto::GenericHyperParameters& ps) -> std::string {
+    if (ps.fields_size() == 0) {
+      return "*empty*";
+    }
+    std::string text;
+    for (const auto& field : ps.fields()) {
+      if (!text.empty()) {
+        // Adds a space in between hyperparameters.
+        absl::StrAppend(&text, " ");
+      }
+      absl::StrAppend(&text, field.name(), ":");
+      switch (field.value().Type_case()) {
+        case proto::GenericHyperParameters::Value::TypeCase::kCategorical:
+          absl::StrAppend(&text, field.value().categorical());
+          break;
+        case proto::GenericHyperParameters::Value::TypeCase::kInteger:
+          absl::StrAppend(&text, field.value().integer());
+          break;
+        case proto::GenericHyperParameters::Value::TypeCase::kReal:
+          absl::StrAppend(&text, field.value().real());
+          break;
+        case proto::GenericHyperParameters::Value::TypeCase::kCategoricalList:
+          absl::StrAppend(&text,
+                          field.value().categorical_list().DebugString());
+          break;
+        case proto::GenericHyperParameters::Value::TypeCase::TYPE_NOT_SET:
+          absl::StrAppend(&text, "NOT_SET");
+          break;
+      }
+    }
+    return text;
+  };
+
+  // Title
+  absl::StrAppend(description, "Hyperparameter optimizer:\n\n");
+  const auto& logs = hyperparameter_optimizer_logs_.value();  // Shorter
+
+  absl::StrAppendFormat(description, "Best parameters: %s\n",
+                        hyperparameter_to_string(logs.best_hyperparameters()));
+  absl::StrAppendFormat(description, "Num steps: %d\n", logs.steps_size());
+  absl::StrAppendFormat(description, "Best score: %f\n", logs.best_score());
+  absl::StrAppend(description, "\n");
+
+  // Prints the score and hyper-parameter of each step.
+  for (int step_idx = 0; step_idx < logs.steps_size(); step_idx++) {
+    const auto& step = logs.steps(step_idx);
+    absl::StrAppendFormat(description, "Step #%d score:%f parameters:{ %s }\n",
+                          step_idx, step.score(),
+                          hyperparameter_to_string(step.hyperparameters()));
+  }
+  absl::StrAppend(description, "\n");
 }
 
 std::vector<std::string> AbstractModel::AvailableVariableImportances() const {
@@ -930,6 +1003,12 @@ void AbstractModel::CopyAbstractModelMetaData(AbstractModel* dst) const {
   dst->precomputed_variable_importances_ = precomputed_variable_importances_;
   dst->classification_outputs_probabilities_ =
       classification_outputs_probabilities_;
+
+  if (hyperparameter_optimizer_logs_.has_value()) {
+    dst->hyperparameter_optimizer_logs_ = hyperparameter_optimizer_logs_;
+  } else {
+    dst->hyperparameter_optimizer_logs_ = {};
+  }
 }
 
 absl::Status AbstractModel::Validate() const {

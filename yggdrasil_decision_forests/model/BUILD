@@ -35,12 +35,14 @@ cc_library_ydf(
     ],
     deps = [
         ":abstract_model_cc_proto",
+        ":hyperparameter_cc_proto",
         ":prediction_cc_proto",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/types:optional",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
@@ -113,6 +115,7 @@ all_proto_library(
     name = "abstract_model_proto",
     srcs = ["abstract_model.proto"],
     deps = [
+        ":hyperparameter_proto",
         "//yggdrasil_decision_forests/dataset:data_spec_proto",
         "//yggdrasil_decision_forests/dataset:weight_proto",
     ],
@@ -122,6 +125,11 @@ all_proto_library(
     name = "prediction_proto",
     srcs = ["prediction.proto"],
     deps = ["//yggdrasil_decision_forests/utils:distribution_proto"],
+)
+
+all_proto_library(
+    name = "hyperparameter_proto",
+    srcs = ["hyperparameter.proto"],
 )
 
 # Tests

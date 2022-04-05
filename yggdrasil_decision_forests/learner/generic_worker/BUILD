@@ -15,6 +15,7 @@ all_proto_library(
         "//yggdrasil_decision_forests/dataset:data_spec_proto",
         "//yggdrasil_decision_forests/learner:abstract_learner_proto",
         "//yggdrasil_decision_forests/metric:metric_proto",
+        "//yggdrasil_decision_forests/model:hyperparameter_proto",
         "//yggdrasil_decision_forests/utils/distribute:distribute_proto",
     ],
 )

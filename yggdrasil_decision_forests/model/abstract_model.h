@@ -29,6 +29,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -365,6 +366,16 @@ class AbstractModel {
   const MetaData& metadata() const { return metadata_; }
   MetaData* mutable_metadata() { return &metadata_; }
 
+  // Hyperparameter tuning logs.
+  const absl::optional<proto::HyperparametersOptimizerLogs>&
+  hyperparameter_optimizer_logs() const {
+    return hyperparameter_optimizer_logs_;
+  }
+  absl::optional<proto::HyperparametersOptimizerLogs>*
+  mutable_hyperparameter_optimizer_logs() {
+    return &hyperparameter_optimizer_logs_;
+  }
+
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 
@@ -375,6 +386,9 @@ class AbstractModel {
       const serving::FastEngine& engine, utils::RandomEngine* rnd,
       std::vector<model::proto::Prediction>* predictions,
       metric::proto::EvaluationResults* eval) const;
+
+  // Prints informations about the hyper-parameter optimizer logs.
+  void AppendHyperparameterOptimizerLogs(std::string* description) const;
 
   // A string uniquely identifying the model type . Used to determine
   // model types during serialization. This should match the registered names in
@@ -417,6 +431,9 @@ class AbstractModel {
   // TODO(gbm): Use proto::Metadata.
   // Note: Cannot use proto::Metadata with the version of protobuf linked by TF.
   MetaData metadata_;
+
+  absl::optional<proto::HyperparametersOptimizerLogs>
+      hyperparameter_optimizer_logs_;
 
   // Note: New fields should be registered in:
   // - The proto serialization functions.

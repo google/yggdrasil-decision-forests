@@ -150,6 +150,7 @@ TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTraining) {
   TrainAndEvaluateModel();
   EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
 
 TEST_F(OnAdult, RandomTuner_FileDataset_LocalTraining) {
@@ -158,6 +159,7 @@ TEST_F(OnAdult, RandomTuner_FileDataset_LocalTraining) {
   TrainAndEvaluateModel();
   EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
 
 TEST_F(OnAdult, RandomTuner_MemoryDataset_DistributedTraining) {
@@ -165,6 +167,7 @@ TEST_F(OnAdult, RandomTuner_MemoryDataset_DistributedTraining) {
   TrainAndEvaluateModel();
   EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
 
 TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining) {
@@ -173,6 +176,7 @@ TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining) {
   TrainAndEvaluateModel();
   EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
 
 TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTraining_NoRetrain) {
@@ -184,6 +188,7 @@ TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTraining_NoRetrain) {
   TrainAndEvaluateModel();
   EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
 
 TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining_NoRetrain) {
@@ -196,6 +201,7 @@ TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining_NoRetrain) {
   TrainAndEvaluateModel();
   EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
 
 TEST_F(OnAdult, DefaultTargetMetric) {

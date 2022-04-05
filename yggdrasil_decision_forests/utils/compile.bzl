@@ -18,7 +18,8 @@ def all_proto_library(
         compile_cc = True,
         compile_py = True,
         visibility = None,
-        has_services = False):
+        has_services = False,
+        exports = None):
     """Create the set of proto, cc proto and py proto targets.
 
     Usage example:
@@ -35,6 +36,7 @@ def all_proto_library(
       compile_py: If true, generate a py proto rule.
       visibility: Visibility of the rules.
       has_services: The proto has a grpc service.
+      exports: List of proto_library targets that can be referenced via "import public".
     """
 
     suffix = "_proto"

@@ -20,6 +20,7 @@ package yggdrasil_decision_forests.model.generic_worker.proto;
 import "yggdrasil_decision_forests/dataset/data_spec.proto";
 import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 import "yggdrasil_decision_forests/metric/metric.proto";
+import "yggdrasil_decision_forests/model/hyperparameter.proto";
 
 message Welcome {
   optional string temporary_directory = 1;

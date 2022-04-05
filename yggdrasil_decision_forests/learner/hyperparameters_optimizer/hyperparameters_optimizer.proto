@@ -19,6 +19,7 @@ package yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto;
 
 import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 import "yggdrasil_decision_forests/metric/metric.proto";
+import "yggdrasil_decision_forests/model/hyperparameter.proto";
 
 message HyperParametersOptimizerLearnerTrainingConfig {
   // Definition of the machine learning algorithm to tune as well as the value

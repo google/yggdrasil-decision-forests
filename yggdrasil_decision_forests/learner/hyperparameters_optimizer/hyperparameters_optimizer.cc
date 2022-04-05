@@ -20,6 +20,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.pb.h"
@@ -206,11 +207,12 @@ HyperParameterOptimizerLearner::TrainWithStatus(
   LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
 
   // Select the best hyperparameters.
+  model::proto::HyperparametersOptimizerLogs logs;
   std::unique_ptr<AbstractModel> best_model;
   ASSIGN_OR_RETURN(const auto best_params,
                    SearchBestHyperparameterInProcess(
                        spe_config, config_link, search_space_spec, search_space,
-                       train_dataset, valid_dataset, &best_model));
+                       train_dataset, valid_dataset, &best_model, &logs));
   LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
 
   // TODO(gbm): Record the logs.
@@ -224,11 +226,13 @@ HyperParameterOptimizerLearner::TrainWithStatus(
     utils::usage::OnTrainingEnd(train_dataset.data_spec(), training_config(),
                                 config_link, train_dataset.nrow(), *mdl,
                                 absl::Now() - begin_training);
+    *mdl->mutable_hyperparameter_optimizer_logs() = logs;
     return mdl;
   } else {
     if (!best_model) {
       return absl::InternalError("Missing model");
     }
+    *best_model->mutable_hyperparameter_optimizer_logs() = logs;
     return best_model;
   }
 }
@@ -304,12 +308,13 @@ HyperParameterOptimizerLearner::TrainWithStatus(
   LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
 
   // Select the best hyperparameters.
+  model::proto::HyperparametersOptimizerLogs logs;
   std::unique_ptr<AbstractModel> best_model;
   ASSIGN_OR_RETURN(
       const auto best_params,
       SearchBestHyperparameterDistributed(
           spe_config, config_link, search_space_spec, search_space, typed_path,
-          data_spec, typed_valid_path, &best_model, manager.get()));
+          data_spec, typed_valid_path, &best_model, manager.get(), &logs));
   LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
 
   // TODO(gbm): Record the logs.
@@ -325,11 +330,13 @@ HyperParameterOptimizerLearner::TrainWithStatus(
 
     utils::usage::OnTrainingEnd(data_spec, training_config(), config_link, -1,
                                 *model, absl::Now() - begin_training);
+    *model->mutable_hyperparameter_optimizer_logs() = logs;
     return model;
   } else {
     if (!best_model) {
       return absl::InternalError("Missing model");
     }
+    *best_model->mutable_hyperparameter_optimizer_logs() = logs;
     return best_model;
   }
 }
@@ -432,8 +439,14 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset,
-    std::unique_ptr<AbstractModel>* best_model) const {
+    std::unique_ptr<AbstractModel>* best_model,
+    model::proto::HyperparametersOptimizerLogs* logs) const {
   const auto begin_optimization = absl::Now();
+
+  // Initialize the hyperparameter logs.
+  *logs->mutable_space() = search_space;
+  logs->set_hyperparameter_optimizer_key(
+      spe_config.optimizer().optimizer_key());
 
   // Instantiate the optimizer.
   ASSIGN_OR_RETURN(auto optimizer, OptimizerInterfaceRegisterer::Create(
@@ -527,6 +540,13 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
     RETURN_IF_ERROR(
         optimizer->ConsumeEvaluation(output->candidate, output->score));
 
+    // Record the hyperparameter + evaluation.
+    auto& log_entry = *logs->add_steps();
+    log_entry.set_evaluation_time(
+        absl::ToDoubleSeconds(absl::Now() - begin_optimization));
+    *log_entry.mutable_hyperparameters() = output->candidate;
+    log_entry.set_score(output->score);
+
     if (std::isnan(logging_best_score) || output->score > logging_best_score) {
       logging_best_score = output->score;
       *best_model = std::move(output->model);
@@ -550,6 +570,10 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
   model::proto::GenericHyperParameters best_params;
   double best_score;
   std::tie(best_params, best_score) = optimizer->BestParameters();
+
+  logs->set_best_score(best_score);
+  *logs->mutable_best_hyperparameters() = best_params;
+
   return best_params;
 }
 
@@ -563,8 +587,14 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
     const dataset::proto::DataSpecification& data_spec,
     const absl::optional<std::string>& typed_valid_path,
     std::unique_ptr<AbstractModel>* best_model,
-    distribute::AbstractManager* manager) const {
+    distribute::AbstractManager* manager,
+    model::proto::HyperparametersOptimizerLogs* logs) const {
   const auto begin_optimization = absl::Now();
+
+  // Initializer the hyperparameter logs.
+  *logs->mutable_space() = search_space;
+  logs->set_hyperparameter_optimizer_key(
+      spe_config.optimizer().optimizer_key());
 
   // Instantiate the optimizer.
   ASSIGN_OR_RETURN(auto optimizer, OptimizerInterfaceRegisterer::Create(
@@ -666,6 +696,13 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
 
     RETURN_IF_ERROR(optimizer->ConsumeEvaluation(candidate, score));
 
+    // Record the hyperparameter + evaluation.
+    auto& log_entry = *logs->add_steps();
+    log_entry.set_evaluation_time(
+        absl::ToDoubleSeconds(absl::Now() - begin_optimization));
+    *log_entry.mutable_hyperparameters() = candidate;
+    log_entry.set_score(score);
+
     if (std::isnan(logging_best_score) || score > logging_best_score) {
       logging_best_score = score;
       best_model_path = evaluator_result.train_model().model_path();
@@ -688,6 +725,9 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
   model::proto::GenericHyperParameters best_params;
   double best_score;
   std::tie(best_params, best_score) = optimizer->BestParameters();
+
+  logs->set_best_score(best_score);
+  *logs->mutable_best_hyperparameters() = best_params;
 
   if (!spe_config.retrain_final_model()) {
     // If the best model is needed, load it.

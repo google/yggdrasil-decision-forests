@@ -19,6 +19,7 @@ package yggdrasil_decision_forests.model.proto;
 
 import "yggdrasil_decision_forests/dataset/data_spec.proto";
 import "yggdrasil_decision_forests/dataset/weight.proto";
+import "yggdrasil_decision_forests/model/hyperparameter.proto";
 
 // Modeling task.
 enum Task {
@@ -74,6 +75,9 @@ message AbstractModel {
   optional int32 uplift_treatment_col_idx = 9 [default = -1];
 
   optional Metadata metadata = 10;
+
+  // Logs of the automated hyper-parameter tuning of the model.
+  optional HyperparametersOptimizerLogs hyperparameter_optimizer_logs = 11;
 }
 
 // Information about the model.
@@ -105,4 +109,35 @@ message VariableImportanceSet {
   // Next ID: 2
 
   repeated VariableImportance variable_importances = 1;
+}
+
+message HyperparametersOptimizerLogs {
+  // Optimization steps ordered chronologically by evaluation_time.
+  repeated Step steps = 1;
+
+  // Domain of search for the hyper-parameters.
+  optional HyperParameterSpace space = 2;
+
+  //  Registered key for the hyperparameter optimizer.
+  optional string hyperparameter_optimizer_key = 3;
+
+  // The selected hyperparameters and its score.
+  //
+  // Note: It is possible that the best hyperparameters are not part of the
+  // "steps".
+  optional GenericHyperParameters best_hyperparameters = 5;
+  optional float best_score = 4;
+
+  message Step {
+    // Time, in seconds, relative to the start of the hyper-parameter tuning, of
+    // the consuption of the hyperparameters evaluation.
+    optional double evaluation_time = 1;
+
+    // Tested hyperparameters.
+    optional GenericHyperParameters hyperparameters = 2;
+
+    // Score (the higher, the better) of the hyperparameters.
+    // A NaN value indicates that the hyperparameters are unfeasible.
+    optional float score = 3;
+  }
 }
