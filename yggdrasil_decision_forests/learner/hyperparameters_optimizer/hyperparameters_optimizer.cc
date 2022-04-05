@@ -490,6 +490,11 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
   double logging_best_score = std::numeric_limits<double>::quiet_NaN();
 
   while (true) {
+    if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
+      LOG(INFO) << "Training interrupted per the user";
+      break;
+    }
+
     // Generate as many candidates as possible.
     while (true) {
       model::proto::GenericHyperParameters candidate;
@@ -621,6 +626,11 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
   std::string best_model_path;
 
   while (true) {
+    if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
+      LOG(INFO) << "Training interrupted per the user";
+      break;
+    }
+
     // Generate as many candidates as possible.
     while (true) {
       model::proto::GenericHyperParameters candidate;
@@ -748,6 +758,7 @@ HyperParameterOptimizerLearner::EvaluateCandidateLocally(
     std::unique_ptr<AbstractModel>* model) const {
   ASSIGN_OR_RETURN(const auto base_learner, BuildBaseLearner(spe_config, true));
   RETURN_IF_ERROR(base_learner->SetHyperParameters(candidate));
+  base_learner->set_stop_training_trigger(stop_training_trigger_);
 
   metric::proto::EvaluationResults evaluation;
   switch (spe_config.evaluation().source_case()) {
