@@ -85,7 +85,6 @@ cc_library_ydf(
     deps = [
         ":decision_tree_cc_proto",
         ":decision_tree_io_interface",
-        "@com_google_absl//absl/memory",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:sharded_io_blob_sequence",
     ],
