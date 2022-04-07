@@ -83,9 +83,9 @@ void InitializeDataSpecFromColumnNames(
   for (int head_col_idx = 0; head_col_idx < header.size(); head_col_idx++) {
     const auto& col_name = header[head_col_idx];
     proto::ColumnGuide col_guide;
-    const bool has_specific_guide =
+    const bool has_user_col_guide =
         BuildColumnGuide(col_name, guide, &col_guide);
-    if (!has_specific_guide && guide.ignore_columns_without_guides()) {
+    if (!has_user_col_guide && guide.ignore_columns_without_guides()) {
       continue;
     }
     if (col_guide.ignore_column()) {
@@ -93,11 +93,13 @@ void InitializeDataSpecFromColumnNames(
     }
     proto::Column* column = data_spec->add_columns();
     column->set_name(col_name);
-    column->set_is_manual_type(has_specific_guide);
     spec_col_idx_2_csv_col_idx->push_back(
         std::make_pair(head_col_idx, col_guide));
-    if (has_specific_guide) {
+    if (has_user_col_guide && col_guide.has_type()) {
+      column->set_is_manual_type(true);
       column->set_type(col_guide.type());
+    } else {
+      column->set_is_manual_type(false);
     }
   }
 }
@@ -581,21 +583,36 @@ utils::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path) {
 bool BuildColumnGuide(const absl::string_view col_name,
                       const proto::DataSpecificationGuide& guide,
                       proto::ColumnGuide* col_guide) {
-  bool found_specific = false;
-  // Default guide values.
+  bool found_user_guide = false;
+  std::string matched_column_guide_pattern;
+
+  // Set the default guide.
   *col_guide = guide.default_column_guide();
+
   // Search for a matching guide.
   for (auto& candidate_guide : guide.column_guides()) {
-    if (std::regex_match(std::string(col_name),
-                         std::regex(candidate_guide.column_name_pattern()))) {
-      MergeColumnGuide(candidate_guide, col_guide);
-      found_specific = true;
-      if (!candidate_guide.allow_multi_match()) {
-        break;
-      }
+    if (!std::regex_match(std::string(col_name),
+                          std::regex(candidate_guide.column_name_pattern()))) {
+      continue;
     }
+    // The spec guide contains a column guide matching this column name.
+
+    if (found_user_guide && !candidate_guide.allow_multi_match()) {
+      LOG(FATAL)
+          << "At least two different column guides are matching the same "
+             "column \""
+          << col_name << "\".\nColumn guide 1: " << matched_column_guide_pattern
+          << "\nColumn guide 2: " << candidate_guide.column_name_pattern()
+          << "\n. If this is expected, set allow_multi_match=true in"
+             " the column guide. Alterntively, ensure that each column is "
+             "matched by only one column guide.";
+    }
+    MergeColumnGuide(candidate_guide, col_guide);
+    found_user_guide = true;
+    matched_column_guide_pattern = candidate_guide.column_name_pattern();
   }
-  return found_specific;
+
+  return found_user_guide;
 }
 
 absl::Status UpdateSingleColSpecWithGuideInfo(

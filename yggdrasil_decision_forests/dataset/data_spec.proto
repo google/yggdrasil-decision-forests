@@ -82,7 +82,9 @@ message Column {
   optional string name = 2;
   // If true, the type is set manually by the user (instead of been
   // automatically detected). This field is purely used for debugging purpose
-  // and has no impact on the computation.
+  // and has no impact on the computation. Note that if a column guide matches
+  // this column, and if this column guide does not contain a type,
+  // is_manual_type is set to false (as if there were no column guide match).
   optional bool is_manual_type = 3 [default = false];
   // Tokenization. For non-integerized list or sets columns (numerical or
   // categorical).
@@ -324,8 +326,11 @@ message ColumnGuide {
   // string entry (if any) will be tokenized. If the attribute contains more
   // than one entry, an error will be raised.
   optional TokenizerGuide tokenizer = 5;
-  // If false, a column matched to this guide won't be tested against other
-  // guides. If true, other guides will be tried.
+  // If true, a column can be matched against multiple different "ColumnGuide"
+  // with the last ColumnGuide having higher priority. For example, it the
+  // "type" is set in two matching column guides, the type defined in the last
+  // column guide will be used. If false, an error will be raised if more than
+  // one column guide is matching a column.
   optional bool allow_multi_match = 6 [default = false];
   optional DiscretizedNumericalGuide discretized_numerical = 7;
   // If true, matching columns are ignored and won't be in the dataspec.
