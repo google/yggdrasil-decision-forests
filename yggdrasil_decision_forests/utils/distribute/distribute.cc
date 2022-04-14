@@ -33,7 +33,9 @@ utils::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
 utils::StatusOr<int> NumWorkers(const proto::Config& config) {
   ASSIGN_OR_RETURN(auto manager, AbstractManagerRegisterer::Create(
                                      config.implementation_key()));
-  return manager->NumWorkersInConfiguration(config);
+  const auto num_workers = manager->NumWorkersInConfiguration(config);
+  RETURN_IF_ERROR(manager->Done());
+  return num_workers;
 }
 
 }  // namespace distribute

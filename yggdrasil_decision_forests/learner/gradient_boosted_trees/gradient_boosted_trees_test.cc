@@ -755,7 +755,7 @@ TEST_F(GradientBoostedTreesOnAdult, BaseAggresiveDiscretizedNumerical) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8562, 0.004);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8562, 0.005);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 

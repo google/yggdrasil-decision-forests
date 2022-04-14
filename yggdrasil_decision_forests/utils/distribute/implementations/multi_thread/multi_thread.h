@@ -33,6 +33,14 @@ class MultiThreadManager : public AbstractManager,
  public:
   static constexpr char kKey[] = "MULTI_THREAD";
 
+  virtual ~MultiThreadManager() {
+    if (!done_was_called_) {
+      LOG(WARNING) << "Calling destructor on distribute manager before having "
+                      "called \"Done\".";
+      CHECK_OK(Done({}));
+    }
+  }
+
   utils::StatusOr<Blob> BlockingRequest(Blob blob, int worker_idx) override;
 
   absl::Status AsynchronousRequest(Blob blob, int worker_idx) override;

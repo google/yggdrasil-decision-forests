@@ -331,12 +331,15 @@ HyperParameterOptimizerLearner::TrainWithStatus(
     utils::usage::OnTrainingEnd(data_spec, training_config(), config_link, -1,
                                 *model, absl::Now() - begin_training);
     *model->mutable_hyperparameter_optimizer_logs() = logs;
+
+    RETURN_IF_ERROR(manager->Done());
     return model;
   } else {
     if (!best_model) {
       return absl::InternalError("Missing model");
     }
     *best_model->mutable_hyperparameter_optimizer_logs() = logs;
+    RETURN_IF_ERROR(manager->Done());
     return best_model;
   }
 }
