@@ -451,9 +451,7 @@ double GetDensityIntegerDistributionProto(const T& dist, int value);
 
 // Compute p log p without worrying about p=0.
 inline double ProtectedPLogP(double p) {
-  DCHECK_GE(p, 0.);
-  DCHECK_LE(p, 1.);
-  if (p == 0) return 0.;
+  if (p <= 0) return 0.;
   return -p * log(p);
 }
 
@@ -468,9 +466,7 @@ inline double ProtectedPLogPInt(int64_t a, int64_t b) {
 }
 
 inline double ProtectedPLogPDouble(double a, double b) {
-  DCHECK_GE(a, 0);
-  DCHECK_LE(a, b);
-  if (a == 0 || a == b) return 0.;
+  if (a <= 0 || a >= b) return 0.;
   DCHECK_GT(b, 0);
   return ProtectedPLogP(a / b);
 }
