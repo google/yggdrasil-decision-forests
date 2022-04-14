@@ -121,6 +121,7 @@ void InitializeModelWithTrainingConfig(
 struct PredictionAccumulator {
   utils::IntegerDistribution<float> classification;
   double regression = 0;
+  internal::UplifLeafAccumulator uplift;
   // Number of tree predictions being accumulated.
   int num_trees = 0;
 };
@@ -131,6 +132,7 @@ void InitializeOOBPredictionAccumulators(
     const dataset::VerticalDataset::row_t num_predictions,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
+    const dataset::proto::DataSpecification& data_spec,
     std::vector<PredictionAccumulator>* predictions);
 
 // Add the predictions of a decision tree to a set of predictor accumulators.

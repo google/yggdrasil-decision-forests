@@ -607,6 +607,9 @@ std::string EvaluationSnippet(
                               metric::LogLoss(evaluation));
     case model::proto::Task::REGRESSION:
       return absl::Substitute("rmse:$0", metric::RMSE(evaluation));
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      return absl::Substitute("qini:$0 auuc:$1", metric::Qini(evaluation),
+                              metric::AUUC(evaluation));
     default:
       LOG(FATAL) << "Not implemented";
   }

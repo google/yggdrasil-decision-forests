@@ -389,13 +389,6 @@ RandomForestLearner::TrainWithStatus(
         false);
   }
 
-  if (training_config().task() == model::proto::Task::CATEGORICAL_UPLIFT &&
-      rf_config.compute_oob_performances()) {
-    LOG(WARNING)
-        << "RF does not support OOB performances with the uplift task (yet).";
-    rf_config.set_compute_oob_performances(false);
-  }
-
   auto mdl = absl::make_unique<RandomForestModel>();
   mdl->set_data_spec(train_dataset.data_spec());
   model::proto::TrainingConfigLinking config_link;
@@ -495,7 +488,7 @@ RandomForestLearner::TrainWithStatus(
   if (compute_oob_performances) {
     internal::InitializeOOBPredictionAccumulators(
         train_dataset.nrow(), config_with_default, config_link,
-        &oob_predictions);
+        train_dataset.data_spec(), &oob_predictions);
   }
   if (compute_oob_variable_importances) {
     if (!rf_config.compute_oob_performances())
@@ -508,6 +501,7 @@ RandomForestLearner::TrainWithStatus(
     for (const int feature_idx : config_link.features()) {
       internal::InitializeOOBPredictionAccumulators(
           train_dataset.nrow(), config_with_default, config_link,
+          train_dataset.data_spec(),
           &oob_predictions_per_input_features[feature_idx]);
     }
   }
@@ -851,12 +845,34 @@ void InitializeOOBPredictionAccumulators(
     const dataset::VerticalDataset::row_t num_predictions,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
+    const dataset::proto::DataSpecification& data_spec,
     std::vector<PredictionAccumulator>* predictions) {
   predictions->resize(num_predictions);
-  if (config.task() == model::proto::Task::CLASSIFICATION) {
-    for (auto& prediction : *predictions) {
-      prediction.classification.SetNumClasses(config_link.num_label_classes());
-    }
+
+  switch (config.task()) {
+    case model::proto::Task::CLASSIFICATION:
+      for (auto& prediction : *predictions) {
+        prediction.classification.SetNumClasses(
+            config_link.num_label_classes());
+      }
+      break;
+
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      // Note: -2 because: The value 0 is reserved for the out-of-vocab item,
+      // and there is one less predictions than treatments.
+      for (auto& prediction : *predictions) {
+        prediction.uplift.assign(
+            data_spec.columns(config_link.uplift_treatment())
+                    .categorical()
+                    .number_of_unique_values() -
+                2,
+            0);
+      }
+      break;
+
+    default:
+      // Nothing to do.
+      break;
   }
 }
 
@@ -914,6 +930,9 @@ void UpdateOOBPredictionsWithNewTree(
         break;
       case model::proto::Task::RANKING:
         LOG(FATAL) << "OOB not implemented for Uplift.";
+        break;
+      case model::proto::Task::CATEGORICAL_UPLIFT:
+        AddUpliftLeafToAccumulator(*leaf, &accumulator.uplift);
         break;
       default:
         LOG(WARNING) << "Not implemented";
@@ -981,7 +1000,9 @@ metric::proto::EvaluationResults EvaluateOOBPredictions(
             prediction_accumulator.num_trees);
         break;
       case model::proto::Task::CATEGORICAL_UPLIFT:
-        LOG(FATAL) << "OOB not implemented for Uplift.";
+        *prediction.mutable_uplift()->mutable_treatment_effect() = {
+            prediction_accumulator.uplift.begin(),
+            prediction_accumulator.uplift.end()};
         break;
       default:
         LOG(WARNING) << "Not implemented";

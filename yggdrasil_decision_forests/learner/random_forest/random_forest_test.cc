@@ -653,8 +653,8 @@ TEST(RandomForest, OOBPredictions) {
                              &dataset);
 
   std::vector<internal::PredictionAccumulator> predictions;
-  internal::InitializeOOBPredictionAccumulators(dataset.nrow(), config,
-                                                config_link, &predictions);
+  internal::InitializeOOBPredictionAccumulators(
+      dataset.nrow(), config, config_link, dataset.data_spec(), &predictions);
   EXPECT_EQ(predictions.size(), dataset.nrow());
 
   std::vector<dataset::VerticalDataset::row_t> sorted_non_oob_example_indices =
@@ -715,10 +715,11 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
   std::vector<std::vector<internal::PredictionAccumulator>>
       oob_predictions_per_input_features(2);
 
-  internal::InitializeOOBPredictionAccumulators(dataset.nrow(), config,
-                                                config_link, &oob_predictions);
   internal::InitializeOOBPredictionAccumulators(
-      dataset.nrow(), config, config_link,
+      dataset.nrow(), config, config_link, dataset.data_spec(),
+      &oob_predictions);
+  internal::InitializeOOBPredictionAccumulators(
+      dataset.nrow(), config, config_link, dataset.data_spec(),
       &oob_predictions_per_input_features[0]);
 
   std::vector<dataset::VerticalDataset::row_t> sorted_non_oob_example_indices =
