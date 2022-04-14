@@ -63,8 +63,8 @@ echo "nothing" > "${KOKORO_ARTIFACTS_DIR}/artifacts/toto.txt"
 
 # Install GCC
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-sudo apt-get update
-sudo apt-get install -y gcc-${GCC_VERSION} g++-${GCC_VERSION}
+sudo apt-get -qq update
+sudo apt-get -qq install -y gcc-${GCC_VERSION} g++-${GCC_VERSION}
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${GCC_VERSION} 100 --slave /usr/bin/g++ g++ /usr/bin/g++-${GCC_VERSION}
 sudo update-alternatives --set gcc "/usr/bin/gcc-${GCC_VERSION}"
 gcc --version
@@ -76,15 +76,11 @@ BAZEL=bazel
 which ${BAZEL}
 ${BAZEL} version
 
-# Without TensorFlow IO, c++17 and with abslStatusOr.
-FLAGS="--config=linux_cpp17 --config=linux_avx2"
-bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+echo "====================================================="
+echo "1. With TensorFlow IO, c++14 and without abslStatusOr"
+echo "====================================================="
+# The most likely way to fail.
 
-if [ "${RUN_TESTS}" = 1 ]; then
-  bazel test //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc ${FLAGS}
-fi
-
-# With TensorFlow IO, c++14 and without abslStatusOr.
 FLAGS="--config=linux_cpp14 --config=linux_avx2 --config=use_tensorflow_io --define=no_absl_statusor=1"
 bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
 
@@ -92,7 +88,22 @@ if [ "${RUN_TESTS}" = 1 ]; then
   bazel test //yggdrasil_decision_forests/{cli,dataset,learner,metric,model,serving}/...:all //examples:beginner_cc ${FLAGS}
 fi
 
-# With TensorFlow IO, c++17 and with abslStatusOr (the most complete way).
+echo "====================================================="
+echo "2. Without TensorFlow IO, c++17 and with abslStatusOr"
+echo "====================================================="
+
+FLAGS="--config=linux_cpp17 --config=linux_avx2"
+bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+
+if [ "${RUN_TESTS}" = 1 ]; then
+  bazel test //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc ${FLAGS}
+fi
+
+echo "=================================================="
+echo "3. With TensorFlow IO, c++17 and with abslStatusOr"
+echo "=================================================="
+# The most complete way
+
 FLAGS="--config=linux_cpp17 --config=linux_avx2 --config=use_tensorflow_io"
 bazel build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
 if [ "${RUN_TESTS}" = 1 ]; then
@@ -106,14 +117,18 @@ if [ "${EXPORT_BINARIES}" = 1 ]; then
   chmod a-x output/*
 fi
 
-echo "Files before capturing logs"
-pwd
-ls -L -R -l bazel-testlogs
-ls -L -R -l output
+# echo "Files before capturing logs"
+# pwd
+# ls -L -R -l bazel-testlogs
+# ls -L -R -l output
 
 capture_test_logs
 trap - EXIT
 
-echo "Files after capturing logs"
-pwd
-ls -L -R -l output
+# echo "Files after capturing logs"
+# pwd
+# ls -L -R -l output
+
+echo "================================"
+echo "End of common compilation script"
+echo "================================"

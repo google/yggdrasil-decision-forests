@@ -358,7 +358,7 @@ HyperParameterOptimizerLearner::TrainRemoteModel(
   *train_request.mutable_deployment_config() = deployment_config;
   *train_request.mutable_generic_hyper_parameters() = generic_hyper_params;
 
-  train_request.set_dataset_path(typed_train_path);
+  train_request.set_dataset_path(std::string(typed_train_path));
   if (typed_valid_path.has_value()) {
     train_request.set_valid_dataset_path(typed_valid_path.value());
   }
@@ -536,29 +536,29 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
       }
       break;
     }
-    if (!maybe_output->ok()) {
-      return maybe_output->status();
+    if (!maybe_output.value().ok()) {
+      return maybe_output.value().status();
     }
-    auto& output = maybe_output.value();
+    auto& output = maybe_output.value().value();
     pending_evaluation--;
 
     RETURN_IF_ERROR(
-        optimizer->ConsumeEvaluation(output->candidate, output->score));
+        optimizer->ConsumeEvaluation(output.candidate, output.score));
 
     // Record the hyperparameter + evaluation.
     auto& log_entry = *logs->add_steps();
     log_entry.set_evaluation_time(
         absl::ToDoubleSeconds(absl::Now() - begin_optimization));
-    *log_entry.mutable_hyperparameters() = output->candidate;
-    log_entry.set_score(output->score);
+    *log_entry.mutable_hyperparameters() = output.candidate;
+    log_entry.set_score(output.score);
 
-    if (std::isnan(logging_best_score) || output->score > logging_best_score) {
-      logging_best_score = output->score;
-      *best_model = std::move(output->model);
+    if (std::isnan(logging_best_score) || output.score > logging_best_score) {
+      logging_best_score = output.score;
+      *best_model = std::move(output.model);
     }
     LOG(INFO) << "[" << round_idx + 1 << "/" << optimizer->NumExpectedRounds()
-              << "] Score: " << output->score << " / " << logging_best_score
-              << " HParams: " << output->candidate.ShortDebugString();
+              << "] Score: " << output.score << " / " << logging_best_score
+              << " HParams: " << output.candidate.ShortDebugString();
 
     if (training_config().has_maximum_training_duration_seconds() &&
         (absl::Now() - begin_optimization) >
@@ -665,7 +665,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
             spe_config.base_learner_deployment();
         *train_request.mutable_generic_hyper_parameters() = candidate;
 
-        train_request.set_dataset_path(typed_train_path);
+        train_request.set_dataset_path(std::string(typed_train_path));
         if (typed_valid_path.has_value()) {
           train_request.set_valid_dataset_path(typed_valid_path.value());
         }
@@ -772,10 +772,11 @@ HyperParameterOptimizerLearner::EvaluateCandidateLocally(
       break;
   }
 
-  return EvaluationToScore(spe_config, evaluation);
+  ASSIGN_OR_RETURN(const auto score, EvaluationToScore(spe_config, evaluation));
+  return score;
 }
 
-utils::StatusOr<float> HyperParameterOptimizerLearner::EvaluationToScore(
+utils::StatusOr<double> HyperParameterOptimizerLearner::EvaluationToScore(
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
     const metric::proto::EvaluationResults& evaluation) const {
   // Extract the metric to optimize from the evaluation.

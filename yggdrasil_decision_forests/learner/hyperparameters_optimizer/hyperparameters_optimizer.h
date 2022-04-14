@@ -161,7 +161,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
 
   // Extracts the score from an evaluation. For scores, larger is always better.
   // Scores can be negative.
-  utils::StatusOr<float> EvaluationToScore(
+  utils::StatusOr<double> EvaluationToScore(
       const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
       const metric::proto::EvaluationResults& evaluation) const;
 };
