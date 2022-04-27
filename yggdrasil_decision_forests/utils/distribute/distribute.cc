@@ -35,7 +35,12 @@ utils::StatusOr<int> NumWorkers(const proto::Config& config) {
                                      config.implementation_key()));
   const auto num_workers = manager->NumWorkersInConfiguration(config);
   RETURN_IF_ERROR(manager->Done());
-  return num_workers;
+  // Returning num_workers directly fails in old versions of absl currently used
+  // by tensorflow.
+  if (num_workers.ok()) {
+    return num_workers.value();
+  }
+  return num_workers.status();
 }
 
 }  // namespace distribute
