@@ -98,6 +98,17 @@ constexpr char kHParamUpliftSplitScoreEDAlt[] = "ED";
 constexpr char kHParamUpliftSplitScoreCSAlt[] = "CS";
 
 constexpr char kHParamHonest[] = "honest";
+constexpr char kHParamHonestRatioLeafExamples[] = "honest_ratio_leaf_examples";
+constexpr char kHParamHonestFixedSeparation[] = "honest_fixed_separation";
+
+// The values kTrue and kFalse represent boolean values of a categorical
+// hyper-parameter.
+// TODO(gbm): Add direct support for boolean hyper-parameter. Note: users are
+// generally not using those hyper-parameter directly. Instead generic
+// hyper-parameter are used in several sub-modules (automatic generation of
+// documentation, generation of python code, hyper-parameter tuning, etc.).
+constexpr char kTrue[] = "true";
+constexpr char kFalse[] = "false";
 
 // Fill decision tree specific generic hyper parameter specifications.
 // This function is designed to be called by the learners using decision trees

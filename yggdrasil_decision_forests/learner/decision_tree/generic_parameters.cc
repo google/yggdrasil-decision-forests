@@ -87,18 +87,18 @@ absl::Status GetGenericHyperParameterSpecification(
   {
     ASSIGN_OR_RETURN(auto param, get_params(kHParamInSplitMinExampleCheck));
     param->mutable_categorical()->set_default_value(
-        config.in_split_min_examples_check() ? "true" : "false");
-    param->mutable_categorical()->add_possible_values("true");
-    param->mutable_categorical()->add_possible_values("false");
+        config.in_split_min_examples_check() ? kTrue : kFalse);
+    param->mutable_categorical()->add_possible_values(kTrue);
+    param->mutable_categorical()->add_possible_values(kFalse);
     param->mutable_documentation()->set_description(
         R"(Whether to check the `min_examples` constraint in the split search (i.e. splits leading to one child having less than `min_examples` examples are considered invalid) or before the split search (i.e. a node can be derived only if it contains more than `min_examples` examples). If false, there can be nodes with less than `min_examples` training examples.)");
   }
   {
     ASSIGN_OR_RETURN(auto param, get_params(kHParamAllowNaConditions));
     param->mutable_categorical()->set_default_value(
-        config.allow_na_conditions() ? "true" : "false");
-    param->mutable_categorical()->add_possible_values("true");
-    param->mutable_categorical()->add_possible_values("false");
+        config.allow_na_conditions() ? kTrue : kFalse);
+    param->mutable_categorical()->add_possible_values(kTrue);
+    param->mutable_categorical()->add_possible_values(kFalse);
     param->mutable_documentation()->set_description(
         R"(If true, the tree training evaluates conditions of the type `X is NA` i.e. `X is missing`.)");
   }
@@ -306,9 +306,9 @@ absl::Status GetGenericHyperParameterSpecification(
     ASSIGN_OR_RETURN(auto param,
                      get_params(kHParamKeepNonLeafLabelDistribution));
     param->mutable_categorical()->set_default_value(
-        config.keep_non_leaf_label_distribution() ? "true" : "false");
-    param->mutable_categorical()->add_possible_values("true");
-    param->mutable_categorical()->add_possible_values("false");
+        config.keep_non_leaf_label_distribution() ? kTrue : kFalse);
+    param->mutable_categorical()->add_possible_values(kTrue);
+    param->mutable_categorical()->add_possible_values(kFalse);
     param->mutable_documentation()->set_description(
         R"(Whether to keep the node value (i.e. the distribution of the labels of the training examples) of non-leaf nodes. This information is not used during serving, however it can be used for model interpretation as well as hyper parameter tuning. This can take lots of space, sometimes accounting for half of the model size.)");
   }
@@ -345,11 +345,31 @@ absl::Status GetGenericHyperParameterSpecification(
   {
     ASSIGN_OR_RETURN(auto param, get_params(kHParamHonest));
     param->mutable_categorical()->set_default_value(
-        config.has_honest() ? "true" : "false");
-    param->mutable_categorical()->add_possible_values("true");
-    param->mutable_categorical()->add_possible_values("false");
+        config.has_honest() ? kTrue : kFalse);
+    param->mutable_categorical()->add_possible_values(kTrue);
+    param->mutable_categorical()->add_possible_values(kFalse);
     param->mutable_documentation()->set_description(
         R"(In honest trees, different training examples are used to infer the structure and the leaf values. This regularization technique trades examples for bias estimates. It might increase or reduce the quality of the model. See "Generalized Random Forests", Athey et al. In this paper, Honest trees are trained with the Random Forest algorithm with a sampling without replacement.)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(auto param, get_params(kHParamHonestRatioLeafExamples));
+    param->mutable_real()->set_minimum(0.);
+    param->mutable_real()->set_maximum(1.);
+    param->mutable_real()->set_default_value(
+        config.honest().ratio_leaf_examples());
+    param->mutable_documentation()->set_description(
+        R"(For honest trees only i.e. honest=true. Ratio of examples used to set the leaf values.)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(auto param, get_params(kHParamHonestFixedSeparation));
+    param->mutable_categorical()->set_default_value(
+        config.honest().fixed_separation() ? kTrue : kFalse);
+    param->mutable_categorical()->add_possible_values(kTrue);
+    param->mutable_categorical()->add_possible_values(kFalse);
+    param->mutable_documentation()->set_description(
+        R"(For honest trees only i.e. honest=true. If true, a new random separation is generated for each tree. If false, the same separation is used for all the trees (e.g., in Gradient Boosted Trees containing multiple trees).)");
   }
 
   return absl::OkStatus();
@@ -400,7 +420,7 @@ absl::Status SetHyperParameters(
         generic_hyper_params->Get(kHParamInSplitMinExampleCheck);
     if (hparam.has_value()) {
       dt_config->set_in_split_min_examples_check(
-          hparam.value().value().categorical() == "true");
+          hparam.value().value().categorical() == kTrue);
     }
   }
 
@@ -408,7 +428,7 @@ absl::Status SetHyperParameters(
     const auto hparam = generic_hyper_params->Get(kHParamAllowNaConditions);
     if (hparam.has_value()) {
       dt_config->set_allow_na_conditions(hparam.value().value().categorical() ==
-                                         "true");
+                                         kTrue);
     }
   }
 
@@ -636,7 +656,7 @@ absl::Status SetHyperParameters(
         generic_hyper_params->Get(kHParamKeepNonLeafLabelDistribution);
     if (hparam.has_value()) {
       dt_config->set_keep_non_leaf_label_distribution(
-          hparam.value().value().categorical() == "true");
+          hparam.value().value().categorical() == kTrue);
     }
   }
 
@@ -676,10 +696,31 @@ absl::Status SetHyperParameters(
   {
     const auto hparam = generic_hyper_params->Get(kHParamHonest);
     if (hparam.has_value()) {
-      if (hparam.value().value().categorical() == "true") {
+      if (hparam.value().value().categorical() == kTrue) {
         dt_config->mutable_honest();
       } else {
         dt_config->clear_honest();
+      }
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamHonestRatioLeafExamples);
+    if (hparam.has_value()) {
+      if (dt_config->has_honest()) {
+        dt_config->mutable_honest()->set_ratio_leaf_examples(
+            hparam.value().value().real());
+      }
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamHonestFixedSeparation);
+    if (hparam.has_value()) {
+      if (dt_config->has_honest()) {
+        dt_config->mutable_honest()->set_fixed_separation(
+            hparam.value().value().categorical() == kTrue);
       }
     }
   }
