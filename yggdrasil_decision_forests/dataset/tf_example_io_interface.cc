@@ -300,11 +300,11 @@ void TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
         col_type_info.col_idx = data_spec->columns_size();
         column = data_spec->add_columns();
         column->set_name(col_name);
-        column->set_is_manual_type(has_specific_guide);
-        if (has_specific_guide) {
+        if (has_specific_guide && col_type_info.col_guide.has_type()) {
           column->set_type(col_type_info.col_guide.type());
+          column->set_is_manual_type(true);
         } else {
-          column->set_type(ColumnType::UNKNOWN);
+          column->set_is_manual_type(false);
         }
       } else {
         column = data_spec->mutable_columns(col_type_info.col_idx);

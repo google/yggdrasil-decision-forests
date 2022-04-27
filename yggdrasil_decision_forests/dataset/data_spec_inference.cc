@@ -365,6 +365,8 @@ void CreateDataSpec(const absl::string_view typed_path, const bool use_flume,
   // each column.
   proto::DataSpecificationAccumulator accumulator;
   InitializeDataspecAccumulator(*data_spec, &accumulator);
+  // TODO(gbm): Call ComputeColumnStatistics in parallel other the different
+  // paths.
   creator->ComputeColumnStatistics(paths, guide, data_spec, &accumulator);
   FinalizeComputeSpec(guide, accumulator, data_spec);
 
