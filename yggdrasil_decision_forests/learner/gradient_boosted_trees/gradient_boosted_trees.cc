@@ -2279,6 +2279,13 @@ utils::StatusOr<proto::Loss> DefaultLoss(
       return proto::Loss::BINOMIAL_LOG_LIKELIHOOD;
     } else if (label_spec.categorical().number_of_unique_values() > 3) {
       return proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD;
+    } else {
+      return absl::InvalidArgumentError(
+          "No default loss available for a categorical label with a single "
+          "unique value. 1) Make sure you want classification (e.g. instead of "
+          "regression), 2) Make sure your training dataset contains at least "
+          "two different categorical label values. 3) Alternatively, specify "
+          "manually the loss e.g. loss=BINOMIAL_LOG_LIKELIHOOD.");
     }
   }
 
