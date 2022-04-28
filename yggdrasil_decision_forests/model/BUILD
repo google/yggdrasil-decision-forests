@@ -134,6 +134,21 @@ all_proto_library(
 
 # Tests
 # =====
+cc_library_ydf(
+    name = "model_testing",
+    testonly = 1,
+    hdrs = [
+        "model_testing.h",
+    ],
+    deps = [
+        ":abstract_model",
+        ":prediction_cc_proto",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+    ],
+)
 
 cc_test(
     name = "abstract_model_test",
@@ -143,6 +158,7 @@ cc_test(
         ":abstract_model",
         ":abstract_model_cc_proto",
         ":model_library",
+        ":model_testing",
         ":prediction_cc_proto",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",

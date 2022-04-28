@@ -30,6 +30,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
+#include "yggdrasil_decision_forests/model/model_testing.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
@@ -52,32 +53,10 @@ std::string TestDataDir() {
                         "yggdrasil_decision_forests/test_data");
 }
 
-class FakeModelWithEngine : public AbstractModel {
+class FakeModelWithEngine : public FakeModel {
  public:
-  static constexpr char kRegisteredName[] = "FAKE_MODEL_WITH_ENGINE";
-
-  FakeModelWithEngine() : AbstractModel(kRegisteredName) {}
-
-  absl::Status Save(absl::string_view directory) const override {
-    return absl::UnimplementedError("Non implemented");
-  }
-  absl::Status Load(absl::string_view directory) override {
-    return absl::UnimplementedError("Non implemented");
-  }
-
-  void Predict(const dataset::VerticalDataset& dataset,
-               dataset::VerticalDataset::row_t row_idx,
-               model::proto::Prediction* prediction) const override {
-    LOG(FATAL) << "Not implemented";
-  }
-
-  void Predict(const dataset::proto::Example& example,
-               model::proto::Prediction* prediction) const override {
-    LOG(FATAL) << "Not implemented";
-  }
+  FakeModelWithEngine() : FakeModel() {}
 };
-
-constexpr char FakeModelWithEngine::kRegisteredName[];
 
 class Engine1 : public serving::FastEngine {
  public:
@@ -187,32 +166,10 @@ class EngineFactory2 : public model::FastEngineFactory {
 
 REGISTER_FastEngineFactory(EngineFactory2, "engine2");
 
-class FakeModelWithoutEngine : public AbstractModel {
+class FakeModelWithoutEngine : public FakeModel {
  public:
-  static constexpr char kRegisteredName[] = "FAKE_MODEL_WITHOUT_ENGINE";
-
-  FakeModelWithoutEngine() : AbstractModel(kRegisteredName) {}
-
-  absl::Status Save(absl::string_view directory) const override {
-    return absl::UnimplementedError("Non implemented");
-  }
-  absl::Status Load(absl::string_view directory) override {
-    return absl::UnimplementedError("Non implemented");
-  }
-
-  void Predict(const dataset::VerticalDataset& dataset,
-               dataset::VerticalDataset::row_t row_idx,
-               model::proto::Prediction* prediction) const override {
-    LOG(FATAL) << "Not implemented";
-  }
-
-  void Predict(const dataset::proto::Example& example,
-               model::proto::Prediction* prediction) const override {
-    LOG(FATAL) << "Not implemented";
-  }
+  FakeModelWithoutEngine() : FakeModel() {}
 };
-
-constexpr char FakeModelWithoutEngine::kRegisteredName[];
 
 TEST(AbstractLearner, MergeVariableImportance) {
   std::vector<proto::VariableImportance> a;

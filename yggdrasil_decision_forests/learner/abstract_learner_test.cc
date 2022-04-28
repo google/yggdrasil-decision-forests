@@ -30,6 +30,7 @@
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/model_testing.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -175,17 +176,9 @@ TEST(AbstractLearner, GenericHyperParameters) {
 // with 4 x 1000 observations: 2 labels of class "2" and two labels of class "1"
 // x 1000. Run a 10 fold cross-validation.
 TEST(AbstractLearner, EvaluateLearner) {
-  class FakeModel : public AbstractModel {
+  class FakeClassificationModel : public FakeModel {
    public:
-    FakeModel() : AbstractModel("FAKE_MODEL") {}
-
-    absl::Status Save(absl::string_view directory) const override {
-      return absl::OkStatus();
-    }
-
-    absl::Status Load(absl::string_view directory) override {
-      return absl::OkStatus();
-    }
+    FakeClassificationModel() : FakeModel() {}
 
     void Predict(const dataset::VerticalDataset& dataset,
                  dataset::VerticalDataset::row_t row_idx,
@@ -196,11 +189,6 @@ TEST(AbstractLearner, EvaluateLearner) {
           distribution { counts: 0 counts: 1 counts: 0 sum: 1 }
         }
       )pb");
-    }
-
-    void Predict(const dataset::proto::Example& example,
-                 model::proto::Prediction* prediction) const override {
-      LOG(FATAL) << "Should not be called";
     }
   };
 
@@ -213,7 +201,7 @@ TEST(AbstractLearner, EvaluateLearner) {
         const dataset::VerticalDataset& train_dataset,
         absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
             valid_dataset = {}) const override {
-      auto model = absl::make_unique<FakeModel>();
+      auto model = absl::make_unique<FakeClassificationModel>();
       model::proto::TrainingConfigLinking config_link;
       CHECK_OK(AbstractLearner::LinkTrainingConfig(
           training_config(), train_dataset.data_spec(), &config_link));
