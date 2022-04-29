@@ -761,7 +761,8 @@ absl::Status CreateCheckpoint(
   RETURN_IF_ERROR(file::RecursivelyCreateDir(checkpoint_dir, file::Defaults()));
 
   // Save the model structure.
-  RETURN_IF_ERROR(model.Save(file::JoinPath(checkpoint_dir, "model")));
+  RETURN_IF_ERROR(model.Save(file::JoinPath(checkpoint_dir, "model"),
+                             /*io_options=*/{/*file_prefix=*/""}));
 
   // Save the worker-side checkpoint content.
   RETURN_IF_ERROR(EmitCreateCheckpoint(
@@ -796,7 +797,8 @@ absl::Status RestoreManagerCheckpoint(
   *label_statistics = checkpoint->label_statistics();
   *model =
       absl::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
-  RETURN_IF_ERROR(model->get()->Load(file::JoinPath(checkpoint_dir, "model")));
+  RETURN_IF_ERROR(model->get()->Load(file::JoinPath(checkpoint_dir, "model"),
+                                     /*io_options=*/{/*file_prefix=*/""}));
   return absl::OkStatus();
 }
 

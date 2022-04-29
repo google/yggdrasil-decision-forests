@@ -62,13 +62,14 @@ using ::yggdrasil_decision_forests::model::decision_tree::
 // Basename for the shards containing the nodes.
 constexpr char kNodeBaseFilename[] = "nodes";
 // Filename containing the gradient boosted trees header.
-constexpr char kHeaderFilename[] = "gradient_boosted_trees_header.pb";
+constexpr char kHeaderBaseFilename[] = "gradient_boosted_trees_header.pb";
 
 }  // namespace
 
 absl::Status GradientBoostedTreesModel::Save(
-    absl::string_view directory) const {
+    absl::string_view directory, const ModelIOOptions& io_options) const {
   RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
+  RETURN_IF_ERROR(ValidateModelIOOptions(io_options));
 
   // Format used to store the nodes.
   std::string format;
@@ -79,8 +80,10 @@ absl::Status GradientBoostedTreesModel::Save(
   }
 
   int num_shards;
+  std::string node_base_filename =
+      absl::StrCat(io_options.file_prefix.value(), kNodeBaseFilename);
   RETURN_IF_ERROR(decision_tree::SaveTreesToDisk(
-      directory, kNodeBaseFilename, decision_trees_, format, &num_shards));
+      directory, node_base_filename, decision_trees_, format, &num_shards));
   proto::Header header;
   header.set_node_format(format);
   header.set_num_node_shards(num_shards);
@@ -92,18 +95,27 @@ absl::Status GradientBoostedTreesModel::Save(
   *header.mutable_initial_predictions() = google::protobuf::RepeatedField<float>(
       initial_predictions_.begin(), initial_predictions_.end());
   *header.mutable_training_logs() = training_logs_;
+  std::string header_filename =
+      absl::StrCat(io_options.file_prefix.value(), kHeaderBaseFilename);
   RETURN_IF_ERROR(file::SetBinaryProto(
-      file::JoinPath(directory, kHeaderFilename), header, file::Defaults()));
+      file::JoinPath(directory, header_filename), header, file::Defaults()));
   return absl::OkStatus();
 }
 
-absl::Status GradientBoostedTreesModel::Load(absl::string_view directory) {
+absl::Status GradientBoostedTreesModel::Load(absl::string_view directory,
+                                             const ModelIOOptions& io_options) {
+  RETURN_IF_ERROR(ValidateModelIOOptions(io_options));
+
   proto::Header header;
   decision_trees_.clear();
+  std::string header_filename =
+      absl::StrCat(io_options.file_prefix.value(), kHeaderBaseFilename);
   RETURN_IF_ERROR(file::GetBinaryProto(
-      file::JoinPath(directory, kHeaderFilename), &header, file::Defaults()));
+      file::JoinPath(directory, header_filename), &header, file::Defaults()));
+  std::string node_base_filename =
+      absl::StrCat(io_options.file_prefix.value(), kNodeBaseFilename);
   RETURN_IF_ERROR(decision_tree::LoadTreesFromDisk(
-      directory, kNodeBaseFilename, header.num_node_shards(),
+      directory, node_base_filename, header.num_node_shards(),
       header.num_trees(), header.node_format(), &decision_trees_));
   node_format_ = header.node_format();
   loss_ = header.loss();

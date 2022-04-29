@@ -37,16 +37,22 @@ absl::Status CreateEmptyModel(absl::string_view model_name,
 std::vector<std::string> AllRegisteredModels();
 
 // Save the model into a directory. The directory should not exist already.
+// All file names with start with `prefix`.
 absl::Status SaveModel(absl::string_view directory,
-                       const AbstractModel* const mdl);
+                       const AbstractModel* const mdl,
+                       ModelIOOptions io_options = {});
 
-// Load a model from a directory previously created with "SaveModel".
+// Load a model from a directory previously created with "SaveModel". If
+// `prefix` is nonempty, only files whose file names use that prefix are
+// considered.
 absl::Status LoadModel(absl::string_view directory,
-                       std::unique_ptr<AbstractModel>* model);
+                       std::unique_ptr<AbstractModel>* model,
+                       ModelIOOptions io_options = {});
 
 // Checks if a model exist i.e. if the "done" file (see kModelDoneFileName) is
 // present.
-utils::StatusOr<bool> ModelExist(absl::string_view directory);
+utils::StatusOr<bool> ModelExists(absl::string_view directory,
+                                  const ModelIOOptions& io_options);
 
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

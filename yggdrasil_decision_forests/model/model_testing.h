@@ -31,11 +31,13 @@ class FakeModel : public AbstractModel {
   FakeModel(const absl::string_view name = "FAKE_MODEL")
       : AbstractModel(name) {}
 
-  absl::Status Save(absl::string_view directory) const override {
+  absl::Status Save(absl::string_view directory,
+                    const ModelIOOptions& io_options) const override {
     return absl::UnimplementedError("Save");
   }
 
-  absl::Status Load(absl::string_view directory) override {
+  absl::Status Load(absl::string_view directory,
+                    const ModelIOOptions& io_options) override {
     return absl::UnimplementedError("Load");
   }
 

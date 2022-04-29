@@ -58,8 +58,10 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
       "MEAN_INCREASE_IN_RMSE";
 
   RandomForestModel() : AbstractModel(kRegisteredName) {}
-  absl::Status Save(absl::string_view directory) const override;
-  absl::Status Load(absl::string_view directory) override;
+  absl::Status Save(absl::string_view directory,
+                    const ModelIOOptions& io_options) const override;
+  absl::Status Load(absl::string_view directory,
+                    const ModelIOOptions& io_options) override;
 
   absl::Status Validate() const override;
 

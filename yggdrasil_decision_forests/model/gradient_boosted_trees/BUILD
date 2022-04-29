@@ -51,3 +51,20 @@ all_proto_library(
 
 # Test
 # ========
+
+cc_test(
+    name = "gradient_boosted_trees_test",
+    size = "medium",
+    srcs = ["gradient_boosted_trees_test.cc"],
+    data = [
+        "//yggdrasil_decision_forests/test_data",
+    ],
+    deps = [
+        ":gradient_boosted_trees",
+        "@com_google_googletest//:gtest_main",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:test",
+    ],
+)

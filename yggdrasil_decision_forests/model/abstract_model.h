@@ -48,6 +48,16 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 
+struct ModelIOOptions {
+  // The prefix of files used by the model.
+  //
+  // For saving a model, if `file_prefix` is not set, an empty string is used.
+  // For loading a model, if `file_prefix` is not set, the model prefix is
+  // auto-detected (if possible) based on the existing files in the given
+  // directory.
+  absl::optional<std::string> file_prefix;
+};
+
 class AbstractModel {
  public:
   virtual ~AbstractModel() {}
@@ -60,13 +70,17 @@ class AbstractModel {
   // files called "header.pb" nor "data_spec.pb" (see kModelHeaderFileName and
   // kModelDataSpecFileName) as these filenames are reserved for the model meta
   // information.
-  virtual absl::Status Save(absl::string_view directory) const = 0;
+  // If no file prefix is given through `io_options`, the empty string is used.
+  virtual absl::Status Save(absl::string_view directory,
+                            const ModelIOOptions& io_options) const = 0;
 
   // It is likely that you want to use the function "LoadModel" from
   // "model_library.h" instead of this function.
   //
   // Load the model from a directory. Should match the format created by "Save".
-  virtual absl::Status Load(absl::string_view directory) = 0;
+  // Derived classes may require a file prefix be given through `io_options`.
+  virtual absl::Status Load(absl::string_view directory,
+                            const ModelIOOptions& io_options) = 0;
 
   // Creates an inference engine able to run the model more efficiently
   // than by calling "Predict". Once the inference engine created, the model
@@ -389,6 +403,11 @@ class AbstractModel {
 
   // Prints informations about the hyper-parameter optimizer logs.
   void AppendHyperparameterOptimizerLogs(std::string* description) const;
+
+  // Checks if the ModelIOOptions are sufficient to load the model.
+  //
+  // At this time, this function checks if a prefix if given.
+  static absl::Status ValidateModelIOOptions(const ModelIOOptions& io_options);
 
   // A string uniquely identifying the model type . Used to determine
   // model types during serialization. This should match the registered names in

@@ -376,6 +376,55 @@ TEST(RandomForest, GetLeaves) {
   EXPECT_EQ(leaves[6], 151);
 }
 
+TEST(RandomForest, SaveAndLoadModelWithoutPrefix) {
+  std::unique_ptr<model::AbstractModel> original_model;
+  // TODO(b/227344233): Simplify this test by having it use the toy model
+  // defined above.
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
+      &original_model));
+  std::string model_path =
+      file::JoinPath(test::TmpDirectory(), "saved_model_without_prefix");
+  EXPECT_OK(SaveModel(model_path, original_model.get(), {}));
+
+  std::unique_ptr<model::AbstractModel> loaded_model;
+  EXPECT_OK(LoadModel(model_path, &loaded_model, {}));
+  EXPECT_EQ(original_model->DescriptionAndStatistics(/*full_definition=*/true),
+            loaded_model->DescriptionAndStatistics(/*full_definition=*/true));
+}
+
+TEST(RandomForest, SaveAndLoadModelWithPrefix) {
+  std::string saved_model_path =
+      file::JoinPath(test::TmpDirectory(), "saved_models_with_prefixes");
+  std::unique_ptr<model::AbstractModel> original_model_1;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
+      &original_model_1));
+  EXPECT_OK(SaveModel(saved_model_path, original_model_1.get(),
+                      {/*file_prefix=*/"prefix_1_"}));
+
+  std::unique_ptr<model::AbstractModel> original_model_2;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_oblique_rf"),
+      &original_model_2));
+  EXPECT_OK(SaveModel(saved_model_path, original_model_2.get(),
+                      {/*file_prefix=*/"prefix_2_"}));
+
+  std::unique_ptr<model::AbstractModel> loaded_model_1;
+  EXPECT_OK(LoadModel(saved_model_path, &loaded_model_1,
+                      {/*file_prefix=*/"prefix_1_"}));
+  EXPECT_EQ(
+      original_model_1->DescriptionAndStatistics(/*full_definition=*/true),
+      loaded_model_1->DescriptionAndStatistics(/*full_definition=*/true));
+
+  std::unique_ptr<model::AbstractModel> loaded_model_2;
+  EXPECT_OK(LoadModel(saved_model_path, &loaded_model_2,
+                      {/*file_prefix=*/"prefix_2_"}));
+  EXPECT_EQ(
+      original_model_2->DescriptionAndStatistics(/*full_definition=*/true),
+      loaded_model_2->DescriptionAndStatistics(/*full_definition=*/true));
+}
+
 }  // namespace
 }  // namespace random_forest
 }  // namespace model

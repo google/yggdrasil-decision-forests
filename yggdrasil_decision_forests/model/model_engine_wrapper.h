@@ -54,12 +54,14 @@ class EngineWrapperModel : public AbstractModel {
     set_ranking_group_col(model->ranking_group_col_idx());
   }
 
-  absl::Status Save(absl::string_view directory) const override {
+  absl::Status Save(absl::string_view directory,
+                    const ModelIOOptions& io_options) const override {
     return absl::InvalidArgumentError(
         "Engine wrapper doesn't support model serialization");
   }
 
-  absl::Status Load(absl::string_view directory) override {
+  absl::Status Load(absl::string_view directory,
+                    const ModelIOOptions& io_options) override {
     return absl::InvalidArgumentError(
         "Engine wrapper don't support model serialization");
   }

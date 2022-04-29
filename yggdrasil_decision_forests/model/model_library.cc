@@ -60,41 +60,56 @@ absl::Status CreateEmptyModel(const absl::string_view model_name,
 }
 
 absl::Status SaveModel(absl::string_view directory,
-                       const AbstractModel* const mdl) {
+                       const AbstractModel* const mdl,
+                       ModelIOOptions io_options) {
   RETURN_IF_ERROR(mdl->Validate());
   RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
   proto::AbstractModel header;
   AbstractModel::ExportProto(*mdl, &header);
-  RETURN_IF_ERROR(
-      file::SetBinaryProto(file::JoinPath(directory, kModelHeaderFileName),
-                           header, file::Defaults()));
-  RETURN_IF_ERROR(
-      file::SetBinaryProto(file::JoinPath(directory, kModelDataSpecFileName),
-                           mdl->data_spec(), file::Defaults()));
-  RETURN_IF_ERROR(mdl->Save(directory));
+  io_options.file_prefix = io_options.file_prefix.value_or("");
+  RETURN_IF_ERROR(file::SetBinaryProto(
+      file::JoinPath(directory, absl::StrCat(io_options.file_prefix.value(),
+                                             kModelHeaderFileName)),
+      header, file::Defaults()));
+  RETURN_IF_ERROR(file::SetBinaryProto(
+      file::JoinPath(directory, absl::StrCat(io_options.file_prefix.value(),
+                                             kModelDataSpecFileName)),
+      mdl->data_spec(), file::Defaults()));
+  RETURN_IF_ERROR(mdl->Save(directory, io_options));
 
-  RETURN_IF_ERROR(
-      file::SetContent(file::JoinPath(directory, kModelDoneFileName), ""));
+  RETURN_IF_ERROR(file::SetContent(
+      file::JoinPath(directory, absl::StrCat(io_options.file_prefix.value(),
+                                             kModelDoneFileName)),
+      ""));
   return absl::OkStatus();
 }
 
 absl::Status LoadModel(absl::string_view directory,
-                       std::unique_ptr<AbstractModel>* model) {
+                       std::unique_ptr<AbstractModel>* model,
+                       ModelIOOptions io_options) {
   proto::AbstractModel header;
-  RETURN_IF_ERROR(
-      file::GetBinaryProto(file::JoinPath(directory, kModelHeaderFileName),
-                           &header, file::Defaults()));
+  // TODO(b/224445588): Add model prefix autodetection.
+  io_options.file_prefix = io_options.file_prefix.value_or("");
+  RETURN_IF_ERROR(file::GetBinaryProto(
+      file::JoinPath(directory, absl::StrCat(io_options.file_prefix.value(),
+                                             kModelHeaderFileName)),
+      &header, file::Defaults()));
   RETURN_IF_ERROR(CreateEmptyModel(header.name(), model));
   AbstractModel::ImportProto(header, model->get());
   RETURN_IF_ERROR(file::GetBinaryProto(
-      file::JoinPath(directory, kModelDataSpecFileName),
+      file::JoinPath(directory, absl::StrCat(io_options.file_prefix.value(),
+                                             kModelDataSpecFileName)),
       model->get()->mutable_data_spec(), file::Defaults()));
-  RETURN_IF_ERROR(model->get()->Load(directory));
+  RETURN_IF_ERROR(model->get()->Load(directory, io_options));
   return model->get()->Validate();
 }
 
-utils::StatusOr<bool> ModelExist(absl::string_view directory) {
-  return file::FileExists(file::JoinPath(directory, kModelDoneFileName));
+utils::StatusOr<bool> ModelExists(absl::string_view directory,
+                                  const ModelIOOptions& io_options) {
+  // TODO(b/224445588): Add model prefix autodetection.
+  return file::FileExists(file::JoinPath(
+      directory,
+      absl::StrCat(io_options.file_prefix.value_or(""), kModelDoneFileName)));
 }
 
 }  // namespace model

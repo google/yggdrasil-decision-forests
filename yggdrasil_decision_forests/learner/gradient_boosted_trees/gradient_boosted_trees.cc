@@ -1196,7 +1196,9 @@ GradientBoostedTreesLearner::TrainWithStatus(
           file::JoinPath(deployment_.cache_path(),
                          absl::StrCat("model_", snapshot_idx_or.value()));
       // Load the model structure.
-      RETURN_IF_ERROR(mdl->Load(model_path));
+      // TODO(b/224445588): Add model prefix autodetection.
+      RETURN_IF_ERROR(
+          mdl->Load(model_path, /*io_options=*/{/*file_prefix=*/""}));
       iter_idx = mdl->NumTrees();
 
       // Recompute the prediction caches.
@@ -1456,7 +1458,9 @@ GradientBoostedTreesLearner::TrainWithStatus(
                                              absl::StrCat("model_", iter_idx));
 
       // Save the model structure.
-      RETURN_IF_ERROR(mdl->Save(model_path));
+      // TODO(b/224445588): Consider adding a model prefix.
+      RETURN_IF_ERROR(
+          mdl->Save(model_path, /*io_options=*/{/*file_prefix=*/""}));
 
       // Record the snapshot.
       RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
@@ -1478,7 +1482,9 @@ GradientBoostedTreesLearner::TrainWithStatus(
                                              absl::StrCat("model_", iter_idx));
 
       // Save the model structure.
-      RETURN_IF_ERROR(mdl->Save(model_path));
+      // TODO(b/224445588): Consider adding a model prefix.
+      RETURN_IF_ERROR(
+          mdl->Save(model_path, /*io_options=*/{/*file_prefix=*/""}));
 
       // Record the snapshot.
       RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));

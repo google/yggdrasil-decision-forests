@@ -1157,5 +1157,15 @@ size_t AbstractModel::AbstractAttributesSizeInBytes() const {
   return size;
 }
 
+absl::Status AbstractModel::ValidateModelIOOptions(
+    const ModelIOOptions& io_options) {
+  // TODO(b/224445588): Update the error message as soon as model prefix
+  // autodetection is implemented.
+  if (!io_options.file_prefix) {
+    return absl::InvalidArgumentError("No model file prefix given.");
+  }
+  return absl::OkStatus();
+}
+
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

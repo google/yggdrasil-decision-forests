@@ -56,8 +56,10 @@ class GradientBoostedTreesModel : public AbstractModel,
   static constexpr char kRegisteredName[] = "GRADIENT_BOOSTED_TREES";
 
   GradientBoostedTreesModel() : AbstractModel(kRegisteredName) {}
-  absl::Status Save(absl::string_view directory) const override;
-  absl::Status Load(absl::string_view directory) override;
+  absl::Status Save(absl::string_view directory,
+                    const ModelIOOptions& io_options) const override;
+  absl::Status Load(absl::string_view directory,
+                    const ModelIOOptions& io_options) override;
 
   absl::Status Validate() const override;
 
