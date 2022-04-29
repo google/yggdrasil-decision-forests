@@ -23,6 +23,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/strip.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -88,8 +89,10 @@ absl::Status LoadModel(absl::string_view directory,
                        std::unique_ptr<AbstractModel>* model,
                        ModelIOOptions io_options) {
   proto::AbstractModel header;
-  // TODO(b/224445588): Add model prefix autodetection.
-  io_options.file_prefix = io_options.file_prefix.value_or("");
+
+  if (!io_options.file_prefix) {
+    ASSIGN_OR_RETURN(io_options.file_prefix, DetectFilePrefix(directory));
+  }
   RETURN_IF_ERROR(file::GetBinaryProto(
       file::JoinPath(directory, absl::StrCat(io_options.file_prefix.value(),
                                              kModelHeaderFileName)),
@@ -106,10 +109,27 @@ absl::Status LoadModel(absl::string_view directory,
 
 utils::StatusOr<bool> ModelExists(absl::string_view directory,
                                   const ModelIOOptions& io_options) {
-  // TODO(b/224445588): Add model prefix autodetection.
-  return file::FileExists(file::JoinPath(
-      directory,
-      absl::StrCat(io_options.file_prefix.value_or(""), kModelDoneFileName)));
+  if (io_options.file_prefix) {
+    return file::FileExists(file::JoinPath(
+        directory,
+        absl::StrCat(io_options.file_prefix.value(), kModelDataSpecFileName)));
+  }
+  return DetectFilePrefix(directory).ok();
+}
+
+utils::StatusOr<std::string> DetectFilePrefix(absl::string_view directory) {
+  std::vector<std::string> done_files;
+  RETURN_IF_ERROR(file::Match(
+      file::JoinPath(directory, absl::StrCat("*", kModelDataSpecFileName)),
+      &done_files, file::Defaults()));
+  if (done_files.size() != 1) {
+    return absl::FailedPreconditionError(
+        absl::Substitute("File prefix cannot be autodetected: $0 models exist "
+                         "in $1",
+                         done_files.size(), directory));
+  }
+  return file::GetBasename(
+      absl::StripSuffix(done_files[0], kModelDataSpecFileName));
 }
 
 }  // namespace model

@@ -1159,10 +1159,10 @@ size_t AbstractModel::AbstractAttributesSizeInBytes() const {
 
 absl::Status AbstractModel::ValidateModelIOOptions(
     const ModelIOOptions& io_options) {
-  // TODO(b/224445588): Update the error message as soon as model prefix
-  // autodetection is implemented.
   if (!io_options.file_prefix) {
-    return absl::InvalidArgumentError("No model file prefix given.");
+    return absl::InvalidArgumentError(
+        "No model file prefix given. When using model::LoadModel() and "
+        "model::SaveModel(), a prefix is automatically chosen, if possible.");
   }
   return absl::OkStatus();
 }

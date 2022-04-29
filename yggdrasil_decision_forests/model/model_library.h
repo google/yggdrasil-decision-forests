@@ -54,6 +54,11 @@ absl::Status LoadModel(absl::string_view directory,
 utils::StatusOr<bool> ModelExists(absl::string_view directory,
                                   const ModelIOOptions& io_options);
 
+// If exactly one model exists in the given directory, returns the prefix of the
+// given model. Returns absl::StatusCode::kFailedPrecondition if zero or
+// multiple models exist in the given directory.
+utils::StatusOr<std::string> DetectFilePrefix(absl::string_view directory);
+
 }  // namespace model
 }  // namespace yggdrasil_decision_forests
 

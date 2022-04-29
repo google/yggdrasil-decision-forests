@@ -44,7 +44,8 @@ namespace model {
 namespace random_forest {
 namespace {
 
-using test::EqualsProto;
+using ::yggdrasil_decision_forests::test::EqualsProto;
+using ::yggdrasil_decision_forests::test::StatusIs;
 
 std::string TestDataDir() {
   return file::JoinPath(test::DataRootDirectory(),
@@ -391,6 +392,41 @@ TEST(RandomForest, SaveAndLoadModelWithoutPrefix) {
   EXPECT_OK(LoadModel(model_path, &loaded_model, {}));
   EXPECT_EQ(original_model->DescriptionAndStatistics(/*full_definition=*/true),
             loaded_model->DescriptionAndStatistics(/*full_definition=*/true));
+}
+
+TEST(RandomForest, SaveAndLoadModelWithAutodetectedPrefix) {
+  std::unique_ptr<model::AbstractModel> original_model;
+  // TODO(b/227344233): Simplify this test by having it use the toy model
+  // defined above.
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
+      &original_model));
+  std::string model_path =
+      file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
+  EXPECT_OK(SaveModel(model_path, original_model.get(),
+                      {.file_prefix = "prefix_1_"}));
+
+  std::unique_ptr<model::AbstractModel> loaded_model;
+  EXPECT_OK(LoadModel(model_path, &loaded_model, {}));
+  EXPECT_EQ(original_model->DescriptionAndStatistics(/*full_definition=*/true),
+            loaded_model->DescriptionAndStatistics(/*full_definition=*/true));
+}
+
+TEST(RandomForest, FailingPrefixDetectionForMultipleModelsPerDirectory) {
+  std::unique_ptr<model::AbstractModel> original_model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
+      &original_model));
+  std::string model_path =
+      file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
+  ASSERT_OK(SaveModel(model_path, original_model.get(),
+                      {.file_prefix = "prefix_1_"}));
+  ASSERT_OK(SaveModel(model_path, original_model.get(),
+                      {.file_prefix = "prefix_2_"}));
+
+  std::unique_ptr<model::AbstractModel> loaded_model;
+  EXPECT_THAT(LoadModel(model_path, &loaded_model, {}),
+              StatusIs(absl::StatusCode::kFailedPrecondition));
 }
 
 TEST(RandomForest, SaveAndLoadModelWithPrefix) {

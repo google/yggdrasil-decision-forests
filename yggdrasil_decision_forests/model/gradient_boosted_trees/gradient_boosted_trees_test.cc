@@ -80,6 +80,49 @@ TEST(GradientBoostedTrees, SaveAndLoadModelWithPrefix) {
       loaded_model_2->DescriptionAndStatistics(/*full_definition=*/true));
 }
 
+TEST(GradientBoostedTrees, SaveAndLoadModelWithAutodetectedPrefix) {
+  std::unique_ptr<model::AbstractModel> original_model;
+  // TODO(b/227344233): Simplify this test by having it use the toy model
+  // defined above.
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &original_model));
+  std::string model_path =
+      file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
+  EXPECT_OK(SaveModel(model_path, original_model.get(),
+                      {.file_prefix = "prefix_1_"}));
+
+  std::unique_ptr<model::AbstractModel> loaded_model;
+  EXPECT_OK(LoadModel(model_path, &loaded_model, {}));
+  EXPECT_EQ(original_model->DescriptionAndStatistics(/*full_definition=*/true),
+            loaded_model->DescriptionAndStatistics(/*full_definition=*/true));
+}
+
+TEST(GradientBoostedTrees,
+     FailingPrefixDetectionForMultipleModelsPerDirectory) {
+  std::unique_ptr<model::AbstractModel> original_model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &original_model));
+  std::string model_path =
+      file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
+  ASSERT_OK(SaveModel(model_path, original_model.get(),
+                      {.file_prefix = "prefix_1_"}));
+  ASSERT_OK(SaveModel(model_path, original_model.get(),
+                      {.file_prefix = "prefix_2_"}));
+
+  std::unique_ptr<model::AbstractModel> loaded_model;
+  EXPECT_THAT(LoadModel(model_path, &loaded_model, {}),
+              test::StatusIs(absl::StatusCode::kFailedPrecondition));
+
+  std::unique_ptr<model::AbstractModel> loaded_model_1;
+  EXPECT_OK(LoadModel(model_path, &loaded_model_1,
+                      /*io_options*/ {/*file_prefix=*/"prefix_1_"}));
+  std::unique_ptr<model::AbstractModel> loaded_model_2;
+  EXPECT_OK(LoadModel(model_path, &loaded_model_2,
+                      /*io_options*/ {/*file_prefix=*/"prefix_2_"}));
+}
+
 }  // namespace
 }  // namespace random_forest
 }  // namespace model
