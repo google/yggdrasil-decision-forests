@@ -234,4 +234,8 @@ absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
                                                              std::string(to)));
 }
 
+std::string GetBasename(absl::string_view path) {
+  return std::string(tensorflow::io::Basename(path));
+}
+
 }  // namespace file

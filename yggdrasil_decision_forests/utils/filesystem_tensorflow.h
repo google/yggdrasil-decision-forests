@@ -168,6 +168,13 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
 yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
     absl::string_view path);
 
+// Gets the basename of the path.
+//
+// Usage example:
+//   std::string basename = GetBasename("/path/to/my/file.txt");
+//   EXPECT_EQ(basename, "file.txt");
+std::string GetBasename(absl::string_view path);
+
 // Renames a file or a directory.
 absl::Status Rename(absl::string_view from, absl::string_view to, int options);
 

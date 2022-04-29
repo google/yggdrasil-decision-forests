@@ -162,5 +162,17 @@ TEST(Filesystem, Rename) {
   EXPECT_EQ(content, read_content);
 }
 
+TEST(Filesystem, Basename) {
+  EXPECT_EQ(GetBasename("file"), "file");
+  EXPECT_EQ(GetBasename("file.txt"), "file.txt");
+  EXPECT_EQ(GetBasename(""), "");
+  EXPECT_EQ(GetBasename(file::JoinPath("dir", "file")), "file");
+  EXPECT_EQ(GetBasename(file::JoinPath("dir", "file.txt")), "file.txt");
+  std::string dir_with_subdir = file::JoinPath("dir", "subdir");
+  EXPECT_EQ(GetBasename(file::JoinPath(dir_with_subdir, "file")), "file");
+  EXPECT_EQ(GetBasename(file::JoinPath(dir_with_subdir, "file.txt")),
+            "file.txt");
+}
+
 }  // namespace
 }  // namespace file

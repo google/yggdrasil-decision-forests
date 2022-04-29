@@ -22,6 +22,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -229,6 +230,15 @@ absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
     return absl::InvalidArgumentError(e.what());
   }
   return absl::OkStatus();
+}
+
+std::string GetBasename(absl::string_view path) {
+  try {
+    return std::filesystem::path(path).filename();
+  } catch (const std::exception& e) {
+    LOG(ERROR) << "Error parsing basename of " << path << ": " << e.what();
+    return "";
+  }
 }
 
 }  // namespace file
