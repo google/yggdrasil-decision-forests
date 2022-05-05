@@ -62,6 +62,10 @@ MATCHER(StatusIsOk, "Status is OK") { return arg.ok(); }
 #define EXPECT_OK(expr) \
   EXPECT_THAT(expr, ::yggdrasil_decision_forests::test::StatusIsOk())
 #endif
+#ifndef ASSERT_OK
+#define ASSERT_OK(expr) \
+  ASSERT_THAT(expr, ::yggdrasil_decision_forests::test::StatusIsOk())
+#endif
 
 // Gets the root directory for data dependency files.
 std::string DataRootDirectory();
