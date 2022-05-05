@@ -1,0 +1,222 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: CLASSIFICATION
+Label: "income"
+
+Input Features (14):
+	age
+	workclass
+	fnlwgt
+	education
+	education_num
+	marital_status
+	occupation
+	relationship
+	race
+	sex
+	capital_gain
+	capital_loss
+	hours_per_week
+	native_country
+
+No weights
+
+Variable Importance: NUM_NODES:
+    1.         "fnlwgt" 1038.000000 ################
+    2.            "age" 716.000000 ##########
+    3. "hours_per_week" 538.000000 #######
+    4.   "capital_gain" 496.000000 #######
+    5.   "capital_loss" 396.000000 #####
+    6.     "occupation" 267.000000 ###
+    7.      "education" 167.000000 ##
+    8.  "education_num" 160.000000 #
+    9. "marital_status" 126.000000 #
+   10.      "workclass" 118.000000 #
+   11. "native_country" 99.000000 
+   12.   "relationship" 81.000000 
+   13.            "sex" 42.000000 
+   14.           "race" 40.000000 
+
+Variable Importance: NUM_AS_ROOT:
+    1.            "age" 31.000000 ################
+    2. "marital_status" 22.000000 ###########
+    3.   "capital_gain"  8.000000 ###
+    4.     "occupation"  3.000000 #
+    5.  "education_num"  2.000000 
+    6.      "education"  1.000000 
+    7.   "capital_loss"  1.000000 
+
+Variable Importance: SUM_SCORE:
+    1. "marital_status" 530956984.119748 ################
+    2.   "capital_gain" 411123634.345114 ############
+    3.            "age" 354664186.766705 ##########
+    4. "hours_per_week" 240233774.133519 #######
+    5.   "capital_loss" 172591458.733243 #####
+    6.     "occupation" 112809328.090070 ###
+    7.         "fnlwgt" 104373733.635293 ###
+    8.      "education" 38044579.052098 #
+    9.  "education_num" 29986295.822112 
+   10.            "sex" 11084945.032449 
+   11.      "workclass" 9233258.450864 
+   12.   "relationship" 4745657.076093 
+   13.           "race" 3349279.550052 
+   14. "native_country" 3231785.561941 
+
+Variable Importance: MEAN_MIN_DEPTH:
+    1.         "income" 13.314568 ################
+    2.            "sex" 12.294347 ##############
+    3.      "workclass" 12.090993 ##############
+    4. "native_country" 12.015855 ##############
+    5.           "race" 11.423024 #############
+    6.   "relationship" 10.658088 ############
+    7.  "education_num"  9.788143 ###########
+    8.      "education"  9.713006 ##########
+    9.         "fnlwgt"  9.465993 ##########
+   10.     "occupation"  9.348116 ##########
+   11. "hours_per_week"  8.722197 #########
+   12. "marital_status"  7.505055 #######
+   13.   "capital_loss"  6.580882 ######
+   14.            "age"  2.503447 
+   15.   "capital_gain"  1.868336 
+
+
+
+Loss: BINOMIAL_LOG_LIKELIHOOD
+Validation loss value: 0.573843
+Number of trees per iteration: 1
+Number of trees: 68
+Total number of nodes: 8636
+
+Number of nodes by tree:
+Count: 68 Average: 127 StdDev: 0
+Min: 127 Max: 127 Ignored: 0
+----------------------------------------------
+[ 127, 127] 68 100.00% 100.00% ##########
+
+Depth by leafs:
+Count: 4352 Average: 13.3146 StdDev: 8.74848
+Min: 1 Max: 54 Ignored: 0
+----------------------------------------------
+[  1,  3)  79   1.82%   1.82% #
+[  3,  6) 553  12.71%  14.52% ######
+[  6,  9) 881  20.24%  34.77% ##########
+[  9, 11) 578  13.28%  48.05% #######
+[ 11, 14) 669  15.37%  63.42% ########
+[ 14, 17) 427   9.81%  73.23% #####
+[ 17, 19) 204   4.69%  77.92% ##
+[ 19, 22) 242   5.56%  83.48% ###
+[ 22, 25) 203   4.66%  88.14% ##
+[ 25, 28) 137   3.15%  91.29% ##
+[ 28, 30)  92   2.11%  93.41% #
+[ 30, 33)  85   1.95%  95.36% #
+[ 33, 36)  72   1.65%  97.01% #
+[ 36, 38)  37   0.85%  97.86%
+[ 38, 41)  43   0.99%  98.85%
+[ 41, 44)  33   0.76%  99.61%
+[ 44, 46)   7   0.16%  99.77%
+[ 46, 49)   3   0.07%  99.84%
+[ 49, 52)   3   0.07%  99.91%
+[ 52, 54]   4   0.09% 100.00%
+
+Number of training obs by leaf:
+Count: 4352 Average: 0 StdDev: 0
+Min: 0 Max: 0 Ignored: 0
+----------------------------------------------
+[ 0, 0] 4352 100.00% 100.00% ##########
+
+Attribute in nodes:
+	1038 : fnlwgt [NUMERICAL]
+	716 : age [NUMERICAL]
+	538 : hours_per_week [NUMERICAL]
+	496 : capital_gain [NUMERICAL]
+	396 : capital_loss [NUMERICAL]
+	267 : occupation [CATEGORICAL]
+	167 : education [CATEGORICAL]
+	160 : education_num [CATEGORICAL]
+	126 : marital_status [CATEGORICAL]
+	118 : workclass [CATEGORICAL]
+	99 : native_country [CATEGORICAL]
+	81 : relationship [CATEGORICAL]
+	42 : sex [CATEGORICAL]
+	40 : race [CATEGORICAL]
+
+Attribute in nodes with depth <= 0:
+	31 : age [NUMERICAL]
+	22 : marital_status [CATEGORICAL]
+	8 : capital_gain [NUMERICAL]
+	3 : occupation [CATEGORICAL]
+	2 : education_num [CATEGORICAL]
+	1 : capital_loss [NUMERICAL]
+	1 : education [CATEGORICAL]
+
+Attribute in nodes with depth <= 1:
+	97 : capital_gain [NUMERICAL]
+	53 : age [NUMERICAL]
+	23 : marital_status [CATEGORICAL]
+	5 : occupation [CATEGORICAL]
+	3 : capital_loss [NUMERICAL]
+	3 : education_num [CATEGORICAL]
+	1 : hours_per_week [NUMERICAL]
+	1 : education [CATEGORICAL]
+
+Attribute in nodes with depth <= 2:
+	141 : capital_gain [NUMERICAL]
+	98 : age [NUMERICAL]
+	33 : marital_status [CATEGORICAL]
+	32 : capital_loss [NUMERICAL]
+	19 : hours_per_week [NUMERICAL]
+	19 : occupation [CATEGORICAL]
+	8 : education_num [CATEGORICAL]
+	5 : education [CATEGORICAL]
+	3 : race [CATEGORICAL]
+	2 : fnlwgt [NUMERICAL]
+	1 : relationship [CATEGORICAL]
+
+Attribute in nodes with depth <= 3:
+	180 : capital_gain [NUMERICAL]
+	133 : age [NUMERICAL]
+	87 : capital_loss [NUMERICAL]
+	56 : hours_per_week [NUMERICAL]
+	37 : marital_status [CATEGORICAL]
+	33 : occupation [CATEGORICAL]
+	22 : education [CATEGORICAL]
+	17 : education_num [CATEGORICAL]
+	16 : fnlwgt [NUMERICAL]
+	4 : race [CATEGORICAL]
+	2 : sex [CATEGORICAL]
+	2 : relationship [CATEGORICAL]
+	1 : workclass [CATEGORICAL]
+
+Attribute in nodes with depth <= 5:
+	241 : capital_gain [NUMERICAL]
+	234 : age [NUMERICAL]
+	160 : capital_loss [NUMERICAL]
+	151 : hours_per_week [NUMERICAL]
+	80 : occupation [CATEGORICAL]
+	79 : fnlwgt [NUMERICAL]
+	58 : marital_status [CATEGORICAL]
+	56 : education [CATEGORICAL]
+	41 : education_num [CATEGORICAL]
+	21 : sex [CATEGORICAL]
+	14 : relationship [CATEGORICAL]
+	11 : workclass [CATEGORICAL]
+	6 : race [CATEGORICAL]
+	2 : native_country [CATEGORICAL]
+
+Condition type in nodes:
+	3184 : HigherCondition
+	1100 : ContainsBitmapCondition
+Condition type in nodes with depth <= 0:
+	40 : HigherCondition
+	28 : ContainsBitmapCondition
+Condition type in nodes with depth <= 1:
+	154 : HigherCondition
+	32 : ContainsBitmapCondition
+Condition type in nodes with depth <= 2:
+	292 : HigherCondition
+	69 : ContainsBitmapCondition
+Condition type in nodes with depth <= 3:
+	472 : HigherCondition
+	118 : ContainsBitmapCondition
+Condition type in nodes with depth <= 5:
+	865 : HigherCondition
+	289 : ContainsBitmapCondition
