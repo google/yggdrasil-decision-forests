@@ -539,7 +539,7 @@ TEST_F(RandomForestOnAdult, MaximumDurationAdaptSampling) {
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
 #if !defined(MEMORY_SANITIZER) && !defined(THREAD_SANITIZER) && \
-    !defined(ADDRESS_SANITIZER)
+    !defined(ADDRESS_SANITIZER) && !defined(SKIP_TIMING_TESTS)
   EXPECT_LE(absl::ToDoubleSeconds(training_duration_), 10 + 20);
   EXPECT_GE(metric::Accuracy(evaluation_), 0.84);
 #endif

@@ -552,8 +552,7 @@ SplitSearchResult ScanSplits(
     num_neg_examples += item.label.count;
 
     if (!FeatureBucketType::IsValidSplit(
-            example_bucket_set.items[bucket_idx].feature,
-            example_bucket_set.items[bucket_idx + 1].feature)) {
+            item.feature, example_bucket_set.items[bucket_idx + 1].feature)) {
       continue;
     }
 
@@ -662,7 +661,9 @@ SplitSearchResult ScanSplitsCustomOrder(
 
   int best_bucket_idx = -1;
   int best_order_idx = -1;
-  for (int order_idx = 0; order_idx < bucket_order.size(); order_idx++) {
+
+  const int end_order_idx = bucket_order.size() - 1;
+  for (int order_idx = 0; order_idx < end_order_idx; order_idx++) {
     const auto bucket_idx = bucket_order[order_idx].second;
     const auto& item = example_bucket_set.items[bucket_idx];
 
@@ -675,8 +676,9 @@ SplitSearchResult ScanSplitsCustomOrder(
     num_neg_examples += item.label.count;
 
     if (!FeatureBucketType::IsValidSplit(
-            example_bucket_set.items[bucket_idx].feature,
-            example_bucket_set.items[bucket_idx + 1].feature)) {
+            item.feature,
+            example_bucket_set.items[bucket_order[order_idx + 1].second]
+                .feature)) {
       continue;
     }
 
