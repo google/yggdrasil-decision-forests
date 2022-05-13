@@ -149,8 +149,11 @@ void AddTokensToCategoricalColumnSpec(const std::vector<std::string>& tokens,
 void UpdateComputeSpecDiscretizedNumerical(
     const float value, proto::Column* column,
     proto::DataSpecificationAccumulator::Column* accumulator) {
-  const uint32_t int_value = *reinterpret_cast<const uint32_t*>(&value);
-  (*accumulator->mutable_discretized_numerical())[int_value]++;
+  if (!std::isnan(value)) {
+    // TODO(gbm): Use absl::bit_cast.
+    const uint32_t int_value = *reinterpret_cast<const uint32_t*>(&value);
+    (*accumulator->mutable_discretized_numerical())[int_value]++;
+  }
 }
 
 void UpdateComputeSpecBooleanFeature(float value, proto::Column* column) {
