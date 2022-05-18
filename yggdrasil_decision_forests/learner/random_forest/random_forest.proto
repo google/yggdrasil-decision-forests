@@ -22,7 +22,7 @@ import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
 
 // Training configuration for the Random Forest algorithm.
 message RandomForestTrainingConfig {
-  // Next ID: 16
+  // Next ID: 17
 
   // Basic parameters.
 
@@ -110,6 +110,20 @@ message RandomForestTrainingConfig {
   // Total maximum of nodes in the model. If specified, and if the total number
   // of nodes is exceeded, the training stops and the forest is truncated.
   optional int64 total_max_num_nodes = 13 [default = -1];
+
+  // If set, and if "compute_oob_performances" is true, export the out-of-bag
+  // predictions of the model on the training dataset in the file specified by
+  // "export_oob_prediction_path". Note that "export_oob_prediction_path" is a
+  // typed-path e.g. a path with a format prefix.
+  //
+  // The writer implementation of the format should be linked in the binary. For
+  // example, to export the predictions to the csv or tfrecord+tfe format, you
+  // need to make sure that dataset:csv_example_writer or
+  // dataset:tf_example_io_tfrecord are respectively linked.
+  //
+  // Example:
+  //   export_oob_prediction_path = "csv:/tmp/oob_predictions.csv"
+  optional string export_oob_prediction_path = 16;
 
   // Fields used for low level and/or internal API. In most cases, the user
   // should not care about this field.

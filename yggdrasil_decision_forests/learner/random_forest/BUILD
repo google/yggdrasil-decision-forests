@@ -25,6 +25,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:example_writer",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:weight",
         "//yggdrasil_decision_forests/dataset:weight_cc_proto",

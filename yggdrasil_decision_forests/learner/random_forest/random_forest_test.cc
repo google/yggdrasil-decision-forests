@@ -29,6 +29,7 @@
 #include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
@@ -218,6 +219,10 @@ TEST_F(RandomForestOnAdult, Base) {
       random_forest::proto::random_forest_config);
   rf_config->set_compute_oob_variable_importances(true);
   rf_config->mutable_decision_tree()->set_allow_na_conditions(true);
+  const auto oob_prediction_path =
+      file::JoinPath(test::TmpDirectory(), "oob_predictions.csv");
+  rf_config->set_export_oob_prediction_path(
+      absl::StrCat("csv:", oob_prediction_path));
 
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
@@ -266,6 +271,13 @@ TEST_F(RandomForestOnAdult, Base) {
   CHECK_NE(description.find("Type: \"RANDOM_FOREST\""), -1);
   CHECK_NE(description.find("Task: CLASSIFICATION"), -1);
   CHECK_NE(description.find("Label: \"income\""), -1);
+
+  // Check the oob predictions.
+  const auto oob_predictions =
+      file::GetContents(oob_prediction_path, file::Defaults()).value();
+  EXPECT_TRUE(absl::StartsWith(oob_predictions, "<=50K,>50K\n"));
+  EXPECT_EQ(std::count(oob_predictions.begin(), oob_predictions.end(), '\n'),
+            train_dataset_.nrow() + 1 /*the header*/);
 }
 
 // Separate the examples used for the structure and the leaves of the model.
@@ -585,8 +597,22 @@ class RandomForestOnAbalone : public utils::TrainAndTestTester {
 };
 
 TEST_F(RandomForestOnAbalone, Base) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  const auto oob_prediction_path =
+      file::JoinPath(test::TmpDirectory(), "oob_predictions.csv");
+  rf_config->set_export_oob_prediction_path(
+      absl::StrCat("csv:", oob_prediction_path));
+
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::RMSE(evaluation_), 2.0825, 0.01);
+
+  // Check the oob predictions.
+  const auto oob_predictions =
+      file::GetContents(oob_prediction_path, file::Defaults()).value();
+  EXPECT_TRUE(absl::StartsWith(oob_predictions, "Rings\n"));
+  EXPECT_EQ(std::count(oob_predictions.begin(), oob_predictions.end(), '\n'),
+            train_dataset_.nrow() + 1 /*the header*/);
 }
 
 TEST_F(RandomForestOnAbalone, ExtremelyRandomizeTrees) {
@@ -1030,6 +1056,13 @@ class RandomForestOnSimPTE : public utils::TrainAndTestTester {
 };
 
 TEST_F(RandomForestOnSimPTE, Base) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  const auto oob_prediction_path =
+      file::JoinPath(test::TmpDirectory(), "oob_predictions.csv");
+  rf_config->set_export_oob_prediction_path(
+      absl::StrCat("csv:", oob_prediction_path));
+
   TrainAndEvaluateModel();
   // Note: A Qini of ~0.1 is expected with a simple Random Forest model.
   EXPECT_NEAR(metric::Qini(evaluation_), 0.105709, 0.001);
@@ -1039,6 +1072,13 @@ TEST_F(RandomForestOnSimPTE, Base) {
       file::JoinPath(test::TmpDirectory(), "uplift_pred.csv");
   CHECK_OK(utils::ExportUpliftPredictionsToTFUpliftCsvFormat(
       *model_, test_dataset_, uplift_pred_csv_path));
+
+  // Check the oob predictions.
+  const auto oob_predictions =
+      file::GetContents(oob_prediction_path, file::Defaults()).value();
+  EXPECT_TRUE(absl::StartsWith(oob_predictions, "2\n"));
+  EXPECT_EQ(std::count(oob_predictions.begin(), oob_predictions.end(), '\n'),
+            train_dataset_.nrow() + 1 /*the header*/);
 }
 
 TEST_F(RandomForestOnSimPTE, Honest) {

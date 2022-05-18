@@ -176,6 +176,14 @@ void SampleTrainingExamples(
     const bool with_replacement, utils::RandomEngine* random,
     std::vector<dataset::VerticalDataset::row_t>* selected);
 
+// Exports the Out-of-bag predictions of a model to disk.
+absl::Status ExportOOBPredictions(
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const dataset::proto::DataSpecification& dataspec,
+    const std::vector<PredictionAccumulator>& oob_predictions,
+    absl::string_view typed_path);
+
 }  // namespace internal
 
 }  // namespace random_forest

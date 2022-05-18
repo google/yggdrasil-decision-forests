@@ -32,6 +32,7 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/example_writer.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
@@ -839,6 +840,12 @@ RandomForestLearner::TrainWithStatus(
                               config_link, train_dataset.nrow(), *mdl,
                               absl::Now() - begin_training);
 
+  if (!rf_config.export_oob_prediction_path().empty()) {
+    RETURN_IF_ERROR(ExportOOBPredictions(
+        config_with_default, config_link, train_dataset.data_spec(),
+        oob_predictions, rf_config.export_oob_prediction_path()));
+  }
+
   // Cache the structural variable importance in the model data.
   RETURN_IF_ERROR(mdl->PrecomputeVariableImportances(
       mdl->AvailableStructuralVariableImportances()));
@@ -1104,6 +1111,104 @@ void SampleTrainingExamples(const row_t num_examples, const row_t num_samples,
       }
     }
   }
+}
+
+absl::Status ExportOOBPredictions(
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const dataset::proto::DataSpecification& dataspec,
+    const std::vector<PredictionAccumulator>& oob_predictions,
+    absl::string_view typed_path) {
+  // Create the dataspec that describes the exported prediction dataset.
+  dataset::proto::DataSpecification pred_dataspec;
+
+  // Buffer example.
+  dataset::proto::Example example;
+
+  // Number of classification classes. Unused if the label is not categorical.
+  int num_label_classes = -1;
+
+  const auto& label_spec = dataspec.columns(config_link.label());
+  switch (config.task()) {
+    case model::proto::Task::CLASSIFICATION: {
+      num_label_classes = label_spec.categorical().number_of_unique_values();
+      for (int i = 1 /*skip the OOV*/; i < num_label_classes; i++) {
+        auto* col = pred_dataspec.add_columns();
+        col->set_name(dataset::CategoricalIdxToRepresentation(label_spec, i));
+        col->set_type(dataset::proto::ColumnType::NUMERICAL);
+        example.add_attributes()->set_numerical(0);
+      }
+    } break;
+
+    case model::proto::Task::REGRESSION: {
+      auto* col = pred_dataspec.add_columns();
+      col->set_name(label_spec.name());
+      col->set_type(dataset::proto::ColumnType::NUMERICAL);
+      example.add_attributes()->set_numerical(0);
+    } break;
+
+    case model::proto::Task::CATEGORICAL_UPLIFT: {
+      num_label_classes = label_spec.categorical().number_of_unique_values();
+      for (int i = 2 /*skip the OOV and treatement*/; i < num_label_classes;
+           i++) {
+        auto* col = pred_dataspec.add_columns();
+        col->set_name(dataset::CategoricalIdxToRepresentation(label_spec, i));
+        col->set_type(dataset::proto::ColumnType::NUMERICAL);
+        example.add_attributes()->set_numerical(0);
+      }
+    } break;
+
+    case model::proto::Task::NUMERICAL_UPLIFT: {
+      auto* col = pred_dataspec.add_columns();
+      col->set_name(label_spec.name());
+      col->set_type(dataset::proto::ColumnType::NUMERICAL);
+      example.add_attributes()->set_numerical(0);
+    } break;
+
+    default:
+      return absl::InvalidArgumentError(
+          "Exporting oob-predictions not supported for this task");
+  }
+
+  ASSIGN_OR_RETURN(auto writer,
+                   dataset::CreateExampleWriter(typed_path, pred_dataspec));
+
+  // Write the predictions one by one.
+  for (const auto& pred : oob_predictions) {
+    switch (config.task()) {
+      case model::proto::Task::CLASSIFICATION:
+        DCHECK_EQ(pred.classification.NumClasses(), num_label_classes);
+        for (int i = 1 /*skip the OOV*/; i < num_label_classes; i++) {
+          example.mutable_attributes(i - 1)->set_numerical(
+              pred.classification.NumObservations() > 0
+                  ? pred.classification.SafeProportionOrMinusInfinity(i)
+                  : 0);
+        }
+        break;
+
+      case model::proto::Task::REGRESSION:
+        example.mutable_attributes(0)->set_numerical(pred.regression);
+        break;
+
+      case model::proto::Task::CATEGORICAL_UPLIFT:
+        DCHECK_EQ(pred.uplift.size(), num_label_classes - 2);
+        for (int i = 2; i < num_label_classes; i++) {
+          example.mutable_attributes(i - 2)->set_numerical(pred.uplift[i - 2]);
+        }
+        break;
+
+      case model::proto::Task::NUMERICAL_UPLIFT:
+        DCHECK_EQ(pred.uplift.size(), 1);
+        example.mutable_attributes(0)->set_numerical(pred.uplift[0]);
+        break;
+
+      default:
+        return absl::InvalidArgumentError("Unsupported task");
+    }
+    RETURN_IF_ERROR(writer->Write(example));
+  }
+
+  return absl::OkStatus();
 }
 
 }  // namespace internal
