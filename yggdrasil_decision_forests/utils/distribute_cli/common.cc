@@ -37,7 +37,7 @@ void BaseOutput(const absl::string_view log_dir,
                 std::string* output_dir, std::string* output_base_filename) {
   // Number of characters in each intermediate subdirectory.
   constexpr int sub_directory_name_length = 3;
-  *output_dir = log_dir;
+  *output_dir = std::string(log_dir);
   int idx = 0;
   while (idx + sub_directory_name_length < internal_command_id.size()) {
     *output_dir = file::JoinPath(
@@ -45,7 +45,7 @@ void BaseOutput(const absl::string_view log_dir,
         internal_command_id.substr(idx, sub_directory_name_length));
     idx += sub_directory_name_length;
   }
-  *output_base_filename = internal_command_id.substr(idx);
+  *output_base_filename = std::string(internal_command_id.substr(idx));
   DCHECK_GT(output_base_filename->size(), 0);
 }
 
