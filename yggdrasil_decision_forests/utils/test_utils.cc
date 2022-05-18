@@ -213,6 +213,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
             EXPECT_NEAR(metric::NDCG(e1), metric::NDCG(e2), 0.001);
             break;
           case model::proto::Task::CATEGORICAL_UPLIFT:
+          case model::proto::Task::NUMERICAL_UPLIFT:
             EXPECT_NEAR(metric::AUUC(e1), metric::AUUC(e2), 0.001);
             EXPECT_NEAR(metric::Qini(e1), metric::Qini(e2), 0.001);
             break;
@@ -482,7 +483,8 @@ void ExpectEqualPredictions(const model::proto::Task task,
       EXPECT_NEAR(a.ranking().relevance(), b.ranking().relevance(), epsilon);
       break;
 
-    case model::proto::Task::CATEGORICAL_UPLIFT: {
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+    case model::proto::Task::NUMERICAL_UPLIFT: {
       EXPECT_EQ(a.uplift().treatment_effect().size(),
                 b.uplift().treatment_effect().size());
       for (int effect_idx = 0;
@@ -576,7 +578,8 @@ void ExpectEqualPredictions(
             << "Predictions don't match.";
         break;
 
-      case model::proto::Task::CATEGORICAL_UPLIFT: {
+      case model::proto::Task::CATEGORICAL_UPLIFT:
+      case model::proto::Task::NUMERICAL_UPLIFT: {
         // Precomputed predictions.
         const int num_effects =
             generic_prediction.uplift().treatment_effect_size();

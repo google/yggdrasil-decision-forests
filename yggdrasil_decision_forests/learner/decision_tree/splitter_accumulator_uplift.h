@@ -31,11 +31,11 @@ namespace decision_tree {
 using row_t = dataset::VerticalDataset::row_t;
 
 // Distribution of uplift classification labels.
-struct UpliftCategoricalLabelDistribution {
+struct UpliftLabelDistribution {
  public:
   typedef proto::DecisionTreeTrainingConfig::Uplift::SplitScore SplitScoreType;
 
-  void InitializeAndClearLike(const UpliftCategoricalLabelDistribution& guide) {
+  void InitializeAndClearLike(const UpliftLabelDistribution& guide) {
     sum_weights_ = 0;
     sum_weights_per_treatment_.assign(guide.sum_weights_per_treatment_.size(),
                                       0);
@@ -45,8 +45,9 @@ struct UpliftCategoricalLabelDistribution {
         guide.sum_weights_per_treatment_and_outcome_.size(), 0);
   }
 
-  void InitializeAndClear(const int num_unique_values_in_treatments_column,
-                          const int num_unique_in_outcomes_column) {
+  void InitializeAndClearCategoricalOutcome(
+      const int num_unique_values_in_treatments_column,
+      const int num_unique_in_outcomes_column) {
     // The value "0" is reserved.
     const int num_treatments = num_unique_values_in_treatments_column - 1;
     const int num_outcomes = num_unique_in_outcomes_column - 1;
@@ -56,6 +57,17 @@ struct UpliftCategoricalLabelDistribution {
     num_examples_per_treatment_.assign(num_treatments, 0);
     sum_weights_per_treatment_and_outcome_.assign(
         num_treatments * (num_outcomes - 1), 0);
+  }
+
+  void InitializeAndClearNumericalOutcome(
+      const int num_unique_values_in_treatments_column) {
+    // The value "0" is reserved.
+    const int num_treatments = num_unique_values_in_treatments_column - 1;
+
+    sum_weights_ = 0;
+    sum_weights_per_treatment_.assign(num_treatments, 0);
+    num_examples_per_treatment_.assign(num_treatments, 0);
+    sum_weights_per_treatment_and_outcome_.assign(num_treatments, 0);
   }
 
   void AddCategoricalOutcome(int outcome_value, int treatment_value,
@@ -83,7 +95,24 @@ struct UpliftCategoricalLabelDistribution {
     }
   }
 
-  void Add(const UpliftCategoricalLabelDistribution& src) {
+  void AddNumericalOutcome(float outcome_value, int treatment_value,
+                           const float weight) {
+    // Only support binary treatment and binary outcome.
+    DCHECK_GE(treatment_value, 1);
+    DCHECK_LE(treatment_value, 2);
+    DCHECK_LE(treatment_value, sum_weights_per_treatment_.size());
+    DCHECK_LE(treatment_value, num_examples_per_treatment_.size());
+
+    treatment_value -= 1;
+
+    sum_weights_ += weight;
+    sum_weights_per_treatment_[treatment_value] += weight;
+    num_examples_per_treatment_[treatment_value]++;
+    sum_weights_per_treatment_and_outcome_[treatment_value] +=
+        weight * outcome_value;
+  }
+
+  void Add(const UpliftLabelDistribution& src) {
     DCHECK_EQ(sum_weights_per_treatment_.size(),
               src.sum_weights_per_treatment_.size());
     DCHECK_EQ(sum_weights_per_treatment_and_outcome_.size(),
@@ -102,7 +131,7 @@ struct UpliftCategoricalLabelDistribution {
     }
   }
 
-  void Sub(const UpliftCategoricalLabelDistribution& src) {
+  void Sub(const UpliftLabelDistribution& src) {
     DCHECK_EQ(sum_weights_per_treatment_.size(),
               src.sum_weights_per_treatment_.size());
     DCHECK_EQ(sum_weights_per_treatment_and_outcome_.size(),
@@ -235,34 +264,51 @@ struct LabelUpliftCategoricalScoreAccumulator {
 
   double WeightedNumExamples() const { return label.num_examples(); }
 
-  UpliftCategoricalLabelDistribution label;
-  UpliftCategoricalLabelDistribution::SplitScoreType score;
+  UpliftLabelDistribution label;
+  UpliftLabelDistribution::SplitScoreType score;
 };
 
-struct LabelUpliftCategoricalOneValueBucket {
-  typedef LabelUpliftCategoricalScoreAccumulator Accumulator;
-  typedef LabelUpliftCategoricalOneValueBucket Bucket;
+typedef LabelUpliftCategoricalScoreAccumulator
+    LabelUpliftNumericalScoreAccumulator;
+
+template <bool categorical_label>
+struct LabelUpliftGenericOneValueBucket {
+  typedef typename std::conditional<
+      categorical_label, LabelUpliftCategoricalScoreAccumulator,
+      LabelUpliftNumericalScoreAccumulator>::type Accumulator;
+
+  typedef LabelUpliftGenericOneValueBucket<categorical_label> Bucket;
+
+  typedef typename std::conditional<categorical_label, int32_t, float>::type
+      OutcomeValue;
 
   int treatment;
-  int outcome;
+  OutcomeValue outcome;
   float weight;
 
   static constexpr int count = 1;  // NOLINT
 
   void AddToScoreAcc(Accumulator* acc) const {
-    acc->label.AddCategoricalOutcome(outcome, treatment, weight);
+    if constexpr (categorical_label) {
+      acc->label.AddCategoricalOutcome(outcome, treatment, weight);
+    } else {
+      acc->label.AddNumericalOutcome(outcome, treatment, weight);
+    }
   }
 
   void SubToScoreAcc(Accumulator* acc) const {
-    acc->label.AddCategoricalOutcome(outcome, treatment, -weight);
+    if constexpr (categorical_label) {
+      acc->label.AddCategoricalOutcome(outcome, treatment, -weight);
+    } else {
+      acc->label.AddNumericalOutcome(outcome, treatment, -weight);
+    }
   }
 
   class Initializer {
    public:
-    Initializer(
-        const UpliftCategoricalLabelDistribution& label_distribution,
-        const int min_examples_per_treatment,
-        const UpliftCategoricalLabelDistribution::SplitScoreType score_type)
+    Initializer(const UpliftLabelDistribution& label_distribution,
+                const int min_examples_per_treatment,
+                const UpliftLabelDistribution::SplitScoreType score_type)
         : label_distribution_(label_distribution),
           initial_uplift_(label_distribution.UpliftSplitScore(score_type)),
           min_examples_per_treatment_(min_examples_per_treatment),
@@ -295,15 +341,15 @@ struct LabelUpliftCategoricalOneValueBucket {
     double MinimumScore() const { return 0; }
 
    private:
-    const UpliftCategoricalLabelDistribution& label_distribution_;
+    const UpliftLabelDistribution& label_distribution_;
     const double initial_uplift_;
     const int min_examples_per_treatment_;
-    UpliftCategoricalLabelDistribution::SplitScoreType score_type_;
+    const UpliftLabelDistribution::SplitScoreType score_type_;
   };
 
   class Filler {
    public:
-    Filler(const std::vector<int32_t>& outcomes,
+    Filler(const std::vector<OutcomeValue>& outcomes,
            const std::vector<int32_t>& treatments,
            const std::vector<float>& weights)
         : outcomes_(outcomes), treatments_(treatments), weights_(weights) {}
@@ -323,17 +369,30 @@ struct LabelUpliftCategoricalOneValueBucket {
     }
 
    private:
-    const std::vector<int32_t>& outcomes_;
+    const std::vector<OutcomeValue>& outcomes_;
     const std::vector<int32_t>& treatments_;
     const std::vector<float>& weights_;
   };
 };
 
-struct LabelUpliftCategoricalBucket {
-  typedef LabelUpliftCategoricalScoreAccumulator Accumulator;
-  typedef LabelUpliftCategoricalBucket Bucket;
+typedef LabelUpliftGenericOneValueBucket<true>
+    LabelUpliftCategoricalOneValueBucket;
 
-  UpliftCategoricalLabelDistribution distribution;
+typedef LabelUpliftGenericOneValueBucket<false>
+    LabelUpliftNumericalOneValueBucket;
+
+template <bool categorical_label>
+struct LabelUpliftGenericBucket {
+  typedef typename std::conditional<
+      categorical_label, LabelUpliftCategoricalScoreAccumulator,
+      LabelUpliftNumericalScoreAccumulator>::type Accumulator;
+
+  typedef LabelUpliftGenericBucket<categorical_label> Bucket;
+
+  typedef typename std::conditional<categorical_label, int32_t, float>::type
+      OutcomeValue;
+
+  UpliftLabelDistribution distribution;
   int64_t count;
   float signed_uplift;
 
@@ -347,9 +406,9 @@ struct LabelUpliftCategoricalBucket {
 
   class Initializer {
    public:
-    Initializer(const UpliftCategoricalLabelDistribution& label_distribution,
+    Initializer(const UpliftLabelDistribution& label_distribution,
                 const int min_examples_per_treatment,
-                UpliftCategoricalLabelDistribution::SplitScoreType score)
+                UpliftLabelDistribution::SplitScoreType score)
         : label_distribution_(label_distribution),
           initial_uplift_(label_distribution.UpliftSplitScore(score)),
           min_examples_per_treatment_(min_examples_per_treatment),
@@ -383,16 +442,16 @@ struct LabelUpliftCategoricalBucket {
     double MinimumScore() const { return 0; }
 
    private:
-    const UpliftCategoricalLabelDistribution& label_distribution_;
+    const UpliftLabelDistribution& label_distribution_;
     const double initial_uplift_;
     const int min_examples_per_treatment_;
-    const UpliftCategoricalLabelDistribution::SplitScoreType score_;
+    const UpliftLabelDistribution::SplitScoreType score_;
   };
 
   class Filler {
    public:
-    Filler(const UpliftCategoricalLabelDistribution& label_distribution,
-           const std::vector<int32_t>& outcomes,
+    Filler(const UpliftLabelDistribution& label_distribution,
+           const std::vector<OutcomeValue>& outcomes,
            const std::vector<int32_t>& treatments,
            const std::vector<float>& weights)
         : outcomes_(outcomes),
@@ -410,19 +469,30 @@ struct LabelUpliftCategoricalBucket {
     }
 
     void ConsumeExample(const row_t example_idx, Bucket* acc) const {
-      acc->distribution.AddCategoricalOutcome(outcomes_[example_idx],
+      if constexpr (categorical_label) {
+        acc->distribution.AddCategoricalOutcome(outcomes_[example_idx],
+                                                treatments_[example_idx],
+                                                weights_[example_idx]);
+
+      } else {
+        acc->distribution.AddNumericalOutcome(outcomes_[example_idx],
                                               treatments_[example_idx],
                                               weights_[example_idx]);
+      }
       acc->count++;
     }
 
    private:
-    const std::vector<int32_t>& outcomes_;
+    const std::vector<OutcomeValue>& outcomes_;
     const std::vector<int32_t>& treatments_;
     const std::vector<float>& weights_;
-    const UpliftCategoricalLabelDistribution& label_distribution_;
+    const UpliftLabelDistribution& label_distribution_;
   };
 };
+
+typedef LabelUpliftGenericBucket<true> LabelUpliftCategoricalBucket;
+
+typedef LabelUpliftGenericBucket<false> LabelUpliftNumericalBucket;
 
 }  // namespace decision_tree
 }  // namespace model

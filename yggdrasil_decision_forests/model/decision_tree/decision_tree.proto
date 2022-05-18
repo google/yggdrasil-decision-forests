@@ -56,7 +56,9 @@ message NodeUpliftOutput {
   // Number of examples for each outcome (major) and each treatment (minor).
   // In the case of categorical outcome, exclude the zero outcome. For example,
   // in case of binary treatment, "sum_weights_per_treatment_and_outcome"
-  // contains one value for each treatment.
+  // contains one value for each treatment. In the case of numerical outcome,
+  // "sum_weights_per_treatment_and_outcome" is the weighted sum of the
+  // outcomes.
   //
   // Currently, the code only supports binary categorical or regressive outcome.
   repeated double sum_weights_per_treatment_and_outcome = 3 [packed = true];

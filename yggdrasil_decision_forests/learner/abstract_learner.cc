@@ -90,9 +90,10 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   }
   config_link->set_ranking_group(ranking_group);
 
-  // Uplift threatment.
+  // Uplift treatment.
   int32_t uplift_treatment = -1;
-  if (training_config.task() == proto::CATEGORICAL_UPLIFT) {
+  if (training_config.task() == proto::CATEGORICAL_UPLIFT ||
+      training_config.task() == proto::NUMERICAL_UPLIFT) {
     if (!training_config.has_uplift_treatment())
       return absl::InvalidArgumentError(
           "\"uplift_treatment\" should be specified for an uplift task.");
@@ -417,6 +418,26 @@ absl::Status AbstractLearner::CheckConfiguration(
             "The \"uplift_treatment\" column must be CATEGORICAL.");
       }
     } break;
+    case model::proto::Task::NUMERICAL_UPLIFT: {
+      if (label_col_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
+        return absl::InvalidArgumentError(
+            "The label column should be NUMERICAL for an NUMERICAL_UPLIFT "
+            "task.");
+      }
+      if (!config_link.has_uplift_treatment() ||
+          config_link.uplift_treatment() < 0) {
+        return absl::InvalidArgumentError(
+            "The \"uplift_treatment\" is not defined but required for an "
+            "UPLIFT task.");
+      }
+      const auto& uplift_treatment_col_spec =
+          data_spec.columns(config_link.uplift_treatment());
+      if (uplift_treatment_col_spec.type() !=
+          dataset::proto::ColumnType::CATEGORICAL) {
+        return absl::InvalidArgumentError(
+            "The \"uplift_treatment\" column must be CATEGORICAL.");
+      }
+    } break;
   }
   // Check the label don't contains NaN.
   if (label_col_spec.count_nas() != 0) {
@@ -601,7 +622,8 @@ void InitializeModelWithAbstractTrainingConfig(
     model->set_ranking_group_col(training_config_linking.ranking_group());
   }
 
-  if (training_config.task() == proto::Task::CATEGORICAL_UPLIFT) {
+  if (training_config.task() == proto::Task::CATEGORICAL_UPLIFT ||
+      training_config.task() == proto::Task::NUMERICAL_UPLIFT) {
     model->set_uplift_treatment_col(training_config_linking.uplift_treatment());
   }
 

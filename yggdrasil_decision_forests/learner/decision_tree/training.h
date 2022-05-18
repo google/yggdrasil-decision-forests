@@ -80,7 +80,7 @@ struct RegressionHessianLabelStats : LabelStats {
 };
 
 // Structure that encapsulates label statistics for uplift with categorical
-// treatment.
+// treatment and categorical outcome.
 struct CategoricalUpliftLabelStats : LabelStats {
   explicit CategoricalUpliftLabelStats(
       const std::vector<int32_t>& outcome_values,
@@ -98,7 +98,26 @@ struct CategoricalUpliftLabelStats : LabelStats {
   int32_t num_unique_values_in_treatments_column;
   int32_t num_unique_in_outcomes_column;
 
-  UpliftCategoricalLabelDistribution label_distribution;
+  UpliftLabelDistribution label_distribution;
+};
+
+// Structure that encapsulates label statistics for uplift with categorical
+// treatment and numerical outcome..
+struct NumericalUpliftLabelStats : LabelStats {
+  explicit NumericalUpliftLabelStats(
+      const std::vector<float>& outcome_values,
+      const std::vector<int32_t>& treatment_values,
+      const int num_unique_values_in_treatments_column)
+      : outcome_values(outcome_values),
+        treatment_values(treatment_values),
+        num_unique_values_in_treatments_column(
+            num_unique_values_in_treatments_column) {}
+
+  const std::vector<float>& outcome_values;
+  const std::vector<int32_t>& treatment_values;
+  int32_t num_unique_values_in_treatments_column;
+
+  UpliftLabelDistribution label_distribution;
 };
 
 // A collection of objects used by split-finding methods.
@@ -449,7 +468,7 @@ SplitSearchResult FindBestCondition(
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache);
 
-// Specialization in the case of uplift with categorical treatment.
+// Specialization in the case of uplift with categorical outcome.
 SplitSearchResult FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
@@ -462,7 +481,20 @@ SplitSearchResult FindBestCondition(
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache);
 
-// Following are the split finder fonction. Their name follow the patter:
+// Specialization in the case of uplift with numerical outcome.
+SplitSearchResult FindBestCondition(
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<float>& weights,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const proto::Node& parent, const InternalTrainConfig& internal_config,
+    const NumericalUpliftLabelStats& label_stats, int32_t attribute_idx,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    SplitterPerThreadCache* cache);
+
+// Following are the split finder function. Their name follow the patter:
 // FindSplitLabel{label_type}Feature{feature_type}{algorithm_name}.
 
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
@@ -776,8 +808,8 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     int32_t attribute_idx, proto::NodeCondition* condition,
     utils::RandomEngine* random);
 
-// Find the best possible condition for a uplift with categorical treatment and
-// a numerical feature
+// Find the best possible condition for a uplift with categorical treatment,
+// a numerical feature and categorical outcome.
 SplitSearchResult FindSplitLabelUpliftCategoricalFeatureNumericalCart(
     const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
@@ -787,12 +819,34 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureNumericalCart(
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache);
 
-// Find the best possible condition for a uplift with categorical treatment and
-// a categorical feature
+// Find the best possible condition for a uplift with categorical treatment,
+// a numerical feature and numerical outcome.
+SplitSearchResult FindSplitLabelUpliftNumericalFeatureNumericalCart(
+    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<float>& weights, const std::vector<float>& attributes,
+    const NumericalUpliftLabelStats& label_stats, float na_replacement,
+    dataset::VerticalDataset::row_t min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
+// Find the best possible condition for a uplift with categorical treatment,
+// a categorical feature, and categorical outcome.
 SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
     const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const CategoricalUpliftLabelStats& label_stats, int num_attribute_classes,
+    int32_t na_replacement, dataset::VerticalDataset::row_t min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
+
+// Find the best possible condition for a uplift with categorical treatment,
+// a categorical feature and numerical outcome.
+SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
+    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const NumericalUpliftLabelStats& label_stats, int num_attribute_classes,
     int32_t na_replacement, dataset::VerticalDataset::row_t min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
@@ -950,14 +1004,12 @@ absl::Status SplitExamples(
     const bool examples_are_training_examples = true);
 
 // Copies the content on uplift categorical leaf output to a label distribution.
-void CategoricalUpliftLeafToLabelDist(
-    const decision_tree::proto::NodeUpliftOutput& leaf,
-    UpliftCategoricalLabelDistribution* dist);
+void UpliftLeafToLabelDist(const decision_tree::proto::NodeUpliftOutput& leaf,
+                           UpliftLabelDistribution* dist);
 
 // Copies the content on uplift categorical label distribution to the leafs.
-void CategoricalUpliftLabelDistToLeaf(
-    const UpliftCategoricalLabelDistribution& dist,
-    decision_tree::proto::NodeUpliftOutput* leaf);
+void UpliftLabelDistToLeaf(const UpliftLabelDistribution& dist,
+                           decision_tree::proto::NodeUpliftOutput* leaf);
 
 }  // namespace internal
 

@@ -2168,9 +2168,9 @@ TEST(DecisionTree, FindBestNumericalDiscretizedSplitCartBase) {
 }
 
 TEST(UpliftCategoricalLabelDistribution, Base) {
-  UpliftCategoricalLabelDistribution dist;
+  UpliftLabelDistribution dist;
 
-  dist.InitializeAndClear(
+  dist.InitializeAndClearCategoricalOutcome(
       /*num_unique_values_in_treatments_column=*/3,
       /*num_unique_in_outcomes_column=*/3);
 
@@ -2214,7 +2214,7 @@ TEST(UpliftCategoricalLabelDistribution, Base) {
                 proto::DecisionTreeTrainingConfig::Uplift::CHI_SQUARED),
             (1.0 - 0.5) * (1.0 - 0.5) / 0.5);
 
-  UpliftCategoricalLabelDistribution dist2;
+  UpliftLabelDistribution dist2;
   dist2.InitializeAndClearLike(dist);
 
   // Empty dist.
@@ -2252,7 +2252,7 @@ TEST(UpliftCategoricalLabelDistribution, FromToLeafProto) {
         num_examples_per_treatment: 2
         num_examples_per_treatment: 2
       )pb");
-  UpliftCategoricalLabelDistribution dist;
+  UpliftLabelDistribution dist;
   dist.ImportSetFromLeafProto(source_leaf_proto);
 
   EXPECT_EQ(dist.num_examples(), 4);
@@ -2309,7 +2309,8 @@ TEST(DecisionTree, FindBestSplitNumericalFeatureTaskCategoricalUplift) {
                                           treatments, num_treatment_classes);
 
   auto& label_dist = label_stats.label_distribution;
-  label_dist.InitializeAndClear(num_outcome_classes, num_treatment_classes);
+  label_dist.InitializeAndClearCategoricalOutcome(num_outcome_classes,
+                                                  num_treatment_classes);
 
   for (const auto example_idx : selected_examples) {
     label_dist.AddCategoricalOutcome(
@@ -2362,7 +2363,8 @@ TEST(DecisionTree, FindBestSplitCategoricalFeatureTaskCategoricalUplift) {
                                           treatments, num_treatment_classes);
 
   auto& label_dist = label_stats.label_distribution;
-  label_dist.InitializeAndClear(num_outcome_classes, num_treatment_classes);
+  label_dist.InitializeAndClearCategoricalOutcome(num_outcome_classes,
+                                                  num_treatment_classes);
 
   for (const auto example_idx : selected_examples) {
     label_dist.AddCategoricalOutcome(

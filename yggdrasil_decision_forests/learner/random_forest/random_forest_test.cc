@@ -1073,6 +1073,39 @@ TEST(SampleTrainingExamples, WithoutReplacement) {
               examples.end());
 }
 
+class RandomForestOnRegressiveSimPTE : public utils::TrainAndTestTester {
+  void SetUp() override {
+    train_config_.set_learner(RandomForestLearner::kRegisteredName);
+    train_config_.set_task(model::proto::Task::NUMERICAL_UPLIFT);
+    train_config_.set_label("y");
+    train_config_.set_uplift_treatment("treat");
+
+    guide_ = PARSE_TEST_PROTO(
+        R"pb(
+          column_guides {
+            column_name_pattern: "treat"
+            type: CATEGORICAL
+            categorial { is_already_integerized: true }
+          }
+          detect_boolean_as_numerical: true
+        )pb");
+
+    dataset_filename_ = "sim_pte_train.csv";
+    dataset_test_filename_ = "sim_pte_test.csv";
+  }
+};
+
+TEST_F(RandomForestOnRegressiveSimPTE, Base) {
+  TrainAndEvaluateModel();
+  // Note: The labels of this dataset are in {1,2}. Therefore, regressive
+  // uplift (this test) is not perfectly equal to categorical uplift
+  // (RandomForestOnSimPTE.Base) test, and the Qini score of this test is not
+  // exactly the same as the Qini score of categorical uplift test. If the
+  // labels of this dataset were to be replaced with {0,1}, the scores would be
+  // equal (tested).
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.095192, 0.008);
+}
+
 }  // namespace
 }  // namespace random_forest
 }  // namespace model

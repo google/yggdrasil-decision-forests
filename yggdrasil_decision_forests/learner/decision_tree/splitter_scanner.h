@@ -209,6 +209,14 @@ using FeatureNumericalLabelUpliftCategoricalOneValue =
 using FeatureCategoricalLabelUpliftCategorical = ExampleBucketSet<
     ExampleBucket<FeatureCategoricalBucket, LabelUpliftCategoricalBucket>>;
 
+// Label: Uplift numerical.
+
+using FeatureNumericalLabelUpliftNumericalOneValue = ExampleBucketSet<
+    ExampleBucket<FeatureNumericalBucket, LabelUpliftNumericalOneValueBucket>>;
+
+using FeatureCategoricalLabelUpliftNumerical = ExampleBucketSet<
+    ExampleBucket<FeatureCategoricalBucket, LabelUpliftNumericalBucket>>;
+
 // Memory cache for the splitter.
 //
 // Used to avoid re-allocating memory each time the splitter is called.
@@ -252,6 +260,9 @@ struct PerThreadCacheV2 {
   FeatureNumericalLabelUpliftCategoricalOneValue example_bucket_set_ul_1;
   FeatureCategoricalLabelUpliftCategorical example_bucket_set_ul_2;
 
+  FeatureNumericalLabelUpliftNumericalOneValue example_bucket_set_ul_n_1;
+  FeatureCategoricalLabelUpliftNumerical example_bucket_set_ul_n_2;
+
   // Cache for the label score accumulator;
   LabelNumericalScoreAccumulator label_numerical_score_accumulator[2];
   LabelCategoricalScoreAccumulator label_categorical_score_accumulator[2];
@@ -263,6 +274,8 @@ struct PerThreadCacheV2 {
       label_numerical_with_hessian_score_accumulator[2];
   LabelUpliftCategoricalScoreAccumulator
       label_uplift_categorical_score_accumulator[2];
+  LabelUpliftNumericalScoreAccumulator
+      label_uplift_numerical_score_accumulator[2];
 
   std::vector<std::pair<float, int32_t>> bucket_order;
 
@@ -379,6 +392,14 @@ auto* GetCachedExampleBucketSet(PerThreadCacheV2* cache) {
   } else if constexpr (is_same_v<ExampleBucketSet,
                                  FeatureCategoricalLabelUpliftCategorical>) {
     return &cache->example_bucket_set_ul_2;
+  } else if constexpr (is_same_v<
+                           ExampleBucketSet,
+                           FeatureNumericalLabelUpliftNumericalOneValue>) {
+    // Uplift numerical
+    return &cache->example_bucket_set_ul_n_1;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureCategoricalLabelUpliftNumerical>) {
+    return &cache->example_bucket_set_ul_n_2;
   } else {
     static_assert(!is_same_v<ExampleBucketSet, ExampleBucketSet>,
                   "Not implemented.");
@@ -407,6 +428,9 @@ auto* GetCachedLabelScoreAccumulator(const bool side, PerThreadCacheV2* cache) {
   } else if constexpr (is_same_v<LabelScoreAccumulator,
                                  LabelUpliftCategoricalScoreAccumulator>) {
     return &cache->label_uplift_categorical_score_accumulator[side];
+  } else if constexpr (is_same_v<LabelScoreAccumulator,
+                                 LabelUpliftNumericalScoreAccumulator>) {
+    return &cache->label_uplift_numerical_score_accumulator[side];
   } else {
     static_assert(!is_same_v<LabelScoreAccumulator, LabelScoreAccumulator>,
                   "Not implemented.");
@@ -1297,7 +1321,7 @@ constexpr auto FindBestSplit_LabelHessianRegressionFeatureNACart =
                   LabelHessianNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
 
-// Label : Uplift
+// Label : Uplift categorical
 
 constexpr auto FindBestSplit_LabelUpliftClassificationFeatureNumerical =
     FindBestSplit<FeatureNumericalLabelUpliftCategoricalOneValue,
@@ -1312,6 +1336,22 @@ constexpr auto FindBestSplit_LabelUpliftClassificationFeatureCategoricalCart =
 constexpr auto FindBestSplit_LabelUpliftClassificationFeatureCategoricalRandom =
     FindBestSplitRandom<FeatureCategoricalLabelUpliftCategorical,
                         LabelUpliftCategoricalScoreAccumulator>;
+
+// Label : Uplift numerical
+
+constexpr auto FindBestSplit_LabelUpliftNumericalFeatureNumerical =
+    FindBestSplit<FeatureNumericalLabelUpliftNumericalOneValue,
+                  LabelUpliftNumericalScoreAccumulator,
+                  /*require_label_sorting*/ false>;
+
+constexpr auto FindBestSplit_LabelUpliftNumericalFeatureCategoricalCart =
+    FindBestSplit<FeatureCategoricalLabelUpliftNumerical,
+                  LabelUpliftNumericalScoreAccumulator,
+                  /*require_label_sorting*/ true>;
+
+constexpr auto FindBestSplit_LabelUpliftNumericalFeatureCategoricalRandom =
+    FindBestSplitRandom<FeatureCategoricalLabelUpliftNumerical,
+                        LabelUpliftNumericalScoreAccumulator>;
 
 }  // namespace decision_tree
 }  // namespace model

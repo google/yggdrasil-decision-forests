@@ -36,6 +36,10 @@ enum Task {
   // Predicts the incremental impact of a treatment on a categorical outcome.
   // See https://en.wikipedia.org/wiki/Uplift_modelling.
   CATEGORICAL_UPLIFT = 4;
+
+  // Predicts the incremental impact of a treatment on a numerical outcome.
+  // See https://en.wikipedia.org/wiki/Uplift_modelling.
+  NUMERICAL_UPLIFT = 5;
 }
 
 // Contains the same information as a model::AbstractModel (without the

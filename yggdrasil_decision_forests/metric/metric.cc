@@ -797,7 +797,12 @@ void InitializeEvaluation(const proto::EvaluationOptions& option,
       eval->mutable_ranking();
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
-      CHECK_OK(uplift::InitializeUpliftEvaluation(option, label_column, eval));
+      CHECK_OK(uplift::InitializeCategoricalUpliftEvaluation(
+          option, label_column, eval));
+      break;
+    case model::proto::Task::NUMERICAL_UPLIFT:
+      CHECK_OK(uplift::InitializeNumericalUpliftEvaluation(option, label_column,
+                                                           eval));
       break;
     default:
       CHECK(false) << "Non supported task type: "
@@ -873,6 +878,7 @@ void AddPrediction(const proto::EvaluationOptions& option,
       need_prediction_sampling = true;
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
+    case model::proto::Task::NUMERICAL_UPLIFT:
       CHECK_OK(uplift::AddUpliftPredictionImp(option, pred, rnd, eval));
       need_prediction_sampling = true;
       break;
@@ -919,6 +925,7 @@ void FinalizeEvaluation(const proto::EvaluationOptions& option,
       FinalizeRankingMetricsFromSampledPredictions(option, eval);
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
+    case model::proto::Task::NUMERICAL_UPLIFT:
       CHECK_OK(uplift::FinalizeUpliftMetricsFromSampledPredictions(
           option, label_column, eval));
       break;

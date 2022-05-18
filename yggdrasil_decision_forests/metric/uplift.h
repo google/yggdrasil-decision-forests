@@ -27,7 +27,11 @@ namespace uplift {
 // Implementation of "InitializeEvaluation", "AddUpPrediction" and
 // "FinalizeMetricsFromSampledPredictions" in the case of Uplift evaluation.
 
-absl::Status InitializeUpliftEvaluation(
+absl::Status InitializeCategoricalUpliftEvaluation(
+    const proto::EvaluationOptions& option,
+    const dataset::proto::Column& label_column, proto::EvaluationResults* eval);
+
+absl::Status InitializeNumericalUpliftEvaluation(
     const proto::EvaluationOptions& option,
     const dataset::proto::Column& label_column, proto::EvaluationResults* eval);
 

@@ -400,6 +400,14 @@ struct GenericRandomForestCategoricalUplift : ExampleSetModel<NodeOffsetRep> {
 };
 using RandomForestCategoricalUplift = GenericRandomForestCategoricalUplift<>;
 
+// Random Forest model for numerical uplift.
+template <typename NodeOffsetRep = uint16_t>
+struct GenericRandomForestNumericalUplift : ExampleSetModel<NodeOffsetRep> {
+  static constexpr model::proto::Task kTask =
+      model::proto::Task::NUMERICAL_UPLIFT;
+};
+using RandomForestNumericalUplift = GenericRandomForestNumericalUplift<>;
+
 // GBDT model for binary classification.
 template <typename NodeOffsetRep = uint16_t>
 struct GenericGradientBoostedTreesBinaryClassification

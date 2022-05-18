@@ -400,7 +400,7 @@ absl::Status PruneTreeRegression(
       tree->mutable_root());
 }
 
-absl::Status PruneTreeUplift(
+absl::Status PruneTreeUpliftCategorical(
     const dataset::VerticalDataset& dataset, const std::vector<float> weights,
     const std::vector<row_t>& example_idxs,
     const model::proto::TrainingConfig& config,
@@ -495,8 +495,8 @@ absl::Status PruneTree(const dataset::VerticalDataset& dataset,
       break;
 
     case model::proto::Task::CATEGORICAL_UPLIFT:
-      RETURN_IF_ERROR(PruneTreeUplift(dataset, weights, example_idxs, config,
-                                      config_link, tree));
+      RETURN_IF_ERROR(PruneTreeUpliftCategorical(dataset, weights, example_idxs,
+                                                 config, config_link, tree));
       break;
 
     default:

@@ -523,6 +523,28 @@ absl::Status SetLeafNodeRandomForestCategoricalUplift(
   return absl::OkStatus();
 }
 
+template <typename SpecializedModel>
+absl::Status SetLeafNodeRandomForestNumericalUplift(
+    const RandomForestModel& src_model, const NodeWithChildren& src_node,
+    SpecializedModel* dst_model,
+    typename SpecializedModel::NodeType* dst_node) {
+  using Node = typename SpecializedModel::NodeType;
+  static_assert(std::is_same<Node, GenericNode<uint16_t>>::value ||
+                    std::is_same<Node, GenericNode<uint32_t>>::value,
+                "Non supported node type.");
+
+  if (src_node.node().uplift().treatment_effect_size() != 1) {
+    return absl::InvalidArgumentError("Invalid uplift model");
+  }
+
+  *dst_node = Node::Leaf(
+      /*.right_idx =*/0,
+      /*.feature_idx =*/0,
+      /*.label =*/src_node.node().uplift().treatment_effect(0) /
+          src_model.NumTrees());
+  return absl::OkStatus();
+}
+
 // Set the leaf of a binary classification Gradient Boosted Trees.
 template <typename SpecializedModel>
 absl::Status SetLeafGradientBoostedTreesClassification(
@@ -906,6 +928,14 @@ absl::Status GenericToSpecializedModel(const RandomForestModel& src,
 }
 
 template <>
+absl::Status GenericToSpecializedModel(const RandomForestModel& src,
+                                       RandomForestNumericalUplift* dst) {
+  using DstType = std::remove_pointer<decltype(dst)>::type;
+  return GenericToSpecializedModelHelper2(
+      SetLeafNodeRandomForestNumericalUplift<DstType>, src, dst);
+}
+
+template <>
 absl::Status GenericToSpecializedModel(
     const RandomForestModel& src,
     GenericRandomForestBinaryClassification<uint32_t>* dst) {
@@ -946,6 +976,15 @@ absl::Status GenericToSpecializedModel(
   using DstType = std::remove_pointer<decltype(dst)>::type;
   return GenericToSpecializedModelHelper2(
       SetLeafNodeRandomForestCategoricalUplift<DstType>, src, dst);
+}
+
+template <>
+absl::Status GenericToSpecializedModel(
+    const RandomForestModel& src,
+    GenericRandomForestNumericalUplift<uint32_t>* dst) {
+  using DstType = std::remove_pointer<decltype(dst)>::type;
+  return GenericToSpecializedModelHelper2(
+      SetLeafNodeRandomForestNumericalUplift<DstType>, src, dst);
 }
 
 template <>
@@ -1712,6 +1751,14 @@ void Predict(const RandomForestCategoricalUplift& model,
 }
 
 template <>
+void Predict(const RandomForestNumericalUplift& model,
+             const typename RandomForestNumericalUplift::ExampleSet& examples,
+             int num_examples, std::vector<float>* predictions) {
+  PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
+      model, examples, num_examples, predictions);
+}
+
+template <>
 void Predict(const GenericRandomForestBinaryClassification<uint32_t>& model,
              const typename GenericRandomForestBinaryClassification<
                  uint32_t>::ExampleSet& examples,
@@ -1748,6 +1795,16 @@ void Predict(
   PredictHelperMultiDimensionTrees<std::remove_reference<decltype(model)>::type,
                                    Idendity>(model, examples, num_examples,
                                              predictions);
+}
+
+template <>
+void Predict(
+    const GenericRandomForestNumericalUplift<uint32_t>& model,
+    const typename GenericRandomForestNumericalUplift<uint32_t>::ExampleSet&
+        examples,
+    int num_examples, std::vector<float>* predictions) {
+  PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
+      model, examples, num_examples, predictions);
 }
 
 template <>

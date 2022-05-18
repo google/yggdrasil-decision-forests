@@ -41,7 +41,7 @@ utils::StatusOr<float> GetOutcome(const model::proto::Prediction& prediction) {
 
 }  // namespace
 
-absl::Status InitializeUpliftEvaluation(
+absl::Status InitializeCategoricalUpliftEvaluation(
     const proto::EvaluationOptions& option,
     const dataset::proto::Column& label_column,
     proto::EvaluationResults* eval) {
@@ -57,6 +57,20 @@ absl::Status InitializeUpliftEvaluation(
   eval->mutable_uplift();
   return absl::OkStatus();
 }
+
+absl::Status InitializeNumericalUpliftEvaluation(
+    const proto::EvaluationOptions& option,
+    const dataset::proto::Column& label_column,
+    proto::EvaluationResults* eval) {
+  if (label_column.type() != dataset::proto::ColumnType::NUMERICAL) {
+    return absl::InvalidArgumentError(
+        "Numerical uplift requires a numerical label (i.e. response or "
+        "outcome). ");
+  }
+  eval->mutable_uplift();
+  return absl::OkStatus();
+}
+
 absl::Status AddUpliftPredictionImp(const proto::EvaluationOptions& option,
                                     const model::proto::Prediction& pred,
                                     utils::RandomEngine* rnd,

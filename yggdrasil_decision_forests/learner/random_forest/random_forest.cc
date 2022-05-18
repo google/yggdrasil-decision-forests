@@ -364,7 +364,8 @@ RandomForestLearner::TrainWithStatus(
 
   if (training_config().task() != model::proto::Task::CLASSIFICATION &&
       training_config().task() != model::proto::Task::REGRESSION &&
-      training_config().task() != model::proto::Task::CATEGORICAL_UPLIFT) {
+      training_config().task() != model::proto::Task::CATEGORICAL_UPLIFT &&
+      training_config().task() != model::proto::Task::NUMERICAL_UPLIFT) {
     std::string tip;
     if (training_config().task() == model::proto::Task::RANKING) {
       tip =
@@ -387,6 +388,13 @@ RandomForestLearner::TrainWithStatus(
       config_with_default.has_maximum_model_size_in_memory_in_bytes()) {
     rf_config.mutable_decision_tree()->set_keep_non_leaf_label_distribution(
         false);
+  }
+
+  if (training_config().task() == model::proto::Task::NUMERICAL_UPLIFT &&
+      rf_config.compute_oob_performances()) {
+    LOG(WARNING) << "RF does not support OOB performances with the numerical "
+                    "uplift task (yet).";
+    rf_config.set_compute_oob_performances(false);
   }
 
   auto mdl = absl::make_unique<RandomForestModel>();
@@ -962,6 +970,7 @@ metric::proto::EvaluationResults EvaluateOOBPredictions(
       eval_options.mutable_regression()->set_enable_regression_plots(false);
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
+    case model::proto::Task::NUMERICAL_UPLIFT:
       break;
     default:
       LOG(WARNING) << "Not implemented";

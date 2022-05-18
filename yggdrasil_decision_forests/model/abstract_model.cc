@@ -225,6 +225,7 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
       break;
 
     case proto::CATEGORICAL_UPLIFT:
+    case proto::NUMERICAL_UPLIFT:
       DCHECK_EQ(num_prediction_dimensions, 1);
       *dst_prediction->mutable_uplift()->mutable_treatment_effect() = {
           src_prediction.begin() + example_idx * num_prediction_dimensions,
@@ -577,19 +578,11 @@ void SetGroundTruth(const dataset::VerticalDataset& dataset,
     case proto::Task::CATEGORICAL_UPLIFT: {
       CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
       CHECK_NE(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
-      const auto& numerical_outcomes = dataset.ColumnWithCastOrNull<
-          dataset::VerticalDataset::CategoricalColumn>(columns.label_col_idx);
-      const auto& categorical_outcomes = dataset.ColumnWithCastOrNull<
-          dataset::VerticalDataset::CategoricalColumn>(columns.label_col_idx);
-      if (categorical_outcomes != nullptr) {
-        prediction->mutable_uplift()->set_outcome_categorical(
-            categorical_outcomes->values()[row_idx]);
-      } else if (numerical_outcomes != nullptr) {
-        prediction->mutable_uplift()->set_outcome_numerical(
-            numerical_outcomes->values()[row_idx]);
-      } else {
-        LOG(FATAL) << "Not supported outcome type";
-      }
+      const auto& categorical_outcomes =
+          dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+              columns.label_col_idx);
+      prediction->mutable_uplift()->set_outcome_categorical(
+          categorical_outcomes->values()[row_idx]);
       const auto& treatments =
           dataset
               .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
@@ -597,6 +590,23 @@ void SetGroundTruth(const dataset::VerticalDataset& dataset,
               ->values();
       prediction->mutable_uplift()->set_treatment(treatments[row_idx]);
     } break;
+
+    case proto::Task::NUMERICAL_UPLIFT: {
+      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      CHECK_NE(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
+      const auto& numerical_outcomes =
+          dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+              columns.label_col_idx);
+      prediction->mutable_uplift()->set_outcome_numerical(
+          numerical_outcomes->values()[row_idx]);
+      const auto& treatments =
+          dataset
+              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+                  columns.uplift_treatment_col_idx)
+              ->values();
+      prediction->mutable_uplift()->set_treatment(treatments[row_idx]);
+    } break;
+
     default:
       LOG(FATAL) << "Non supported task.";
       break;
@@ -1056,7 +1066,14 @@ absl::Status AbstractModel::Validate() const {
     case model::proto::Task::CATEGORICAL_UPLIFT:
       if (label_col_spec().type() != dataset::proto::CATEGORICAL) {
         return absl::InvalidArgumentError(absl::StrCat(
-            "Invalid label type for uplift: ",
+            "Invalid label type for categorical uplift: ",
+            dataset::proto::ColumnType_Name(label_col_spec().type())));
+      }
+      break;
+    case model::proto::Task::NUMERICAL_UPLIFT:
+      if (label_col_spec().type() != dataset::proto::NUMERICAL) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid label type for regressive uplift: ",
             dataset::proto::ColumnType_Name(label_col_spec().type())));
       }
       break;

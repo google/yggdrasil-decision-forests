@@ -173,22 +173,14 @@ absl::Status RandomForestModel::Validate() const {
     return absl::OkStatus();
   };
 
-  const auto validate_uplift =
+  const auto validate_generic_uplift =
       [&](const decision_tree::proto::Node& node) -> absl::Status {
     if (!node.has_uplift()) {
       return absl::InvalidArgumentError("Uplift missing in RF");
     }
 
-    const auto& outcome_col_spec = label_col_spec();
     const auto& treatment_col_spec =
         data_spec().columns(uplift_treatment_col_idx());
-
-    if (outcome_col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
-      return absl::InvalidArgumentError("The outcome is not categorical.");
-    }
-    if (outcome_col_spec.categorical().number_of_unique_values() - 1 != 2) {
-      return absl::InvalidArgumentError("Only binary outcome is supported.");
-    }
 
     const int num_treatments =
         treatment_col_spec.categorical().number_of_unique_values() - 1;
@@ -206,6 +198,29 @@ absl::Status RandomForestModel::Validate() const {
     return absl::OkStatus();
   };
 
+  const auto validate_categorical_uplift =
+      [&](const decision_tree::proto::Node& node) -> absl::Status {
+    RETURN_IF_ERROR(validate_generic_uplift(node));
+    const auto& outcome_col_spec = label_col_spec();
+    if (outcome_col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
+      return absl::InvalidArgumentError("The outcome is not categorical.");
+    }
+    if (outcome_col_spec.categorical().number_of_unique_values() - 1 != 2) {
+      return absl::InvalidArgumentError("Only binary outcome is supported.");
+    }
+    return absl::OkStatus();
+  };
+
+  const auto validate_numerical_uplift =
+      [&](const decision_tree::proto::Node& node) -> absl::Status {
+    RETURN_IF_ERROR(validate_generic_uplift(node));
+    const auto& outcome_col_spec = label_col_spec();
+    if (outcome_col_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
+      return absl::InvalidArgumentError("The outcome is not numerical.");
+    }
+    return absl::OkStatus();
+  };
+
   switch (task_) {
     case model::proto::Task::CLASSIFICATION:
       for (const auto& tree : decision_trees_) {
@@ -219,11 +234,17 @@ absl::Status RandomForestModel::Validate() const {
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
       for (const auto& tree : decision_trees_) {
-        RETURN_IF_ERROR(tree->Validate(data_spec(), validate_uplift));
+        RETURN_IF_ERROR(
+            tree->Validate(data_spec(), validate_categorical_uplift));
+      }
+      break;
+    case model::proto::Task::NUMERICAL_UPLIFT:
+      for (const auto& tree : decision_trees_) {
+        RETURN_IF_ERROR(tree->Validate(data_spec(), validate_numerical_uplift));
       }
       break;
     default:
-      LOG(FATAL) << "Non supported task in RF.";
+      return absl::InvalidArgumentError("Non supported task in RF.");
       break;
   }
 
@@ -286,6 +307,7 @@ void RandomForestModel::Predict(const dataset::VerticalDataset& dataset,
       PredictRegression(dataset, row_idx, prediction);
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
+    case model::proto::Task::NUMERICAL_UPLIFT:
       PredictUplift(dataset, row_idx, prediction);
       break;
     default:
@@ -305,6 +327,7 @@ void RandomForestModel::Predict(const dataset::proto::Example& example,
       PredictRegression(example, prediction);
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
+    case model::proto::Task::NUMERICAL_UPLIFT:
       PredictUplift(example, prediction);
       break;
     default:
@@ -519,6 +542,7 @@ std::vector<std::string> RandomForestModel::AvailableVariableImportances()
       }
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
+    case model::proto::Task::NUMERICAL_UPLIFT:
       // TODO(gbm): Add uplift variable importances.
       break;
     default:
