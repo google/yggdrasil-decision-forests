@@ -1092,6 +1092,16 @@ TEST_F(RandomForestOnSimPTE, Honest) {
   EXPECT_NEAR(metric::Qini(evaluation_), 0.106705, 0.002);
 }
 
+TEST_F(RandomForestOnSimPTE, LowerBound) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->mutable_decision_tree()->mutable_uplift()->set_split_score(
+      decision_tree::proto::DecisionTreeTrainingConfig::Uplift::
+          CONSERVATIVE_EUCLIDEAN_DISTANCE);
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.10889, 0.002);
+}
+
 TEST(SampleTrainingExamples, WithReplacement) {
   utils::RandomEngine random;
   std::vector<dataset::VerticalDataset::row_t> examples;

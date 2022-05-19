@@ -93,9 +93,11 @@ constexpr char kHParamUpliftMinExamplesInTreatment[] =
 constexpr char kHParamUpliftSplitScoreKL[] = "KULLBACK_LEIBLER";
 constexpr char kHParamUpliftSplitScoreED[] = "EUCLIDEAN_DISTANCE";
 constexpr char kHParamUpliftSplitScoreCS[] = "CHI_SQUARED";
+constexpr char kHParamUpliftSplitScoreCED[] = "CONSERVATIVE_EUCLIDEAN_DISTANCE";
 constexpr char kHParamUpliftSplitScoreKLAlt[] = "KL";
 constexpr char kHParamUpliftSplitScoreEDAlt[] = "ED";
 constexpr char kHParamUpliftSplitScoreCSAlt[] = "CS";
+constexpr char kHParamUpliftSplitScoreCEDAlt[] = "CED";
 
 constexpr char kHParamHonest[] = "honest";
 constexpr char kHParamHonestRatioLeafExamples[] = "honest_ratio_leaf_examples";

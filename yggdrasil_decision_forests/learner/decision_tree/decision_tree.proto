@@ -245,6 +245,9 @@ message DecisionTreeTrainingConfig {
       // Score: (p-q)^2/q
       // Categorical outcome only.
       CHI_SQUARED = 2;
+
+      // Conservative estimate (lower bound) of the euclidean distance.
+      CONSERVATIVE_EUCLIDEAN_DISTANCE = 3;
     }
 
     optional SplitScore split_score = 2 [default = KULLBACK_LEIBLER];

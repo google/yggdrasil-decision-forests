@@ -170,19 +170,61 @@ struct UpliftLabelDistribution {
     return response_treatment - response_control;
   }
 
-  double UpliftSplitScore(const SplitScoreType score) const {
-    const double response_control = MeanOutcomePerTreatment(0);
-    const double response_treatment = MeanOutcomePerTreatment(1);
+  // Returns the lower bound of the 9.7% confidence interval of the uplift.
+  // Model the outcome as a normal distribution.
+  double ConservativeUplift() const {
+    // Only support binary treatment and single dimension outcome.
+    DCHECK_EQ(sum_weights_per_treatment_.size(), 2);
+    DCHECK_EQ(num_examples_per_treatment_.size(), 2);
+    DCHECK_EQ(sum_weights_per_treatment_and_outcome_.size(), 2);
 
-    if (response_treatment == 0) {
+    if (sum_weights_per_treatment_[0] == 0 ||
+        sum_weights_per_treatment_[1] == 0) {
       return 0;
     }
 
+    const double mean_c = MeanOutcomePerTreatment(0);
+    const double mean_t = MeanOutcomePerTreatment(1);
+    const auto var_c = mean_c * (1 - mean_c) / sum_weights_per_treatment_[0];
+    const auto var_t = mean_t * (1 - mean_t) / sum_weights_per_treatment_[1];
+    const auto mean_diff = mean_t - mean_c;
+    const auto var_diff = var_c + var_t;
+    const auto sd_diff = sqrt(var_diff);
+    // z-value for a ~9.7% confidence bound. This value was selected to give
+    // reasonable results on the train/test SimPTE dataset.
+    const double z = 1.3;
+
+    const double lb = mean_diff - z * sd_diff;
+    const double ub = mean_diff + z * sd_diff;
+
+    // Return the most conservative uplift value (i.e. the value closest to
+    // zero; i.e. with the smaller absolute value) in [lb, ub]. For example, if
+    // l=-0.1 and ub=0.3, return return 0.
+    if (lb > 0) {
+      return lb;
+    }
+    if (ub < 0) {
+      return ub;
+    }
+    return 0;
+  }
+
+  double UpliftSplitScore(const SplitScoreType score) const {
     switch (score) {
-      case proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE:
+      case proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE: {
+        const double response_control = MeanOutcomePerTreatment(0);
+        const double response_treatment = MeanOutcomePerTreatment(1);
+
         return (response_control - response_treatment) *
                (response_control - response_treatment);
-      case proto::DecisionTreeTrainingConfig::Uplift::KULLBACK_LEIBLER:
+      }
+      case proto::DecisionTreeTrainingConfig::Uplift::KULLBACK_LEIBLER: {
+        const double response_control = MeanOutcomePerTreatment(0);
+        const double response_treatment = MeanOutcomePerTreatment(1);
+        if (response_treatment == 0) {
+          return 0;
+        }
+
         if (response_control == 0) {
           // The returned divergence should be infinite (or very high). However,
           // this would essentially discard all the possible splits. Returning
@@ -193,7 +235,10 @@ struct UpliftLabelDistribution {
         }
         return response_treatment *
                std::log(response_treatment / response_control);
-      case proto::DecisionTreeTrainingConfig::Uplift::CHI_SQUARED:
+      }
+      case proto::DecisionTreeTrainingConfig::Uplift::CHI_SQUARED: {
+        const double response_control = MeanOutcomePerTreatment(0);
+        const double response_treatment = MeanOutcomePerTreatment(1);
         if (response_control == 0) {
           // The returned divergence should be infinite (or very high). However,
           // this would essentially discard all the possible splits. Returning
@@ -204,6 +249,12 @@ struct UpliftLabelDistribution {
         }
         return (response_treatment - response_control) *
                (response_treatment - response_control) / response_control;
+      }
+      case proto::DecisionTreeTrainingConfig::Uplift::
+          CONSERVATIVE_EUCLIDEAN_DISTANCE: {
+        const auto u = ConservativeUplift();
+        return u * u;
+      }
     }
   }
 

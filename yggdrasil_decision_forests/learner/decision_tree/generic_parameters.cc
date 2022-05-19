@@ -320,7 +320,8 @@ absl::Status GetGenericHyperParameterSpecification(
     for (const auto& value :
          {kHParamUpliftSplitScoreKL, kHParamUpliftSplitScoreKLAlt,
           kHParamUpliftSplitScoreED, kHParamUpliftSplitScoreEDAlt,
-          kHParamUpliftSplitScoreCS, kHParamUpliftSplitScoreCSAlt}) {
+          kHParamUpliftSplitScoreCS, kHParamUpliftSplitScoreCSAlt,
+          kHParamUpliftSplitScoreCED, kHParamUpliftSplitScoreCEDAlt}) {
       param->mutable_categorical()->add_possible_values(value);
     }
 
@@ -685,6 +686,11 @@ absl::Status SetHyperParameters(
                  value == kHParamUpliftSplitScoreEDAlt) {
         dt_config->mutable_uplift()->set_split_score(
             proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE);
+      } else if (value == kHParamUpliftSplitScoreCED ||
+                 value == kHParamUpliftSplitScoreCEDAlt) {
+        dt_config->mutable_uplift()->set_split_score(
+            proto::DecisionTreeTrainingConfig::Uplift::
+                CONSERVATIVE_EUCLIDEAN_DISTANCE);
       } else {
         return absl::InvalidArgumentError(
             absl::StrFormat(R"(Unknown value "%s" for parameter "%s")", value,
