@@ -273,8 +273,7 @@ TEST_F(RandomForestOnAdult, Base) {
   CHECK_NE(description.find("Label: \"income\""), -1);
 
   // Check the oob predictions.
-  const auto oob_predictions =
-      file::GetContents(oob_prediction_path, file::Defaults()).value();
+  const auto oob_predictions = file::GetContent(oob_prediction_path).value();
   EXPECT_TRUE(absl::StartsWith(oob_predictions, "<=50K,>50K\n"));
   EXPECT_EQ(std::count(oob_predictions.begin(), oob_predictions.end(), '\n'),
             train_dataset_.nrow() + 1 /*the header*/);
@@ -608,8 +607,7 @@ TEST_F(RandomForestOnAbalone, Base) {
   EXPECT_NEAR(metric::RMSE(evaluation_), 2.0825, 0.01);
 
   // Check the oob predictions.
-  const auto oob_predictions =
-      file::GetContents(oob_prediction_path, file::Defaults()).value();
+  const auto oob_predictions = file::GetContent(oob_prediction_path).value();
   EXPECT_TRUE(absl::StartsWith(oob_predictions, "Rings\n"));
   EXPECT_EQ(std::count(oob_predictions.begin(), oob_predictions.end(), '\n'),
             train_dataset_.nrow() + 1 /*the header*/);

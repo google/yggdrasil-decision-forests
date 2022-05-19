@@ -161,6 +161,21 @@ the gradient of the loss relative to the model output).
     trained with the Random Forest algorithm with a sampling without
     replacement.
 
+#### [honest_fixed_separation](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:honest_fixed_separation)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   For honest trees only i.e. honest=true. If true, a new random separation is
+    generated for each tree. If false, the same separation is used for all the
+    trees (e.g., in Gradient Boosted Trees containing multiple trees).
+
+#### [honest_ratio_leaf_examples](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:honest_ratio_leaf_examples)
+
+-   **Type:** Real **Default:** 0.5 **Possible values:** min:0 max:1
+
+-   For honest trees only i.e. honest=true. Ratio of examples used to set the
+    leaf values.
+
 #### [in_split_min_examples_check](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
 
 -   **Type:** Categorical **Default:** true **Possible values:** true, false
@@ -540,6 +555,21 @@ It is probably the most well-known of the Decision Forest training algorithms.
     trained with the Random Forest algorithm with a sampling without
     replacement.
 
+#### [honest_fixed_separation](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:honest_fixed_separation)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   For honest trees only i.e. honest=true. If true, a new random separation is
+    generated for each tree. If false, the same separation is used for all the
+    trees (e.g., in Gradient Boosted Trees containing multiple trees).
+
+#### [honest_ratio_leaf_examples](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:honest_ratio_leaf_examples)
+
+-   **Type:** Real **Default:** 0.5 **Possible values:** min:0 max:1
+
+-   For honest trees only i.e. honest=true. Ratio of examples used to set the
+    leaf values.
+
 #### [in_split_min_examples_check](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
 
 -   **Type:** Categorical **Default:** true **Possible values:** true, false
@@ -800,6 +830,21 @@ used to grow the tree while the second is used to prune the tree.
     "Generalized Random Forests", Athey et al. In this paper, Honest trees are
     trained with the Random Forest algorithm with a sampling without
     replacement.
+
+#### [honest_fixed_separation](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:honest_fixed_separation)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   For honest trees only i.e. honest=true. If true, a new random separation is
+    generated for each tree. If false, the same separation is used for all the
+    trees (e.g., in Gradient Boosted Trees containing multiple trees).
+
+#### [honest_ratio_leaf_examples](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:honest_ratio_leaf_examples)
+
+-   **Type:** Real **Default:** 0.5 **Possible values:** min:0 max:1
+
+-   For honest trees only i.e. honest=true. Ratio of examples used to set the
+    leaf values.
 
 #### [in_split_min_examples_check](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:in_split_min_examples_check)
 
