@@ -790,7 +790,8 @@ utils::StatusOr<double> HyperParameterOptimizerLearner::EvaluationToScore(
     ASSIGN_OR_RETURN(target_metric, internal::DefaultTargetMetric(evaluation));
   }
 
-  auto metric_value = metric::GetMetric(evaluation, target_metric);
+  ASSIGN_OR_RETURN(auto metric_value,
+                   metric::GetMetric(evaluation, target_metric));
   if (!std::isfinite(metric_value)) {
     return absl::InvalidArgumentError("Non finite target metric value");
   }

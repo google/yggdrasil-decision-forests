@@ -65,9 +65,10 @@ BinomialLogLikelihoodLoss::InitialPredictions(
   // Return: log(y/(1-y)) with y the ratio of positive labels.
   double weighted_sum_positive = 0;
   double sum_weights = 0;
-  const auto* labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          label_col_idx);
+  ASSIGN_OR_RETURN(
+      const auto* labels,
+      dataset.ColumnWithCastWithStatus<
+          dataset::VerticalDataset::CategoricalColumn>(label_col_idx));
   for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
     sum_weights += weights[example_idx];
     weighted_sum_positive +=
@@ -221,9 +222,12 @@ void BinomialLogLikelihoodLoss::SetLeaf(
   //   (\sum_i weight[i] * (label[i] - p[i]) ) / (\sum_i weight[i] * p[i] *
   //   (1-p[i]))
   // with: p[i] = 1/(1+exp(-prediction)
+  // TODO(b/223183975): Update.
   const auto* labels =
-      train_dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          label_col_idx);
+      train_dataset
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(label_col_idx)
+          .value();
   double numerator = 0;
   double denominator = 0;
   double sum_weights = 0;

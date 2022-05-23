@@ -68,7 +68,8 @@ absl::Status LoadVerticalDatasetSingleThread(
       skipped_examples++;
       continue;
     }
-    dataset->AppendExample(example, config.load_columns);
+    RETURN_IF_ERROR(
+        dataset->AppendExampleWithStatus(example, config.load_columns));
     if ((dataset->nrow() % 100) == 0) {
       LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples scanned.");
     }
@@ -122,7 +123,7 @@ absl::Status LoadVerticalDataset(
   std::string path, prefix;
   ASSIGN_OR_RETURN(std::tie(prefix, path), SplitTypeAndPath(typed_path));
   std::vector<std::string> shards;
-  CHECK_OK(utils::ExpandInputShards(path, &shards));
+  RETURN_IF_ERROR(utils::ExpandInputShards(path, &shards));
 
   if (shards.size() <= 1 || config.num_threads <= 1) {
     // Loading in a single thread.
@@ -208,7 +209,8 @@ absl::Status LoadVerticalDataset(
         skipped_examples++;
         continue;
       }
-      dataset->AppendExample(*example, config.load_columns);
+      RETURN_IF_ERROR(
+          dataset->AppendExampleWithStatus(*example, config.load_columns));
     }
     LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples scanned.");
     loaded_shards++;

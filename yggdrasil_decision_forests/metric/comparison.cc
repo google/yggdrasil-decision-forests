@@ -26,6 +26,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace metric {
@@ -163,7 +164,7 @@ dataset::proto::DataSpecification CreateDataSpecForComparisonTable(
   return data_spec;
 }
 
-std::vector<std::pair<std::string, float>> OneSidedMcNemarTest(
+utils::StatusOr<std::vector<std::pair<std::string, float>>> OneSidedMcNemarTest(
     const proto::EvaluationResults& eval_results1,
     const proto::EvaluationResults& eval_results2) {
   std::vector<std::pair<std::string, float>> labels_and_p_values;
@@ -176,7 +177,7 @@ std::vector<std::pair<std::string, float>> OneSidedMcNemarTest(
   for (int roc_idx = 0; roc_idx < eval_results1.classification().rocs_size();
        ++roc_idx) {
     const proto::Roc& roc_1 = eval_results1.classification().rocs(roc_idx);
-    CHECK_LT(roc_idx, eval_results2.classification().rocs_size());
+    STATUS_CHECK_LT(roc_idx, eval_results2.classification().rocs_size());
     const proto::Roc& roc_2 = eval_results2.classification().rocs(roc_idx);
 
     // Max accuracy.
@@ -188,24 +189,27 @@ std::vector<std::pair<std::string, float>> OneSidedMcNemarTest(
         absl::StrCat(dataset::CategoricalIdxToRepresentation(
                          eval_results1.label_column(), roc_idx),
                      "_vs_the_others", "@MaxAccuracy");
-    const float pvalue =
+    ASSIGN_OR_RETURN(
+        const float pvalue,
         OneSidedMcNemarTest(eval_results1, eval_results2, roc_idx,
-                            max_accuracy_threshold1, max_accuracy_threshold2);
+                            max_accuracy_threshold1, max_accuracy_threshold2));
     labels_and_p_values.push_back(std::make_pair(label, pvalue));
 
     for (const auto& x_at_y_accessor : XAtYMetricsAccessors()) {
       const auto& x_at_ys = x_at_y_accessor.const_access(roc_1);
       const auto& x_at_ys2 = x_at_y_accessor.const_access(roc_2);
-      CHECK_EQ(x_at_ys.size(), x_at_ys2.size());
+      STATUS_CHECK_EQ(x_at_ys.size(), x_at_ys2.size());
       for (int x_at_y_idx = 0; x_at_y_idx < x_at_ys.size(); ++x_at_y_idx) {
         const std::string xy_label =
             absl::StrCat(dataset::CategoricalIdxToRepresentation(
                              eval_results1.label_column(), roc_idx),
                          "_vs_the_others@", x_at_y_accessor.y_name, "=",
                          x_at_ys[x_at_y_idx].y_metric_constraint());
-        const float xy_pvalue = OneSidedMcNemarTest(
-            eval_results1, eval_results2, roc_idx,
-            x_at_ys[x_at_y_idx].threshold(), x_at_ys2[x_at_y_idx].threshold());
+        ASSIGN_OR_RETURN(
+            const float xy_pvalue,
+            OneSidedMcNemarTest(eval_results1, eval_results2, roc_idx,
+                                x_at_ys[x_at_y_idx].threshold(),
+                                x_at_ys2[x_at_y_idx].threshold()));
         labels_and_p_values.push_back(std::make_pair(xy_label, xy_pvalue));
       }
     }
@@ -215,29 +219,29 @@ std::vector<std::pair<std::string, float>> OneSidedMcNemarTest(
 
 // This is calculated using McNemar Tests (Description at
 // https://www.mathworks.com/help/stats/testcholdout.html#bup0p8g-1)
-float OneSidedMcNemarTest(const proto::EvaluationResults& eval_results1,
-                          const proto::EvaluationResults& eval_results2,
-                          const int roc_idx, const float threshold1,
-                          const float threshold2) {
+utils::StatusOr<float> OneSidedMcNemarTest(
+    const proto::EvaluationResults& eval_results1,
+    const proto::EvaluationResults& eval_results2, const int roc_idx,
+    const float threshold1, const float threshold2) {
   // Compute n12 and n21.
   double n12 = 0.0;
   double n21 = 0.0;
   for (size_t i = 0; i < eval_results1.sampled_predictions_size(); ++i) {
     const int ground_truth =
         eval_results1.sampled_predictions(i).classification().ground_truth();
-    CHECK_EQ(
+    STATUS_CHECK_EQ(
         ground_truth,
         eval_results2.sampled_predictions(i).classification().ground_truth());
-    CHECK_GT(eval_results1.sampled_predictions(i)
-                 .classification()
-                 .distribution()
-                 .sum(),
-             0);
-    CHECK_GT(eval_results2.sampled_predictions(i)
-                 .classification()
-                 .distribution()
-                 .sum(),
-             0);
+    STATUS_CHECK_GT(eval_results1.sampled_predictions(i)
+                        .classification()
+                        .distribution()
+                        .sum(),
+                    0);
+    STATUS_CHECK_GT(eval_results2.sampled_predictions(i)
+                        .classification()
+                        .distribution()
+                        .sum(),
+                    0);
 
     const float prediction1 = eval_results1.sampled_predictions(i)
                                   .classification()
@@ -284,11 +288,11 @@ float OneSidedMcNemarTest(const proto::EvaluationResults& eval_results1,
   return static_cast<float>(pvalue);
 }
 
-float PairwiseRegressiveResidualTest(
+utils::StatusOr<float> PairwiseRegressiveResidualTest(
     const proto::EvaluationResults& eval_baseline,
     const proto::EvaluationResults& eval_candidate) {
-  CHECK_EQ(eval_baseline.sampled_predictions_size(),
-           eval_candidate.sampled_predictions_size());
+  STATUS_CHECK_EQ(eval_baseline.sampled_predictions_size(),
+                  eval_candidate.sampled_predictions_size());
   const auto num_examples = eval_baseline.sampled_predictions_size();
 
   std::vector<float> sample;
@@ -297,8 +301,9 @@ float PairwiseRegressiveResidualTest(
   for (size_t i = 0; i < eval_baseline.sampled_predictions_size(); ++i) {
     const float label =
         eval_baseline.sampled_predictions(i).regression().ground_truth();
-    CHECK_EQ(label,
-             eval_candidate.sampled_predictions(i).regression().ground_truth());
+    STATUS_CHECK_EQ(
+        label,
+        eval_candidate.sampled_predictions(i).regression().ground_truth());
     const float pred_1 =
         eval_baseline.sampled_predictions(i).regression().value();
     const float pred_2 =
@@ -311,10 +316,11 @@ float PairwiseRegressiveResidualTest(
   return PValueMeanIsGreaterThanZero(sample);
 }
 
-float PairwiseRankingNDCG5Test(const proto::EvaluationResults& eval_baseline,
-                               const proto::EvaluationResults& eval_candidate) {
-  CHECK_EQ(eval_baseline.sampled_predictions_size(),
-           eval_candidate.sampled_predictions_size());
+utils::StatusOr<float> PairwiseRankingNDCG5Test(
+    const proto::EvaluationResults& eval_baseline,
+    const proto::EvaluationResults& eval_candidate) {
+  STATUS_CHECK_EQ(eval_baseline.sampled_predictions_size(),
+                  eval_candidate.sampled_predictions_size());
 
   NDCGCalculator ndcg_calculator(5);
   struct Group {
@@ -326,17 +332,17 @@ float PairwiseRankingNDCG5Test(const proto::EvaluationResults& eval_baseline,
   for (size_t i = 0; i < eval_baseline.sampled_predictions_size(); ++i) {
     const auto label =
         eval_baseline.sampled_predictions(i).ranking().ground_truth_relevance();
-    CHECK_EQ(label, eval_candidate.sampled_predictions(i)
-                        .ranking()
-                        .ground_truth_relevance());
+    STATUS_CHECK_EQ(label, eval_candidate.sampled_predictions(i)
+                               .ranking()
+                               .ground_truth_relevance());
     const auto pred_1 =
         eval_baseline.sampled_predictions(i).ranking().relevance();
     const auto pred_2 =
         eval_candidate.sampled_predictions(i).ranking().relevance();
     const auto group_id =
         eval_baseline.sampled_predictions(i).ranking().group_id();
-    CHECK_EQ(group_id,
-             eval_candidate.sampled_predictions(i).ranking().group_id());
+    STATUS_CHECK_EQ(group_id,
+                    eval_candidate.sampled_predictions(i).ranking().group_id());
     auto& group = groups[group_id];
     group.model_1.push_back({/*.prediction =*/pred_1, /*.label =*/label});
     group.model_2.push_back({/*.prediction =*/pred_2, /*.label =*/label});

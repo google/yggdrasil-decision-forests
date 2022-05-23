@@ -70,9 +70,11 @@ void feature_statistics_toy_example(const ExampleFormat format) {
     }
   )pb");
   CHECK_OK(dataset.CreateColumnsFromDataspec());
-  dataset.AppendExample({{"a", "1.0"}, {"b", "2.0"}, {"c", "1"}});
-  dataset.AppendExample({{"a", "2.0"}, {"b", "3.0"}, {"c", "2"}});
-  dataset.AppendExample({{"a", "3.0"}});
+  CHECK_OK(dataset.AppendExampleWithStatus(
+      {{"a", "1.0"}, {"b", "2.0"}, {"c", "1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus(
+      {{"a", "2.0"}, {"b", "3.0"}, {"c", "2"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "3.0"}}));
 
   std::vector<NumericalOrCategoricalValue> replacement_values = {
       NumericalOrCategoricalValue::Numerical(-1),
@@ -87,7 +89,7 @@ void feature_statistics_toy_example(const ExampleFormat format) {
   stats.Update(batch_1, 3, format);
   LOG(INFO) << "Report 1:\n" << stats.BuildReport();
   const proto::FeatureStatistics expected_1 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         features {
           num_non_missing: 3
           numerical { sum: 6 sum_squared: 14 min: 1 max: 3 }
@@ -105,13 +107,13 @@ void feature_statistics_toy_example(const ExampleFormat format) {
           }
         }
         num_examples: 3
-      )");
+      )pb");
   EXPECT_THAT(stats.Export(), EqualsProto(expected_1));
 
   stats.Update(batch_1, 3, format);
   LOG(INFO) << "Report 2:\n" << stats.BuildReport();
   const proto::FeatureStatistics expected_2 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         features {
           num_non_missing: 6
           numerical { sum: 12 sum_squared: 28 min: 1 max: 3 }
@@ -129,17 +131,17 @@ void feature_statistics_toy_example(const ExampleFormat format) {
           }
         }
         num_examples: 6
-      )");
+      )pb");
   EXPECT_THAT(stats.Export(), EqualsProto(expected_2));
 
   FeatureStatistics stats2(&dataset.data_spec(), {0, 1, 2}, replacement_values);
   LOG(INFO) << "Report 3:\n" << stats.BuildReport();
   const proto::FeatureStatistics expected_3 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         features { numerical {} }
         features { numerical {} }
         features { categorical {} }
-      )");
+      )pb");
   EXPECT_THAT(stats2.Export(), EqualsProto(expected_3));
 
   CHECK_OK(stats2.ImportAndAggregate(stats.Export()));
@@ -149,7 +151,7 @@ void feature_statistics_toy_example(const ExampleFormat format) {
   CHECK_OK(stats2.ImportAndAggregate(stats.Export()));
   LOG(INFO) << "Report 5:\n" << stats.BuildReport();
   const proto::FeatureStatistics expected_4 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         features {
           num_non_missing: 12
           numerical { sum: 24 sum_squared: 56 min: 1 max: 3 }
@@ -167,7 +169,7 @@ void feature_statistics_toy_example(const ExampleFormat format) {
           }
         }
         num_examples: 12
-      )");
+      )pb");
   EXPECT_THAT(stats2.Export(), EqualsProto(expected_4));
 
   EXPECT_EQ(stats.BuildReport(), R"(FeatureStatistics report

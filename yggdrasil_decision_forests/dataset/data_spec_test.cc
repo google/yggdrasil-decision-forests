@@ -102,7 +102,7 @@ TEST(Dataset, DiscretizeAdult) {
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult.csv"));
   dataset::proto::DataSpecification data_spec;
   dataset::proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         column_guides {
           type: DISCRETIZED_NUMERICAL
           column_name_pattern: "age"
@@ -113,7 +113,7 @@ TEST(Dataset, DiscretizeAdult) {
           column_name_pattern: "capital_gain"
         }
         ignore_columns_without_guides: true
-      )");
+      )pb");
   dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
 
   std::string readable_representation = PrintHumanReadable(data_spec, true);
@@ -148,9 +148,9 @@ TEST(Dataset, AdultAllDiscretized) {
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult.csv"));
   dataset::proto::DataSpecification data_spec;
   dataset::proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         detect_numerical_as_discretized_numerical: true
-      )");
+      )pb");
   dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
   LOG(INFO) << readable_representation;
@@ -195,7 +195,7 @@ Terminology:
 
 TEST(Dataset, ExampleToCsvRow) {
   const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns { type: NUMERICAL name: "a" }
         columns { type: NUMERICAL_SET name: "b" }
         columns { type: NUMERICAL_LIST name: "c" }
@@ -221,9 +221,9 @@ TEST(Dataset, ExampleToCsvRow) {
           name: "i"
           discretized_numerical { boundaries: 0 boundaries: 1 boundaries: 2 }
         }
-      )");
+      )pb");
   const proto::Example example = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes { numerical: 0.5 }
         attributes { numerical_set: { values: 0 values: 1 } }
         attributes { numerical_list: { values: 0 values: 1 } }
@@ -233,9 +233,9 @@ TEST(Dataset, ExampleToCsvRow) {
         attributes { boolean: 1 }
         attributes { text: "hello" }
         attributes { discretized_numerical: 2 }
-      )");
+      )pb");
   std::vector<std::string> csv_fields;
-  ExampleToCsvRow(example, data_spec, &csv_fields);
+  CHECK_OK(ExampleToCsvRow(example, data_spec, &csv_fields));
   EXPECT_THAT(csv_fields, ElementsAre("0.5", "0 1", "0 1", "1", "0 1", "0 1",
                                       "1", "hello", "1.5"));
 }
@@ -267,7 +267,7 @@ TEST(DataSpec, GetSingleColumnIdxFromName) {
 
 TEST(Dataset, TfExampleToExample) {
   const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         # Id: 0
         columns { type: NUMERICAL name: "a" }
         # Id: 1
@@ -392,9 +392,9 @@ TEST(Dataset, TfExampleToExample) {
           size: 3
           type: DISCRETIZED_NUMERICAL
         }
-      )");
+      )pb");
   tensorflow::Example tf_example = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         features {
           feature {
             key: "a"
@@ -445,11 +445,11 @@ TEST(Dataset, TfExampleToExample) {
             value { float_list { value: 0.5 value: 1.5 value: 0.5 } }
           }
         }
-      )");
+      )pb");
   proto::Example example;
   EXPECT_OK(TfExampleToExample(tf_example, data_spec, &example));
   const proto::Example expected_example = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes { numerical: 1 }
         attributes { numerical_set { values: 2 values: 3 } }
         attributes { numerical_list { values: 4 values: 5 } }
@@ -468,7 +468,7 @@ TEST(Dataset, TfExampleToExample) {
         attributes { discretized_numerical: 1 }
         attributes { discretized_numerical: 2 }
         attributes { discretized_numerical: 1 }
-      )");
+      )pb");
   EXPECT_THAT(example, EqualsProto(expected_example));
 
   tensorflow::Example convert_back_tf_example;
@@ -476,8 +476,8 @@ TEST(Dataset, TfExampleToExample) {
                                          &convert_back_tf_example));
   // The original int64_t is stored in a float.
   auto* values = (*tf_example.mutable_features()->mutable_feature())["k"]
-      .mutable_float_list()
-      ->mutable_value();
+                     .mutable_float_list()
+                     ->mutable_value();
   values->Add(20.f);
   values->Add(21.f);
   values->Add(22.f);
@@ -486,7 +486,7 @@ TEST(Dataset, TfExampleToExample) {
 
 TEST(Dataset, TfExampleToExampleErrors) {
   const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns {
           type: CATEGORICAL
           name: "a_0"
@@ -513,44 +513,44 @@ TEST(Dataset, TfExampleToExampleErrors) {
         }
         unstackeds { original_name: "a" begin_column_idx: 0 size: 2 }
         unstackeds { original_name: "b" begin_column_idx: 2 size: 2 }
-      )");
+      )pb");
 
   tensorflow::Example example_1 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         features {
           feature {
             key: "a"
             value { float_list { value: 1.0 value: 2.0 } }
           }
         }
-      )");
+      )pb");
   proto::Example example;
   EXPECT_THAT(TfExampleToExample(example_1, data_spec, &example),
               StatusIs(absl::StatusCode::kInvalidArgument,
                        "a's type is not supported for stacked feature."));
 
   tensorflow::Example example_2 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         features {
           feature {
             key: "b"
             value { float_list { value: 1.0 value: 2.0 value: 3.0 } }
           }
         }
-      )");
+      )pb");
   EXPECT_THAT(TfExampleToExample(example_2, data_spec, &example),
               StatusIs(absl::StatusCode::kInvalidArgument,
                        "Wrong number of elements for feature b"));
 
   tensorflow::Example example_3 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         features {
           feature {
             key: "b"
             value { bytes_list { value: "x" } }
           }
         }
-      )");
+      )pb");
   EXPECT_THAT(TfExampleToExample(example_3, data_spec, &example),
               StatusIs(absl::StatusCode::kInvalidArgument,
                        "Feature b is not stored as float or int64."));
@@ -559,61 +559,63 @@ TEST(Dataset, TfExampleToExampleErrors) {
 TEST(Dataset, Tokenizer) {
   std::vector<std::string> tokens;
 
-  Tokenize("", PARSE_TEST_PROTO(R"()"), &tokens);
+  CHECK_OK(Tokenize("", PARSE_TEST_PROTO(R"pb()pb"), &tokens));
   EXPECT_THAT(tokens, ElementsAre());
 
-  Tokenize("Hello world", PARSE_TEST_PROTO(R"(splitter: REGEX_MATCH)"),
-           &tokens);
+  CHECK_OK(Tokenize("Hello world",
+                    PARSE_TEST_PROTO(R"pb(splitter: REGEX_MATCH)pb"), &tokens));
   EXPECT_THAT(tokens, ElementsAre("hello", "world"));
 
-  Tokenize("12345Little Monsters zzz",
-           PARSE_TEST_PROTO(R"(splitter: REGEX_MATCH)"), &tokens);
+  CHECK_OK(Tokenize("12345Little Monsters zzz",
+                    PARSE_TEST_PROTO(R"pb(splitter: REGEX_MATCH)pb"), &tokens));
   EXPECT_THAT(tokens, ElementsAre("12345little", "monsters", "zzz"));
 
-  Tokenize("Hello;the,world ", PARSE_TEST_PROTO(R"(splitter: SEPARATOR)"),
-           &tokens);
+  CHECK_OK(Tokenize("Hello;the,world ",
+                    PARSE_TEST_PROTO(R"pb(splitter: SEPARATOR)pb"), &tokens));
   EXPECT_THAT(tokens, ElementsAre("hello", "the", "world"));
 
-  Tokenize("Hello;the,world ",
-           PARSE_TEST_PROTO(R"(splitter: SEPARATOR
-                               grouping { bigrams: true })"),
-           &tokens);
+  CHECK_OK(Tokenize("Hello;the,world ",
+                    PARSE_TEST_PROTO(R"pb(splitter: SEPARATOR
+                                          grouping { bigrams: true })pb"),
+                    &tokens));
   EXPECT_THAT(tokens,
               ElementsAre("hello", "the", "world", "hello_the", "the_world"));
 
-  Tokenize("Hello world", PARSE_TEST_PROTO(R"(splitter: CHARACTER
-                                              grouping { unigrams: true })"),
-           &tokens);
+  CHECK_OK(Tokenize("Hello world",
+                    PARSE_TEST_PROTO(R"pb(splitter: CHARACTER
+                                          grouping { unigrams: true })pb"),
+                    &tokens));
   EXPECT_EQ(tokens, std::vector<std::string>({"h", "e", "l", "l", "o", " ", "w",
                                               "o", "r", "l", "d"}));
 
-  Tokenize("Hello world",
-           PARSE_TEST_PROTO(
-               R"(
-                 splitter: CHARACTER
-                 grouping { unigrams: false bigrams: true }
-               )"),
-           &tokens);
+  CHECK_OK(Tokenize("Hello world",
+                    PARSE_TEST_PROTO(
+                        R"pb(
+                          splitter: CHARACTER
+                          grouping { unigrams: false bigrams: true }
+                        )pb"),
+                    &tokens));
   EXPECT_THAT(tokens, ElementsAre("he", "el", "ll", "lo", "o ", " w", "wo",
                                   "or", "rl", "ld"));
 
-  Tokenize("Hello world",
-           PARSE_TEST_PROTO(
-               R"(
-                 splitter: CHARACTER
-                 grouping { unigrams: false trigrams: true }
-               )"),
-           &tokens);
+  CHECK_OK(Tokenize("Hello world",
+                    PARSE_TEST_PROTO(
+                        R"pb(
+                          splitter: CHARACTER
+                          grouping { unigrams: false trigrams: true }
+                        )pb"),
+                    &tokens));
   EXPECT_THAT(tokens, ElementsAre("hel", "ell", "llo", "lo ", "o w", " wo",
                                   "wor", "orl", "rld"));
 
-  Tokenize("Hello world",
-           PARSE_TEST_PROTO(
-               R"(
-                 splitter: CHARACTER
-                 grouping { unigrams: false bigrams: true trigrams: true }
-               )"),
-           &tokens);
+  CHECK_OK(
+      Tokenize("Hello world",
+               PARSE_TEST_PROTO(
+                   R"pb(
+                     splitter: CHARACTER
+                     grouping { unigrams: false bigrams: true trigrams: true }
+                   )pb"),
+               &tokens));
   EXPECT_EQ(tokens, std::vector<std::string>({"he", "el", "ll", "lo", "o ",
                                               " w", "wo", "or", "rl", "ld",
                                               "hel", "ell", "llo", "lo ", "o w",
@@ -623,7 +625,7 @@ TEST(Dataset, Tokenizer) {
 TEST(DataSpecUtil, CategoricalIdxsToRepresentation) {
   const std::vector<int> elements{1, 2, 3};
   proto::Column col_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: CATEGORICAL
         categorical {
           most_frequent_value: 0
@@ -646,7 +648,7 @@ TEST(DataSpecUtil, CategoricalIdxsToRepresentation) {
             value { index: 3 count: 7 }
           }
         }
-      )");
+      )pb");
   const auto representation =
       CategoricalIdxsToRepresentation(col_spec, elements, 2);
   CHECK_EQ(representation, "b, c, ...[1 left]");
@@ -657,10 +659,10 @@ TEST(DataSpecUtil, AddColumn) {
   AddColumn("a", proto::ColumnType::NUMERICAL, &data_spec);
   AddColumn("b", proto::ColumnType::CATEGORICAL, &data_spec);
   const proto::DataSpecification expected = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns { type: NUMERICAL name: "a" }
         columns { type: CATEGORICAL name: "b" }
-      )");
+      )pb");
   EXPECT_THAT(data_spec, EqualsProto(expected));
 }
 
@@ -668,26 +670,27 @@ TEST(DataSpecUtil, AddColumn) {
 TEST(DataSpec, DiscretizedNumericalToNumerical) {
   const float eps = 0.0001f;
   proto::Column col = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: DISCRETIZED_NUMERICAL
         discretized_numerical { boundaries: 10 boundaries: 20 boundaries: 30 }
-      )");
+      )pb");
 
   EXPECT_TRUE(std::isnan(
-      DiscretizedNumericalToNumerical(col, kDiscretizedNumericalMissingValue)));
-  EXPECT_NEAR(DiscretizedNumericalToNumerical(col, 0), 9.f, eps);
-  EXPECT_NEAR(DiscretizedNumericalToNumerical(col, 1), 15.f, eps);
-  EXPECT_NEAR(DiscretizedNumericalToNumerical(col, 2), 25.f, eps);
-  EXPECT_NEAR(DiscretizedNumericalToNumerical(col, 3), 31.f, eps);
+      DiscretizedNumericalToNumerical(col, kDiscretizedNumericalMissingValue)
+          .value()));
+  EXPECT_NEAR(DiscretizedNumericalToNumerical(col, 0).value(), 9.f, eps);
+  EXPECT_NEAR(DiscretizedNumericalToNumerical(col, 1).value(), 15.f, eps);
+  EXPECT_NEAR(DiscretizedNumericalToNumerical(col, 2).value(), 25.f, eps);
+  EXPECT_NEAR(DiscretizedNumericalToNumerical(col, 3).value(), 31.f, eps);
 }
 
 // Conversion numerical -> discretized numerical.
 TEST(DataSpec, NumericalToDiscretizedNumerical) {
   proto::Column col = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         type: DISCRETIZED_NUMERICAL
         discretized_numerical { boundaries: 10 boundaries: 20 boundaries: 30 }
-      )");
+      )pb");
 
   EXPECT_EQ(NumericalToDiscretizedNumerical(col, -2.f), 0);
   EXPECT_EQ(NumericalToDiscretizedNumerical(col, -1.f), 0);
@@ -718,38 +721,45 @@ TEST(Dataset, GenDiscretizedBoundaries) {
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/4,
-                                       /*min_obs_in_bins=*/1, {}),
+                                       /*min_obs_in_bins=*/1, {})
+                  .value(),
               ElementsAre(1.5, 2.5, 3.5));
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/4,
-                                       /*min_obs_in_bins=*/1, {}),
+                                       /*min_obs_in_bins=*/1, {})
+                  .value(),
               ElementsAre(1.5, 2.5, 3.5));
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_100,
                                        /*maximum_num_bins=*/4,
-                                       /*min_obs_in_bins=*/1, {}),
+                                       /*min_obs_in_bins=*/1, {})
+                  .value(),
               ElementsAre(25.5, 50.5, 75.5));
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/10,
-                                       /*min_obs_in_bins=*/1, {}),
+                                       /*min_obs_in_bins=*/1, {})
+                  .value(),
               ElementsAre(1.5, 2.5, 3.5, 4.5));
 
   EXPECT_THAT(
       GenDiscretizedBoundaries(interval_1_100,
                                /*maximum_num_bins=*/10, /*min_obs_in_bins=*/1,
-                               {}),
+                               {})
+          .value(),
       ElementsAre(10.5, 20.5, 30.5, 40.5, 50.5, 60.5, 70.5, 80.5, 90.5));
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/1000,
-                                       /*min_obs_in_bins=*/3, {}),
+                                       /*min_obs_in_bins=*/3, {})
+                  .value(),
               ElementsAre(3.5));
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_100,
                                        /*maximum_num_bins=*/1000,
-                                       /*min_obs_in_bins=*/15, {}),
+                                       /*min_obs_in_bins=*/15, {})
+                  .value(),
               ElementsAre(15.5, 30.5, 45.5, 60.5, 75.5, 90.5));
 }
 
@@ -761,17 +771,20 @@ TEST(Dataset, GenDiscretizedBoundariesCornerCases) {
 
   EXPECT_THAT(GenDiscretizedBoundaries({},
                                        /*maximum_num_bins=*/10,
-                                       /*min_obs_in_bins=*/1, {}),
+                                       /*min_obs_in_bins=*/1, {})
+                  .value(),
               ElementsAre());
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/1,
-                                       /*min_obs_in_bins=*/1, {}),
+                                       /*min_obs_in_bins=*/1, {})
+                  .value(),
               ElementsAre());
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/1,
-                                       /*min_obs_in_bins=*/1, {2.f}),
+                                       /*min_obs_in_bins=*/1, {2.f})
+                  .value(),
               ElementsAre(1.5, std::nextafter(2.f, 1.f),
                           std::nextafter(2.f, 3.f), 2.5, 3.5, 4.5));
 }
@@ -789,24 +802,28 @@ TEST(Dataset, GenDiscretizedBoundariesWithSpecialValues) {
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/4 + 1,
-                                       /*min_obs_in_bins=*/1, {0.f}),
+                                       /*min_obs_in_bins=*/1, {0.f})
+                  .value(),
               ElementsAre(std::nextafter(0.f, 1.f), 1.5, 2.5, 3.5));
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/4 + 2,
-                                       /*min_obs_in_bins=*/1, {2.f}),
+                                       /*min_obs_in_bins=*/1, {2.f})
+                  .value(),
               ElementsAre(1.5, std::nextafter(2.f, 1.f),
                           std::nextafter(2.f, 3.f), 2.5, 3.5));
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/4 + 2,
-                                       /*min_obs_in_bins=*/1, {2.5f}),
+                                       /*min_obs_in_bins=*/1, {2.5f})
+                  .value(),
               ElementsAre(1.5, std::nextafter(2.5f, 2.f),
                           std::nextafter(2.5f, 3.f), 3.5));
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/4 + 1,
-                                       /*min_obs_in_bins=*/1, {5.f}),
+                                       /*min_obs_in_bins=*/1, {5.f})
+                  .value(),
               ElementsAre(1.5, 2.5, 3.5, std::nextafter(5.f, 4.f)));
 }
 

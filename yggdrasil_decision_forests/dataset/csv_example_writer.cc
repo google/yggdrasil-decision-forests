@@ -57,7 +57,7 @@ absl::Status CsvExampleWriter::Implementation::OpenShard(
 
 absl::Status CsvExampleWriter::Implementation::WriteInShard(
     const proto::Example& example) {
-  ExampleToCsvRow(example, data_spec_, &buffer_);
+  RETURN_IF_ERROR(ExampleToCsvRow(example, data_spec_, &buffer_));
   return csv_writer->WriteRow({buffer_.begin(), buffer_.end()});
 }
 

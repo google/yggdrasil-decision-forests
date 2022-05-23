@@ -92,12 +92,12 @@ absl::Status GetLinkedWeightDefinition(
           return absl::InvalidArgumentError(absl::StrCat(
               "The categorical weight value \"", weight_item.value(),
               "\" is defined several times in the weight specification."));
-        };
+        }
         if (weight_item.weight() < 0) {
           return absl::InvalidArgumentError(absl::StrCat(
               "The categorical weight value \"", weight_item.value(),
               "\" is defined with a negative weight."));
-        };
+        }
         linked_def->mutable_categorical()->set_categorical_value_idx_2_weight(
             cat_value_idx, weight_item.weight());
       }
@@ -131,14 +131,25 @@ absl::Status GetLinkedWeightDefinition(
   return absl::OkStatus();
 }
 
+float GetWeight(const VerticalDataset& dataset, VerticalDataset::row_t row,
+                const proto::LinkedWeightDefinition& weight_definition) {
+  return GetWeightWithStatus(dataset, row, weight_definition).value();
+}
+
 float GetWeight(const proto::Example& example,
                 const proto::LinkedWeightDefinition& weight_definition) {
+  return GetWeightWithStatus(example, weight_definition).value();
+}
+
+utils::StatusOr<float> GetWeightWithStatus(
+    const proto::Example& example,
+    const proto::LinkedWeightDefinition& weight_definition) {
   switch (weight_definition.type_case()) {
     case proto::LinkedWeightDefinition::kCategorical: {
       const int cat_value =
           example.attributes(weight_definition.attribute_idx()).categorical();
       if (cat_value == VerticalDataset::CategoricalColumn::kNaValue) {
-        LOG(FATAL) << "Found NA value for weighting attribute";
+        STATUS_FATAL("Found NA value for weighting attribute");
       }
       return weight_definition.categorical().categorical_value_idx_2_weight(
           cat_value);
@@ -147,21 +158,22 @@ float GetWeight(const proto::Example& example,
       const float num_value =
           example.attributes(weight_definition.attribute_idx()).numerical();
       if (std::isnan(num_value)) {
-        LOG(FATAL) << "Found NA value for weighting attribute";
+        STATUS_FATAL("Found NA value for weighting attribute");
       }
       if (num_value < 0) {
-        LOG(FATAL) << "Found negative weight value";
+        STATUS_FATAL("Found negative weight value");
       }
       return num_value;
     }
     default:
-      LOG(FATAL) << "Non implemented";
+      STATUS_FATAL("Non implemented");
   }
   return 1.f;
 }
 
-float GetWeight(const VerticalDataset& dataset, VerticalDataset::row_t row,
-                const proto::LinkedWeightDefinition& weight_definition) {
+utils::StatusOr<float> GetWeightWithStatus(
+    const VerticalDataset& dataset, VerticalDataset::row_t row,
+    const proto::LinkedWeightDefinition& weight_definition) {
   switch (weight_definition.type_case()) {
     case proto::LinkedWeightDefinition::kCategorical: {
       // "weight_col" is the data about the categorical attribute that controls
@@ -180,33 +192,35 @@ float GetWeight(const VerticalDataset& dataset, VerticalDataset::row_t row,
       //
       // In this example, the weight of the first example is 3, and the second
       // example is 4.
-      const auto* weight_col =
-          dataset.ColumnWithCast<VerticalDataset::CategoricalColumn>(
-              weight_definition.attribute_idx());
+      ASSIGN_OR_RETURN(
+          const auto* weight_col,
+          dataset.ColumnWithCastWithStatus<VerticalDataset::CategoricalColumn>(
+              weight_definition.attribute_idx()));
       const int cat_value = weight_col->values()[row];
       if (cat_value == VerticalDataset::CategoricalColumn::kNaValue) {
-        LOG(FATAL) << "Found NA value for weighting attribute in example #"
-                   << row;
+        STATUS_FATALS("Found NA value for weighting attribute in example #",
+                      row);
       }
       return weight_definition.categorical().categorical_value_idx_2_weight(
           cat_value);
     }
     case proto::LinkedWeightDefinition::kNumerical: {
-      const auto* weight_col =
-          dataset.ColumnWithCast<VerticalDataset::NumericalColumn>(
-              weight_definition.attribute_idx());
+      ASSIGN_OR_RETURN(
+          const auto* weight_col,
+          dataset.ColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(
+              weight_definition.attribute_idx()));
       const float num_value = weight_col->values()[row];
       if (std::isnan(num_value)) {
-        LOG(FATAL) << "Found NA value for weighting attribute in example #"
-                   << row;
+        STATUS_FATALS("Found NA value for weighting attribute in example #",
+                      row);
       }
       if (num_value < 0) {
-        LOG(FATAL) << "Found negative weight value in example #" << row;
+        STATUS_FATALS("Found negative weight value in example #", row);
       }
       return num_value;
     }
     default:
-      LOG(FATAL) << "Non implemented";
+      STATUS_FATAL("Non implemented");
   }
   return 1.f;
 }
@@ -216,9 +230,10 @@ absl::Status GetWeights(const VerticalDataset& dataset,
                         std::vector<float>* weights) {
   switch (weight_definition.type_case()) {
     case proto::LinkedWeightDefinition::kCategorical: {
-      const auto* weight_col =
-          dataset.ColumnWithCast<VerticalDataset::CategoricalColumn>(
-              weight_definition.attribute_idx());
+      ASSIGN_OR_RETURN(
+          const auto* weight_col,
+          dataset.ColumnWithCastWithStatus<VerticalDataset::CategoricalColumn>(
+              weight_definition.attribute_idx()));
       weights->resize(dataset.nrow());
       for (VerticalDataset::row_t row_idx = 0; row_idx < dataset.nrow();
            row_idx++) {
@@ -233,9 +248,10 @@ absl::Status GetWeights(const VerticalDataset& dataset,
       }
     } break;
     case proto::LinkedWeightDefinition::kNumerical: {
-      const auto* weight_col =
-          dataset.ColumnWithCast<VerticalDataset::NumericalColumn>(
-              weight_definition.attribute_idx());
+      ASSIGN_OR_RETURN(
+          const auto* weight_col,
+          dataset.ColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(
+              weight_definition.attribute_idx()));
       *weights = weight_col->values();
       if (std::find_if(weights->begin(), weights->end(), [](const float value) {
             return std::isnan(value);

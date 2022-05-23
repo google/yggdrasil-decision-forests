@@ -298,7 +298,7 @@ TEST(Distribution, IntegersConfusionMatrix_AppendTextReport) {
     }
   }
   std::string representation;
-  confusion.AppendTextReport(column, &representation);
+  CHECK_OK(confusion.AppendTextReport(column, &representation));
   EXPECT_EQ(representation, R"(truth\prediction
         a   bb  ccc  dddd
    a    1    5    9    13
@@ -321,7 +321,7 @@ TEST(Distribution, IntegersConfusionMatrix_AppendTextReportAlreadyIntegerized) {
     }
   }
   std::string representation;
-  confusion.AppendTextReport(column, &representation);
+  CHECK_OK(confusion.AppendTextReport(column, &representation));
   EXPECT_EQ(representation, R"(truth\prediction
      0    1    2    3
 0    1    5    9   13
@@ -360,7 +360,7 @@ TEST(Distribution, IntegersConfusionMatrix_AppendHtmlReport) {
     }
   }
   std::string representation;
-  confusion.AppendHtmlReport(column, &representation);
+  CHECK_OK(confusion.AppendHtmlReport(column, &representation));
   EXPECT_EQ(representation,
             absl::StrReplaceAll(R"(<table class="confusion_matrix">
 <tr>

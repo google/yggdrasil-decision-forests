@@ -104,10 +104,10 @@ void InitializeDataSpecFromColumnNames(
   }
 }
 
-bool LooksMultiDimensional(const absl::string_view value,
-                           const Tokenizer& tokenizer) {
+utils::StatusOr<bool> LooksMultiDimensional(const absl::string_view value,
+                                            const Tokenizer& tokenizer) {
   std::vector<std::string> tokens;
-  Tokenize(value, tokenizer, &tokens);
+  RETURN_IF_ERROR(Tokenize(value, tokenizer, &tokens));
   return tokens.size() >= 2;
 }
 
@@ -123,15 +123,20 @@ absl::Status UpdateColSpecsWithGuideInfo(
   return absl::OkStatus();
 }
 
-void AddTokensToCategoricalColumnSpec(const std::vector<std::string>& tokens,
-                                      proto::Column* col) {
+absl::Status AddTokensToCategoricalColumnSpec(
+    const std::vector<std::string>& tokens, proto::Column* col) {
   if (col->categorical().is_already_integerized()) {
     // The tokens are already numbers (stored as strings).
     for (const std::string& token : tokens) {
       int32_t int_value;
-      CHECK(absl::SimpleAtoi(token, &int_value));
-      CHECK_GE(int_value, 0)
-          << "Already integerized categories should be positive (non strict).";
+      if (!absl::SimpleAtoi(token, &int_value)) {
+        return absl::InvalidArgumentError(
+            absl::StrCat(token, " is not an integer"));
+      }
+      if (int_value < 0) {
+        return absl::InvalidArgumentError(
+            "Already integerized categories should be positive (non strict).");
+      }
       if (int_value >= col->categorical().number_of_unique_values()) {
         col->mutable_categorical()->set_number_of_unique_values(int_value + 1);
       }
@@ -144,6 +149,7 @@ void AddTokensToCategoricalColumnSpec(const std::vector<std::string>& tokens,
       item.set_count(item.count() + 1);
     }
   }
+  return absl::OkStatus();
 }
 
 void UpdateComputeSpecDiscretizedNumerical(
@@ -166,7 +172,7 @@ void UpdateComputeSpecBooleanFeature(float value, proto::Column* column) {
   }
 }
 
-void FinalizeComputeSpecDiscretizedNumerical(
+absl::Status FinalizeComputeSpecDiscretizedNumerical(
     const proto::DataSpecificationAccumulator::Column& accumulator,
     proto::Column* column) {
   std::vector<std::pair<float, int>> unique_values_and_counts;
@@ -177,17 +183,19 @@ void FinalizeComputeSpecDiscretizedNumerical(
   }
   std::sort(unique_values_and_counts.begin(), unique_values_and_counts.end());
 
-  const auto bounds = GenDiscretizedBoundaries(
-      unique_values_and_counts,
-      column->discretized_numerical().maximum_num_bins(),
-      column->discretized_numerical().min_obs_in_bins(),
-      {0.f, static_cast<float>(column->numerical().mean())});
+  ASSIGN_OR_RETURN(const auto bounds,
+                   GenDiscretizedBoundaries(
+                       unique_values_and_counts,
+                       column->discretized_numerical().maximum_num_bins(),
+                       column->discretized_numerical().min_obs_in_bins(),
+                       {0.f, static_cast<float>(column->numerical().mean())}));
 
   column->mutable_discretized_numerical()->set_original_num_unique_values(
       unique_values_and_counts.size());
 
   *column->mutable_discretized_numerical()->mutable_boundaries() = {
       bounds.begin(), bounds.end()};
+  return absl::OkStatus();
 }
 
 // Finalize the information of a numerical column.
@@ -339,11 +347,20 @@ void MergeColumnGuide(const proto::ColumnGuide& src, proto::ColumnGuide* dst) {
   dst->MergeFrom(src);
 }
 
-void CreateDataSpec(const absl::string_view typed_path, const bool use_flume,
+void CreateDataSpec(absl::string_view typed_path, bool use_flume,
                     const proto::DataSpecificationGuide& guide,
                     proto::DataSpecification* data_spec) {
+  // Note: Temporary okay CHECK_OK.
+  CHECK_OK(CreateDataSpecWithStatus(typed_path, use_flume, guide, data_spec));
+}
+
+absl::Status CreateDataSpecWithStatus(
+    const absl::string_view typed_path, const bool use_flume,
+    const proto::DataSpecificationGuide& guide,
+    proto::DataSpecification* data_spec) {
   if (use_flume) {
-    LOG(FATAL) << "Dataspec inference with flume is not implemented";
+    return absl::InvalidArgumentError(
+        "Dataspec inference with flume is not implemented");
   }
 
   // Format of the dataset.
@@ -353,14 +370,14 @@ void CreateDataSpec(const absl::string_view typed_path, const bool use_flume,
 
   // Files in the dataset.
   std::vector<std::string> paths;
-  CHECK_OK(utils::ExpandInputShards(sharded_path, &paths));
+  RETURN_IF_ERROR(utils::ExpandInputShards(sharded_path, &paths));
 
   // Create the dataspec creator.
   const auto& format_name = proto::DatasetFormat_Name(format);
   auto creator = AbstractDataSpecCreatorRegisterer::Create(format_name).value();
 
   // Detect the column names and semantics.
-  creator->InferColumnsAndTypes(paths, guide, data_spec);
+  RETURN_IF_ERROR(creator->InferColumnsAndTypes(paths, guide, data_spec));
   FinalizeInferTypes(guide, data_spec);
   LOG(INFO) << data_spec->columns_size() << " column(s) found";
 
@@ -370,11 +387,13 @@ void CreateDataSpec(const absl::string_view typed_path, const bool use_flume,
   InitializeDataspecAccumulator(*data_spec, &accumulator);
   // TODO(gbm): Call ComputeColumnStatistics in parallel other the different
   // paths.
-  creator->ComputeColumnStatistics(paths, guide, data_spec, &accumulator);
-  FinalizeComputeSpec(guide, accumulator, data_spec);
+  RETURN_IF_ERROR(
+      creator->ComputeColumnStatistics(paths, guide, data_spec, &accumulator));
+  RETURN_IF_ERROR(FinalizeComputeSpec(guide, accumulator, data_spec));
 
   LOG(INFO) << "Finalizing [" << data_spec->created_num_rows()
             << " row(s) found]";
+  return absl::OkStatus();
 }
 
 void FinalizeInferTypes(const proto::DataSpecificationGuide& guide,
@@ -416,7 +435,7 @@ void FinalizeInferTypes(const proto::DataSpecificationGuide& guide,
       const auto type = guide.detect_numerical_as_discretized_numerical()
                             ? proto::DISCRETIZED_NUMERICAL
                             : proto::NUMERICAL;
-      CHECK_GT(column.multi_values().max_observed_size(), 0);
+      DCHECK_GT(column.multi_values().max_observed_size(), 0);
       unstack_begin_column_name.push_back(
           UnstackedColumnName(column.name(), 0));
       auto* unstacked = data_spec->add_unstackeds();
@@ -466,9 +485,10 @@ void FinalizeInferTypes(const proto::DataSpecificationGuide& guide,
   }
 }
 
-void FinalizeComputeSpec(const proto::DataSpecificationGuide& guide,
-                         const proto::DataSpecificationAccumulator& accumulator,
-                         proto::DataSpecification* data_spec) {
+absl::Status FinalizeComputeSpec(
+    const proto::DataSpecificationGuide& guide,
+    const proto::DataSpecificationAccumulator& accumulator,
+    proto::DataSpecification* data_spec) {
   for (int col_idx = 0; col_idx < data_spec->columns_size(); col_idx++) {
     auto* col = data_spec->mutable_columns(col_idx);
     const auto& col_acc = accumulator.columns(col_idx);
@@ -484,9 +504,10 @@ void FinalizeComputeSpec(const proto::DataSpecificationGuide& guide,
       FinalizeComputeSpecColumnCategorical(count_valid_records, col_acc, col);
     }
     if (col->type() == ColumnType::DISCRETIZED_NUMERICAL) {
-      FinalizeComputeSpecDiscretizedNumerical(col_acc, col);
+      RETURN_IF_ERROR(FinalizeComputeSpecDiscretizedNumerical(col_acc, col));
     }
   }
+  return absl::OkStatus();
 }
 
 absl::Status UpdateNumericalColumnSpec(
@@ -561,7 +582,7 @@ utils::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path) {
   proto::DatasetFormat format;
   std::tie(sharded_path, format) = GetDatasetPathAndType(typed_path);
   std::vector<std::string> paths;
-  CHECK_OK(utils::ExpandInputShards(sharded_path, &paths));
+  RETURN_IF_ERROR(utils::ExpandInputShards(sharded_path, &paths));
   LOG(INFO) << "Counting the number of examples on " << paths.size()
             << " shard(s)";
   std::atomic<int64_t> number_of_examples{0};

@@ -118,8 +118,6 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/utils:compatibility",
-        "//yggdrasil_decision_forests/utils:concurrency",
-        "//yggdrasil_decision_forests/utils:distribution",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",

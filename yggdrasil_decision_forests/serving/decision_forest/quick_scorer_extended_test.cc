@@ -76,11 +76,11 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
   CHECK_OK(dataset->CreateColumnsFromDataspec());
 
   if (use_cateset_feature) {
-    dataset->AppendExample(
-        {{"a", "0.5"}, {"b", "0.5"}, {"c", "1"}, {"e", "1.5"}, {"d", "2 3"}});
+    CHECK_OK(dataset->AppendExampleWithStatus(
+        {{"a", "0.5"}, {"b", "0.5"}, {"c", "1"}, {"e", "1.5"}, {"d", "2 3"}}));
   } else {
-    dataset->AppendExample(
-        {{"a", "0.5"}, {"b", "0.5"}, {"c", "1"}, {"e", "1.5"}});
+    CHECK_OK(dataset->AppendExampleWithStatus(
+        {{"a", "0.5"}, {"b", "0.5"}, {"c", "1"}, {"e", "1.5"}}));
   }
 
   struct NodeHelper {

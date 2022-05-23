@@ -95,17 +95,18 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
 
   dataset->set_data_spec(dataspec);
   CHECK_OK(dataset->CreateColumnsFromDataspec());
-  auto* col_1 =
-      dataset->MutableColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          0);
+  auto* col_1 = dataset
+                    ->MutableColumnWithCastWithStatus<
+                        dataset::VerticalDataset::NumericalColumn>(0)
+                    .value();
   col_1->Add(0);
   col_1->Add(2);
   col_1->Add(4);
 
-  auto* col_2 =
-      dataset
-          ->MutableColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              1);
+  auto* col_2 = dataset
+                    ->MutableColumnWithCastWithStatus<
+                        dataset::VerticalDataset::CategoricalColumn>(1)
+                    .value();
   col_2->Add(1);
   col_2->Add(2);
   col_2->Add(1);
@@ -176,7 +177,7 @@ void ExtremelyRandomizeTreesFigure10Dataset(const int num_examples,
     dataset::proto::Example example;
     example.add_attributes()->set_numerical(x);
     example.add_attributes()->set_numerical(y);
-    dataset->AppendExample(example);
+    CHECK_OK(dataset->AppendExampleWithStatus(example));
   }
 }
 
@@ -696,8 +697,10 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(predictions[2].classification.NumObservations(), 1);
   EXPECT_EQ(predictions[2].classification.TopClass(), 0);
 
-  const auto evaluation_1 = internal::EvaluateOOBPredictions(
-      dataset, config.task(), config_link.label(), -1, {}, predictions);
+  const auto evaluation_1 =
+      internal::EvaluateOOBPredictions(dataset, config.task(),
+                                       config_link.label(), -1, {}, predictions)
+          .value();
   EXPECT_EQ(internal::EvaluationSnippet(evaluation_1),
             "accuracy:0.5 logloss:18.0218");
 
@@ -714,8 +717,10 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(predictions[2].classification.NumObservations(), 2);
   EXPECT_EQ(predictions[2].classification.TopClass(), 0);
 
-  const auto evaluation_2 = internal::EvaluateOOBPredictions(
-      dataset, config.task(), config_link.label(), -1, {}, predictions);
+  const auto evaluation_2 =
+      internal::EvaluateOOBPredictions(dataset, config.task(),
+                                       config_link.label(), -1, {}, predictions)
+          .value();
   EXPECT_EQ(internal::EvaluationSnippet(evaluation_2),
             "accuracy:0.5 logloss:18.0218");
 }
@@ -770,8 +775,8 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
   }
 
   // Compute importance.
-  internal::ComputeVariableImportancesFromAccumulatedPredictions(
-      oob_predictions, oob_predictions_per_input_features, dataset, &model);
+  CHECK_OK(internal::ComputeVariableImportancesFromAccumulatedPredictions(
+      oob_predictions, oob_predictions_per_input_features, dataset, &model));
 
   // Ground truth: 1, 1
   // Baseline prediction: 1, 0
@@ -868,18 +873,21 @@ TEST(ExtremelyRandomizeTrees, Figure10) {
   // Evaluate the RMSE between the predictions and a linear interpolation.
   const auto& train_xs =
       train_dataset
-          .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               train_dataset.ColumnNameToColumnIdx("x"))
+          .value()
           ->values();
   const auto& train_ys =
       train_dataset
-          .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               train_dataset.ColumnNameToColumnIdx("y"))
+          .value()
           ->values();
   const auto& test_xs =
       test_dataset
-          .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               test_dataset.ColumnNameToColumnIdx("x"))
+          .value()
           ->values();
 
   // List of <input,output> of the training examples sorted by increasing input
@@ -1072,8 +1080,7 @@ TEST_F(RandomForestOnSimPTE, Base) {
       *model_, test_dataset_, uplift_pred_csv_path));
 
   // Check the oob predictions.
-  const auto oob_predictions =
-      file::GetContents(oob_prediction_path, file::Defaults()).value();
+  const auto oob_predictions = file::GetContent(oob_prediction_path).value();
   EXPECT_TRUE(absl::StartsWith(oob_predictions, "2\n"));
   EXPECT_EQ(std::count(oob_predictions.begin(), oob_predictions.end(), '\n'),
             train_dataset_.nrow() + 1 /*the header*/);

@@ -44,10 +44,18 @@ utils::StatusOr<proto::WeightDefinition> GetUnlinkedWeightDefinition(
     const proto::DataSpecification& data_spec);
 
 // Get the weight of an example from a vertical dataset.
-float GetWeight(const VerticalDataset& dataset, VerticalDataset::row_t row,
-                const proto::LinkedWeightDefinition& weight_definition);
+utils::StatusOr<float> GetWeightWithStatus(
+    const VerticalDataset& dataset, VerticalDataset::row_t row,
+    const proto::LinkedWeightDefinition& weight_definition);
 
 // Get the weight of a proto::Example.
+utils::StatusOr<float> GetWeightWithStatus(
+    const proto::Example& example,
+    const proto::LinkedWeightDefinition& weight_definition);
+
+// TODO(b/223183975): Update.
+float GetWeight(const VerticalDataset& dataset, VerticalDataset::row_t row,
+                const proto::LinkedWeightDefinition& weight_definition);
 float GetWeight(const proto::Example& example,
                 const proto::LinkedWeightDefinition& weight_definition);
 

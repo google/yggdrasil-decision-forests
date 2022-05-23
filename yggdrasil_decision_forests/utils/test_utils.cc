@@ -179,7 +179,8 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   utils::RandomEngine rnd(1234);
   evaluation_ = model_->Evaluate(test_dataset_, eval_options_, &rnd);
   std::string evaluation_description;
-  metric::AppendTextReport(evaluation_, &evaluation_description);
+  CHECK_OK(
+      metric::AppendTextReportWithStatus(evaluation_, &evaluation_description));
   LOG(INFO) << "Evaluation:\n" << evaluation_description;
 
   if (!check_model) {
@@ -349,11 +350,12 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
 
     // Down-sampling of examples according of a numerical attribute.
     if (numerical_weight_attribute_idx != -1) {
-      const float weight =
-          dataset
-              .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                  numerical_weight_attribute_idx)
-              ->values()[example_idx];
+      const float weight = dataset
+                               .ColumnWithCastWithStatus<
+                                   dataset::VerticalDataset::NumericalColumn>(
+                                   numerical_weight_attribute_idx)
+                               .value()
+                               ->values()[example_idx];
       const float proba_reject = weight / max_numerical_weight_value;
       if (dist_01(rnd) < proba_reject) {
         continue;
@@ -591,7 +593,6 @@ void ExpectEqualPredictions(
                       epsilon)
               << "Predictions don't match.";
         }
-
       } break;
 
       default:
@@ -700,7 +701,7 @@ absl::Status ExportUpliftPredictionsToTFUpliftCsvFormat(
   for (int example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
     model::proto::Prediction prediction;
     model.Predict(dataset, example_idx, &prediction);
-    model.SetGroundTruth(dataset, example_idx, &prediction);
+    RETURN_IF_ERROR(model.SetGroundTruth(dataset, example_idx, &prediction));
 
     if (prediction.uplift().treatment_effect_size() != 1) {
       return absl::InvalidArgumentError("Only binary effect supported");

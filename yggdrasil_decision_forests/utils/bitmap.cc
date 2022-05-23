@@ -277,8 +277,8 @@ void MultibitWriter::Write(const uint64_t value) {
 }
 
 void MultibitWriter::Finish() {
-  CHECK(!finish_called_);
-  CHECK(!check_full_write_ || index_ == size_);
+  DCHECK(!finish_called_);
+  DCHECK(!check_full_write_ || index_ == size_);
   finish_called_ = true;
   if (sub_cur_ > 0) {
     const int num_tails = (sub_cur_ + 7) / 8;

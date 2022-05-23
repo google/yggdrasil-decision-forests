@@ -233,10 +233,10 @@ TEST(AbstractLearner, EvaluateLearner) {
   dataset.set_data_spec(data_spec);
   CHECK_OK(dataset.CreateColumnsFromDataspec());
   for (int i = 0; i < 1000; i++) {
-    dataset.AppendExample({{"a", "1"}});
-    dataset.AppendExample({{"a", "2"}});
-    dataset.AppendExample({{"a", "1"}});
-    dataset.AppendExample({{"a", "2"}});
+    CHECK_OK(dataset.AppendExampleWithStatus({{"a", "1"}}));
+    CHECK_OK(dataset.AppendExampleWithStatus({{"a", "2"}}));
+    CHECK_OK(dataset.AppendExampleWithStatus({{"a", "1"}}));
+    CHECK_OK(dataset.AppendExampleWithStatus({{"a", "2"}}));
   }
 
   const metric::proto::EvaluationOptions evaluation_options =

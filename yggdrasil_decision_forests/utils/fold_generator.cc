@@ -116,9 +116,10 @@ absl::Status GenerateFoldsCrossValidationWithGroups(
         "The fold group attribute is not categorical.");
   }
 
-  const auto* group_attribute =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          group_column_idx);
+  ASSIGN_OR_RETURN(
+      const auto* group_attribute,
+      dataset.ColumnWithCastWithStatus<
+          dataset::VerticalDataset::CategoricalColumn>(group_column_idx));
   absl::flat_hash_map<int, Group> rows_per_groups;
   for (dataset::VerticalDataset::row_t row_idx = 0; row_idx < dataset.nrow();
        row_idx++) {
@@ -223,10 +224,10 @@ absl::Status GenerateFoldsPrecomputedCrossValidation(
   RETURN_IF_ERROR(
       LoadVerticalDataset(generator.precomputed_cross_validation().fold_path(),
                           fold_dataspec, &folds_dataset));
-  const auto fold_values =
-      folds_dataset
-          .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(0)
-          ->values();
+  ASSIGN_OR_RETURN(const auto fold_column,
+                   folds_dataset.ColumnWithCastWithStatus<
+                       dataset::VerticalDataset::CategoricalColumn>(0));
+  const auto& fold_values = fold_column->values();
   if (fold_values.empty()) {
     return absl::InvalidArgumentError("The set of precomputed folds is empty.");
   }
@@ -331,8 +332,8 @@ absl::Status GenerateFoldsConstDataset(const proto::FoldGenerator& generator,
 
 Fold MergeIndicesExceptOneFold(const utils::FoldList& folds,
                                const int excluded_fold_idx) {
-  CHECK_GE(excluded_fold_idx, 0);
-  CHECK_LT(excluded_fold_idx, folds.size());
+  DCHECK_GE(excluded_fold_idx, 0);
+  DCHECK_LT(excluded_fold_idx, folds.size());
   Fold dst;
   for (size_t fold_idx = 0; fold_idx < folds.size(); fold_idx++) {
     if (excluded_fold_idx != fold_idx) {

@@ -63,6 +63,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:registration",
         "//yggdrasil_decision_forests/utils:sharded_io",
+        "//yggdrasil_decision_forests/utils:status_macros",
     ],
 )
 

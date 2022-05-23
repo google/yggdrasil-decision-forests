@@ -264,34 +264,36 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
   const auto num_examples = end_example_idx - begin_example_idx;
 
   const auto CopyNumericalFeature = [&](const int feature_idx) -> absl::Status {
-    const auto& feature_data =
-        *dataset.ColumnWithCast<NumericalColumn>(feature_idx);
+    ASSIGN_OR_RETURN(
+        const auto& feature_data,
+        dataset.ColumnWithCastWithStatus<NumericalColumn>(feature_idx));
     ASSIGN_OR_RETURN(const auto feature_id,
-                     features.GetNumericalFeatureId(feature_data.name()));
+                     features.GetNumericalFeatureId(feature_data->name()));
     for (int example_idx = 0; example_idx < num_examples; example_idx++) {
       const row_t row_idx = begin_example_idx + example_idx;
-      if (feature_data.IsNa(row_idx)) {
+      if (feature_data->IsNa(row_idx)) {
         examples->SetMissingNumerical(example_idx, feature_id, features);
       } else {
         examples->SetNumerical(example_idx, feature_id,
-                               feature_data.values()[row_idx], features);
+                               feature_data->values()[row_idx], features);
       }
     }
     return absl::OkStatus();
   };
 
   const auto CopyBooleanFeature = [&](const int feature_idx) -> absl::Status {
-    const auto& feature_data =
-        *dataset.ColumnWithCast<BooleanColumn>(feature_idx);
+    ASSIGN_OR_RETURN(
+        const auto& feature_data,
+        dataset.ColumnWithCastWithStatus<BooleanColumn>(feature_idx));
     ASSIGN_OR_RETURN(const auto feature_id,
-                     features.GetBooleanFeatureId(feature_data.name()));
+                     features.GetBooleanFeatureId(feature_data->name()));
     for (int example_idx = 0; example_idx < num_examples; example_idx++) {
       const row_t row_idx = begin_example_idx + example_idx;
-      if (feature_data.IsNa(row_idx)) {
+      if (feature_data->IsNa(row_idx)) {
         examples->SetMissingBoolean(example_idx, feature_id, features);
       } else {
         examples->SetBoolean(example_idx, feature_id,
-                             feature_data.values()[row_idx], features);
+                             feature_data->values()[row_idx], features);
       }
     }
     return absl::OkStatus();
@@ -299,20 +301,22 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
 
   const auto CopyDiscretizedNumericalFeature =
       [&](const int feature_idx) -> absl::Status {
-    const auto& feature_data =
-        *dataset.ColumnWithCast<DiscretizedNumericalColumn>(feature_idx);
+    ASSIGN_OR_RETURN(
+        const auto& feature_data,
+        dataset.ColumnWithCastWithStatus<DiscretizedNumericalColumn>(
+            feature_idx));
     ASSIGN_OR_RETURN(const auto feature_id,
-                     features.GetNumericalFeatureId(feature_data.name()));
+                     features.GetNumericalFeatureId(feature_data->name()));
     for (int example_idx = 0; example_idx < num_examples; example_idx++) {
       const row_t row_idx = begin_example_idx + example_idx;
-      if (feature_data.IsNa(row_idx)) {
+      if (feature_data->IsNa(row_idx)) {
         examples->SetMissingNumerical(example_idx, feature_id, features);
       } else {
-        examples->SetNumerical(example_idx, feature_id,
-                               dataset::DiscretizedNumericalToNumerical(
-                                   features.data_spec().columns(feature_idx),
-                                   feature_data.values()[row_idx]),
-                               features);
+        ASSIGN_OR_RETURN(auto value,
+                         dataset::DiscretizedNumericalToNumerical(
+                             features.data_spec().columns(feature_idx),
+                             feature_data->values()[row_idx]));
+        examples->SetNumerical(example_idx, feature_id, value, features);
       }
     }
     return absl::OkStatus();
@@ -320,17 +324,18 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
 
   const auto CopyCategoricalFeature =
       [&](const int feature_idx) -> absl::Status {
-    const auto& feature_data =
-        *dataset.ColumnWithCast<CategoricalColumn>(feature_idx);
+    ASSIGN_OR_RETURN(
+        const auto& feature_data,
+        dataset.ColumnWithCastWithStatus<CategoricalColumn>(feature_idx));
     ASSIGN_OR_RETURN(const auto feature_id,
-                     features.GetCategoricalFeatureId(feature_data.name()));
+                     features.GetCategoricalFeatureId(feature_data->name()));
     for (int example_idx = 0; example_idx < num_examples; example_idx++) {
       const row_t row_idx = begin_example_idx + example_idx;
-      if (feature_data.IsNa(row_idx)) {
+      if (feature_data->IsNa(row_idx)) {
         examples->SetMissingCategorical(example_idx, feature_id, features);
       } else {
         examples->SetCategorical(example_idx, feature_id,
-                                 feature_data.values()[row_idx], features);
+                                 feature_data->values()[row_idx], features);
       }
     }
     return absl::OkStatus();
@@ -338,17 +343,18 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
 
   const auto CopyCategoricalSetFeature =
       [&](const int feature_idx) -> absl::Status {
-    const auto& feature_data =
-        *dataset.ColumnWithCast<CategoricalSetColumn>(feature_idx);
+    ASSIGN_OR_RETURN(
+        const auto& feature_data,
+        dataset.ColumnWithCastWithStatus<CategoricalSetColumn>(feature_idx));
     ASSIGN_OR_RETURN(const auto feature_id,
-                     features.GetCategoricalSetFeatureId(feature_data.name()));
+                     features.GetCategoricalSetFeatureId(feature_data->name()));
     for (int example_idx = 0; example_idx < num_examples; example_idx++) {
       const row_t row_idx = begin_example_idx + example_idx;
-      if (feature_data.IsNa(row_idx)) {
+      if (feature_data->IsNa(row_idx)) {
         examples->SetMissingCategoricalSet(example_idx, feature_id, features);
       } else {
-        std::vector<int32_t> values = {feature_data.begin(row_idx),
-                                       feature_data.end(row_idx)};
+        std::vector<int32_t> values = {feature_data->begin(row_idx),
+                                       feature_data->end(row_idx)};
         examples->SetCategoricalSet(example_idx, feature_id, values, features);
       }
     }

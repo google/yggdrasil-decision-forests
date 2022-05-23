@@ -25,7 +25,7 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-void PlotAndExportTrainingLogs(
+absl::Status PlotAndExportTrainingLogs(
     const yggdrasil_decision_forests::model::gradient_boosted_trees::proto::
         TrainingLogs& training_logs,
     absl::string_view directory);

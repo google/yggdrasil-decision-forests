@@ -91,8 +91,8 @@ TEST(TrainAndEvaluateModel, Base) {
       manager->BlockingProtoRequest<proto::Result>(evaluate_request).value();
 
   LOG(INFO) << "Evaluation:"
-            << metric::TextReport(
-                   evaluate_result.evaluate_model().evaluation());
+            << metric::TextReport(evaluate_result.evaluate_model().evaluation())
+                   .value();
 
   EXPECT_GE(metric::Accuracy(evaluate_result.evaluate_model().evaluation()),
             0.86);

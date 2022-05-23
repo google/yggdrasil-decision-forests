@@ -71,7 +71,7 @@ void AddToConfusionMatrixProto(const proto::IntegersConfusionMatrixDouble& src,
 
 double ConfusionMatrixProtoTrace(
     const proto::IntegersConfusionMatrixDouble& confusion) {
-  CHECK_EQ(confusion.nrow(), confusion.ncol());
+  DCHECK_EQ(confusion.nrow(), confusion.ncol());
   double sum = 0;
   for (int row = 0; row < confusion.ncol(); row++) {
     const int index =

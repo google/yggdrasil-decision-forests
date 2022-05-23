@@ -285,11 +285,12 @@ namespace dataset {
 // See "dataset_cache.h" for an explanation of the dataset cache.
 class PartialDatasetCacheDataSpecCreator : public AbstractDataSpecCreator {
  public:
-  void InferColumnsAndTypes(const std::vector<std::string>& paths,
-                            const proto::DataSpecificationGuide& guide,
-                            proto::DataSpecification* data_spec) override;
+  absl::Status InferColumnsAndTypes(
+      const std::vector<std::string>& paths,
+      const proto::DataSpecificationGuide& guide,
+      proto::DataSpecification* data_spec) override;
 
-  void ComputeColumnStatistics(
+  absl::Status ComputeColumnStatistics(
       const std::vector<std::string>& paths,
       const proto::DataSpecificationGuide& guide,
       proto::DataSpecification* data_spec,
@@ -299,7 +300,7 @@ class PartialDatasetCacheDataSpecCreator : public AbstractDataSpecCreator {
 
  private:
   // Compute the statistics of a single column on a single shard.
-  static void ComputeColumnStatisticsColumnAndShard(
+  static absl::Status ComputeColumnStatisticsColumnAndShard(
       int col_idx,
       const model::distributed_decision_tree::dataset_cache::proto::
           PartialColumnShardMetadata& shard_meta_data,

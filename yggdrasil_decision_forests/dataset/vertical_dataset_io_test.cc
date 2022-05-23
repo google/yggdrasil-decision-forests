@@ -96,55 +96,77 @@ TEST(VerticalDatasetIOTest, LoadSaveLoad) {
   for (int example_idx = 0; example_idx < ds.nrow(); example_idx++) {
     int column_idx = 0;
     EXPECT_EQ(
-        ds.MutableColumnWithCast<VerticalDataset::NumericalColumn>(column_idx)
+        ds.MutableColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(
+              column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)),
-        ds2.MutableColumnWithCast<VerticalDataset::NumericalColumn>(column_idx)
+        ds2.MutableColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(
+               column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)));
 
     column_idx = 1;
     EXPECT_EQ(
-        ds.MutableColumnWithCast<VerticalDataset::NumericalColumn>(column_idx)
+        ds.MutableColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(
+              column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)),
-        ds2.MutableColumnWithCast<VerticalDataset::NumericalColumn>(column_idx)
+        ds2.MutableColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(
+               column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)));
 
     column_idx = 2;
     EXPECT_EQ(
-        ds.MutableColumnWithCast<VerticalDataset::CategoricalColumn>(column_idx)
+        ds.MutableColumnWithCastWithStatus<VerticalDataset::CategoricalColumn>(
+              column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)),
-        ds2.MutableColumnWithCast<VerticalDataset::CategoricalColumn>(
+        ds2.MutableColumnWithCastWithStatus<VerticalDataset::CategoricalColumn>(
                column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)));
 
     column_idx = 3;
     EXPECT_EQ(
-        ds.MutableColumnWithCast<VerticalDataset::CategoricalColumn>(column_idx)
+        ds.MutableColumnWithCastWithStatus<VerticalDataset::CategoricalColumn>(
+              column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)),
-        ds2.MutableColumnWithCast<VerticalDataset::CategoricalColumn>(
+        ds2.MutableColumnWithCastWithStatus<VerticalDataset::CategoricalColumn>(
                column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)));
 
     column_idx = 4;
-    EXPECT_EQ(ds.MutableColumnWithCast<VerticalDataset::CategoricalSetColumn>(
-                    column_idx)
+    EXPECT_EQ(ds.MutableColumnWithCastWithStatus<
+                    VerticalDataset::CategoricalSetColumn>(column_idx)
+                  .value()
                   ->ToString(example_idx, ds.data_spec().columns(column_idx)),
-              ds2.MutableColumnWithCast<VerticalDataset::CategoricalSetColumn>(
-                     column_idx)
+              ds2.MutableColumnWithCastWithStatus<
+                     VerticalDataset::CategoricalSetColumn>(column_idx)
+                  .value()
                   ->ToString(example_idx, ds.data_spec().columns(column_idx)));
 
     column_idx = 5;
-    EXPECT_EQ(ds.MutableColumnWithCast<VerticalDataset::CategoricalSetColumn>(
-                    column_idx)
+    EXPECT_EQ(ds.MutableColumnWithCastWithStatus<
+                    VerticalDataset::CategoricalSetColumn>(column_idx)
+                  .value()
                   ->ToString(example_idx, ds.data_spec().columns(column_idx)),
-              ds2.MutableColumnWithCast<VerticalDataset::CategoricalSetColumn>(
-                     column_idx)
+              ds2.MutableColumnWithCastWithStatus<
+                     VerticalDataset::CategoricalSetColumn>(column_idx)
+                  .value()
                   ->ToString(example_idx, ds.data_spec().columns(column_idx)));
 
     column_idx = 6;
     EXPECT_EQ(
-        ds.MutableColumnWithCast<VerticalDataset::BooleanColumn>(column_idx)
+        ds.MutableColumnWithCastWithStatus<VerticalDataset::BooleanColumn>(
+              column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)),
-        ds2.MutableColumnWithCast<VerticalDataset::BooleanColumn>(column_idx)
+        ds2.MutableColumnWithCastWithStatus<VerticalDataset::BooleanColumn>(
+               column_idx)
+            .value()
             ->ToString(example_idx, ds.data_spec().columns(column_idx)));
   }
 }
@@ -157,14 +179,14 @@ TEST(Dataset, TokenizeTfExample) {
       "tfrecord+tfe:", file::JoinPath(DatasetDir(), "sentences.tfe-tfrecord"));
 
   const proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         column_guides {
           column_name_pattern: ".*"
           type: CATEGORICAL_LIST
           tokenizer {}
           categorial { min_vocab_frequency: 1 }
         }
-      )");
+      )pb");
   proto::DataSpecification data_spec;
   CreateDataSpec(path, false, guide, &data_spec);
 
@@ -178,14 +200,14 @@ TEST(Dataset, TokenizeTfExample) {
 
   proto::Example example;
   dataset.ExtractExample(0, &example);
-  const proto::Example expected_example_1 = PARSE_TEST_PROTO(R"(
+  const proto::Example expected_example_1 = PARSE_TEST_PROTO(R"pb(
     attributes { categorical_list { values: 4 values: 1 } }
-  )");
+  )pb");
   EXPECT_THAT(example, EqualsProto(expected_example_1));
   dataset.ExtractExample(1, &example);
-  const proto::Example expected_example_2 = PARSE_TEST_PROTO(R"(
+  const proto::Example expected_example_2 = PARSE_TEST_PROTO(R"pb(
     attributes { categorical_list { values: 5 values: 3 values: 2 } }
-  )");
+  )pb");
   EXPECT_THAT(example, EqualsProto(expected_example_2));
 }
 

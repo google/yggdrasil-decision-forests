@@ -58,7 +58,7 @@ void InferDataSpecType(const absl::string_view typed_path,
   CHECK_OK(utils::ExpandInputShards(sharded_path, &paths));
   const auto& format_name = proto::DatasetFormat_Name(format);
   auto creator = AbstractDataSpecCreatorRegisterer::Create(format_name).value();
-  creator->InferColumnsAndTypes(paths, guide, data_spec);
+  CHECK_OK(creator->InferColumnsAndTypes(paths, guide, data_spec));
   FinalizeInferTypes(guide, data_spec);
 }
 

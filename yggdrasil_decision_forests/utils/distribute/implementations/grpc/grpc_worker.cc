@@ -297,7 +297,7 @@ class WorkerService final : public proto::Server::Service {
 
   // Loop for a thread processing inter worker requests.
   void ProcessInterWorkerCommunication() {
-    CHECK(intra_worker_communication_);
+    DCHECK(intra_worker_communication_);
     while (true) {
       auto pending_blob_or = intra_worker_communication_->pending_queries.Pop();
       if (!pending_blob_or.has_value()) {
@@ -316,7 +316,7 @@ class WorkerService final : public proto::Server::Service {
   // This method should be called before any inter worker communication.
   void InitializerInterWorkerCommunication(const int num_workers,
                                            const int num_threads) {
-    CHECK(!intra_worker_communication_);
+    DCHECK(!intra_worker_communication_);
     intra_worker_communication_ = absl::make_unique<InterWorkerCommunication>();
     intra_worker_communication_->threads.Start(
         num_threads, [&]() { ProcessInterWorkerCommunication(); });

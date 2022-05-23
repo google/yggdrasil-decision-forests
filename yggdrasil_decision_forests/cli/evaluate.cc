@@ -83,7 +83,7 @@ void Evaluate() {
   evaluation = model->Evaluate(absl::GetFlag(FLAGS_dataset), options, &rnd);
 
   std::string text_report;
-  metric::AppendTextReport(evaluation, &text_report);
+  CHECK_OK(metric::AppendTextReportWithStatus(evaluation, &text_report));
   std::cout << "Evaluation:" << std::endl << text_report;
 }
 

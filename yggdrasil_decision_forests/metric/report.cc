@@ -18,6 +18,7 @@
 #include <string>
 #include <utility>
 
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -38,14 +39,19 @@ std::string PairToString(const std::pair<T, T>& p) {
 
 }  // namespace
 
-std::string TextReport(const proto::EvaluationResults& eval) {
+utils::StatusOr<std::string> TextReport(const proto::EvaluationResults& eval) {
   std::string report;
-  AppendTextReport(eval, &report);
+  RETURN_IF_ERROR(AppendTextReportWithStatus(eval, &report));
   return report;
 }
 
 void AppendTextReport(const proto::EvaluationResults& eval,
                       std::string* report) {
+  CHECK_OK(AppendTextReportWithStatus(eval, report));
+}
+
+absl::Status AppendTextReportWithStatus(const proto::EvaluationResults& eval,
+                                        std::string* report) {
   absl::StrAppend(report, "Number of predictions (without weights): ",
                   eval.count_predictions_no_weight(), "\n");
   absl::StrAppend(report, "Number of predictions (with weights): ",
@@ -60,24 +66,25 @@ void AppendTextReport(const proto::EvaluationResults& eval,
 
   switch (eval.type_case()) {
     case proto::EvaluationResults::TypeCase::kClassification:
-      AppendTextReportClassification(eval, report);
+      RETURN_IF_ERROR(AppendTextReportClassification(eval, report));
       break;
     case proto::EvaluationResults::TypeCase::kRegression:
-      AppendTextReportRegression(eval, report);
+      RETURN_IF_ERROR(AppendTextReportRegression(eval, report));
       break;
     case proto::EvaluationResults::TypeCase::kRanking:
-      AppendTextReportRanking(eval, report);
+      RETURN_IF_ERROR(AppendTextReportRanking(eval, report));
       break;
     case proto::EvaluationResults::TypeCase::kUplift:
-      AppendTextReportUplift(eval, report);
+      RETURN_IF_ERROR(AppendTextReportUplift(eval, report));
       break;
     default:
-      LOG(FATAL) << "Not implemented";
+      STATUS_FATAL("Not implemented");
   }
+  return absl::OkStatus();
 }
 
-void AppendTextReportClassification(const proto::EvaluationResults& eval,
-                                    std::string* report) {
+absl::Status AppendTextReportClassification(
+    const proto::EvaluationResults& eval, std::string* report) {
   absl::SubstituteAndAppend(report, "Accuracy: $0  CI95[W][$1]\n",
                             Accuracy(eval),
                             PairToString(AccuracyConfidenceInterval(eval)));
@@ -93,7 +100,7 @@ void AppendTextReportClassification(const proto::EvaluationResults& eval,
   absl::StrAppend(report, "Confusion Table:\n");
   utils::IntegersConfusionMatrixDouble confusion;
   confusion.Load(eval.classification().confusion());
-  confusion.AppendTextReport(eval.label_column(), report);
+  RETURN_IF_ERROR(confusion.AppendTextReport(eval.label_column(), report));
   absl::StrAppend(report, "\n");
 
   // Print a description of a X@Y metric. For example:
@@ -185,10 +192,11 @@ void AppendTextReportClassification(const proto::EvaluationResults& eval,
     }
     absl::StrAppend(report, "\n");
   }
+  return absl::OkStatus();
 }
 
-void AppendTextReportRegression(const proto::EvaluationResults& eval,
-                                std::string* report) {
+absl::Status AppendTextReportRegression(const proto::EvaluationResults& eval,
+                                        std::string* report) {
   absl::StrAppend(report, "RMSE: ", RMSE(eval));
 
   const auto closed_ci = RMSEConfidenceInterval(eval);
@@ -204,10 +212,11 @@ void AppendTextReportRegression(const proto::EvaluationResults& eval,
   absl::StrAppend(report, "\n");
 
   absl::StrAppend(report, "Default RMSE: ", DefaultRMSE(eval), "\n");
+  return absl::OkStatus();
 }
 
-void AppendTextReportRanking(const proto::EvaluationResults& eval,
-                             std::string* report) {
+absl::Status AppendTextReportRanking(const proto::EvaluationResults& eval,
+                                     std::string* report) {
   absl::StrAppend(report, "NDCG@", eval.ranking().ndcg_truncation(), ": ",
                   NDCG(eval));
   if (eval.ranking().ndcg().has_bootstrap_based_95p()) {
@@ -245,14 +254,16 @@ void AppendTextReportRanking(const proto::EvaluationResults& eval,
                   eval.ranking().mean_num_items_in_group(),
                   " min:", eval.ranking().min_num_items_in_group(),
                   " max:", eval.ranking().max_num_items_in_group(), "\n");
+  return absl::OkStatus();
 }
 
-void AppendTextReportUplift(const proto::EvaluationResults& eval,
-                            std::string* report) {
+absl::Status AppendTextReportUplift(const proto::EvaluationResults& eval,
+                                    std::string* report) {
   absl::StrAppend(
       report, "Number of treatments: ", eval.uplift().num_treatments(), "\n");
   absl::StrAppend(report, "AUUC: ", AUUC(eval), "\n");
   absl::StrAppend(report, "Qini: ", Qini(eval), "\n");
+  return absl::OkStatus();
 }
 
 }  // namespace metric

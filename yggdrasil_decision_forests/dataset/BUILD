@@ -61,6 +61,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:regex",
         "//yggdrasil_decision_forests/utils:hash",
+        "//yggdrasil_decision_forests/utils:status_macros",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
             "@tensorflow_pypi//:libtensorflow_framework",

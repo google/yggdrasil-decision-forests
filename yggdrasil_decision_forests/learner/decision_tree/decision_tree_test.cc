@@ -637,23 +637,24 @@ TEST(DecisionTree, FindBestConditionClassification) {
 
   dataset.set_data_spec(dataspec);
   CHECK_OK(dataset.CreateColumnsFromDataspec());
-  auto* col_1 =
-      dataset.MutableColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          0);
+  auto* col_1 = dataset
+                    .MutableColumnWithCastWithStatus<
+                        dataset::VerticalDataset::NumericalColumn>(0)
+                    .value();
   col_1->Add(0);
   col_1->Add(2);
 
-  auto* col_2 =
-      dataset
-          .MutableColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              1);
+  auto* col_2 = dataset
+                    .MutableColumnWithCastWithStatus<
+                        dataset::VerticalDataset::CategoricalColumn>(1)
+                    .value();
   col_2->Add(1);
   col_2->Add(2);
 
-  auto* col_3 =
-      dataset
-          .MutableColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              2);
+  auto* col_3 = dataset
+                    .MutableColumnWithCastWithStatus<
+                        dataset::VerticalDataset::CategoricalColumn>(2)
+                    .value();
   col_3->Add(1);
   col_3->Add(2);
 
@@ -946,7 +947,7 @@ TEST_P(FindBestNumericalSplitCartNumericalLabelBasePresortedTest,
       } else {
         example.add_attributes()->set_numerical(attribute);
       }
-      dataset.AppendExample(example);
+      CHECK_OK(dataset.AppendExampleWithStatus(example));
     }
     model::proto::TrainingConfigLinking config_link;
     config_link.add_features(0);
@@ -1016,7 +1017,7 @@ TEST(FindBestNumericalSplitCartNumericalLabelBasePresortedTestManual, Base) {
     for (const auto attribute : attributes) {
       dataset::proto::Example example;
       example.add_attributes()->set_numerical(attribute);
-      dataset.AppendExample(example);
+      CHECK_OK(dataset.AppendExampleWithStatus(example));
     }
     model::proto::TrainingConfigLinking config_link;
     config_link.add_features(0);
@@ -1434,7 +1435,7 @@ TEST(DecisionTree, GenerateRandomImputation) {
         attributes { text: "riri" }
         attributes { numerical: 1 }
       )pb");
-  dataset.AppendExample(example_1);
+  CHECK_OK(dataset.AppendExampleWithStatus(example_1));
 
   const dataset::proto::Example example_2 = PARSE_TEST_PROTO(
       R"pb(
@@ -1444,7 +1445,7 @@ TEST(DecisionTree, GenerateRandomImputation) {
         attributes {}
         attributes {}
       )pb");
-  dataset.AppendExample(example_2);
+  CHECK_OK(dataset.AppendExampleWithStatus(example_2));
 
   const dataset::proto::Example example_3 = PARSE_TEST_PROTO(
       R"pb(
@@ -1454,7 +1455,7 @@ TEST(DecisionTree, GenerateRandomImputation) {
         attributes { text: "fifi" }
         attributes { numerical: 1 }
       )pb");
-  dataset.AppendExample(example_3);
+  CHECK_OK(dataset.AppendExampleWithStatus(example_3));
 
   const dataset::proto::Example example_4 = PARSE_TEST_PROTO(
       R"pb(
@@ -1464,7 +1465,7 @@ TEST(DecisionTree, GenerateRandomImputation) {
         attributes { text: "loulou" }
         attributes { numerical: 1 }
       )pb");
-  dataset.AppendExample(example_4);
+  CHECK_OK(dataset.AppendExampleWithStatus(example_4));
 
   utils::RandomEngine rnd(1324);
   dataset::VerticalDataset imputed;
@@ -1479,23 +1480,27 @@ TEST(DecisionTree, GenerateRandomImputation) {
   EXPECT_EQ(imputed.column(3)->nrows(), 3);
   EXPECT_EQ(imputed.column(4)->nrows(), 0);
 
-  EXPECT_TRUE(
-      (imputed
-           .MutableColumnWithCast<dataset::VerticalDataset::NumericalColumn>(0)
-           ->values() == std::vector<float>{1, 1, 2}) ||
-      (imputed
-           .MutableColumnWithCast<dataset::VerticalDataset::NumericalColumn>(0)
-           ->values() == std::vector<float>{1, 2, 2}));
+  EXPECT_TRUE((imputed
+                   .MutableColumnWithCastWithStatus<
+                       dataset::VerticalDataset::NumericalColumn>(0)
+                   .value()
+                   ->values() == std::vector<float>{1, 1, 2}) ||
+              (imputed
+                   .MutableColumnWithCastWithStatus<
+                       dataset::VerticalDataset::NumericalColumn>(0)
+                   .value()
+                   ->values() == std::vector<float>{1, 2, 2}));
 
-  EXPECT_TRUE(
-      (imputed
-           .MutableColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-               2)
-           ->values() == std::vector<int>{1, 1, 2}) ||
-      (imputed
-           .MutableColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-               2)
-           ->values() == std::vector<int>{1, 2, 2}));
+  EXPECT_TRUE((imputed
+                   .MutableColumnWithCastWithStatus<
+                       dataset::VerticalDataset::CategoricalColumn>(2)
+                   .value()
+                   ->values() == std::vector<int>{1, 1, 2}) ||
+              (imputed
+                   .MutableColumnWithCastWithStatus<
+                       dataset::VerticalDataset::CategoricalColumn>(2)
+                   .value()
+                   ->values() == std::vector<int>{1, 2, 2}));
 }
 
 TEST(DecisionTree,

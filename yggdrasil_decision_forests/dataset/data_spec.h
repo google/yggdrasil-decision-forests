@@ -86,9 +86,9 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
 // Converts a proto::Example into an array of string that can be saved in a csv
 // file. The output "csv_fields[i]" is the string representation of the "i-th"
 // column of "example".
-void ExampleToCsvRow(const proto::Example& example,
-                     const proto::DataSpecification& data_spec,
-                     std::vector<std::string>* csv_fields);
+absl::Status ExampleToCsvRow(const proto::Example& example,
+                             const proto::DataSpecification& data_spec,
+                             std::vector<std::string>* csv_fields);
 
 // Converts a proto::Example into a tensorflow::Example.
 void ExampleToTfExample(const proto::Example& example,
@@ -128,12 +128,16 @@ std::string PrintHumanReadable(const proto::DataSpecification& data_spec,
 
 // Returns the integer representation of a categorical value provided as a
 // string.
+utils::StatusOr<int32_t> CategoricalStringToValueWithStatus(
+    const std::string& value, const proto::Column& col_spec);
+
 int32_t CategoricalStringToValue(const std::string& value,
                                  const proto::Column& col_spec);
 
 // Tokenize a string. "tokens" is cleared before being filled.
-void Tokenize(const absl::string_view text, const proto::Tokenizer& tokenizer,
-              std::vector<std::string>* tokens);
+absl::Status Tokenize(const absl::string_view text,
+                      const proto::Tokenizer& tokenizer,
+                      std::vector<std::string>* tokens);
 
 // Extract a ngrams of tokens from a list of token i.e. extracts all the
 // sub-sequences of length "n" from "tokens". Append "separator" in between the
@@ -171,22 +175,22 @@ bool IsNumerical(proto::ColumnType type);
 
 // Get the float value contained in a feature. Can return NaN. Fails if
 // the feature contains more than one value.
-float GetSingleFloatFromTFFeature(const tensorflow::Feature& feature,
-                                  const proto::Column& col);
+utils::StatusOr<float> GetSingleFloatFromTFFeature(
+    const tensorflow::Feature& feature, const proto::Column& col);
 
 // Get all the float values contained in a feature.
-void GetNumericalValuesFromTFFeature(const tensorflow::Feature& feature,
-                                     const proto::Column& col,
-                                     std::vector<float>* values);
+absl::Status GetNumericalValuesFromTFFeature(const tensorflow::Feature& feature,
+                                             const proto::Column& col,
+                                             std::vector<float>* values);
 
 // Get the categorical tokens in a feature.
-void GetCategoricalTokensFromTFFeature(const tensorflow::Feature& feature,
-                                       const proto::Column& col,
-                                       std::vector<std::string>* tokens);
+absl::Status GetCategoricalTokensFromTFFeature(
+    const tensorflow::Feature& feature, const proto::Column& col,
+    std::vector<std::string>* tokens);
 
 // Converts a discretized numerical value into a numerical value.
-float DiscretizedNumericalToNumerical(const proto::Column& col_spec,
-                                      DiscretizedNumericalIndex value);
+utils::StatusOr<float> DiscretizedNumericalToNumerical(
+    const proto::Column& col_spec, DiscretizedNumericalIndex value);
 
 // Determines a set of histogram-like boundaries of a discretized numerical
 // features.
@@ -208,7 +212,7 @@ float DiscretizedNumericalToNumerical(const proto::Column& col_spec,
 //    that require their own bin. E.g. if 5 is in "special_values", and if
 //    "candidates" contains values both greater and smaller than 5 (e.g. -3, 1,
 //    6, 10) there will be a bin [5-eps, 5+eps[.
-std::vector<float> GenDiscretizedBoundaries(
+utils::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
     const std::vector<std::pair<float, int>>& candidates, int maximum_num_bins,
     int min_obs_in_bins, const std::vector<float>& special_values);
 

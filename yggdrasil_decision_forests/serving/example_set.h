@@ -694,13 +694,13 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
         << "\" should be passed as an integer";
 #endif
 
-    SetCategorical(
-        example_idx, feature_id,
-        dataset::CategoricalStringToValue(
-            value,
-            features.data_spec().columns(
-                features.fixed_length_features()[feature_id.index].spec_idx)),
-        features);
+    const auto int_value = dataset::CategoricalStringToValueWithStatus(
+        value,
+        features.data_spec().columns(
+            features.fixed_length_features()[feature_id.index].spec_idx));
+    if (int_value.ok()) {
+      SetCategorical(example_idx, feature_id, int_value.value(), features);
+    }
   }
 
   void SetCategorical(const int example_idx,
@@ -759,11 +759,14 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
         example_idx, feature_id.index, features)];
     dst_range.begin = categorical_item_buffer_.size();
     for (const auto& value : values) {
-      const auto value_idx = dataset::CategoricalStringToValue(
+      auto value_idx_or = dataset::CategoricalStringToValueWithStatus(
           value,
           features.data_spec().columns(
               features.categorical_set_features()[feature_id.index].spec_idx));
-      categorical_item_buffer_.push_back(value_idx);
+
+      if (value_idx_or.ok()) {
+        categorical_item_buffer_.push_back(value_idx_or.value());
+      }
     }
     dst_range.end = categorical_item_buffer_.size();
   }
@@ -1322,11 +1325,12 @@ ExampleSetNumericalOrCategoricalFlat<Model, format>::FromProtoExample(
 
       case dataset::proto::ColumnType::DISCRETIZED_NUMERICAL: {
         if (attribute.has_discretized_numerical()) {
+          ASSIGN_OR_RETURN(const auto value,
+                           dataset::DiscretizedNumericalToNumerical(
+                               features.data_spec().columns(feature.spec_idx),
+                               attribute.discretized_numerical()));
           SetNumerical(example_idx, NumericalFeatureId{feature.internal_idx},
-                       dataset::DiscretizedNumericalToNumerical(
-                           features.data_spec().columns(feature.spec_idx),
-                           attribute.discretized_numerical()),
-                       features);
+                       value, features);
         } else {
           SetMissingNumerical(
               example_idx, NumericalFeatureId{feature.internal_idx}, features);

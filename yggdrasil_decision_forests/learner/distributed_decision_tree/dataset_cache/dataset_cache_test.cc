@@ -104,7 +104,10 @@ TEST_F(End2End, NumericalInOrder) {
       /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache()));
 
   const auto& ground_truth_values =
-      dataset_.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(0)
+      dataset_
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+              0)
+          .value()
           ->values();
 
   size_t num_examples = 0;
@@ -144,7 +147,10 @@ TEST_F(End2End, CategoricalInOrder) {
       /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache()));
 
   const auto& ground_truth_values =
-      dataset_.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(1)
+      dataset_
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(1)
+          .value()
           ->values();
 
   size_t num_examples = 0;
@@ -218,7 +224,10 @@ TEST_F(End2End, SortedNumericalColumn) {
 
   // Grab and sort the values of the feature.
   auto ground_truth_values =
-      dataset_.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(0)
+      dataset_
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+              0)
+          .value()
           ->values();
   for (auto& value : ground_truth_values) {
     if (std::isnan(value)) {
@@ -272,7 +281,10 @@ TEST_F(End2End, NumericalInOrderDiscretized) {
       /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache()));
 
   const auto& ground_truth_values =
-      dataset_.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(4)
+      dataset_
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+              4)
+          .value()
           ->values();
 
   size_t num_examples = 0;

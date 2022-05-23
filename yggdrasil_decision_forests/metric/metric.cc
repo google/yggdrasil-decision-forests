@@ -123,13 +123,15 @@ void SetLowerAndUpperBounds(
 // "prediction_selected_count" specifies the number of times each prediction is
 // selected. If "prediction_selected_count" is empty, all predictions are
 // selected once.
-void BuildROCCurveFromSortedPredictions(
+absl::Status BuildROCCurveFromSortedPredictions(
     const std::vector<BinaryPrediction>& sorted_predictions,
     const std::vector<int>& prediction_selected_count,
     const double sum_positive_label, const double sum_negative_label,
     google::protobuf::RepeatedPtrField<proto::Roc::Point>* curve) {
-  CHECK(prediction_selected_count.empty() ||
-        prediction_selected_count.size() == sorted_predictions.size());
+  if (!prediction_selected_count.empty() &&
+      prediction_selected_count.size() != sorted_predictions.size()) {
+    return absl::InvalidArgumentError("Non matching prediction count");
+  }
   curve->Clear();
   // Initialize accumulator.
   proto::Roc::Point accumulator;
@@ -178,6 +180,7 @@ void BuildROCCurveFromSortedPredictions(
     const auto n = curve->size();
     (*curve)[n - 1].set_threshold((*curve)[n - 2].threshold() + 1);
   }
+  return absl::OkStatus();
 }
 
 // Return the index of a x@y metric from the y constraint value.
@@ -228,10 +231,10 @@ void BootstrapMetricEstimate(
   metric->mutable_bootstrap_based_95p()->set_upper(samples[quantile_2_idx]);
 }
 
-void FinalizeRankingMetricsFromSampledPredictions(
+absl::Status FinalizeRankingMetricsFromSampledPredictions(
     const proto::EvaluationOptions& option, proto::EvaluationResults* eval) {
   const auto num_preds = eval->sampled_predictions_size();
-  CHECK_GT(num_preds, 0);
+  STATUS_CHECK_GT(num_preds, 0);
   auto& ranking = *eval->mutable_ranking();
 
   // sorted_prediction_by_group[i].pred_and_label_relevance[j] is the predicted
@@ -255,12 +258,12 @@ void FinalizeRankingMetricsFromSampledPredictions(
 
   if (!option.ranking().allow_only_one_group() &&
       grouped_examples.size() == 1) {
-    LOG(FATAL) << "During the ranking evaluation, all items ("
-               << eval->sampled_predictions().size()
-               << ") (e.g. documents) are in the same group (e.g. "
+    STATUS_FATALS("During the ranking evaluation, all items (",
+                  eval->sampled_predictions().size(),
+                  ") (e.g. documents) are in the same group (e.g. "
                   "query). Make sure the dataspec was also "
                   "initialized using the test dataset, or that the ranking "
-                  "group is of type HASH.";
+                  "group is of type HASH.");
   }
 
   NDCGCalculator ndcg_computer(option.ranking().ndcg_truncation());
@@ -350,6 +353,8 @@ void FinalizeRankingMetricsFromSampledPredictions(
     BootstrapMetricEstimate(individual_mrrs, option.bootstrapping_samples(),
                             eval->mutable_ranking()->mutable_mrr());
   }
+
+  return absl::OkStatus();
 }
 
 // Specialization of "MergeEvaluation" to specific task type.
@@ -516,7 +521,7 @@ std::vector<MetricDefinition> DefaultMetrics(
                true}};
     }
     default:
-      LOG(FATAL) << "Not implemented task.";
+      return {};
   }
 }
 
@@ -572,7 +577,7 @@ std::pair<double, double> GetQuantiles(
     const std::function<double(const proto::Roc&)>& getter,
     const float quantile_1, const float quantile_2) {
   const auto n = samples.size();
-  CHECK_GT(n, 0);
+  DCHECK_GT(n, 0);
   std::vector<double> extracted_samples(n);
   for (size_t sample_idx = 0; sample_idx < n; sample_idx++) {
     extracted_samples[sample_idx] = getter(samples[sample_idx]);
@@ -585,12 +590,12 @@ std::pair<double, double> GetQuantiles(
   return {extracted_samples[quantile_1_idx], extracted_samples[quantile_2_idx]};
 }
 
-void UpdateRMSEConfidenceIntervalUsingBootstrapping(
+absl::Status UpdateRMSEConfidenceIntervalUsingBootstrapping(
     const proto::EvaluationOptions& option, proto::EvaluationResults* eval) {
   // Bootstrap samples of RMSEes.
   std::vector<float> rmse_samples(option.bootstrapping_samples());
   const auto num_preds = eval->sampled_predictions_size();
-  CHECK_GT(num_preds, 0);
+  STATUS_CHECK_GT(num_preds, 0);
   // Random generator for the selection of predictions.
   utils::RandomEngine rnd;
   std::uniform_int_distribution<int64_t> prediction_idx_dist(0, num_preds - 1);
@@ -625,9 +630,10 @@ void UpdateRMSEConfidenceIntervalUsingBootstrapping(
       rmse_samples[quantile_1_idx]);
   eval->mutable_regression()->set_bootstrap_rmse_upper_bounds_95p(
       rmse_samples[quantile_2_idx]);
+  return absl::OkStatus();
 }
 
-void ComputeRocConfidenceIntervalsUsingBootstrapping(
+absl::Status ComputeRocConfidenceIntervalsUsingBootstrapping(
     const proto::EvaluationOptions& option,
     const std::vector<BinaryPrediction>& sorted_predictions, proto::Roc* roc) {
   const auto num_preds = sorted_predictions.size();
@@ -665,9 +671,9 @@ void ComputeRocConfidenceIntervalsUsingBootstrapping(
 
     // Compute the ROC
     temporary_roc.Clear();
-    BuildROCCurveFromSortedPredictions(
+    RETURN_IF_ERROR(BuildROCCurveFromSortedPredictions(
         sorted_predictions, selected_count, sampled_sum_positive_label,
-        sampled_sum_negative_label, &temporary_roc);
+        sampled_sum_negative_label, &temporary_roc));
 
     // Evaluate metrics on the bootstrap.
     sample_roc.set_auc(computeAUC(temporary_roc));
@@ -699,25 +705,28 @@ void ComputeRocConfidenceIntervalsUsingBootstrapping(
       roc);
 
   // X@Y Metrics
-  CHECK(!samples.empty());
+  if (samples.empty()) {
+    return absl::InvalidArgumentError("No sample available");
+  }
   for (const auto& x_at_y_accessor : XAtYMetricsAccessors()) {
     const auto num_conditions = x_at_y_accessor.const_access(samples[0]).size();
     for (int constraint_idx = 0; constraint_idx < num_conditions;
          constraint_idx++) {
       const auto getter = [&](const proto::Roc& item) {
         const auto& x_at_y = x_at_y_accessor.const_access(item);
-        CHECK_LT(constraint_idx, x_at_y.size());
+        DCHECK_LT(constraint_idx, x_at_y.size());
         return x_at_y[constraint_idx].x_metric_value();
       };
-      const auto setter = [&](const double value, proto::Roc* item) {
+      const auto setter = [&](const double value, proto::Roc* item) -> void {
         auto& x_at_y = *x_at_y_accessor.mutable_access(item);
-        CHECK_EQ(constraint_idx, x_at_y.size());
+        DCHECK_EQ(constraint_idx, x_at_y.size());
         auto* constraint_value = x_at_y.Add();
         constraint_value->set_x_metric_value(value);
       };
       SetLowerAndUpperBounds(samples, getter, setter, roc);
     }
   }
+  return absl::OkStatus();
 }
 }  // namespace internal
 
@@ -769,13 +778,14 @@ std::vector<XAtYAccessor> XAtYMetricsAccessors() {
   return accessors;
 }
 
-void InitializeEvaluation(const proto::EvaluationOptions& option,
-                          const dataset::proto::Column& label_column,
-                          proto::EvaluationResults* eval) {
+absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
+                                  const dataset::proto::Column& label_column,
+                                  proto::EvaluationResults* eval) {
   switch (option.task()) {
     case model::proto::Task::CLASSIFICATION: {
       if (label_column.type() != dataset::proto::ColumnType::CATEGORICAL) {
-        LOG(FATAL) << "Classification requires a categorical label.";
+        return absl::InvalidArgumentError(
+            "Classification requires a categorical label.");
       }
       // Allocate and zero the confusion matrix.
       const int32_t num_classes =
@@ -786,13 +796,15 @@ void InitializeEvaluation(const proto::EvaluationOptions& option,
     } break;
     case model::proto::Task::REGRESSION:
       if (label_column.type() != dataset::proto::ColumnType::NUMERICAL) {
-        LOG(FATAL) << "Regression requires a numerical label.";
+        return absl::InvalidArgumentError(
+            "Regression requires a numerical label.");
       }
       eval->mutable_regression();
       break;
     case model::proto::Task::RANKING:
       if (label_column.type() != dataset::proto::ColumnType::NUMERICAL) {
-        LOG(FATAL) << "Ranking requires a numerical label.";
+        return absl::InvalidArgumentError(
+            "Ranking requires a numerical label.");
       }
       eval->mutable_ranking();
       break;
@@ -805,16 +817,19 @@ void InitializeEvaluation(const proto::EvaluationOptions& option,
                                                            eval));
       break;
     default:
-      CHECK(false) << "Non supported task type: "
-                   << model::proto::Task_Name(option.task());
-      break;
+      STATUS_FATALS("Non supported task type: ",
+                    model::proto::Task_Name(option.task()));
   }
+  return absl::OkStatus();
 }
 
-void AddPrediction(const proto::EvaluationOptions& option,
-                   const model::proto::Prediction& pred,
-                   utils::RandomEngine* rnd, proto::EvaluationResults* eval) {
-  CHECK_EQ(option.has_weights(), pred.has_weight());
+absl::Status AddPrediction(const proto::EvaluationOptions& option,
+                           const model::proto::Prediction& pred,
+                           utils::RandomEngine* rnd,
+                           proto::EvaluationResults* eval) {
+  if (option.has_weights() != pred.has_weight()) {
+    return absl::InvalidArgumentError("Wrong weight shape");
+  }
   // Count the number of predictions.
   eval->set_count_predictions(eval->count_predictions() + pred.weight());
   eval->set_count_predictions_no_weight(eval->count_predictions_no_weight() +
@@ -828,10 +843,10 @@ void AddPrediction(const proto::EvaluationOptions& option,
 
   switch (option.task()) {
     case model::proto::Task::CLASSIFICATION: {
-      CHECK(pred.has_classification());
+      STATUS_CHECK(pred.has_classification());
       auto* eval_cls = eval->mutable_classification();
       const auto& pred_cls = pred.classification();
-      CHECK(pred_cls.has_ground_truth());
+      STATUS_CHECK(pred_cls.has_ground_truth());
       // Confusion matrix.
       utils::AddToConfusionMatrixProto(pred_cls.ground_truth(),
                                        pred_cls.value(), pred.weight(),
@@ -856,10 +871,10 @@ void AddPrediction(const proto::EvaluationOptions& option,
     } break;
 
     case model::proto::Task::REGRESSION: {
-      CHECK(pred.has_regression());
+      STATUS_CHECK(pred.has_regression());
       auto* eval_reg = eval->mutable_regression();
       const auto& pred_reg = pred.regression();
-      CHECK(pred_reg.has_ground_truth());
+      STATUS_CHECK(pred_reg.has_ground_truth());
       // MSE
       const float error = pred_reg.value() - pred_reg.ground_truth();
       eval_reg->set_sum_square_error(eval_reg->sum_square_error() +
@@ -874,12 +889,12 @@ void AddPrediction(const proto::EvaluationOptions& option,
     } break;
 
     case model::proto::Task::RANKING:
-      CHECK(pred.has_ranking());
+      STATUS_CHECK(pred.has_ranking());
       need_prediction_sampling = true;
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
     case model::proto::Task::NUMERICAL_UPLIFT:
-      CHECK_OK(uplift::AddUpliftPredictionImp(option, pred, rnd, eval));
+      RETURN_IF_ERROR(uplift::AddUpliftPredictionImp(option, pred, rnd, eval));
       need_prediction_sampling = true;
       break;
 
@@ -892,12 +907,15 @@ void AddPrediction(const proto::EvaluationOptions& option,
     eval->set_count_sampled_predictions(eval->count_sampled_predictions() +
                                         pred.weight());
   }
+  return absl::OkStatus();
 }
 
-void FinalizeEvaluation(const proto::EvaluationOptions& option,
-                        const dataset::proto::Column& label_column,
-                        proto::EvaluationResults* eval) {
-  CHECK(!eval->has_task()) << "The evaluation is finalized twice.";
+absl::Status FinalizeEvaluation(const proto::EvaluationOptions& option,
+                                const dataset::proto::Column& label_column,
+                                proto::EvaluationResults* eval) {
+  if (eval->has_task()) {
+    return absl::InvalidArgumentError("The evaluation is finalized twice.");
+  }
   eval->set_task(option.task());
   *(eval->mutable_label_column()) = label_column;
   switch (option.task()) {
@@ -909,7 +927,8 @@ void FinalizeEvaluation(const proto::EvaluationOptions& option,
         // Compute the ROCs.
         for (int label_value = 0; label_value < num_classes; label_value++) {
           auto* roc = eval_cls->mutable_rocs()->Add();
-          BuildROCCurve(option, label_column, *eval, label_value, roc);
+          RETURN_IF_ERROR(
+              BuildROCCurve(option, label_column, *eval, label_value, roc));
         }
       }
     } break;
@@ -918,15 +937,18 @@ void FinalizeEvaluation(const proto::EvaluationOptions& option,
       if (option.bootstrapping_samples() > 0) {
         LOG(INFO) << "Computing rmse intervals of evaluation metrics with "
                      "bootstrapping.";
-        internal::UpdateRMSEConfidenceIntervalUsingBootstrapping(option, eval);
+        RETURN_IF_ERROR(
+            internal::UpdateRMSEConfidenceIntervalUsingBootstrapping(option,
+                                                                     eval));
       }
     } break;
     case model::proto::Task::RANKING:
-      FinalizeRankingMetricsFromSampledPredictions(option, eval);
+      RETURN_IF_ERROR(
+          FinalizeRankingMetricsFromSampledPredictions(option, eval));
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
     case model::proto::Task::NUMERICAL_UPLIFT:
-      CHECK_OK(uplift::FinalizeUpliftMetricsFromSampledPredictions(
+      RETURN_IF_ERROR(uplift::FinalizeUpliftMetricsFromSampledPredictions(
           option, label_column, eval));
       break;
     default:
@@ -935,6 +957,7 @@ void FinalizeEvaluation(const proto::EvaluationOptions& option,
   if (eval->num_folds() == 0) {
     eval->set_num_folds(1);
   }
+  return absl::OkStatus();
 }
 
 float Accuracy(const proto::EvaluationResults& eval) {
@@ -1134,10 +1157,10 @@ void ComputeXAtYMetrics(
   }
 }
 
-void BuildROCCurve(const proto::EvaluationOptions& option,
-                   const dataset::proto::Column& label_column,
-                   const proto::EvaluationResults& eval, const int label_value,
-                   proto::Roc* roc) {
+absl::Status BuildROCCurve(const proto::EvaluationOptions& option,
+                           const dataset::proto::Column& label_column,
+                           const proto::EvaluationResults& eval,
+                           const int label_value, proto::Roc* roc) {
   // Retrieve, binarize and sort the predictions.
   std::vector<BinaryPrediction> sorted_predictions;
   sorted_predictions.reserve(eval.sampled_predictions().size());
@@ -1162,21 +1185,21 @@ void BuildROCCurve(const proto::EvaluationOptions& option,
     // This situation can happen when one of the label value is not represented
     // in the test dataset. This is generally the case for the Out-Of-Vocabulary
     // item.
-    return;
+    return absl::OkStatus();
   }
   if (sorted_predictions.empty()) {
     LOG(WARNING) << "No sampled prediction found. Computation of the ROC "
                     "curve skipped.";
-    return;
+    return absl::OkStatus();
   }
   std::sort(sorted_predictions.begin(), sorted_predictions.end(),
             [](const BinaryPrediction& a, const BinaryPrediction& b) {
               return a.predict_true < b.predict_true;
             });
 
-  BuildROCCurveFromSortedPredictions(sorted_predictions, std::vector<int>(),
-                                     sum_positive_label, sum_negative_label,
-                                     roc->mutable_curve());
+  RETURN_IF_ERROR(BuildROCCurveFromSortedPredictions(
+      sorted_predictions, std::vector<int>(), sum_positive_label,
+      sum_negative_label, roc->mutable_curve()));
 
   roc->set_auc(computeAUC(roc->curve()));
   roc->set_pr_auc(computePrAuc(roc->curve()));
@@ -1189,8 +1212,8 @@ void BuildROCCurve(const proto::EvaluationOptions& option,
     LOG(INFO) << "Computing confidence intervals of evaluation metrics with "
                  "bootstrapping for label #"
               << label_value << ".";
-    internal::ComputeRocConfidenceIntervalsUsingBootstrapping(
-        option, sorted_predictions, roc);
+    RETURN_IF_ERROR(internal::ComputeRocConfidenceIntervalsUsingBootstrapping(
+        option, sorted_predictions, roc));
   }
 
   // Remove excedent points in the ROC.
@@ -1205,11 +1228,12 @@ void BuildROCCurve(const proto::EvaluationOptions& option,
                 return a.threshold() < b.threshold();
               });
   }
+  return absl::OkStatus();
 }
 
-void MergeEvaluation(const proto::EvaluationOptions& option,
-                     const proto::EvaluationResults& src,
-                     proto::EvaluationResults* dst) {
+absl::Status MergeEvaluation(const proto::EvaluationOptions& option,
+                             const proto::EvaluationResults& src,
+                             proto::EvaluationResults* dst) {
   // Merging generic fields.
   dst->set_count_predictions(dst->count_predictions() +
                              src.count_predictions());
@@ -1221,10 +1245,11 @@ void MergeEvaluation(const proto::EvaluationOptions& option,
   dst->set_training_duration_in_seconds(dst->training_duration_in_seconds() +
                                         src.training_duration_in_seconds());
   dst->set_num_folds(dst->num_folds() + src.num_folds());
-  CHECK_EQ(src.task(), dst->task());
+  STATUS_CHECK_EQ(src.task(), dst->task());
 
   // Merging of task specific fields.
-  CHECK_EQ(src.type_case(), dst->type_case());
+  STATUS_CHECK_EQ(src.type_case(), dst->type_case());
+
   switch (src.type_case()) {
     case proto::EvaluationResults::kClassification:
       MergeEvaluationClassification(src.classification(),
@@ -1240,14 +1265,15 @@ void MergeEvaluation(const proto::EvaluationOptions& option,
       MergeEvaluationUplift(src.uplift(), dst->mutable_uplift());
       break;
     case proto::EvaluationResults::TYPE_NOT_SET:
-      LOG(FATAL) << "Non initialized evaluation";
+      return absl::InvalidArgumentError("Non initialized evaluation");
       break;
   }
+  return absl::OkStatus();
 }
 
-std::unordered_map<std::string, std::string> ExtractFlatMetrics(
-    const absl::string_view model_name,
-    const proto::EvaluationResults& evaluation) {
+utils::StatusOr<std::unordered_map<std::string, std::string>>
+ExtractFlatMetrics(const absl::string_view model_name,
+                   const proto::EvaluationResults& evaluation) {
   std::unordered_map<std::string, std::string> flat_metrics;
   flat_metrics[kLabelModel] = std::string(model_name);
 
@@ -1269,8 +1295,8 @@ std::unordered_map<std::string, std::string> ExtractFlatMetrics(
       for (int one_vs_other_label_value = 0;
            one_vs_other_label_value < num_label_values;
            one_vs_other_label_value++) {
-        CHECK_LT(one_vs_other_label_value,
-                 evaluation.classification().rocs_size());
+        STATUS_CHECK_LT(one_vs_other_label_value,
+                        evaluation.classification().rocs_size());
         const auto& roc =
             evaluation.classification().rocs(one_vs_other_label_value);
         if (!roc.has_auc()) {
@@ -1341,8 +1367,9 @@ std::unordered_map<std::string, std::string> ExtractFlatMetrics(
                   roc.bootstrap_lower_bounds_95p());
               const auto& x_at_ys_upper_bounds = x_at_y_accessor.const_access(
                   roc.bootstrap_upper_bounds_95p());
-              CHECK_EQ(x_at_ys.size(), x_at_ys_upper_bounds.size());
-              CHECK_EQ(x_at_ys_lower_bound.size(), x_at_ys_upper_bounds.size());
+              DCHECK_EQ(x_at_ys.size(), x_at_ys_upper_bounds.size());
+              DCHECK_EQ(x_at_ys_lower_bound.size(),
+                        x_at_ys_upper_bounds.size());
               const auto& x_at_y_lower_bound = x_at_ys_lower_bound[idx];
               const auto& x_at_y_upper_bound = x_at_ys_upper_bounds[idx];
               flat_metrics[GetPerClassComparisonMetricLabel(
@@ -1389,8 +1416,7 @@ std::unordered_map<std::string, std::string> ExtractFlatMetrics(
       }
     } break;
     default:
-      CHECK(false);
-      break;
+      return absl::InvalidArgumentError("Non implemented task");
   }
   return flat_metrics;
 }
@@ -1460,7 +1486,7 @@ namespace {
 
 // Specialization of GetMetric.
 
-double GetMetricClassificationOneVsOthers(
+utils::StatusOr<double> GetMetricClassificationOneVsOthers(
     const proto::EvaluationResults& evaluation,
     const proto::MetricAccessor::Classification::OneVsOther& metric) {
   const int num_label_classes =
@@ -1480,16 +1506,19 @@ double GetMetricClassificationOneVsOthers(
                    << "\" instead.";
     }
   } else {
-    positive_class_idx = dataset::CategoricalStringToValue(
-        metric.positive_class(), evaluation.label_column());
+    ASSIGN_OR_RETURN(positive_class_idx,
+                     dataset::CategoricalStringToValueWithStatus(
+                         metric.positive_class(), evaluation.label_column()));
   }
 
-  CHECK_LT(positive_class_idx, evaluation.classification().rocs_size())
-      << "The evaluation does not contains the requested metric. Make sure "
-         "that the component that made this evaluation generated the request "
-         "metric, or use another metric.\nEvaluation:\n"
-      << evaluation.DebugString() << "\nRequested metric:\n"
-      << metric.DebugString();
+  if (positive_class_idx > evaluation.classification().rocs_size()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "The evaluation does not contains the requested metric. Make sure "
+        "that the component that made this evaluation generated the request "
+        "metric, or use another metric.\nEvaluation:\n",
+        evaluation.DebugString(), "\nRequested metric:\n",
+        metric.DebugString()));
+  }
 
   const auto roc = evaluation.classification().rocs(positive_class_idx);
   switch (metric.Type_case()) {
@@ -1540,11 +1569,11 @@ double GetMetricClassificationOneVsOthers(
     }
 
     default:
-      LOG(FATAL) << "Not implemented";
+      return absl::InvalidArgumentError("Not implemented");
   }
 }
 
-double GetMetricClassification(
+utils::StatusOr<double> GetMetricClassification(
     const proto::EvaluationResults& evaluation,
     const proto::MetricAccessor::Classification& metric) {
   switch (metric.Type_case()) {
@@ -1556,88 +1585,90 @@ double GetMetricClassification(
       return GetMetricClassificationOneVsOthers(evaluation,
                                                 metric.one_vs_other());
     default:
-      LOG(FATAL) << "Not implemented";
+      return absl::InvalidArgumentError("Not implemented");
   }
 }
 
-double GetMetricRegression(const proto::EvaluationResults& evaluation,
-                           const proto::MetricAccessor::Regression& metric) {
+utils::StatusOr<double> GetMetricRegression(
+    const proto::EvaluationResults& evaluation,
+    const proto::MetricAccessor::Regression& metric) {
   switch (metric.Type_case()) {
     case proto::MetricAccessor::Regression::kRmse:
       return RMSE(evaluation);
     default:
-      LOG(FATAL) << "Not implemented";
+      return absl::InvalidArgumentError("Not implemented");
   }
 }
 
-double GetMetricRanking(const proto::EvaluationResults& evaluation,
-                        const proto::MetricAccessor::Ranking& metric) {
+utils::StatusOr<double> GetMetricRanking(
+    const proto::EvaluationResults& evaluation,
+    const proto::MetricAccessor::Ranking& metric) {
   switch (metric.Type_case()) {
     case proto::MetricAccessor::Ranking::kNdcg:
       return NDCG(evaluation);
     case proto::MetricAccessor::Ranking::kMrr:
       return MRR(evaluation);
     default:
-      LOG(FATAL) << "Not implemented";
+      return absl::InvalidArgumentError("Not implemented");
   }
 }
 
-double GetMetricUplift(const proto::EvaluationResults& evaluation,
-                       const proto::MetricAccessor::Uplift& metric) {
+utils::StatusOr<double> GetMetricUplift(
+    const proto::EvaluationResults& evaluation,
+    const proto::MetricAccessor::Uplift& metric) {
   switch (metric.type_case()) {
     case proto::MetricAccessor::Uplift::kQini:
       return Qini(evaluation);
     default:
-      LOG(FATAL) << "Not implemented";
+      return absl::InvalidArgumentError("Not implemented");
   }
 }
 
-// Raises a LOG(FATAL) with an error message about the non-availability of a
-// metric in a given evaluation.
-void GetMetricFatalMissing(const absl::string_view required,
-                           const proto::EvaluationResults& evaluation,
-                           const proto::MetricAccessor& metric) {
-  LOG(FATAL)
-      << "The metric does not have " << required
-      << " information. Make sure "
-         "that the component that generates the evaluation generate this "
-         "metric, or use another metric.\nevaluation:\n"
-      << evaluation.DebugString() << "\nmetric:\n"
-      << metric.DebugString();
+// Returns an absl invalid status with an error message about the
+// non-availability of a metric in a given evaluation.
+absl::Status GetMetricFatalMissing(const absl::string_view required,
+                                   const proto::EvaluationResults& evaluation,
+                                   const proto::MetricAccessor& metric) {
+  STATUS_FATALS(
+      "The metric does not have ", required,
+      " information. Make sure "
+      "that the component that generates the evaluation generate this "
+      "metric, or use another metric.\nevaluation:\n",
+      evaluation.DebugString(), "\nmetric:\n", metric.DebugString());
 }
 
 }  // namespace
 
-double GetMetric(const proto::EvaluationResults& evaluation,
-                 const proto::MetricAccessor& metric) {
+utils::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
+                                  const proto::MetricAccessor& metric) {
   switch (metric.Task_case()) {
     case proto::MetricAccessor::kClassification:
       if (!evaluation.has_classification()) {
-        GetMetricFatalMissing("classification", evaluation, metric);
+        return GetMetricFatalMissing("classification", evaluation, metric);
       }
       return GetMetricClassification(evaluation, metric.classification());
     case proto::MetricAccessor::kRegression:
       if (!evaluation.has_regression()) {
-        GetMetricFatalMissing("regression", evaluation, metric);
+        return GetMetricFatalMissing("regression", evaluation, metric);
       }
       return GetMetricRegression(evaluation, metric.regression());
     case proto::MetricAccessor::kLoss:
       if (!evaluation.has_loss_value()) {
-        GetMetricFatalMissing("loss", evaluation, metric);
+        return GetMetricFatalMissing("loss", evaluation, metric);
       }
       return evaluation.loss_value();
     case proto::MetricAccessor::kRanking:
       if (!evaluation.has_ranking()) {
-        GetMetricFatalMissing("ranking", evaluation, metric);
+        return GetMetricFatalMissing("ranking", evaluation, metric);
       }
       return GetMetricRanking(evaluation, metric.ranking());
     case proto::MetricAccessor::kUplift:
       if (!evaluation.has_uplift()) {
-        GetMetricFatalMissing("uplift", evaluation, metric);
+        return GetMetricFatalMissing("uplift", evaluation, metric);
       }
       return GetMetricUplift(evaluation, metric.uplift());
     case proto::MetricAccessor::TASK_NOT_SET:
-      LOG(FATAL) << "Non set metric accessor proto";
+      return absl::InvalidArgumentError("Metric accessor not set");
   }
 }
 
@@ -1730,8 +1761,10 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
   (*categorical_label.mutable_items())[std::string(positive_label)].set_index(
       positive_value);
 
-  InitializeEvaluation(option, label_column, &eval);
+  // Note: Temporary okay CHECK_OK.
+  CHECK_OK(InitializeEvaluation(option, label_column, &eval));
 
+  // Note: Temporary okay CHECK_OK.
   CHECK_EQ(labels.size(), predictions.size());
   model::proto::Prediction prediction_proto;
   auto& prediction_distribution =
@@ -1743,6 +1776,8 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
         labels[example_idx] ? positive_value : negative_value);
 
     const float prediction = predictions[example_idx];
+
+    // Note: Temporary okay CHECK_OK.
     CHECK_GE(prediction, 0.f);
     CHECK_LE(prediction, 1.f);
 
@@ -1752,18 +1787,20 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
     prediction_distribution.set_counts(negative_value, 1 - prediction);
     prediction_distribution.set_counts(positive_value, prediction);
 
-    AddPrediction(option, prediction_proto, rnd, &eval);
+    // Note: Temporary okay CHECK_OK.
+    CHECK_OK(AddPrediction(option, prediction_proto, rnd, &eval));
   }
 
-  FinalizeEvaluation(option, label_column, &eval);
+  // Note: Temporary okay CHECK_OK.
+  CHECK_OK(FinalizeEvaluation(option, label_column, &eval));
   return eval;
 }
 
-double RMSE(const std::vector<float>& labels,
-            const std::vector<float>& predictions,
-            const std::vector<float>& weights) {
-  CHECK_EQ(labels.size(), predictions.size());
-  CHECK_EQ(labels.size(), weights.size());
+utils::StatusOr<double> RMSE(const std::vector<float>& labels,
+                             const std::vector<float>& predictions,
+                             const std::vector<float>& weights) {
+  STATUS_CHECK_EQ(labels.size(), predictions.size());
+  STATUS_CHECK_EQ(labels.size(), weights.size());
   double sum_loss = 0;
   double sum_weights = 0;
   for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
@@ -1782,9 +1819,9 @@ double RMSE(const std::vector<float>& labels,
   }
 }
 
-double RMSE(const std::vector<float>& labels,
-            const std::vector<float>& predictions) {
-  CHECK_EQ(labels.size(), predictions.size());
+utils::StatusOr<double> RMSE(const std::vector<float>& labels,
+                             const std::vector<float>& predictions) {
+  STATUS_CHECK_EQ(labels.size(), predictions.size());
 
   double sum_loss = 0;
   for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {

@@ -43,8 +43,8 @@ class ModelComparisonPValueTest : public ::testing::Test {
     option_.mutable_classification()->add_precision_at_volume(0.0);
     option_.mutable_classification()->add_recall_at_false_positive_rate(0.5);
 
-    InitializeEvaluation(option_, label_column_, &eval_results1_);
-    InitializeEvaluation(option_, label_column_, &eval_results2_);
+    CHECK_OK(InitializeEvaluation(option_, label_column_, &eval_results1_));
+    CHECK_OK(InitializeEvaluation(option_, label_column_, &eval_results2_));
   }
 
   void AddPredictionToEvaluationResult(const float proba,
@@ -58,7 +58,7 @@ class ModelComparisonPValueTest : public ::testing::Test {
     pred_proba->set_counts(0, proba);
     pred_proba->set_counts(1, 1.0f - proba);
     pred.mutable_classification()->set_ground_truth(ground_truth);
-    AddPrediction(option_, pred, &rnd_, eval_result);
+    CHECK_OK(AddPrediction(option_, pred, &rnd_, eval_result));
   }
 
   proto::EvaluationResults eval_results1_;
@@ -83,11 +83,11 @@ TEST_F(ModelComparisonPValueTest, BasicTest) {
                                     &eval_results2_);
   }
 
-  FinalizeEvaluation(option_, label_column_, &eval_results1_);
-  FinalizeEvaluation(option_, label_column_, &eval_results2_);
+  CHECK_OK(FinalizeEvaluation(option_, label_column_, &eval_results1_));
+  CHECK_OK(FinalizeEvaluation(option_, label_column_, &eval_results2_));
 
   const std::vector<std::pair<std::string, float>> result =
-      OneSidedMcNemarTest(eval_results1_, eval_results2_);
+      OneSidedMcNemarTest(eval_results1_, eval_results2_).value();
   const std::vector<std::pair<std::string, float>> expected_results = {
       // For model 1, the max accuracy is 0.8.
       // For model 2, the max accuracy is 0.4.
@@ -147,7 +147,8 @@ TEST(PairwiseRegressiveResidualTest, Base) {
   for (int l = 0; l < 50; l++) {
     add_example(l, l + 1.0f, l + 0.5f);
   }
-  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2), 1.f, 0.0001f);
+  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2).value(), 1.f,
+              0.0001f);
 
   // M2 is always better.
   clear_examples();
@@ -155,14 +156,16 @@ TEST(PairwiseRegressiveResidualTest, Base) {
     add_example(l + 1.0f + 0.1 * dist_01(rnd), l - 0.5f - 0.1 * dist_01(rnd),
                 l);
   }
-  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2), 0.f, 0.0001f);
+  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2).value(), 0.f,
+              0.0001f);
 
   // M2 is always better. Constant residual difference.
   clear_examples();
   for (int l = 0; l < 50; l++) {
     add_example(l + 1.0f, l - 0.5f, l);
   }
-  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2), 0.f, 0.0001f);
+  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2).value(), 0.f,
+              0.0001f);
 
   // M2 is better 50% of the time, by twice the margin.
   clear_examples();
@@ -172,7 +175,8 @@ TEST(PairwiseRegressiveResidualTest, Base) {
   for (int l = 0; l < 50; l++) {
     add_example(l + 0.1f, l - 0.2f, l);
   }
-  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2), 0.f, 0.0001f);
+  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2).value(), 0.f,
+              0.0001f);
 
   // absResidual(M1)-absResidual(M2) ~ Norma with CDF(0)=0.2 and sd=sqrt(num
   // examples).
@@ -184,7 +188,8 @@ TEST(PairwiseRegressiveResidualTest, Base) {
     const double rs = rs_dist(rnd);
     add_example(l + 1000.f + rs, l + 1000.f, l);
   }
-  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2), 0.365, 0.1f);
+  EXPECT_NEAR(PairwiseRegressiveResidualTest(eval_1, eval_2).value(), 0.365,
+              0.1f);
 }
 
 TEST(PairwiseRankingNDCG5Test, Base) {
@@ -218,7 +223,7 @@ TEST(PairwiseRankingNDCG5Test, Base) {
     add_example(2, 12, 3, g);
     add_example(3, 13, 4, g);
   }
-  EXPECT_NEAR(PairwiseRankingNDCG5Test(eval_1, eval_2), 1.f, 0.0001f);
+  EXPECT_NEAR(PairwiseRankingNDCG5Test(eval_1, eval_2).value(), 1.f, 0.0001f);
 
   // Two equally terrible models.
   clear_examples();
@@ -228,7 +233,7 @@ TEST(PairwiseRankingNDCG5Test, Base) {
     add_example(2, 20, 3, g);
     add_example(1, 10, 4, g);
   }
-  EXPECT_NEAR(PairwiseRankingNDCG5Test(eval_1, eval_2), 1.f, 0.0001f);
+  EXPECT_NEAR(PairwiseRankingNDCG5Test(eval_1, eval_2).value(), 1.f, 0.0001f);
 
   // M2 is better.
   clear_examples();
@@ -238,7 +243,7 @@ TEST(PairwiseRankingNDCG5Test, Base) {
     add_example(2, 3, 3, g);
     add_example(4, 4, 4, g);
   }
-  EXPECT_NEAR(PairwiseRankingNDCG5Test(eval_1, eval_2), 0.f, 0.0001f);
+  EXPECT_NEAR(PairwiseRankingNDCG5Test(eval_1, eval_2).value(), 0.f, 0.0001f);
 }
 
 }  // namespace

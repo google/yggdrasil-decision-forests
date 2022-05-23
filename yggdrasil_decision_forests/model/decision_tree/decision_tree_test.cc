@@ -65,9 +65,10 @@ TEST(DecisionTree, GetLeafAndGetPath) {
   dataset::VerticalDataset dataset;
   dataset.set_data_spec(dataspec);
   CHECK_OK(dataset.CreateColumnsFromDataspec());
-  auto* col =
-      dataset.MutableColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          0);
+  auto* col = dataset
+                  .MutableColumnWithCastWithStatus<
+                      dataset::VerticalDataset::NumericalColumn>(0)
+                  .value();
   col->Add(0);
   col->Add(2);
   dataset.set_nrow(2);

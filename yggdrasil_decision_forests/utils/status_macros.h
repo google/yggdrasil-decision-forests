@@ -20,4 +20,24 @@
 
 #include "yggdrasil_decision_forests/utils/status_macros_default.h"
 
+// Status macros for Absl Status
+// NOLINTBEGIN
+
+#define STATUS_FATAL(arg) \
+ return absl::InvalidArgumentError(arg)
+
+#define STATUS_FATALS(arg, args...) \
+ return absl::InvalidArgumentError(absl::StrCat(arg, args))
+
+#define STATUS_CHECK(expr) \
+  if (!(expr)) return absl::InvalidArgumentError("Check failed " #expr)
+#define STATUS_CHECK_EQ(a, b) STATUS_CHECK(a == b)
+#define STATUS_CHECK_NE(a, b) STATUS_CHECK(a != b)
+#define STATUS_CHECK_GE(a, b) STATUS_CHECK(a >= b)
+#define STATUS_CHECK_LE(a, b) STATUS_CHECK(a <= b)
+#define STATUS_CHECK_GT(a, b) STATUS_CHECK(a > b)
+#define STATUS_CHECK_LT(a, b) STATUS_CHECK(a < b)
+// NOLINTEND
+
+
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_STATUS_MACROS_H_

@@ -50,10 +50,12 @@ absl::Status SeparateNumericalColumn(const int column_idx,
   proto::CreateDatasetCacheConfig config;
   FloatColumnWriter writer;
   RETURN_IF_ERROR(writer.Open(path));
-  const auto& values =
+  ASSIGN_OR_RETURN(
+      const auto& column,
       dataset
-          .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(column_idx)
-          ->values();
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+              column_idx));
+  auto& values = column->values();
 
   const float missing_value_replacement = column_spec.numerical().mean();
   std::vector<float> buffer(kIOBufferSizeInBytes / sizeof(float));
@@ -82,11 +84,11 @@ absl::Status SeparateCategoricalColumn(
   RETURN_IF_ERROR(writer.Open(
       path,
       /*max_value=*/column_spec.categorical().number_of_unique_values() - 1));
-  const auto& values =
-      dataset
-          .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              column_idx)
-          ->values();
+  ASSIGN_OR_RETURN(
+      const auto& column,
+      dataset.ColumnWithCastWithStatus<
+          dataset::VerticalDataset::CategoricalColumn>(column_idx));
+  const auto& values = column->values();
 
   const int32_t missing_value_replacement =
       column_spec.categorical().most_frequent_value();
@@ -118,10 +120,11 @@ absl::Status SeparateBooleanColumn(const int column_idx,
   IntegerColumnWriter writer;
   RETURN_IF_ERROR(writer.Open(path,
                               /*max_value=*/2));
-  const auto& values =
-      dataset
-          .ColumnWithCast<dataset::VerticalDataset::BooleanColumn>(column_idx)
-          ->values();
+  ASSIGN_OR_RETURN(
+      const auto& column,
+      dataset.ColumnWithCastWithStatus<dataset::VerticalDataset::BooleanColumn>(
+          column_idx));
+  const auto& values = column->values();
 
   const int8_t missing_value_replacement =
       column_spec.boolean().count_true() >= column_spec.boolean().count_false();

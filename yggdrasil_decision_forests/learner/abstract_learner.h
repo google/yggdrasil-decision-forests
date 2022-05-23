@@ -222,6 +222,13 @@ absl::Status CheckGenericHyperParameterSpecification(
 // If your learner is already parallelized, training and evaluating a single
 // models at a time might be best i.e. deployment_evaluation = { .num_threads =
 // 1 }.
+
+utils::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
+    const AbstractLearner& learner, const dataset::VerticalDataset& dataset,
+    const utils::proto::FoldGenerator& fold_generator,
+    const metric::proto::EvaluationOptions& evaluation_options,
+    const proto::DeploymentConfig& deployment_evaluation = {});
+
 metric::proto::EvaluationResults EvaluateLearner(
     const AbstractLearner& learner, const dataset::VerticalDataset& dataset,
     const utils::proto::FoldGenerator& fold_generator,

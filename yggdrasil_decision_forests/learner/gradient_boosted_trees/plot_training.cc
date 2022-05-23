@@ -18,6 +18,7 @@
 #include "learning/lib/ami/tools/simpleplot/fig_canvas.h"
 #include "learning/lib/ami/tools/simpleplot/simpleplot.pb.h"
 #include "learning/lib/ami/tools/simpleplot/svg_canvas.h"
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 
@@ -29,7 +30,7 @@ namespace {
 // Create a multi-plot with a log of training. The plot contains:
 // - The training and validation loss according to the number of trees.
 // - The secondary metric (e.g. accuracy) according to the number of trees.
-simpleplot::MultiPlot CreatePlotOfLogs(
+utils::StatusOr<simpleplot::MultiPlot> CreatePlotOfLogs(
     const proto::TrainingLogs& training_logs) {
   // Labels of the plot.
   constexpr char kLabelNumTrees[] = "Number of trees";
@@ -135,11 +136,11 @@ simpleplot::MultiPlot CreatePlotOfLogs(
     validation_loss->add_ys(entry.validation_loss());
     mean_abs_pred->add_ys(entry.mean_abs_prediction());
 
-    CHECK_EQ(training_logs.secondary_metric_names().size(),
-             entry.training_secondary_metrics().size());
+    STATUS_CHECK_EQ(training_logs.secondary_metric_names().size(),
+                    entry.training_secondary_metrics().size());
     if (has_validation) {
-      CHECK_EQ(training_logs.secondary_metric_names().size(),
-               entry.validation_secondary_metrics().size());
+      STATUS_CHECK_EQ(training_logs.secondary_metric_names().size(),
+                      entry.validation_secondary_metrics().size());
     }
 
     for (int secondary_metric_idx = 0;
@@ -163,17 +164,19 @@ simpleplot::MultiPlot CreatePlotOfLogs(
 
 }  // namespace
 
-void PlotAndExportTrainingLogs(const proto::TrainingLogs& training_logs,
-                               absl::string_view directory) {
-  QCHECK_OK(file::RecursivelyCreateDir(directory, file::Defaults()));
-  const auto plots = CreatePlotOfLogs(training_logs);
+absl::Status PlotAndExportTrainingLogs(const proto::TrainingLogs& training_logs,
+                                       absl::string_view directory) {
+  RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
+  ASSIGN_OR_RETURN(auto plots, CreatePlotOfLogs(training_logs));
   simpleplot::SVGOutputCanvas canvas(800, 400 * plots.subplots_size());
   canvas.GetFigure().DrawMultiPlot(plots);
 
   const auto svg_plot_path = file::JoinPath(directory, "training_logs.svg");
   canvas.SaveToFile(svg_plot_path);
   const auto pbbin_plot_path = file::JoinPath(directory, "training_logs.pbbin");
-  QCHECK_OK(file::SetBinaryProto(pbbin_plot_path, plots, file::Defaults()));
+  RETURN_IF_ERROR(
+      file::SetBinaryProto(pbbin_plot_path, plots, file::Defaults()));
+  return absl::OkStatus();
 }
 
 }  // namespace gradient_boosted_trees

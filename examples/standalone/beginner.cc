@@ -150,7 +150,8 @@ int main(int argc, char** argv) {
 
   // Export the evaluation to a nice text.
   std::string evaluation_report;
-  ygg::metric::AppendTextReport(evaluation, &evaluation_report);
+  QCHECK_OK(
+      ygg::metric::AppendTextReportWithStatus(evaluation, &evaluation_report));
   QCHECK_OK(file::SetContent(absl::StrCat(evaluation_path, ".txt"),
                              evaluation_report));
   LOG(INFO) << "Evaluation:\n" << evaluation_report;

@@ -42,6 +42,7 @@
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -110,8 +111,8 @@ class VerticalDataset {
 
     // Extract a subset of rows.  The "dst" columns
     // should have the same type as "this".
-    virtual void ExtractAndAppend(const std::vector<row_t>& indices,
-                                  AbstractColumn* dst) const = 0;
+    virtual absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
+                                          AbstractColumn* dst) const = 0;
 
     // Converts the content of a column to another dataspec.
     virtual absl::Status ConvertToGivenDataspec(
@@ -161,8 +162,8 @@ class VerticalDataset {
     const std::vector<T>& values() const { return values_; }
     std::vector<T>* mutable_values() { return &values_; }
 
-    void ExtractAndAppend(const std::vector<row_t>& indices,
-                          AbstractColumn* dst) const override;
+    absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
+                                  AbstractColumn* dst) const override;
 
     std::pair<uint64_t, uint64_t> memory_usage() const override {
       return std::pair<uint64_t, uint64_t>(values_.size() * sizeof(T),
@@ -213,8 +214,8 @@ class VerticalDataset {
       Add(values.begin(), values.end());
     }
 
-    void ExtractAndAppend(const std::vector<row_t>& indices,
-                          AbstractColumn* dst) const override;
+    absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
+                                  AbstractColumn* dst) const override;
 
     const std::vector<std::pair<size_t, size_t>>& values() const {
       return values_;
@@ -602,6 +603,10 @@ class VerticalDataset {
   // The ownership of the column array is not transferred, don't delete the
   // column.
   template <typename T>
+  utils::StatusOr<const T*> ColumnWithCastWithStatus(int col) const;
+
+  // TODO(b/223183975): Fix
+  template <typename T>
   const T* ColumnWithCast(int col) const;
 
   // Similar to "ColumnWithCast", but won't check if the column is of the right
@@ -619,6 +624,10 @@ class VerticalDataset {
 
   // Retrieve and cast a column to the specified class. Fails if the type is not
   // compatible.
+  template <typename T>
+  utils::StatusOr<T*> MutableColumnWithCastWithStatus(int col);
+
+  // TODO(b/223183975): Fix
   template <typename T>
   T* MutableColumnWithCast(int col);
 
@@ -687,8 +696,14 @@ class VerticalDataset {
 
   // Append a new example to the dataset.
   // If "load_columns" is set, only the columns specified in it will be loaded.
+  absl::Status AppendExampleWithStatus(
+      const proto::Example& example,
+      const absl::optional<std::vector<int>> load_columns = {});
   void AppendExample(const proto::Example& example,
                      const absl::optional<std::vector<int>> load_columns = {});
+
+  absl::Status AppendExampleWithStatus(
+      const std::unordered_map<std::string, std::string>& example);
   void AppendExample(
       const std::unordered_map<std::string, std::string>& example);
 
@@ -747,6 +762,10 @@ class VerticalDataset {
 // key of "src" should be a valid column name in "data_spec". In "src",
 // values are stored as string (independently of their true semantic) and are
 // parsed similarly as a CSV field.
+absl::Status MapExampleToProtoExampleWithStatus(
+    const std::unordered_map<std::string, std::string>& src,
+    const proto::DataSpecification& data_spec, proto::Example* dst);
+
 void MapExampleToProtoExample(
     const std::unordered_map<std::string, std::string>& src,
     const proto::DataSpecification& data_spec, proto::Example* dst);
@@ -769,15 +788,15 @@ bool IsValidSubDataspec(const proto::DataSpecification& a,
                         const proto::DataSpecification& b, std::string* reason);
 
 template <typename T>
-void VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
+absl::Status VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
     const std::vector<row_t>& indices, AbstractColumn* dst) const {
   auto* cast_dst =
       dynamic_cast<VerticalDataset::TemplateScalarStorage<T>*>(dst);
-  CHECK(cast_dst != nullptr);
+  STATUS_CHECK(cast_dst != nullptr);
   if (values_.empty() && !indices.empty()) {
-    LOG(FATAL) << "Trying to extract " << indices.size()
-               << " examples from the non-allocated column \"" << name()
-               << "\".";
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Trying to extract ", indices.size(),
+        " examples from the non-allocated column \"", name(), "\"."));
   }
   const size_t indices_size = indices.size();
   const size_t init_dst_nrows = dst->nrows();
@@ -792,16 +811,17 @@ void VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
       cast_dst->SetNA(dst_row_idx);
     }
   }
+  return absl::OkStatus();
 }
 
 template <typename T>
-void VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
+absl::Status VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
     const std::vector<row_t>& indices, AbstractColumn* dst) const {
   auto* cast_dst =
       dynamic_cast<VerticalDataset::TemplateMultiValueStorage<T>*>(dst);
-  CHECK(cast_dst != nullptr);
+  STATUS_CHECK(cast_dst != nullptr);
   if (values_.empty() && !indices.empty()) {
-    LOG(FATAL) << "ExtractAndAppend on an empty column";
+    return absl::InvalidArgumentError("ExtractAndAppend on an empty column");
   }
   cast_dst->Reserve(dst->nrows() + indices.size());
   for (const auto row_idx : indices) {
@@ -813,21 +833,29 @@ void VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
       cast_dst->AddNA();
     }
   }
+  return absl::OkStatus();
 }
 
 template <typename T>
-const T* VerticalDataset::ColumnWithCast(int col) const {
+utils::StatusOr<const T*> VerticalDataset::ColumnWithCastWithStatus(
+    int col) const {
   static_assert(std::is_base_of<AbstractColumn, T>::value,
                 "The template class argument does not derive AbstractColumn.");
   const auto* abstract_column = column(col);
   const T* const casted_column = dynamic_cast<const T* const>(abstract_column);
   if (!casted_column) {
-    LOG(FATAL) << "Column \"" << abstract_column->name() << "\"=" << col
-               << " has type "
-               << proto::ColumnType_Name(abstract_column->type())
-               << " and is not compatible with type " << typeid(T).name();
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Column \"", abstract_column->name(), "\"=", col, " has type ",
+        proto::ColumnType_Name(abstract_column->type()),
+        " and is not compatible with type ", typeid(T).name()));
   }
   return casted_column;
+}
+
+template <typename T>
+const T* VerticalDataset::ColumnWithCast(int col) const {
+  // TODO(b/223183975): Update.
+  return ColumnWithCastWithStatus<T>(col).value();
 }
 
 template <typename T>
@@ -847,18 +875,24 @@ const T* VerticalDataset::ColumnWithCastOrNull(int col) const {
 }
 
 template <typename T>
-T* VerticalDataset::MutableColumnWithCast(int col) {
+utils::StatusOr<T*> VerticalDataset::MutableColumnWithCastWithStatus(int col) {
   static_assert(std::is_base_of<AbstractColumn, T>::value,
                 "The template class argument does not derive  AbstractColumn.");
   auto* abstract_column = mutable_column(col);
   T* const casted_column = dynamic_cast<T* const>(abstract_column);
   if (!casted_column) {
-    LOG(FATAL) << "Column \"" << abstract_column->name() << "\"=" << col
-               << " has type "
-               << proto::ColumnType_Name(abstract_column->type())
-               << " and is not compatible with type " << typeid(T).name();
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Column \"", abstract_column->name(), "\"=", col, " has type ",
+        proto::ColumnType_Name(abstract_column->type()),
+        " and is not compatible with type ", typeid(T).name()));
   }
   return casted_column;
+}
+
+template <typename T>
+T* VerticalDataset::MutableColumnWithCast(int col) {
+  // TODO(b/223183975): Update.
+  return MutableColumnWithCastWithStatus<T>(col).value();
 }
 
 template <typename T>

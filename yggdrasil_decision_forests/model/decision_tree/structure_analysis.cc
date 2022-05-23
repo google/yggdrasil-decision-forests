@@ -72,8 +72,8 @@ ForestStructureStatistics ComputeForestStructureStatistics(
             continue;
           }
           const int attribute_idx = node.node().condition().attribute();
-          CHECK_GE(attribute_idx, 0);
-          CHECK_LT(attribute_idx, attribute_and_max_depth.second.size());
+          DCHECK_GE(attribute_idx, 0);
+          DCHECK_LT(attribute_idx, attribute_and_max_depth.second.size());
           attribute_and_max_depth.second[node.node().condition().attribute()]++;
         }
 
@@ -85,9 +85,9 @@ ForestStructureStatistics ComputeForestStructureStatistics(
           }
           const int condition_type_idx =
               static_cast<int>(node.node().condition().condition().type_case());
-          CHECK_GE(condition_type_idx, 0);
-          CHECK_LT(condition_type_idx,
-                   condition_type_and_max_depth.second.size());
+          DCHECK_GE(condition_type_idx, 0);
+          DCHECK_LT(condition_type_idx,
+                    condition_type_and_max_depth.second.size());
           condition_type_and_max_depth.second[condition_type_idx]++;
         }
 

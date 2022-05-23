@@ -61,8 +61,8 @@ void InferDataspec() {
   }
 
   dataset::proto::DataSpecification data_spec;
-  dataset::CreateDataSpec(absl::GetFlag(FLAGS_dataset), false, guide,
-                          &data_spec);
+  QCHECK_OK(dataset::CreateDataSpecWithStatus(absl::GetFlag(FLAGS_dataset),
+                                              false, guide, &data_spec));
 
   QCHECK_OK(file::SetTextProto(absl::GetFlag(FLAGS_output), data_spec,
                                file::Defaults()));

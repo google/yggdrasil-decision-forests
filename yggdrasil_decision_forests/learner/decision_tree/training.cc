@@ -88,9 +88,12 @@ void SetClassificationLabelDistribution(
     const std::vector<row_t>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
+  // TODO(b/223183975): Update.
   const auto* const labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          config_link.label());
+      dataset
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(config_link.label())
+          .value();
   utils::IntegerDistributionDouble label_distribution;
   const int32_t num_classes = dataset.data_spec()
                                   .columns(config_link.label())
@@ -115,13 +118,19 @@ void SetCategoricalUpliftLabelDistribution(
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   DCHECK(!weights.empty());
+  // TODO(b/223183975): Update.
   const auto* const outcomes =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          config_link.label());
+      dataset
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(config_link.label())
+          .value();
 
   const auto* const treatments =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          config_link.uplift_treatment());
+      dataset
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(
+              config_link.uplift_treatment())
+          .value();
 
   const auto& outcome_spec = dataset.data_spec().columns(config_link.label());
   const auto& treatment_spec =
@@ -505,8 +514,9 @@ SplitSearchResult FindBestCondition(
 
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::NumericalColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement = attribute_column_spec.numerical().mean();
       if (dt_config.numerical_split().type() == proto::NumericalSplit::EXACT) {
@@ -531,9 +541,10 @@ SplitSearchResult FindBestCondition(
 
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<
+              .ColumnWithCastWithStatus<
                   dataset::VerticalDataset::DiscretizedNumericalColumn>(
                   attribute_idx)
+              .value()
               ->values();
       const auto na_replacement = attribute_column_spec.numerical().mean();
       const auto num_bins =
@@ -551,8 +562,9 @@ SplitSearchResult FindBestCondition(
     case dataset::proto::ColumnType::CATEGORICAL: {
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::CategoricalColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement =
           attribute_column_spec.categorical().most_frequent_value();
@@ -568,8 +580,9 @@ SplitSearchResult FindBestCondition(
     case dataset::proto::ColumnType::CATEGORICAL_SET: {
       const auto* attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalSetColumn>(
-                  attribute_idx);
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::CategoricalSetColumn>(attribute_idx)
+              .value();
       const auto num_attribute_classes =
           attribute_column_spec.categorical().number_of_unique_values();
       result = FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
@@ -583,8 +596,9 @@ SplitSearchResult FindBestCondition(
       // Condition of the type "Attr is True".
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::BooleanColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::BooleanColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement =
           attribute_column_spec.boolean().count_true() >=
@@ -643,8 +657,9 @@ SplitSearchResult FindBestCondition(
       // Condition of the type "Attr >= threshold".
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::NumericalColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement = attribute_column_spec.numerical().mean();
       if (dt_config.numerical_split().type() == proto::NumericalSplit::EXACT) {
@@ -667,9 +682,10 @@ SplitSearchResult FindBestCondition(
       // Condition of the type "Attr >= threshold".
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<
+              .ColumnWithCastWithStatus<
                   dataset::VerticalDataset::DiscretizedNumericalColumn>(
                   attribute_idx)
+              .value()
               ->values();
       const auto na_replacement = attribute_column_spec.numerical().mean();
       const auto num_bins =
@@ -690,8 +706,9 @@ SplitSearchResult FindBestCondition(
       // Condition of the type "Attr \in X".
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::CategoricalColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement =
           attribute_column_spec.categorical().most_frequent_value();
@@ -709,8 +726,9 @@ SplitSearchResult FindBestCondition(
       // Condition of the type "Attr is True".
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::BooleanColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::BooleanColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement =
           attribute_column_spec.boolean().count_true() >=
@@ -773,8 +791,9 @@ SplitSearchResult FindBestCondition(
       // Condition of the type "Attr >= threshold".
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::NumericalColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement = attribute_column_spec.numerical().mean();
       if (dt_config.numerical_split().type() == proto::NumericalSplit::EXACT) {
@@ -800,9 +819,10 @@ SplitSearchResult FindBestCondition(
       // Condition of the type "Attr >= threshold".
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<
+              .ColumnWithCastWithStatus<
                   dataset::VerticalDataset::DiscretizedNumericalColumn>(
                   attribute_idx)
+              .value()
               ->values();
       const auto na_replacement = attribute_column_spec.numerical().mean();
       const auto num_bins =
@@ -820,8 +840,9 @@ SplitSearchResult FindBestCondition(
       // Condition of the type "Attr \in X".
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::CategoricalColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement =
           attribute_column_spec.categorical().most_frequent_value();
@@ -837,8 +858,9 @@ SplitSearchResult FindBestCondition(
     case dataset::proto::ColumnType::CATEGORICAL_SET: {
       const auto* attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalSetColumn>(
-                  attribute_idx);
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::CategoricalSetColumn>(attribute_idx)
+              .value();
       const auto num_attribute_classes =
           attribute_column_spec.categorical().number_of_unique_values();
       result = FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
@@ -852,8 +874,9 @@ SplitSearchResult FindBestCondition(
       // Condition of the type "Attr is True".
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::BooleanColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::BooleanColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement =
           attribute_column_spec.boolean().count_true() >=
@@ -906,8 +929,9 @@ SplitSearchResult FindBestCondition(
     case dataset::proto::ColumnType::NUMERICAL: {
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::NumericalColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement = attribute_column_spec.numerical().mean();
 
@@ -920,8 +944,9 @@ SplitSearchResult FindBestCondition(
     case dataset::proto::ColumnType::CATEGORICAL: {
       const auto& attribute_data =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-                  attribute_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::CategoricalColumn>(attribute_idx)
+              .value()
               ->values();
       const auto na_replacement =
           attribute_column_spec.categorical().most_frequent_value();
@@ -1282,7 +1307,7 @@ utils::StatusOr<bool> FindBestConditionConcurrentManager(
   }
 
   // Get Channel readers and writers.
-  auto& processor = *splitter_concurrency_setup.split_finder_processor.get();
+  auto& processor = *splitter_concurrency_setup.split_finder_processor;
 
   // Helper function to create a WorkRequest.
   auto produce = [&](const int idx, const float best_score) {
@@ -1445,8 +1470,10 @@ utils::StatusOr<bool> FindBestCondition(
       }
       ClassificationLabelStats label_stat(
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::CategoricalColumn>(
                   config_link.label())
+              .value()
               ->values());
 
       const auto& label_column_spec =
@@ -1474,12 +1501,16 @@ utils::StatusOr<bool> FindBestCondition(
       if (internal_config.use_hessian_gain) {
         RegressionHessianLabelStats label_stat(
             train_dataset
-                .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+                .ColumnWithCastWithStatus<
+                    dataset::VerticalDataset::NumericalColumn>(
                     config_link.label())
+                .value()
                 ->values(),
             train_dataset
-                .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+                .ColumnWithCastWithStatus<
+                    dataset::VerticalDataset::NumericalColumn>(
                     internal_config.hessian_col_idx)
+                .value()
                 ->values());
 
         label_stat.sum_gradient = parent.regressor().sum_gradients();
@@ -1493,8 +1524,10 @@ utils::StatusOr<bool> FindBestCondition(
       } else {
         RegressionLabelStats label_stat(
             train_dataset
-                .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+                .ColumnWithCastWithStatus<
+                    dataset::VerticalDataset::NumericalColumn>(
                     config_link.label())
+                .value()
                 ->values());
 
         label_stat.label_distribution.Load(parent.regressor().distribution());
@@ -1517,13 +1550,17 @@ utils::StatusOr<bool> FindBestCondition(
 
       CategoricalUpliftLabelStats label_stat(
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::CategoricalColumn>(
                   config_link.label())
+              .value()
               ->values(),
           outcome_spec.categorical().number_of_unique_values(),
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::CategoricalColumn>(
                   config_link.uplift_treatment())
+              .value()
               ->values(),
           treatment_spec.categorical().number_of_unique_values());
 
@@ -1845,7 +1882,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
       LabelUnweightedBinaryCategoricalBucket::Initializer initializer(
           label_distribution);
 
-      return FindBestSplit_LabelUnweightedBinaryClassificationFeatureDiscretizedNumerical(
+      return FindBestSplit_LabelUnweightedBinaryClassificationFeatureDiscretizedNumerical(  // NOLINT(whitespace/line_length)
           selected_examples, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx, condition, &cache->cache_v2);
     } else {
@@ -2281,7 +2318,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
       LabelUnweightedBinaryCategoricalBucket::Initializer initializer(
           label_distribution);
 
-      return FindBestSplit_LabelUnweightedBinaryClassificationFeatureBooleanCart(
+      return FindBestSplit_LabelUnweightedBinaryClassificationFeatureBooleanCart(  // NOLINT(whitespace/line_length)
           selected_examples, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx, condition, &cache->cache_v2);
     } else {
@@ -3312,7 +3349,7 @@ void GenerateRandomImputationOnColumn(
                           1));
   std::vector<row_t> source_indices = examples;
   if (non_na_examples.empty()) {
-    src->ExtractAndAppend(source_indices, dst);
+    CHECK_OK(src->ExtractAndAppend(source_indices, dst));
     return;
   }
 
@@ -3325,7 +3362,7 @@ void GenerateRandomImputationOnColumn(
     }
     local_example_idx++;
   }
-  src->ExtractAndAppend(source_indices, dst);
+  CHECK_OK(src->ExtractAndAppend(source_indices, dst));
 }
 
 void SetRegressionLabelDistribution(
@@ -3335,8 +3372,10 @@ void SetRegressionLabelDistribution(
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   DCHECK(!weights.empty());
   const auto* const labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          config_link.label());
+      dataset
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+              config_link.label())
+          .value();
   utils::NormalDistributionDouble label_distribution;
   for (const row_t example_idx : selected_examples) {
     label_distribution.Add(labels->values()[example_idx], weights[example_idx]);
@@ -3821,8 +3860,9 @@ absl::Status PresortNumericalFeatures(
       const dataset::VerticalDataset::row_t num_examples = train_dataset.nrow();
       const auto& values =
           train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                  feature_idx)
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::NumericalColumn>(feature_idx)
+              .value()
               ->values();
       CHECK_EQ(num_examples, values.size());
 

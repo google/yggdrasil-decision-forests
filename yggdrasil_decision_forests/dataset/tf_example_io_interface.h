@@ -112,11 +112,12 @@ class TFExampleReaderToDataSpecCreator : public AbstractDataSpecCreator {
  public:
   virtual std::unique_ptr<AbstractTFExampleReader> CreateReader() = 0;
 
-  void InferColumnsAndTypes(const std::vector<std::string>& paths,
-                            const proto::DataSpecificationGuide& guide,
-                            proto::DataSpecification* data_spec) override;
+  absl::Status InferColumnsAndTypes(
+      const std::vector<std::string>& paths,
+      const proto::DataSpecificationGuide& guide,
+      proto::DataSpecification* data_spec) override;
 
-  void ComputeColumnStatistics(
+  absl::Status ComputeColumnStatistics(
       const std::vector<std::string>& paths,
       const proto::DataSpecificationGuide& guide,
       proto::DataSpecification* data_spec,

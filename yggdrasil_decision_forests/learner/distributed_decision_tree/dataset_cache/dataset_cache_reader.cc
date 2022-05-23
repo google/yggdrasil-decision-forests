@@ -17,6 +17,7 @@
 
 #include <numeric>
 
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
@@ -203,7 +204,6 @@ utils::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
   LOG(INFO) << "Non-blocking work done. Making the new features available";
 
   // Wait for the loading thread.
-  CHECK(non_blocking_.loading_thread != nullptr);
   non_blocking_.loading_thread->Join();
   non_blocking_.loading_thread.reset();
 
@@ -800,19 +800,19 @@ using model::distributed_decision_tree::dataset_cache::proto::
 using model::distributed_decision_tree::dataset_cache::proto::
     PartialDatasetMetadata;
 
-void PartialDatasetCacheDataSpecCreator::InferColumnsAndTypes(
+absl::Status PartialDatasetCacheDataSpecCreator::InferColumnsAndTypes(
     const std::vector<std::string>& paths,
     const proto::DataSpecificationGuide& guide,
     proto::DataSpecification* data_spec) {
   if (paths.size() != 1) {
-    LOG(FATAL)
-        << "The inference of dataspec on a partial dataset cache requires "
-           " exactly one file path";
+    return absl::InvalidArgumentError(
+        "The inference of dataspec on a partial dataset cache requires  "
+        "exactly one file path");
   }
   const auto& cache_path = paths.front();
 
   PartialDatasetMetadata partial_meta_data;
-  CHECK_OK(
+  RETURN_IF_ERROR(
       file::GetBinaryProto(file::JoinPath(cache_path, kFilenamePartialMetaData),
                            &partial_meta_data, file::Defaults()));
 
@@ -822,7 +822,7 @@ void PartialDatasetCacheDataSpecCreator::InferColumnsAndTypes(
 
     // Load the column+shard meta-data.
     PartialColumnShardMetadata shard_meta_data;
-    CHECK_OK(file::GetBinaryProto(
+    RETURN_IF_ERROR(file::GetBinaryProto(
         absl::StrCat(
             PartialRawColumnFilePath(cache_path, col_idx, /*shard_idx=*/0),
             kFilenameMetaDataPostfix),
@@ -844,9 +844,11 @@ void PartialDatasetCacheDataSpecCreator::InferColumnsAndTypes(
         break;
     }
   }
+  return absl::OkStatus();
 }
 
-void PartialDatasetCacheDataSpecCreator::ComputeColumnStatisticsColumnAndShard(
+absl::Status
+PartialDatasetCacheDataSpecCreator::ComputeColumnStatisticsColumnAndShard(
     const int col_idx, const PartialColumnShardMetadata& shard_meta_data,
     proto::DataSpecification* data_spec,
     proto::DataSpecificationAccumulator* accumulator) {
@@ -908,22 +910,26 @@ void PartialDatasetCacheDataSpecCreator::ComputeColumnStatisticsColumnAndShard(
     case PartialColumnShardMetadata::TYPE_NOT_SET:
       break;
   }
+  return absl::OkStatus();
 }
 
-void PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
+absl::Status PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
     const std::vector<std::string>& paths,
     const proto::DataSpecificationGuide& guide,
     proto::DataSpecification* data_spec,
     proto::DataSpecificationAccumulator* accumulator) {
-  DCHECK_EQ(paths.size(), 1);
+  if (paths.size() != 1) {
+    return absl::InvalidArgumentError("Path should have exactly one element");
+  }
   const auto& cache_path = paths.front();
 
   PartialDatasetMetadata partial_meta_data;
-  CHECK_OK(
+  RETURN_IF_ERROR(
       file::GetBinaryProto(file::JoinPath(cache_path, kFilenamePartialMetaData),
                            &partial_meta_data, file::Defaults()));
 
   std::vector<int64_t> num_examples_per_columns(data_spec->columns_size(), 0);
+  absl::Status thread_status;
   utils::concurrency::Mutex mutex_data;
   {
     utils::concurrency::ThreadPool thread_pool("InferDataspec",
@@ -936,20 +942,26 @@ void PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
             PartialRawColumnFilePath(cache_path, col_idx, shard_idx),
             kFilenameMetaDataPostfix);
         thread_pool.Schedule([shard_meta_data_path, &mutex_data, accumulator,
-                              data_spec, col_idx, &num_examples_per_columns]() {
+                              data_spec, col_idx, &num_examples_per_columns,
+                              &thread_status]() {
           PartialColumnShardMetadata shard_meta_data;
-          CHECK_OK(file::GetBinaryProto(shard_meta_data_path, &shard_meta_data,
-                                        file::Defaults()));
+          const auto status_get_binary = file::GetBinaryProto(
+              shard_meta_data_path, &shard_meta_data, file::Defaults());
 
           utils::concurrency::MutexLock l(&mutex_data);
-
+          thread_status.Update(status_get_binary);
+          if (!thread_status.ok()) {
+            return;
+          }
           num_examples_per_columns[col_idx] += shard_meta_data.num_examples();
-          ComputeColumnStatisticsColumnAndShard(col_idx, shard_meta_data,
-                                                data_spec, accumulator);
+          thread_status.Update(ComputeColumnStatisticsColumnAndShard(
+              col_idx, shard_meta_data, data_spec, accumulator));
         });
       }
     }
   }
+
+  RETURN_IF_ERROR(thread_status);
 
   if (!num_examples_per_columns.empty()) {
     for (int col_idx = 0; col_idx < num_examples_per_columns.size();
@@ -961,6 +973,7 @@ void PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
       }
     }
   }
+  return absl::OkStatus();
 }
 
 utils::StatusOr<int64_t> PartialDatasetCacheDataSpecCreator::CountExamples(

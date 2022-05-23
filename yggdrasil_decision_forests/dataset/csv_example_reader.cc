@@ -99,7 +99,7 @@ bool LooksLikeANumber(const absl::string_view value) {
 // column type is decided. Example of update includes adding new dictionary
 // entry for a categorical attribute, or updating the mean for a numerical
 // column.
-void UpdateDataSpecWithCsvExample(
+absl::Status UpdateDataSpecWithCsvExample(
     const std::vector<std::string>& fields,
     const std::vector<int>& col_idx_to_field_idx,
     proto::DataSpecification* data_spec,
@@ -120,47 +120,54 @@ void UpdateDataSpecWithCsvExample(
     // Mean, min and max of single dimension numerical columns.
     if (IsNumerical(col->type()) && !IsMultiDimensional(col->type())) {
       float num_value;
-      CHECK(absl::SimpleAtof(value, &num_value))
-          << "The value \"" << value << "\" of attribute \"" << col->name()
-          << "\" cannot be parsed as a float.  Possible reasons => solution: "
-             "1) You forced the type NUMERICAL => Set the type to something "
-             "else. 2) You specified a regression task (simpleML Playground) "
-             "for a classification => Set the task to classification.";
+      if (!absl::SimpleAtof(value, &num_value)) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The value \"", value, "\" of attribute \"", col->name(),
+            "\" cannot be parsed as a float.  Possible reasons => solution: "
+            "1) You forced the type NUMERICAL => Set the type to something "
+            "else. 2) You specified a regression task (simpleML Playground) "
+            "for a classification => Set the task to classification."));
+      }
       FillContentNumericalFeature(num_value, col_acc);
     }
     if (IsCategorical(col->type())) {
       // Retrieve the items.
       std::vector<std::string> tokens;
       if (IsMultiDimensional(col->type())) {
-        Tokenize(value, col->tokenizer(), &tokens);
+        RETURN_IF_ERROR(Tokenize(value, col->tokenizer(), &tokens));
       } else {
         tokens.push_back(value);
       }
-      AddTokensToCategoricalColumnSpec(tokens, col);
+      RETURN_IF_ERROR(AddTokensToCategoricalColumnSpec(tokens, col));
     }
     if (col->type() == proto::ColumnType::DISCRETIZED_NUMERICAL) {
       float num_value;
-      CHECK(absl::SimpleAtof(value, &num_value))
-          << "The value \"" << value << "\" of attribute \"" << col->name()
-          << "\" cannot be parsed as a float.  Possible reasons => solution: "
-             "1) You forced the type DISCRETIZED_NUMERICAL => Set the type to "
-             "something "
-             "else.";
+      if (!absl::SimpleAtof(value, &num_value)) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The value \"", value, "\" of attribute \"", col->name(),
+            "\" cannot be parsed as a float.  Possible reasons => solution: "
+            "1) You forced the type DISCRETIZED_NUMERICAL => Set the type to "
+            "something "
+            "else."));
+      }
       UpdateComputeSpecDiscretizedNumerical(num_value, col, col_acc);
     }
     if (col->type() == proto::ColumnType::BOOLEAN) {
       float num_value;
-      CHECK(absl::SimpleAtof(value, &num_value))
-          << "The value \"" << value << "\" of attribute \"" << col->name()
-          << "\" cannot be parsed as a float.  Possible reasons => solution: "
-             "1) You forced the type BOOLEAN => Set the type to something "
-             "else.";
+      if (!absl::SimpleAtof(value, &num_value)) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The value \"", value, "\" of attribute \"", col->name(),
+            "\" cannot be parsed as a float.  Possible reasons => solution: "
+            "1) You forced the type BOOLEAN => Set the type to something "
+            "else."));
+      }
       UpdateComputeSpecBooleanFeature(num_value, col);
     }
   }
+  return absl::OkStatus();
 }
 
-void CsvDataSpecCreator::InferColumnsAndTypes(
+absl::Status CsvDataSpecCreator::InferColumnsAndTypes(
     const std::vector<std::string>& paths,
     const proto::DataSpecificationGuide& guide,
     proto::DataSpecification* data_spec) {
@@ -180,7 +187,7 @@ void CsvDataSpecCreator::InferColumnsAndTypes(
     std::vector<absl::string_view>* row;
     const bool has_header = reader.NextRow(&row).value();
     if (!has_header) {
-      LOG(FATAL) << path << " is empty.";
+      return absl::InvalidArgumentError(absl::StrCat(path, " is empty."));
     }
 
     if (csv_header.empty()) {
@@ -191,8 +198,9 @@ void CsvDataSpecCreator::InferColumnsAndTypes(
     } else {
       if (!std::equal(csv_header.begin(), csv_header.end(), row->begin(),
                       row->end())) {
-        LOG(FATAL) << "The header of " << path
-                   << " does not match the header of " << paths.front();
+        return absl::InvalidArgumentError(
+            absl::StrCat("The header of ", path,
+                         " does not match the header of ", paths.front()));
       }
     }
     while (reader.NextRow(&row).value()) {
@@ -207,10 +215,10 @@ void CsvDataSpecCreator::InferColumnsAndTypes(
       }
       // Check the number of fields.
       if (row->size() != csv_header.size()) {
-        LOG(QFATAL) << "Inconsistent number of columns at line " << nrow
-                    << " of file " << path << ". The header has "
-                    << csv_header.size() << " field(s) while this line has "
-                    << row->size();
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Inconsistent number of columns at line ", nrow, " of file ", path,
+            ". The header has ", csv_header.size(),
+            " field(s) while this line has ", row->size()));
       }
 
       for (int col_idx = 0; col_idx < spec_col_idx_2_csv_col_idx.size();
@@ -228,9 +236,11 @@ void CsvDataSpecCreator::InferColumnsAndTypes(
           continue;
         }
         // Update the type of the column.
-        auto new_type = InferType(
-            guide, value, guide.default_column_guide().tokenizer().tokenizer(),
-            col->type());
+        ASSIGN_OR_RETURN(
+            auto new_type,
+            InferType(guide, value,
+                      guide.default_column_guide().tokenizer().tokenizer(),
+                      col->type()));
         col->set_type(new_type);
       }
       nrow++;
@@ -239,10 +249,10 @@ void CsvDataSpecCreator::InferColumnsAndTypes(
         nrow > guide.max_num_scanned_rows_to_guess_type())
       break;
   }
-  CHECK_OK(UpdateColSpecsWithGuideInfo(spec_col_idx_2_csv_col_idx, data_spec));
+  return UpdateColSpecsWithGuideInfo(spec_col_idx_2_csv_col_idx, data_spec);
 }
 
-void CsvDataSpecCreator::ComputeColumnStatistics(
+absl::Status CsvDataSpecCreator::ComputeColumnStatistics(
     const std::vector<std::string>& paths,
     const proto::DataSpecificationGuide& guide,
     proto::DataSpecification* data_spec,
@@ -265,37 +275,39 @@ void CsvDataSpecCreator::ComputeColumnStatistics(
     std::vector<absl::string_view>* row;
     const bool has_header = reader.NextRow(&row).value();
     if (!has_header) {
-      LOG(FATAL) << path << " is empty.";
+      return absl::InvalidArgumentError(absl::StrCat(path, " is empty."));
     }
 
     if (csv_header.empty()) {
       // Create the dataspec columns.
       csv_header = {row->begin(), row->end()};
-      CHECK_OK(BuildColIdxToFeatureLabelIdx(*data_spec, csv_header,
-                                            &col_idx_to_field_idx));
+      RETURN_IF_ERROR(BuildColIdxToFeatureLabelIdx(*data_spec, csv_header,
+                                                   &col_idx_to_field_idx));
     } else {
       if (!std::equal(csv_header.begin(), csv_header.end(), row->begin(),
                       row->end())) {
-        LOG(FATAL) << "The header of " << path
-                   << " does not match the header of " << paths.front();
+        return absl::InvalidArgumentError(
+            absl::StrCat("The header of ", path,
+                         " does not match the header of ", paths.front()));
       }
     }
     while (reader.NextRow(&row).value()) {
       LOG_INFO_EVERY_N_SEC(30, _ << nrow << " row(s) processed");
       // Check the number of fields.
       if (row->size() != csv_header.size()) {
-        LOG(QFATAL) << "Inconsistent number of columns at line " << nrow
-                    << " of file " << path << ". The header has "
-                    << csv_header.size() << " field(s) while this line has "
-                    << row->size();
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Inconsistent number of columns at line ", nrow, " of file ", path,
+            ". The header has ", csv_header.size(),
+            " field(s) while this line has ", row->size()));
       }
-      UpdateDataSpecWithCsvExample({row->begin(), row->end()},
-                                   col_idx_to_field_idx, data_spec,
-                                   accumulator);
+      RETURN_IF_ERROR(UpdateDataSpecWithCsvExample({row->begin(), row->end()},
+                                                   col_idx_to_field_idx,
+                                                   data_spec, accumulator));
       nrow++;
     }
   }
   data_spec->set_created_num_rows(nrow);
+  return absl::OkStatus();
 }
 
 utils::StatusOr<int64_t> CsvDataSpecCreator::CountExamples(
@@ -319,10 +331,9 @@ utils::StatusOr<int64_t> CsvDataSpecCreator::CountExamples(
   return count - 1;
 }
 
-ColumnType InferType(const proto::DataSpecificationGuide& guide,
-                     const absl::string_view value,
-                     const proto::Tokenizer& tokenizer,
-                     const ColumnType previous_type) {
+utils::StatusOr<proto::ColumnType> InferType(
+    const proto::DataSpecificationGuide& guide, const absl::string_view value,
+    const proto::Tokenizer& tokenizer, const ColumnType previous_type) {
   auto type = previous_type;
   // Boolean is the weakest type.
   if (type == ColumnType::UNKNOWN) {
@@ -350,7 +361,9 @@ ColumnType InferType(const proto::DataSpecificationGuide& guide,
   }
   // One dimension -> Multi dimensions.
   if (!IsMultiDimensional(type)) {
-    if (LooksMultiDimensional(value, tokenizer)) {
+    ASSIGN_OR_RETURN(const auto look_multi_dim,
+                     LooksMultiDimensional(value, tokenizer));
+    if (look_multi_dim) {
       if (type == ColumnType::NUMERICAL || type == ColumnType::BOOLEAN ||
           type == ColumnType::DISCRETIZED_NUMERICAL) {
         type = ColumnType::NUMERICAL_SET;
@@ -365,7 +378,7 @@ ColumnType InferType(const proto::DataSpecificationGuide& guide,
     bool remain_numerical = true;
     if (IsMultiDimensional(type)) {
       std::vector<std::string> tokens;
-      Tokenize(value, tokenizer, &tokens);
+      RETURN_IF_ERROR(Tokenize(value, tokenizer, &tokens));
       for (const auto& token : tokens) {
         if (!LooksLikeANumber(token)) {
           remain_numerical = false;
@@ -389,7 +402,7 @@ ColumnType InferType(const proto::DataSpecificationGuide& guide,
           type = ColumnType::CATEGORICAL_LIST;
           break;
         default:
-          LOG(FATAL) << "Non supported type for categorization.";
+          return type;
       }
     }
   }

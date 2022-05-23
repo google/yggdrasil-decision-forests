@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/status.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -65,10 +66,11 @@ dataset::VerticalDataset ShuffleDatasetColumns(
   return permuted_dataset;
 }
 
-void ComputePermutationFeatureImportance(
+absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
-        absl::optional<metric::proto::EvaluationResults>(const int feature_idx)>
+        utils::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
+            const int feature_idx)>
         get_permutation_evaluation,
     model::AbstractModel* model, int num_rounds) {
   const auto metrics =
@@ -88,7 +90,8 @@ void ComputePermutationFeatureImportance(
        feature_idx++) {
     std::vector<metric::proto::EvaluationResults> permuted_evaluations;
     for (int round_idx = 0; round_idx < num_rounds; round_idx++) {
-      auto permuted_evaluation = get_permutation_evaluation(feature_idx);
+      ASSIGN_OR_RETURN(auto permuted_evaluation,
+                       get_permutation_evaluation(feature_idx));
       if (!permuted_evaluation.has_value()) {
         continue;
       }
@@ -102,13 +105,14 @@ void ComputePermutationFeatureImportance(
 
     for (int metric_idx = 0; metric_idx < metrics.size(); metric_idx++) {
       const auto metric = metrics[metric_idx];
-      const auto baseline_metric_value =
-          metric::GetMetric(base_evaluation, metric.accessor);
+      ASSIGN_OR_RETURN(const auto baseline_metric_value,
+                       metric::GetMetric(base_evaluation, metric.accessor));
 
       double sum_permuted_metric_value = 0;
       for (const auto& permuted_evaluation : permuted_evaluations) {
-        sum_permuted_metric_value +=
-            metric::GetMetric(permuted_evaluation, metric.accessor);
+        ASSIGN_OR_RETURN(auto value, metric::GetMetric(permuted_evaluation,
+                                                       metric.accessor));
+        sum_permuted_metric_value += value;
       }
       const auto permuted_metric_value =
           sum_permuted_metric_value / permuted_evaluations.size();
@@ -137,6 +141,7 @@ void ComputePermutationFeatureImportance(
               feature_importance.mutable_variable_importances()->end(),
               var_importance_comparer);
   }
+  return absl::OkStatus();
 }
 
 absl::Status ComputePermutationFeatureImportance(
@@ -166,9 +171,8 @@ absl::Status ComputePermutationFeatureImportance(
                            &rnd_permutation_vi);
   };
 
-  utils::ComputePermutationFeatureImportance(
+  return utils::ComputePermutationFeatureImportance(
       base_evaluation, permutation_evaluation, model, num_rounds);
-  return absl::OkStatus();
 }
 
 }  // namespace utils

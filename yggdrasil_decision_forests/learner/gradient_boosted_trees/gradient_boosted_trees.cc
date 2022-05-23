@@ -2667,7 +2667,7 @@ absl::Status SampleTrainingExamplesWithSelGB(
 absl::Status ExportTrainingLogs(const proto::TrainingLogs& training_logs,
                                 absl::string_view directory) {
   // Add methods to plot training logs here.
-  CHECK_OK(file::RecursivelyCreateDir(directory, file::Defaults()));
+  RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
 
   // Export the logs in a .csv file.
   ASSIGN_OR_RETURN(auto file_handle, file::OpenOutputFile(file::JoinPath(

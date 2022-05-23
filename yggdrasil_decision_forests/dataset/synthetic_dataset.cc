@@ -136,7 +136,7 @@ uint64_t StableHash(uint64_t value) {
 
 // Creates a decreasing weight for a list of features.
 float DecreasingWeight(const int feature_idx, const int num_features) {
-  CHECK_LT(feature_idx, num_features);
+  DCHECK_LT(feature_idx, num_features);
   return static_cast<float>(num_features - feature_idx) / num_features;
 }
 
@@ -694,12 +694,12 @@ absl::Status GenerateSyntheticDatasetTrainValidTest(
     const absl::string_view typed_path_valid,
     const absl::string_view typed_path_test, const float ratio_valid,
     const float ratio_test) {
-  CHECK_GE(ratio_valid, 0.0);
-  CHECK_LE(ratio_valid, 1.0);
-  CHECK_GE(ratio_test, 0.0);
-  CHECK_LE(ratio_test, 1.0);
-  CHECK_GE(1.0 - ratio_test - ratio_valid, 0.0);
-  CHECK_LE(1.0 - ratio_test - ratio_valid, 1.0);
+  DCHECK_GE(ratio_valid, 0.0);
+  DCHECK_LE(ratio_valid, 1.0);
+  DCHECK_GE(ratio_test, 0.0);
+  DCHECK_LE(ratio_test, 1.0);
+  DCHECK_GE(1.0 - ratio_test - ratio_valid, 0.0);
+  DCHECK_LE(1.0 - ratio_test - ratio_valid, 1.0);
 
   if (typed_path_valid.empty() && ratio_valid > 0) {
     return absl::InvalidArgumentError(

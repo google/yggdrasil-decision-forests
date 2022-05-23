@@ -77,17 +77,18 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
 
   dataset->set_data_spec(dataspec);
   CHECK_OK(dataset->CreateColumnsFromDataspec());
-  auto* col_1 =
-      dataset->MutableColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          0);
+  auto* col_1 = dataset
+                    ->MutableColumnWithCastWithStatus<
+                        dataset::VerticalDataset::NumericalColumn>(0)
+                    .value();
   col_1->Add(0);
   col_1->Add(2);
   col_1->Add(4);
 
-  auto* col_2 =
-      dataset
-          ->MutableColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              1);
+  auto* col_2 = dataset
+                    ->MutableColumnWithCastWithStatus<
+                        dataset::VerticalDataset::CategoricalColumn>(1)
+                    .value();
   col_2->Add(1);
   col_2->Add(2);
   col_2->Add(1);

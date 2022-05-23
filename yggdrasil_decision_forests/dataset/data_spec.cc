@@ -41,6 +41,8 @@
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/regex.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
+
 namespace yggdrasil_decision_forests {
 namespace dataset {
 namespace {
@@ -101,8 +103,8 @@ void AddBucket(const float value, std::vector<float>* boundaries) {
 
 }  // namespace
 
-float GetSingleFloatFromTFFeature(const tensorflow::Feature& feature,
-                                  const proto::Column& col) {
+utils::StatusOr<float> GetSingleFloatFromTFFeature(
+    const tensorflow::Feature& feature, const proto::Column& col) {
   float num_value;
   switch (feature.kind_case()) {
     case tensorflow::Feature::KindCase::KIND_NOT_SET:
@@ -112,10 +114,12 @@ float GetSingleFloatFromTFFeature(const tensorflow::Feature& feature,
       if (feature.float_list().value_size() == 0) {
         num_value = std::numeric_limits<float>::quiet_NaN();
       } else {
-        CHECK_EQ(feature.float_list().value_size(), 1)
-            << "[Error #1] Example found with \"" << col.name()
-            << "\" having several values while this feature is univariate. "
-            << feature.DebugString();
+        if (feature.float_list().value_size() != 1) {
+          return absl::InvalidArgumentError(absl::StrCat(
+              "[Error #1] Example found with \"", col.name(),
+              "\" having several values while this feature is univariate. ",
+              feature.DebugString()));
+        }
         num_value = feature.float_list().value(0);
       }
       break;
@@ -123,10 +127,13 @@ float GetSingleFloatFromTFFeature(const tensorflow::Feature& feature,
       if (feature.int64_list().value_size() == 0) {
         num_value = std::numeric_limits<float>::quiet_NaN();
       } else {
-        CHECK_EQ(feature.int64_list().value_size(), 1)
-            << "[Error #1] Example found with \"" << col.name()
-            << "\" having several values while this feature is univariate. "
-            << feature.DebugString();
+        if (feature.int64_list().value_size() != 1) {
+          return absl::InvalidArgumentError(
+              absl::StrCat("[Error #1] Example found with \"", col.name(),
+                           "\" having several values while this "
+                           "feature is univariate. ",
+                           feature.DebugString()));
+        }
         num_value = static_cast<float>(feature.int64_list().value(0));
       }
       break;
@@ -134,20 +141,23 @@ float GetSingleFloatFromTFFeature(const tensorflow::Feature& feature,
       if (feature.bytes_list().value_size() == 0) {
         num_value = std::numeric_limits<float>::quiet_NaN();
       } else {
-        CHECK_EQ(feature.bytes_list().value_size(), 1)
-            << "[Error #1] Example found with \"" << col.name()
-            << "\" having several values while this feature is univariate. "
-            << feature.DebugString();
-        CHECK(absl::SimpleAtof(feature.bytes_list().value(0), &num_value));
+        if (feature.bytes_list().value_size() != 1) {
+          return absl::InvalidArgumentError(absl::StrCat(
+              "[Error #1] Example found with \"", col.name(),
+              "\" having several values while this feature is univariate. ",
+              feature.DebugString()));
+        }
+        STATUS_CHECK(
+            absl::SimpleAtof(feature.bytes_list().value(0), &num_value));
       }
       break;
   }
   return num_value;
 }
 
-void GetNumericalValuesFromTFFeature(const tensorflow::Feature& feature,
-                                     const proto::Column& col,
-                                     std::vector<float>* values) {
+absl::Status GetNumericalValuesFromTFFeature(const tensorflow::Feature& feature,
+                                             const proto::Column& col,
+                                             std::vector<float>* values) {
   if (feature.kind_case() == tensorflow::Feature::KindCase::kFloatList) {
     values->assign(feature.float_list().value().begin(),
                    feature.float_list().value().end());
@@ -155,13 +165,15 @@ void GetNumericalValuesFromTFFeature(const tensorflow::Feature& feature,
     values->assign(feature.int64_list().value().begin(),
                    feature.int64_list().value().end());
   } else {
-    LOG(FATAL) << "Non supported values for set of numerical values.";
+    return absl::InvalidArgumentError(
+        "Non supported values for set of numerical values.");
   }
+  return absl::OkStatus();
 }
 
-void GetCategoricalTokensFromTFFeature(const tensorflow::Feature& feature,
-                                       const proto::Column& col,
-                                       std::vector<std::string>* tokens) {
+absl::Status GetCategoricalTokensFromTFFeature(
+    const tensorflow::Feature& feature, const proto::Column& col,
+    std::vector<std::string>* tokens) {
   switch (feature.kind_case()) {
     case tensorflow::Feature::KindCase::KIND_NOT_SET:
       break;
@@ -177,13 +189,16 @@ void GetCategoricalTokensFromTFFeature(const tensorflow::Feature& feature,
       break;
     case tensorflow::Feature::KindCase::kBytesList:
       if (col.has_tokenizer()) {
-        CHECK_LE(feature.bytes_list().value_size(), 1)
-            << "The feature \"" << col.name()
-            << "\" configured with a tokenizer contains multiple entries. "
-               "Either disable the tokenizer, or make sure each example does "
-               "not contains more than one entry.";
+        if (feature.bytes_list().value_size() > 1) {
+          STATUS_FATALS(
+              "The feature \"", col.name(),
+              "\" configured with a tokenizer contains multiple entries. "
+              "Either disable the tokenizer, or make sure each example does "
+              "not contains more than one entry.");
+        }
         if (feature.bytes_list().value_size()) {
-          Tokenize(feature.bytes_list().value(0), col.tokenizer(), tokens);
+          RETURN_IF_ERROR(
+              Tokenize(feature.bytes_list().value(0), col.tokenizer(), tokens));
         }
       } else {
         for (const auto& value : feature.bytes_list().value()) {
@@ -193,13 +208,16 @@ void GetCategoricalTokensFromTFFeature(const tensorflow::Feature& feature,
       break;
   }
   if (!IsMultiDimensional(col.type())) {
-    CHECK_LE(tokens->size(), 1)
-        << "[Error #1] Feature \"" << col.name()
-        << "\" having several values while this feature is defined as a "
-           "univariate feature ("
-        << proto::ColumnType_Name(col.type())
-        << ").\nFeature value: " << feature.DebugString();
+    if (tokens->size() > 1) {
+      STATUS_FATALS(
+          "[Error #1] Feature \"", col.name(),
+          "\" having several values while this feature is defined as a "
+          "univariate feature (",
+          proto::ColumnType_Name(col.type()),
+          ").\nFeature value: ", feature.DebugString());
+    }
   }
+  return absl::OkStatus();
 }
 
 bool IsMultiDimensional(ColumnType type) {
@@ -223,13 +241,21 @@ bool IsNumerical(ColumnType type) {
 
 int32_t CategoricalStringToValue(const std::string& value,
                                  const proto::Column& col_spec) {
+  // TODO(b/223183975): Update.
+  return CategoricalStringToValueWithStatus(value, col_spec).value();
+}
+
+utils::StatusOr<int32_t> CategoricalStringToValueWithStatus(
+    const std::string& value, const proto::Column& col_spec) {
   if (col_spec.categorical().is_already_integerized()) {
     int32_t int_value;
-    CHECK(absl::SimpleAtoi(value, &int_value))
-        << "Cannot parse the string \"" << value
-        << "\" as an integer for columns \"" << col_spec.name() << "\".";
-    CHECK_GE(int_value, 0);
-    CHECK_LT(int_value, col_spec.categorical().number_of_unique_values());
+    if (!absl::SimpleAtoi(value, &int_value)) {
+      STATUS_FATALS("Cannot parse the string \"", value,
+                    "\" as an integer for columns \"", col_spec.name(), "\".");
+    }
+    STATUS_CHECK_GE(int_value, 0);
+    STATUS_CHECK_LT(int_value,
+                    col_spec.categorical().number_of_unique_values());
     return int_value;
   } else {
     auto value_in_dict = col_spec.categorical().items().find(value);
@@ -347,12 +373,11 @@ bool HasColumn(absl::string_view name,
   return false;
 }
 
-
 absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
                              const proto::DataSpecification& data_spec,
                              const std::vector<int>& col_idx_to_field_idx,
                              proto::Example* example) {
-  CHECK_EQ(col_idx_to_field_idx.size(), data_spec.columns_size());
+  STATUS_CHECK_EQ(col_idx_to_field_idx.size(), data_spec.columns_size());
   example->mutable_attributes()->Clear();
   example->mutable_attributes()->Reserve(data_spec.columns_size());
   for (int col_idx = 0; col_idx < data_spec.columns_size(); col_idx++) {
@@ -405,7 +430,7 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
           dst = dst_value->mutable_numerical_list()->mutable_values();
         }
         std::vector<std::string> tokens;
-        Tokenize(value, col_spec.tokenizer(), &tokens);
+        RETURN_IF_ERROR(Tokenize(value, col_spec.tokenizer(), &tokens));
         dst->Reserve(tokens.size());
         for (const std::string& token : tokens) {
           float num_value;
@@ -421,12 +446,14 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
           dst->erase(std::unique(dst->begin(), dst->end()), dst->end());
         }
       } break;
-      case ColumnType::CATEGORICAL:
+      case ColumnType::CATEGORICAL: {
         if (value.empty()) {
           break;
         }
-        dst_value->set_categorical(CategoricalStringToValue(value, col_spec));
-        break;
+        ASSIGN_OR_RETURN(auto value,
+                         CategoricalStringToValueWithStatus(value, col_spec));
+        dst_value->set_categorical(value);
+      } break;
       case ColumnType::CATEGORICAL_SET:
       case ColumnType::CATEGORICAL_LIST: {
         google::protobuf::RepeatedField<int32_t>* dst;
@@ -436,10 +463,12 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
           dst = dst_value->mutable_categorical_list()->mutable_values();
         }
         std::vector<std::string> tokens;
-        Tokenize(value, col_spec.tokenizer(), &tokens);
+        RETURN_IF_ERROR(Tokenize(value, col_spec.tokenizer(), &tokens));
         dst->Reserve(tokens.size());
         for (const std::string& token : tokens) {
-          dst->Add(CategoricalStringToValue(token, col_spec));
+          ASSIGN_OR_RETURN(auto value,
+                           CategoricalStringToValueWithStatus(token, col_spec));
+          dst->Add(value);
         }
         if (col_spec.type() == ColumnType::CATEGORICAL_SET) {
           // Sets are expected to be sorted.
@@ -472,9 +501,9 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
   return absl::OkStatus();
 }
 
-void ExampleToCsvRow(const proto::Example& example,
-                     const proto::DataSpecification& data_spec,
-                     std::vector<std::string>* csv_fields) {
+absl::Status ExampleToCsvRow(const proto::Example& example,
+                             const proto::DataSpecification& data_spec,
+                             std::vector<std::string>* csv_fields) {
   csv_fields->resize(data_spec.columns_size());
   for (int col_idx = 0; col_idx < data_spec.columns_size(); col_idx++) {
     const auto& col_spec = data_spec.columns(col_idx);
@@ -491,10 +520,12 @@ void ExampleToCsvRow(const proto::Example& example,
       case proto::Example::Attribute::TypeCase::kNumerical:
         dst_value = absl::StrCat(src_value.numerical());
         break;
-      case proto::Example::Attribute::TypeCase::kDiscretizedNumerical:
-        dst_value = absl::StrCat(DiscretizedNumericalToNumerical(
-            col_spec, src_value.discretized_numerical()));
-        break;
+      case proto::Example::Attribute::TypeCase::kDiscretizedNumerical: {
+        ASSIGN_OR_RETURN(auto value,
+                         DiscretizedNumericalToNumerical(
+                             col_spec, src_value.discretized_numerical()));
+        dst_value = absl::StrCat(value);
+      } break;
       case proto::Example::Attribute::TypeCase::kCategorical:
         dst_value =
             CategoricalIdxToRepresentation(col_spec, src_value.categorical());
@@ -529,6 +560,7 @@ void ExampleToCsvRow(const proto::Example& example,
         break;
     }
   }
+  return absl::OkStatus();
 }
 
 absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
@@ -632,20 +664,23 @@ absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
       case ColumnType::UNKNOWN:
         break;
       case ColumnType::NUMERICAL: {
-        const float num_value =
-            GetSingleFloatFromTFFeature(it_feature->second, col_spec);
+        ASSIGN_OR_RETURN(
+            const float num_value,
+            GetSingleFloatFromTFFeature(it_feature->second, col_spec));
         dst_value->set_numerical(num_value);
       } break;
       case ColumnType::DISCRETIZED_NUMERICAL: {
-        const float num_value =
-            GetSingleFloatFromTFFeature(it_feature->second, col_spec);
+        ASSIGN_OR_RETURN(
+            const float num_value,
+            GetSingleFloatFromTFFeature(it_feature->second, col_spec));
         dst_value->set_discretized_numerical(
             NumericalToDiscretizedNumerical(col_spec, num_value));
       } break;
       case ColumnType::NUMERICAL_SET:
       case ColumnType::NUMERICAL_LIST: {
         std::vector<float> values;
-        GetNumericalValuesFromTFFeature(it_feature->second, col_spec, &values);
+        RETURN_IF_ERROR(GetNumericalValuesFromTFFeature(it_feature->second,
+                                                        col_spec, &values));
 
         google::protobuf::RepeatedField<float>* dst;
         if (col_spec.type() == ColumnType::NUMERICAL_SET) {
@@ -665,13 +700,14 @@ absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
       } break;
       case ColumnType::CATEGORICAL: {
         std::vector<std::string> tokens;
-        GetCategoricalTokensFromTFFeature(it_feature->second, col_spec,
-                                          &tokens);
+        RETURN_IF_ERROR(GetCategoricalTokensFromTFFeature(it_feature->second,
+                                                          col_spec, &tokens));
         if (tokens.empty()) {
           // NA.
         } else if (tokens.size() == 1) {
-          dst_value->set_categorical(
-              CategoricalStringToValue(tokens[0], col_spec));
+          ASSIGN_OR_RETURN(auto value, CategoricalStringToValueWithStatus(
+                                           tokens[0], col_spec));
+          dst_value->set_categorical(value);
         } else {
           return absl::InvalidArgumentError(absl::StrFormat(
               "Categorical attribute with more than one value for feature %s",
@@ -681,8 +717,8 @@ absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
       case ColumnType::CATEGORICAL_SET:
       case ColumnType::CATEGORICAL_LIST: {
         std::vector<std::string> tokens;
-        GetCategoricalTokensFromTFFeature(it_feature->second, col_spec,
-                                          &tokens);
+        RETURN_IF_ERROR(GetCategoricalTokensFromTFFeature(it_feature->second,
+                                                          col_spec, &tokens));
 
         google::protobuf::RepeatedField<int32_t>* dst;
         if (col_spec.type() == ColumnType::CATEGORICAL_SET) {
@@ -693,7 +729,9 @@ absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
 
         dst->Reserve(tokens.size());
         for (const std::string& token : tokens) {
-          dst->Add(CategoricalStringToValue(token, col_spec));
+          ASSIGN_OR_RETURN(auto value,
+                           CategoricalStringToValueWithStatus(token, col_spec));
+          dst->Add(value);
         }
         if (col_spec.type() == ColumnType::CATEGORICAL_SET) {
           // Sets are expected to be sorted.
@@ -702,13 +740,14 @@ absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
         }
       } break;
       case ColumnType::BOOLEAN: {
-        const float num_value =
-            GetSingleFloatFromTFFeature(it_feature->second, col_spec);
+        ASSIGN_OR_RETURN(
+            const float num_value,
+            GetSingleFloatFromTFFeature(it_feature->second, col_spec));
         dst_value->set_boolean(num_value >= 0.5f);
       } break;
       case ColumnType::STRING:
-        CHECK_EQ(it_feature->second.kind_case(),
-                 tensorflow::Feature::KindCase::kBytesList);
+        STATUS_CHECK_EQ(it_feature->second.kind_case(),
+                        tensorflow::Feature::KindCase::kBytesList);
         if (it_feature->second.bytes_list().value().empty()) {
           // NA
         } else if (it_feature->second.bytes_list().value().size() == 1) {
@@ -723,8 +762,8 @@ absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
 
       case ColumnType::HASH: {
         std::vector<std::string> tokens;
-        GetCategoricalTokensFromTFFeature(it_feature->second, col_spec,
-                                          &tokens);
+        RETURN_IF_ERROR(GetCategoricalTokensFromTFFeature(it_feature->second,
+                                                          col_spec, &tokens));
         if (tokens.empty()) {
           // NA.
         } else if (tokens.size() == 1) {
@@ -743,6 +782,7 @@ absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
 void ExampleToTfExample(const proto::Example& example,
                         const proto::DataSpecification& data_spec,
                         tensorflow::Example* tf_example) {
+  // Note: Temporarly okay.
   CHECK_OK(ExampleToTfExampleWithStatus(example, data_spec, tf_example));
 }
 
@@ -762,11 +802,12 @@ absl::Status ExampleToTfExampleWithStatus(
         case proto::NUMERICAL:
           dst_value.mutable_float_list()->add_value(src_value.numerical());
           break;
-        case proto::DISCRETIZED_NUMERICAL:
-          dst_value.mutable_float_list()->add_value(
-              DiscretizedNumericalToNumerical(
-                  col_spec, src_value.discretized_numerical()));
-          break;
+        case proto::DISCRETIZED_NUMERICAL: {
+          ASSIGN_OR_RETURN(auto value,
+                           DiscretizedNumericalToNumerical(
+                               col_spec, src_value.discretized_numerical()));
+          dst_value.mutable_float_list()->add_value(value);
+        } break;
         default:
           return absl::InvalidArgumentError(
               absl::StrFormat("%s's type is not supported for stacked feature.",
@@ -793,11 +834,12 @@ absl::Status ExampleToTfExampleWithStatus(
       case proto::Example::Attribute::TypeCase::kNumerical:
         dst_value.mutable_float_list()->add_value(src_value.numerical());
         break;
-      case proto::Example::Attribute::TypeCase::kDiscretizedNumerical:
-        dst_value.mutable_float_list()->add_value(
-            DiscretizedNumericalToNumerical(col_spec,
-                                            src_value.discretized_numerical()));
-        break;
+      case proto::Example::Attribute::TypeCase::kDiscretizedNumerical: {
+        ASSIGN_OR_RETURN(auto value,
+                         DiscretizedNumericalToNumerical(
+                             col_spec, src_value.discretized_numerical()));
+        dst_value.mutable_float_list()->add_value(value);
+      } break;
       case proto::Example::Attribute::TypeCase::kCategorical:
         if (col_spec.categorical().is_already_integerized()) {
           dst_value.mutable_int64_list()->add_value(src_value.categorical());
@@ -1022,10 +1064,11 @@ std::string PrintHumanReadable(const proto::DataSpecification& data_spec,
   return result;
 }
 
-void Tokenize(const absl::string_view text, const proto::Tokenizer& tokenizer,
-              std::vector<std::string>* tokens) {
+absl::Status Tokenize(const absl::string_view text,
+                      const proto::Tokenizer& tokenizer,
+                      std::vector<std::string>* tokens) {
   tokens->clear();
-  if (text.empty()) return;
+  if (text.empty()) return absl::OkStatus();
   std::string cased_text;
   // Optional string lower casing.
   if (tokenizer.to_lower_case()) {
@@ -1037,7 +1080,7 @@ void Tokenize(const absl::string_view text, const proto::Tokenizer& tokenizer,
   std::vector<std::string> unit_tokens;
   switch (tokenizer.splitter()) {
     case proto::Tokenizer::INVALID:
-      LOG(FATAL) << "Unsupported INVALID tokenizer type.";
+      STATUS_FATAL("Unsupported INVALID tokenizer type.");
       break;
     case proto::Tokenizer::SEPARATOR:
       unit_tokens =
@@ -1075,6 +1118,7 @@ void Tokenize(const absl::string_view text, const proto::Tokenizer& tokenizer,
   if (tokenizer.grouping().trigrams()) {
     ExtractNGrams(unit_tokens, 3, group_separator, tokens);
   }
+  return absl::OkStatus();
 }
 
 void ExtractNGrams(const std::vector<std::string>& tokens, const int n,
@@ -1145,7 +1189,7 @@ proto::Column* AddColumn(const absl::string_view name,
   return col;
 }
 
-std::vector<float> GenDiscretizedBoundaries(
+utils::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
     const std::vector<std::pair<float, int>>& candidates, int maximum_num_bins,
     int min_obs_in_bins, const std::vector<float>& special_values) {
   // Algorithm:
@@ -1170,8 +1214,8 @@ std::vector<float> GenDiscretizedBoundaries(
   // remaining counts: Observations not already assigned to a bin and not
   // reserved by a large candidate.
 
-  CHECK_LT(maximum_num_bins, kDiscretizedNumericalMissingValue);
-  CHECK_GE(min_obs_in_bins, 1);
+  STATUS_CHECK_LT(maximum_num_bins, kDiscretizedNumericalMissingValue);
+  STATUS_CHECK_GE(min_obs_in_bins, 1);
 
   // Reserve bins for special values.
   int num_special_values_in_bounds = 0;
@@ -1279,14 +1323,14 @@ std::vector<float> GenDiscretizedBoundaries(
   return boundaries;
 }
 
-float DiscretizedNumericalToNumerical(const proto::Column& col_spec,
-                                      const DiscretizedNumericalIndex value) {
+utils::StatusOr<float> DiscretizedNumericalToNumerical(
+    const proto::Column& col_spec, const DiscretizedNumericalIndex value) {
   if (value == kDiscretizedNumericalMissingValue) {
     return std::numeric_limits<float>::quiet_NaN();
   }
   const auto& boundaries = col_spec.discretized_numerical().boundaries();
-  DCHECK_GT(boundaries.size(), 0);
-  CHECK_LE(value, boundaries.size());
+  STATUS_CHECK(!boundaries.empty());
+  STATUS_CHECK_LE(value, boundaries.size());
   if (value == 0) {
     return boundaries[0] - kEpsDiscretizedToNonDiscretizedNumerical;
   }

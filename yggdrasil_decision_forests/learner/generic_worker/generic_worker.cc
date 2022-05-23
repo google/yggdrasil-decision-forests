@@ -106,8 +106,8 @@ absl::Status GenericWorker::EvaluateModel(
 
   // Load dataset.
   dataset::VerticalDataset dataset;
-  QCHECK_OK(LoadVerticalDataset(request.dataset_path(), model->data_spec(),
-                                &dataset));
+  RETURN_IF_ERROR(LoadVerticalDataset(request.dataset_path(),
+                                      model->data_spec(), &dataset));
 
   if (!options.has_task()) {
     options.set_task(model->task());

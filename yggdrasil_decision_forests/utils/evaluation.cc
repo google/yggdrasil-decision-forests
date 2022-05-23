@@ -43,27 +43,27 @@ absl::Status ExportPredictions(
     // Save the prediction as a tfrecord of proto::Predictions.
     auto prediction_writer =
         absl::make_unique<TFRecordShardedWriter<model::proto::Prediction>>();
-    CHECK_OK(prediction_writer->Open(prediction_path,
-                                     num_records_by_shard_in_output));
+    RETURN_IF_ERROR(prediction_writer->Open(prediction_path,
+                                            num_records_by_shard_in_output));
     for (const auto& prediction : predictions) {
-      CHECK_OK(prediction_writer->Write(prediction));
+      RETURN_IF_ERROR(prediction_writer->Write(prediction));
     }
-  } else
+    return absl::OkStatus();
+  }
 #endif
-  {
-    // Save the prediction as a collection (e.g. tfrecord or csv) of
-    // proto::Examples.
-    ASSIGN_OR_RETURN(auto dataspec, PredictionDataspec(task, label_column));
-    ASSIGN_OR_RETURN(auto writer, dataset::CreateExampleWriter(
-                                      typed_prediction_path, dataspec,
-                                      num_records_by_shard_in_output));
-    dataset::proto::Example prediction_as_example;
-    for (const auto& prediction : predictions) {
-      // Convert the prediction into an example.
-      RETURN_IF_ERROR(PredictionToExample(task, label_column, prediction,
-                                          &prediction_as_example));
-      RETURN_IF_ERROR(writer->Write(prediction_as_example));
-    }
+
+  // Save the prediction as a collection (e.g. tfrecord or csv) of
+  // proto::Examples.
+  ASSIGN_OR_RETURN(auto dataspec, PredictionDataspec(task, label_column));
+  ASSIGN_OR_RETURN(auto writer, dataset::CreateExampleWriter(
+                                    typed_prediction_path, dataspec,
+                                    num_records_by_shard_in_output));
+  dataset::proto::Example prediction_as_example;
+  for (const auto& prediction : predictions) {
+    // Convert the prediction into an example.
+    RETURN_IF_ERROR(PredictionToExample(task, label_column, prediction,
+                                        &prediction_as_example));
+    RETURN_IF_ERROR(writer->Write(prediction_as_example));
   }
   return absl::OkStatus();
 }

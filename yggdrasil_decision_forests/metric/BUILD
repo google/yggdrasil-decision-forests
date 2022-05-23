@@ -86,7 +86,9 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/model:prediction_cc_proto",
+        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
     ],
 )
 
@@ -101,10 +103,13 @@ cc_library_ydf(
     deps = [
         ":metric",
         ":metric_cc_proto",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:distribution",
+        "//yggdrasil_decision_forests/utils:status_macros",
     ],
 )
 
@@ -166,7 +171,6 @@ cc_test(
     name = "uplift_test",
     srcs = ["uplift_test.cc"],
     deps = [
-        ":comparison",
         ":metric",
         ":metric_cc_proto",
         ":report",
@@ -174,8 +178,6 @@ cc_test(
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
-        "//yggdrasil_decision_forests/utils:compatibility",
-        "//yggdrasil_decision_forests/utils:distribution",
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:test",
     ],

@@ -59,7 +59,7 @@ proto::EvaluationResults GenEvaluationBinaryOutcome(
   option.set_task(model::proto::Task::CATEGORICAL_UPLIFT);
 
   proto::EvaluationResults eval;
-  InitializeEvaluation(option, effect_column, &eval);
+  CHECK_OK(InitializeEvaluation(option, effect_column, &eval));
 
   double sum_weights = 0;
   for (int example_idx = 0; example_idx < treatments.size(); example_idx++) {
@@ -78,12 +78,12 @@ proto::EvaluationResults GenEvaluationBinaryOutcome(
         predicted_uplift[example_idx].end()};
     pred_uplift.set_outcome_categorical(outcomes[example_idx]);
     pred_uplift.set_treatment(treatments[example_idx]);
-    AddPrediction(option, pred, &rnd, &eval);
+    CHECK_OK(AddPrediction(option, pred, &rnd, &eval));
 
     sum_weights += weight;
   }
 
-  FinalizeEvaluation(option, effect_column, &eval);
+  CHECK_OK(FinalizeEvaluation(option, effect_column, &eval));
 
   EXPECT_NEAR(eval.count_predictions(), sum_weights, 0.00001);
   EXPECT_EQ(eval.count_predictions_no_weight(), treatments.size());
@@ -92,7 +92,7 @@ proto::EvaluationResults GenEvaluationBinaryOutcome(
 
   // Create reports.
   std::string report;
-  AppendTextReport(eval, &report);
+  CHECK_OK(AppendTextReportWithStatus(eval, &report));
   LOG(INFO) << "Report :\n" << report;
 
   return eval;

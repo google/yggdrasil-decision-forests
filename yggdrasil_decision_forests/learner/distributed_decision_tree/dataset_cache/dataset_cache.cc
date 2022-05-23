@@ -145,7 +145,7 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
 
   // Load the partial meta-data.
   proto::PartialDatasetMetadata partial_meta_data;
-  CHECK_OK(file::GetBinaryProto(
+  RETURN_IF_ERROR(file::GetBinaryProto(
       file::JoinPath(partial_cache_directory, kFilenamePartialMetaData),
       &partial_meta_data, file::Defaults()));
   metadata.set_num_examples(data_spec.created_num_rows());

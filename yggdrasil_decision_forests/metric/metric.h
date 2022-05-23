@@ -36,26 +36,27 @@ namespace yggdrasil_decision_forests {
 namespace metric {
 
 // Initialize the evaluation. Should be called before any "AddPrediction".
-void InitializeEvaluation(const proto::EvaluationOptions& option,
-                          const dataset::proto::Column& label_column,
-                          proto::EvaluationResults* eval);
+absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
+                                  const dataset::proto::Column& label_column,
+                                  proto::EvaluationResults* eval);
 
 // Add a prediction to the evaluation. The predictions should contain the label
 // / ground truth (see the "SetGroundTruth" methods in "abstract_model.h").
-void AddPrediction(const proto::EvaluationOptions& option,
-                   const model::proto::Prediction& pred,
-                   utils::RandomEngine* rnd, proto::EvaluationResults* eval);
+absl::Status AddPrediction(const proto::EvaluationOptions& option,
+                           const model::proto::Prediction& pred,
+                           utils::RandomEngine* rnd,
+                           proto::EvaluationResults* eval);
 
 // Merge two initialized (with the same options) and non-finalized evaluations.
-void MergeEvaluation(const proto::EvaluationOptions& option,
-                     const proto::EvaluationResults& src,
-                     proto::EvaluationResults* dst);
+absl::Status MergeEvaluation(const proto::EvaluationOptions& option,
+                             const proto::EvaluationResults& src,
+                             proto::EvaluationResults* dst);
 
 // Finalize the evaluation. Only then the metrics can be read from the
 // evaluation. Should be called after all "AddPrediction".
-void FinalizeEvaluation(const proto::EvaluationOptions& option,
-                        const dataset::proto::Column& label_column,
-                        proto::EvaluationResults* eval);
+absl::Status FinalizeEvaluation(const proto::EvaluationOptions& option,
+                                const dataset::proto::Column& label_column,
+                                proto::EvaluationResults* eval);
 
 // Helper function to evaluate binary classification predictions.
 //
@@ -85,10 +86,10 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
 //    positive_label_value: The value of the "positive" label. All other label
 //      values are considered "negative".
 //    roc: The output ROC.
-void BuildROCCurve(const proto::EvaluationOptions& option,
-                   const dataset::proto::Column& label_column,
-                   const proto::EvaluationResults& eval,
-                   const int positive_label_value, proto::Roc* roc);
+absl::Status BuildROCCurve(const proto::EvaluationOptions& option,
+                           const dataset::proto::Column& label_column,
+                           const proto::EvaluationResults& eval,
+                           const int positive_label_value, proto::Roc* roc);
 
 // Compute the "X@Y" metrics e.g. recall at given precision or precision at
 // given volume. Metrics are computed without interpolation:
@@ -169,8 +170,9 @@ float DefaultRMSE(const proto::EvaluationResults& eval);
 float DefaultNDCG(const proto::EvaluationResults& eval);
 
 // Export a set of metrics from a model evaluation.
-std::unordered_map<std::string, std::string> ExtractFlatMetrics(
-    absl::string_view model_name, const proto::EvaluationResults& evaluation);
+utils::StatusOr<std::unordered_map<std::string, std::string>>
+ExtractFlatMetrics(absl::string_view model_name,
+                   const proto::EvaluationResults& evaluation);
 
 // Export a set of metrics from a model evaluation stored in a file. The file
 // should store a serialized binary proto::EvaluationResults.
@@ -212,8 +214,8 @@ std::string GetPerClassComparisonMetricLabel(
 
 // Returns the numerical metric value defined by "metric" and contained in
 // "evaluation".
-double GetMetric(const proto::EvaluationResults& evaluation,
-                 const proto::MetricAccessor& metric);
+utils::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
+                                  const proto::MetricAccessor& metric);
 
 // If true, a higher value for the metric is generally preferable (e.g.
 // accuracy). If false, a lower value is preferable (e.g. loss). Fails if
@@ -232,11 +234,11 @@ class MinMaxStream {
 
   // Minimum and maximum of the visited values.
   const T& min() const {
-    CHECK(!empty_);
+    DCHECK(!empty_);
     return min_;
   }
   const T& max() const {
-    CHECK(!empty_);
+    DCHECK(!empty_);
     return max_;
   }
 
@@ -248,7 +250,7 @@ class MinMaxStream {
 
 template <typename T>
 void MinMaxStream<T>::visit(const T& value) {
-  CHECK(!std::isnan(value));
+  DCHECK(!std::isnan(value));
   if (empty_) {
     empty_ = false;
     min_ = max_ = value;
@@ -276,11 +278,11 @@ std::vector<MetricDefinition> DefaultMetrics(
     model::proto::Task task, const dataset::proto::Column& label);
 
 // Computes the RMSE of a set of predictions.
-double RMSE(const std::vector<float>& labels,
-            const std::vector<float>& predictions,
-            const std::vector<float>& weights);
-double RMSE(const std::vector<float>& labels,
-            const std::vector<float>& predictions);
+utils::StatusOr<double> RMSE(const std::vector<float>& labels,
+                             const std::vector<float>& predictions,
+                             const std::vector<float>& weights);
+utils::StatusOr<double> RMSE(const std::vector<float>& labels,
+                             const std::vector<float>& predictions);
 
 // Gets the threshold on a binary classifier output that maximize accuracy.
 float ComputeThresholdForMaxAccuracy(
@@ -295,7 +297,7 @@ float PValueMeanIsGreaterThanZero(const std::vector<float>& sample);
 
 namespace internal {
 // Bootstrap the performance metrics for classification.
-void ComputeRocConfidenceIntervalsUsingBootstrapping(
+absl::Status ComputeRocConfidenceIntervalsUsingBootstrapping(
     const proto::EvaluationOptions& option,
     const std::vector<BinaryPrediction>& sorted_predictions, proto::Roc* roc);
 
@@ -308,7 +310,7 @@ std::pair<double, double> GetQuantiles(
 
 // Bootstrap the performance metrics for regression. Note: "eval" is both the
 // input and the output.
-void UpdateRMSEConfidenceIntervalUsingBootstrapping(
+absl::Status UpdateRMSEConfidenceIntervalUsingBootstrapping(
     const proto::EvaluationOptions& option, proto::EvaluationResults* eval);
 
 // ROC metrics from a ROC point.

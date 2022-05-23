@@ -97,10 +97,12 @@ absl::Status AbstractLoss::Loss(const dataset::VerticalDataset& dataset,
 void RankingGroupsIndices::Initialize(const dataset::VerticalDataset& dataset,
                                       int label_col_idx, int group_col_idx) {
   // Access to raw label and group values.
+  // TODO(b/223183975): Update.
   const auto& label_values =
       dataset
-          .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               label_col_idx)
+          .value()
           ->values();
 
   const auto* group_categorical_values =

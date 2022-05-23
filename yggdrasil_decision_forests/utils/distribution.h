@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "absl/container/inlined_vector.h"
+#include "absl/status/status.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -31,6 +32,7 @@
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/html.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -377,23 +379,23 @@ class IntegersConfusionMatrix {
   void Load(const P& proto);
 
   // Create a text table representing the confusion matrix.
-  void AppendTextReport(const dataset::proto::Column& column_spec,
-                        std::string* result) const;
+  absl::Status AppendTextReport(const dataset::proto::Column& column_spec,
+                                std::string* result) const;
 
   // Create a text table representing the confusion matrix.
-  void AppendTextReport(const std::vector<std::string>& column_labels,
-                        const std::vector<std::string>& row_labels,
-                        std::string* result) const;
+  absl::Status AppendTextReport(const std::vector<std::string>& column_labels,
+                                const std::vector<std::string>& row_labels,
+                                std::string* result) const;
 
   // Create a html table representing the confusion matrix.
-  void AppendHtmlReport(const dataset::proto::Column& column_spec,
-                        std::string* result) const;
+  absl::Status AppendHtmlReport(const dataset::proto::Column& column_spec,
+                                std::string* result) const;
 
   // Create a html table representing the confusion matrix.
-  void AppendHtmlReport(const std::vector<std::string>& column_labels,
-                        const std::vector<std::string>& row_labels,
-                        absl::string_view corner_label,
-                        std::string* result) const;
+  absl::Status AppendHtmlReport(const std::vector<std::string>& column_labels,
+                                const std::vector<std::string>& row_labels,
+                                absl::string_view corner_label,
+                                std::string* result) const;
 
  private:
   T sum_ = 0;
@@ -487,11 +489,11 @@ void IntegersConfusionMatrix<T>::SetSize(const int32_t nrow,
 }
 
 template <typename T>
-void IntegersConfusionMatrix<T>::AppendTextReport(
+absl::Status IntegersConfusionMatrix<T>::AppendTextReport(
     const std::vector<std::string>& column_labels,
     const std::vector<std::string>& row_labels, std::string* result) const {
-  CHECK_EQ(column_labels.size(), ncol());
-  CHECK_EQ(row_labels.size(), nrow());
+  STATUS_CHECK_EQ(column_labels.size(), ncol());
+  STATUS_CHECK_EQ(row_labels.size(), nrow());
 
   // Minimum margin (expressed in spaces) between displayed elements.
   const int margin = 2;
@@ -549,13 +551,14 @@ void IntegersConfusionMatrix<T>::AppendTextReport(
     absl::StrAppend(result, "\n");
   }
   absl::StrAppend(result, "Total: ", sum_, "\n");
+  return absl::OkStatus();
 }
 
 template <typename T>
-void IntegersConfusionMatrix<T>::AppendTextReport(
+absl::Status IntegersConfusionMatrix<T>::AppendTextReport(
     const dataset::proto::Column& column_spec, std::string* result) const {
-  CHECK_EQ(column_spec.categorical().number_of_unique_values(), ncol());
-  CHECK_EQ(column_spec.categorical().number_of_unique_values(), nrow());
+  STATUS_CHECK_EQ(column_spec.categorical().number_of_unique_values(), ncol());
+  STATUS_CHECK_EQ(column_spec.categorical().number_of_unique_values(), nrow());
 
   // Extract the string representation of the column values.
   std::vector<std::string> labels(ncol_);
@@ -563,25 +566,25 @@ void IntegersConfusionMatrix<T>::AppendTextReport(
     labels[value] = dataset::CategoricalIdxToRepresentation(column_spec, value);
   }
   absl::StrAppend(result, "truth\\prediction\n");
-  AppendTextReport(labels, labels, result);
+  return AppendTextReport(labels, labels, result);
 }
 
 template <typename T>
-void IntegersConfusionMatrix<T>::AppendHtmlReport(
+absl::Status IntegersConfusionMatrix<T>::AppendHtmlReport(
     const dataset::proto::Column& column_spec, std::string* result) const {
-  CHECK_EQ(column_spec.categorical().number_of_unique_values(), ncol());
-  CHECK_EQ(column_spec.categorical().number_of_unique_values(), nrow());
+  STATUS_CHECK_EQ(column_spec.categorical().number_of_unique_values(), ncol());
+  STATUS_CHECK_EQ(column_spec.categorical().number_of_unique_values(), nrow());
 
   // Extract the string representation of the column values.
   std::vector<std::string> labels(ncol_);
   for (int value = 0; value < ncol_; value++) {
     labels[value] = dataset::CategoricalIdxToRepresentation(column_spec, value);
   }
-  AppendHtmlReport(labels, labels, "Truth\\Prediction", result);
+  return AppendHtmlReport(labels, labels, "Truth\\Prediction", result);
 }
 
 template <typename T>
-void IntegersConfusionMatrix<T>::AppendHtmlReport(
+absl::Status IntegersConfusionMatrix<T>::AppendHtmlReport(
     const std::vector<std::string>& column_labels,
     const std::vector<std::string>& row_labels, absl::string_view corner_label,
     std::string* result) const {
@@ -620,6 +623,7 @@ void IntegersConfusionMatrix<T>::AppendHtmlReport(
   auto content = h::Table(a::Class("confusion_matrix"), rows);
   content.Append(h::P("Total: ", absl::StrCat(sum_)));
   absl::StrAppend(result, std::string(content.content()));
+  return absl::OkStatus();
 }
 
 template <typename T>

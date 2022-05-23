@@ -19,24 +19,30 @@
 #define YGGDRASIL_DECISION_FORESTS_METRIC_REPORT_H_
 
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace metric {
 
 // Append a textual report of the evaluation.
-std::string TextReport(const proto::EvaluationResults& eval);
+utils::StatusOr<std::string> TextReport(const proto::EvaluationResults& eval);
+
 void AppendTextReport(const proto::EvaluationResults& eval,
                       std::string* report);
 
+absl::Status AppendTextReportWithStatus(const proto::EvaluationResults& eval,
+                                        std::string* report);
+
 // Specialization for specific task.
-void AppendTextReportClassification(const proto::EvaluationResults& eval,
+absl::Status AppendTextReportClassification(
+    const proto::EvaluationResults& eval, std::string* report);
+absl::Status AppendTextReportRegression(const proto::EvaluationResults& eval,
+                                        std::string* report);
+absl::Status AppendTextReportRanking(const proto::EvaluationResults& eval,
+                                     std::string* report);
+absl::Status AppendTextReportUplift(const proto::EvaluationResults& eval,
                                     std::string* report);
-void AppendTextReportRegression(const proto::EvaluationResults& eval,
-                                std::string* report);
-void AppendTextReportRanking(const proto::EvaluationResults& eval,
-                             std::string* report);
-void AppendTextReportUplift(const proto::EvaluationResults& eval,
-                            std::string* report);
 
 }  // namespace metric
 }  // namespace yggdrasil_decision_forests

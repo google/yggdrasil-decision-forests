@@ -47,7 +47,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-
 absl::Status MultinomialLogLikelihoodLoss::Status() const {
   if (task_ != model::proto::Task::CLASSIFICATION) {
     return absl::InvalidArgumentError(
@@ -178,10 +177,12 @@ void MultinomialLogLikelihoodLoss::SetLeaf(
   //  (1-|grad[i]|))
   //
   // Note: The leaf value does not depend on the label value (directly).
+  // TODO(b/223183975): Fix
   const auto& grad =
       train_dataset
-          .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               config_link.label())
+          .value()
           ->values();
   double numerator = 0;
   double denominator = 0;

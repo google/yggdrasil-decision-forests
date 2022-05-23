@@ -105,17 +105,19 @@ utils::StatusOr<std::unique_ptr<VerticalDataset::AbstractColumn>> CreateColumn(
 
 // Ensure that two solumn specs are compatible i.e. "src_spec" can be converted
 // into "dst_spec".
-void CheckCompatibleCategocialColumnSpec(const proto::Column& src_spec,
-                                         const proto::Column& dst_spec) {
+absl::Status CheckCompatibleCategocialColumnSpec(
+    const proto::Column& src_spec, const proto::Column& dst_spec) {
   if (src_spec.categorical().is_already_integerized() !=
       dst_spec.categorical().is_already_integerized()) {
-    LOG(FATAL) << "Non matching \"is_already_integerized\" for column \""
-               << src_spec.name() << "\".";
+    return absl::InvalidArgumentError(
+        absl::StrCat("Non matching \"is_already_integerized\" for column \"",
+                     src_spec.name(), "\"."));
   }
   if (src_spec.categorical().is_already_integerized()) {
-    CHECK_LE(dst_spec.categorical().number_of_unique_values(),
-             src_spec.categorical().number_of_unique_values());
+    STATUS_CHECK_LE(dst_spec.categorical().number_of_unique_values(),
+                    src_spec.categorical().number_of_unique_values());
   }
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -132,7 +134,14 @@ int VerticalDataset::ColumnNameToColumnIdx(absl::string_view name) const {
 void VerticalDataset::AppendExample(
     const proto::Example& example,
     const absl::optional<std::vector<int>> load_columns) {
-  CHECK_EQ(columns_.size(), example.attributes_size());
+  // TODO(b/223183975): Update.
+  CHECK_OK(AppendExampleWithStatus(example, load_columns));
+}
+
+absl::Status VerticalDataset::AppendExampleWithStatus(
+    const proto::Example& example,
+    const absl::optional<std::vector<int>> load_columns) {
+  DCHECK_EQ(columns_.size(), example.attributes_size());
   if (load_columns.has_value()) {
     for (int col_idx : load_columns.value()) {
       mutable_column(col_idx)->AddFromExample(example.attributes(col_idx));
@@ -143,12 +152,13 @@ void VerticalDataset::AppendExample(
     }
   }
   nrow_++;
+  return absl::OkStatus();
 }
 
 void VerticalDataset::ExtractExample(const row_t example_idx,
                                      proto::Example* example) const {
-  CHECK_GE(example_idx, 0);
-  CHECK_LT(example_idx, nrow_);
+  DCHECK_GE(example_idx, 0);
+  DCHECK_LT(example_idx, nrow_);
   example->mutable_attributes()->Clear();
   for (int col_idx = 0; col_idx < columns_.size(); col_idx++) {
     const auto& col = *column(col_idx);
@@ -213,8 +223,8 @@ utils::StatusOr<proto::Column*> VerticalDataset::AddColumn(
 utils::StatusOr<VerticalDataset::AbstractColumn*>
 VerticalDataset::ReplaceColumn(int column_idx,
                                const proto::Column& column_spec) {
-  CHECK_GE(column_idx, 0);
-  CHECK_LT(column_idx, columns_.size());
+  DCHECK_GE(column_idx, 0);
+  DCHECK_LT(column_idx, columns_.size());
   *data_spec_.mutable_columns(column_idx) = column_spec;
   ASSIGN_OR_RETURN(auto new_column,
                    CreateColumn(column_spec.type(), column_spec.name()));
@@ -292,7 +302,7 @@ absl::Status VerticalDataset::CategoricalColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
   auto* cast_dst = dst->MutableCast<CategoricalColumn>();
-  CheckCompatibleCategocialColumnSpec(src_spec, dst_spec);
+  RETURN_IF_ERROR(CheckCompatibleCategocialColumnSpec(src_spec, dst_spec));
   if (src_spec.categorical().is_already_integerized()) {
     *cast_dst->mutable_values() = values();
   } else {
@@ -304,7 +314,8 @@ absl::Status VerticalDataset::CategoricalColumn::ConvertToGivenDataspec(
       const int src_value_idx = values()[example_idx];
       const std::string value =
           CategoricalIdxToRepresentation(src_spec, src_value_idx, false);
-      const int dst_value_idx = CategoricalStringToValue(value, dst_spec);
+      ASSIGN_OR_RETURN(const int dst_value_idx,
+                       CategoricalStringToValueWithStatus(value, dst_spec));
       cast_dst->Add(dst_value_idx);
     }
   }
@@ -333,7 +344,8 @@ absl::Status VerticalDataset::CategoricalSetColumn::ConvertToGivenDataspec(
       const int src_value_idx = bank()[bank_idx];
       const std::string value =
           CategoricalIdxToRepresentation(src_spec, src_value_idx, false);
-      const int dst_value_idx = CategoricalStringToValue(value, dst_spec);
+      ASSIGN_OR_RETURN(const int dst_value_idx,
+                       CategoricalStringToValueWithStatus(value, dst_spec));
       cast_dst->mutable_bank().push_back(dst_value_idx);
     }
   }
@@ -352,7 +364,8 @@ absl::Status VerticalDataset::CategoricalListColumn::ConvertToGivenDataspec(
       const int src_value_idx = bank()[bank_idx];
       const std::string value =
           CategoricalIdxToRepresentation(src_spec, src_value_idx, false);
-      const int dst_value_idx = CategoricalStringToValue(value, dst_spec);
+      ASSIGN_OR_RETURN(const int dst_value_idx,
+                       CategoricalStringToValueWithStatus(value, dst_spec));
       cast_dst->mutable_bank().push_back(dst_value_idx);
     }
   }
@@ -771,7 +784,9 @@ VerticalDataset::DiscretizedNumericalColumn::ToStringWithDigitPrecision(
   if (IsNa(row)) {
     return kNaSymbol;
   }
-  const float value = DiscretizedNumericalToNumerical(col_spec, values()[row]);
+  // TODO(b/223183975): Update.
+  const float value =
+      DiscretizedNumericalToNumerical(col_spec, values()[row]).value();
   return absl::StrFormat("%.*g", digit_precision, value);
 }
 
@@ -823,7 +838,8 @@ utils::StatusOr<VerticalDataset> VerticalDataset::Extract(
   RETURN_IF_ERROR(dst.CreateColumnsFromDataspec());
   for (int col_idx = 0; col_idx < ncol(); col_idx++) {
     if (column(col_idx)->nrows() > 0) {
-      column(col_idx)->ExtractAndAppend(indices, dst.mutable_column(col_idx));
+      RETURN_IF_ERROR(column(col_idx)->ExtractAndAppend(
+          indices, dst.mutable_column(col_idx)));
     }
   }
   return std::move(dst);
@@ -842,8 +858,9 @@ utils::StatusOr<VerticalDataset> VerticalDataset::ConvertToGivenDataspec(
     if (!HasColumn(dst_col->name(), data_spec_)) {
       if (std::find(required_column_idxs.begin(), required_column_idxs.end(),
                     dst_col_idx) != required_column_idxs.end()) {
-        LOG(FATAL) << "Source dataspec don't contains the required column \""
-                   << dst_col->name() << "\".";
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Source dataspec don't contains the required column \"",
+            dst_col->name(), "\"."));
       } else {
         for (row_t example_idx = 0; example_idx < nrow_; example_idx++) {
           dst_col->AddNA();
@@ -854,9 +871,9 @@ utils::StatusOr<VerticalDataset> VerticalDataset::ConvertToGivenDataspec(
     const int src_col_idx = GetColumnIdxFromName(dst_col->name(), data_spec_);
     const auto& src_col = *column(src_col_idx);
     if (src_col.type() != dst_col->type()) {
-      LOG(FATAL)
-          << "Source and destination dataspec types don't match for column \""
-          << dst_col->name() << "\".";
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Source and destination dataspec types don't match for column \"",
+          dst_col->name(), "\"."));
     }
     RETURN_IF_ERROR(
         src_col.ConvertToGivenDataspec(dst_col, data_spec_.columns(src_col_idx),
@@ -878,16 +895,26 @@ absl::Status VerticalDataset::Append(const VerticalDataset& src,
     RETURN_IF_ERROR(CreateColumnsFromDataspec());
   }
   // Note: "MessageDifferencer" is too slow.
-  CHECK_EQ(src.data_spec().ShortDebugString(), data_spec().ShortDebugString())
-      << "The source and destination datasets should have the same dataspec.";
+  if (src.data_spec().ShortDebugString() != data_spec().ShortDebugString()) {
+    return absl::InvalidArgumentError(
+        "The source and destination datasets should have the same dataspec.");
+  }
   nrow_ += indices.size();
   for (int col_idx = 0; col_idx < ncol(); col_idx++) {
-    src.column(col_idx)->ExtractAndAppend(indices, mutable_column(col_idx));
+    RETURN_IF_ERROR(src.column(col_idx)->ExtractAndAppend(
+        indices, mutable_column(col_idx)));
   }
   return absl::OkStatus();
 }
 
 void MapExampleToProtoExample(
+    const std::unordered_map<std::string, std::string>& src,
+    const proto::DataSpecification& data_spec, proto::Example* dst) {
+  // TODO(b/223183975): Update.
+  CHECK_OK(MapExampleToProtoExampleWithStatus(src, data_spec, dst));
+}
+
+absl::Status MapExampleToProtoExampleWithStatus(
     const std::unordered_map<std::string, std::string>& src,
     const proto::DataSpecification& data_spec, proto::Example* dst) {
   std::vector<std::string> flat_values;
@@ -897,7 +924,7 @@ void MapExampleToProtoExample(
     col_idx_to_field_idx[col_idx] = flat_values.size();
     flat_values.push_back(src_value.second);
   }
-  CHECK_OK(CsvRowToExample(flat_values, data_spec, col_idx_to_field_idx, dst));
+  return CsvRowToExample(flat_values, data_spec, col_idx_to_field_idx, dst);
 }
 
 utils::StatusOr<std::unordered_map<std::string, std::string>>
@@ -907,7 +934,7 @@ ProtoExampleToMapExample(const proto::Example& src,
   VerticalDataset ds;
   ds.set_data_spec(data_spec);
   RETURN_IF_ERROR(ds.CreateColumnsFromDataspec());
-  ds.AppendExample(src);
+  RETURN_IF_ERROR(ds.AppendExampleWithStatus(src));
 
   for (int col_idx = 0; col_idx < data_spec.columns_size(); col_idx++) {
     auto& dst_value = dst[data_spec.columns(col_idx).name()];
@@ -918,9 +945,16 @@ ProtoExampleToMapExample(const proto::Example& src,
 
 void VerticalDataset::AppendExample(
     const std::unordered_map<std::string, std::string>& example) {
+  // TODO(b/223183975): Update.
+  CHECK_OK(AppendExampleWithStatus(example));
+}
+
+absl::Status VerticalDataset::AppendExampleWithStatus(
+    const std::unordered_map<std::string, std::string>& example) {
   proto::Example proto_example;
-  MapExampleToProtoExample(example, data_spec(), &proto_example);
-  AppendExample(proto_example);
+  RETURN_IF_ERROR(
+      MapExampleToProtoExampleWithStatus(example, data_spec(), &proto_example));
+  return AppendExampleWithStatus(proto_example);
 }
 
 std::string VerticalDataset::ValueToString(const row_t row,

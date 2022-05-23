@@ -1177,9 +1177,10 @@ absl::Status LoadFlatBatchFromDataset(
           absl::StrCat("\"", feature_names[node_feature_idx],
                        "\" feature's type is not supported"));
     }
-    const auto* numerical_feature_data =
-        dataset.ColumnWithCast<VerticalDataset::NumericalColumn>(
-            spec_feature_idx);
+    ASSIGN_OR_RETURN(
+        const auto* numerical_feature_data,
+        dataset.ColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(
+            spec_feature_idx));
     float feature_value = numerical_feature_data->values()[example_idx];
     if (std::isnan(feature_value)) {
       feature_value = na_replacement_values[node_feature_idx].numerical_value;
@@ -1208,9 +1209,10 @@ absl::Status LoadFlatBatchFromDataset(
         node_feature_idx_to_spec_feature_idx[node_feature_idx];
     NumericalOrCategoricalValue feature_value;
     if (dataset.column(spec_feature_idx)->type() == ColumnType::NUMERICAL) {
-      const auto* numerical_feature_data =
-          dataset.ColumnWithCast<VerticalDataset::NumericalColumn>(
-              spec_feature_idx);
+      ASSIGN_OR_RETURN(
+          const auto* numerical_feature_data,
+          dataset.ColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(
+              spec_feature_idx));
       feature_value.numerical_value =
           numerical_feature_data->values()[example_idx];
       if (std::isnan(feature_value.numerical_value)) {
@@ -1218,9 +1220,10 @@ absl::Status LoadFlatBatchFromDataset(
       }
     } else if (dataset.column(spec_feature_idx)->type() ==
                ColumnType::CATEGORICAL) {
-      const auto* categorical_feature_data =
-          dataset.ColumnWithCast<VerticalDataset::CategoricalColumn>(
-              spec_feature_idx);
+      ASSIGN_OR_RETURN(
+          const auto* categorical_feature_data,
+          dataset.ColumnWithCastWithStatus<VerticalDataset::CategoricalColumn>(
+              spec_feature_idx));
       feature_value.categorical_value =
           categorical_feature_data->values()[example_idx];
       if (feature_value.categorical_value ==

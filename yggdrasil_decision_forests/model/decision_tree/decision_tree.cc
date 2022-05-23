@@ -426,13 +426,13 @@ absl::Status DecisionTree::Validate(
 }
 
 void DecisionTree::CreateRoot() {
-  CHECK(!root_);
+  DCHECK(!root_);
   root_ = absl::make_unique<NodeWithChildren>();
 }
 
 absl::Status DecisionTree::WriteNodes(
     utils::ShardedWriter<proto::Node>* writer) const {
-  CHECK(root_) << "You cannot export an empty tree";
+  DCHECK(root_) << "You cannot export an empty tree";
   return root_->WriteNodes(writer);
 }
 

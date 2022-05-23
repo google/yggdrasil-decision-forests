@@ -139,8 +139,8 @@ class AbstractModel {
 
   // Name of the label column.
   std::string label() const {
-    CHECK_GE(label_col_idx_, 0);
-    CHECK_LT(label_col_idx_, data_spec_.columns_size());
+    DCHECK_GE(label_col_idx_, 0);
+    DCHECK_LT(label_col_idx_, data_spec_.columns_size());
     return data_spec_.columns(label_col_idx_).name();
   }
 
@@ -193,6 +193,11 @@ class AbstractModel {
   // Evaluates the model on a dataset. Returns a finalized EvaluationResults.
   //
   // If specified, "predictions" will be populated with the predictions.
+  utils::StatusOr<metric::proto::EvaluationResults> EvaluateWithStatus(
+      const dataset::VerticalDataset& dataset,
+      const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
+      std::vector<model::proto::Prediction>* predictions = nullptr) const;
+
   metric::proto::EvaluationResults Evaluate(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
@@ -207,13 +212,18 @@ class AbstractModel {
   // Evaluates the model on a dataset. Returns a finalized EvaluationResults.
   // The random generator "rnd" is used boostrapping of confidence intervals and
   // sub-sampling evaluation (if configured in "option").
+  utils::StatusOr<metric::proto::EvaluationResults> EvaluateWithStatus(
+      const absl::string_view typed_path,
+      const metric::proto::EvaluationOptions& option,
+      utils::RandomEngine* rnd) const;
+
   metric::proto::EvaluationResults Evaluate(
       const absl::string_view typed_path,
       const metric::proto::EvaluationOptions& option,
       utils::RandomEngine* rnd) const;
 
   // Similar to "Evaluate", but allow to override the evaluation objective.
-  metric::proto::EvaluationResults EvaluateOverrideType(
+  utils::StatusOr<metric::proto::EvaluationResults> EvaluateOverrideType(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& option,
       const proto::Task override_task, const int override_label_col_idx,
@@ -224,7 +234,7 @@ class AbstractModel {
   // non-finalized EvaluationResults.
   //
   // If specified, "predictions" will be populated with the predictions.
-  void AppendEvaluation(
+  absl::Status AppendEvaluation(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
       metric::proto::EvaluationResults* eval,
@@ -233,14 +243,14 @@ class AbstractModel {
   // Similar as "AppendEvaluation" above. But operate on dataset stored on disk.
   // This method is preferable when the number of examples is large since they
   // do not have to be all loaded in memory as the same time.
-  void AppendEvaluation(const absl::string_view typed_path,
-                        const metric::proto::EvaluationOptions& option,
-                        utils::RandomEngine* rnd,
-                        metric::proto::EvaluationResults* eval) const;
+  absl::Status AppendEvaluation(const absl::string_view typed_path,
+                                const metric::proto::EvaluationOptions& option,
+                                utils::RandomEngine* rnd,
+                                metric::proto::EvaluationResults* eval) const;
 
   // Similar to "AppendEvaluation", but allow to override the evaluation
   // objective.
-  void AppendEvaluationOverrideType(
+  absl::Status AppendEvaluationOverrideType(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& option,
       const proto::Task override_task, const int override_label_col_idx,
@@ -249,7 +259,7 @@ class AbstractModel {
       std::vector<model::proto::Prediction>* predictions = nullptr) const;
 
   // Generates the predictions of the model.
-  void AppendPredictions(
+  absl::Status AppendPredictions(
       const dataset::VerticalDataset& dataset, const bool add_ground_truth,
       std::vector<model::proto::Prediction>* predictions) const;
 
@@ -260,6 +270,8 @@ class AbstractModel {
   // available in "serving:all".
   //
   // Does not set the ground truth and the weight fields in "prediction".
+  //
+  // TODO(b/223183975): Add status.
   virtual void Predict(const dataset::VerticalDataset& dataset,
                        dataset::VerticalDataset::row_t row_idx,
                        proto::Prediction* prediction) const = 0;
@@ -274,6 +286,8 @@ class AbstractModel {
   // "TfExampleToExample".
   //
   // Does not set the ground truth and the weight fields in "prediction".
+  //
+  // TODO(b/223183975): Add status.
   virtual void Predict(const dataset::proto::Example& example,
                        proto::Prediction* prediction) const = 0;
 
@@ -284,14 +298,14 @@ class AbstractModel {
   //
   // Both version requires that either the example (this version) or dataset
   // (next version) contains the label value.
-  void SetGroundTruth(const dataset::proto::Example& example,
-                      proto::Prediction* prediction) const;
+  absl::Status SetGroundTruth(const dataset::proto::Example& example,
+                              proto::Prediction* prediction) const;
 
   // Set the ground truth values (see description above) of one Prediction
   // proto from the specified row in the given dataset.
-  void SetGroundTruth(const dataset::VerticalDataset& dataset,
-                      dataset::VerticalDataset::row_t row_idx,
-                      proto::Prediction* prediction) const;
+  absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
+                              dataset::VerticalDataset::row_t row_idx,
+                              proto::Prediction* prediction) const;
 
   // Generates a human readable description of the statistics and structure of
   // the model. If "full_definition" is true, the entire model definition is
@@ -393,7 +407,7 @@ class AbstractModel {
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 
-  void AppendEvaluationWithEngine(
+  absl::Status AppendEvaluationWithEngine(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& option,
       const dataset::proto::LinkedWeightDefinition& weight_links,
@@ -497,20 +511,20 @@ struct GroundTruthColumnIndices {
 // evaluated with task=REGRESSION).
 
 // See comments above.
-void SetGroundTruth(const dataset::VerticalDataset& dataset,
-                    dataset::VerticalDataset::row_t row_idx,
-                    const GroundTruthColumnIndices& columns, proto::Task task,
-                    proto::Prediction* prediction);
+absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
+                            dataset::VerticalDataset::row_t row_idx,
+                            const GroundTruthColumnIndices& columns,
+                            proto::Task task, proto::Prediction* prediction);
 
 // See comments above.
-void SetGroundTruth(const dataset::proto::Example& example,
-                    const GroundTruthColumnIndices& columns, proto::Task task,
-                    proto::Prediction* prediction);
+absl::Status SetGroundTruth(const dataset::proto::Example& example,
+                            const GroundTruthColumnIndices& columns,
+                            proto::Task task, proto::Prediction* prediction);
 
 // Converts a prediction from one type to another.
-void ChangePredictionType(proto::Task src_task, proto::Task dst_task,
-                          const proto::Prediction& src_pred,
-                          proto::Prediction* dst_pred);
+absl::Status ChangePredictionType(proto::Task src_task, proto::Task dst_task,
+                                  const proto::Prediction& src_pred,
+                                  proto::Prediction* dst_pred);
 
 // Create a user readable description of the set of the variable importances of
 // a model as returned by "GetVariableImportance".

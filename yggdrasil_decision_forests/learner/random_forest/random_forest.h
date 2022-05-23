@@ -153,7 +153,7 @@ void UpdateOOBPredictionsWithNewTree(
 
 // Evaluates the OOB predictions. Examples without any tree predictions are
 // skipped.
-metric::proto::EvaluationResults EvaluateOOBPredictions(
+utils::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
     int uplift_treatment_col_idx,
@@ -162,7 +162,7 @@ metric::proto::EvaluationResults EvaluateOOBPredictions(
     bool for_permutation_importance = false);
 
 // Update the variable importance of the model with set of oob predictions.
-void ComputeVariableImportancesFromAccumulatedPredictions(
+absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
     const std::vector<internal::PredictionAccumulator>& oob_predictions,
     const std::vector<std::vector<internal::PredictionAccumulator>>&
         oob_predictions_per_input_features,

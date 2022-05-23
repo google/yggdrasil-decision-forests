@@ -75,7 +75,7 @@ class CsvExampleReader final : public ExampleReaderInterface {
     // The data spec.
     const proto::DataSpecification data_spec_;
 
-    // Currently open file;
+    // Currently, open file;
     std::unique_ptr<yggdrasil_decision_forests::utils::csv::Reader> csv_reader_;
     file::InputFileCloser file_closer_;
 
@@ -95,11 +95,12 @@ REGISTER_ExampleReaderInterface(CsvExampleReader, "FORMAT_CSV");
 
 class CsvDataSpecCreator : public AbstractDataSpecCreator {
  public:
-  void InferColumnsAndTypes(const std::vector<std::string>& paths,
-                            const proto::DataSpecificationGuide& guide,
-                            proto::DataSpecification* data_spec) override;
+  absl::Status InferColumnsAndTypes(
+      const std::vector<std::string>& paths,
+      const proto::DataSpecificationGuide& guide,
+      proto::DataSpecification* data_spec) override;
 
-  void ComputeColumnStatistics(
+  absl::Status ComputeColumnStatistics(
       const std::vector<std::string>& paths,
       const proto::DataSpecificationGuide& guide,
       proto::DataSpecification* data_spec,
@@ -112,10 +113,9 @@ REGISTER_AbstractDataSpecCreator(CsvDataSpecCreator, "FORMAT_CSV");
 
 // Determine the most likely type of the attribute according to the current
 // most likely value type and an observed string value.
-proto::ColumnType InferType(const proto::DataSpecificationGuide& guide,
-                            absl::string_view value,
-                            const proto::Tokenizer& tokenizer,
-                            proto::ColumnType previous_type);
+utils::StatusOr<proto::ColumnType> InferType(
+    const proto::DataSpecificationGuide& guide, absl::string_view value,
+    const proto::Tokenizer& tokenizer, proto::ColumnType previous_type);
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

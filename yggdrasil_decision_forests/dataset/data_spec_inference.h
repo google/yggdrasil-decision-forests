@@ -36,13 +36,19 @@ namespace yggdrasil_decision_forests {
 namespace dataset {
 
 // Computes a data spec given a dataset and a dataspec guide.
+absl::Status CreateDataSpecWithStatus(
+    absl::string_view typed_path, bool use_flume,
+    const proto::DataSpecificationGuide& guide,
+    proto::DataSpecification* data_spec);
+
+// Deprecated. Use "CreateDataSpecWithStatus" instead.
 void CreateDataSpec(absl::string_view typed_path, bool use_flume,
                     const proto::DataSpecificationGuide& guide,
                     proto::DataSpecification* data_spec);
 
 // Creates a dataspec from a dataset.
 //
-// The life of a AbstractDataSpecCreator is as follow:
+// The life of a AbstractDataSpecCreator is as follows:
 // 1. "InferColumnsAndTypes" is called on a compatible dataset.
 // 2. "ComputeColumnStatistics" is called on the
 //
@@ -53,12 +59,13 @@ class AbstractDataSpecCreator {
   // Lists the columns (with name and semantic) in the dataset.
   // If the column semantic is not defined in "guide", the most likely semantic
   // should be used.
-  virtual void InferColumnsAndTypes(const std::vector<std::string>& paths,
-                                    const proto::DataSpecificationGuide& guide,
-                                    proto::DataSpecification* data_spec) = 0;
+  virtual absl::Status InferColumnsAndTypes(
+      const std::vector<std::string>& paths,
+      const proto::DataSpecificationGuide& guide,
+      proto::DataSpecification* data_spec) = 0;
 
   // Accumulate statistics about each features.
-  virtual void ComputeColumnStatistics(
+  virtual absl::Status ComputeColumnStatistics(
       const std::vector<std::string>& paths,
       const proto::DataSpecificationGuide& guide,
       proto::DataSpecification* data_spec,
@@ -75,9 +82,10 @@ REGISTRATION_CREATE_POOL(AbstractDataSpecCreator);
 
 // Finalize the computation of data spec. This steps removes infrequent
 // dictionary entries, update statistics of numerical columns, etc.
-void FinalizeComputeSpec(const proto::DataSpecificationGuide& guide,
-                         const proto::DataSpecificationAccumulator& accumulator,
-                         proto::DataSpecification* data_spec);
+absl::Status FinalizeComputeSpec(
+    const proto::DataSpecificationGuide& guide,
+    const proto::DataSpecificationAccumulator& accumulator,
+    proto::DataSpecification* data_spec);
 
 // Finalize the inference of the type of each features. Should be called after
 // "InferColumnsAndTypes" and before "ComputeColumnStatistics".
@@ -156,12 +164,12 @@ absl::Status UpdateColSpecsWithGuideInfo(
 // Add the tokens to the dictionary of categorical column spec that is
 // currently being assembled. Don't check the size of the dictionary (i.e. the
 // dictionary can grow larger than "max_number_of_unique_values").
-void AddTokensToCategoricalColumnSpec(const std::vector<std::string>& tokens,
-                                      proto::Column* col);
+absl::Status AddTokensToCategoricalColumnSpec(
+    const std::vector<std::string>& tokens, proto::Column* col);
 
 // Does this value looks like to be a multi dimensional value?
-bool LooksMultiDimensional(absl::string_view value,
-                           const proto::Tokenizer& tokenizer);
+utils::StatusOr<bool> LooksMultiDimensional(absl::string_view value,
+                                            const proto::Tokenizer& tokenizer);
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

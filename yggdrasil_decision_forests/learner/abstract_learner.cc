@@ -542,39 +542,61 @@ metric::proto::EvaluationResults EvaluateLearner(
     const utils::proto::FoldGenerator& fold_generator,
     const metric::proto::EvaluationOptions& evaluation_options,
     const proto::DeploymentConfig& deployment_evaluation) {
+  return EvaluateLearnerOrStatus(learner, dataset, fold_generator,
+                                 evaluation_options, deployment_evaluation)
+      .value();
+}
+
+utils::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
+    const model::AbstractLearner& learner,
+    const dataset::VerticalDataset& dataset,
+    const utils::proto::FoldGenerator& fold_generator,
+    const metric::proto::EvaluationOptions& evaluation_options,
+    const proto::DeploymentConfig& deployment_evaluation) {
   // Make sure the computation distribution is supported.
   switch (deployment_evaluation.execution_case()) {
     case proto::DeploymentConfig::EXECUTION_NOT_SET:
     case proto::DeploymentConfig::kLocal:
       break;
     default:
-      LOG(FATAL) << "\"EvaluateLearner\" only support local deployment config.";
+      STATUS_FATAL("\"EvaluateLearner\" only support local deployment config.");
       break;
   }
 
   // Initialize the folds.
   utils::FoldList folds;
-  CHECK_OK(utils::GenerateFoldsConstDataset(fold_generator, dataset, &folds));
+  RETURN_IF_ERROR(
+      utils::GenerateFoldsConstDataset(fold_generator, dataset, &folds));
   const int num_folds = utils::NumberOfFolds(fold_generator, folds);
 
   // Get the label column specification.
   int32_t label_col_idx;
-  CHECK_OK(dataset::GetSingleColumnIdxFromName(
+  RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
       learner.training_config().label(), dataset.data_spec(), &label_col_idx));
   const auto& label_col_spec = dataset.data_spec().columns(label_col_idx);
 
   // Protects "aggregated_evaluation".
   utils::concurrency::Mutex evaluation_mutex;
   metric::proto::EvaluationResults aggregated_evaluation;
+  absl::Status status_train_and_evaluate;
 
   // Trains and evaluates a single model on the "fold_idx".
   const auto train_and_evaluate =
       [&aggregated_evaluation, &evaluation_mutex, &label_col_spec, &dataset,
-       &folds, &learner,
-       &evaluation_options](const int fold_idx, utils::RandomEngine* rnd) {
+       &folds, &learner, &evaluation_options, &status_train_and_evaluate](
+          const int fold_idx, utils::RandomEngine* rnd) {
         metric::proto::EvaluationResults evaluation;
-        metric::InitializeEvaluation(evaluation_options, label_col_spec,
-                                     &evaluation);
+        {
+          utils::concurrency::MutexLock lock(&evaluation_mutex);
+          if (!status_train_and_evaluate.ok()) {
+            return;
+          }
+          status_train_and_evaluate.Update(metric::InitializeEvaluation(
+              evaluation_options, label_col_spec, &evaluation));
+          if (!status_train_and_evaluate.ok()) {
+            return;
+          }
+        }
 
         // Extract the training and testing dataset.
         const auto testing_dataset = dataset.Extract(folds[fold_idx]).value();
@@ -584,17 +606,20 @@ metric::proto::EvaluationResults EvaluateLearner(
         // Train a model.
         auto model = learner.TrainWithStatus(training_dataset).value();
         // Evaluate the model.
-        model->AppendEvaluation(testing_dataset, evaluation_options, rnd,
-                                &evaluation);
+        auto status_append = model->AppendEvaluation(
+            testing_dataset, evaluation_options, rnd, &evaluation);
         // Aggregate the evaluations.
-        utils::concurrency::MutexLock lock(&evaluation_mutex);
-        metric::MergeEvaluation(evaluation_options, evaluation,
-                                &aggregated_evaluation);
+        {
+          utils::concurrency::MutexLock lock(&evaluation_mutex);
+          status_train_and_evaluate.Update(status_append);
+          status_train_and_evaluate.Update(metric::MergeEvaluation(
+              evaluation_options, evaluation, &aggregated_evaluation));
+        }
       };
 
   utils::RandomEngine rnd;
-  metric::InitializeEvaluation(evaluation_options, label_col_spec,
-                               &aggregated_evaluation);
+  RETURN_IF_ERROR(metric::InitializeEvaluation(
+      evaluation_options, label_col_spec, &aggregated_evaluation));
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         "Evaluator", deployment_evaluation.num_threads());
@@ -607,8 +632,8 @@ metric::proto::EvaluationResults EvaluateLearner(
     }
   }
 
-  metric::FinalizeEvaluation(evaluation_options, label_col_spec,
-                             &aggregated_evaluation);
+  RETURN_IF_ERROR(metric::FinalizeEvaluation(evaluation_options, label_col_spec,
+                                             &aggregated_evaluation));
   return aggregated_evaluation;
 }
 

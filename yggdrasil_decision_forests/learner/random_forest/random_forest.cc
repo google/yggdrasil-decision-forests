@@ -360,6 +360,7 @@ RandomForestLearner::TrainWithStatus(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
+  // TODO(gbm): Divide function into smaller blocks.
   const auto begin_training = absl::Now();
   RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
 
@@ -532,19 +533,33 @@ RandomForestLearner::TrainWithStatus(
         kAdaptativeWarmUpSeconds, rf_config.min_adapted_subsample());
   }
 
-  // Count the number of nodes in the trees so far. Used to enforce the
-  // "total_max_num_nodes" parameter.
-  //
-  // Protects all the following variables.
-  utils::concurrency::Mutex mutex_max_total_num_nodes;
-  // Number of nodes in the "completed" trees.
-  std::vector<int64_t> num_nodes_completed_trees(rf_config.num_trees(), -1);
-  // Number of nodes in the accounted trees i.e. the first
-  // "next_tree_idx_to_account" trees.
-  int64_t total_num_nodes_accounted = 0;
-  // Index of the next tree to account.
-  int next_tree_idx_to_account = 0;
-  int64_t model_size_in_bytes = mdl->AbstractAttributesSizeInBytes();
+  // Various fields modified by the various training workers.
+  struct {
+    // Number of nodes in the "completed" trees.
+    std::vector<int64_t> num_nodes_completed_trees GUARDED_BY(mutex);
+
+    // Number of nodes in the accounted trees i.e. the first
+    // "next_tree_idx_to_account" trees.
+    int64_t total_num_nodes_accounted GUARDED_BY(mutex) = 0;
+
+    // Index of the next tree to account.
+    int next_tree_idx_to_account GUARDED_BY(mutex) = 0;
+
+    int64_t model_size_in_bytes GUARDED_BY(mutex);
+
+    absl::Status status GUARDED_BY(mutex);
+
+    utils::concurrency::Mutex mutex;
+  } concurrent_fields;
+
+  // Initialize the concurrent_fields.
+  {
+    utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+    concurrent_fields.num_nodes_completed_trees.assign(rf_config.num_trees(),
+                                                       -1);
+    concurrent_fields.model_size_in_bytes =
+        mdl->AbstractAttributesSizeInBytes();
+  }
 
   // Note: "num_trained_trees" is defined outside of the following brackets so
   // to make use it is not released before "pool".
@@ -586,20 +601,26 @@ RandomForestLearner::TrainWithStatus(
           }
         }
 
-        // Maximum model size.
-        if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
-          utils::concurrency::MutexLock lock(&mutex_max_total_num_nodes);
-          if (model_size_in_bytes >
-              training_config().maximum_model_size_in_memory_in_bytes()) {
+        {
+          utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+          if (!concurrent_fields.status.ok()) {
             return;
           }
-        }
 
-        if (rf_config.total_max_num_nodes() > 0) {
-          utils::concurrency::MutexLock lock(&mutex_max_total_num_nodes);
-          if (total_num_nodes_accounted > rf_config.total_max_num_nodes()) {
-            // The num node limits is already exceeded.
-            return;
+          // Maximum model size.
+          if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
+            if (concurrent_fields.model_size_in_bytes >
+                training_config().maximum_model_size_in_memory_in_bytes()) {
+              return;
+            }
+          }
+
+          if (rf_config.total_max_num_nodes() > 0) {
+            if (concurrent_fields.total_num_nodes_accounted >
+                rf_config.total_max_num_nodes()) {
+              // The num node limits is already exceeded.
+              return;
+            }
           }
         }
 
@@ -650,44 +671,55 @@ RandomForestLearner::TrainWithStatus(
         decision_tree::InternalTrainConfig internal_config;
         internal_config.preprocessing = &preprocessing;
         internal_config.timeout = timeout;
-        CHECK_OK(decision_tree::Train(
+        auto status_train = decision_tree::Train(
             train_dataset, selected_examples, config_with_default, config_link,
             rf_config.decision_tree(), deployment(), weights, &random,
-            decision_tree.get(), internal_config));
+            decision_tree.get(), internal_config);
 
-        if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
-          const auto tree_size_in_bytes =
-              decision_tree->EstimateModelSizeInBytes();
-          utils::concurrency::MutexLock lock(&mutex_max_total_num_nodes);
-          model_size_in_bytes += tree_size_in_bytes;
-          // Note: A model should contain at least one tree.
-          if (num_trained_trees > 0 &&
-              model_size_in_bytes >
-                  training_config().maximum_model_size_in_memory_in_bytes()) {
-            if (!training_stopped_early) {
-              training_stopped_early = true;
-              LOG(INFO)
-                  << "Stop training after " << num_trained_trees
-                  << " trees because the model size exceeded "
-                     "maximum_model_size_in_memory_in_bytes="
-                  << training_config().maximum_model_size_in_memory_in_bytes();
-            }
-            // Remove the tree that was just trained.
-            decision_tree.reset();
+        int current_num_trained_trees;
+        {
+          utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+          concurrent_fields.status.Update(status_train);
+          if (!concurrent_fields.status.ok()) {
             return;
           }
-        }
 
-        const auto current_num_trained_trees = ++num_trained_trees;
+          if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
+            const auto tree_size_in_bytes =
+                decision_tree->EstimateModelSizeInBytes();
+            concurrent_fields.model_size_in_bytes += tree_size_in_bytes;
+            // Note: A model should contain at least one tree.
+            if (num_trained_trees > 0 &&
+                concurrent_fields.model_size_in_bytes >
+                    training_config().maximum_model_size_in_memory_in_bytes()) {
+              if (!training_stopped_early) {
+                training_stopped_early = true;
+                LOG(INFO) << "Stop training after " << num_trained_trees
+                          << " trees because the model size exceeded "
+                             "maximum_model_size_in_memory_in_bytes="
+                          << training_config()
+                                 .maximum_model_size_in_memory_in_bytes();
+              }
+              // Remove the tree that was just trained.
+              decision_tree.reset();
+              return;
+            }
+          }
 
-        if (rf_config.total_max_num_nodes() > 0) {
-          utils::concurrency::MutexLock lock(&mutex_max_total_num_nodes);
-          num_nodes_completed_trees[tree_idx] = decision_tree->NumNodes();
-          while (next_tree_idx_to_account < num_nodes_completed_trees.size() &&
-                 num_nodes_completed_trees[next_tree_idx_to_account] >= 0) {
-            total_num_nodes_accounted +=
-                num_nodes_completed_trees[next_tree_idx_to_account];
-            next_tree_idx_to_account++;
+          current_num_trained_trees = ++num_trained_trees;
+
+          if (rf_config.total_max_num_nodes() > 0) {
+            concurrent_fields.num_nodes_completed_trees[tree_idx] =
+                decision_tree->NumNodes();
+            while (concurrent_fields.next_tree_idx_to_account <
+                       concurrent_fields.num_nodes_completed_trees.size() &&
+                   concurrent_fields.num_nodes_completed_trees
+                           [concurrent_fields.next_tree_idx_to_account] >= 0) {
+              concurrent_fields.total_num_nodes_accounted +=
+                  concurrent_fields.num_nodes_completed_trees
+                      [concurrent_fields.next_tree_idx_to_account];
+              concurrent_fields.next_tree_idx_to_account++;
+            }
           }
         }
 
@@ -733,11 +765,19 @@ RandomForestLearner::TrainWithStatus(
             last_oob_computation_num_trees = current_num_trained_trees;
             proto::OutOfBagTrainingEvaluations evaluation;
             evaluation.set_number_of_trees(current_num_trained_trees);
-            *evaluation.mutable_evaluation() = internal::EvaluateOOBPredictions(
+            auto evaluation_or = internal::EvaluateOOBPredictions(
                 train_dataset, mdl->task(), mdl->label_col_idx(),
                 mdl->uplift_treatment_col_idx(), mdl->weights(),
                 oob_predictions,
                 /*for_permutation_importance=*/false);
+            if (!evaluation_or.ok()) {
+              utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+              concurrent_fields.status.Update(evaluation_or.status());
+              return;
+            }
+
+            *evaluation.mutable_evaluation() = evaluation_or.value();
+
             mdl->mutable_out_of_bag_evaluations()->push_back(evaluation);
 
             // Print progress in the console.
@@ -749,9 +789,9 @@ RandomForestLearner::TrainWithStatus(
                                     bootstrap_size_ratio_factor);
             }
             if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
-              utils::concurrency::MutexLock lock2(&mutex_max_total_num_nodes);
+              utils::concurrency::MutexLock lock2(&concurrent_fields.mutex);
               absl::StrAppendFormat(&snippet, " model-size:%d bytes",
-                                    model_size_in_bytes);
+                                    concurrent_fields.model_size_in_bytes);
             }
             absl::StrAppendFormat(
                 &snippet, " (tree index:%d) done %s", tree_idx,
@@ -795,31 +835,43 @@ RandomForestLearner::TrainWithStatus(
         trees.end());
   }
 
-  if (rf_config.total_max_num_nodes() > 0 &&
-      total_num_nodes_accounted > rf_config.total_max_num_nodes()) {
-    // Keep the first trees such that the maximum number of nodes constraint is
-    // satisfied.
-    auto& trees = *mdl->mutable_decision_trees();
-    int num_trees_to_keep = 0;
-    int64_t num_nodes = 0;
-    while (num_trees_to_keep < trees.size() &&
-           num_nodes + num_nodes_completed_trees[num_trees_to_keep] <
-               rf_config.total_max_num_nodes()) {
-      num_nodes += num_nodes_completed_trees[num_trees_to_keep];
-      num_trees_to_keep++;
+  {
+    // Note: At this point, there are not concurrent workers running.
+    utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+
+    // Check for any pending failure during the training.
+    RETURN_IF_ERROR(concurrent_fields.status);
+
+    if (rf_config.total_max_num_nodes() > 0 &&
+        concurrent_fields.total_num_nodes_accounted >
+            rf_config.total_max_num_nodes()) {
+      // Keep the first trees such that the maximum number of nodes constraint
+      // is satisfied.
+      auto& trees = *mdl->mutable_decision_trees();
+      int num_trees_to_keep = 0;
+      int64_t num_nodes = 0;
+      while (num_trees_to_keep < trees.size() &&
+             num_nodes + concurrent_fields
+                             .num_nodes_completed_trees[num_trees_to_keep] <
+                 rf_config.total_max_num_nodes()) {
+        num_nodes +=
+            concurrent_fields.num_nodes_completed_trees[num_trees_to_keep];
+        num_trees_to_keep++;
+      }
+      if (num_trees_to_keep == 0) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The first tree alone exceeds the \"total_max_num_nodes\" "
+            "parameter with ",
+            concurrent_fields.num_nodes_completed_trees[0], ">",
+            rf_config.total_max_num_nodes(),
+            " nodes. Relax \"total_max_num_nodes\" or limit the "
+            "growth of the tree (e.g. maximum depth)"));
+      }
+      trees.erase(trees.begin() + num_trees_to_keep, trees.end());
+      LOG(INFO) << "Retaining the first " << num_trees_to_keep
+                << " trees to satisfy the "
+                   "\"total_max_num_nodes\" constraint.";
     }
-    if (num_trees_to_keep == 0) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "The first tree alone exceeds the \"total_max_num_nodes\" "
-          "parameter with ",
-          num_nodes_completed_trees[0], ">", rf_config.total_max_num_nodes(),
-          " nodes. Relax \"total_max_num_nodes\" or limit the "
-          "growth of the tree (e.g. maximum depth)"));
-    }
-    trees.erase(trees.begin() + num_trees_to_keep, trees.end());
-    LOG(INFO) << "Retaining the first " << num_trees_to_keep
-              << " trees to satisfy the "
-                 "\"total_max_num_nodes\" constraint.";
   }
 
   if (compute_oob_performances &&
@@ -831,9 +883,9 @@ RandomForestLearner::TrainWithStatus(
   }
 
   if (compute_oob_variable_importances) {
-    ComputeVariableImportancesFromAccumulatedPredictions(
+    RETURN_IF_ERROR(ComputeVariableImportancesFromAccumulatedPredictions(
         oob_predictions, oob_predictions_per_input_features, train_dataset,
-        mdl.get());
+        mdl.get()));
   }
 
   utils::usage::OnTrainingEnd(train_dataset.data_spec(), config_with_default,
@@ -955,7 +1007,7 @@ void UpdateOOBPredictionsWithNewTree(
   }
 }
 
-metric::proto::EvaluationResults EvaluateOOBPredictions(
+utils::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
     const int uplift_treatment_col_idx,
@@ -988,11 +1040,12 @@ metric::proto::EvaluationResults EvaluateOOBPredictions(
     eval_options.mutable_weights();
   }
 
-  const auto& label_colum_spec =
+  const auto& label_column_spec =
       train_dataset.data_spec().columns(label_col_idx);
   utils::RandomEngine rnd;
   metric::proto::EvaluationResults evaluation;
-  metric::InitializeEvaluation(eval_options, label_colum_spec, &evaluation);
+  RETURN_IF_ERROR(metric::InitializeEvaluation(eval_options, label_column_spec,
+                                               &evaluation));
   model::proto::Prediction prediction;
 
   for (dataset::VerticalDataset::row_t example_idx = 0;
@@ -1023,18 +1076,22 @@ metric::proto::EvaluationResults EvaluateOOBPredictions(
       default:
         LOG(WARNING) << "Not implemented";
     }
-    model::SetGroundTruth(
+    RETURN_IF_ERROR(model::SetGroundTruth(
         train_dataset, example_idx,
         model::GroundTruthColumnIndices(label_col_idx, model::kNoRankingGroup,
                                         uplift_treatment_col_idx),
-        eval_options.task(), &prediction);
+        eval_options.task(), &prediction));
     if (weight_links.has_value()) {
-      prediction.set_weight(
-          dataset::GetWeight(train_dataset, example_idx, weight_links.value()));
+      ASSIGN_OR_RETURN(auto weight,
+                       dataset::GetWeightWithStatus(train_dataset, example_idx,
+                                                    weight_links.value()));
+      prediction.set_weight(weight);
     }
-    metric::AddPrediction(eval_options, prediction, &rnd, &evaluation);
+    RETURN_IF_ERROR(
+        metric::AddPrediction(eval_options, prediction, &rnd, &evaluation));
   }
-  metric::FinalizeEvaluation(eval_options, label_colum_spec, &evaluation);
+  RETURN_IF_ERROR(
+      metric::FinalizeEvaluation(eval_options, label_column_spec, &evaluation));
   if (!for_permutation_importance &&
       evaluation.sampled_predictions_size() != 0) {
     LOG(WARNING) << "Internal error: Non empty oob evaluation";
@@ -1043,30 +1100,36 @@ metric::proto::EvaluationResults EvaluateOOBPredictions(
   return evaluation;
 }
 
-void ComputeVariableImportancesFromAccumulatedPredictions(
+absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
     const std::vector<internal::PredictionAccumulator>& oob_predictions,
     const std::vector<std::vector<internal::PredictionAccumulator>>&
         oob_predictions_per_input_features,
     const dataset::VerticalDataset& dataset, RandomForestModel* model) {
   // Note: "for_permutation_importance=true" allows to compute AUC, PR-AUC and
   // other expensive evaluation metrics.
-  const auto base_evaluation = EvaluateOOBPredictions(
-      dataset, model->task(), model->label_col_idx(),
-      model->uplift_treatment_col_idx(), model->weights(), oob_predictions,
-      /*for_permutation_importance=*/true);
+  ASSIGN_OR_RETURN(
+      const auto base_evaluation,
+      EvaluateOOBPredictions(dataset, model->task(), model->label_col_idx(),
+                             model->uplift_treatment_col_idx(),
+                             model->weights(), oob_predictions,
+                             /*for_permutation_importance=*/true));
+
   const auto permutation_evaluation = [&](const int feature_idx)
-      -> absl::optional<metric::proto::EvaluationResults> {
+      -> utils::StatusOr<absl::optional<metric::proto::EvaluationResults>> {
     if (oob_predictions_per_input_features[feature_idx].empty()) {
-      return {};
+      return absl::optional<metric::proto::EvaluationResults>{};
     }
-    return EvaluateOOBPredictions(
-        dataset, model->task(), model->label_col_idx(),
-        model->uplift_treatment_col_idx(), model->weights(),
-        oob_predictions_per_input_features[feature_idx],
-        /*for_permutation_importance=*/true);
+    ASSIGN_OR_RETURN(auto eval,
+                     EvaluateOOBPredictions(
+                         dataset, model->task(), model->label_col_idx(),
+                         model->uplift_treatment_col_idx(), model->weights(),
+                         oob_predictions_per_input_features[feature_idx],
+                         /*for_permutation_importance=*/true));
+    return eval;
   };
-  utils::ComputePermutationFeatureImportance(base_evaluation,
-                                             permutation_evaluation, model);
+
+  return utils::ComputePermutationFeatureImportance(
+      base_evaluation, permutation_evaluation, model);
 }
 
 void InitializeModelWithTrainingConfig(

@@ -47,7 +47,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-
 absl::Status MeanSquaredErrorLoss::Status() const {
   if (task_ != model::proto::Task::REGRESSION &&
       task_ != model::proto::Task::RANKING) {
@@ -64,9 +63,11 @@ utils::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
   // Note: The initial value is the weighted mean of the labels.
   double weighted_sum_values = 0;
   double sum_weights = 0;
-  const auto* labels =
-      dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          label_col_idx);
+  ASSIGN_OR_RETURN(
+      const auto* labels,
+      dataset
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+              label_col_idx));
   for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
     sum_weights += weights[example_idx];
     weighted_sum_values += weights[example_idx] * labels->values()[example_idx];
@@ -138,7 +139,7 @@ decision_tree::CreateSetLeafValueFunctor MeanSquaredErrorLoss::SetLeafFunctor(
       };
 }
 
-void MeanSquaredErrorLoss::SetLeaf(
+absl::Status MeanSquaredErrorLoss::SetLeaf(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
     const std::vector<float>& weights,
@@ -152,9 +153,11 @@ void MeanSquaredErrorLoss::SetLeaf(
 
   // Set the value of the leaf to be the residual:
   //   label[i] - prediction
-  const auto* labels =
-      train_dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          label_col_idx);
+  ASSIGN_OR_RETURN(
+      const auto* labels,
+      train_dataset
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+              label_col_idx));
   double sum_weighted_values = 0;
   double sum_weights = 0;
   for (const auto example_idx : selected_examples) {
@@ -173,6 +176,7 @@ void MeanSquaredErrorLoss::SetLeaf(
   node->mutable_node()->mutable_regressor()->set_top_value(
       gbt_config_.shrinkage() * sum_weighted_values /
       (sum_weights + gbt_config_.l2_regularization() / 2));
+  return absl::OkStatus();
 }
 
 utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
@@ -215,9 +219,9 @@ absl::Status MeanSquaredErrorLoss::Loss(
     utils::concurrency::ThreadPool* thread_pool) const {
   // The RMSE is also the loss.
   if (weights.empty()) {
-    *loss_value = metric::RMSE(labels, predictions);
+    ASSIGN_OR_RETURN(*loss_value, metric::RMSE(labels, predictions));
   } else {
-    *loss_value = metric::RMSE(labels, predictions, weights);
+    ASSIGN_OR_RETURN(*loss_value, metric::RMSE(labels, predictions, weights));
   }
 
   if (task_ == model::proto::Task::RANKING) {

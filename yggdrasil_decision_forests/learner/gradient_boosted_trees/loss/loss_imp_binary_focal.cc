@@ -273,9 +273,12 @@ void BinaryFocalLoss::SetLeaf(
   }
 
   // Set the value of the leaf to the sum(gradients) / sum(hessians)
+  // TODO(b/223183975): Update.
   const auto* labels =
-      train_dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          label_col_idx);
+      train_dataset
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(label_col_idx)
+          .value();
   double numerator = 0;
   double denominator = 0;
   double sum_weights = 0;

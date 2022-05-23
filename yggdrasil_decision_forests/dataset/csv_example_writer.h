@@ -53,7 +53,7 @@ class CsvExampleWriter final : public ExampleWriterInterface {
    public:
     explicit Implementation(const proto::DataSpecification& data_spec);
 
-    absl::Status CloseWithStatus() { return file_closer_.Close(); };
+    absl::Status CloseWithStatus() { return file_closer_.Close(); }
 
    protected:
     absl::Status OpenShard(absl::string_view path) final;
@@ -74,13 +74,6 @@ class CsvExampleWriter final : public ExampleWriterInterface {
 };
 
 REGISTER_ExampleWriterInterface(CsvExampleWriter, "FORMAT_CSV");
-
-// Converts a proto::Example into an array of string that can be saved in a csv
-// file. The output "csv_fields[i]" is the string representation of the "i-th"
-// column of "example".
-void ExampleToCsvRow(const proto::Example& example,
-                     const proto::DataSpecification& data_spec,
-                     std::vector<std::string>* csv_fields);
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

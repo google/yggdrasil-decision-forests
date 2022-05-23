@@ -329,8 +329,9 @@ absl::Status PruneTreeClassification(
     model::decision_tree::DecisionTree* tree) {
   const auto& labels =
       dataset
-          .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              config_link.label())
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(config_link.label())
+          .value()
           ->values();
 
   class AccuracyAccumulator {
@@ -368,8 +369,9 @@ absl::Status PruneTreeRegression(
     model::decision_tree::DecisionTree* tree) {
   const auto& labels =
       dataset
-          .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               config_link.label())
+          .value()
           ->values();
 
   class NegMSEAccumulator {
@@ -408,15 +410,17 @@ absl::Status PruneTreeUpliftCategorical(
     model::decision_tree::DecisionTree* tree) {
   const auto& outcomes =
       dataset
-          .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              config_link.label())
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(config_link.label())
+          .value()
           ->values();
 
-  const auto& treatments =
-      dataset
-          .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              config_link.uplift_treatment())
-          ->values();
+  const auto& treatments = dataset
+                               .ColumnWithCastWithStatus<
+                                   dataset::VerticalDataset::CategoricalColumn>(
+                                   config_link.uplift_treatment())
+                               .value()
+                               ->values();
 
   class UpliftAccumulator {
    public:
@@ -434,7 +438,8 @@ absl::Status PruneTreeUpliftCategorical(
       options_.mutable_weights();
       outcome_column_.set_type(dataset::proto::ColumnType::CATEGORICAL);
       outcome_column_.mutable_categorical()->set_number_of_unique_values(3);
-      metric::InitializeEvaluation(options_, outcome_column_, &evaluation_);
+      CHECK_OK(metric::InitializeEvaluation(options_, outcome_column_,
+                                            &evaluation_));
     }
 
     void Add(const int32_t outcome, const int32_t treatment,
@@ -447,7 +452,8 @@ absl::Status PruneTreeUpliftCategorical(
       uplift_pred.set_treatment(treatment);
       *uplift_pred.mutable_treatment_effect() = {prediction.begin(),
                                                  prediction.end()};
-      metric::AddPrediction(options_, proto_pred, &rnd_, &evaluation_);
+      CHECK_OK(
+          metric::AddPrediction(options_, proto_pred, &rnd_, &evaluation_));
     }
 
     float Score() {
@@ -456,7 +462,8 @@ absl::Status PruneTreeUpliftCategorical(
         return 0;
       }
 
-      metric::FinalizeEvaluation(options_, outcome_column_, &evaluation_);
+      CHECK_OK(
+          metric::FinalizeEvaluation(options_, outcome_column_, &evaluation_));
       return metric::AUUC(evaluation_);
     }
 

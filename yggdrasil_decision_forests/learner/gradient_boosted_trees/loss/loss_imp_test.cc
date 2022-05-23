@@ -50,10 +50,10 @@ dataset::VerticalDataset CreateToyDataset() {
     }
   )pb");
   CHECK_OK(dataset.CreateColumnsFromDataspec());
-  dataset.AppendExample({{"a", "1"}, {"b", "1"}});
-  dataset.AppendExample({{"a", "2"}, {"b", "2"}});
-  dataset.AppendExample({{"a", "3"}, {"b", "1"}});
-  dataset.AppendExample({{"a", "4"}, {"b", "2"}});
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "1"}, {"b", "1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "2"}, {"b", "2"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "3"}, {"b", "1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "2"}}));
   return dataset;
 }
 
@@ -313,9 +313,9 @@ TEST(GradientBoostedTrees, SetLabelDistributionSquaredError) {
   config_link.set_label(2);  // Gradient column.
 
   decision_tree::NodeWithChildren node;
-  loss_imp.SetLeaf(gradient_dataset, selected_examples, weights, config,
-                   config_link, predictions,
-                   /* label_col_idx= */ 0, &node);
+  CHECK_OK(loss_imp.SetLeaf(gradient_dataset, selected_examples, weights,
+                            config, config_link, predictions,
+                            /* label_col_idx= */ 0, &node));
 
   EXPECT_EQ(node.node().regressor().top_value(), 2.5f);  // Mean of the labels.
   // Distribution of the gradients:

@@ -55,4 +55,14 @@ inline ::tensorflow::Status FromUtilStatus(const absl::Status& s) {
   TF_RETURN_IF_ERROR(::yggdrasil_decision_forests::utils::FromUtilStatus(expr))
 #endif
 
+// "ASSIGN_OR_RETURN" on a function returning an absl::Status and a context
+// expecting a tensorflow::Status.
+#define TF_ASSIGN_OR_RETURN_FROM_ABSL_STATUS(lhs, rexpr)        \
+  auto tmpvar = (rexpr);                                        \
+  if (ABSL_PREDICT_FALSE(!tmpvar.ok())) {                       \
+    return ::yggdrasil_decision_forests::utils::FromUtilStatus( \
+        tmpvar.status());                                       \
+  }                                                             \
+  lhs = std::move(tmpvar).value()
+
 #endif  // THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_TENSORFLOW_H_

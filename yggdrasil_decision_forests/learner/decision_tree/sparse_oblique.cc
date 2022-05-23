@@ -173,12 +173,13 @@ class ProjectionEvaluator {
         *std::max_element(numerical_features.begin(), numerical_features.end());
     numerical_attributes_.assign(max_feature_idx + 1, nullptr);
     for (const auto attribute_idx : numerical_features) {
-      const std::vector<float>* values =
-          &train_dataset
-               .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                   attribute_idx)
-               ->values();
-      numerical_attributes_[attribute_idx] = values;
+      // TODO(b/223183975): Update.
+      const auto* column =
+          train_dataset
+              .ColumnWithCastWithStatus<
+                  dataset::VerticalDataset::NumericalColumn>(attribute_idx)
+              .value();
+      numerical_attributes_[attribute_idx] = &column->values();
     }
   }
 

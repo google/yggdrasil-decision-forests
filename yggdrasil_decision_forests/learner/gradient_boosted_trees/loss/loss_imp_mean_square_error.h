@@ -82,7 +82,7 @@ class MeanSquaredErrorLoss : public AbstractLoss {
       const std::vector<GradientData>& gradients,
       int label_col_idx) const override;
 
-  void SetLeaf(
+  absl::Status SetLeaf(
       const dataset::VerticalDataset& train_dataset,
       const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
       const std::vector<float>& weights,

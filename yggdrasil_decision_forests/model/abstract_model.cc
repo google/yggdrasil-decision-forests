@@ -56,6 +56,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -117,46 +118,69 @@ metric::proto::EvaluationResults AbstractModel::Evaluate(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
     std::vector<model::proto::Prediction>* predictions) const {
-  CHECK_EQ(option.task(), task())
-      << "The evaluation and the model tasks differ.";
-  metric::proto::EvaluationResults eval;
-  metric::InitializeEvaluation(option, LabelColumnSpec(), &eval);
-  AppendEvaluation(dataset, option, rnd, &eval, predictions);
-  metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval);
-  return eval;
+  // TODO(223183975): Fix.
+  return EvaluateWithStatus(dataset, option, rnd, predictions).value();
 }
 
 metric::proto::EvaluationResults AbstractModel::Evaluate(
     const absl::string_view typed_path,
     const metric::proto::EvaluationOptions& option,
     utils::RandomEngine* rnd) const {
+  // TODO(223183975): Fix.
+  return EvaluateWithStatus(typed_path, option, rnd).value();
+}
+
+utils::StatusOr<metric::proto::EvaluationResults>
+AbstractModel::EvaluateWithStatus(
+    const dataset::VerticalDataset& dataset,
+    const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
+    std::vector<model::proto::Prediction>* predictions) const {
   CHECK_EQ(option.task(), task())
       << "The evaluation and the model tasks differ.";
   metric::proto::EvaluationResults eval;
-  metric::InitializeEvaluation(option, LabelColumnSpec(), &eval);
-  AppendEvaluation(typed_path, option, rnd, &eval);
-  metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval);
+  RETURN_IF_ERROR(
+      metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(AppendEvaluation(dataset, option, rnd, &eval, predictions));
+  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
   return eval;
 }
 
-metric::proto::EvaluationResults AbstractModel::EvaluateOverrideType(
+utils::StatusOr<metric::proto::EvaluationResults>
+AbstractModel::EvaluateWithStatus(
+    const absl::string_view typed_path,
+    const metric::proto::EvaluationOptions& option,
+    utils::RandomEngine* rnd) const {
+  CHECK_EQ(option.task(), task())
+      << "The evaluation and the model tasks differ.";
+  metric::proto::EvaluationResults eval;
+  RETURN_IF_ERROR(
+      metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(AppendEvaluation(typed_path, option, rnd, &eval));
+  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
+  return eval;
+}
+
+utils::StatusOr<metric::proto::EvaluationResults>
+AbstractModel::EvaluateOverrideType(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option,
     const proto::Task override_task, const int override_label_col_idx,
     const int override_group_col_idx, utils::RandomEngine* rnd,
     std::vector<model::proto::Prediction>* predictions) const {
-  CHECK_EQ(option.task(), override_task)
-      << "The evaluation and the model tasks differ.";
+  if (option.task() == override_task) {
+    STATUS_FATAL("The evaluation and the model tasks differ.");
+  }
   metric::proto::EvaluationResults eval;
-  metric::InitializeEvaluation(option, LabelColumnSpec(), &eval);
-  AppendEvaluationOverrideType(dataset, option, override_task,
-                               override_label_col_idx, override_group_col_idx,
-                               rnd, &eval, predictions);
-  metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval);
+  RETURN_IF_ERROR(
+      metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(AppendEvaluationOverrideType(
+      dataset, option, override_task, override_label_col_idx,
+      override_group_col_idx, rnd, &eval, predictions));
+  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
   return eval;
 }
 
-void AbstractModel::AppendPredictions(
+absl::Status AbstractModel::AppendPredictions(
     const dataset::VerticalDataset& dataset, const bool add_ground_truth,
     std::vector<model::proto::Prediction>* predictions) const {
   proto::Prediction prediction;
@@ -166,10 +190,11 @@ void AbstractModel::AppendPredictions(
                                << " predictions generated.");
     Predict(dataset, test_row_idx, &prediction);
     if (add_ground_truth) {
-      SetGroundTruth(dataset, test_row_idx, &prediction);
+      RETURN_IF_ERROR(SetGroundTruth(dataset, test_row_idx, &prediction));
     }
     predictions->push_back(prediction);
   }
+  return absl::OkStatus();
 }
 
 void FloatToProtoPrediction(const std::vector<float>& src_prediction,
@@ -178,7 +203,7 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
                             proto::Prediction* dst_prediction) {
   switch (task) {
     case proto::UNDEFINED:
-      LOG(FATAL) << "Undefined task";
+      LOG(WARNING) << "Undefined task";
       break;
     case proto::CLASSIFICATION: {
       auto* classification = dst_prediction->mutable_classification();
@@ -235,7 +260,7 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
   }
 }
 
-void AbstractModel::AppendEvaluationWithEngine(
+absl::Status AbstractModel::AppendEvaluationWithEngine(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option,
     const dataset::proto::LinkedWeightDefinition& weight_links,
@@ -261,7 +286,7 @@ void AbstractModel::AppendEvaluationWithEngine(
     const int64_t end_example_idx =
         std::min(begin_example_idx + batch_size, total_num_examples);
     const int effective_batch_size = end_example_idx - begin_example_idx;
-    CHECK_OK(CopyVerticalDatasetToAbstractExampleSet(
+    RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
         dataset, begin_example_idx, end_example_idx, engine_features,
         batch_of_examples.get()));
     engine.Predict(*batch_of_examples, effective_batch_size,
@@ -270,36 +295,40 @@ void AbstractModel::AppendEvaluationWithEngine(
          sub_example_idx++) {
       FloatToProtoPrediction(batch_of_predictions, sub_example_idx, task(),
                              num_prediction_dimensions, &prediction);
-      SetGroundTruth(dataset, begin_example_idx + sub_example_idx, &prediction);
+      RETURN_IF_ERROR(SetGroundTruth(
+          dataset, begin_example_idx + sub_example_idx, &prediction));
       if (option.has_weights()) {
-        const float weight = dataset::GetWeight(
-            dataset, begin_example_idx + sub_example_idx, weight_links);
+        ASSIGN_OR_RETURN(
+            const float weight,
+            dataset::GetWeightWithStatus(
+                dataset, begin_example_idx + sub_example_idx, weight_links));
         prediction.set_weight(weight);
       }
-      metric::AddPrediction(option, prediction, rnd, eval);
+      RETURN_IF_ERROR(metric::AddPrediction(option, prediction, rnd, eval));
       if (predictions) {
         predictions->push_back(prediction);
       }
     }
   }
+  return absl::OkStatus();
 }
 
-void AbstractModel::AppendEvaluation(
+absl::Status AbstractModel::AppendEvaluation(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
     metric::proto::EvaluationResults* eval,
     std::vector<model::proto::Prediction>* predictions) const {
   dataset::proto::LinkedWeightDefinition weight_links;
   if (option.has_weights()) {
-    CHECK_OK(dataset::GetLinkedWeightDefinition(option.weights(), data_spec_,
-                                                &weight_links));
+    RETURN_IF_ERROR(dataset::GetLinkedWeightDefinition(
+        option.weights(), data_spec_, &weight_links));
   }
 
   auto engine_or_status = BuildFastEngine();
   if (engine_or_status.ok()) {
-    AppendEvaluationWithEngine(dataset, option, weight_links,
-                               *engine_or_status.value(), rnd, predictions,
-                               eval);
+    RETURN_IF_ERROR(AppendEvaluationWithEngine(dataset, option, weight_links,
+                                               *engine_or_status.value(), rnd,
+                                               predictions, eval));
   } else {
     // Evaluate using the (slow) generic inference.
 
@@ -309,13 +338,14 @@ void AbstractModel::AppendEvaluation(
       LOG_INFO_EVERY_N_SEC(30, _ << (test_row_idx + 1) << "/" << dataset.nrow()
                                  << " predictions evaluated.");
       Predict(dataset, test_row_idx, &prediction);
-      SetGroundTruth(dataset, test_row_idx, &prediction);
+      RETURN_IF_ERROR(SetGroundTruth(dataset, test_row_idx, &prediction));
       if (option.has_weights()) {
-        const float weight =
-            dataset::GetWeight(dataset, test_row_idx, weight_links);
+        ASSIGN_OR_RETURN(
+            const float weight,
+            dataset::GetWeightWithStatus(dataset, test_row_idx, weight_links));
         prediction.set_weight(weight);
       }
-      metric::AddPrediction(option, prediction, rnd, eval);
+      RETURN_IF_ERROR(metric::AddPrediction(option, prediction, rnd, eval));
       if (predictions) {
         predictions->push_back(prediction);
       }
@@ -323,16 +353,17 @@ void AbstractModel::AppendEvaluation(
   }
 
   eval->set_num_folds(eval->num_folds() + 1);
+  return absl::OkStatus();
 }
 
-void AbstractModel::AppendEvaluation(
+absl::Status AbstractModel::AppendEvaluation(
     const absl::string_view typed_path,
     const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
     metric::proto::EvaluationResults* eval) const {
   dataset::proto::LinkedWeightDefinition weight_links;
   if (option.has_weights()) {
-    CHECK_OK(dataset::GetLinkedWeightDefinition(option.weights(), data_spec_,
-                                                &weight_links));
+    RETURN_IF_ERROR(dataset::GetLinkedWeightDefinition(
+        option.weights(), data_spec_, &weight_links));
   }
 
   auto engine_or_status = BuildFastEngine();
@@ -342,56 +373,80 @@ void AbstractModel::AppendEvaluation(
     std::string path, prefix;
     std::tie(prefix, path) = dataset::SplitTypeAndPath(typed_path).value();
     std::vector<std::string> shards;
-    CHECK_OK(utils::ExpandInputShards(path, &shards));
+    RETURN_IF_ERROR(utils::ExpandInputShards(path, &shards));
 
     // Evaluate each shard in a separate thread.
-    {
-      utils::concurrency::Mutex
-          mutex;  // Guards "num_evaluated_shards" and "eval".
-      int num_evaluated_shards = 0;
+    utils::concurrency::Mutex
+        mutex;  // Guards "num_evaluated_shards" and "eval".
+    int num_evaluated_shards = 0;
+    absl::Status worker_status;
 
+    const auto process_shard = [&option, eval, &mutex, &prefix, &engine,
+                                &weight_links, &num_evaluated_shards, &shards,
+                                this](absl::string_view shard,
+                                      int sub_rnd_seed) -> absl::Status {
+      utils::RandomEngine sub_rnd(sub_rnd_seed);
+
+      dataset::VerticalDataset dataset;
+      RETURN_IF_ERROR(dataset::LoadVerticalDataset(
+          absl::StrCat(prefix, ":", shard), data_spec_, &dataset));
+
+      metric::proto::EvaluationResults sub_evaluation;
+      RETURN_IF_ERROR(metric::InitializeEvaluation(option, LabelColumnSpec(),
+                                                   &sub_evaluation));
+
+      RETURN_IF_ERROR(AppendEvaluationWithEngine(dataset, option, weight_links,
+                                                 *engine, &sub_rnd, nullptr,
+                                                 &sub_evaluation));
+
+      utils::concurrency::MutexLock lock(&mutex);
+      RETURN_IF_ERROR(metric::MergeEvaluation(option, sub_evaluation, eval));
+      num_evaluated_shards++;
+      LOG_INFO_EVERY_N_SEC(30, _ << num_evaluated_shards << "/" << shards.size()
+                                 << " shards evaluated");
+      return absl::OkStatus();
+    };
+
+    {
       const int num_threads = std::min<int>(shards.size(), 20);
       utils::concurrency::ThreadPool thread_pool("evaluation", num_threads);
       thread_pool.StartWorkers();
       for (const auto& shard : shards) {
-        thread_pool.Schedule([&option, eval, &mutex, &shard, &prefix, &engine,
-                              &weight_links, sub_rnd_seed = (*rnd)(),
-                              &num_evaluated_shards, &shards, this]() {
-          utils::RandomEngine sub_rnd(sub_rnd_seed);
-
-          dataset::VerticalDataset dataset;
-          CHECK_OK(dataset::LoadVerticalDataset(
-              absl::StrCat(prefix, ":", shard), data_spec_, &dataset));
-
-          metric::proto::EvaluationResults sub_evaluation;
-          metric::InitializeEvaluation(option, LabelColumnSpec(),
-                                       &sub_evaluation);
-
-          AppendEvaluationWithEngine(dataset, option, weight_links, *engine,
-                                     &sub_rnd, nullptr, &sub_evaluation);
-
-          utils::concurrency::MutexLock lock(&mutex);
-          metric::MergeEvaluation(option, sub_evaluation, eval);
-          num_evaluated_shards++;
-          LOG_INFO_EVERY_N_SEC(30, _ << num_evaluated_shards << "/"
-                                     << shards.size() << " shards evaluated");
+        thread_pool.Schedule([&shard, &mutex, &process_shard, &worker_status,
+                              sub_rnd_seed = (*rnd)()]() -> void {
+          {
+            utils::concurrency::MutexLock lock(&mutex);
+            if (!worker_status.ok()) {
+              return;
+            }
+          }
+          auto sub_status = process_shard(shard, sub_rnd_seed);
+          {
+            utils::concurrency::MutexLock lock(&mutex);
+            worker_status.Update(sub_status);
+          }
         });
       }
     }
+
+    RETURN_IF_ERROR(worker_status);
+
   } else {
     // Evaluate using the (slow) generic inference.
     LOG(WARNING)
         << "Evaluation with the slow generic engine without distribution";
     dataset::VerticalDataset dataset;
-    CHECK_OK(dataset::LoadVerticalDataset(typed_path, data_spec_, &dataset));
-    AppendEvaluation(dataset, option, rnd, eval);
-    return;
+    RETURN_IF_ERROR(
+        dataset::LoadVerticalDataset(typed_path, data_spec_, &dataset));
+    RETURN_IF_ERROR(AppendEvaluation(dataset, option, rnd, eval));
+    return absl::OkStatus();
   }
 
   eval->set_num_folds(eval->num_folds() + 1);
+  return absl::OkStatus();
 }
 
-void AbstractModel::AppendEvaluationOverrideType(
+absl::Status AbstractModel::AppendEvaluationOverrideType(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option,
     const proto::Task override_task, const int override_label_col_idx,
@@ -400,8 +455,8 @@ void AbstractModel::AppendEvaluationOverrideType(
     std::vector<model::proto::Prediction>* predictions) const {
   dataset::proto::LinkedWeightDefinition weight_links;
   if (option.has_weights()) {
-    CHECK_OK(dataset::GetLinkedWeightDefinition(option.weights(), data_spec_,
-                                                &weight_links));
+    RETURN_IF_ERROR(dataset::GetLinkedWeightDefinition(
+        option.weights(), data_spec_, &weight_links));
   }
   proto::Prediction original_prediction;
   proto::Prediction overridden_prediction;
@@ -427,7 +482,7 @@ void AbstractModel::AppendEvaluationOverrideType(
       const int64_t end_example_idx =
           std::min(begin_example_idx + batch_size, total_num_examples);
       const int effective_batch_size = end_example_idx - begin_example_idx;
-      CHECK_OK(CopyVerticalDatasetToAbstractExampleSet(
+      RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
           dataset, begin_example_idx, end_example_idx, engine_features,
           batch_of_examples.get()));
       engine->Predict(*batch_of_examples, effective_batch_size,
@@ -436,20 +491,24 @@ void AbstractModel::AppendEvaluationOverrideType(
            sub_example_idx++) {
         FloatToProtoPrediction(batch_of_predictions, sub_example_idx, task(),
                                num_prediction_dimensions, &original_prediction);
-        ChangePredictionType(task(), override_task, original_prediction,
-                             &overridden_prediction);
-        model::SetGroundTruth(
+        RETURN_IF_ERROR(ChangePredictionType(task(), override_task,
+                                             original_prediction,
+                                             &overridden_prediction));
+        RETURN_IF_ERROR(model::SetGroundTruth(
             dataset, begin_example_idx + sub_example_idx,
             model::GroundTruthColumnIndices(override_label_col_idx,
                                             override_group_col_idx,
                                             uplift_treatment_col_idx_),
-            override_task, &overridden_prediction);
+            override_task, &overridden_prediction));
         if (option.has_weights()) {
-          const float weight = dataset::GetWeight(
-              dataset, begin_example_idx + sub_example_idx, weight_links);
+          ASSIGN_OR_RETURN(
+              const float weight,
+              dataset::GetWeightWithStatus(
+                  dataset, begin_example_idx + sub_example_idx, weight_links));
           overridden_prediction.set_weight(weight);
         }
-        metric::AddPrediction(option, overridden_prediction, rnd, eval);
+        RETURN_IF_ERROR(
+            metric::AddPrediction(option, overridden_prediction, rnd, eval));
         if (predictions) {
           predictions->push_back(overridden_prediction);
         }
@@ -461,36 +520,41 @@ void AbstractModel::AppendEvaluationOverrideType(
       LOG_INFO_EVERY_N_SEC(30, _ << (test_row_idx + 1) << "/" << dataset.nrow()
                                  << " predictions evaluated.");
       Predict(dataset, test_row_idx, &original_prediction);
-      ChangePredictionType(task(), override_task, original_prediction,
-                           &overridden_prediction);
-      model::SetGroundTruth(dataset, test_row_idx,
-                            model::GroundTruthColumnIndices(
-                                override_label_col_idx, override_group_col_idx,
-                                uplift_treatment_col_idx_),
-                            override_task, &overridden_prediction);
+      RETURN_IF_ERROR(ChangePredictionType(
+          task(), override_task, original_prediction, &overridden_prediction));
+      RETURN_IF_ERROR(model::SetGroundTruth(
+          dataset, test_row_idx,
+          model::GroundTruthColumnIndices(override_label_col_idx,
+                                          override_group_col_idx,
+                                          uplift_treatment_col_idx_),
+          override_task, &overridden_prediction));
       if (option.has_weights()) {
-        const float weight =
-            dataset::GetWeight(dataset, test_row_idx, weight_links);
+        ASSIGN_OR_RETURN(
+            const float weight,
+            dataset::GetWeightWithStatus(dataset, test_row_idx, weight_links));
         overridden_prediction.set_weight(weight);
       }
-      metric::AddPrediction(option, overridden_prediction, rnd, eval);
+      RETURN_IF_ERROR(
+          metric::AddPrediction(option, overridden_prediction, rnd, eval));
       if (predictions) {
         predictions->push_back(overridden_prediction);
       }
     }
   }
+  return absl::OkStatus();
 }
 
-void ChangePredictionType(proto::Task src_task, proto::Task dst_task,
-                          const proto::Prediction& src_pred,
-                          proto::Prediction* dst_pred) {
+absl::Status ChangePredictionType(proto::Task src_task, proto::Task dst_task,
+                                  const proto::Prediction& src_pred,
+                                  proto::Prediction* dst_pred) {
   if (src_task == dst_task) {
     *dst_pred = src_pred;
   } else if (src_task == proto::Task::CLASSIFICATION &&
              dst_task == proto::Task::RANKING) {
     if (src_pred.classification().distribution().counts_size() != 3) {
-      LOG(FATAL) << "Conversion CLASSIFICATION -> RANKING only possible for "
-                    "binary classification.";
+      STATUS_FATAL(
+          "Conversion CLASSIFICATION -> RANKING only possible for "
+          "binary classification.");
     }
     dst_pred->mutable_ranking()->set_relevance(
         src_pred.classification().distribution().counts(2) /
@@ -502,61 +566,71 @@ void ChangePredictionType(proto::Task src_task, proto::Task dst_task,
              dst_task == proto::Task::REGRESSION) {
     dst_pred->mutable_regression()->set_value(src_pred.ranking().relevance());
   } else {
-    LOG(FATAL) << "Non supported override of task from "
-               << proto::Task_Name(src_task) << " to "
-               << proto::Task_Name(dst_task);
+    STATUS_FATALS("Non supported override of task from ",
+                  proto::Task_Name(src_task), " to ",
+                  proto::Task_Name(dst_task));
   }
+  return absl::OkStatus();
 }
 
-void AbstractModel::SetGroundTruth(const dataset::VerticalDataset& dataset,
-                                   dataset::VerticalDataset::row_t row_idx,
-                                   proto::Prediction* prediction) const {
-  model::SetGroundTruth(
+absl::Status AbstractModel::SetGroundTruth(
+    const dataset::VerticalDataset& dataset,
+    dataset::VerticalDataset::row_t row_idx,
+    proto::Prediction* prediction) const {
+  return model::SetGroundTruth(
       dataset, row_idx,
       GroundTruthColumnIndices(label_col_idx_, ranking_group_col_idx_,
                                uplift_treatment_col_idx_),
       task_, prediction);
 }
 
-void AbstractModel::SetGroundTruth(const dataset::proto::Example& example,
-                                   proto::Prediction* prediction) const {
-  model::SetGroundTruth(
+absl::Status AbstractModel::SetGroundTruth(
+    const dataset::proto::Example& example,
+    proto::Prediction* prediction) const {
+  return model::SetGroundTruth(
       example,
       GroundTruthColumnIndices(label_col_idx_, ranking_group_col_idx_,
                                uplift_treatment_col_idx_),
       task_, prediction);
 }
 
-void SetGroundTruth(const dataset::VerticalDataset& dataset,
-                    const dataset::VerticalDataset::row_t row_idx,
-                    const GroundTruthColumnIndices& columns,
-                    const proto::Task task, proto::Prediction* prediction) {
+absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
+                            const dataset::VerticalDataset::row_t row_idx,
+                            const GroundTruthColumnIndices& columns,
+                            const proto::Task task,
+                            proto::Prediction* prediction) {
   switch (task) {
     case proto::Task::CLASSIFICATION: {
-      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
-      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
-      const auto* classification_labels =
-          dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              columns.label_col_idx);
+      STATUS_CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      STATUS_CHECK_EQ(columns.uplift_treatment_col_idx,
+                      kNoUpliftTreatmentGroup);
+      ASSIGN_OR_RETURN(const auto* classification_labels,
+                       dataset.ColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(
+                           columns.label_col_idx));
       prediction->mutable_classification()->set_ground_truth(
           classification_labels->values()[row_idx]);
     } break;
     case proto::Task::REGRESSION: {
-      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
-      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
-      const auto* regression_labels =
-          dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-              columns.label_col_idx);
+      STATUS_CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      STATUS_CHECK_EQ(columns.uplift_treatment_col_idx,
+                      kNoUpliftTreatmentGroup);
+      ASSIGN_OR_RETURN(const auto* regression_labels,
+                       dataset.ColumnWithCastWithStatus<
+                           dataset::VerticalDataset::NumericalColumn>(
+                           columns.label_col_idx));
       prediction->mutable_regression()->set_ground_truth(
           regression_labels->values()[row_idx]);
     } break;
     case proto::Task::RANKING: {
-      CHECK_NE(columns.group_col_idx, kNoRankingGroup);
-      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
+      STATUS_CHECK_NE(columns.group_col_idx, kNoRankingGroup);
+      STATUS_CHECK_EQ(columns.uplift_treatment_col_idx,
+                      kNoUpliftTreatmentGroup);
 
-      const auto* ranking_labels =
-          dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-              columns.label_col_idx);
+      ASSIGN_OR_RETURN(const auto* ranking_labels,
+                       dataset.ColumnWithCastWithStatus<
+                           dataset::VerticalDataset::NumericalColumn>(
+                           columns.label_col_idx));
       prediction->mutable_ranking()->set_ground_truth_relevance(
           ranking_labels->values()[row_idx]);
 
@@ -572,23 +646,32 @@ void SetGroundTruth(const dataset::VerticalDataset& dataset,
         prediction->mutable_ranking()->set_group_id(
             hash_groups->values()[row_idx]);
       } else {
-        LOG(FATAL) << "The group attribute should be CATEGORICAL or HASH";
+        STATUS_FATAL("The group attribute should be CATEGORICAL or HASH");
       }
     } break;
     case proto::Task::CATEGORICAL_UPLIFT: {
-      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
-      CHECK_NE(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
-      const auto& categorical_outcomes =
-          dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              columns.label_col_idx);
-      prediction->mutable_uplift()->set_outcome_categorical(
-          categorical_outcomes->values()[row_idx]);
-      const auto& treatments =
-          dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-                  columns.uplift_treatment_col_idx)
-              ->values();
-      prediction->mutable_uplift()->set_treatment(treatments[row_idx]);
+      STATUS_CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      STATUS_CHECK_NE(columns.uplift_treatment_col_idx,
+                      kNoUpliftTreatmentGroup);
+      const auto& numerical_outcomes = dataset.ColumnWithCastOrNull<
+          dataset::VerticalDataset::CategoricalColumn>(columns.label_col_idx);
+      const auto& categorical_outcomes = dataset.ColumnWithCastOrNull<
+          dataset::VerticalDataset::CategoricalColumn>(columns.label_col_idx);
+      if (categorical_outcomes != nullptr) {
+        prediction->mutable_uplift()->set_outcome_categorical(
+            categorical_outcomes->values()[row_idx]);
+      } else if (numerical_outcomes != nullptr) {
+        prediction->mutable_uplift()->set_outcome_numerical(
+            numerical_outcomes->values()[row_idx]);
+      } else {
+        STATUS_FATAL("Not supported outcome type");
+      }
+      ASSIGN_OR_RETURN(const auto& treatments,
+                       dataset.ColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(
+                           columns.uplift_treatment_col_idx));
+      prediction->mutable_uplift()->set_treatment(
+          treatments->values()[row_idx]);
     } break;
 
     case proto::Task::NUMERICAL_UPLIFT: {
@@ -608,30 +691,34 @@ void SetGroundTruth(const dataset::VerticalDataset& dataset,
     } break;
 
     default:
-      LOG(FATAL) << "Non supported task.";
+      STATUS_FATAL("Non supported task.");
       break;
   }
+  return absl::OkStatus();
 }
 
-void SetGroundTruth(const dataset::proto::Example& example,
-                    const GroundTruthColumnIndices& columns, proto::Task task,
-                    proto::Prediction* prediction) {
+absl::Status SetGroundTruth(const dataset::proto::Example& example,
+                            const GroundTruthColumnIndices& columns,
+                            proto::Task task, proto::Prediction* prediction) {
   switch (task) {
     case proto::Task::CLASSIFICATION: {
-      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
-      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
+      STATUS_CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      STATUS_CHECK_EQ(columns.uplift_treatment_col_idx,
+                      kNoUpliftTreatmentGroup);
       prediction->mutable_classification()->set_ground_truth(
           example.attributes(columns.label_col_idx).categorical());
     } break;
     case proto::Task::REGRESSION: {
-      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
-      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
+      STATUS_CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      STATUS_CHECK_EQ(columns.uplift_treatment_col_idx,
+                      kNoUpliftTreatmentGroup);
       prediction->mutable_regression()->set_ground_truth(
           example.attributes(columns.label_col_idx).numerical());
     } break;
     case proto::Task::RANKING: {
-      CHECK_NE(columns.group_col_idx, kNoRankingGroup);
-      CHECK_EQ(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
+      STATUS_CHECK_NE(columns.group_col_idx, kNoRankingGroup);
+      STATUS_CHECK_EQ(columns.uplift_treatment_col_idx,
+                      kNoUpliftTreatmentGroup);
       prediction->mutable_ranking()->set_ground_truth_relevance(
           example.attributes(columns.label_col_idx).numerical());
       const auto& group_value = example.attributes(columns.group_col_idx);
@@ -645,14 +732,15 @@ void SetGroundTruth(const dataset::proto::Example& example,
               example.attributes(columns.group_col_idx).hash());
           break;
         default:
-          LOG(FATAL) << "The group attribute should be CATEGORICAL or HASH";
+          STATUS_FATAL("The group attribute should be CATEGORICAL or HASH");
           break;
       }
     } break;
     default:
-      LOG(FATAL) << "Non supported task.";
+      STATUS_FATAL("Non supported task.");
       break;
   }
+  return absl::OkStatus();
 }
 
 std::string AbstractModel::DescriptionAndStatistics(
@@ -902,7 +990,7 @@ void AppendVariableImportanceDescription(
 }
 
 metric::proto::EvaluationResults AbstractModel::ValidationEvaluation() const {
-  LOG(FATAL) << "Validation evaluation not supported for " << name();
+  LOG(WARNING) << "Validation evaluation not supported for " << name();
   return {};
 }
 

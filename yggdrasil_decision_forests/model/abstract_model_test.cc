@@ -273,8 +273,8 @@ TEST(ChangePredictionType, ClassificationToRanking) {
                distribution { counts: 0 counts: 1 counts: 3 sum: 4 }
              })pb");
     proto::Prediction dst_pred;
-    ChangePredictionType(proto::Task::CLASSIFICATION, proto::Task::RANKING,
-                         src_pred, &dst_pred);
+    CHECK_OK(ChangePredictionType(proto::Task::CLASSIFICATION,
+                                  proto::Task::RANKING, src_pred, &dst_pred));
     EXPECT_THAT(dst_pred, EqualsProto(utils::ParseTextProto<proto::Prediction>(
                                           R"(ranking { relevance: 0.75 })")
                                           .value()));
@@ -284,8 +284,8 @@ TEST(ChangePredictionType, ClassificationToRanking) {
     const proto::Prediction src_pred =
         PARSE_TEST_PROTO(R"pb(regression { value: 5 })pb");
     proto::Prediction dst_pred;
-    ChangePredictionType(proto::Task::REGRESSION, proto::Task::RANKING,
-                         src_pred, &dst_pred);
+    CHECK_OK(ChangePredictionType(proto::Task::REGRESSION, proto::Task::RANKING,
+                                  src_pred, &dst_pred));
     EXPECT_THAT(dst_pred, EqualsProto(utils::ParseTextProto<proto::Prediction>(
                                           R"(ranking { relevance: 5 })")
                                           .value()));
@@ -295,8 +295,8 @@ TEST(ChangePredictionType, ClassificationToRanking) {
     const proto::Prediction src_pred =
         PARSE_TEST_PROTO(R"pb(ranking { relevance: 5 })pb");
     proto::Prediction dst_pred;
-    ChangePredictionType(proto::Task::RANKING, proto::Task::REGRESSION,
-                         src_pred, &dst_pred);
+    CHECK_OK(ChangePredictionType(proto::Task::RANKING, proto::Task::REGRESSION,
+                                  src_pred, &dst_pred));
     EXPECT_THAT(dst_pred, EqualsProto(utils::ParseTextProto<proto::Prediction>(
                                           R"(regression { value: 5 })")
                                           .value()));
@@ -306,8 +306,8 @@ TEST(ChangePredictionType, ClassificationToRanking) {
     const proto::Prediction src_pred =
         PARSE_TEST_PROTO(R"pb(regression { value: 5 })pb");
     proto::Prediction dst_pred;
-    ChangePredictionType(proto::Task::REGRESSION, proto::Task::REGRESSION,
-                         src_pred, &dst_pred);
+    CHECK_OK(ChangePredictionType(
+        proto::Task::REGRESSION, proto::Task::REGRESSION, src_pred, &dst_pred));
     EXPECT_THAT(dst_pred, EqualsProto(utils::ParseTextProto<proto::Prediction>(
                                           R"(regression { value: 5 })")
                                           .value()));

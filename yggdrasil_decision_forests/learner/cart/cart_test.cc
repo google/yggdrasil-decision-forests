@@ -136,9 +136,9 @@ class CartPruningTest : public ::testing::Test {
       }
     )pb");
     EXPECT_OK(dataset_.CreateColumnsFromDataspec());
-    dataset_.AppendExample({{"a", "0"}, {"l", "1"}});
-    dataset_.AppendExample({{"a", "1"}, {"l", "2"}});
-    dataset_.AppendExample({{"a", "2"}, {"l", "2"}});
+    CHECK_OK(dataset_.AppendExampleWithStatus({{"a", "0"}, {"l", "1"}}));
+    CHECK_OK(dataset_.AppendExampleWithStatus({{"a", "1"}, {"l", "2"}}));
+    CHECK_OK(dataset_.AppendExampleWithStatus({{"a", "2"}, {"l", "2"}}));
 
     config_link_.set_label(1);
 

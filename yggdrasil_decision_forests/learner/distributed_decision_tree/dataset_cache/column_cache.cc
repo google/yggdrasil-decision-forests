@@ -243,7 +243,7 @@ absl::Status ShardedIntegerColumnReader<Value>::ReadAndAppend(
                   /*end_shard_idx=*/end_shard_idx));
 
   while (true) {
-    CHECK_OK(reader.Next());
+    RETURN_IF_ERROR(reader.Next());
     const auto values = reader.Values();
     if (values.empty()) {
       break;
@@ -465,7 +465,7 @@ absl::Status ShardedFloatColumnReader::ReadAndAppend(
                   /*end_shard_idx=*/end_shard_idx));
 
   while (true) {
-    CHECK_OK(reader.Next());
+    RETURN_IF_ERROR(reader.Next());
     const auto values = reader.Values();
     if (values.empty()) {
       break;

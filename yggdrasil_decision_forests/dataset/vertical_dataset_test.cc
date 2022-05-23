@@ -166,21 +166,26 @@ TEST(VerticalDataset, ColumnWithCast) {
   VerticalDataset dataset;
   EXPECT_OK(LoadVerticalDataset(dataset_path, data_spec, &dataset));
 
-  EXPECT_NE(
-      dataset.MutableColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          0),
-      nullptr);
-  EXPECT_NE(
-      dataset
-          .MutableColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-              2),
-      nullptr);
-  EXPECT_NE(dataset.MutableColumnWithCast<
-                dataset::VerticalDataset::CategoricalSetColumn>(4),
+  EXPECT_NE(dataset
+                .MutableColumnWithCastWithStatus<
+                    dataset::VerticalDataset::NumericalColumn>(0)
+                .value(),
             nullptr);
-  EXPECT_NE(
-      dataset.MutableColumnWithCast<dataset::VerticalDataset::BooleanColumn>(6),
-      nullptr);
+  EXPECT_NE(dataset
+                .MutableColumnWithCastWithStatus<
+                    dataset::VerticalDataset::CategoricalColumn>(2)
+                .value(),
+            nullptr);
+  EXPECT_NE(dataset
+                .MutableColumnWithCastWithStatus<
+                    dataset::VerticalDataset::CategoricalSetColumn>(4)
+                .value(),
+            nullptr);
+  EXPECT_NE(dataset
+                .MutableColumnWithCastWithStatus<
+                    dataset::VerticalDataset::BooleanColumn>(6)
+                .value(),
+            nullptr);
 }
 
 TEST(VerticalDataset, MapExampleToProtoExample) {
@@ -197,15 +202,16 @@ TEST(VerticalDataset, MapExampleToProtoExample) {
   std::unordered_map<std::string, std::string> example_map{
       {"a", "0.5"}, {"b", "test"}, {"c", "1.5"}, {"d", "hello"}};
   proto::Example example;
-  MapExampleToProtoExample(example_map, data_spec, &example);
+  CHECK_OK(
+      MapExampleToProtoExampleWithStatus(example_map, data_spec, &example));
 
   const proto::Example expected_example = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes { numerical: 0.5 }
         attributes { text: "test" }
         attributes { discretized_numerical: 2 }
         attributes { hash: 13009744463427800296 }
-      )");
+      )pb");
   EXPECT_THAT(example, EqualsProto(expected_example));
 }
 
@@ -224,13 +230,13 @@ TEST(VerticalDataset, ProtoExampleToMapExample) {
   AddColumn("e", proto::ColumnType::HASH, &data_spec);
 
   const proto::Example example = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes { numerical: 0.5 }
         attributes { text: "test" }
         attributes { categorical_set { values: 1 values: 2 values: 4 } }
         attributes { discretized_numerical: 2 }
         attributes { hash: 1234 }
-      )");
+      )pb");
   const auto example_map = ProtoExampleToMapExample(example, data_spec).value();
   std::unordered_map<std::string, std::string> expected_example_map{
       {"a", "0.5"},
@@ -256,8 +262,8 @@ TEST(VerticalDataset, AppendExample) {
   VerticalDataset dataset;
   dataset.set_data_spec(data_spec);
   EXPECT_OK(dataset.CreateColumnsFromDataspec());
-  dataset.AppendExample(example_map);
-  dataset.AppendExample(example_map);
+  CHECK_OK(dataset.AppendExampleWithStatus(example_map));
+  CHECK_OK(dataset.AppendExampleWithStatus(example_map));
 
   EXPECT_EQ(dataset.nrow(), 2);
   EXPECT_EQ(dataset.ncol(), 4);
@@ -273,7 +279,7 @@ TEST(VerticalDataset, AppendExample) {
 
 TEST(VerticalDataset, ExtractExample) {
   const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns { type: NUMERICAL name: "a" }
         columns { type: NUMERICAL_SET name: "b" }
         columns { type: NUMERICAL_LIST name: "c" }
@@ -299,14 +305,14 @@ TEST(VerticalDataset, ExtractExample) {
           name: "i"
           discretized_numerical { boundaries: 0 boundaries: 1 boundaries: 2 }
         }
-      )");
+      )pb");
 
   VerticalDataset dataset;
   dataset.set_data_spec(data_spec);
   EXPECT_OK(dataset.CreateColumnsFromDataspec());
 
   const proto::Example example_1 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes { numerical: 0.5 }
         attributes { numerical_set: { values: 0 values: 1 } }
         attributes { numerical_list: { values: 0 values: 1 } }
@@ -316,11 +322,11 @@ TEST(VerticalDataset, ExtractExample) {
         attributes { boolean: 1 }
         attributes { text: "hello" }
         attributes { discretized_numerical: 2 }
-      )");
-  dataset.AppendExample(example_1);
+      )pb");
+  CHECK_OK(dataset.AppendExampleWithStatus(example_1));
 
   const proto::Example example_2 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes {}
         attributes {}
         attributes {}
@@ -330,8 +336,8 @@ TEST(VerticalDataset, ExtractExample) {
         attributes {}
         attributes {}
         attributes {}
-      )");
-  dataset.AppendExample(example_2);
+      )pb");
+  CHECK_OK(dataset.AppendExampleWithStatus(example_2));
 
   proto::Example extracted_example_1;
   dataset.ExtractExample(0, &extracted_example_1);
@@ -388,7 +394,9 @@ TEST(VerticalDataset, PushBackOwnedColumn) {
       absl::make_unique<VerticalDataset::NumericalColumn>());
   EXPECT_EQ(dataset.column(0)->nrows(), 0);
   EXPECT_EQ(dataset.ncol(), 1);
-  dataset.MutableColumnWithCast<VerticalDataset::NumericalColumn>(0)->Add(5.f);
+  dataset.MutableColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(0)
+      .value()
+      ->Add(5.f);
   EXPECT_EQ(dataset.column(0)->nrows(), 1);
 }
 
@@ -397,8 +405,8 @@ TEST(VerticalDataset, ShallowNonOwningClone) {
   AddColumn("a", proto::ColumnType::NUMERICAL, original.mutable_data_spec());
   AddColumn("b", proto::ColumnType::STRING, original.mutable_data_spec());
   EXPECT_OK(original.CreateColumnsFromDataspec());
-  original.AppendExample({{"a", "0.1"}, {"b", "AAA"}});
-  original.AppendExample({{"a", "0.2"}, {"b", "BBB"}});
+  CHECK_OK(original.AppendExampleWithStatus({{"a", "0.1"}, {"b", "AAA"}}));
+  CHECK_OK(original.AppendExampleWithStatus({{"a", "0.2"}, {"b", "BBB"}}));
 
   const auto clone_1 = original.ShallowNonOwningClone();
   const auto clone_2 = clone_1.ShallowNonOwningClone();
@@ -418,54 +426,54 @@ TEST(VerticalDataset, ShallowNonOwningClone) {
 
 TEST(VerticalDataset, AddColumn) {
   VerticalDataset dataset;
-  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"(
+  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "a" }
     columns { type: NUMERICAL name: "b" }
-  )");
+  )pb");
   EXPECT_OK(dataset.CreateColumnsFromDataspec());
-  dataset.AppendExample({{"a", "0.1"}, {"b", "0.3"}});
-  dataset.AppendExample({{"a", "0.2"}, {"b", "0.4"}});
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0.1"}, {"b", "0.3"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0.2"}, {"b", "0.4"}}));
 
   auto* col_c = dynamic_cast<dataset::VerticalDataset::NumericalColumn*>(
       dataset
-          .AddColumn(PARSE_TEST_PROTO(R"(
+          .AddColumn(PARSE_TEST_PROTO(R"pb(
             type: NUMERICAL name: "c"
-          )"))
+          )pb"))
           .value());
   EXPECT_EQ(col_c->values().size(), 2);
 
   const proto::DataSpecification expected_dataspec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns { type: NUMERICAL name: "a" }
         columns { type: NUMERICAL name: "b" }
         columns { type: NUMERICAL name: "c" }
-      )");
+      )pb");
   EXPECT_THAT(dataset.data_spec(), EqualsProto(expected_dataspec));
 }
 
 TEST(VerticalDataset, ReplaceColumn) {
   VerticalDataset dataset;
-  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"(
+  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "a" }
     columns { type: NUMERICAL name: "b" }
-  )");
+  )pb");
   EXPECT_OK(dataset.CreateColumnsFromDataspec());
-  dataset.AppendExample({{"a", "0.1"}, {"b", "0.3"}});
-  dataset.AppendExample({{"a", "0.2"}, {"b", "0.4"}});
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0.1"}, {"b", "0.3"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0.2"}, {"b", "0.4"}}));
 
   auto* col_c = dynamic_cast<dataset::VerticalDataset::NumericalColumn*>(
       dataset
-          .ReplaceColumn(0, PARSE_TEST_PROTO(R"(
+          .ReplaceColumn(0, PARSE_TEST_PROTO(R"pb(
                            type: NUMERICAL name: "c"
-                         )"))
+                         )pb"))
           .value());
   EXPECT_EQ(col_c->values().size(), 2);
 
   const proto::DataSpecification expected_dataspec = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         columns { type: NUMERICAL name: "c" }
         columns { type: NUMERICAL name: "b" }
-      )");
+      )pb");
   EXPECT_THAT(dataset.data_spec(), EqualsProto(expected_dataspec));
 }
 
@@ -474,8 +482,8 @@ TEST(VerticalDataset, Set) {
   AddColumn("a", proto::ColumnType::NUMERICAL, dataset.mutable_data_spec());
   AddColumn("b", proto::ColumnType::STRING, dataset.mutable_data_spec());
   EXPECT_OK(dataset.CreateColumnsFromDataspec());
-  dataset.AppendExample({{"a", "0.1"}, {"b", "AAA"}});
-  dataset.AppendExample({{"a", "0.2"}, {"b", "BBB"}});
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0.1"}, {"b", "AAA"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0.2"}, {"b", "BBB"}}));
 
   dataset.Set(0, 0, PARSE_TEST_PROTO("numerical: 0.3"));
   dataset.Set(1, 0, PARSE_TEST_PROTO(""));  // Missing feature

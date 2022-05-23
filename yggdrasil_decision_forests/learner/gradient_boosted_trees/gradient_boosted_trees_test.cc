@@ -88,10 +88,10 @@ dataset::VerticalDataset CreateToyDataset() {
     }
   )pb");
   CHECK_OK(dataset.CreateColumnsFromDataspec());
-  dataset.AppendExample({{"a", "1"}, {"b", "1"}});
-  dataset.AppendExample({{"a", "2"}, {"b", "2"}});
-  dataset.AppendExample({{"a", "3"}, {"b", "1"}});
-  dataset.AppendExample({{"a", "4"}, {"b", "2"}});
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "1"}, {"b", "1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "2"}, {"b", "2"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "3"}, {"b", "1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "2"}}));
   return dataset;
 }
 
@@ -180,11 +180,15 @@ TEST(GradientBoostedTrees, ExtractValidationDatasetWithGroup) {
   EXPECT_TRUE(training.OwnsColumn(0));
 
   const auto train_group =
-      training.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          group_feature_idx);
+      training
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(group_feature_idx)
+          .value();
   const auto validation_group =
-      validation.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          group_feature_idx);
+      validation
+          .ColumnWithCastWithStatus<
+              dataset::VerticalDataset::CategoricalColumn>(group_feature_idx)
+          .value();
 
   // Ensure the intersection of the groups is empty.
   absl::btree_set<int> train_group_values(train_group->values().begin(),
@@ -288,13 +292,13 @@ TEST(GradientBoostedTrees, SampleTrainingExamplesWithSelGB) {
     }
   )pb");
   CHECK_OK(dataset.CreateColumnsFromDataspec());
-  dataset.AppendExample({{"a", "1"}, {"b", "1"}});
-  dataset.AppendExample({{"a", "2"}, {"b", "2"}});
-  dataset.AppendExample({{"a", "0"}, {"b", "2"}});
-  dataset.AppendExample({{"a", "3"}, {"b", "1"}});
-  dataset.AppendExample({{"a", "0"}, {"b", "2"}});
-  dataset.AppendExample({{"a", "4"}, {"b", "2"}});
-  dataset.AppendExample({{"a", "0"}, {"b", "2"}});
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "1"}, {"b", "1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "2"}, {"b", "2"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0"}, {"b", "2"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "3"}, {"b", "1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0"}, {"b", "2"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "2"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0"}, {"b", "2"}}));
 
   RankingGroupsIndices index;
   index.Initialize(dataset, 0, 1);
@@ -558,7 +562,7 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingExact) {
   // Evaluate the models.
   utils::RandomEngine rnd(1234);
   const auto evaluation = model->Evaluate(test_ds_, {}, &rnd);
-  LOG(INFO) << "Evaluation:" << metric::TextReport(evaluation);
+  LOG(INFO) << "Evaluation:" << metric::TextReport(evaluation).value();
 
   // Sharded model is "good".
   EXPECT_NEAR(metric::Accuracy(evaluation), 0.8665, 0.008);

@@ -105,7 +105,7 @@ absl::Status UpdateColSpecsWithGuideInfo(
 }
 
 // Specialization of "UpdateDataSpecWithTFExample" for unstacked features.
-void UpdateDataSpecWithTFExampleUnstacked(
+absl::Status UpdateDataSpecWithTFExampleUnstacked(
     const tensorflow::Example& example, proto::DataSpecification* data_spec,
     proto::DataSpecificationAccumulator* accumulator) {
   for (const auto& unstacked : data_spec->unstackeds()) {
@@ -133,44 +133,50 @@ void UpdateDataSpecWithTFExampleUnstacked(
 
     switch (it_feature->second.kind_case()) {
       case tensorflow::Feature::KindCase::kInt64List: {
-        CHECK_EQ(it_feature->second.int64_list().value_size(), unstacked.size())
-            << "Wrong number of value for multi dimension feature "
-            << unstacked.original_name();
+        if (it_feature->second.int64_list().value_size() != unstacked.size()) {
+          return absl::InvalidArgumentError(
+              absl::StrCat("Wrong number of value for multi dimension feature ",
+                           unstacked.original_name()));
+        }
         for (int dim_idx = 0; dim_idx < unstacked.size(); dim_idx++) {
           const int col_idx = unstacked.begin_column_idx() + dim_idx;
           proto::Column* col = data_spec->mutable_columns(col_idx);
           auto* col_acc = accumulator->mutable_columns(col_idx);
-          CHECK_OK(UpdateNumericalColumnSpec(
+          RETURN_IF_ERROR(UpdateNumericalColumnSpec(
               it_feature->second.int64_list().value(dim_idx), col, col_acc));
         }
       } break;
 
       case tensorflow::Feature::KindCase::kFloatList: {
-        CHECK_EQ(it_feature->second.float_list().value_size(), unstacked.size())
-            << "Wrong number of value for multi dimension feature "
-            << unstacked.original_name();
+        if (it_feature->second.float_list().value_size() != unstacked.size()) {
+          return absl::InvalidArgumentError(
+              absl::StrCat("Wrong number of value for multi dimension feature ",
+                           unstacked.original_name()));
+        }
         for (int dim_idx = 0; dim_idx < unstacked.size(); dim_idx++) {
           const int col_idx = unstacked.begin_column_idx() + dim_idx;
           proto::Column* col = data_spec->mutable_columns(col_idx);
           auto* col_acc = accumulator->mutable_columns(col_idx);
-          CHECK_OK(UpdateNumericalColumnSpec(
+          RETURN_IF_ERROR(UpdateNumericalColumnSpec(
               it_feature->second.float_list().value(dim_idx), col, col_acc));
         }
       } break;
 
       case tensorflow::Feature::KindCase::kBytesList:
-        LOG(FATAL) << "Byte value for numerical feature "
-                   << unstacked.original_name();
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Byte value for numerical feature ", unstacked.original_name()));
         break;
 
       default:
-        LOG(FATAL) << "Internal error";  // Should not happen;
+        return absl::InvalidArgumentError(
+            "Internal error");  // Should not happen;
     }
   }
+  return absl::OkStatus();
 }
 
 // Specialization of "UpdateDataSpecWithTFExample" for non-unstacked features.
-void UpdateDataSpecWithTFExampleBase(
+absl::Status UpdateDataSpecWithTFExampleBase(
     const tensorflow::Example& example, proto::DataSpecification* data_spec,
     proto::DataSpecificationAccumulator* accumulator) {
   for (int col_idx = 0; col_idx < data_spec->columns_size(); col_idx++) {
@@ -189,44 +195,48 @@ void UpdateDataSpecWithTFExampleBase(
     }
     // Mean of single dimension numerical columns.
     if (IsNumerical(col->type()) && !IsMultiDimensional(col->type())) {
-      const float num_value =
-          GetSingleFloatFromTFFeature(it_feature->second, *col);
-      CHECK_OK(UpdateNumericalColumnSpec(num_value, col, col_acc));
+      ASSIGN_OR_RETURN(const float num_value,
+                       GetSingleFloatFromTFFeature(it_feature->second, *col));
+      RETURN_IF_ERROR(UpdateNumericalColumnSpec(num_value, col, col_acc));
     }
 
     if (IsCategorical(col->type())) {
       std::vector<std::string> tokens;
-      GetCategoricalTokensFromTFFeature(it_feature->second, *col, &tokens);
+      RETURN_IF_ERROR(
+          GetCategoricalTokensFromTFFeature(it_feature->second, *col, &tokens));
       if (!IsMultiDimensional(col->type()) && tokens.empty()) {
         col->set_count_nas(col->count_nas() + 1);
         continue;
       }
-      AddTokensToCategoricalColumnSpec(tokens, col);
+      RETURN_IF_ERROR(AddTokensToCategoricalColumnSpec(tokens, col));
     }
 
     if (col->type() == ColumnType::DISCRETIZED_NUMERICAL) {
-      const float num_value =
-          GetSingleFloatFromTFFeature(it_feature->second, *col);
+      ASSIGN_OR_RETURN(const float num_value,
+                       GetSingleFloatFromTFFeature(it_feature->second, *col));
       UpdateComputeSpecDiscretizedNumerical(num_value, col, col_acc);
     }
 
     if (col->type() == ColumnType::BOOLEAN) {
-      const float num_value =
-          GetSingleFloatFromTFFeature(it_feature->second, *col);
+      ASSIGN_OR_RETURN(const float num_value,
+                       GetSingleFloatFromTFFeature(it_feature->second, *col));
       UpdateComputeSpecBooleanFeature(num_value, col);
     }
   }
+  return absl::OkStatus();
 }
 
 // Update the dataspec with a new example. This operation is applied once the
 // column type is decided. Example of update includes adding new dictionary
 // entry for a categorical attribute, or updating the mean for a numerical
 // column.
-void UpdateDataSpecWithTFExample(
+absl::Status UpdateDataSpecWithTFExample(
     const tensorflow::Example& example, proto::DataSpecification* data_spec,
     proto::DataSpecificationAccumulator* accumulator) {
-  UpdateDataSpecWithTFExampleBase(example, data_spec, accumulator);
-  UpdateDataSpecWithTFExampleUnstacked(example, data_spec, accumulator);
+  RETURN_IF_ERROR(
+      UpdateDataSpecWithTFExampleBase(example, data_spec, accumulator));
+
+  return UpdateDataSpecWithTFExampleUnstacked(example, data_spec, accumulator);
 }
 
 TFExampleReaderToExampleReader::TFExampleReaderToExampleReader(
@@ -251,12 +261,12 @@ utils::StatusOr<bool> TFExampleReaderToExampleReader::Next(
   return true;
 }
 
-void TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
+absl::Status TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
     const std::vector<std::string>& paths,
     const proto::DataSpecificationGuide& guide,
     proto::DataSpecification* data_spec) {
   auto reader = CreateReader();
-  CHECK_OK(reader->Open(paths));
+  RETURN_IF_ERROR(reader->Open(paths));
   data_spec->clear_columns();
   // Maps each tf.Example features to a column idx and a column guide.
   absl::node_hash_map<std::string, InferTypeInfo>
@@ -336,7 +346,7 @@ void TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
     }
     nrow++;
   }
-  CHECK_OK(
+  RETURN_IF_ERROR(
       UpdateColSpecsWithGuideInfo(tfe_feature_to_infer_type_info, data_spec));
 
   // Sort the column by name.
@@ -345,15 +355,17 @@ void TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
             [](const proto::Column& a, const proto::Column& b) {
               return a.name() < b.name();
             });
+
+  return absl::OkStatus();
 }
 
-void TFExampleReaderToDataSpecCreator::ComputeColumnStatistics(
+absl::Status TFExampleReaderToDataSpecCreator::ComputeColumnStatistics(
     const std::vector<std::string>& paths,
     const proto::DataSpecificationGuide& guide,
     proto::DataSpecification* data_spec,
     proto::DataSpecificationAccumulator* accumulator) {
   auto reader = CreateReader();
-  CHECK_OK(reader->Open(paths));
+  RETURN_IF_ERROR(reader->Open(paths));
   uint64_t nrow = 0;
   tensorflow::Example example;
   while (reader->Next(&example).value()) {
@@ -362,16 +374,18 @@ void TFExampleReaderToDataSpecCreator::ComputeColumnStatistics(
       break;
     }
     LOG_INFO_EVERY_N_SEC(30, _ << nrow << " row(s) processed");
-    UpdateDataSpecWithTFExample(example, data_spec, accumulator);
+    RETURN_IF_ERROR(
+        UpdateDataSpecWithTFExample(example, data_spec, accumulator));
     nrow++;
   }
   data_spec->set_created_num_rows(nrow);
+  return absl::OkStatus();
 }
 
 utils::StatusOr<int64_t> TFExampleReaderToDataSpecCreator::CountExamples(
     absl::string_view path) {
   auto reader = CreateReader();
-  CHECK_OK(reader->Open(path));
+  RETURN_IF_ERROR(reader->Open(path));
   int64_t count = 0;
   tensorflow::Example value;
   while (true) {
@@ -389,7 +403,7 @@ ColumnType InferType(const proto::DataSpecificationGuide& guide,
                      const tensorflow::Feature& feature,
                      const proto::Tokenizer& tokenizer,
                      const ColumnType previous_type, int* num_sub_values) {
-  CHECK(num_sub_values != nullptr);
+  DCHECK(num_sub_values != nullptr);
   *num_sub_values = 0;
   auto type = previous_type;
   // Boolean is the weakest type.
