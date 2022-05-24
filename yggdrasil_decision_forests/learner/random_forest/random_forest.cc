@@ -67,8 +67,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace random_forest {
 
-using row_t = dataset::VerticalDataset::row_t;
-
 constexpr double kAdaptativeWarmUpSeconds = 5.0;
 constexpr char RandomForestLearner::kRegisteredName[];
 constexpr char RandomForestLearner::kHParamNumTrees[];
@@ -629,7 +627,7 @@ RandomForestLearner::TrainWithStatus(
         utils::RandomEngine random(tree_seeds[tree_idx]);
         // Examples selected for the training.
         // Note: This in the inverse of the Out-of-bag (OOB) set.
-        std::vector<row_t> selected_examples;
+        std::vector<UnsignedExampleIdx> selected_examples;
         auto& decision_tree = (*mdl->mutable_decision_trees())[tree_idx];
         if (rf_config.bootstrap_training_dataset()) {
           if (!rf_config.sampling_with_replacement() &&
@@ -909,7 +907,7 @@ RandomForestLearner::TrainWithStatus(
 namespace internal {
 
 void InitializeOOBPredictionAccumulators(
-    const dataset::VerticalDataset::row_t num_predictions,
+    const UnsignedExampleIdx num_predictions,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const dataset::proto::DataSpecification& data_spec,
@@ -946,7 +944,7 @@ void InitializeOOBPredictionAccumulators(
 void UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
-    std::vector<row_t> sorted_non_oob_example_indices,
+    std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
     const absl::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
@@ -954,13 +952,13 @@ void UpdateOOBPredictionsWithNewTree(
   // "next_non_oob_example_idx" is the index in "sorted_non_oob_example_indices"
   // of the example, with the smallest index which is greater or equal to the
   // index of the example being iterator on in the following "for loop".
-  dataset::VerticalDataset::row_t next_non_oob_example_idx = 0;
+  UnsignedExampleIdx next_non_oob_example_idx = 0;
 
-  std::uniform_int_distribution<row_t> row_distribution(
+  std::uniform_int_distribution<UnsignedExampleIdx> row_distribution(
       0, train_dataset.nrow() - 1);
 
-  for (dataset::VerticalDataset::row_t example_idx = 0;
-       example_idx < train_dataset.nrow(); example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < train_dataset.nrow();
+       example_idx++) {
     // Skip the example_idx in "sorted_non_oob_example_indices".
     while (next_non_oob_example_idx < sorted_non_oob_example_indices.size() &&
            sorted_non_oob_example_indices[next_non_oob_example_idx] <
@@ -1048,8 +1046,8 @@ utils::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
                                                &evaluation));
   model::proto::Prediction prediction;
 
-  for (dataset::VerticalDataset::row_t example_idx = 0;
-       example_idx < train_dataset.nrow(); example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < train_dataset.nrow();
+       example_idx++) {
     auto& prediction_accumulator = oob_predictions[example_idx];
     if (prediction_accumulator.num_trees == 0) {
       // Not decision tree has been trained (yet) with this example in the oob
@@ -1143,18 +1141,20 @@ void InitializeModelWithTrainingConfig(
   model->set_winner_take_all_inference(rf_config.winner_take_all_inference());
 }
 
-void SampleTrainingExamples(const row_t num_examples, const row_t num_samples,
+void SampleTrainingExamples(const UnsignedExampleIdx num_examples,
+                            const UnsignedExampleIdx num_samples,
                             const bool with_replacement,
                             utils::RandomEngine* random,
-                            std::vector<row_t>* selected) {
+                            std::vector<UnsignedExampleIdx>* selected) {
   selected->resize(num_samples);
 
   if (with_replacement) {
     selected->resize(num_samples);
     // Sampling with replacement.
-    std::uniform_int_distribution<row_t> example_idx_distrib(0,
-                                                             num_examples - 1);
-    for (row_t sample_idx = 0; sample_idx < num_samples; sample_idx++) {
+    std::uniform_int_distribution<UnsignedExampleIdx> example_idx_distrib(
+        0, num_examples - 1);
+    for (UnsignedExampleIdx sample_idx = 0; sample_idx < num_samples;
+         sample_idx++) {
       (*selected)[sample_idx] = example_idx_distrib(*random);
     }
     std::sort(selected->begin(), selected->end());
@@ -1163,7 +1163,8 @@ void SampleTrainingExamples(const row_t num_examples, const row_t num_samples,
     selected->reserve(num_samples);
     // Sampling without replacement.
     std::uniform_real_distribution<float> dist_01;
-    for (row_t example_idx = 0; example_idx < num_examples; example_idx++) {
+    for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
+         example_idx++) {
       // The probability of selection is p/n where p is the remaining number of
       // items to sample, and n the remaining number of items to test.
       const float proba_select =

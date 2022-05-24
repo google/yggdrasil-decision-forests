@@ -203,7 +203,7 @@ TEST_F(CartPruningTest, PruneTree) {
   EXPECT_EQ(tree_.NumNodes(), 5);
 
   std::vector<float> weights = {1.f, 1.f, 1.f};
-  std::vector<dataset::VerticalDataset::row_t> example_idxs = {0, 1, 2};
+  std::vector<UnsignedExampleIdx> example_idxs = {0, 1, 2};
   EXPECT_OK(internal::PruneTree(dataset_, weights, example_idxs, config_,
                                 config_link_, &tree_));
 

@@ -25,6 +25,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -32,8 +33,6 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
-
-using row_t = dataset::VerticalDataset::row_t;
 
 // Maximum number of items in a ranking group (e.g. maximum number of queries
 // for a document). While possible, it is very unlikely that a user would exceed

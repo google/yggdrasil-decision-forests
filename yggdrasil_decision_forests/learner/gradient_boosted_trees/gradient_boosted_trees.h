@@ -225,7 +225,7 @@ absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
 // Copy the initial model predictions to the accumulator of predictions.
 template <typename V>
 void SetInitialPredictions(const std::vector<float>& initial_predictions,
-                           dataset::VerticalDataset::row_t num_rows,
+                           UnsignedExampleIdx num_rows,
                            std::vector<V>* predictions);
 
 // Computes the predictions and gradient of the model without relying on
@@ -242,17 +242,15 @@ absl::Status ComputePredictions(
     std::vector<float>* predictions);
 
 // Sample (without replacement) a set of example indices.
-void SampleTrainingExamples(
-    dataset::VerticalDataset::row_t num_rows, float sample,
-    utils::RandomEngine* random,
-    std::vector<dataset::VerticalDataset::row_t>* selected_examples);
+void SampleTrainingExamples(UnsignedExampleIdx num_rows, float sample,
+                            utils::RandomEngine* random,
+                            std::vector<UnsignedExampleIdx>* selected_examples);
 
 // Sample a set of example indices using the GOSS algorithm.
 void SampleTrainingExamplesWithGoss(
-    const std::vector<GradientData>& gradients,
-    dataset::VerticalDataset::row_t num_rows, float alpha, float beta,
-    utils::RandomEngine* random,
-    std::vector<dataset::VerticalDataset::row_t>* selected_examples,
+    const std::vector<GradientData>& gradients, UnsignedExampleIdx num_rows,
+    float alpha, float beta, utils::RandomEngine* random,
+    std::vector<UnsignedExampleIdx>* selected_examples,
     std::vector<float>* weights);
 
 // Sample a set of example indices using the Selective Gradient Boosting
@@ -260,10 +258,10 @@ void SampleTrainingExamplesWithGoss(
 // only those negative training examples that are more difficult (i.e., those
 // with larger scores).
 absl::Status SampleTrainingExamplesWithSelGB(
-    model::proto::Task task, dataset::VerticalDataset::row_t num_rows,
+    model::proto::Task task, UnsignedExampleIdx num_rows,
     const RankingGroupsIndices* ranking_index,
     const std::vector<float>& predictions, float ratio,
-    std::vector<dataset::VerticalDataset::row_t>* selected_examples);
+    std::vector<UnsignedExampleIdx>* selected_examples);
 
 // Export the training logs. Creates:
 // - A static plot (.svg) of the training/validation loss/secondary metric
@@ -286,7 +284,7 @@ class DartPredictionAccumulator {
   // any other function. After this call, the accumulator represents a GBDT
   // model without any tree.
   void Initialize(const std::vector<float>& initial_predictions,
-                  dataset::VerticalDataset::row_t num_rows);
+                  UnsignedExampleIdx num_rows);
 
   // Sample a set of iteration indices (Note: one iteration = one tree for
   // regression or binary classification) to be EXCLUDED (i.e. dropped) for the
@@ -461,7 +459,7 @@ utils::StatusOr<proto::Loss> DefaultLoss(
     model::proto::Task task, const dataset::proto::Column& label_spec);
 
 void SetInitialPredictions(const std::vector<float>& initial_predictions,
-                           const dataset::VerticalDataset::row_t num_rows,
+                           const UnsignedExampleIdx num_rows,
                            std::vector<float>* predictions);
 
 // Sets the default hyper-parameters of the learner.

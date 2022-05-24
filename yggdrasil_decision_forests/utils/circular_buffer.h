@@ -54,8 +54,7 @@ class CircularBuffer {
 
   void clear() {
     for (size_t i = 0; i < size_; i++) {
-      const auto idx = WrapIndexOnce(begin_ + i);
-      elements_[idx].~T();
+      elements_[(i + begin_) % capacity_].~T();
     }
     begin_ = 0;
     size_ = 0;
@@ -68,6 +67,15 @@ class CircularBuffer {
       capacity_ = new_size;
       elements_ = std::allocator<T>().allocate(capacity_);
     }
+  }
+
+  // Set the content with values [0,  new_size).
+  void fill_iota(size_t new_size, T value) {
+    clear_and_resize(new_size);
+    for (size_t i = 0; i < new_size; i++) {
+      elements_[i] = value++;
+    }
+    size_ = new_size;
   }
 
   bool full() const { return size_ == capacity_; }

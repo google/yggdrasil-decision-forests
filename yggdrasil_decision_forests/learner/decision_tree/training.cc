@@ -34,6 +34,7 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -85,7 +86,7 @@ NumTrialsForRandomCategoricalSplit(const proto::Categorical::Random& config) {
 // Set the label value for a classification label on a vertical dataset.
 void SetClassificationLabelDistribution(
     const dataset::VerticalDataset& dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   // TODO(b/223183975): Update.
@@ -100,7 +101,7 @@ void SetClassificationLabelDistribution(
                                   .categorical()
                                   .number_of_unique_values();
   label_distribution.SetNumClasses(num_classes);
-  for (const row_t example_idx : selected_examples) {
+  for (const UnsignedExampleIdx example_idx : selected_examples) {
     if (weights.empty()) {
       label_distribution.Add(labels->values()[example_idx]);
     } else {
@@ -114,7 +115,7 @@ void SetClassificationLabelDistribution(
 
 void SetCategoricalUpliftLabelDistribution(
     const dataset::VerticalDataset& dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   DCHECK(!weights.empty());
@@ -141,7 +142,7 @@ void SetCategoricalUpliftLabelDistribution(
       outcome_spec.categorical().number_of_unique_values(),
       treatment_spec.categorical().number_of_unique_values());
 
-  for (const row_t example_idx : selected_examples) {
+  for (const UnsignedExampleIdx example_idx : selected_examples) {
     label_dist.AddCategoricalOutcome(outcomes->values()[example_idx],
                                      treatments->values()[example_idx],
                                      weights[example_idx]);
@@ -151,7 +152,7 @@ void SetCategoricalUpliftLabelDistribution(
 
 void SetRegressiveUpliftLabelDistribution(
     const dataset::VerticalDataset& dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   const auto* const outcomes =
@@ -169,7 +170,7 @@ void SetRegressiveUpliftLabelDistribution(
   label_dist.InitializeAndClearNumericalOutcome(
       treatment_spec.categorical().number_of_unique_values());
 
-  for (const row_t example_idx : selected_examples) {
+  for (const UnsignedExampleIdx example_idx : selected_examples) {
     label_dist.AddNumericalOutcome(outcomes->values()[example_idx],
                                    treatments->values()[example_idx],
                                    weights[example_idx]);
@@ -251,7 +252,7 @@ void SetConditionHelper(
 // If the feature only contains missing values, the "na_replacement" argument is
 // left unchanged.
 void LocalImputationForNumericalAttribute(
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
     float* na_replacement) {
   double na_replacement_value_accumulator = 0;
@@ -273,7 +274,7 @@ void LocalImputationForNumericalAttribute(
 // Similar as "LocalImputationForNumericalAttribute", but for a categorical
 // attribute. Return the most frequent attribute value.
 void LocalImputationForCategoricalAttribute(
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const int32_t num_attribute_classes, int32_t* na_replacement) {
   utils::IntegerDistributionDouble attribute_distribution;
@@ -294,7 +295,7 @@ void LocalImputationForCategoricalAttribute(
 // Similar to "LocalImputationForCategoricalAttribute", but for a boolean
 // attribute. Returns the most frequent attribute value.
 void LocalImputationForBooleanAttribute(
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<char>& attributes,
     bool* na_replacement) {
   DCHECK(!weights.empty());
@@ -316,7 +317,7 @@ void LocalImputationForBooleanAttribute(
 // Return false if there is no min-max e.g. selected_examples is empty or all
 // the values are NAs.
 bool MinMaxNumericalAttribute(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& attributes, float* min_value, float* max_value) {
   float local_min_value = 0;
   float local_max_value = 0;
@@ -341,12 +342,12 @@ bool MinMaxNumericalAttribute(
 std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
     const double variance_reduction, const int32_t num_attribute_classes,
     const utils::BinaryToNormalDistributionDouble& split_label_distribution,
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<bool>& positive_selected_example_bitmap,
     const std::vector<std::pair<size_t, size_t>>& attribute_values,
     const std::vector<int>& attribute_bank, const std::vector<float>& weights,
     const std::vector<float>& labels, const double initial_variance,
-    std::vector<dataset::VerticalDataset::row_t>* running_attr_bank_idx,
+    std::vector<UnsignedExampleIdx>* running_attr_bank_idx,
     std::vector<bool>* candidate_attributes_bitmap) {
   DCHECK_EQ(weights.size(), labels.size());
   // Search for the attribute item that maximize the variance reduction. Note:
@@ -386,7 +387,7 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
       // order. The candidate attributes "candidate_attr_value" are testing in
       // increasing order.
       bool match = false;
-      dataset::VerticalDataset::row_t last_attr;
+      UnsignedExampleIdx last_attr;
       while (
           (*running_attr_bank_idx)[select_idx] <
               attribute_values[example_idx].second &&
@@ -452,7 +453,7 @@ bool IsPresortingOnNumericalSplitMoreEfficient(
 
 void SetLabelDistribution(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -489,7 +490,7 @@ void SetLabelDistribution(
 // Specialization in the case of classification.
 SplitSearchResult FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -631,7 +632,7 @@ SplitSearchResult FindBestCondition(
 
 SplitSearchResult FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -765,7 +766,7 @@ SplitSearchResult FindBestCondition(
 // Specialization in the case of regression.
 SplitSearchResult FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -909,7 +910,7 @@ SplitSearchResult FindBestCondition(
 // Specialization in the case of uplift with categorical outcome.
 SplitSearchResult FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -977,7 +978,7 @@ SplitSearchResult FindBestCondition(
 // Specialization in the case of uplift with numerical outcome.
 SplitSearchResult FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -1049,10 +1050,26 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
     const InternalTrainConfig& internal_config,
     const SplitterWorkRequest& request) {
   SplitterWorkResponse response;
-  response.status_idx = request.status_idx;
-  response.condition = request.dst_condition;
-  response.condition->set_split_score(request.best_score);
+  response.manager_data = request.manager_data;
   request.splitter_cache->random.seed(request.seed);
+
+  if (request.num_oblique_projections_to_run.has_value()) {
+    DCHECK_EQ(request.attribute_idx, -1);
+    const auto found_oblique_condition =
+        FindBestConditionSparseOblique(
+            request.common->train_dataset, request.common->selected_examples,
+            weights, config, config_link, dt_config, request.common->parent,
+            internal_config, request.common->label_stats,
+            request.num_oblique_projections_to_run.value(), request.condition,
+            &request.splitter_cache->random, request.splitter_cache)
+            .value();
+
+    // An oblique split cannot be invalid.
+    response.status = found_oblique_condition
+                          ? SplitSearchResult::kBetterSplitFound
+                          : SplitSearchResult::kNoBetterSplitFound;
+    return response;
+  }
 
   switch (config.task()) {
     case model::proto::Task::CLASSIFICATION: {
@@ -1064,7 +1081,7 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
           request.common->train_dataset, request.common->selected_examples,
           weights, config, config_link, dt_config, request.common->parent,
           internal_config, label_stats, request.attribute_idx,
-          response.condition, &request.splitter_cache->random,
+          request.condition, &request.splitter_cache->random,
           request.splitter_cache);
     } break;
     case model::proto::Task::REGRESSION:
@@ -1077,7 +1094,7 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
             request.common->train_dataset, request.common->selected_examples,
             weights, config, config_link, dt_config, request.common->parent,
             internal_config, label_stats, request.attribute_idx,
-            response.condition, &request.splitter_cache->random,
+            request.condition, &request.splitter_cache->random,
             request.splitter_cache);
 
       } else {
@@ -1088,7 +1105,7 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
             request.common->train_dataset, request.common->selected_examples,
             weights, config, config_link, dt_config, request.common->parent,
             internal_config, label_stats, request.attribute_idx,
-            response.condition, &request.splitter_cache->random,
+            request.condition, &request.splitter_cache->random,
             request.splitter_cache);
       }
       break;
@@ -1099,9 +1116,55 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
   return response;
 }
 
+utils::StatusOr<bool> FindBestConditionSparseOblique(
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<float>& weights,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const proto::Node& parent, const InternalTrainConfig& internal_config,
+    const LabelStats& label_stats,
+    const absl::optional<int>& override_num_projections,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    SplitterPerThreadCache* cache) {
+  switch (config.task()) {
+    case model::proto::Task::CLASSIFICATION: {
+      const auto& class_label_stats =
+          utils::down_cast<const ClassificationLabelStats&>(label_stats);
+      return FindBestConditionSparseOblique(
+          train_dataset, selected_examples, weights, config, config_link,
+          dt_config, parent, internal_config, class_label_stats,
+          override_num_projections, best_condition, random, cache);
+    } break;
+    case model::proto::Task::REGRESSION:
+      if (internal_config.use_hessian_gain) {
+        const auto& reg_label_stats =
+            utils::down_cast<const RegressionHessianLabelStats&>(label_stats);
+        return FindBestConditionSparseOblique(
+            train_dataset, selected_examples, weights, config, config_link,
+            dt_config, parent, internal_config, reg_label_stats,
+            override_num_projections, best_condition, random, cache);
+      } else {
+        const auto& reg_label_stats =
+            utils::down_cast<const RegressionLabelStats&>(label_stats);
+        return FindBestConditionSparseOblique(
+            train_dataset, selected_examples, weights, config, config_link,
+            dt_config, parent, internal_config, reg_label_stats,
+            override_num_projections, best_condition, random, cache);
+      }
+      break;
+    default:
+      return absl::UnimplementedError(
+          "Oblique splits not implemented for this task");
+  }
+
+  return false;
+}
+
 utils::StatusOr<bool> FindBestConditionSingleThreadManager(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -1121,45 +1184,12 @@ utils::StatusOr<bool> FindBestConditionSingleThreadManager(
       // Nothing to do.
       break;
     case proto::DecisionTreeTrainingConfig::kSparseObliqueSplit:
-      switch (config.task()) {
-        case model::proto::Task::CLASSIFICATION: {
-          const auto& class_label_stats =
-              utils::down_cast<const ClassificationLabelStats&>(label_stats);
-          ASSIGN_OR_RETURN(
-              found_good_condition,
-              FindBestConditionSparseOblique(
-                  train_dataset, selected_examples, weights, config,
-                  config_link, dt_config, parent, internal_config,
-                  class_label_stats, best_condition, random,
-                  &cache->splitter_cache_list[0]));
-        } break;
-        case model::proto::Task::REGRESSION:
-          if (internal_config.use_hessian_gain) {
-            const auto& reg_label_stats =
-                utils::down_cast<const RegressionHessianLabelStats&>(
-                    label_stats);
-            ASSIGN_OR_RETURN(
-                found_good_condition,
-                FindBestConditionSparseOblique(
-                    train_dataset, selected_examples, weights, config,
-                    config_link, dt_config, parent, internal_config,
-                    reg_label_stats, best_condition, random,
-                    &cache->splitter_cache_list[0]));
-          } else {
-            const auto& reg_label_stats =
-                utils::down_cast<const RegressionLabelStats&>(label_stats);
-            ASSIGN_OR_RETURN(
-                found_good_condition,
-                FindBestConditionSparseOblique(
-                    train_dataset, selected_examples, weights, config,
-                    config_link, dt_config, parent, internal_config,
-                    reg_label_stats, best_condition, random,
-                    &cache->splitter_cache_list[0]));
-          }
-          break;
-        default:
-          return absl::UnimplementedError("Task not implemented");
-      }
+      ASSIGN_OR_RETURN(
+          found_good_condition,
+          FindBestConditionSparseOblique(
+              train_dataset, selected_examples, weights, config, config_link,
+              dt_config, parent, internal_config, label_stats, {},
+              best_condition, random, &cache->splitter_cache_list[0]));
       break;
   }
 
@@ -1251,7 +1281,7 @@ utils::StatusOr<bool> FindBestConditionSingleThreadManager(
 
 utils::StatusOr<bool> FindBestConditionConcurrentManager(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -1260,6 +1290,36 @@ utils::StatusOr<bool> FindBestConditionConcurrentManager(
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, PerThreadCache* cache) {
+  // This method looks for the best split using worker threads.
+  //
+  // Background:
+  // The best split is the split with the best score among the first
+  // "min_num_jobs_to_test" valid split searches. The order of the split is
+  // defined by the list of candidate attributes generated by
+  // GetCandidateAttributes. A split search is valid if it tested at least one
+  // split.
+  //
+  // Since the execution is multi-threaded, splits are computed/evaluated in
+  // unpredictable order. However, this method's result is as if the splits were
+  // evaluated sequentially according to the order defined by
+  // GetCandidateAttributes. Oblique splits are always evaluated (if requested
+  // by the user).
+  //
+  // A work unit (called a "job") is the evaluation of a single attribute or, in
+  // the case of oblique splits, the evaluation of a given number of random
+  // projections. A job with a given idx can be in one of multiple states (in
+  // chronological order):
+  //
+  // 1. Before being scheduled (idx >= next_job_to_schedule).
+  // 2. Scheduled and being computed by a worker.
+  // 3. The worker is done with the computation, and the result was recorded by
+  // the manager (cache->durable_response_list[idx].set).
+  // 4. The result was processed by the manager (idx < next_job_to_process).
+  //
+  // This method guarantees that the jobs/splits are processed in order.
+  //
+  // Note that next_job_to_process < next_job_to_schedule always holds.
+
   int num_threads = splitter_concurrency_setup.num_threads;
   int num_features = config_link.features().size();
 
@@ -1274,131 +1334,229 @@ utils::StatusOr<bool> FindBestConditionConcurrentManager(
       /*.label_stats =*/label_stats,
   };
 
-  // Prepare cache.
-  cache->splitter_cache_list.resize(num_threads);
-  cache->work_status_list.resize(num_features);
-  cache->condition_list.resize(num_threads * kConditionPoolGrowthFactor);
+  // Computes the number of oblique projections to evaluate and how to group
+  // them into requests.
+  bool oblique = false;
+  int num_oblique_jobs = 0;
+  int num_oblique_projections = 0;
+  if (dt_config.split_axis_case() ==
+      proto::DecisionTreeTrainingConfig::kSparseObliqueSplit) {
+    num_oblique_projections =
+        GetNumProjections(dt_config, config_link.numerical_features_size());
 
-  if (dt_config.split_axis_case() !=
-          proto::DecisionTreeTrainingConfig::kAxisAlignedSplit &&
-      dt_config.split_axis_case() !=
-          proto::DecisionTreeTrainingConfig::SPLIT_AXIS_NOT_SET) {
-    LOG(FATAL) << "Multi-threaded splitter only support axis aligned splits";
+    // Arbitrary minimum number of oblique projections to test in each job.
+    // Because oblique jobs are expensive (more than non oblique jobs), it is
+    // not efficient to create a request with too little work to do.
+    //
+    // In most real cases, this parameter does not matter as the limit is
+    // effectively constraint by the number of threads.
+    const int min_projections_per_request = 10;
+
+    DCHECK_GE(num_threads, 1);
+    num_oblique_jobs = std::min(num_threads, (num_oblique_projections +
+                                              min_projections_per_request - 1) /
+                                                 min_projections_per_request);
+    oblique = num_oblique_projections > 0;
   }
+
+  // Prepare caches.
+  cache->splitter_cache_list.resize(num_threads);
+  cache->condition_list.resize(num_threads * kConditionPoolGrowthFactor);
+  const int num_jobs = num_features + num_oblique_jobs;
+  cache->durable_response_list.resize(num_jobs);
 
   // Get the ordered indices of the attributes to test.
-  int min_to_examine;
+  int min_num_jobs_to_test;
   std::vector<int32_t>& candidate_attributes = cache->candidate_attributes;
-  GetCandidateAttributes(config, config_link, dt_config, &min_to_examine,
+  GetCandidateAttributes(config, config_link, dt_config, &min_num_jobs_to_test,
                          &candidate_attributes, random);
+  // All the oblique requests need to be tested.
+  min_num_jobs_to_test += num_oblique_jobs;
 
-  // The following keeps track of free slots in the splitter cache and node
-  // condition cache
-  cache->available_cache_idxs.clear_and_resize(
-      cache->splitter_cache_list.size());
-  for (int32_t i = 0; i < cache->splitter_cache_list.size(); i++) {
-    cache->available_cache_idxs.push_back(i);
-  }
+  // Marks all the caches and conditions as "available".
+  cache->available_cache_idxs.fill_iota(cache->splitter_cache_list.size(), 0);
+  cache->available_condition_idxs.fill_iota(cache->condition_list.size(), 0);
 
-  cache->available_condition_idxs.clear_and_resize(
-      cache->condition_list.size());
-  for (int32_t i = 0; i < cache->condition_list.size(); i++) {
-    cache->available_condition_idxs.push_back(i);
+  // Marks all the duration responses as "non set".
+  for (auto& s : cache->durable_response_list) {
+    s.set = false;
   }
 
   // Get Channel readers and writers.
   auto& processor = *splitter_concurrency_setup.split_finder_processor;
 
   // Helper function to create a WorkRequest.
-  auto produce = [&](const int idx, const float best_score) {
+  //
+  // If attribute_idx is != -1 create a request for an axis-aligned split.
+  //
+  // If attribute_idx is == -1 and num_oblique_projections_to_run != -1, create
+  // a request for an oblique split.
+  //
+  auto produce =
+      [&](const int job_idx, const float best_score, const int attribute_idx,
+          const int num_oblique_projections_to_run) -> SplitterWorkRequest {
+    // Get a cache and a condition.
+    DCHECK(!cache->available_cache_idxs.empty());
+    DCHECK(!cache->available_condition_idxs.empty());
     int32_t cache_idx = cache->available_cache_idxs.back();
     cache->available_cache_idxs.pop_back();
     int32_t condition_idx = cache->available_condition_idxs.back();
+    DCHECK_GE(condition_idx, -1);
     cache->available_condition_idxs.pop_back();
 
     SplitterWorkRequest request;
-    request.status_idx = idx;
-    request.attribute_idx = candidate_attributes[idx];
-    request.dst_condition = &cache->condition_list[condition_idx];
+    request.manager_data.condition_idx = condition_idx;
+    request.manager_data.cache_idx = cache_idx;
+    request.manager_data.job_idx = job_idx;
+    DCHECK((attribute_idx == -1) != (num_oblique_projections_to_run == -1));
+    if (attribute_idx != -1) {
+      request.attribute_idx = attribute_idx;
+    } else {
+      request.num_oblique_projections_to_run = num_oblique_projections_to_run;
+      request.attribute_idx = -1;
+    }
+    request.condition = &cache->condition_list[condition_idx];
     request.splitter_cache = &cache->splitter_cache_list[cache_idx];
-    request.best_score = best_score;
+    request.condition->set_split_score(best_score);  // Best score so far.
     request.common = &common;
-    request.seed = (*random)();
-
-    cache->work_status_list[idx].cache_idx = cache_idx;
-    cache->work_status_list[idx].condition_idx = condition_idx;
-    cache->work_status_list[idx].condition = nullptr;
+    request.seed = (*random)();  // Create a new seed.
 
     return request;
   };
 
-  // Create initial workload.
-  int32_t next_to_examine = 0;
-  while (next_to_examine < std::min(num_threads, num_features)) {
-    processor.Submit(produce(next_to_examine, best_condition->split_score()));
-    next_to_examine++;
+  // Schedule all the oblique jobs.
+  int next_job_to_schedule = 0;
+  if (oblique) {
+    const int num_oblique_projections_per_job =
+        (num_oblique_projections + num_oblique_jobs - 1) / num_oblique_jobs;
+
+    for (int oblique_job_idx = 0; oblique_job_idx < num_oblique_jobs;
+         oblique_job_idx++) {
+      const int num_projections_in_request =
+          std::min((oblique_job_idx + 1) * num_oblique_projections_per_job,
+                   num_oblique_projections) -
+          oblique_job_idx * num_oblique_projections_per_job;
+      processor.Submit(produce(
+          next_job_to_schedule++, best_condition->split_score(),
+          /*attribute_idx=*/-1,
+          /*num_oblique_projections_to_run=*/num_projections_in_request));
+    }
   }
 
-  // Start accumulating results and start more workers if necessary.
-  int valid_examined_features = 0;
-  int process_idx = 0;
-  SplitterWorkStatus* best_status = nullptr;
+  // Schedule some non-oblique jobs.
+  while (next_job_to_schedule < std::min(num_threads, num_jobs) &&
+         !cache->available_condition_idxs.empty() &&
+         !cache->available_cache_idxs.empty()) {
+    const int attribute_idx =
+        candidate_attributes[next_job_to_schedule - num_oblique_jobs];
+    processor.Submit(produce(next_job_to_schedule++,
+                             best_condition->split_score(),
+                             /*attribute_idx=*/attribute_idx,
+                             /*num_oblique_projections_to_run=*/-1));
+  }
+
+  int num_valid_job_tested = 0;
+  int next_job_to_process = 0;
+
+  // Index of the best condition. -1 if not better condition was found.
+  int best_condition_idx = -1;
+  // Score of the best found condition, or minimum condition score to look for.
+  float best_split_score = best_condition->split_score();
 
   while (true) {
     auto maybe_response = processor.GetResult();
     if (!maybe_response.has_value()) {
       break;
     }
-    SplitterWorkResponse& response = maybe_response.value();
 
-    cache->work_status_list[response.status_idx].condition = response.condition;
-    cache->work_status_list[response.status_idx].status = response.status;
+    {
+      // Record, but do not process, the worker response.
+      SplitterWorkResponse& response = maybe_response.value();
 
-    // Release the cache entry as it may now be reused by other workers.
-    cache->available_cache_idxs.push_front(
-        cache->work_status_list[response.status_idx].cache_idx);
+      // Release the cache immediately to be reused by other workers.
+      cache->available_cache_idxs.push_front(response.manager_data.cache_idx);
 
-    while (process_idx < next_to_examine &&
-           valid_examined_features < min_to_examine &&
-           cache->work_status_list[process_idx].condition != nullptr) {
-      auto status = &cache->work_status_list[process_idx];
-      process_idx++;
+      auto& durable_response =
+          cache->durable_response_list[response.manager_data.job_idx];
+      durable_response.status = response.status;
+      durable_response.set = true;
+      if (response.status == SplitSearchResult::kBetterSplitFound) {
+        // The worker found a better solution compared from when the worker
+        // started working.
 
-      if (status->status != SplitSearchResult::kInvalidAttribute) {
-        valid_examined_features++;
+        const float new_split_score =
+            cache->condition_list[response.manager_data.condition_idx]
+                .split_score();
 
-        if (best_status == nullptr) {
-          best_status = status;
-        } else if (status->condition->split_score() >
-                   best_status->condition->split_score()) {
-          cache->available_condition_idxs.push_front(
-              best_status->condition_idx);
-          best_status = status;
+        if (new_split_score > best_split_score) {
+          // This is the best condition so far. Keep it for processing.
+          durable_response.condition_idx = response.manager_data.condition_idx;
         } else {
-          cache->available_condition_idxs.push_front(status->condition_idx);
+          // Acctually, a better condition was found by another worker and
+          // processed in the mean time. No need to keep the condition.
+          cache->available_condition_idxs.push_front(
+              response.manager_data.condition_idx);
+          durable_response.condition_idx = -1;
+          durable_response.status = SplitSearchResult::kNoBetterSplitFound;
         }
       } else {
-        cache->available_condition_idxs.push_front(status->condition_idx);
+        // Return the condition to the condition pool.
+        cache->available_condition_idxs.push_front(
+            response.manager_data.condition_idx);
+        durable_response.condition_idx = -1;
       }
     }
 
-    if (valid_examined_features >= min_to_examine) {
+    // Process all the responses that can be processed.
+    // Simulate a deterministic sequential processing of the responses.
+    while (next_job_to_process < next_job_to_schedule &&
+           num_valid_job_tested < min_num_jobs_to_test &&
+           cache->durable_response_list[next_job_to_process].set) {
+      auto durable_response =
+          &cache->durable_response_list[next_job_to_process];
+      next_job_to_process++;
+
+      if (durable_response->status == SplitSearchResult::kNoBetterSplitFound) {
+        // Even if no better split was found, this is still a valid job.
+        num_valid_job_tested++;
+      } else if (durable_response->status ==
+                 SplitSearchResult::kBetterSplitFound) {
+        num_valid_job_tested++;
+        DCHECK_NE(durable_response->condition_idx, -1);
+
+        const float process_split_score =
+            cache->condition_list[durable_response->condition_idx]
+                .split_score();
+
+        if (process_split_score > best_split_score) {
+          if (best_condition_idx != -1) {
+            cache->available_condition_idxs.push_front(best_condition_idx);
+          }
+          best_condition_idx = durable_response->condition_idx;
+          best_split_score = process_split_score;
+        } else {
+          // Return the condition to the condition pool.
+          cache->available_condition_idxs.push_front(
+              durable_response->condition_idx);
+        }
+      }
+    }
+
+    if (num_valid_job_tested >= min_num_jobs_to_test) {
+      // Enough jobs have been tested to take a decision.
       break;
     }
 
-    // Create more work.
+    // Schedule the testing of more conditions.
+
     while (!cache->available_condition_idxs.empty() &&
            !cache->available_cache_idxs.empty() &&
-           next_to_examine < num_features) {
-      if (best_status != nullptr && best_status->condition->split_score() >
-                                        best_condition->split_score()) {
-        processor.Submit(
-            produce(next_to_examine, best_status->condition->split_score()));
-      } else {
-        processor.Submit(
-            produce(next_to_examine, best_condition->split_score()));
-      }
-      next_to_examine++;
+           next_job_to_schedule < num_jobs) {
+      const int attribute_idx =
+          candidate_attributes[next_job_to_schedule - num_oblique_jobs];
+      processor.Submit(produce(next_job_to_schedule++, best_split_score,
+                               /*attribute_idx=*/attribute_idx,
+                               /*num_oblique_projections_to_run=*/-1));
     }
 
     // The following condition means that no work is in the pipeline and no more
@@ -1415,16 +1573,14 @@ utils::StatusOr<bool> FindBestConditionConcurrentManager(
       break;
     }
     SplitterWorkResponse& response = maybe_response.value();
-    cache->available_cache_idxs.push_front(
-        cache->work_status_list[response.status_idx].cache_idx);
+    cache->available_cache_idxs.push_front(response.manager_data.cache_idx);
   }
 
   // Move the random generator state to facilitate deterministic behavior.
-  random->discard(num_features - next_to_examine);
+  random->discard(num_jobs - next_job_to_schedule);
 
-  if (best_status != nullptr &&
-      best_status->condition->split_score() > best_condition->split_score()) {
-    *best_condition = *(best_status->condition);
+  if (best_condition_idx != -1) {
+    *best_condition = cache->condition_list[best_condition_idx];
     return true;
   }
   return false;
@@ -1432,7 +1588,7 @@ utils::StatusOr<bool> FindBestConditionConcurrentManager(
 
 utils::StatusOr<bool> FindBestConditionManager(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -1454,7 +1610,7 @@ utils::StatusOr<bool> FindBestConditionManager(
 
 utils::StatusOr<bool> FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -1607,10 +1763,10 @@ utils::StatusOr<bool> FindBestCondition(
 }
 
 SplitSearchResult FindSplitLabelClassificationFeatureNumericalHistogram(
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
     const std::vector<int32_t>& labels, const int32_t num_label_classes,
-    float na_replacement, const row_t min_num_obs,
+    float na_replacement, const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, utils::RandomEngine* random,
@@ -1724,10 +1880,10 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalHistogram(
 }
 
 SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
     const std::vector<int32_t>& labels, const int32_t num_label_classes,
-    float na_replacement, const row_t min_num_obs,
+    float na_replacement, const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, const InternalTrainConfig& internal_config,
@@ -1862,13 +2018,14 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
 }
 
 SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
     const int num_bins, const std::vector<int32_t>& labels,
     const int32_t num_label_classes,
     const dataset::DiscretizedNumericalIndex na_replacement,
-    const row_t min_num_obs, const proto::DecisionTreeTrainingConfig& dt_config,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
@@ -1907,10 +2064,10 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
 }
 
 SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
     const std::vector<float>& labels, float na_replacement,
-    const dataset::VerticalDataset::row_t min_num_obs,
+    const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, utils::RandomEngine* random,
@@ -2035,10 +2192,10 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
 }
 
 SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
-    float na_replacement, row_t min_num_obs,
+    float na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
     double sum_hessian, double sum_weights, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
@@ -2096,11 +2253,12 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
 
 SplitSearchResult
 FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
     int num_bins, const std::vector<float>& gradients,
-    const std::vector<float>& hessians, float na_replacement, row_t min_num_obs,
+    const std::vector<float>& hessians, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
     double sum_hessian, double sum_weights, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
@@ -2123,10 +2281,10 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
 }
 
 SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
     const std::vector<float>& labels, float na_replacement,
-    const dataset::VerticalDataset::row_t min_num_obs,
+    const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, const InternalTrainConfig& internal_config,
@@ -2177,12 +2335,13 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
 }
 
 SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
     const int num_bins, const std::vector<float>& labels,
     const dataset::DiscretizedNumericalIndex na_replacement,
-    const row_t min_num_obs, const proto::DecisionTreeTrainingConfig& dt_config,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
@@ -2199,11 +2358,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
 }
 
 SplitSearchResult FindSplitLabelClassificationFeatureNA(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::AbstractColumn* attributes,
     const std::vector<int32_t>& labels, const int32_t num_label_classes,
-    const dataset::VerticalDataset::row_t min_num_obs,
+    const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
@@ -2244,11 +2403,10 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
 }
 
 SplitSearchResult FindSplitLabelRegressionFeatureNA(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::AbstractColumn* attributes,
-    const std::vector<float>& labels,
-    const dataset::VerticalDataset::row_t min_num_obs,
+    const std::vector<float>& labels, const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
@@ -2265,11 +2423,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureNA(
 }
 
 SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::AbstractColumn* attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
-    const dataset::VerticalDataset::row_t min_num_obs,
+    const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const double sum_gradient, const double sum_hessian,
     const double sum_weights, const int32_t attribute_idx,
@@ -2292,10 +2450,10 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
 }
 
 SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<char>& attributes,
     const std::vector<int32_t>& labels, const int32_t num_label_classes,
-    bool na_replacement, dataset::VerticalDataset::row_t min_num_obs,
+    bool na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
@@ -2345,10 +2503,10 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
 }
 
 SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<char>& attributes,
     const std::vector<float>& labels, bool na_replacement,
-    dataset::VerticalDataset::row_t min_num_obs,
+    UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
@@ -2369,10 +2527,10 @@ SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
 }
 
 SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<char>& attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
-    bool na_replacement, const dataset::VerticalDataset::row_t min_num_obs,
+    bool na_replacement, const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const double sum_gradient, const double sum_hessian,
     const double sum_weights, const int32_t attribute_idx,
@@ -2400,11 +2558,11 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
 }
 
 SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
     const int32_t num_attribute_classes, int32_t na_replacement,
-    const dataset::VerticalDataset::row_t min_num_obs,
+    const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const double sum_gradient, const double sum_hessian,
     const double sum_weights, const int32_t attribute_idx,
@@ -2453,10 +2611,10 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
 }
 
 SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const std::vector<float>& labels, const int32_t num_attribute_classes,
-    int32_t na_replacement, const dataset::VerticalDataset::row_t min_num_obs,
+    int32_t na_replacement, const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
@@ -2500,12 +2658,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
 
 SplitSearchResult
 FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::CategoricalSetColumn& attributes,
     const std::vector<int32_t>& labels, const int32_t num_attribute_classes,
-    const int32_t num_label_classes,
-    const dataset::VerticalDataset::row_t min_num_obs,
+    const int32_t num_label_classes, const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
@@ -2569,7 +2726,7 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
   // When initialized, this corresponds to the index of the first values for
   // this particular example: i.e. running_attr_bank_idx[select_idx] ==
   // attribute_values[selected_examples[select_idx]].first.
-  std::vector<dataset::VerticalDataset::row_t> running_attr_bank_idx(
+  std::vector<UnsignedExampleIdx> running_attr_bank_idx(
       selected_examples.size());
 
   const int max_iterations =
@@ -2628,7 +2785,7 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
         // order. The candidate attributes "candidate_attr_value" are testing
         // in increasing order.
         bool match = false;
-        dataset::VerticalDataset::row_t last_attr;
+        UnsignedExampleIdx last_attr;
         while (
             running_attr_bank_idx[select_idx] <
                 attribute_values[example_idx].second &&
@@ -2727,11 +2884,12 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
 }
 
 SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::CategoricalSetColumn& attributes,
     const std::vector<float>& labels, int32_t num_attribute_classes,
-    row_t min_num_obs, const proto::DecisionTreeTrainingConfig& dt_config,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
     utils::RandomEngine* random) {
@@ -2793,7 +2951,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
   // When initialized, this corresponds to the index of the first values for
   // this particular example: i.e. running_attr_bank_idx[select_idx] ==
   // attribute_values[selected_examples[select_idx]].first.
-  std::vector<dataset::VerticalDataset::row_t> running_attr_bank_idx(
+  std::vector<UnsignedExampleIdx> running_attr_bank_idx(
       selected_examples.size());
 
   const double initial_variance = label_distribution.Var();
@@ -2872,10 +3030,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
 template <typename LabelBucket, typename ExampleBucketSet,
           typename LabelScoreAccumulator>
 SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const std::vector<int32_t>& labels, int32_t num_attribute_classes,
-    int32_t num_label_classes, int32_t na_replacement, row_t min_num_obs,
+    int32_t num_label_classes, int32_t na_replacement,
+    UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     int32_t attribute_idx, utils::RandomEngine* random,
@@ -3049,10 +3208,11 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
 }
 
 SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const std::vector<int32_t>& labels, int32_t num_attribute_classes,
-    int32_t num_label_classes, int32_t na_replacement, row_t min_num_obs,
+    int32_t num_label_classes, int32_t na_replacement,
+    UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     int32_t attribute_idx, utils::RandomEngine* random,
@@ -3095,10 +3255,10 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
 }
 
 SplitSearchResult FindSplitLabelUpliftCategoricalFeatureNumericalCart(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
     const CategoricalUpliftLabelStats& label_stats, float na_replacement,
-    dataset::VerticalDataset::row_t min_num_obs,
+    UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
@@ -3126,10 +3286,10 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureNumericalCart(
 }
 
 SplitSearchResult FindSplitLabelUpliftNumericalFeatureNumericalCart(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
     const NumericalUpliftLabelStats& label_stats, float na_replacement,
-    dataset::VerticalDataset::row_t min_num_obs,
+    UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
@@ -3157,10 +3317,10 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureNumericalCart(
 }
 
 SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const CategoricalUpliftLabelStats& label_stats, int num_attribute_classes,
-    int32_t na_replacement, dataset::VerticalDataset::row_t min_num_obs,
+    int32_t na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random) {
@@ -3209,10 +3369,10 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
 }
 
 SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const NumericalUpliftLabelStats& label_stats, int num_attribute_classes,
-    int32_t na_replacement, dataset::VerticalDataset::row_t min_num_obs,
+    int32_t na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random) {
@@ -3313,10 +3473,11 @@ void GetCandidateAttributes(
       *num_attributes_to_test, static_cast<int>(candidate_attributes->size()));
 }
 
-void GenerateRandomImputation(
-    const dataset::VerticalDataset& src, const std::vector<int>& attributes,
-    const std::vector<dataset::VerticalDataset::row_t>& examples,
-    dataset::VerticalDataset* dst, utils::RandomEngine* random) {
+void GenerateRandomImputation(const dataset::VerticalDataset& src,
+                              const std::vector<int>& attributes,
+                              const std::vector<UnsignedExampleIdx>& examples,
+                              dataset::VerticalDataset* dst,
+                              utils::RandomEngine* random) {
   CHECK_EQ(dst->ncol(), 0) << "The destination dataset should be empty.";
   dst->set_data_spec(src.data_spec());
   CHECK_OK(dst->CreateColumnsFromDataspec());
@@ -3329,31 +3490,28 @@ void GenerateRandomImputation(
 
 void GenerateRandomImputationOnColumn(
     const dataset::VerticalDataset::AbstractColumn* src,
-    const std::vector<dataset::VerticalDataset::row_t>& examples,
+    const std::vector<UnsignedExampleIdx>& examples,
     dataset::VerticalDataset::AbstractColumn* dst,
     utils::RandomEngine* random) {
   CHECK_EQ(src->type(), dst->type());
   // Extract the indices of the example with non-na values i.e. the candidate
   // for sampling.
-  std::vector<dataset::VerticalDataset::row_t> non_na_examples;
+  std::vector<UnsignedExampleIdx> non_na_examples;
   for (const auto example_idx : examples) {
     if (!src->IsNa(example_idx)) {
       non_na_examples.push_back(example_idx);
     }
   }
-  std::uniform_int_distribution<dataset::VerticalDataset::row_t>
-      non_na_example_dist(
-          0, std::max(static_cast<dataset::VerticalDataset::row_t>(0),
-                      static_cast<dataset::VerticalDataset::row_t>(
-                          non_na_examples.size()) -
-                          1));
-  std::vector<row_t> source_indices = examples;
+  std::uniform_int_distribution<UnsignedExampleIdx> non_na_example_dist(
+      0, std::max(static_cast<UnsignedExampleIdx>(0),
+                  static_cast<UnsignedExampleIdx>(non_na_examples.size()) - 1));
+  std::vector<UnsignedExampleIdx> source_indices = examples;
   if (non_na_examples.empty()) {
     CHECK_OK(src->ExtractAndAppend(source_indices, dst));
     return;
   }
 
-  dataset::VerticalDataset::row_t local_example_idx = 0;
+  UnsignedExampleIdx local_example_idx = 0;
   for (const auto example_idx : examples) {
     if (src->IsNa(example_idx)) {
       // Sample a random non-na value.
@@ -3367,7 +3525,7 @@ void GenerateRandomImputationOnColumn(
 
 void SetRegressionLabelDistribution(
     const dataset::VerticalDataset& dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   DCHECK(!weights.empty());
@@ -3377,7 +3535,7 @@ void SetRegressionLabelDistribution(
               config_link.label())
           .value();
   utils::NormalDistributionDouble label_distribution;
-  for (const row_t example_idx : selected_examples) {
+  for (const UnsignedExampleIdx example_idx : selected_examples) {
     label_distribution.Add(labels->values()[example_idx], weights[example_idx]);
   }
   label_distribution.Save(node->mutable_regressor()->mutable_distribution());
@@ -3429,8 +3587,8 @@ S& Container(std::priority_queue<T, S, C>& q) {
 
 absl::Status GrowTreeBestFirstGlobal(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& train_example_idxs,
-    const std::vector<row_t>* optional_leaf_examples,
+    const std::vector<UnsignedExampleIdx>& train_example_idxs,
+    const std::vector<UnsignedExampleIdx>* optional_leaf_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -3458,7 +3616,7 @@ absl::Status GrowTreeBestFirstGlobal(
     // Split.
     proto::NodeCondition condition;
     // Indices of examples in the node.
-    std::vector<row_t> example_idxs;
+    std::vector<UnsignedExampleIdx> example_idxs;
     // Global score of the split.
     float score;
     // The currently leaf node.
@@ -3476,9 +3634,9 @@ absl::Status GrowTreeBestFirstGlobal(
 
   // Initialize a node and update the list of candidate splits with a given
   // node.
-  const auto ingest_node = [&](const std::vector<row_t>& example_idxs,
-                               NodeWithChildren* node,
-                               const int depth) -> absl::Status {
+  const auto ingest_node =
+      [&](const std::vector<UnsignedExampleIdx>& example_idxs,
+          NodeWithChildren* node, const int depth) -> absl::Status {
     internal_config.set_leaf_value_functor(train_dataset, example_idxs, weights,
                                            config, config_link, node);
 
@@ -3518,8 +3676,8 @@ absl::Status GrowTreeBestFirstGlobal(
   const int max_num_nodes =
       dt_config.growing_strategy_best_first_global().max_num_nodes();
 
-  std::vector<row_t> positive_examples;
-  std::vector<row_t> negative_examples;
+  std::vector<UnsignedExampleIdx> positive_examples;
+  std::vector<UnsignedExampleIdx> negative_examples;
 
   while (!candidate_splits.empty() &&
          (max_num_nodes < 0 || num_nodes < max_num_nodes) &&
@@ -3570,7 +3728,7 @@ absl::Status GrowTreeBestFirstGlobal(
 
 absl::Status DecisionTreeTrain(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -3579,10 +3737,10 @@ absl::Status DecisionTreeTrain(
     DecisionTree* dt, const InternalTrainConfig& internal_config) {
   // Decide if execution should happen in single-thread or concurrent mode.
 
-  const std::vector<row_t>* effective_selected_examples;
-  const std::vector<row_t>* leaf_examples;
-  std::vector<row_t> selected_examples_buffer;
-  std::vector<row_t> leaf_examples_buffer;
+  const std::vector<UnsignedExampleIdx>* effective_selected_examples;
+  const std::vector<UnsignedExampleIdx>* leaf_examples;
+  std::vector<UnsignedExampleIdx> selected_examples_buffer;
+  std::vector<UnsignedExampleIdx> leaf_examples_buffer;
 
   if (dt_config.has_honest()) {
     // Split the examples in two parts. One ("selected_examples_buffer") will be
@@ -3620,13 +3778,8 @@ absl::Status DecisionTreeTrain(
     leaf_examples = nullptr;
   }
 
-  const bool force_single_thread =
-      internal_config.num_threads > 1 &&
-      dt_config.split_axis_case() ==
-          proto::DecisionTreeTrainingConfig::kSparseObliqueSplit;
-
   SplitterConcurrencySetup splitter_concurrency_setup;
-  if (internal_config.num_threads <= 1 || force_single_thread) {
+  if (internal_config.num_threads <= 1) {
     splitter_concurrency_setup.concurrent_execution = false;
     return DecisionTreeCoreTrain(train_dataset, *effective_selected_examples,
                                  leaf_examples, config, config_link, dt_config,
@@ -3655,8 +3808,8 @@ absl::Status DecisionTreeTrain(
 
 absl::Status DecisionTreeCoreTrain(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
-    const std::vector<dataset::VerticalDataset::row_t>* optional_leaf_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<UnsignedExampleIdx>* optional_leaf_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -3685,8 +3838,8 @@ absl::Status DecisionTreeCoreTrain(
 
 absl::Status NodeTrain(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
-    const std::vector<row_t>* optional_leaf_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<UnsignedExampleIdx>* optional_leaf_examples,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -3721,7 +3874,8 @@ absl::Status NodeTrain(
   }
   // Dataset used to train this node.
   const dataset::VerticalDataset* local_train_dataset = &train_dataset;
-  const std::vector<row_t>* local_selected_examples = &selected_examples;
+  const std::vector<UnsignedExampleIdx>* local_selected_examples =
+      &selected_examples;
   // If true, the entire dataset "local_train_dataset" is composed of training
   // examples for this node. If false, only the subset of
   // "local_train_dataset" indexed by "selected_examples" are to be considered
@@ -3730,7 +3884,7 @@ absl::Status NodeTrain(
 
   // Extract the random local imputation.
   dataset::VerticalDataset random_local_imputation_train_dataset;
-  std::vector<row_t> random_local_imputation_selected_examples;
+  std::vector<UnsignedExampleIdx> random_local_imputation_selected_examples;
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::RANDOM_LOCAL_IMPUTATION) {
     std::vector<int> label_and_input_features(config_link.features().begin(),
@@ -3774,8 +3928,10 @@ absl::Status NodeTrain(
 
   // Separate the positive and negative examples.
   auto& per_depth_cache = *cache->per_depth[depth - 1];
-  std::vector<row_t>& positive_examples = per_depth_cache.positive_examples;
-  std::vector<row_t>& negative_examples = per_depth_cache.negative_examples;
+  std::vector<UnsignedExampleIdx>& positive_examples =
+      per_depth_cache.positive_examples;
+  std::vector<UnsignedExampleIdx>& negative_examples =
+      per_depth_cache.negative_examples;
   RETURN_IF_ERROR(internal::SplitExamples(
       *local_train_dataset, selected_examples, node->node().condition(),
       local_train_dataset_is_compact,
@@ -3784,8 +3940,8 @@ absl::Status NodeTrain(
 
   // Separate the positive and negative examples used only to determine the node
   // value.
-  std::vector<row_t>* positive_node_only_examples = nullptr;
-  std::vector<row_t>* negative_node_only_examples = nullptr;
+  std::vector<UnsignedExampleIdx>* positive_node_only_examples = nullptr;
+  std::vector<UnsignedExampleIdx>* negative_node_only_examples = nullptr;
   if (optional_leaf_examples) {
     positive_node_only_examples = &per_depth_cache.positive_node_only_examples;
     negative_node_only_examples = &per_depth_cache.negative_node_only_examples;
@@ -3857,7 +4013,7 @@ absl::Status PresortNumericalFeatures(
     }
 
     pool.Schedule([feature_idx, &train_dataset, preprocessing]() {
-      const dataset::VerticalDataset::row_t num_examples = train_dataset.nrow();
+      const UnsignedExampleIdx num_examples = train_dataset.nrow();
       const auto& values =
           train_dataset
               .ColumnWithCastWithStatus<
@@ -3872,8 +4028,8 @@ absl::Status PresortNumericalFeatures(
 
       std::vector<std::pair<float, SparseItem::ExampleIdx>> items(
           values.size());
-      for (dataset::VerticalDataset::row_t example_idx = 0;
-           example_idx < num_examples; example_idx++) {
+      for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
+           example_idx++) {
         auto value = values[example_idx];
         if (std::isnan(value)) {
           value = na_replacement_value;
@@ -3888,7 +4044,7 @@ absl::Status PresortNumericalFeatures(
           (*preprocessing->mutable_presorted_numerical_features())[feature_idx];
       sorted_values.items.resize(values.size());
 
-      for (dataset::VerticalDataset::row_t sorted_example_idx = 0;
+      for (UnsignedExampleIdx sorted_example_idx = 0;
            sorted_example_idx < num_examples; sorted_example_idx++) {
         SparseItem::ExampleIdx example_idx = items[sorted_example_idx].second;
         const bool change_value =
@@ -3911,7 +4067,7 @@ namespace internal {
 bool MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
     const proto::DecisionTreeTrainingConfig& dt_config,
     int32_t num_attribute_classes,
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<int64_t>&
         count_examples_without_weights_by_attribute_class,
     std::vector<bool>* candidate_attributes_bitmap,
@@ -3977,12 +4133,12 @@ std::vector<float> GenHistogramBins(const proto::NumericalSplit::Type type,
 }
 
 absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
-                           const std::vector<row_t>& examples,
+                           const std::vector<UnsignedExampleIdx>& examples,
                            const proto::NodeCondition& condition,
                            const bool dataset_is_dense,
                            const bool error_on_wrong_splitter_statistics,
-                           std::vector<row_t>* positive_examples,
-                           std::vector<row_t>* negative_examples,
+                           std::vector<UnsignedExampleIdx>* positive_examples,
+                           std::vector<UnsignedExampleIdx>* negative_examples,
                            const bool examples_are_training_examples) {
   if (examples_are_training_examples) {
     positive_examples->reserve(
@@ -3994,20 +4150,21 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
   positive_examples->clear();
   negative_examples->clear();
 
-  std::vector<row_t>* example_sets[] = {negative_examples, positive_examples};
+  std::vector<UnsignedExampleIdx>* example_sets[] = {negative_examples,
+                                                     positive_examples};
 
   // Index of the example selected for this node.
   const auto column_data = dataset.column(condition.attribute());
 
   if (!dataset_is_dense) {
-    for (const row_t example_idx : examples) {
+    for (const UnsignedExampleIdx example_idx : examples) {
       const auto dst = example_sets[EvalConditionFromColumn(
           condition, column_data, dataset, example_idx)];
       dst->push_back(example_idx);
     }
   } else {
-    row_t dense_example_idx = 0;
-    for (const row_t example_idx : examples) {
+    UnsignedExampleIdx dense_example_idx = 0;
+    for (const UnsignedExampleIdx example_idx : examples) {
       const auto dst = example_sets[EvalConditionFromColumn(
           condition, column_data, dataset, dense_example_idx)];
       dense_example_idx++;

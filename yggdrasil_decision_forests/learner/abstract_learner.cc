@@ -205,6 +205,15 @@ absl::Status AbstractLearner::LinkTrainingConfig(
                      feature_idxs.end());
 
   *config_link->mutable_features() = {feature_idxs.begin(), feature_idxs.end()};
+
+  // Index the numerical features.
+  config_link->clear_numerical_features();
+  for (const auto feature_idx : feature_idxs) {
+    if (data_spec.columns(feature_idx).type() == dataset::proto::NUMERICAL) {
+      config_link->add_numerical_features(feature_idx);
+    }
+  }
+
   return absl::OkStatus();
 }
 

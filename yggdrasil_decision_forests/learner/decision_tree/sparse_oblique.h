@@ -36,6 +36,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -51,41 +52,50 @@ namespace decision_tree {
 // Classification.
 utils::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const ClassificationLabelStats& label_stats,
+    const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache);
 
 // Regression with hessian term.
 utils::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionHessianLabelStats& label_stats,
+    const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache);
 
 // Regression.
 utils::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionLabelStats& label_stats,
+    const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache);
+
+// Computes the number of projections to test i.e.
+// num_projections = min(max_num_projections,
+// ceil(num_features ^ num_projections_exponent)).
+int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
+                      const int num_numerical_features);
 
 }  // namespace decision_tree
 }  // namespace model

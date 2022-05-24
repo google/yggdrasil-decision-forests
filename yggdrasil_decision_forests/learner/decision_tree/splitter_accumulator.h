@@ -57,8 +57,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
 
-using row_t = dataset::VerticalDataset::row_t;
-
 // ===============
 // Feature Buckets
 // ===============
@@ -94,11 +92,12 @@ using row_t = dataset::VerticalDataset::row_t;
 // void InitializeAndZero(const int bucket_idx, FeatureBucket* acc) const;
 //
 // // In which bucket a given example is falling.
-// size_t GetBucketIndex(const size_t local_example_idx, const row_t
-// example_idx) const;
+// size_t GetBucketIndex(const size_t local_example_idx, const
+// UnsignedExampleIdx example_idx) const;
 //
 // // Consume a training example.
-// void ConsumeExample(const row_t example_idx, FeatureBucket* acc) const;
+// void ConsumeExample(const UnsignedExampleIdx example_idx, FeatureBucket* acc)
+// const;
 //
 // Set the split function if this bucket is selected as
 // the best greater bucket in the negative side of the split. All the
@@ -132,8 +131,8 @@ struct FeatureNumericalBucket {
 
   class Filler {
    public:
-    Filler(const row_t num_selected_examples, const float na_replacement,
-           const std::vector<float>& attributes)
+    Filler(const UnsignedExampleIdx num_selected_examples,
+           const float na_replacement, const std::vector<float>& attributes)
         : num_selected_examples_(num_selected_examples),
           na_replacement_(na_replacement),
           attributes_(attributes) {}
@@ -144,16 +143,16 @@ struct FeatureNumericalBucket {
                            FeatureNumericalBucket* acc) const {}
 
     size_t GetBucketIndex(const size_t local_example_idx,
-                          const row_t example_idx) const {
+                          const UnsignedExampleIdx example_idx) const {
       return local_example_idx;
     }
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         FeatureNumericalBucket* acc) const {
       acc->value = GetValue(example_idx);
     }
 
-    float GetValue(const row_t example_idx) const {
+    float GetValue(const UnsignedExampleIdx example_idx) const {
       const float attribute = attributes_[example_idx];
       return std::isnan(attribute) ? na_replacement_ : attribute;
     }
@@ -181,7 +180,7 @@ struct FeatureNumericalBucket {
     float MissingValueReplacement() const { return na_replacement_; }
 
    private:
-    const row_t num_selected_examples_;
+    const UnsignedExampleIdx num_selected_examples_;
     const float na_replacement_;
     const std::vector<float>& attributes_;
   };
@@ -230,14 +229,14 @@ struct FeatureDiscretizedNumericalBucket {
                            FeatureDiscretizedNumericalBucket* acc) const {}
 
     size_t GetBucketIndex(const size_t local_example_idx,
-                          const row_t example_idx) const {
+                          const UnsignedExampleIdx example_idx) const {
       const auto attribute = attributes_[example_idx];
       return (attribute != dataset::kDiscretizedNumericalMissingValue)
                  ? attribute
                  : na_replacement_;
     }
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         FeatureDiscretizedNumericalBucket* acc) const {}
 
     template <typename ExampleBucketSet>
@@ -318,7 +317,7 @@ struct FeatureCategoricalBucket {
     }
 
     size_t GetBucketIndex(const size_t local_example_idx,
-                          const row_t example_idx) const {
+                          const UnsignedExampleIdx example_idx) const {
       const auto attribute = attributes_[example_idx];
       return (attribute ==
               dataset::VerticalDataset::CategoricalColumn::kNaValue)
@@ -326,7 +325,7 @@ struct FeatureCategoricalBucket {
                  : attribute;
     }
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         FeatureCategoricalBucket* acc) const {}
 
     template <typename ExampleBucketSet>
@@ -439,14 +438,14 @@ struct FeatureBooleanBucket {
                            FeatureBooleanBucket* acc) const {}
 
     size_t GetBucketIndex(const size_t local_example_idx,
-                          const row_t example_idx) const {
+                          const UnsignedExampleIdx example_idx) const {
       const auto attribute = attributes_[example_idx];
       return (attribute == dataset::VerticalDataset::BooleanColumn::kNaValue)
                  ? na_replacement_
                  : attribute;
     }
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         FeatureBooleanBucket* acc) const {}
 
     template <typename ExampleBucketSet>
@@ -503,11 +502,11 @@ struct FeatureIsMissingBucket {
                            FeatureIsMissingBucket* acc) const {}
 
     size_t GetBucketIndex(const size_t local_example_idx,
-                          const row_t example_idx) const {
+                          const UnsignedExampleIdx example_idx) const {
       return attributes_->IsNa(example_idx);
     }
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         FeatureIsMissingBucket* acc) const {}
 
     template <typename ExampleBucketSet>
@@ -751,7 +750,8 @@ struct LabelHessianNumericalScoreAccumulator {
 // void InitializeAndZero(LabelBucket* acc) const;
 //
 // Add the statistics about one examples to the bucket.
-// void ConsumeExample(const row_t example_idx, LabelBucket* acc) const;
+// void ConsumeExample(const UnsignedExampleIdx example_idx, LabelBucket* acc)
+// const;
 //
 // Initialize and empty an accumulator.
 // void InitEmpty(ScoreAccumulator* acc) const;
@@ -821,7 +821,7 @@ struct LabelNumericalOneValueBucket {
 
     void Finalize(LabelNumericalOneValueBucket* acc) const {}
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelNumericalOneValueBucket* acc) const {
       acc->value = label_[example_idx];
       acc->weight = weights_[example_idx];
@@ -963,7 +963,7 @@ struct LabelHessianNumericalOneValueBucket {
 
     void Finalize(LabelHessianNumericalOneValueBucket* acc) const {}
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelHessianNumericalOneValueBucket* acc) const {
       acc->gradient = gradients_[example_idx];
       acc->hessian = hessians_[example_idx];
@@ -1086,7 +1086,7 @@ struct LabelCategoricalOneValueBucket {
 
     void Finalize(LabelCategoricalOneValueBucket* acc) const {}
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelCategoricalOneValueBucket* acc) const {
       acc->value = label_[example_idx];
       acc->weight = weights_[example_idx];
@@ -1207,7 +1207,7 @@ struct LabelBinaryCategoricalOneValueBucket {
 
     void Finalize(LabelBinaryCategoricalOneValueBucket* acc) const {}
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelBinaryCategoricalOneValueBucket* acc) const {
       acc->value = label_[example_idx] == 2;
       acc->weight = weights_[example_idx];
@@ -1328,7 +1328,7 @@ struct LabelUnweightedBinaryCategoricalOneValueBucket {
     void Finalize(LabelUnweightedBinaryCategoricalOneValueBucket* acc) const {}
 
     void ConsumeExample(
-        const row_t example_idx,
+        const UnsignedExampleIdx example_idx,
         LabelUnweightedBinaryCategoricalOneValueBucket* acc) const {
       acc->value = label_[example_idx] == 2;
     }
@@ -1456,7 +1456,7 @@ struct LabelNumericalBucket {
 
     void Finalize(LabelNumericalBucket* acc) const {}
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelNumericalBucket* acc) const {
       acc->value.Add(label_[example_idx], weights_[example_idx]);
       acc->count++;
@@ -1661,7 +1661,7 @@ struct LabelHessianNumericalBucket {
       }
     }
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelHessianNumericalBucket* acc) const {
       acc->sum_gradient += gradients_[example_idx];
       acc->sum_hessian += hessians_[example_idx];
@@ -1779,7 +1779,7 @@ struct LabelCategoricalBucket {
 
     void Finalize(LabelCategoricalBucket* acc) const {}
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelCategoricalBucket* acc) const {
       acc->value.Add(label_[example_idx], weights_[example_idx]);
       acc->count++;
@@ -1881,7 +1881,7 @@ struct LabelBinaryCategoricalBucket {
 
     void Finalize(LabelBinaryCategoricalBucket* acc) const {}
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelBinaryCategoricalBucket* acc) const {
       static float table[] = {0.f, 1.f};
       acc->sum_trues += table[label_[example_idx] == 2] * weights_[example_idx];
@@ -1982,7 +1982,7 @@ struct LabelUnweightedBinaryCategoricalBucket {
 
     void Finalize(LabelUnweightedBinaryCategoricalBucket* acc) const {}
 
-    void ConsumeExample(const row_t example_idx,
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelUnweightedBinaryCategoricalBucket* acc) const {
       static float table[] = {0.f, 1.f};
       acc->sum_trues += table[label_[example_idx] == 2];

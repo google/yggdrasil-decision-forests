@@ -108,7 +108,7 @@ class RankingGroupsIndices {
     // Ground truth relevance.
     float relevance;
     // Index of the example.
-    dataset::VerticalDataset::row_t example_idx;
+    UnsignedExampleIdx example_idx;
   };
 
   // A "group" of examples is a set of examples that share the same "group
@@ -140,7 +140,7 @@ class RankingGroupsIndices {
   std::vector<Group> groups_;
 
   // Total number of items.
-  dataset::VerticalDataset::row_t num_items_ = 0;
+  UnsignedExampleIdx num_items_ = 0;
 };
 
 // Loss to optimize during the training of a GBT.

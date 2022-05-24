@@ -28,7 +28,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
 
-using row_t = dataset::VerticalDataset::row_t;
 
 // Distribution of uplift classification labels.
 struct UpliftLabelDistribution {
@@ -413,7 +412,8 @@ struct LabelUpliftGenericOneValueBucket {
       // Nothing to do.
     }
 
-    void ConsumeExample(const row_t example_idx, Bucket* acc) const {
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
+                        Bucket* acc) const {
       acc->outcome = outcomes_[example_idx];
       acc->treatment = treatments_[example_idx];
       acc->weight = weights_[example_idx];
@@ -519,7 +519,8 @@ struct LabelUpliftGenericBucket {
       acc->signed_uplift = acc->distribution.Uplift();
     }
 
-    void ConsumeExample(const row_t example_idx, Bucket* acc) const {
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
+                        Bucket* acc) const {
       if constexpr (categorical_label) {
         acc->distribution.AddCategoricalOutcome(outcomes_[example_idx],
                                                 treatments_[example_idx],

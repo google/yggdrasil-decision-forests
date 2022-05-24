@@ -830,20 +830,6 @@ std::string VerticalDataset::CategoricalListColumn::ToStringWithDigitPrecision(
   return rep;
 }
 
-utils::StatusOr<VerticalDataset> VerticalDataset::Extract(
-    const std::vector<row_t>& indices) const {
-  VerticalDataset dst;
-  dst.data_spec_ = data_spec_;
-  dst.nrow_ = indices.size();
-  RETURN_IF_ERROR(dst.CreateColumnsFromDataspec());
-  for (int col_idx = 0; col_idx < ncol(); col_idx++) {
-    if (column(col_idx)->nrows() > 0) {
-      RETURN_IF_ERROR(column(col_idx)->ExtractAndAppend(
-          indices, dst.mutable_column(col_idx)));
-    }
-  }
-  return std::move(dst);
-}
 
 utils::StatusOr<VerticalDataset> VerticalDataset::ConvertToGivenDataspec(
     const proto::DataSpecification& new_data_spec,

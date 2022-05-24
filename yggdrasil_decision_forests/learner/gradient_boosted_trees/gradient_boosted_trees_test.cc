@@ -107,14 +107,14 @@ std::string ShardDataset(const dataset::VerticalDataset& dataset,
   CHECK_OK(utils::ExpandOutputShards(sharded_path, &shards));
 
   // Down-sample the number of examples.
-  std::vector<dataset::VerticalDataset::row_t> examples(dataset.nrow());
+  std::vector<UnsignedExampleIdx> examples(dataset.nrow());
   std::iota(examples.begin(), examples.end(), 0);
   std::mt19937 rnd;
   std::shuffle(examples.begin(), examples.end(), rnd);
   examples.resize(std::lround(sampling * dataset.nrow()));
 
   for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
-    std::vector<dataset::VerticalDataset::row_t> idxs;
+    std::vector<UnsignedExampleIdx> idxs;
     for (int i = shard_idx; i < examples.size(); i += num_shards) {
       idxs.push_back(examples[i]);
     }
@@ -248,7 +248,7 @@ TEST(GradientBoostedTrees, SetInitialPredictions) {
 }
 
 TEST(GradientBoostedTrees, SampleTrainingExamplesWithGoss) {
-  const dataset::VerticalDataset::row_t num_rows = 4;
+  const UnsignedExampleIdx num_rows = 4;
   std::vector<float> weights(num_rows, 1.f);
 
   std::vector<float> dim1_values = {0.8, 2.0, -0.1, -3.2};
@@ -256,7 +256,7 @@ TEST(GradientBoostedTrees, SampleTrainingExamplesWithGoss) {
   std::vector<GradientData> gradients = {dim1};
 
   utils::RandomEngine random(1234);
-  std::vector<dataset::VerticalDataset::row_t> selected_examples;
+  std::vector<UnsignedExampleIdx> selected_examples;
 
   internal::SampleTrainingExamplesWithGoss(gradients, num_rows, /*alpha=*/1.,
                                            /*beta=*/0., &random,
@@ -305,7 +305,7 @@ TEST(GradientBoostedTrees, SampleTrainingExamplesWithSelGB) {
   EXPECT_EQ(index.groups().size(), 2);
 
   std::vector<float> predictions = {0.8, -0.1, -4.0, 2.0, 1.2, -3.2, -0.3};
-  std::vector<dataset::VerticalDataset::row_t> selected_examples;
+  std::vector<UnsignedExampleIdx> selected_examples;
 
   CHECK_OK(internal::SampleTrainingExamplesWithSelGB(
       model::proto::Task::RANKING, dataset.nrow(), &index, predictions,

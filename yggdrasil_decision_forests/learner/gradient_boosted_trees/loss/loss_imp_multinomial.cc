@@ -146,7 +146,7 @@ MultinomialLogLikelihoodLoss::SetLeafFunctor(
   return
       [this, &predictions, label_col_idx](
           const dataset::VerticalDataset& train_dataset,
-          const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+          const std::vector<UnsignedExampleIdx>& selected_examples,
           const std::vector<float>& weights,
           const model::proto::TrainingConfig& config,
           const model::proto::TrainingConfigLinking& config_link,
@@ -158,7 +158,7 @@ MultinomialLogLikelihoodLoss::SetLeafFunctor(
 
 void MultinomialLogLikelihoodLoss::SetLeaf(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,

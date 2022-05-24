@@ -114,6 +114,9 @@ class VerticalDataset {
     virtual absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
                                           AbstractColumn* dst) const = 0;
 
+    virtual absl::Status ExtractAndAppend(const std::vector<uint32_t>& indices,
+                                          AbstractColumn* dst) const = 0;
+
     // Converts the content of a column to another dataspec.
     virtual absl::Status ConvertToGivenDataspec(
         AbstractColumn* dst, const proto::Column& src_spec,
@@ -163,6 +166,9 @@ class VerticalDataset {
     std::vector<T>* mutable_values() { return &values_; }
 
     absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
+                                  AbstractColumn* dst) const override;
+
+    absl::Status ExtractAndAppend(const std::vector<uint32_t>& indices,
                                   AbstractColumn* dst) const override;
 
     std::pair<uint64_t, uint64_t> memory_usage() const override {
@@ -215,6 +221,9 @@ class VerticalDataset {
     }
 
     absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
+                                  AbstractColumn* dst) const override;
+
+    absl::Status ExtractAndAppend(const std::vector<uint32_t>& indices,
                                   AbstractColumn* dst) const override;
 
     const std::vector<std::pair<size_t, size_t>>& values() const {
@@ -649,8 +658,8 @@ class VerticalDataset {
   int ColumnNameToColumnIdx(absl::string_view name) const;
 
   // Extract a subset of observations from the dataset.
-  utils::StatusOr<VerticalDataset> Extract(
-      const std::vector<row_t>& indices) const;
+  template <typename T>
+  utils::StatusOr<VerticalDataset> Extract(const std::vector<T>& indices) const;
 
   // Copy the dataset while changing its dataspec.
   // When a column is present in the new dataspec but not in the old one:
@@ -815,6 +824,33 @@ absl::Status VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
 }
 
 template <typename T>
+absl::Status VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
+    const std::vector<uint32_t>& indices, AbstractColumn* dst) const {
+  auto* cast_dst =
+      dynamic_cast<VerticalDataset::TemplateScalarStorage<T>*>(dst);
+  STATUS_CHECK(cast_dst != nullptr);
+  if (values_.empty() && !indices.empty()) {
+    LOG(FATAL) << "Trying to extract " << indices.size()
+               << " examples from the non-allocated column \"" << name()
+               << "\".";
+  }
+  const size_t indices_size = indices.size();
+  const size_t init_dst_nrows = dst->nrows();
+  cast_dst->Resize(init_dst_nrows + indices_size);
+  for (size_t new_idx = 0; new_idx < indices_size; new_idx++) {
+    const auto src_row_idx = indices[new_idx];
+    const auto dst_row_idx = new_idx + init_dst_nrows;
+    DCHECK_LT(src_row_idx, values_.size());
+    if (!IsNa(src_row_idx)) {
+      cast_dst->values_[dst_row_idx] = values_[src_row_idx];
+    } else {
+      cast_dst->SetNA(dst_row_idx);
+    }
+  }
+  return absl::OkStatus();
+}
+
+template <typename T>
 absl::Status VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
     const std::vector<row_t>& indices, AbstractColumn* dst) const {
   auto* cast_dst =
@@ -822,6 +858,28 @@ absl::Status VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
   STATUS_CHECK(cast_dst != nullptr);
   if (values_.empty() && !indices.empty()) {
     return absl::InvalidArgumentError("ExtractAndAppend on an empty column");
+  }
+  cast_dst->Reserve(dst->nrows() + indices.size());
+  for (const auto row_idx : indices) {
+    DCHECK_LT(row_idx, values_.size());
+    if (!IsNa(row_idx)) {
+      cast_dst->Add(bank_.begin() + values_[row_idx].first,
+                    bank_.begin() + values_[row_idx].second);
+    } else {
+      cast_dst->AddNA();
+    }
+  }
+  return absl::OkStatus();
+}
+
+template <typename T>
+absl::Status VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
+    const std::vector<uint32_t>& indices, AbstractColumn* dst) const {
+  auto* cast_dst =
+      dynamic_cast<VerticalDataset::TemplateMultiValueStorage<T>*>(dst);
+  STATUS_CHECK(cast_dst != nullptr);
+  if (values_.empty() && !indices.empty()) {
+    LOG(FATAL) << "ExtractAndAppend on an empty column";
   }
   cast_dst->Reserve(dst->nrows() + indices.size());
   for (const auto row_idx : indices) {
@@ -901,6 +959,22 @@ T* VerticalDataset::MutableColumnWithCastOrNull(int col) {
                 "The template class argument does not derive  AbstractColumn.");
   auto* abstract_column = mutable_column(col);
   return dynamic_cast<T* const>(abstract_column);
+}
+
+template <typename T>
+utils::StatusOr<VerticalDataset> VerticalDataset::Extract(
+    const std::vector<T>& indices) const {
+  VerticalDataset dst;
+  dst.data_spec_ = data_spec_;
+  dst.nrow_ = indices.size();
+  RETURN_IF_ERROR(dst.CreateColumnsFromDataspec());
+  for (int col_idx = 0; col_idx < ncol(); col_idx++) {
+    if (column(col_idx)->nrows() > 0) {
+      RETURN_IF_ERROR(column(col_idx)->ExtractAndAppend(
+          indices, dst.mutable_column(col_idx)));
+    }
+  }
+  return std::move(dst);
 }
 
 }  // namespace dataset

@@ -55,6 +55,7 @@ cc_library_ydf(
     deps = [
         "@com_google_absl//absl/status",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/learner:types",
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:utils",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_cc_proto",

@@ -682,8 +682,7 @@ TEST(RandomForest, OOBPredictions) {
       dataset.nrow(), config, config_link, dataset.data_spec(), &predictions);
   EXPECT_EQ(predictions.size(), dataset.nrow());
 
-  std::vector<dataset::VerticalDataset::row_t> sorted_non_oob_example_indices =
-      {1};
+  std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices = {1};
   internal::UpdateOOBPredictionsWithNewTree(
       dataset, config, sorted_non_oob_example_indices, true,
       *model.decision_trees()[0].get(), {}, &rnd, &predictions);
@@ -751,8 +750,7 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
       dataset.nrow(), config, config_link, dataset.data_spec(),
       &oob_predictions_per_input_features[0]);
 
-  std::vector<dataset::VerticalDataset::row_t> sorted_non_oob_example_indices =
-      {1};
+  std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices = {1};
 
   // Baseline
   internal::UpdateOOBPredictionsWithNewTree(
@@ -861,8 +859,8 @@ TEST(ExtremelyRandomizeTrees, Figure10) {
           .value());
 
   // Generate the predictions.
-  for (dataset::VerticalDataset::row_t example_idx = 0;
-       example_idx < test_dataset.nrow(); example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < test_dataset.nrow();
+       example_idx++) {
     model::proto::Prediction pred;
     rf_model->Predict(test_dataset, example_idx, &pred);
     (*rf_preds->mutable_values())[example_idx] = pred.regression().value();
@@ -894,8 +892,8 @@ TEST(ExtremelyRandomizeTrees, Figure10) {
   // value (so we can use a binary search).
   std::vector<std::pair<float, float>> sorted_training_examples;
   sorted_training_examples.reserve(train_xs.size());
-  for (dataset::VerticalDataset::row_t example_idx = 0;
-       example_idx < train_xs.size(); example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < train_xs.size();
+       example_idx++) {
     sorted_training_examples.push_back(
         {train_xs[example_idx], train_ys[example_idx]});
   }
@@ -908,8 +906,8 @@ TEST(ExtremelyRandomizeTrees, Figure10) {
     // Only the testing examples in between two training examples (i.e. not
     // outside the bounds) are valid.
     int num_valid_examples = 0;
-    for (dataset::VerticalDataset::row_t example_idx = 0;
-         example_idx < test_dataset.nrow(); example_idx++) {
+    for (UnsignedExampleIdx example_idx = 0; example_idx < test_dataset.nrow();
+         example_idx++) {
       const float prediction = predictions[example_idx];
       // The input feature value of the  example "example_idx" is between
       // "(it_upper_bound-1).first" and "it_upper_bound.first".
@@ -1109,7 +1107,7 @@ TEST_F(RandomForestOnSimPTE, LowerBound) {
 
 TEST(SampleTrainingExamples, WithReplacement) {
   utils::RandomEngine random;
-  std::vector<dataset::VerticalDataset::row_t> examples;
+  std::vector<UnsignedExampleIdx> examples;
   internal::SampleTrainingExamples(100, 50, /*with_replacement=*/true, &random,
                                    &examples);
   EXPECT_EQ(examples.size(), 50);
@@ -1118,7 +1116,7 @@ TEST(SampleTrainingExamples, WithReplacement) {
 
 TEST(SampleTrainingExamples, WithoutReplacement) {
   utils::RandomEngine random;
-  std::vector<dataset::VerticalDataset::row_t> examples;
+  std::vector<UnsignedExampleIdx> examples;
   internal::SampleTrainingExamples(100, 50, /*with_replacement=*/false, &random,
                                    &examples);
   EXPECT_EQ(examples.size(), 50);

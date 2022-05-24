@@ -57,16 +57,16 @@ constexpr char CartLearner::kRegisteredName[];
 constexpr char CartLearner::kHParamValidationRatio[];
 
 namespace {
-using row_t = dataset::VerticalDataset::row_t;
 
 // Generates the indices for the training and validation datasets.
 void GenTrainAndValidIndices(const float validation_ratio,
-                             const row_t num_examples,
-                             std::vector<row_t>* train,
-                             std::vector<row_t>* valid,
+                             const UnsignedExampleIdx num_examples,
+                             std::vector<UnsignedExampleIdx>* train,
+                             std::vector<UnsignedExampleIdx>* valid,
                              utils::RandomEngine* rnd) {
   std::uniform_real_distribution<float> unif_dist_01;
-  for (row_t example_idx = 0; example_idx < num_examples; example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
+       example_idx++) {
     const bool in_training = unif_dist_01(*rnd) > validation_ratio;
     (in_training ? train : valid)->push_back(example_idx);
   }
@@ -184,7 +184,7 @@ utils::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
   utils::RandomEngine random(config.random_seed());
 
   // Select the example for training and for pruning.
-  std::vector<row_t> train_examples, valid_examples;
+  std::vector<UnsignedExampleIdx> train_examples, valid_examples;
   GenTrainAndValidIndices(cart_config.validation_ratio(), train_dataset.nrow(),
                           &train_examples, &valid_examples, &random);
 
@@ -259,7 +259,7 @@ absl::Status PruneNode(const dataset::VerticalDataset& dataset,
                        const std::vector<float>& weights,
                        const std::vector<Label>& labels,
                        const std::vector<Secondary>& secondary_labels,
-                       const std::vector<row_t>& example_idxs,
+                       const std::vector<UnsignedExampleIdx>& example_idxs,
                        std::vector<Prediction>* predictions,
                        model::decision_tree::NodeWithChildren* node) {
   if (node->IsLeaf()) {
@@ -272,7 +272,7 @@ absl::Status PruneNode(const dataset::VerticalDataset& dataset,
   }
 
   // Maybe prune the children.
-  std::vector<row_t> positive_examples, negative_examples;
+  std::vector<UnsignedExampleIdx> positive_examples, negative_examples;
   RETURN_IF_ERROR(decision_tree::internal::SplitExamples(
       dataset, example_idxs, node->node().condition(),
       /*dataset_is_dense=*/false, /*error_on_wrong_splitter_statistics=*/false,
@@ -323,7 +323,7 @@ absl::Status PruneNode(const dataset::VerticalDataset& dataset,
 
 absl::Status PruneTreeClassification(
     const dataset::VerticalDataset& dataset, const std::vector<float> weights,
-    const std::vector<row_t>& example_idxs,
+    const std::vector<UnsignedExampleIdx>& example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     model::decision_tree::DecisionTree* tree) {
@@ -363,7 +363,7 @@ absl::Status PruneTreeClassification(
 
 absl::Status PruneTreeRegression(
     const dataset::VerticalDataset& dataset, const std::vector<float> weights,
-    const std::vector<row_t>& example_idxs,
+    const std::vector<UnsignedExampleIdx>& example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     model::decision_tree::DecisionTree* tree) {
@@ -404,7 +404,7 @@ absl::Status PruneTreeRegression(
 
 absl::Status PruneTreeUpliftCategorical(
     const dataset::VerticalDataset& dataset, const std::vector<float> weights,
-    const std::vector<row_t>& example_idxs,
+    const std::vector<UnsignedExampleIdx>& example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     model::decision_tree::DecisionTree* tree) {
@@ -485,7 +485,7 @@ absl::Status PruneTreeUpliftCategorical(
 
 absl::Status PruneTree(const dataset::VerticalDataset& dataset,
                        const std::vector<float>& weights,
-                       const std::vector<row_t>& example_idxs,
+                       const std::vector<UnsignedExampleIdx>& example_idxs,
                        const model::proto::TrainingConfig& config,
                        const model::proto::TrainingConfigLinking& config_link,
                        model::decision_tree::DecisionTree* tree) {

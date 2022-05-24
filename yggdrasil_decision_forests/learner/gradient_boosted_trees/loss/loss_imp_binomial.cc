@@ -69,7 +69,8 @@ BinomialLogLikelihoodLoss::InitialPredictions(
       const auto* labels,
       dataset.ColumnWithCastWithStatus<
           dataset::VerticalDataset::CategoricalColumn>(label_col_idx));
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+  const UnsignedExampleIdx n = dataset.nrow();
+  for (UnsignedExampleIdx example_idx = 0; example_idx < n; example_idx++) {
     sum_weights += weights[example_idx];
     weighted_sum_positive +=
         weights[example_idx] * (labels->values()[example_idx] == 2);
@@ -188,22 +189,21 @@ decision_tree::CreateSetLeafValueFunctor
 BinomialLogLikelihoodLoss::SetLeafFunctor(
     const std::vector<float>& predictions,
     const std::vector<GradientData>& gradients, const int label_col_idx) const {
-  return
-      [this, &predictions, label_col_idx](
-          const dataset::VerticalDataset& train_dataset,
-          const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
-          const std::vector<float>& weights,
-          const model::proto::TrainingConfig& config,
-          const model::proto::TrainingConfigLinking& config_link,
-          decision_tree::NodeWithChildren* node) {
-        return SetLeaf(train_dataset, selected_examples, weights, config,
-                       config_link, predictions, label_col_idx, node);
-      };
+  return [this, &predictions, label_col_idx](
+             const dataset::VerticalDataset& train_dataset,
+             const std::vector<UnsignedExampleIdx>& selected_examples,
+             const std::vector<float>& weights,
+             const model::proto::TrainingConfig& config,
+             const model::proto::TrainingConfigLinking& config_link,
+             decision_tree::NodeWithChildren* node) {
+    return SetLeaf(train_dataset, selected_examples, weights, config,
+                   config_link, predictions, label_col_idx, node);
+  };
 }
 
 void BinomialLogLikelihoodLoss::SetLeaf(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,

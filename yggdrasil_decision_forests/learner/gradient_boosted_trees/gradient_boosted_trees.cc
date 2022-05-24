@@ -71,8 +71,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-using row_t = dataset::VerticalDataset::row_t;
-
 constexpr char GradientBoostedTreesLearner::kRegisteredName[];
 
 // Generic hyper parameter names.
@@ -651,7 +649,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   };
 
   // List of selected examples. Always contains all the training examples.
-  std::vector<row_t> selected_examples;
+  std::vector<UnsignedExampleIdx> selected_examples;
 
   // Thread loading the sample of shard for the next tree.
   // Note: The shard loaded in multi-threaded by the vertical dataset IO lib.
@@ -1222,7 +1220,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
   }
 
   // Train the trees one by one.
-  std::vector<row_t> selected_examples;
+  std::vector<UnsignedExampleIdx> selected_examples;
 
   // Switch between weights and GOSS-specific weights if necessary.
   std::vector<float>* tree_weights = &weights;
@@ -2356,12 +2354,12 @@ absl::Status ExtractValidationDataset(const VerticalDataset& dataset,
     *train = dataset.ShallowNonOwningClone();
   } else {
     std::uniform_real_distribution<float> unif_dist_01;
-    std::vector<row_t> training_rows;
-    std::vector<row_t> validation_rows;
+    std::vector<UnsignedExampleIdx> training_rows;
+    std::vector<UnsignedExampleIdx> validation_rows;
 
     if (group_column_idx == -1) {
       // Sampling per example.
-      for (row_t row = 0; row < dataset.nrow(); row++) {
+      for (UnsignedExampleIdx row = 0; row < dataset.nrow(); row++) {
         const bool in_training = unif_dist_01(*random) > validation_set_ratio;
         (in_training ? training_rows : validation_rows).push_back(row);
       }
@@ -2375,8 +2373,10 @@ absl::Status ExtractValidationDataset(const VerticalDataset& dataset,
           dataset.ColumnWithCastOrNull<dataset::VerticalDataset::HashColumn>(
               group_column_idx);
 
-      absl::flat_hash_map<uint64_t, std::vector<row_t>> rows_per_groups;
-      for (row_t row_idx = 0; row_idx < dataset.nrow(); row_idx++) {
+      absl::flat_hash_map<uint64_t, std::vector<UnsignedExampleIdx>>
+          rows_per_groups;
+      for (UnsignedExampleIdx row_idx = 0; row_idx < dataset.nrow();
+           row_idx++) {
         // Get the value of the group.
         uint64_t group_value;
         if (group_categorical_values) {
@@ -2390,7 +2390,8 @@ absl::Status ExtractValidationDataset(const VerticalDataset& dataset,
         rows_per_groups[group_value].push_back(row_idx);
       }
 
-      std::vector<std::vector<row_t>> rows_per_groups_decreasing_volume;
+      std::vector<std::vector<UnsignedExampleIdx>>
+          rows_per_groups_decreasing_volume;
       rows_per_groups_decreasing_volume.reserve(rows_per_groups.size());
       for (auto& group : rows_per_groups) {
         rows_per_groups_decreasing_volume.push_back(std::move(group.second));
@@ -2399,7 +2400,8 @@ absl::Status ExtractValidationDataset(const VerticalDataset& dataset,
                    rows_per_groups_decreasing_volume.end(), *random);
       std::sort(rows_per_groups_decreasing_volume.begin(),
                 rows_per_groups_decreasing_volume.end(),
-                [](const std::vector<row_t>& a, const std::vector<row_t>& b) {
+                [](const std::vector<UnsignedExampleIdx>& a,
+                   const std::vector<UnsignedExampleIdx>& b) {
                   if (a.size() == b.size()) {
                     return std::lexicographical_compare(a.begin(), a.end(),
                                                         b.begin(), b.end());
@@ -2544,9 +2546,10 @@ absl::Status ComputePredictions(
   return absl::OkStatus();
 }
 
-void SampleTrainingExamples(const dataset::VerticalDataset::row_t num_rows,
-                            const float sample, utils::RandomEngine* random,
-                            std::vector<row_t>* selected_examples) {
+void SampleTrainingExamples(
+    const UnsignedExampleIdx num_rows, const float sample,
+    utils::RandomEngine* random,
+    std::vector<UnsignedExampleIdx>* selected_examples) {
   if (sample >= 1.f - std::numeric_limits<float>::epsilon()) {
     selected_examples->resize(num_rows);
     std::iota(selected_examples->begin(), selected_examples->end(), 0);
@@ -2555,7 +2558,8 @@ void SampleTrainingExamples(const dataset::VerticalDataset::row_t num_rows,
 
   selected_examples->clear();
   std::uniform_real_distribution<float> unif_dist_unit;
-  for (row_t example_idx = 0; example_idx < num_rows; example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < num_rows;
+       example_idx++) {
     if (unif_dist_unit(*random) < sample) {
       selected_examples->push_back(example_idx);
     }
@@ -2563,19 +2567,22 @@ void SampleTrainingExamples(const dataset::VerticalDataset::row_t num_rows,
   if (selected_examples->empty()) {
     // Ensure at least one example is selected.
     selected_examples->push_back(
-        std::uniform_int_distribution<row_t>(num_rows - 1)(*random));
+        std::uniform_int_distribution<UnsignedExampleIdx>(num_rows -
+                                                          1)(*random));
   }
 }
 
 void SampleTrainingExamplesWithGoss(
     const std::vector<GradientData>& gradients,
-    const dataset::VerticalDataset::row_t num_rows, const float alpha,
-    const float beta, utils::RandomEngine* random,
-    std::vector<row_t>* selected_examples, std::vector<float>* weights) {
+    const UnsignedExampleIdx num_rows, const float alpha, const float beta,
+    utils::RandomEngine* random,
+    std::vector<UnsignedExampleIdx>* selected_examples,
+    std::vector<float>* weights) {
   // Compute L1 norm of the gradient vector for every example.
-  std::vector<std::pair<row_t, float>> l1_norm;
+  std::vector<std::pair<UnsignedExampleIdx, float>> l1_norm;
   l1_norm.reserve(num_rows);
-  for (row_t example_idx = 0; example_idx < num_rows; example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < num_rows;
+       example_idx++) {
     float example_l1_norm = 0.f;
     for (const auto& gradient_data : gradients) {
       example_l1_norm += std::fabs(gradient_data.gradient[example_idx]);
@@ -2591,7 +2598,7 @@ void SampleTrainingExamplesWithGoss(
   selected_examples->clear();
 
   int cutoff = std::ceil(alpha * num_rows);
-  for (row_t idx = 0; idx < cutoff; idx++) {
+  for (UnsignedExampleIdx idx = 0; idx < cutoff; idx++) {
     selected_examples->push_back(l1_norm[idx].first);
   }
 
@@ -2599,9 +2606,9 @@ void SampleTrainingExamplesWithGoss(
   if (beta > 0) {
     const float amplification_factor = (1.f - alpha) / beta;
     std::uniform_real_distribution<float> unif_dist_unit;
-    for (row_t idx = cutoff; idx < num_rows; idx++) {
+    for (UnsignedExampleIdx idx = cutoff; idx < num_rows; idx++) {
       if (unif_dist_unit(*random) < beta) {
-        const row_t example_idx = l1_norm[idx].first;
+        const UnsignedExampleIdx example_idx = l1_norm[idx].first;
         selected_examples->push_back(example_idx);
         (*weights)[example_idx] *= amplification_factor;
       }
@@ -2611,15 +2618,16 @@ void SampleTrainingExamplesWithGoss(
   // Ensure at least one example is selected.
   if (selected_examples->empty()) {
     selected_examples->push_back(
-        std::uniform_int_distribution<row_t>(num_rows - 1)(*random));
+        std::uniform_int_distribution<UnsignedExampleIdx>(num_rows -
+                                                          1)(*random));
   }
 }
 
 absl::Status SampleTrainingExamplesWithSelGB(
-    model::proto::Task task, const dataset::VerticalDataset::row_t num_rows,
+    model::proto::Task task, const UnsignedExampleIdx num_rows,
     const RankingGroupsIndices* ranking_index,
     const std::vector<float>& predictions, const float ratio,
-    std::vector<row_t>* selected_examples) {
+    std::vector<UnsignedExampleIdx>* selected_examples) {
   if (task != model::proto::Task::RANKING) {
     return absl::InvalidArgumentError(
         "Selective Gradient Boosting is only applicable to ranking");
@@ -2632,7 +2640,7 @@ absl::Status SampleTrainingExamplesWithSelGB(
   }
 
   selected_examples->clear();
-  std::vector<std::pair<row_t, float>> negative_predictions;
+  std::vector<std::pair<UnsignedExampleIdx, float>> negative_predictions;
 
   for (const auto& group : ranking_index->groups()) {
     const auto group_size = group.items.size();
@@ -2709,7 +2717,8 @@ void InitializeModelWithTrainingConfig(
 }
 
 void DartPredictionAccumulator::Initialize(
-    const std::vector<float>& initial_predictions, const row_t num_rows) {
+    const std::vector<float>& initial_predictions,
+    const UnsignedExampleIdx num_rows) {
   SetInitialPredictions(initial_predictions, num_rows, &predictions_);
 }
 
@@ -2752,7 +2761,7 @@ absl::Status DartPredictionAccumulator::GetSampledPredictions(
   if (dropout_iter_idxs.empty()) {
     return GetAllPredictions(predictions);
   }
-  for (row_t example_idx = 0; example_idx < predictions_.size();
+  for (UnsignedExampleIdx example_idx = 0; example_idx < predictions_.size();
        example_idx++) {
     float acc = predictions_[example_idx];
     if (std::isnan(acc)) {
@@ -2788,7 +2797,7 @@ absl::Status DartPredictionAccumulator::UpdateWithNewIteration(
                                (selected_iter_idxs.size() + 1);
 
   // Update the global predictions.
-  for (row_t example_idx = 0; example_idx < predictions_.size();
+  for (UnsignedExampleIdx example_idx = 0; example_idx < predictions_.size();
        example_idx++) {
     if (std::isnan(predictions_[example_idx])) {
       return absl::InvalidArgumentError("Found NaN in predictions");
@@ -2860,11 +2869,12 @@ bool EarlyStopping::ShouldStop() {
 }
 
 void SetInitialPredictions(const std::vector<float>& initial_predictions,
-                           const row_t num_rows,
+                           const UnsignedExampleIdx num_rows,
                            std::vector<float>* predictions) {
   predictions->resize(num_rows * initial_predictions.size());
   size_t cur = 0;
-  for (row_t example_idx = 0; example_idx < num_rows; example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < num_rows;
+       example_idx++) {
     for (const auto initial_prediction : initial_predictions) {
       (*predictions)[cur++] = initial_prediction;
     }

@@ -29,6 +29,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/cart/cart.pb.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -82,13 +83,12 @@ namespace internal {
 // For each non-leaf node, test if the validation metric (accuracy or rmse)
 // would be better if the node was a leaf. If true, the node is turned into a
 // leaf and the children nodes are pruned.
-absl::Status PruneTree(
-    const dataset::VerticalDataset& train_dataset,
-    const std::vector<float>& weights,
-    const std::vector<dataset::VerticalDataset::row_t>& example_idxs,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    model::decision_tree::DecisionTree* tree);
+absl::Status PruneTree(const dataset::VerticalDataset& train_dataset,
+                       const std::vector<float>& weights,
+                       const std::vector<UnsignedExampleIdx>& example_idxs,
+                       const model::proto::TrainingConfig& config,
+                       const model::proto::TrainingConfigLinking& config_link,
+                       model::decision_tree::DecisionTree* tree);
 
 }  // namespace internal
 

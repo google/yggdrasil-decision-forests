@@ -114,7 +114,8 @@ void RankingGroupsIndices::Initialize(const dataset::VerticalDataset& dataset,
 
   // Fill index.
   absl::flat_hash_map<uint64_t, std::vector<Item>> tmp_groups;
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < dataset.nrow();
+       example_idx++) {
     // Get the value of the group.
     uint64_t group_value;
     if (group_categorical_values) {

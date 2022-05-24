@@ -1,5 +1,11 @@
 # Changelog
 
+## ???? - ????
+
+### Features
+
+-   Multithreading of the oblique splitter for gradient boosted tree models.
+
 ## 0.2.4 - 2022-05-17
 
 ### Features

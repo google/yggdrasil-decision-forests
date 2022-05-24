@@ -23,12 +23,14 @@
 #include <type_traits>
 #include <vector>
 
+#include "src/google/protobuf/repeated_field.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -52,9 +54,10 @@ using std::is_same;
 // Extracts values using an index i.e. returns "values[selected]".
 template <typename T>
 std::vector<T> Extract(const std::vector<T>& values,
-                       const std::vector<row_t>& selected) {
+                       const std::vector<UnsignedExampleIdx>& selected) {
   std::vector<T> extracted(selected.size());
-  for (row_t selected_idx = 0; selected_idx < selected.size(); selected_idx++) {
+  for (UnsignedExampleIdx selected_idx = 0; selected_idx < selected.size();
+       selected_idx++) {
     extracted[selected_idx] = values[selected[selected_idx]];
   }
   return extracted;
@@ -62,13 +65,15 @@ std::vector<T> Extract(const std::vector<T>& values,
 
 // Extraction of label values. Different implementations for different types of
 // labels.
-std::vector<int32_t> ExtractLabels(const ClassificationLabelStats& labels,
-                                   const std::vector<row_t>& selected) {
+std::vector<int32_t> ExtractLabels(
+    const ClassificationLabelStats& labels,
+    const std::vector<UnsignedExampleIdx>& selected) {
   return Extract(labels.label_data, selected);
 }
 
-std::vector<float> ExtractLabels(const RegressionLabelStats& labels,
-                                 const std::vector<row_t>& selected) {
+std::vector<float> ExtractLabels(
+    const RegressionLabelStats& labels,
+    const std::vector<UnsignedExampleIdx>& selected) {
   return Extract(labels.label_data, selected);
 }
 
@@ -77,8 +82,9 @@ struct GradientAndHessian {
   const std::vector<float> hessian_data;
 };
 
-GradientAndHessian ExtractLabels(const RegressionHessianLabelStats& labels,
-                                 const std::vector<row_t>& selected) {
+GradientAndHessian ExtractLabels(
+    const RegressionHessianLabelStats& labels,
+    const std::vector<UnsignedExampleIdx>& selected) {
   return {/*.gradient_data =*/Extract(labels.gradient_data, selected),
           /*.hessian_data =*/Extract(labels.hessian_data, selected)};
 }
@@ -87,7 +93,7 @@ GradientAndHessian ExtractLabels(const RegressionHessianLabelStats& labels,
 // projection contains only one dimension, the weight is guaranteed to be 1.
 void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
                       const dataset::proto::DataSpecification& data_spec,
-                      const std::vector<int>& numerical_features,
+                      const google::protobuf::RepeatedField<int32_t>& numerical_features,
                       const float projection_density, Projection* projection,
                       utils::RandomEngine* random) {
   projection->clear();
@@ -127,20 +133,6 @@ void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
   }
 }
 
-// Get the list of numerical features.
-void GetNumericalFeatures(
-    const dataset::VerticalDataset& train_dataset,
-    const model::proto::TrainingConfigLinking& config_link,
-    std::vector<int>* numerical_features) {
-  numerical_features->clear();
-  for (const auto feature_idx : config_link.features()) {
-    if (train_dataset.column(feature_idx)->type() ==
-        dataset::proto::NUMERICAL) {
-      numerical_features->push_back(feature_idx);
-    }
-  }
-}
-
 // Converts a Projection object + float threshold into a proto condition of the
 // same semantic.
 absl::Status SetCondition(const Projection& projection, const float threshold,
@@ -166,8 +158,9 @@ absl::Status SetCondition(const Projection& projection, const float threshold,
 // Helper for the evaluation of projections.
 class ProjectionEvaluator {
  public:
-  ProjectionEvaluator(const dataset::VerticalDataset& train_dataset,
-                      const std::vector<int>& numerical_features) {
+  ProjectionEvaluator(
+      const dataset::VerticalDataset& train_dataset,
+      const google::protobuf::RepeatedField<int32_t>& numerical_features) {
     DCHECK(!numerical_features.empty());
     const int max_feature_idx =
         *std::max_element(numerical_features.begin(), numerical_features.end());
@@ -184,10 +177,10 @@ class ProjectionEvaluator {
   }
 
   void Evaluate(const Projection& projection,
-                const std::vector<row_t>& selected_examples,
+                const std::vector<UnsignedExampleIdx>& selected_examples,
                 std::vector<float>* values) {
     values->resize(selected_examples.size());
-    for (row_t selected_idx = 0; selected_idx < selected_examples.size();
+    for (size_t selected_idx = 0; selected_idx < selected_examples.size();
          selected_idx++) {
       float value = 0;
       const auto example_idx = selected_examples[selected_idx];
@@ -208,21 +201,6 @@ class ProjectionEvaluator {
   std::vector<const std::vector<float>*> numerical_attributes_;
 };
 
-// Computes the number of projections to test i.e.
-// num_projections = min(max_num_projections,
-// ceil(num_features ^ num_projections_exponent)).
-int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
-                      const int num_numerical_features) {
-  const auto max_num_projections =
-      dt_config.sparse_oblique_split().max_num_projections();
-  const auto num_projections_exponent =
-      dt_config.sparse_oblique_split().num_projections_exponent();
-  return std::min(
-      max_num_projections,
-      static_cast<int>(0.5 + std::ceil(std::pow(num_numerical_features,
-                                                num_projections_exponent))));
-}
-
 // Replacement value of the projection when one of the input feature is missing.
 float DefaultProjectionValue(
     const Projection& projection,
@@ -238,30 +216,47 @@ float DefaultProjectionValue(
 
 }  // namespace
 
+int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
+                      const int num_numerical_features) {
+  const auto max_num_projections =
+      dt_config.sparse_oblique_split().max_num_projections();
+  const auto num_projections_exponent =
+      dt_config.sparse_oblique_split().num_projections_exponent();
+  return std::min(
+      max_num_projections,
+      static_cast<int>(0.5 + std::ceil(std::pow(num_numerical_features,
+                                                num_projections_exponent))));
+}
+
 template <typename LabelStats>
 utils::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const LabelStats& label_stats, proto::NodeCondition* best_condition,
-    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
-  auto& numerical_features = cache->numerical_features;
-  GetNumericalFeatures(train_dataset, config_link, &numerical_features);
-  if (numerical_features.empty()) {
+    const LabelStats& label_stats,
+    const absl::optional<int>& override_num_projections,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    SplitterPerThreadCache* cache) {
+  if (config_link.numerical_features().empty()) {
     return false;
   }
 
   // Effective number of projections to test.
-  const int num_projections =
-      GetNumProjections(dt_config, numerical_features.size());
+  int num_projections;
+  if (override_num_projections.has_value()) {
+    num_projections = override_num_projections.value();
+  } else {
+    num_projections =
+        GetNumProjections(dt_config, config_link.numerical_features_size());
+  }
 
   const float projection_density =
       dt_config.sparse_oblique_split().projection_density_factor() /
-      numerical_features.size();
+      config_link.numerical_features_size();
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
 
@@ -272,19 +267,22 @@ utils::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
   float best_na_replacement = 0;
   auto& projection_values = cache->projection_values;
 
-  ProjectionEvaluator projection_evaluator(train_dataset, numerical_features);
+  ProjectionEvaluator projection_evaluator(train_dataset,
+                                           config_link.numerical_features());
 
+  // TODO(gbm): To cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);
   const auto selected_weights = Extract(weights, selected_examples);
 
-  std::vector<row_t> dense_example_idxs(selected_examples.size());
+  std::vector<UnsignedExampleIdx> dense_example_idxs(selected_examples.size());
   std::iota(dense_example_idxs.begin(), dense_example_idxs.end(), 0);
 
   for (int projection_idx = 0; projection_idx < num_projections;
        projection_idx++) {
     // Generate a current_projection.
-    SampleProjection(dt_config, train_dataset.data_spec(), numerical_features,
-                     projection_density, &current_projection, random);
+    SampleProjection(dt_config, train_dataset.data_spec(),
+                     config_link.numerical_features(), projection_density,
+                     &current_projection, random);
 
     // Pre-compute the result of the current_projection.
     projection_evaluator.Evaluate(current_projection, selected_examples,
@@ -341,50 +339,56 @@ utils::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
 
 utils::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const ClassificationLabelStats& label_stats,
+    const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
   return FindBestConditionSparseObliqueTemplate<ClassificationLabelStats>(
       train_dataset, selected_examples, weights, config, config_link, dt_config,
-      parent, internal_config, label_stats, best_condition, random, cache);
+      parent, internal_config, label_stats, override_num_projections,
+      best_condition, random, cache);
 }
 
 utils::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionHessianLabelStats& label_stats,
+    const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
   return FindBestConditionSparseObliqueTemplate<RegressionHessianLabelStats>(
       train_dataset, selected_examples, weights, config, config_link, dt_config,
-      parent, internal_config, label_stats, best_condition, random, cache);
+      parent, internal_config, label_stats, override_num_projections,
+      best_condition, random, cache);
 }
 
 utils::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionLabelStats& label_stats,
+    const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
   return FindBestConditionSparseObliqueTemplate<RegressionLabelStats>(
       train_dataset, selected_examples, weights, config, config_link, dt_config,
-      parent, internal_config, label_stats, best_condition, random, cache);
+      parent, internal_config, label_stats, override_num_projections,
+      best_condition, random, cache);
 }
 
 }  // namespace decision_tree

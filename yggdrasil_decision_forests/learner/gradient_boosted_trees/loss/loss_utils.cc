@@ -73,7 +73,8 @@ void UpdatePredictionWithSingleUnivariateTree(
     const decision_tree::DecisionTree& tree, std::vector<float>* predictions,
     double* mean_abs_prediction) {
   double sum_abs_predictions = 0;
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < dataset.nrow();
+       example_idx++) {
     const auto& leaf = tree.GetLeaf(dataset, example_idx);
     (*predictions)[example_idx] += leaf.regressor().top_value();
     sum_abs_predictions += std::abs(leaf.regressor().top_value());
@@ -89,7 +90,8 @@ void UpdatePredictionWithMultipleUnivariateTrees(
     std::vector<float>* predictions, double* mean_abs_prediction) {
   double sum_abs_predictions = 0;
   const int num_trees = trees.size();
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < dataset.nrow();
+       example_idx++) {
     for (int grad_idx = 0; grad_idx < num_trees; grad_idx++) {
       const auto& leaf = trees[grad_idx]->GetLeaf(dataset, example_idx);
       (*predictions)[grad_idx + example_idx * num_trees] +=

@@ -161,9 +161,12 @@ message TrainingConfig {
 // The column indies are defined in a given dataspec e.g. If
 // dataspec.columns[5].name = "toto", then the column idx of "toto" is 5.
 message TrainingConfigLinking {
-  // Next ID: 9
+  // Next ID: 10
   // Input features of the models.
   repeated int32 features = 1 [packed = true];
+
+  // Features of type NUMERICAL.
+  repeated int32 numerical_features = 9 [packed = true];
 
   // Label column.
   optional int32 label = 2;

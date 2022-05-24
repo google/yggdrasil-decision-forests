@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.pb.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -129,7 +130,7 @@ struct PredictionAccumulator {
 // Initialize a vector of accumulators to support the task specified in
 // "config*".
 void InitializeOOBPredictionAccumulators(
-    const dataset::VerticalDataset::row_t num_predictions,
+    const UnsignedExampleIdx num_predictions,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const dataset::proto::DataSpecification& data_spec,
@@ -145,7 +146,7 @@ void InitializeOOBPredictionAccumulators(
 void UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
-    std::vector<dataset::VerticalDataset::row_t> sorted_non_oob_example_indices,
+    std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
     const absl::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
@@ -170,11 +171,11 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
 
 // Selects the examples to train one tree. Selects "num_samples" integers in [0,
 // num_examples[ with replacement.
-void SampleTrainingExamples(
-    const dataset::VerticalDataset::row_t num_examples,
-    const dataset::VerticalDataset::row_t num_samples,
-    const bool with_replacement, utils::RandomEngine* random,
-    std::vector<dataset::VerticalDataset::row_t>* selected);
+void SampleTrainingExamples(const UnsignedExampleIdx num_examples,
+                            const UnsignedExampleIdx num_samples,
+                            const bool with_replacement,
+                            utils::RandomEngine* random,
+                            std::vector<UnsignedExampleIdx>* selected);
 
 // Exports the Out-of-bag predictions of a model to disk.
 absl::Status ExportOOBPredictions(

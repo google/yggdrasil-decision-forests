@@ -59,8 +59,6 @@ namespace {
 
 using test::EqualsProto;
 
-using row_t = dataset::VerticalDataset::row_t;
-
 std::string DatasetDir() {
   return file::JoinPath(
       test::DataRootDirectory(),
@@ -73,8 +71,7 @@ struct FakeLabelStats : LabelStats {};
 SplitterWorkResponse FakeFindBestConditionConcurrentConsumerAlwaysInvalid(
     SplitterWorkRequest request) {
   return SplitterWorkResponse{
-      .status_idx = request.status_idx,
-      .condition = request.dst_condition,
+      .manager_data = request.manager_data,
       .status = SplitSearchResult::kInvalidAttribute,
   };
 }
@@ -83,11 +80,10 @@ SplitterWorkResponse FakeFindBestConditionConcurrentConsumerAlwaysInvalid(
 SplitterWorkResponse FakeFindBestConditionConcurrentConsumerMultiplicative(
     SplitterWorkRequest request) {
   SplitterWorkResponse response{
-      .status_idx = request.status_idx,
-      .condition = request.dst_condition,
-      .status = SplitSearchResult::kNoBetterSplitFound,
+      .manager_data = request.manager_data,
+      .status = SplitSearchResult::kBetterSplitFound,
   };
-  response.condition->set_split_score(request.attribute_idx * 10.f);
+  request.condition->set_split_score(request.attribute_idx * 10.f);
   return response;
 }
 
@@ -96,14 +92,13 @@ SplitterWorkResponse FakeFindBestConditionConcurrentConsumerMultiplicative(
 SplitterWorkResponse FakeFindBestConditionConcurrentConsumerAlternate(
     SplitterWorkRequest request) {
   auto response = SplitterWorkResponse{
-      .status_idx = request.status_idx,
-      .condition = request.dst_condition,
-      .status = SplitSearchResult::kNoBetterSplitFound,
+      .manager_data = request.manager_data,
+      .status = SplitSearchResult::kBetterSplitFound,
   };
   if (request.attribute_idx % 2 == 0) {
     response.status = SplitSearchResult::kInvalidAttribute;
   }
-  response.condition->set_split_score(request.attribute_idx * 10.f);
+  request.condition->set_split_score(request.attribute_idx * 10.f);
   return response;
 }
 
@@ -117,7 +112,7 @@ TEST(DecisionTree, FakeTrain) {
   dataset::VerticalDataset train_dataset;
   CHECK_OK(LoadVerticalDataset(ds_typed_path, data_spec, &train_dataset));
 
-  std::vector<row_t> selected_examples(train_dataset.nrow());
+  std::vector<UnsignedExampleIdx> selected_examples(train_dataset.nrow());
   std::iota(selected_examples.begin(), selected_examples.end(), 0);
 
   const std::vector<float> weights(train_dataset.nrow(), 1.f);
@@ -143,14 +138,14 @@ TEST(DecisionTree, FakeTrain) {
 }
 
 TEST(DecisionTree, FindBestNumericalSplitCartBase) {
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
   const float na = std::numeric_limits<float>::quiet_NaN();
   std::vector<float> attributes = {2, 3, 0, 1, na, na};
   const std::vector<int32_t> labels = {1, 1, 0, 0, 1, 0};
   const int32_t num_label_classes = 2;
   const float na_replacement = 2;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_internal()->set_sorting_strategy(
       proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -190,14 +185,14 @@ TEST(DecisionTree, FindBestNumericalSplitCartBase) {
 }
 
 TEST(DecisionTree, FindSplitLabelClassificationFeatureNumericalHistogram) {
-  const std::vector<row_t> selected_examples = {0, 1, 2};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2};
   const std::vector<float> weights = {1.f, 1.f, 1.f};
   const float na = std::numeric_limits<float>::quiet_NaN();
   std::vector<float> attributes = {0, 1, na};
   const std::vector<int32_t> labels = {0, 1, 0};
   const int32_t num_label_classes = 2;
   const float na_replacement = 2;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_numerical_split()->set_type(
       proto::NumericalSplit::HISTOGRAM_RANDOM);
@@ -247,14 +242,14 @@ TEST(DecisionTree, FindSplitLabelClassificationFeatureNumericalHistogram) {
 }
 
 TEST(DecisionTree, FindBestNumericalSplitCartWeighted) {
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {2.f, 1.f, 1.f, 1.f, 1.f, 3.f};
   const float na = std::numeric_limits<float>::quiet_NaN();
   std::vector<float> attributes = {2, 3, 0, 1, na, na};
   const std::vector<int32_t> labels = {1, 1, 0, 0, 1, 0};
   const int32_t num_label_classes = 2;
   const float na_replacement = 2;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_internal()->set_sorting_strategy(
       proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -286,13 +281,13 @@ TEST(DecisionTree, FindBestNumericalSplitCartWeighted) {
 TEST(DecisionTree, FindBestNumericalSplitCartVeryClose) {
   const float a = 0.1234567;
   const float b = nextafterf(a, std::numeric_limits<float>::infinity());
-  const std::vector<row_t> selected_examples = {0, 1};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1};
   const std::vector<float> weights = {1, 1};
   const std::vector<float> attributes = {a, b};
   const std::vector<int32_t> labels = {0, 1};
   const int32_t num_label_classes = 2;
   const float na_replacement = 2;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_internal()->set_sorting_strategy(
       proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -318,7 +313,7 @@ TEST(DecisionTree, FindBestNumericalSplitCartVeryClose) {
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
   // Small basic dataset.
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
   std::vector<int32_t> attributes = {2, 3, 0, 1, -1, -1};
   const std::vector<int32_t> labels = {1, 1, 0, 0, 1, 0};
@@ -327,7 +322,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
 
   // Configuration.
   const int32_t na_replacement = 1;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_internal()->set_sorting_strategy(
       proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -385,7 +380,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
   // Small basic dataset.
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {2, 1, 1, 1, 1, 3};
   std::vector<int32_t> attributes = {2, 3, 0, 1, -1, -1};
   const std::vector<int32_t> labels = {1, 1, 0, 0, 1, 0};
@@ -394,7 +389,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
 
   // Configuration.
   const int32_t na_replacement = 1;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_internal()->set_sorting_strategy(
       proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -456,8 +451,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseAdvances) {
   for (const int32_t num_label_classes : {2, 4, 8}) {
     for (const int32_t num_attribute_classes : {2, 4, 200, 1000}) {
       const int32_t na_replacement = 1;
-      const row_t min_num_obs = 1;
-      const row_t num_examples = 10000;
+      const UnsignedExampleIdx min_num_obs = 1;
+      const UnsignedExampleIdx num_examples = 10000;
       proto::DecisionTreeTrainingConfig dt_config;
       dt_config.mutable_internal()->set_sorting_strategy(
           proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -469,7 +464,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseAdvances) {
                                                         num_label_classes - 1);
       utils::RandomEngine rnd;
 
-      std::vector<row_t> selected_examples;
+      std::vector<UnsignedExampleIdx> selected_examples;
       std::vector<float> weights;
       std::vector<int32_t> attributes;
       std::vector<int32_t> labels;
@@ -478,7 +473,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseAdvances) {
       selected_examples.reserve(num_examples);
       attributes.reserve(num_examples);
       labels.reserve(num_examples);
-      for (row_t example_idx = 0; example_idx < num_examples; example_idx++) {
+      for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
+           example_idx++) {
         selected_examples.push_back(example_idx);
         attributes.push_back(attribute_dist(rnd));
         const auto label = label_dist(rnd);
@@ -516,8 +512,8 @@ TEST(DecisionTree, FindBestCategoricalSplitRandom) {
   const int num_attribute_classes = 100;
   const int num_label_classes = 2;
   const int32_t na_replacement = 1;
-  const row_t min_num_obs = 1;
-  const row_t num_examples = 10000;
+  const UnsignedExampleIdx min_num_obs = 1;
+  const UnsignedExampleIdx num_examples = 10000;
 
   proto::DecisionTreeTrainingConfig random_dt_config;
   random_dt_config.mutable_categorical()->mutable_random();
@@ -528,7 +524,7 @@ TEST(DecisionTree, FindBestCategoricalSplitRandom) {
   std::uniform_int_distribution<int32_t> label_dist(0, num_label_classes - 1);
 
   for (int trial_idx = 0; trial_idx < 10; trial_idx++) {
-    std::vector<row_t> selected_examples;
+    std::vector<UnsignedExampleIdx> selected_examples;
     std::vector<float> weights;
     std::vector<int32_t> attributes;
     std::vector<int32_t> labels;
@@ -537,7 +533,8 @@ TEST(DecisionTree, FindBestCategoricalSplitRandom) {
     selected_examples.reserve(num_examples);
     attributes.reserve(num_examples);
     labels.reserve(num_examples);
-    for (row_t example_idx = 0; example_idx < num_examples; example_idx++) {
+    for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
+         example_idx++) {
       selected_examples.push_back(example_idx);
       attributes.push_back(attribute_dist(rnd));
       const auto label = label_dist(rnd);
@@ -658,7 +655,7 @@ TEST(DecisionTree, FindBestConditionClassification) {
   col_3->Add(1);
   col_3->Add(2);
 
-  const std::vector<row_t> selected_examples = {0, 1};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1};
   const std::vector<float> weights = {1.f, 1.f};
   DecisionTree tree;
   tree.CreateRoot();
@@ -705,7 +702,7 @@ TEST(DecisionTree, FindBestConditionClassification) {
 
 TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForClassification) {
   // Small basic dataset.
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
   const std::vector<int32_t> labels = {1, 1, 0, 0, 1, 0};
   const int32_t num_label_classes = 2;
@@ -719,7 +716,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForClassification) {
   attributes.Add(std::numeric_limits<float>::quiet_NaN());
 
   // Configuration.
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.set_allow_na_conditions(true);
 
@@ -758,7 +755,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForClassification) {
 
 TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForRegression) {
   // Small basic dataset.
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
   const std::vector<float> labels = {1, 1, 0, 0, 1, 0};
 
@@ -771,7 +768,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForRegression) {
   attributes.Add(std::numeric_limits<float>::quiet_NaN());
 
   // Configuration.
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.set_allow_na_conditions(true);
 
@@ -807,13 +804,13 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForRegression) {
 }
 
 TEST(DecisionTree, FindBestNumericalSplitHistogramForRegression) {
-  const std::vector<row_t> selected_examples = {0, 1, 2};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2};
   const std::vector<float> weights = {1.f, 1.f, 1.f};
   const float na = std::numeric_limits<float>::quiet_NaN();
   std::vector<float> attributes = {0, 1, na};
   const std::vector<float> labels = {0, 1, 0};
   const float na_replacement = 2;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   // Compute the label distribution.
   utils::NormalDistributionDouble label_distribution;
   for (int example_idx = 0; example_idx < selected_examples.size();
@@ -863,13 +860,13 @@ TEST(DecisionTree, FindBestNumericalSplitHistogramForRegression) {
 }
 
 TEST(DecisionTree, FindBestNumericalSplitCartNumericalLabelBase) {
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
   const float na = std::numeric_limits<float>::quiet_NaN();
   std::vector<float> attributes = {2, 3, 0, 1, na, na};
   const std::vector<float> labels = {1.f, 1.f, 0.f, 0.f, 1.f, 0.f};
   const float na_replacement = 2;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_internal()->set_sorting_strategy(
       proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -919,13 +916,13 @@ TEST_P(FindBestNumericalSplitCartNumericalLabelBasePresortedTest,
 
   // Similar examples as for the
   // DecisionTree.FindBestNumericalSplitCartNumericalLabelBase test.
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
   const float na = std::numeric_limits<float>::quiet_NaN();
   std::vector<float> attributes = {2, 3, 0, 1, na, na};
   const std::vector<float> labels = {1.f, 1.f, 0.f, 0.f, 1.f, 0.f};
   const float na_replacement = 2;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
 
   // Computes the preprocessing.
   Preprocessing preprocessing;
@@ -994,12 +991,12 @@ INSTANTIATE_TEST_SUITE_P(
     FindBestNumericalSplitCartNumericalLabelBasePresortedTest, testing::Bool());
 
 TEST(FindBestNumericalSplitCartNumericalLabelBasePresortedTestManual, Base) {
-  const std::vector<row_t> selected_examples = {0, 1, 3, 4, 9};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 3, 4, 9};
   const std::vector<float> weights(11, 1.f);
   std::vector<float> attributes = {0, 0, 1, 1, 1, 1, 2, 2, 5, 5, 5};
   const std::vector<float> labels = {0, 0, 1, 1, 1, 1, 1, 1, 1000, 1000, 1000};
   const float na_replacement = 2;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
 
   // Computes the preprocessing.
   Preprocessing preprocessing;
@@ -1054,7 +1051,7 @@ TEST(FindBestNumericalSplitCartNumericalLabelBasePresortedTestManual, Base) {
 
 TEST(DecisionTree, FindBestCategoricalSplitCartNumericalLabels) {
   // Small basic dataset.
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
   std::vector<int32_t> attributes = {2, 3, 0, 1, -1, -1};
   const std::vector<float> labels = {1.f, 1.f, 0.f, 0.f, 1.f, 0.f};
@@ -1063,7 +1060,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartNumericalLabels) {
 
   // Configuration.
   const int32_t na_replacement = 1;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   const proto::DecisionTreeTrainingConfig dt_config;
 
   // Compute the label distribution.
@@ -1116,14 +1113,14 @@ TEST(DecisionTree, FindBestCategoricalSplitCartNumericalLabels) {
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
   // Small basic dataset.
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   std::vector<char> attributes = {0, 1, 0, 1, 0, 0};
   const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
   const std::vector<int32_t> labels = {1, 0, 0, 0, 0, 1};
   const int32_t num_label_classes = 2;
 
   // Configuration.
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
 
   // Compute the label distribution.
@@ -1161,13 +1158,13 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForRegression) {
   // Small basic dataset.
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   std::vector<char> attributes = {0, 1, 0, 1, 0, 0};
   const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
   const std::vector<float> labels = {1, 0, 0, 0, 0, 1};
 
   // Configuration.
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_internal()->set_sorting_strategy(
       proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -1206,7 +1203,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForRegression) {
 }
 
 TEST(DecisionTree, LocalImputationForNumericalAttribute) {
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
   const float na = std::numeric_limits<float>::quiet_NaN();
   std::vector<float> attributes = {2, 3, 0, 1, na, na};
@@ -1216,7 +1213,7 @@ TEST(DecisionTree, LocalImputationForNumericalAttribute) {
   // This "na_replacement" value will be ignored and replaced with
   // "mean(attributes) = 1.5".
   const float na_replacement = -1;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_internal()->set_sorting_strategy(
       proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -1262,7 +1259,7 @@ TEST(DecisionTree, LocalImputationForNumericalAttribute) {
 
 TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
   // Small basic dataset.
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
   std::vector<int32_t> attributes = {2, 2, 0, 1, -1, -1};
   const std::vector<int32_t> labels = {1, 1, 0, 0, 1, 0};
@@ -1274,7 +1271,7 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
   const int32_t na_replacement = 0;
 
   // Configuration.
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.set_missing_value_policy(
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION);
@@ -1341,7 +1338,7 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
 }
 
 TEST(DecisionTree, LocalImputationForBooleanAttribute) {
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
   const char na = dataset::VerticalDataset::BooleanColumn::kNaValue;
   std::vector<char> attributes = {0, 1, 0, 0, na, na};
@@ -1351,7 +1348,7 @@ TEST(DecisionTree, LocalImputationForBooleanAttribute) {
   // This "na_replacement" value will be ignored and replaced with
   // the most frequent attribute (0).
   const bool na_replacement = true;
-  const row_t min_num_obs = 1;
+  const UnsignedExampleIdx min_num_obs = 1;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.set_missing_value_policy(
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION);
@@ -1505,7 +1502,7 @@ TEST(DecisionTree, GenerateRandomImputation) {
 
 TEST(DecisionTree,
      FindSplitLabelClassificationFeatureCategoricalSetGreedyForward) {
-  std::vector<row_t> selected = {0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<UnsignedExampleIdx> selected = {0, 1, 2, 3, 4, 5, 6, 7};
   std::vector<float> weights = {1, 1, 1, 1, 1, 1, 1, 1};
   std::vector<int32_t> labels = {0, 0, 0, 0, 1, 1, 1, 1};
 
@@ -1595,7 +1592,7 @@ TEST(DecisionTree,
 }
 
 TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
-  std::vector<row_t> selected = {0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<UnsignedExampleIdx> selected = {0, 1, 2, 3, 4, 5, 6, 7};
   std::vector<float> weights = {1, 1, 1, 1, 1, 1, 1, 1};
   std::vector<int32_t> labels = {0, 0, 0, 0, 1, 1, 1, 1};
 
@@ -1652,7 +1649,7 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
 
 TEST(DecisionTree, FindBestCategoricalSetSplitCartForRegression) {
   // List of selected examples.
-  std::vector<row_t> selected = {0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<UnsignedExampleIdx> selected = {0, 1, 2, 3, 4, 5, 6, 7};
   // Uniform weights.
   std::vector<float> weights = {1, 1, 1, 1, 1, 1, 1, 1};
   // Example labels. Ultimately, we want the first 4 examples to be in one
@@ -1770,8 +1767,7 @@ TEST(DecisionTree, MaskItemsForCategoricalForSetGreedySelection) {
 
   proto::DecisionTreeTrainingConfig dt_config;
   int32_t num_attribute_classes = 5;
-  std::vector<dataset::VerticalDataset::row_t> selected_examples = {0, 1, 2, 3,
-                                                                    4};
+  std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4};
   std::vector<int64_t> count_examples_without_weights_by_attribute_class = {
       0,  // Pure
       5,  // Pure
@@ -1865,7 +1861,7 @@ TEST(DecisionTree, GenHistogramBins) {
 TEST(DecisionTree, FindBestConditionConcurrentManager_NoFeatures) {
   dataset::VerticalDataset dataset;
   utils::RandomEngine random(1234);
-  std::vector<dataset::VerticalDataset::row_t> selected_examples;
+  std::vector<UnsignedExampleIdx> selected_examples;
   std::vector<float> weights;
   model::proto::TrainingConfig config;
   model::proto::TrainingConfigLinking config_link;
@@ -1903,7 +1899,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_NoFeatures) {
 TEST(DecisionTree, FindBestConditionConcurrentManager_AlwaysInvalid) {
   dataset::VerticalDataset dataset;
   utils::RandomEngine random(1234);
-  std::vector<dataset::VerticalDataset::row_t> selected_examples;
+  std::vector<UnsignedExampleIdx> selected_examples;
   std::vector<float> weights;
   model::proto::TrainingConfig config;
   model::proto::TrainingConfigLinking config_link;
@@ -1936,7 +1932,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_AlwaysInvalid) {
                     .value();
 
   EXPECT_EQ(cache.splitter_cache_list.size(), 2);
-  EXPECT_EQ(cache.work_status_list.size(), 20);
+  EXPECT_EQ(cache.durable_response_list.size(), 20);
   EXPECT_EQ(cache.condition_list.size(), 4);
   EXPECT_FALSE(result);
 }
@@ -1944,7 +1940,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_AlwaysInvalid) {
 TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
   dataset::VerticalDataset dataset;
   utils::RandomEngine random(1234);
-  std::vector<dataset::VerticalDataset::row_t> selected_examples;
+  std::vector<UnsignedExampleIdx> selected_examples;
   std::vector<float> weights;
   model::proto::TrainingConfig config;
   model::proto::TrainingConfigLinking config_link;
@@ -1998,7 +1994,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
 TEST(DecisionTree, FindBestConditionConcurrentManager_Alternate) {
   dataset::VerticalDataset dataset;
   utils::RandomEngine random(1234);
-  std::vector<dataset::VerticalDataset::row_t> selected_examples;
+  std::vector<UnsignedExampleIdx> selected_examples;
   std::vector<float> weights;
   model::proto::TrainingConfig config;
   model::proto::TrainingConfigLinking config_link;
@@ -2039,7 +2035,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Alternate) {
 TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
   dataset::VerticalDataset dataset;
   utils::RandomEngine random(4321);
-  std::vector<dataset::VerticalDataset::row_t> selected_examples;
+  std::vector<UnsignedExampleIdx> selected_examples;
   std::vector<float> weights;
   model::proto::TrainingConfig config;
   model::proto::TrainingConfigLinking config_link;
@@ -2075,7 +2071,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
                     .value();
 
   EXPECT_EQ(cache.splitter_cache_list.size(), 10);
-  EXPECT_EQ(cache.work_status_list.size(), 100);
+  EXPECT_EQ(cache.durable_response_list.size(), 100);
   EXPECT_EQ(cache.condition_list.size(), 20);
   EXPECT_FALSE(result);
 
@@ -2139,7 +2135,7 @@ TEST(DecisionTree, MidThreshold) {
 }
 
 TEST(DecisionTree, FindBestNumericalDiscretizedSplitCartBase) {
-  const std::vector<row_t> selected_examples = {0, 1, 2, 3};
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3};
   const std::vector<float> weights(selected_examples.size(), 1.f);
 
   const int num_binds = 6;
@@ -2290,7 +2286,7 @@ TEST(UpliftCategoricalLabelDistribution, FromToLeafProto) {
 
 TEST(DecisionTree, FindBestSplitNumericalFeatureTaskCategoricalUplift) {
   const int num_examples = 8;
-  std::vector<row_t> selected_examples(num_examples);
+  std::vector<UnsignedExampleIdx> selected_examples(num_examples);
   std::iota(selected_examples.begin(), selected_examples.end(), 0);
   const std::vector<float> weights(num_examples, 1.f);
 
@@ -2342,7 +2338,7 @@ TEST(DecisionTree, FindBestSplitNumericalFeatureTaskCategoricalUplift) {
 
 TEST(DecisionTree, FindBestSplitCategoricalFeatureTaskCategoricalUplift) {
   const int num_examples = 8;
-  std::vector<row_t> selected_examples(num_examples);
+  std::vector<UnsignedExampleIdx> selected_examples(num_examples);
   std::iota(selected_examples.begin(), selected_examples.end(), 0);
   const std::vector<float> weights(num_examples, 1.f);
 

@@ -68,7 +68,8 @@ utils::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
       dataset
           .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               label_col_idx));
-  for (row_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+  for (UnsignedExampleIdx example_idx = 0; example_idx < dataset.nrow();
+       example_idx++) {
     sum_weights += weights[example_idx];
     weighted_sum_values += weights[example_idx] * labels->values()[example_idx];
   }
@@ -129,7 +130,7 @@ decision_tree::CreateSetLeafValueFunctor MeanSquaredErrorLoss::SetLeafFunctor(
   return
       [this, &predictions, label_col_idx](
           const dataset::VerticalDataset& train_dataset,
-          const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+          const std::vector<UnsignedExampleIdx>& selected_examples,
           const std::vector<float>& weights,
           const model::proto::TrainingConfig& config,
           const model::proto::TrainingConfigLinking& config_link,
@@ -141,7 +142,7 @@ decision_tree::CreateSetLeafValueFunctor MeanSquaredErrorLoss::SetLeafFunctor(
 
 absl::Status MeanSquaredErrorLoss::SetLeaf(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<dataset::VerticalDataset::row_t>& selected_examples,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,

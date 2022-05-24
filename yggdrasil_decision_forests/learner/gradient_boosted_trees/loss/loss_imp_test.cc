@@ -263,7 +263,7 @@ TEST(GradientBoostedTrees, SetLabelDistributionBinomialLogLikelihood) {
                                            nullptr));
   EXPECT_EQ(gradients.size(), 1);
 
-  std::vector<dataset::VerticalDataset::row_t> selected_examples{0, 1, 2, 3};
+  std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
   std::vector<float> predictions(dataset.nrow(), 0.f);
 
   model::proto::TrainingConfig config;
@@ -305,7 +305,7 @@ TEST(GradientBoostedTrees, SetLabelDistributionSquaredError) {
                                            nullptr));
   EXPECT_EQ(gradients.size(), 1);
 
-  std::vector<dataset::VerticalDataset::row_t> selected_examples{0, 1, 2, 3};
+  std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
   std::vector<float> predictions(dataset.nrow(), 0.f);
 
   model::proto::TrainingConfig config;

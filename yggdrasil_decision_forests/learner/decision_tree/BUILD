@@ -23,6 +23,8 @@ cc_library_ydf(
         "training.h",
     ],
     deps = [
+        "@com_google_protobuf//:protobuf_lite",
+        "@com_google_absl//absl/types:optional",
         "//yggdrasil_decision_forests/learner:types",
         ":decision_tree_cc_proto",
         ":utils",
