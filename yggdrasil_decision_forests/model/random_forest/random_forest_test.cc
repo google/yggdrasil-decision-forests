@@ -38,6 +38,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -124,6 +125,14 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
       case model::proto::Task::CLASSIFICATION:
         pos_child->mutable_classifier()->set_top_value(beta);
         neg_child->mutable_classifier()->set_top_value(gamma);
+        pos_child->mutable_classifier()
+            ->mutable_distribution()
+            ->mutable_counts()
+            ->Resize(3, 1);
+        neg_child->mutable_classifier()
+            ->mutable_distribution()
+            ->mutable_counts()
+            ->Resize(3, 1);
         break;
       case model::proto::Task::REGRESSION:
         pos_child->mutable_regressor()->set_top_value(beta);
@@ -135,12 +144,27 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
     return tree;
   };
 
+  model->set_node_format("BLOB_SEQUENCE");
   model->AddTree(create_tree(1, 0, 1));
   model->AddTree(create_tree(3, 2, 1));
 
   model->set_task(task);
-  model->set_label_col_idx(1);
+  switch (task) {
+    case model::proto::Task::CLASSIFICATION:
+      model->set_label_col_idx(1);
+      break;
+    case model::proto::Task::REGRESSION:
+      // This test uses the same column as input and label. Note that this might
+      // no longer work in the future, at which point this test will be
+      // updated.
+      model->set_label_col_idx(0);
+      break;
+    default:
+      CHECK(false);
+  }
   model->set_data_spec(dataspec);
+  auto* metadata = model->mutable_metadata();
+  metadata->set_uid(utils::GenUniqueIdUint64());
 }
 
 TEST(DecisionTree, CountFeatureUsage) {
@@ -276,16 +300,16 @@ TEST(DecisionTree, AppendModelStructure) {
 Tree #0
 Condition:: "a">=1 score:0.000000 training_examples:0 positive_training_examples:0 missing_value_evaluation:0
 Positive child
-  Value:: top:0
+  Value:: top:0 proba:[inf, inf, inf] sum:0
 Negative child
-  Value:: top:1
+  Value:: top:1 proba:[inf, inf, inf] sum:0
 
 Tree #1
 Condition:: "a">=3 score:0.000000 training_examples:0 positive_training_examples:0 missing_value_evaluation:0
 Positive child
-  Value:: top:2
+  Value:: top:2 proba:[inf, inf, inf] sum:0
 Negative child
-  Value:: top:1
+  Value:: top:1 proba:[inf, inf, inf] sum:0
 
 )");
 }
@@ -379,51 +403,51 @@ TEST(RandomForest, GetLeaves) {
 }
 
 TEST(RandomForest, SaveAndLoadModelWithoutPrefix) {
-  std::unique_ptr<model::AbstractModel> original_model;
-  // TODO(b/227344233): Simplify this test by having it use the toy model
-  // defined above.
-  EXPECT_OK(model::LoadModel(
-      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
-      &original_model));
+  RandomForestModel original_model;
+  dataset::VerticalDataset dataset;
+  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION,
+                             &original_model, &dataset);
   std::string model_path =
       file::JoinPath(test::TmpDirectory(), "saved_model_without_prefix");
-  EXPECT_OK(SaveModel(model_path, original_model.get(), {}));
+  EXPECT_OK(SaveModel(model_path, &original_model, {}));
 
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_OK(LoadModel(model_path, &loaded_model, {}));
-  EXPECT_EQ(original_model->DescriptionAndStatistics(/*full_definition=*/true),
+  EXPECT_EQ(original_model.DescriptionAndStatistics(/*full_definition=*/true),
             loaded_model->DescriptionAndStatistics(/*full_definition=*/true));
+  EXPECT_EQ(original_model.mutable_metadata()->uid(),
+            loaded_model->mutable_metadata()->uid());
 }
 
 TEST(RandomForest, SaveAndLoadModelWithAutodetectedPrefix) {
-  std::unique_ptr<model::AbstractModel> original_model;
-  // TODO(b/227344233): Simplify this test by having it use the toy model
-  // defined above.
-  EXPECT_OK(model::LoadModel(
-      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
-      &original_model));
+  RandomForestModel original_model;
+  dataset::VerticalDataset dataset;
+  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION,
+                             &original_model, &dataset);
   std::string model_path =
       file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
-  EXPECT_OK(SaveModel(model_path, original_model.get(),
-                      {.file_prefix = "prefix_1_"}));
+  EXPECT_OK(
+      SaveModel(model_path, &original_model, {.file_prefix = "prefix_1_"}));
 
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_OK(LoadModel(model_path, &loaded_model, {}));
-  EXPECT_EQ(original_model->DescriptionAndStatistics(/*full_definition=*/true),
+  EXPECT_EQ(original_model.DescriptionAndStatistics(/*full_definition=*/true),
             loaded_model->DescriptionAndStatistics(/*full_definition=*/true));
+  EXPECT_EQ(original_model.mutable_metadata()->uid(),
+            loaded_model->mutable_metadata()->uid());
 }
 
 TEST(RandomForest, FailingPrefixDetectionForMultipleModelsPerDirectory) {
-  std::unique_ptr<model::AbstractModel> original_model;
-  EXPECT_OK(model::LoadModel(
-      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
-      &original_model));
+  RandomForestModel original_model;
+  dataset::VerticalDataset dataset;
+  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION,
+                             &original_model, &dataset);
   std::string model_path =
       file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
-  ASSERT_OK(SaveModel(model_path, original_model.get(),
-                      {.file_prefix = "prefix_1_"}));
-  ASSERT_OK(SaveModel(model_path, original_model.get(),
-                      {.file_prefix = "prefix_2_"}));
+  ASSERT_OK(
+      SaveModel(model_path, &original_model, {.file_prefix = "prefix_1_"}));
+  ASSERT_OK(
+      SaveModel(model_path, &original_model, {.file_prefix = "prefix_2_"}));
 
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_THAT(LoadModel(model_path, &loaded_model, {}),
@@ -431,35 +455,36 @@ TEST(RandomForest, FailingPrefixDetectionForMultipleModelsPerDirectory) {
 }
 
 TEST(RandomForest, SaveAndLoadModelWithPrefix) {
+  RandomForestModel original_model_1;
+  dataset::VerticalDataset dataset;
+  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION,
+                             &original_model_1, &dataset);
   std::string saved_model_path =
       file::JoinPath(test::TmpDirectory(), "saved_models_with_prefixes");
-  std::unique_ptr<model::AbstractModel> original_model_1;
-  EXPECT_OK(model::LoadModel(
-      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
-      &original_model_1));
-  EXPECT_OK(SaveModel(saved_model_path, original_model_1.get(),
+  EXPECT_OK(SaveModel(saved_model_path, &original_model_1,
                       {/*file_prefix=*/"prefix_1_"}));
 
-  std::unique_ptr<model::AbstractModel> original_model_2;
-  EXPECT_OK(model::LoadModel(
-      file::JoinPath(TestDataDir(), "model", "adult_binary_class_oblique_rf"),
-      &original_model_2));
-  EXPECT_OK(SaveModel(saved_model_path, original_model_2.get(),
+  RandomForestModel original_model_2;
+  BuildToyModelAndToyDataset(model::proto::Task::REGRESSION, &original_model_2,
+                             &dataset);
+  EXPECT_OK(SaveModel(saved_model_path, &original_model_2,
                       {/*file_prefix=*/"prefix_2_"}));
 
   std::unique_ptr<model::AbstractModel> loaded_model_1;
   EXPECT_OK(LoadModel(saved_model_path, &loaded_model_1,
                       {/*file_prefix=*/"prefix_1_"}));
-  EXPECT_EQ(
-      original_model_1->DescriptionAndStatistics(/*full_definition=*/true),
-      loaded_model_1->DescriptionAndStatistics(/*full_definition=*/true));
+  EXPECT_EQ(original_model_1.DescriptionAndStatistics(/*full_definition=*/true),
+            loaded_model_1->DescriptionAndStatistics(/*full_definition=*/true));
+  EXPECT_EQ(original_model_1.mutable_metadata()->uid(),
+            loaded_model_1->mutable_metadata()->uid());
 
   std::unique_ptr<model::AbstractModel> loaded_model_2;
   EXPECT_OK(LoadModel(saved_model_path, &loaded_model_2,
                       {/*file_prefix=*/"prefix_2_"}));
-  EXPECT_EQ(
-      original_model_2->DescriptionAndStatistics(/*full_definition=*/true),
-      loaded_model_2->DescriptionAndStatistics(/*full_definition=*/true));
+  EXPECT_EQ(original_model_2.DescriptionAndStatistics(/*full_definition=*/true),
+            loaded_model_2->DescriptionAndStatistics(/*full_definition=*/true));
+  EXPECT_EQ(original_model_2.mutable_metadata()->uid(),
+            loaded_model_2->mutable_metadata()->uid());
 }
 
 }  // namespace
