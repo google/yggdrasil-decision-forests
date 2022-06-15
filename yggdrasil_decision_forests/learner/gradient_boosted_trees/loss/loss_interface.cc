@@ -68,19 +68,18 @@ absl::Status AbstractLoss::UpdateGradients(
                        dataset.column(label_col_idx)->name(), label_col_idx));
 }
 
-absl::Status AbstractLoss::Loss(const dataset::VerticalDataset& dataset,
-                                int label_col_idx,
-                                const std::vector<float>& predictions,
-                                const std::vector<float>& weights,
-                                const RankingGroupsIndices* ranking_index,
-                                float* loss_value,
-                                std::vector<float>* secondary_metric) const {
+absl::Status AbstractLoss::Loss(
+    const dataset::VerticalDataset& dataset, int label_col_idx,
+    const std::vector<float>& predictions, const std::vector<float>& weights,
+    const RankingGroupsIndices* ranking_index, float* loss_value,
+    std::vector<float>* secondary_metric,
+    utils::concurrency::ThreadPool* thread_pool) const {
   const auto* categorical_labels =
       dataset.ColumnWithCastOrNull<dataset::VerticalDataset::CategoricalColumn>(
           label_col_idx);
   if (categorical_labels) {
     return Loss(categorical_labels->values(), predictions, weights,
-                ranking_index, loss_value, secondary_metric, nullptr);
+                ranking_index, loss_value, secondary_metric, thread_pool);
   }
 
   const auto* numerical_labels =
@@ -88,7 +87,7 @@ absl::Status AbstractLoss::Loss(const dataset::VerticalDataset& dataset,
           label_col_idx);
   if (numerical_labels) {
     return Loss(numerical_labels->values(), predictions, weights, ranking_index,
-                loss_value, secondary_metric, nullptr);
+                loss_value, secondary_metric, thread_pool);
   }
 
   return absl::InternalError("Unknown label type");

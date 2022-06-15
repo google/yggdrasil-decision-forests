@@ -20,7 +20,6 @@
 #include <queue>
 #include <string>
 
-
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 
@@ -36,11 +35,16 @@ class StreamProcessor {
   // Args:
   //   name: Name of the processor. For debug only.
   //   num_threads: Number of running threads.
-  //   call: Job to be executed on each query.
-  //   result_in_order: If false (default), the results will be returned in
+  //   call: Job to be executed on each query. The second optional argument is
+  //     the thread index in [0, num_thread].
+  //    result_in_order: If false (default), the results will be returned in
   //     random order (depending on the job scheduling). If true, the results
   //     will be returned in the same order as the queries. A pending result
   //     will block the thread that executed it.
+  StreamProcessor(std::string name, int num_threads,
+                  std::function<Output(Input, int)> call,
+                  bool result_in_order = false);
+
   StreamProcessor(std::string name, int num_threads,
                   std::function<Output(Input)> call,
                   bool result_in_order = false);
@@ -66,7 +70,7 @@ class StreamProcessor {
 
  private:
   // Running loop for the threads.
-  void ThreadLoop();
+  void ThreadLoop(int thread_idx);
 
   // Number of threads.
   int num_threads_;
@@ -78,7 +82,7 @@ class StreamProcessor {
   std::vector<Thread> threads_;
 
   // Processing function.
-  std::function<Output(Input)> call_;
+  std::function<Output(Input, int)> call_;
 
   Channel<Input> input_channel_;
   Channel<Output> output_channel_;
@@ -97,12 +101,22 @@ class StreamProcessor {
 
 template <typename Input, typename Output>
 StreamProcessor<Input, Output>::StreamProcessor(
-    std::string name, int num_threads, std::function<Output(Input)> call,
+    std::string name, int num_threads, std::function<Output(Input, int)> call,
     bool result_in_order)
     : name_(std::move(name)),
       num_threads_(num_threads),
       call_(std::move(call)),
       result_in_order_(result_in_order) {}
+
+template <typename Input, typename Output>
+StreamProcessor<Input, Output>::StreamProcessor(
+    std::string name, int num_threads, std::function<Output(Input)> call,
+    bool result_in_order)
+    : name_(std::move(name)),
+      num_threads_(num_threads),
+      result_in_order_(result_in_order) {
+  call_ = [call](Input input, int) -> Output { return call(std::move(input)); };
+}
 
 template <typename Input, typename Output>
 StreamProcessor<Input, Output>::~StreamProcessor() {
@@ -116,7 +130,9 @@ void StreamProcessor<Input, Output>::StartWorkers() {
     num_active_threads_ = num_threads_;
   }
   while (threads_.size() < num_threads_) {
-    threads_.emplace_back([this]() mutable { ThreadLoop(); });
+    const int thread_idx = threads_.size();
+    threads_.emplace_back(
+        [this, thread_idx]() mutable { ThreadLoop(thread_idx); });
   }
 }
 
@@ -136,7 +152,7 @@ void StreamProcessor<Input, Output>::JoinAllAndStopThreads() {
 }
 
 template <typename Input, typename Output>
-void StreamProcessor<Input, Output>::ThreadLoop() {
+void StreamProcessor<Input, Output>::ThreadLoop(const int thread_idx) {
   while (true) {
     int64_t query_id;
     auto optional_input = input_channel_.Pop(&query_id);
@@ -145,7 +161,7 @@ void StreamProcessor<Input, Output>::ThreadLoop() {
     }
 
     // Run computation.
-    Output result = call_(std::move(optional_input).value());
+    Output result = call_(std::move(optional_input).value(), thread_idx);
 
     if (result_in_order_) {
       // The results should be returned in order.

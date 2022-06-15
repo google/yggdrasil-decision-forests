@@ -285,13 +285,18 @@ class AbstractLoss {
   //
   // See the instructions of "UpdateGradients" to see which version of "Loss"
   // should be implemented.
-
-  absl::Status Loss(const dataset::VerticalDataset& dataset, int label_col_idx,
-                    const std::vector<float>& predictions,
-                    const std::vector<float>& weights,
-                    const RankingGroupsIndices* ranking_index,
-                    float* loss_value,
-                    std::vector<float>* secondary_metric) const;
+  //
+  // The "Loss" method exports the loss value to the "loss_value" output
+  // argument. The "Loss" method should be called with "secondary_metric"
+  // containing as many items as the loss secondary metrics (as defined by
+  // SecondaryMetricNames()). The "Loss" method populates "secondary_metric"
+  // accordingly.
+  absl::Status Loss(
+      const dataset::VerticalDataset& dataset, int label_col_idx,
+      const std::vector<float>& predictions, const std::vector<float>& weights,
+      const RankingGroupsIndices* ranking_index, float* loss_value,
+      std::vector<float>* secondary_metric,
+      utils::concurrency::ThreadPool* thread_pool = nullptr) const;
 
   virtual absl::Status Loss(const std::vector<int16_t>& labels,
                             const std::vector<float>& predictions,

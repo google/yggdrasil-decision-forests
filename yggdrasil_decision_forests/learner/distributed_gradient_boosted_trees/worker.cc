@@ -1078,47 +1078,75 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
   const auto num_prediction_dimensions =
       validation_.weak_model->NumPredictionDimension();
   const size_t num_examples = validation_.dataset->nrow();
-  auto examples = validation_.weak_model->AllocateExamples(
-      std::min(batch_size, num_examples));
   const size_t num_batches = (num_examples + batch_size - 1) / batch_size;
 
   DCHECK_EQ(validation_.predictions.size(),
             num_examples * num_prediction_dimensions);
 
-  std::vector<float> batch_predictions;
-  batch_predictions.reserve(batch_size * num_prediction_dimensions);
+  // Cache of temporary working data for each thread. This helps reducing the
+  // amonnt of heap allocations.
+  struct CachePerThread {
+    std::unique_ptr<serving::AbstractExampleSet> examples;
+    std::vector<float> batch_predictions;
+  };
 
-  for (size_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
-    const size_t begin_example_idx = batch_idx * batch_size;
-    const size_t end_example_idx =
-        std::min(begin_example_idx + batch_size, num_examples);
-
-    const size_t num_examples_in_batch = end_example_idx - begin_example_idx;
-    RETURN_IF_ERROR(serving::CopyVerticalDatasetToAbstractExampleSet(
-        *validation_.dataset,
-        /*begin_example_idx=*/begin_example_idx,
-        /*end_example_idx=*/end_example_idx, validation_.weak_model->features(),
-        examples.get()));
-
-    validation_.weak_model->Predict(*examples, num_examples_in_batch,
-                                    &batch_predictions);
-
-    DCHECK_EQ(batch_predictions.size(),
-              num_examples_in_batch * num_prediction_dimensions);
-    const auto offset = begin_example_idx * num_prediction_dimensions;
-    for (size_t pred_idx = 0; pred_idx < batch_predictions.size(); pred_idx++) {
-      validation_.predictions[offset + pred_idx] += batch_predictions[pred_idx];
-    }
+  // Allocate the caches.
+  const int num_threads = welcome_.deployment_config().num_threads();
+  std::vector<CachePerThread> caches(num_threads);
+  for (auto& cache : caches) {
+    cache.examples = validation_.weak_model->AllocateExamples(
+        std::min(batch_size, num_examples));
+    cache.batch_predictions.reserve(batch_size * num_prediction_dimensions);
   }
 
+  // Schedule the prediction updates.
+  utils::concurrency::StreamProcessor<int, int> processor(
+      "update predictions", num_threads,
+      [num_examples, this, num_prediction_dimensions, &caches](
+          const int batch_idx, const int thread_idx) -> int {
+        auto& cache = caches[thread_idx];
+
+        const size_t begin_example_idx = batch_idx * batch_size;
+        const size_t end_example_idx =
+            std::min(begin_example_idx + batch_size, num_examples);
+
+        const size_t num_examples_in_batch =
+            end_example_idx - begin_example_idx;
+        serving::CopyVerticalDatasetToAbstractExampleSet(
+            *validation_.dataset,
+            /*begin_example_idx=*/begin_example_idx,
+            /*end_example_idx=*/end_example_idx,
+            validation_.weak_model->features(), cache.examples.get())
+            .IgnoreError();
+
+        validation_.weak_model->Predict(*cache.examples, num_examples_in_batch,
+                                        &cache.batch_predictions);
+
+        DCHECK_EQ(cache.batch_predictions.size(),
+                  num_examples_in_batch * num_prediction_dimensions);
+        const auto offset = begin_example_idx * num_prediction_dimensions;
+        for (size_t pred_idx = 0; pred_idx < cache.batch_predictions.size();
+             pred_idx++) {
+          validation_.predictions[offset + pred_idx] +=
+              cache.batch_predictions[pred_idx];
+        }
+        return 0;
+      });
+  processor.StartWorkers();
+  for (size_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
+    processor.Submit(batch_idx);
+  }
+  // Note: We don't care about the results.
+  processor.JoinAllAndStopThreads();
+
   // Evaluate the validation predictions.
-  // TODO(gbm): Multi-thread evaluation.
   float loss_value;
   std::vector<float> secondary_metric;
   RETURN_IF_ERROR(
       loss_->Loss(*validation_.dataset, welcome_.train_config_linking().label(),
                   validation_.predictions, validation_.weights,
-                  /*ranking_index=*/nullptr, &loss_value, &secondary_metric));
+                  /*ranking_index=*/nullptr, &loss_value, &secondary_metric,
+                  /*thread_pool=*/thread_pool_.get()));
 
   validation_.evaluation.set_loss(loss_value);
   validation_.evaluation.set_num_examples(validation_.dataset->nrow());
