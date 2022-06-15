@@ -3340,7 +3340,8 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
       dt_config.uplift().split_score());
   LabelUpliftCategoricalBucket::Filler label_filler(
       label_stats.label_distribution, label_stats.outcome_values,
-      label_stats.treatment_values, weights);
+      label_stats.treatment_values, weights,
+      dt_config.uplift().empty_bucket__ordering());
 
   // TODO(gbm): Add support for pre-sorted splitting.
 
@@ -3392,7 +3393,8 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
       dt_config.uplift().split_score());
   LabelUpliftNumericalBucket::Filler label_filler(
       label_stats.label_distribution, label_stats.outcome_values,
-      label_stats.treatment_values, weights);
+      label_stats.treatment_values, weights,
+      dt_config.uplift().empty_bucket__ordering());
 
   // TODO(gbm): Add support for pre-sorted splitting.
 

@@ -251,6 +251,20 @@ message DecisionTreeTrainingConfig {
     }
 
     optional SplitScore split_score = 2 [default = KULLBACK_LEIBLER];
+
+    // How to order buckets having no values for one of the treatments.
+    // This parameter is used exclusively for the bucket sorting during the
+    // generation of some of the candidate splits. For example, for categorical
+    // features with the CART splitter
+    enum EmptyBucketOrdering {
+      // Uses the treatment conditional mean outcome of the parent node.
+      PARENT_TREATMENT_OUTCOME = 0;
+
+      // Uses the mean outcome of the parent node.
+      PARENT_OUTCOME = 1;
+    }
+    optional EmptyBucketOrdering empty_bucket__ordering = 3
+        [default = PARENT_TREATMENT_OUTCOME];
   }
 
   // If set, the decision tree is trained to be honest.

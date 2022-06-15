@@ -28,11 +28,12 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
 
-
 // Distribution of uplift classification labels.
 struct UpliftLabelDistribution {
  public:
   typedef proto::DecisionTreeTrainingConfig::Uplift::SplitScore SplitScoreType;
+  typedef proto::DecisionTreeTrainingConfig::Uplift::EmptyBucketOrdering
+      EmptyBucketOrdering;
 
   void InitializeAndClearLike(const UpliftLabelDistribution& guide) {
     sum_weights_ = 0;
@@ -71,6 +72,19 @@ struct UpliftLabelDistribution {
 
   void AddCategoricalOutcome(int outcome_value, int treatment_value,
                              const float weight) {
+    DCHECK_GE(weight, 0);
+    InternalAddCategoricalOutcome(outcome_value, treatment_value, weight, 1);
+  }
+
+  void SubCategoricalOutcome(int outcome_value, int treatment_value,
+                             const float weight) {
+    DCHECK_GE(weight, 0);
+    InternalAddCategoricalOutcome(outcome_value, treatment_value, -weight, -1);
+  }
+
+  void InternalAddCategoricalOutcome(int outcome_value, int treatment_value,
+                                     const float weight,
+                                     const SignedExampleIdx num_examples) {
     // Only support binary treatment and binary outcome.
     DCHECK_GE(outcome_value, 1);
     DCHECK_LE(outcome_value, 2);
@@ -83,7 +97,7 @@ struct UpliftLabelDistribution {
 
     sum_weights_ += weight;
     sum_weights_per_treatment_[treatment_value] += weight;
-    num_examples_per_treatment_[treatment_value]++;
+    num_examples_per_treatment_[treatment_value] += num_examples;
 
     // The zero outcome is ignored.
     if (outcome_value >= 2) {
@@ -96,6 +110,19 @@ struct UpliftLabelDistribution {
 
   void AddNumericalOutcome(float outcome_value, int treatment_value,
                            const float weight) {
+    DCHECK_GE(weight, 0);
+    InternalAddNumericalOutcome(outcome_value, treatment_value, weight, 1);
+  }
+
+  void SubNumericalOutcome(float outcome_value, int treatment_value,
+                           const float weight) {
+    DCHECK_GE(weight, 0);
+    InternalAddNumericalOutcome(outcome_value, treatment_value, -weight, -1);
+  }
+
+  void InternalAddNumericalOutcome(float outcome_value, int treatment_value,
+                                   const float weight,
+                                   const SignedExampleIdx num_examples) {
     // Only support binary treatment and binary outcome.
     DCHECK_GE(treatment_value, 1);
     DCHECK_LE(treatment_value, 2);
@@ -106,7 +133,7 @@ struct UpliftLabelDistribution {
 
     sum_weights_ += weight;
     sum_weights_per_treatment_[treatment_value] += weight;
-    num_examples_per_treatment_[treatment_value]++;
+    num_examples_per_treatment_[treatment_value] += num_examples;
     sum_weights_per_treatment_and_outcome_[treatment_value] +=
         weight * outcome_value;
   }
@@ -149,6 +176,20 @@ struct UpliftLabelDistribution {
     }
   }
 
+  double MeanOutcome() const {
+    DCHECK_EQ(sum_weights_per_treatment_.size(), 2);
+    DCHECK_EQ(num_examples_per_treatment_.size(), 2);
+    DCHECK_EQ(sum_weights_per_treatment_and_outcome_.size(), 2);
+    const auto sum_weights =
+        sum_weights_per_treatment_[0] + sum_weights_per_treatment_[1];
+    if (sum_weights == 0) {
+      return 0;
+    }
+    const auto sum_outcomes = sum_weights_per_treatment_and_outcome_[0] +
+                              sum_weights_per_treatment_and_outcome_[1];
+    return sum_outcomes / sum_weights;
+  }
+
   double MeanOutcomePerTreatment(const int treatment) const {
     DCHECK(treatment == 0 || treatment == 1);
     if (sum_weights_per_treatment_[treatment] == 0) {
@@ -158,7 +199,53 @@ struct UpliftLabelDistribution {
            sum_weights_per_treatment_[treatment];
   }
 
-  double Uplift() const {
+  // Tests if the uplift can be computed.
+  bool HasUplift() const {
+    return sum_weights_per_treatment_[0] != 0 &&
+           sum_weights_per_treatment_[1] != 0;
+  }
+
+  // Uplift value for bucket ordering.
+  double UpliftBucket(const EmptyBucketOrdering empty_bucket_ordering,
+                      const UpliftLabelDistribution& parent) const {
+    // Only support binary treatment and single dimension outcome.
+    DCHECK_EQ(sum_weights_per_treatment_.size(), 2);
+    DCHECK_EQ(num_examples_per_treatment_.size(), 2);
+    DCHECK_EQ(sum_weights_per_treatment_and_outcome_.size(), 2);
+
+    // Replacement value for missing output treatment.
+    const auto missing_outcome_imputation =
+        [&](const int treatement) -> double {
+      switch (empty_bucket_ordering) {
+        case proto::DecisionTreeTrainingConfig::Uplift::
+            PARENT_TREATMENT_OUTCOME:
+          return parent.MeanOutcomePerTreatment(treatement);
+        case proto::DecisionTreeTrainingConfig::Uplift::PARENT_OUTCOME:
+          return parent.MeanOutcome();
+        default:
+          DCHECK(false);
+          break;
+      }
+    };
+
+    const double response_control = (sum_weights_per_treatment_[0] != 0)
+                                        ? MeanOutcomePerTreatment(0)
+                                        : missing_outcome_imputation(0);
+    const double response_treatment = (sum_weights_per_treatment_[1] != 0)
+                                          ? MeanOutcomePerTreatment(1)
+                                          : missing_outcome_imputation(1);
+    return response_treatment - response_control;
+  }
+
+  // Uplift value for leafs. All the treatements should have at least one value.
+  double UpliftLeaf() const {
+    if (!HasUplift()) {
+      // The minimum number of examples per treatement should make this case
+      // not possible.
+      DCHECK(false) << "Uplift leaf not available: " << *this;
+      return 0;
+    }
+
     // Only support binary treatment and single dimension outcome.
     DCHECK_EQ(sum_weights_per_treatment_.size(), 2);
     DCHECK_EQ(num_examples_per_treatment_.size(), 2);
@@ -171,16 +258,15 @@ struct UpliftLabelDistribution {
 
   // Returns the lower bound of the 9.7% confidence interval of the uplift.
   // Model the outcome as a normal distribution.
-  double ConservativeUplift() const {
+  double ConservativeUpliftScore() const {
+    if (!HasUplift()) {
+      return 0;
+    }
+
     // Only support binary treatment and single dimension outcome.
     DCHECK_EQ(sum_weights_per_treatment_.size(), 2);
     DCHECK_EQ(num_examples_per_treatment_.size(), 2);
     DCHECK_EQ(sum_weights_per_treatment_and_outcome_.size(), 2);
-
-    if (sum_weights_per_treatment_[0] == 0 ||
-        sum_weights_per_treatment_[1] == 0) {
-      return 0;
-    }
 
     const double mean_c = MeanOutcomePerTreatment(0);
     const double mean_t = MeanOutcomePerTreatment(1);
@@ -208,7 +294,12 @@ struct UpliftLabelDistribution {
     return 0;
   }
 
+  // Uplift for score splits.
   double UpliftSplitScore(const SplitScoreType score) const {
+    if (!HasUplift()) {
+      return 0;
+    }
+
     switch (score) {
       case proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE: {
         const double response_control = MeanOutcomePerTreatment(0);
@@ -251,20 +342,16 @@ struct UpliftLabelDistribution {
       }
       case proto::DecisionTreeTrainingConfig::Uplift::
           CONSERVATIVE_EUCLIDEAN_DISTANCE: {
-        const auto u = ConservativeUplift();
+        const auto u = ConservativeUpliftScore();
         return u * u;
       }
     }
   }
 
   int MinNumExamplesPerTreatment() const {
-    int min_value = num_examples_per_treatment_[0];
-    for (const auto value : num_examples_per_treatment_) {
-      if (value < min_value) {
-        min_value = value;
-      }
-    }
-    return min_value;
+    DCHECK_EQ(num_examples_per_treatment_.size(), 2);
+    return std::min(sum_weights_per_treatment_[0],
+                    sum_weights_per_treatment_[1]);
   }
 
   double num_examples() const { return sum_weights_; }
@@ -294,7 +381,7 @@ struct UpliftLabelDistribution {
 
     auto& treatment_effect = *leaf->mutable_treatment_effect();
     treatment_effect.Clear();
-    treatment_effect.Add(Uplift());
+    treatment_effect.Add(UpliftLeaf());
   }
 
  private:
@@ -305,7 +392,28 @@ struct UpliftLabelDistribution {
   absl::InlinedVector<double, 2> sum_weights_per_treatment_;
   absl::InlinedVector<double, 2> sum_weights_per_treatment_and_outcome_;
   absl::InlinedVector<SignedExampleIdx, 2> num_examples_per_treatment_;
+
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const UpliftLabelDistribution& data);
 };
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const UpliftLabelDistribution& data) {
+  os << "{sum_weights:" << data.sum_weights_ << " sum_weights_per_treatment:[";
+  for (const auto x : data.sum_weights_per_treatment_) {
+    os << " " << x;
+  }
+  os << "] sum_weights_per_treatment_and_outcome:[";
+  for (const auto x : data.sum_weights_per_treatment_and_outcome_) {
+    os << " " << x;
+  }
+  os << "] num_examples_per_treatment:[";
+  for (const auto x : data.num_examples_per_treatment_) {
+    os << " " << x;
+  }
+  os << "]}";
+  return os;
+}
 
 struct LabelUpliftCategoricalScoreAccumulator {
   static constexpr bool kNormalizeByWeight = true;
@@ -348,9 +456,9 @@ struct LabelUpliftGenericOneValueBucket {
 
   void SubToScoreAcc(Accumulator* acc) const {
     if constexpr (categorical_label) {
-      acc->label.AddCategoricalOutcome(outcome, treatment, -weight);
+      acc->label.SubCategoricalOutcome(outcome, treatment, weight);
     } else {
-      acc->label.AddNumericalOutcome(outcome, treatment, -weight);
+      acc->label.SubNumericalOutcome(outcome, treatment, weight);
     }
   }
 
@@ -424,7 +532,23 @@ struct LabelUpliftGenericOneValueBucket {
     const std::vector<int32_t>& treatments_;
     const std::vector<float>& weights_;
   };
+
+  friend std::ostream& operator<<(std::ostream& os, const Bucket& data);
 };
+
+inline std::ostream& operator<<(
+    std::ostream& os, const LabelUpliftGenericOneValueBucket<true>& data) {
+  os << "value:{treatment:" << data.treatment << " outcome:" << data.outcome
+     << " weight:" << data.weight << "} count:" << data.count;
+  return os;
+}
+
+inline std::ostream& operator<<(
+    std::ostream& os, const LabelUpliftGenericOneValueBucket<false>& data) {
+  os << "value:{treatment:" << data.treatment << " outcome:" << data.outcome
+     << " weight:" << data.weight << "} count:" << data.count;
+  return os;
+}
 
 typedef LabelUpliftGenericOneValueBucket<true>
     LabelUpliftCategoricalOneValueBucket;
@@ -504,11 +628,14 @@ struct LabelUpliftGenericBucket {
     Filler(const UpliftLabelDistribution& label_distribution,
            const std::vector<OutcomeValue>& outcomes,
            const std::vector<int32_t>& treatments,
-           const std::vector<float>& weights)
+           const std::vector<float>& weights,
+           const proto::DecisionTreeTrainingConfig::Uplift::EmptyBucketOrdering
+               empty_bucket_ordering)
         : outcomes_(outcomes),
           treatments_(treatments),
           weights_(weights),
-          label_distribution_(label_distribution) {}
+          label_distribution_(label_distribution),
+          empty_bucket_ordering_(empty_bucket_ordering) {}
 
     void InitializeAndZero(Bucket* acc) const {
       acc->count = 0;
@@ -516,7 +643,8 @@ struct LabelUpliftGenericBucket {
     }
 
     void Finalize(Bucket* acc) const {
-      acc->signed_uplift = acc->distribution.Uplift();
+      acc->signed_uplift = acc->distribution.UpliftBucket(
+          empty_bucket_ordering_, label_distribution_);
     }
 
     void ConsumeExample(const UnsignedExampleIdx example_idx,
@@ -539,8 +667,28 @@ struct LabelUpliftGenericBucket {
     const std::vector<int32_t>& treatments_;
     const std::vector<float>& weights_;
     const UpliftLabelDistribution& label_distribution_;
+    const proto::DecisionTreeTrainingConfig::Uplift::EmptyBucketOrdering
+        empty_bucket_ordering_;
   };
+
+  friend std::ostream& operator<<(
+      std::ostream& os,
+      const LabelUpliftGenericBucket<categorical_label>& data);
 };
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const LabelUpliftGenericBucket<true>& data) {
+  os << "value:{distribution: " << data.distribution
+     << " signed_uplift:" << data.signed_uplift << "} count:" << data.count;
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const LabelUpliftGenericBucket<false>& data) {
+  os << "value:{distribution: " << data.distribution
+     << " signed_uplift:" << data.signed_uplift << "} count:" << data.count;
+  return os;
+}
 
 typedef LabelUpliftGenericBucket<true> LabelUpliftCategoricalBucket;
 

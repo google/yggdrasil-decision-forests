@@ -2178,9 +2178,6 @@ TEST(UpliftCategoricalLabelDistribution, Base) {
   // Empty dist.
   EXPECT_EQ(dist.num_examples(), 0);
   EXPECT_EQ(dist.MinNumExamplesPerTreatment(), 0);
-  EXPECT_EQ(dist.MeanOutcomePerTreatment(0), 0);
-  EXPECT_EQ(dist.MeanOutcomePerTreatment(1), 0);
-  EXPECT_EQ(dist.Uplift(), 0);
   EXPECT_EQ(dist.UpliftSplitScore(
                 proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE),
             0);
@@ -2204,7 +2201,7 @@ TEST(UpliftCategoricalLabelDistribution, Base) {
   EXPECT_EQ(dist.MinNumExamplesPerTreatment(), 2);
   EXPECT_EQ(dist.MeanOutcomePerTreatment(0), 0.5);
   EXPECT_EQ(dist.MeanOutcomePerTreatment(1), 1.0);
-  EXPECT_EQ(dist.Uplift(), 0.5);
+  EXPECT_EQ(dist.UpliftLeaf(), 0.5);
   EXPECT_EQ(dist.UpliftSplitScore(
                 proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE),
             0.5 * 0.5);
@@ -2226,7 +2223,7 @@ TEST(UpliftCategoricalLabelDistribution, Base) {
   EXPECT_EQ(dist2.MinNumExamplesPerTreatment(), 2);
   EXPECT_EQ(dist2.MeanOutcomePerTreatment(0), 0.5);
   EXPECT_EQ(dist2.MeanOutcomePerTreatment(1), 1.0);
-  EXPECT_EQ(dist2.Uplift(), 0.5);
+  EXPECT_EQ(dist2.UpliftLeaf(), 0.5);
   EXPECT_EQ(dist2.UpliftSplitScore(
                 proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE),
             0.5 * 0.5);
@@ -2260,7 +2257,7 @@ TEST(UpliftCategoricalLabelDistribution, FromToLeafProto) {
   EXPECT_EQ(dist.MinNumExamplesPerTreatment(), 2);
   EXPECT_EQ(dist.MeanOutcomePerTreatment(0), 0.5);
   EXPECT_EQ(dist.MeanOutcomePerTreatment(1), 1.0);
-  EXPECT_EQ(dist.Uplift(), 0.5);
+  EXPECT_EQ(dist.UpliftLeaf(), 0.5);
   EXPECT_EQ(dist.UpliftSplitScore(
                 proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE),
             0.5 * 0.5);
@@ -2342,10 +2339,11 @@ TEST(DecisionTree, FindBestSplitCategoricalFeatureTaskCategoricalUplift) {
   std::iota(selected_examples.begin(), selected_examples.end(), 0);
   const std::vector<float> weights(num_examples, 1.f);
 
-  // The values  {1,2} or {3,4} are discriminative.
+  // The values {1,4} or {2,4} are discriminative.
+  // 4 is always positive, and 3 is always negative.
   std::vector<int32_t> attributes = {1, 2, 1, 2, 3, 4, 3, 4};
-  const std::vector<int32_t> outcomes = {1, 1, 1, 1, 1, 2, 1, 2};
   const std::vector<int32_t> treatments = {1, 2, 1, 2, 1, 2, 1, 2};
+  const std::vector<int32_t> outcomes = {1, 1, 1, 1, 2, 2, 2, 2};
 
   const int32_t num_attribute_classes = 4 + 1;
   const int32_t num_outcome_classes = 2 + 1;
@@ -2387,10 +2385,135 @@ TEST(DecisionTree, FindBestSplitCategoricalFeatureTaskCategoricalUplift) {
   EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 4);
   EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 4);
-  // Both the splits of attribute values [neg={1,2}, pos={3,4}] and [pos={1,2},
-  // neg={3,4}] are equivalent and acceptable.
-  EXPECT_NEAR(best_condition.split_score(), 1.f * 0.5f + 0.f * 0.5f - 0.25f,
-              0.0001);
+  // Both the splits of attribute values [neg={3,2}, pos={1,4}] and [pos={3,1},
+  // neg={2,4}] are equivalent and acceptable.
+  EXPECT_NEAR(best_condition.split_score(), 1.f, 0.0001);
+}
+
+// Test the splitter with the replacement of missing outcome by the parent
+// outcome.
+TEST(DecisionTree,
+     FindBestSplitCategoricalFeatureTaskCategoricalUpliftParentImputation) {
+  const int num_examples = 8;
+  std::vector<UnsignedExampleIdx> selected_examples(num_examples);
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights(num_examples, 1.f);
+
+  // The values  {1,4} or {2,4} are discriminative.
+  // 4 is always positive, and 3 is always negative.
+  std::vector<int32_t> attributes = {1, 2, 1, 2, 3, 4, 3, 4};
+  const std::vector<int32_t> treatments = {1, 2, 1, 2, 1, 2, 1, 2};
+  const std::vector<int32_t> outcomes = {1, 1, 1, 1, 2, 2, 2, 2};
+
+  const int32_t num_attribute_classes = 4 + /*out-of-vocabulary*/ 1;
+  const int32_t num_outcome_classes = 2 + /*out-of-vocabulary*/ 1;
+  const int32_t num_treatment_classes = 2 + /*out-of-vocabulary*/ 1;
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_uplift()->set_min_examples_in_treatment(1);
+  // EUCLIDEAN_DISTANCE is the only split score that natively handles the
+  // distance between pure distributions.
+  dt_config.mutable_uplift()->set_split_score(
+      proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE);
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+  dt_config.mutable_uplift()->set_empty_bucket__ordering(
+      proto::DecisionTreeTrainingConfig::Uplift::PARENT_OUTCOME);
+
+  CategoricalUpliftLabelStats label_stats(outcomes, num_outcome_classes,
+                                          treatments, num_treatment_classes);
+
+  auto& label_dist = label_stats.label_distribution;
+  label_dist.InitializeAndClearCategoricalOutcome(num_outcome_classes,
+                                                  num_treatment_classes);
+
+  for (const auto example_idx : selected_examples) {
+    label_dist.AddCategoricalOutcome(
+        outcomes[example_idx], treatments[example_idx], weights[example_idx]);
+  }
+
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  utils::RandomEngine random;
+  EXPECT_EQ(FindSplitLabelUpliftCategoricalFeatureCategorical(
+                selected_examples, weights, attributes, label_stats,
+                num_attribute_classes,
+                /*na_replacement=*/0,
+                /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache,
+                &random),
+            SplitSearchResult::kBetterSplitFound);
+
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 4);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 4);
+  // Both the splits of attribute values [neg={3,2}, pos={1,4}] and [pos={3,1},
+  // neg={2,4}] are equivalent and acceptable.
+  EXPECT_NEAR(best_condition.split_score(), 1.f, 0.0001);
+}
+
+// Tests that the minimum number of examples per treatment constraint works.
+TEST(DecisionTree, MinNumExamplePerTreatment) {
+  const int num_examples = 8;
+  std::vector<UnsignedExampleIdx> selected_examples(num_examples);
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights(num_examples, 1.f);
+
+  // The best splits would be >=1.5 or >=3.5. However, those splits are not
+  // valid as they don't satisfy a min number of examples per treatment = 2
+  // constraint.
+  std::vector<float> attributes = {1, 1, 2, 2, 3, 3, 4, 4};
+  const std::vector<int32_t> treatments = {1, 2, 1, 2, 1, 2, 1, 2};
+  const std::vector<int32_t> outcomes = {1, 2, 1, 1, 2, 2, 1, 2};
+
+  const int32_t num_outcome_classes = 2 + 1;
+  const int32_t num_treatment_classes = 2 + 1;
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_uplift()->set_split_score(
+      proto::DecisionTreeTrainingConfig::Uplift::EUCLIDEAN_DISTANCE);
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  CategoricalUpliftLabelStats label_stats(outcomes, num_outcome_classes,
+                                          treatments, num_treatment_classes);
+
+  auto& label_dist = label_stats.label_distribution;
+  label_dist.InitializeAndClearCategoricalOutcome(num_outcome_classes,
+                                                  num_treatment_classes);
+
+  for (const auto example_idx : selected_examples) {
+    label_dist.AddCategoricalOutcome(
+        outcomes[example_idx], treatments[example_idx], weights[example_idx]);
+  }
+
+  // Without constraints, a split is found.
+  {
+    dt_config.mutable_uplift()->set_min_examples_in_treatment(1);
+
+    proto::NodeCondition best_condition;
+    SplitterPerThreadCache cache;
+    EXPECT_EQ(
+        FindSplitLabelUpliftCategoricalFeatureNumericalCart(
+            selected_examples, weights, attributes, label_stats,
+            /*na_replacement=*/2.5,
+            /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache),
+        SplitSearchResult::kBetterSplitFound);
+  }
+
+  // With constraints, no split is found.
+  {
+    dt_config.mutable_uplift()->set_min_examples_in_treatment(2);
+
+    proto::NodeCondition best_condition;
+    SplitterPerThreadCache cache;
+    EXPECT_EQ(
+        FindSplitLabelUpliftCategoricalFeatureNumericalCart(
+            selected_examples, weights, attributes, label_stats,
+            /*na_replacement=*/2.5,
+            /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache),
+        SplitSearchResult::kNoBetterSplitFound);
+  }
 }
 
 }  // namespace

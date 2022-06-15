@@ -45,6 +45,9 @@
 // If SIMPLE_ML_DEBUG_DECISION_TREE_SPLITTER is set, the algorithm will log the
 // detail in the splitter work.
 //
+// If the preprocessor "YDF_DEBUG_PRINT_SPLIT" is set, detailed logs of the
+// splitting algorithm are printed with LOG(INFO).
+//
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_SPLITTER_SCANNER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_SPLITTER_SCANNER_H_
 
@@ -557,8 +560,20 @@ SplitSearchResult ScanSplits(
   // last new best split were empty).
   bool no_new_examples_since_last_new_best_split = false;
 
+#ifdef YDF_DEBUG_PRINT_SPLIT
+  LOG(INFO) << "Start scanning split with ScanSplits with: num_buckets:"
+            << example_bucket_set.items.size() << " best_score:" << best_score
+            << " num_examples:" << num_examples
+            << " weighted_num_examples:" << weighted_num_examples;
+#endif
+
   for (int bucket_idx = 0; bucket_idx < end_bucket_idx; bucket_idx++) {
     const auto& item = example_bucket_set.items[bucket_idx];
+
+#ifdef YDF_DEBUG_PRINT_SPLIT
+    LOG(INFO) << "Scan item\n\tfeature: " << item.feature
+              << "\n\tlabel: " << item.label;
+#endif
 
     if constexpr (bucket_interpolation) {
       if (no_new_examples_since_last_new_best_split && item.label.count > 0) {
@@ -577,26 +592,46 @@ SplitSearchResult ScanSplits(
 
     if (!FeatureBucketType::IsValidSplit(
             item.feature, example_bucket_set.items[bucket_idx + 1].feature)) {
+#ifdef YDF_DEBUG_PRINT_SPLIT
+      LOG(INFO) << "\tinvalid split (feature)";
+#endif
       continue;
     }
 
     // Enough examples?
     if (num_pos_examples < min_num_obs) {
+#ifdef YDF_DEBUG_PRINT_SPLIT
+      LOG(INFO) << "\tnot enought examples on positive side";
+#endif
       break;
     }
 
     if (num_neg_examples < min_num_obs) {
+#ifdef YDF_DEBUG_PRINT_SPLIT
+      LOG(INFO) << "\tnot enought examples on negative side";
+#endif
       continue;
     }
 
     if (!initializer.IsValidSplit(neg, pos)) {
+#ifdef YDF_DEBUG_PRINT_SPLIT
+      LOG(INFO) << "\tinvalid split (accumulator)";
+#endif
       continue;
     }
 
     const auto score = Score<>(initializer, weighted_num_examples, pos, neg);
     tried_one_split = true;
 
+#ifdef YDF_DEBUG_PRINT_SPLIT
+    LOG(INFO) << "\tscore: " << score;
+#endif
+
     if (score > best_score) {
+#ifdef YDF_DEBUG_PRINT_SPLIT
+      LOG(INFO) << "\tnew best split";
+#endif
+
       // Memorize the split.
       best_bucket_idx = bucket_idx;
       best_score = score;
@@ -609,6 +644,12 @@ SplitSearchResult ScanSplits(
       }
     }
   }
+
+#ifdef YDF_DEBUG_PRINT_SPLIT
+  LOG(INFO) << "Last bucket:\n\tfeature: "
+            << example_bucket_set.items.back().feature
+            << "\n\tlabel: " << example_bucket_set.items.back().label;
+#endif
 
   if (best_bucket_idx != -1) {
     // Finalize the best found split.

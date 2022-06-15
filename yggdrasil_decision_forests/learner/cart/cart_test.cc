@@ -236,11 +236,11 @@ class CartOnSimPTE : public utils::TrainAndTestTester {
 TEST_F(CartOnSimPTE, Base) {
   TrainAndEvaluateModel();
   // Note: A Qini of ~0.1 is expected with a simple Random Forest model.
-  EXPECT_NEAR(metric::Qini(evaluation_), 0.06724, 0.01);
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.051, 0.01);
 
   auto* rf_model =
       dynamic_cast<const random_forest::RandomForestModel*>(model_.get());
-  EXPECT_GT(rf_model->num_pruned_nodes().value(), 50);
+  EXPECT_GT(rf_model->num_pruned_nodes().value(), 20);
   EXPECT_GT(rf_model->NumNodes(), 20);
 }
 
