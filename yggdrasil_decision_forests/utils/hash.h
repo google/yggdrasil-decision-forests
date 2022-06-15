@@ -22,7 +22,7 @@
 
 #include "absl/strings/string_view.h"
 
-#include "src/farmhash.h"
+#include "farmhash.h"
 namespace farmhash_namespace = ::util;
 
 namespace yggdrasil_decision_forests {

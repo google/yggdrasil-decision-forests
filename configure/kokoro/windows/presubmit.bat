@@ -30,9 +30,9 @@ SET PIP_EXE=C:\Python38\Scripts\pip.exe
 %PIP_EXE% install numpy --upgrade
 
 :: Setup Bazel
-wget https://github.com/bazelbuild/bazel/releases/download/4.0.0/bazel-4.0.0-windows-x86_64.exe
+wget https://github.com/bazelbuild/bazel/releases/download/5.1.1/bazel-5.1.1-windows-x86_64.exe
 
-set BAZEL=bazel-4.0.0-windows-x86_64.exe
+set BAZEL=bazel-5.1.1-windows-x86_64.exe
 set FLAGS=--test_output=streamed
 set FLAGS_WO_TF=--config=windows_cpp17
 :: We actually only use cpp14 functionalities.

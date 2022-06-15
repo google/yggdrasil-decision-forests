@@ -8,4 +8,5 @@ cc_library(
     srcs = ["src/farmhash.cc"],
     hdrs = ["src/farmhash.h"],
     defines = ["FARMHASH_NO_BUILTIN_EXPECT"],
+    includes = ["src/."],
 )

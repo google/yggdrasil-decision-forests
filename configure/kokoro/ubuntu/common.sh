@@ -24,7 +24,7 @@
 set -e
 set -x
 
-BAZEL_VERSION=3.7.2
+BAZEL_VERSION=5.1.1
 
 # Print Linux version details.
 cat /etc/{os,lsb}-release

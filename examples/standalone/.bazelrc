@@ -3,7 +3,9 @@
 
 # Common flags.
 common --experimental_repo_remote_exec
-common --incompatible_restrict_string_escapes=false
+
+# Required for bazel <=4, fails with bazel >= 5.
+# common --incompatible_restrict_string_escapes=false
 
 build -c opt
 build --spawn_strategy=standalone

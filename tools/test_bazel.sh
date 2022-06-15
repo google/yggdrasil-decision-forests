@@ -21,6 +21,8 @@ set -xev
 BAZEL=bazel
 ${BAZEL} version
 
+echo "To compile with Bazel>=5, comment the lines 'common --incompatible_restrict_string_escapes=false' in the .bazelrc file"
+
 echo "====================================================="
 echo "1. With TensorFlow IO, c++14 and without abslStatusOr"
 echo "====================================================="

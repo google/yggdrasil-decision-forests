@@ -37,14 +37,17 @@ Pre-compiled binaries are available as
 
 -   Microsoft Visual Studio >= 2019 (Windows)
 -   GCC or Clang (Linux)
--   Bazel >= 3.7.2
+-   Bazelisk (or Bazel 5.1.1)
 -   Python >= 3
 -   Git
 -   Python's numpy
 -   MSYS2 (Windows)
 
-First install [Bazel](https://docs.bazel.build). Versions 3.7.2 and 4.0.0 are
-supported:
+First install [Bazelisk](https://bazel.build/install).
+
+Note: If you need to use an old version of Bazel e.g. you might have to
+uncomment the `common --incompatible_restrict_string_escapes=false` line in
+`.bazelrc`.
 
 -   On linux: `sudo apt update && sudo apt install bazel`
 
