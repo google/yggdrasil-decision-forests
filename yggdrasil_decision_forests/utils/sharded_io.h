@@ -26,6 +26,7 @@
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -53,7 +54,7 @@ absl::Status ExpandOutputShards(const absl::string_view sharded_path,
 
 // Helper class for the sequential reading of sharded files.
 template <typename T>
-class ShardedReader {
+class ShardedReader : public ProtoReaderInterface<T> {
  public:
   virtual ~ShardedReader() = default;
 
@@ -90,7 +91,7 @@ class ShardedReader {
 
 // Helper class for the sequential writing of sharded files.
 template <typename T>
-class ShardedWriter {
+class ShardedWriter : public ProtoWriterInterface<T> {
  public:
   virtual ~ShardedWriter() = default;
 

@@ -26,6 +26,8 @@ namespace distributed_decision_tree {
 namespace dataset_cache {
 namespace {
 
+using testing::ElementsAre;
+
 // Create a sharded record with the pattern: value_i = value_idx * 2.
 // Returns the base path.
 std::string CreatedShardedInteger(const int num_shards,
@@ -207,6 +209,21 @@ TEST(FloatColumn, WriteAndRead) {
   EXPECT_TRUE(reader.Values().empty());
 
   CHECK_OK(reader.Close());
+}
+
+TEST(FloatColumn, ReadAndAppend) {
+  // Write the 5 values.
+  const auto path = file::JoinPath(test::TmpDirectory(), "record");
+  FloatColumnWriter writer;
+  CHECK_OK(writer.Open(path));
+  CHECK_OK(writer.WriteValues({1.5f, 2.5f, 3.5f}));
+  CHECK_OK(writer.WriteValues({4.5f, 5.5f}));
+  CHECK_OK(writer.Close());
+
+  // Read the 5 values.
+  std::vector<float> output;
+  CHECK_OK(FloatColumnReader::ReadAndAppend(path, &output));
+  EXPECT_THAT(output, ElementsAre(1.5f, 2.5f, 3.5f, 4.5f, 5.5f));
 }
 
 TEST(ShardedFloatColumnReader, Base) {

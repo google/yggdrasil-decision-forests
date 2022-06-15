@@ -431,19 +431,22 @@ void DecisionTree::CreateRoot() {
 }
 
 absl::Status DecisionTree::WriteNodes(
-    utils::ShardedWriter<proto::Node>* writer) const {
-  DCHECK(root_) << "You cannot export an empty tree";
+    utils::ProtoWriterInterface<proto::Node>* writer) const {
+  CHECK(root_) << "You cannot export an empty tree";
+  if (!root_) {
+    return absl::InvalidArgumentError("You cannot export an empty tree");
+  }
   return root_->WriteNodes(writer);
 }
 
 absl::Status DecisionTree::ReadNodes(
-    utils::ShardedReader<proto::Node>* reader) {
+    utils::ProtoReaderInterface<proto::Node>* reader) {
   CreateRoot();
   return root_->ReadNodes(reader);
 }
 
 absl::Status NodeWithChildren::WriteNodes(
-    utils::ShardedWriter<proto::Node>* writer) const {
+    utils::ProtoWriterInterface<proto::Node>* writer) const {
   RETURN_IF_ERROR(writer->Write(node_));
   if (!IsLeaf()) {
     RETURN_IF_ERROR(children_[0]->WriteNodes(writer));
@@ -453,7 +456,7 @@ absl::Status NodeWithChildren::WriteNodes(
 }
 
 absl::Status NodeWithChildren::ReadNodes(
-    utils::ShardedReader<proto::Node>* reader) {
+    utils::ProtoReaderInterface<proto::Node>* reader) {
   ASSIGN_OR_RETURN(bool did_read, reader->Next(&node_));
   if (!did_read) {
     return absl::InvalidArgumentError("Unexpected EOF");

@@ -140,6 +140,9 @@ class LoadBalancer {
   // FeaturesPerWorkers()[worker].
   const std::vector<int>& FeaturesPerWorker(int worker) const;
 
+  // Number of workers.
+  int NumWorkers() const { return workers_.size(); }
+
   // Checks if the dynamic balancing is active i.e. the worker->feature
   // assignment can change.
   bool is_dynamic_balancing_active() const {

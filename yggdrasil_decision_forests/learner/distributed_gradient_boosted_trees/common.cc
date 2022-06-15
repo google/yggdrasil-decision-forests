@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 
+#include "absl/status/status.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 
 namespace yggdrasil_decision_forests {
@@ -23,6 +25,38 @@ namespace distributed_gradient_boosted_trees {
 
 std::string SnapshotDirectory(absl::string_view work_directory) {
   return file::JoinPath(work_directory, kFileNameCheckPoint, kFileNameSnapshot);
+}
+
+EndIterTreeProtoWriter::EndIterTreeProtoWriter(
+    proto::WorkerRequest::EndIter::Tree* dst)
+    : dst_(dst) {}
+
+absl::Status EndIterTreeProtoWriter::Write(
+    const decision_tree::proto::Node& value) {
+  *dst_->add_nodes() = value;
+  return absl::OkStatus();
+}
+
+EndIterTreeProtoReader::EndIterTreeProtoReader(
+    const proto::WorkerRequest::EndIter::Tree& src)
+    : src_(src) {}
+
+utils::StatusOr<bool> EndIterTreeProtoReader::Next(
+    decision_tree::proto::Node* value) {
+  if (next_node_idx_ >= src_.nodes_size()) {
+    return false;
+  }
+  *value = src_.nodes(next_node_idx_++);
+  return true;
+}
+
+std::string ValidationPredictionCheckpointPath(absl::string_view checkpoint_dir,
+                                               int evaluation_worker_idx,
+                                               int num_evaluation_workers) {
+  return file::JoinPath(checkpoint_dir,
+                        distributed_decision_tree::dataset_cache::ShardFilename(
+                            "validation_predictions", evaluation_worker_idx,
+                            num_evaluation_workers));
 }
 
 }  // namespace distributed_gradient_boosted_trees

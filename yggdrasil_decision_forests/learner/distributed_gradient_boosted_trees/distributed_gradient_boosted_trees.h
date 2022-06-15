@@ -32,12 +32,17 @@
 //
 // The learning algorithm support worker and manager interruption.
 //
-
+// Internal remarks
+//   - The workers are divided into training and evaluation workers. The first
+//     worker indices are used for training workers while the last indices are
+//     used for evaluation workers.
+//
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_GRADIENT_BOOSTED_TREES_DISTRIBUTED_GRADIENT_BOOSTED_TREES_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_GRADIENT_BOOSTED_TREES_DISTRIBUTED_GRADIENT_BOOSTED_TREES_H_
 
 #include <memory>
 
+#include "absl/container/flat_hash_map.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -96,6 +101,9 @@ REGISTER_AbstractLearner(
     DistributedGradientBoostedTreesLearner::kRegisteredName);
 
 namespace internal {
+
+// For the manager, a validation dataset is simply dataset's path.
+typedef std::string ValidationDataset;
 
 // One weak model being constructed.
 struct WeakModel {
@@ -193,6 +201,36 @@ class Monitoring {
   absl::Time begin_current_iter_;
 };
 
+// Aggregates partial evaluations (evaluation of the weak models trained in a
+// single iteration and on a subset of a dataset). Used to compute the
+// validation loss and metrics from the evaluation worker output.
+class PartialEvaluationAggregator {
+ public:
+  // num_fragments: Number of partial evaluations required to form a complete
+  //   evaluation. If 0, the aggregator is not "active".
+  PartialEvaluationAggregator(const int num_fragments) {
+    data_.set_num_fragments(num_fragments);
+  }
+
+  // Adds a partial evaluation.
+  absl::Status AddPartial(const proto::Evaluation& evaluation);
+
+  // Retrives a full evaluation. Fails if the evaluation cannot be fulled build
+  // i.e. if there are less than "num_fragments" evaluations with the requested
+  // "iter_idx".
+  utils::StatusOr<proto::Evaluation> GetAggregated(const int iter_idx) const;
+
+  // The aggregator can receive evaluations.
+  bool Active() const { return data_.num_fragments() > 0; }
+
+  absl::Status Export(proto::PartialEvaluationAggregator* proto);
+
+  absl::Status Import(const proto::PartialEvaluationAggregator& proto);
+
+ private:
+  proto::PartialEvaluationAggregator data_;
+};
+
 absl::Status SetDefaultHyperParameters(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -238,7 +276,9 @@ TrainWithCache(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
-    absl::string_view cache_path, absl::string_view work_directory,
+    absl::string_view cache_path,
+    const absl::optional<std::string>& typed_valid_path,
+    absl::string_view work_directory,
     const dataset::proto::DataSpecification& data_spec,
     const absl::string_view& log_directory, internal::Monitoring* monitoring);
 
@@ -255,7 +295,8 @@ absl::Status RunIteration(
     gradient_boosted_trees::GradientBoostedTreesModel* model,
     Evaluation* training_evaluation,
     distribute::AbstractManager* distribute_manager, utils::RandomEngine* rnd,
-    internal::Monitoring* monitoring);
+    internal::Monitoring* monitoring,
+    PartialEvaluationAggregator* validation_aggregator);
 
 // Skips the next "num_skip" asynchronous answers from the manager.
 absl::Status SkipAsyncAnswers(int num_skip,
@@ -271,7 +312,8 @@ absl::Status RestoreManagerCheckpoint(
     int iter_idx, absl::string_view work_directory,
     std::unique_ptr<gradient_boosted_trees::GradientBoostedTreesModel>* model,
     decision_tree::proto::LabelStatistics* label_statistics,
-    proto::Checkpoint* checkpoint);
+    proto::Checkpoint* checkpoint,
+    PartialEvaluationAggregator* validation_aggregator);
 
 // Creates a checkpoint of the model.
 absl::Status CreateCheckpoint(
@@ -280,12 +322,15 @@ absl::Status CreateCheckpoint(
     absl::string_view work_directory,
     const decision_tree::proto::LabelStatistics& label_statistics,
     distribute::AbstractManager* distribute_manager,
-    internal::Monitoring* monitoring);
+    internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer,
+    PartialEvaluationAggregator* validation_aggregator);
 
 // Console line showing the progress of training.
 std::string TrainingLog(
     const gradient_boosted_trees::GradientBoostedTreesModel& model,
     const Evaluation& training_evaluation,
+    const absl::optional<proto::Evaluation>& previous_validation_evaliation,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const std::vector<std::string>& metric_names,
     internal::Monitoring* monitoring,
@@ -301,6 +346,7 @@ InitializeDistributionManager(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     absl::string_view cache_path, absl::string_view work_directory,
     const dataset::proto::DataSpecification& data_spec,
+    const std::vector<ValidationDataset>& validation_dataset_per_worker,
     const distributed_decision_tree::LoadBalancer& load_balancer);
 
 // The following "Emit{stage_name}" function are calling the workers with the
@@ -308,53 +354,62 @@ InitializeDistributionManager(
 // the definition of the stages.
 
 utils::StatusOr<decision_tree::proto::LabelStatistics> EmitGetLabelStatistics(
-    distribute::AbstractManager* distribute, internal::Monitoring* monitoring);
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer);
 
 absl::Status EmitSetInitialPredictions(
     const decision_tree::proto::LabelStatistics& label_statistics,
-    distribute::AbstractManager* distribute, internal::Monitoring* monitoring);
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer);
 
 utils::StatusOr<std::vector<decision_tree::proto::LabelStatistics>>
 EmitStartNewIter(int iter_idx, utils::RandomEngine::result_type seed,
                  distribute::AbstractManager* distribute,
-                 internal::Monitoring* monitoring);
+                 internal::Monitoring* monitoring,
+                 distributed_decision_tree::LoadBalancer* load_balancer);
 
 utils::StatusOr<std::vector<distributed_decision_tree::SplitPerOpenNode>>
 EmitFindSplits(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
-    const std::vector<int>& features,
-    distributed_decision_tree::LoadBalancer* load_balancer,
-    const WeakModels& weak_models, distribute::AbstractManager* distribute,
-    utils::RandomEngine* rnd, internal::Monitoring* monitoring);
+    const std::vector<int>& features, const WeakModels& weak_models,
+    distribute::AbstractManager* distribute, utils::RandomEngine* rnd,
+    internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer);
 
 // Returns the list of workers that owns the split evaluation data.
 absl::Status EmitEvaluateSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    distributed_decision_tree::LoadBalancer* load_balancer,
     distribute::AbstractManager* distribute, utils::RandomEngine* rnd,
-    internal::Monitoring* monitoring);
+    internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer);
 
 absl::Status EmitShareSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    distributed_decision_tree::LoadBalancer* load_balancer,
-    distribute::AbstractManager* distribute, internal::Monitoring* monitoring);
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer);
 
-absl::Status EmitEndIter(int iter_idx, distribute::AbstractManager* distribute,
+absl::Status EmitEndIter(int iter_idx, bool is_last_iteration,
+                         const WeakModels& weak_models,
+                         distribute::AbstractManager* distribute,
                          absl::optional<Evaluation*> training_evaluation,
-                         internal::Monitoring* monitoring);
+                         internal::Monitoring* monitoring,
+                         distributed_decision_tree::LoadBalancer* load_balancer,
+                         PartialEvaluationAggregator* validation_aggregator);
 
-absl::Status EmitRestoreCheckpoint(int iter_idx, int num_shards,
-                                   int num_weak_models,
-                                   distribute::AbstractManager* distribute,
-                                   internal::Monitoring* monitoring);
+absl::Status EmitRestoreCheckpoint(
+    int iter_idx, int num_shards, int num_weak_models,
+    const absl::string_view work_directory,
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer);
 
-absl::Status EmitCreateCheckpoint(int iter_idx, size_t num_examples,
-                                  int num_shards,
-                                  absl::string_view work_directory,
-                                  distribute::AbstractManager* distribute,
-                                  internal::Monitoring* monitoring);
+absl::Status EmitCreateCheckpoint(
+    int iter_idx, size_t num_examples, int num_shards,
+    absl::string_view work_directory, distribute::AbstractManager* distribute,
+    internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer,
+    PartialEvaluationAggregator* validation_aggregator);
 
 absl::Status EmitStartTraining(
     distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
@@ -415,6 +470,15 @@ absl::Status SampleFeatures(const std::vector<int>& features,
 absl::Status ExactSampledFeaturesForWorker(
     const FeaturesPerWorkerWeakModelAndNode& sampled_features, int worker_idx,
     proto::WorkerRequest::FindSplits* request, int* num_selected_features);
+
+// Determines the number of workers per type.
+absl::Status DivideWorkers(int num_all_workers,
+                           const float ratio_evaluation_workers,
+                           int* num_train_workers, int* num_eval_workers);
+
+// Splits the validation dataset among the evaluation workers.
+utils::StatusOr<std::vector<ValidationDataset>> DivideValidationDataset(
+    const absl::string_view typed_path, const int num_workers);
 
 }  // namespace internal
 

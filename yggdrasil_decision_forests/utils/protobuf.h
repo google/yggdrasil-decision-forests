@@ -57,6 +57,23 @@ inline void Truncate(google::protobuf::RepeatedPtrField<T>* array, int new_size)
   array->DeleteSubrange(new_size, size - new_size);
 }
 
+// Interface for the sequential reading of protos.
+template <typename T>
+class ProtoReaderInterface {
+ public:
+  // Try to retrieve the next available value. If no more value are
+  // available, returns false.
+  virtual utils::StatusOr<bool> Next(T* value) = 0;
+};
+
+// Interface for the sequential writing of protos.
+template <typename T>
+class ProtoWriterInterface {
+ public:
+  // Write a new record.
+  virtual absl::Status Write(const T& value) = 0;
+};
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
 

@@ -452,6 +452,23 @@ absl::Status FloatColumnReader::Next() {
   return absl::OkStatus();
 }
 
+absl::Status FloatColumnReader::ReadAndAppend(absl::string_view path,
+                                              std::vector<float>* output) {
+  FloatColumnReader reader;
+  RETURN_IF_ERROR(
+      reader.Open(path,
+                  /*max_num_values=*/kIOBufferSizeInBytes / sizeof(float)));
+  while (true) {
+    CHECK_OK(reader.Next());
+    const auto values = reader.Values();
+    if (values.empty()) {
+      break;
+    }
+    output->insert(output->end(), values.begin(), values.end());
+  }
+  return reader.Close();
+}
+
 absl::Status FloatColumnReader::Close() { return file_.Close(); }
 
 absl::Status ShardedFloatColumnReader::ReadAndAppend(

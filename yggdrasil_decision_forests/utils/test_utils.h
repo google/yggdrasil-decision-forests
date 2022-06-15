@@ -311,7 +311,7 @@ void TestPredefinedHyperParametersAdultDataset(
 // Randomly shards a dataset. Returns the sharded path in the temp directory.
 std::string ShardDataset(const dataset::VerticalDataset& dataset,
                          int num_shards, float sampling,
-                         absl::string_view format);
+                         absl::string_view format, absl::string_view name);
 
 // Exports the predictions of a binary treatment uplift model to a csv file with
 // the columns: "uplift", "response", "weight", "group".

@@ -16,9 +16,12 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_GRADIENT_BOOSTED_TREES_WORKER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_GRADIENT_BOOSTED_TREES_WORKER_H_
 
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/worker.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
+#include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 
@@ -84,6 +87,14 @@ class DistributedGradientBoostedTreesWorker
     distributed_decision_tree::SplitEvaluationPerOpenNode split_evaluations;
   };
 
+  // The type of worker.
+  enum class WorkerType {
+    // Find optimal splits and evaluate the model on the training dataset.
+    kTRAINER,
+    // Evaluate the model on the validation dataset (if any).
+    kEVALUATOR
+  };
+
   utils::StatusOr<distribute::Blob> RunRequestImp(
       distribute::Blob serialized_request);
 
@@ -123,6 +134,12 @@ class DistributedGradientBoostedTreesWorker
 
   absl::Status EndIter(const proto::WorkerRequest::EndIter& request,
                        proto::WorkerResult::EndIter* answer);
+  absl::Status EndIterTrainingWorker(
+      const proto::WorkerRequest::EndIter& request,
+      proto::WorkerResult::EndIter* answer);
+  absl::Status EndIterEvaluationWorker(
+      const proto::WorkerRequest::EndIter& request,
+      proto::WorkerResult::EndIter* answer);
 
   absl::Status RestoreCheckpoint(
       const proto::WorkerRequest::RestoreCheckpoint& request,
@@ -131,6 +148,10 @@ class DistributedGradientBoostedTreesWorker
   absl::Status CreateCheckpoint(
       const proto::WorkerRequest::CreateCheckpoint& request,
       proto::WorkerResult::CreateCheckpoint* answer);
+
+  absl::Status CreateEvaluationCheckpoint(
+      const proto::WorkerRequest::CreateEvaluationCheckpoint& request,
+      proto::WorkerResult::CreateEvaluationCheckpoint* answer);
 
   absl::Status StartTraining(const proto::WorkerRequest::StartTraining& request,
                              proto::WorkerResult::StartTraining* answer);
@@ -164,16 +185,42 @@ class DistributedGradientBoostedTreesWorker
   // called by the "SetInitialPredictions" message (i.e. the start of the
   // training) or "RestoreCheckpoint" message (i.e. resuming training from a
   // checkpoint).
-  absl::Status InitializerWorkingMemory(int num_weak_models);
+  absl::Status InitializeTrainingWorkerMemory(int num_weak_models);
 
   // Skips the next "num_skip" answers on the worker-to-worker async channel.
   absl::Status SkipAsyncWorkerToWorkerAnswers(int num_skip);
+
+  // The worker's type define its job.
+  WorkerType GetWorkerType() const;
+
+  // Index of the worker in the training worker pool.
+  int TrainingWorkerIdx() const;
+
+  // Index of the worker in the evaluation worker pool.
+  int EvaluationWorkerIdx() const;
+
+  // Number of evaluation workers.
+  int NumEvaluationWorkers() const;
+
+  // Integrates the weak model "validation_weak_model_" into the prediction
+  // cache, and update the validation loss and metrics "validation_evaluation_".
+  absl::Status EvaluateWeakModelOnvalidationDataset();
+
+  // Starts "EvaluateWeakModelOnvalidationDataset" in the validation thread.
+  absl::Status RunValidationThread(int iter_idx);
+
+  // Join a running "EvaluateWeakModelOnvalidationDataset" thread.
+  absl::Status JoinValidationThread();
+
+  // Test if a validation thread was started and can be joined.
+  bool HasPendingValidationThread();
 
   // Static configuration provided by the manager. Initialized during the
   // "setup" stage.
   proto::WorkerWelcome welcome_;
 
   // Training dataset. Initialized during the "setup" stage.
+  // Only present if the worker is a training worker.
   std::unique_ptr<distributed_decision_tree::dataset_cache::DatasetCacheReader>
       dataset_;
 
@@ -190,7 +237,7 @@ class DistributedGradientBoostedTreesWorker
   // Training loss.  Initialized during the "setup" stage.
   std::unique_ptr<gradient_boosted_trees::AbstractLoss> loss_;
 
-  // Accumulated predictions of the current model.
+  // Accumulated predictions of the current model on the training dataset.
   // Array of size num_examples x num_output_dim. Initialized with the
   // "SetInitialPredictions" message.
   std::vector<float> predictions_;
@@ -198,6 +245,37 @@ class DistributedGradientBoostedTreesWorker
   // Training data for each weak model in the current iteration. Initialized
   // with the "SetInitialPredictions" message.
   std::vector<WeakModel> weak_models_;
+
+  // Fields related to the evaluation of the model on the validation dataset.
+  // Only available for evaluation workers.
+  struct {
+    // Validation dataset. Initialized during the "setup" stage.
+    // Only present if the worker is an evaluation worker.
+    std::unique_ptr<dataset::VerticalDataset> dataset;
+
+    // Weight of the examples.
+    std::vector<float> weights;
+    double sum_weights;
+
+    // Accumulated predictions of the current model on the validation dataset.
+    // Array of size num_examples x num_output_dim. Initialized with the
+    // "SetInitialPredictions" message.
+    std::vector<float> predictions;
+
+    // Weak model currently being evaluated on the validation dataset.
+    std::unique_ptr<serving::FastEngine> weak_model;
+
+    // Thread that run the method "EvaluateWeakModelOnvalidationDataset" that
+    // evaluate the weak model "validation.weak_model_" and export the results
+    // to "validation.evaluation_".
+    std::unique_ptr<utils::concurrency::Thread> weak_model_thread;
+
+    // Last evaluation. Computed by "EvaluateWeakModelOnvalidationDataset".
+    proto::Evaluation evaluation;
+
+    // Status of the last run of "EvaluateWeakModelOnvalidationDataset".
+    absl::Status status;
+  } validation_;
 
   // Accessor to the pseudo response. Initialized with the
   // "SetInitialPredictions" message.

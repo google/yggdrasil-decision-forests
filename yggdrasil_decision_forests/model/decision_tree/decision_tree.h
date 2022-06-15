@@ -81,10 +81,11 @@ class NodeWithChildren {
 
   // Exports the node (and its children) to a RecordIO writer. The nodes are
   // stored sequentially with a depth-first exploration.
-  absl::Status WriteNodes(utils::ShardedWriter<proto::Node>* writer) const;
+  absl::Status WriteNodes(
+      utils::ProtoWriterInterface<proto::Node>* writer) const;
 
   // Imports the node (and its children) to a RecordIO reader.
-  absl::Status ReadNodes(utils::ShardedReader<proto::Node>* reader);
+  absl::Status ReadNodes(utils::ProtoReaderInterface<proto::Node>* reader);
 
   // Indicates the node is a leaf i.e. if the node DOES NOT have children.
   bool IsLeaf() const { return !children_[0]; }
@@ -190,10 +191,11 @@ class DecisionTree {
 
   // Exports the tree to a RecordIO writer. Cannot export a tree without a root
   // node.
-  absl::Status WriteNodes(utils::ShardedWriter<proto::Node>* writer) const;
+  absl::Status WriteNodes(
+      utils::ProtoWriterInterface<proto::Node>* writer) const;
 
   // Imports the tree from a RecordIO reader.
-  absl::Status ReadNodes(utils::ShardedReader<proto::Node>* reader);
+  absl::Status ReadNodes(utils::ProtoReaderInterface<proto::Node>* reader);
 
   // Creates a root node. Fails if the tree is not empty (i.e. if there is
   // already a root node).

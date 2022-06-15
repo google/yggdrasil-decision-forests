@@ -152,6 +152,9 @@ class GradientBoostedTreesModel : public AbstractModel,
     node_format_ = format;
   }
 
+  // Adds a new tree to the model.
+  void AddTree(std::unique_ptr<decision_tree::DecisionTree> decision_tree);
+
  private:
   void PredictClassification(const dataset::VerticalDataset& dataset,
                              dataset::VerticalDataset::row_t row_idx,
@@ -166,9 +169,6 @@ class GradientBoostedTreesModel : public AbstractModel,
 
   void PredictRegression(const dataset::proto::Example& example,
                          model::proto::Prediction* prediction) const;
-
-  // Adds a new tree to the model.
-  void AddTree(std::unique_ptr<decision_tree::DecisionTree> decision_tree);
 
   // Estimates the memory usage of the model in RAM. The serialized or the
   // compiled version of the model can be much smaller.

@@ -23,8 +23,12 @@ import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/training.proto";
+import "yggdrasil_decision_forests/model/decision_tree/decision_tree.proto";
 
-// Welcome message of the worker.
+// "Welcome" proto message of the worker.
+//
+// The welcome message is received as an argument of the "Setup" method.
+// All the workers have the same welcome message.
 message WorkerWelcome {
   // Location used by the manager and the workers to store intermediate data.
   optional string work_directory = 1;
@@ -32,7 +36,7 @@ message WorkerWelcome {
   // Location of the dataset cache i.e. the dataset indexed for fast training.
   optional string cache_path = 2;
 
-  // List of features owned by each worker.
+  // List of features owned by each training worker.
   // "owned_features[i].features" are the features owned by the i-th worker.
   repeated FeatureList owned_features = 3;
   message FeatureList {
@@ -44,6 +48,17 @@ message WorkerWelcome {
   optional model.proto.TrainingConfigLinking train_config_linking = 5;
   optional model.proto.DeploymentConfig deployment_config = 6;
   optional dataset.proto.DataSpecification dataspec = 7;
+
+  // Number of training workers.
+  //
+  // A fraction of the workers will only be used for training while another will
+  // only be used for evaluation. Training worker have index "WorkerIdx() <
+  // num_train_workers" while evaluation worker have index "WorkerIdx() >=
+  // num_train_workers".
+  optional int32 num_train_workers = 8;
+
+  // Validation dataset for each evaluation worker.
+  repeated string validation_dataset_per_worker = 9;
 }
 
 // Request message of the workers. Unless expressed, the messages are designed
@@ -52,45 +67,75 @@ message WorkerRequest {
   oneof type {
     // Computes the statistics of the labels e.g. number of element of each
     // class for classification.
+    //
+    // Worker type: Trainer
     GetLabelStatistics get_label_statistics = 1;
 
     // Sets the initial predictions (also call bias) of the model.
+    //
+    // Worker type: Trainer & Evaluator
     SetInitialPredictions set_initial_predictions = 2;
 
     // Starts the training of a new iteration e.g. starts the training of a new
     // tree if one tree is trained at each iteration. The workers return the
     // statistics of the weak model labels.
+    //
+    // Worker type: Trainer
     StartNewIter start_new_iter = 3;
 
     // Finds the highest scoring splits for each of the model nodes in the
     // current tree.
+    //
+    // Worker type: Trainer
     FindSplits find_splits = 4;
 
     // Each worker will evaluate the split (on each examples) based on the
     // features it owns.
+    //
+    // Worker type: Trainer
     EvaluateSplits evaluate_splits = 5;
 
     // Share the evaluation split values in between the workers. Once the split
     // are sharded, update the node map, tree structure and label statistics.
+    //
+    // Worker type: Trainer
     ShareSplits share_splits = 6;
 
     // Request a subset of split values. This message is only used in between
     // workers.
+    //
+    // Worker type: Trainer
     GetSplitValue get_split_value = 7;
 
     // Finalize the current iteration.
+    //
+    // Worker type: Trainer & Evaluator
     EndIter end_iter = 8;
 
     // Restore an existing checkpoint.
+    //
+    // Worker type: Trainer & Evaluator
     RestoreCheckpoint restore_checkpoint = 9;
 
-    // Create the worker side checkpoint. Possibly, only create part of a
-    // checkpoint (for distributed checkpoint creation).
+    // Create the training worker side checkpoint. Possibly, only create part of
+    // a checkpoint (for distributed checkpoint creation).
+    //
+    // Worker type: Trainer
     CreateCheckpoint create_checkpoint = 10;
 
     // First message send to the worker by the manager. Will be sent both for
     // new or resumed training.
+    //
+    // Worker type: Trainer
     StartTraining start_training = 11;
+
+    // Create an evaluation worker side checkpoint.
+    //
+    // Worker type: Evaluator
+    CreateEvaluationCheckpoint create_evaluation_checkpoint = 17;
+
+    // Note: The id of new messages should be registered in
+    // "MaybeSimulateFailure"for unit testing.
   }
 
   optional int64 request_id = 12;
@@ -164,14 +209,26 @@ message WorkerRequest {
 
   message EndIter {
     optional int32 iter_idx = 1;
+
     // If true, the worker is expected to return the training loss.
     optional bool compute_training_loss = 2;
+
+    // Newly learned tree. Only available to evaluation workers.
+    repeated Tree new_trees = 3;
+    message Tree {
+      repeated decision_tree.proto.Node nodes = 1;
+    }
+
+    // If true, the evaluation worker is expected to return the validation
+    // evaluation immediately (i.e. not in the next iteration).
+    optional bool synchronous_validation = 4 [default = false];
   }
 
   message RestoreCheckpoint {
     optional int32 iter_idx = 2;
     optional int32 num_shards = 3;
     optional int32 num_weak_models = 4;
+    optional string checkpoint_dir = 5;
   }
 
   message CreateCheckpoint {
@@ -184,12 +241,17 @@ message WorkerRequest {
     optional int32 shard_idx = 3;
   }
 
+  message CreateEvaluationCheckpoint {
+    optional string checkpoint_dir = 1;
+  }
+
   message StartTraining {}
 }
 
 // Result message of the worker.
 message WorkerResult {
   // Each WorkerRequest leads to a WorkerResult with the same set attribute.
+  // Keep the same indexing as in "WorkerRequest" for debugging purpose.
   oneof type {
     GetLabelStatistics get_label_statistics = 1;
     SetInitialPredictions set_initial_predictions = 2;
@@ -202,6 +264,7 @@ message WorkerResult {
     RestoreCheckpoint restore_checkpoint = 9;
     CreateCheckpoint create_checkpoint = 10;
     StartTraining start_training = 11;
+    CreateEvaluationCheckpoint create_evaluation_checkpoint = 17;
   }
 
   // If true, indicates that the worker is missing information to complete the
@@ -254,8 +317,11 @@ message WorkerResult {
   }
 
   message EndIter {
-    optional float training_loss = 1;
-    repeated float training_metrics = 2;
+    optional Evaluation training = 1;
+
+    // Because validation evaluation is asynchronous, there can be multiple
+    // validation evaluation corresponding to several previous iterations.
+    repeated Evaluation validations = 2;
   }
 
   message RestoreCheckpoint {}
@@ -270,10 +336,40 @@ message WorkerResult {
     optional int32 num_loaded_features = 1;
     optional double feature_loading_time_seconds = 2;
   }
+
+  message CreateEvaluationCheckpoint {
+    // Any pending validation evaluation.
+    repeated Evaluation validations = 1;
+  }
 }
 
 // Meta-data of a checkpoint.
 message Checkpoint {
   optional decision_tree.proto.LabelStatistics label_statistics = 1;
   optional int32 num_shards = 2;
+  optional PartialEvaluationAggregator validation_aggregator = 3;
+}
+
+message PartialEvaluationAggregator {
+  // Number of evaluation fragments to make a full evaluation.
+  optional int32 num_fragments = 1;
+
+  // Evaluations indexed by "iter_idx".
+  map<int32, Item> items = 2;
+
+  message Item {
+    optional int32 num_fragments = 2;
+    optional Evaluation evaluation = 3;
+  }
+}
+
+// Evaluation. Can be partial i.e. on a subset of a dataset.
+message Evaluation {
+  optional float loss = 1;
+  // The order and semantic of the metrics is defined by the loss
+  // implementation.
+  repeated float metrics = 2;
+  optional double sum_weights = 3;
+  optional int64 num_examples = 4;
+  optional int32 iter_idx = 5;
 }

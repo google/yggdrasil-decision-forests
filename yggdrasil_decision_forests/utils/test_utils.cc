@@ -143,14 +143,14 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   utils::StatusOr<std::unique_ptr<model::AbstractModel>> model_or;
   // Train the model.
   if (pass_training_dataset_as_path_) {
-    const auto train_dataset_path =
-        ShardDataset(train_dataset_, num_shards_, 1.f, preferred_format_type);
+    // Export the training dataset into a set of sharded files.
+    const auto train_dataset_path = ShardDataset(
+        train_dataset_, num_shards_, 1.f, preferred_format_type, "training");
     if (pass_validation_dataset_) {
+      // Export the validation dataset into a set of sharded files.
       const auto valid_dataset_path =
-          absl::StrCat(preferred_format_type, ":",
-                       file::JoinPath(test::TmpDirectory(), "valid_dataset"));
-      CHECK_OK(
-          dataset::SaveVerticalDataset(valid_dataset_, valid_dataset_path));
+          ShardDataset(valid_dataset_, num_shards_, 1.f, preferred_format_type,
+                       "validation");
       model_or = learner_->TrainWithStatus(train_dataset_path, data_spec,
                                            valid_dataset_path);
     } else {
@@ -326,9 +326,24 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
   if (!test_path.empty()) {
     CHECK_OK(LoadVerticalDataset(train_path, data_spec, &train_dataset_));
     CHECK_OK(LoadVerticalDataset(test_path, data_spec, &test_dataset_));
+
     if (pass_validation_dataset_) {
-      LOG(FATAL) << "pass_validation_dataset not supported with test_path";
+      std::vector<dataset::VerticalDataset::row_t> train_example_idxs,
+          valid_example_idxs;
+      for (dataset::VerticalDataset::row_t example_idx = 0;
+           example_idx < train_dataset_.nrow(); example_idx++) {
+        // Split deterministically, 1/2 of the examples in training, 1/2 of the
+        // examples for validation.
+        if ((example_idx % 2) == 0) {
+          train_example_idxs.push_back(example_idx);
+        } else {
+          valid_example_idxs.push_back(example_idx);
+        }
+      }
+      valid_dataset_ = train_dataset_.Extract(valid_example_idxs).value();
+      train_dataset_ = train_dataset_.Extract(train_example_idxs).value();
     }
+
     return;
   }
 
@@ -341,6 +356,11 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
 
   utils::RandomEngine rnd(1234);
   std::uniform_real_distribution<double> dist_01;
+  // If a validation example should be generated (i.e.
+  // pass_validation_dataset_=true), next_example_is_valid indicates if the next
+  // example will be used for validation or testing.
+  bool next_example_is_valid = true;
+
   for (dataset::VerticalDataset::row_t example_idx = 0;
        example_idx < dataset.nrow(); example_idx++) {
     // Down-sampling of examples.
@@ -364,6 +384,7 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
 
     bool is_training_example;
     if (split_train_ratio_ == 0.5f) {
+      // Deterministic split.
       is_training_example = (example_idx % 2) == 0;
     } else {
       is_training_example = dist_01(rnd) < split_train_ratio_;
@@ -372,8 +393,10 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
     if (is_training_example) {
       train_example_idxs.push_back(example_idx);
     } else {
-      if (pass_validation_dataset_ && ((example_idx / 2) % 2) == 0) {
-        valid_example_idxs.push_back(example_idx);
+      if (pass_validation_dataset_) {
+        (next_example_is_valid ? valid_example_idxs : test_example_idxs)
+            .push_back(example_idx);
+        next_example_is_valid ^= true;
       } else {
         test_example_idxs.push_back(example_idx);
       }
@@ -663,8 +686,9 @@ void TestPredefinedHyperParametersAdultDataset(
 
 std::string ShardDataset(const dataset::VerticalDataset& dataset,
                          const int num_shards, const float sampling,
-                         const absl::string_view format) {
-  const auto sharded_dir = file::JoinPath(test::TmpDirectory(), "sharded");
+                         const absl::string_view format,
+                         const absl::string_view name) {
+  const auto sharded_dir = file::JoinPath(test::TmpDirectory(), name);
   const auto sharded_path =
       file::JoinPath(sharded_dir, absl::StrCat("dataset@", num_shards));
   const auto typed_sharded_path = absl::StrCat(format, ":", sharded_path);

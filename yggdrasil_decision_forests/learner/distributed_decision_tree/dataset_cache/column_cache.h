@@ -314,6 +314,10 @@ class FloatColumnReader : public AbstractFloatColumnIterator {
   absl::Status Next() override;
   absl::Status Close() override;
 
+  // Reads and appends the content of a file.
+  static absl::Status ReadAndAppend(absl::string_view path,
+                                    std::vector<float>* output);
+
  private:
   file::FileInputByteStream file_;
 

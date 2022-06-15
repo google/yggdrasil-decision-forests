@@ -15,12 +15,21 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/worker.h"
 
+#include <numeric>
+
+#include "absl/status/status.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
@@ -36,6 +45,34 @@ DistributedGradientBoostedTreesWorker::
   }
 }
 
+DistributedGradientBoostedTreesWorker::WorkerType
+DistributedGradientBoostedTreesWorker::GetWorkerType() const {
+  DCHECK_GE(WorkerIdx(), 0);
+  DCHECK_LT(WorkerIdx(), NumWorkers());
+  DCHECK_LE(welcome_.num_train_workers(), NumWorkers());
+  if (WorkerIdx() < welcome_.num_train_workers()) {
+    return WorkerType::kTRAINER;
+  } else {
+    return WorkerType::kEVALUATOR;
+  }
+}
+
+// Index of the worker in the training worker pool.
+int DistributedGradientBoostedTreesWorker::TrainingWorkerIdx() const {
+  DCHECK(GetWorkerType() == WorkerType::kTRAINER);
+  return WorkerIdx();
+}
+
+// Index of the worker in the evaluation worker pool.
+int DistributedGradientBoostedTreesWorker::EvaluationWorkerIdx() const {
+  DCHECK(GetWorkerType() == WorkerType::kEVALUATOR);
+  return WorkerIdx() - welcome_.num_train_workers();
+}
+
+int DistributedGradientBoostedTreesWorker::NumEvaluationWorkers() const {
+  return NumWorkers() - welcome_.num_train_workers();
+}
+
 absl::Status DistributedGradientBoostedTreesWorker::Setup(
     distribute::Blob serialized_welcome) {
   ASSIGN_OR_RETURN(welcome_, utils::ParseBinaryProto<proto::WorkerWelcome>(
@@ -49,17 +86,52 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     LOG(INFO) << "Initializing DistributedGradientBoostedTreesWorker";
   }
 
-  // Load the dataset.
-  const auto& worker_features = welcome_.owned_features(WorkerIdx()).features();
-  auto read_options = spe_config.dataset_reader_options();
-  *read_options.mutable_features() = worker_features;
-  ASSIGN_OR_RETURN(
-      dataset_,
-      distributed_decision_tree::dataset_cache::DatasetCacheReader::Create(
-          welcome_.cache_path(), read_options));
+  if (GetWorkerType() == WorkerType::kTRAINER) {
+    // Load the dataset.
+    const auto& worker_features =
+        welcome_.owned_features(WorkerIdx()).features();
+    auto read_options = spe_config.dataset_reader_options();
+    *read_options.mutable_features() = worker_features;
+    ASSIGN_OR_RETURN(
+        dataset_,
+        distributed_decision_tree::dataset_cache::DatasetCacheReader::Create(
+            welcome_.cache_path(), read_options));
 
-  dataset_feature_duration_ = dataset_->load_in_memory_duration();
-  dataset_num_features_loaded_ = dataset_->features().size();
+    dataset_feature_duration_ = dataset_->load_in_memory_duration();
+    dataset_num_features_loaded_ = dataset_->features().size();
+  }
+  if (GetWorkerType() == WorkerType::kEVALUATOR) {
+    // Load evaluation worker datasets.
+    if (worker_logs_) {
+      LOG(INFO) << "Loading validation dataset";
+    }
+
+    // Load the dataset in memory.
+    // TODO(gbm): Only load the necessary columns.
+    validation_.dataset = absl::make_unique<dataset::VerticalDataset>();
+    if (welcome_.validation_dataset_per_worker(EvaluationWorkerIdx()).empty()) {
+      // Empty dataset.
+      validation_.dataset->set_data_spec(welcome_.dataspec());
+      RETURN_IF_ERROR(validation_.dataset->CreateColumnsFromDataspec());
+    } else {
+      RETURN_IF_ERROR(dataset::LoadVerticalDataset(
+          welcome_.validation_dataset_per_worker(EvaluationWorkerIdx()),
+          welcome_.dataspec(), validation_.dataset.get()));
+    }
+
+    // Extract / compute the example weights.
+    if (welcome_.train_config_linking().has_weight_definition()) {
+      RETURN_IF_ERROR(dataset::GetWeights(
+          *validation_.dataset,
+          welcome_.train_config_linking().weight_definition(),
+          &validation_.weights));
+      validation_.sum_weights = std::accumulate(validation_.weights.begin(),
+                                                validation_.weights.end(), 0.0);
+    } else {
+      validation_.weights.assign(validation_.dataset->nrow(), 1.f);
+      validation_.sum_weights = validation_.dataset->nrow();
+    }
+  }
 
   // Training loss.
   ASSIGN_OR_RETURN(
@@ -135,6 +207,8 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
     MaybeSimulateFailure(request.type_case());
   }
 
+  // Determine if the worker is in the right state for this request. If not,
+  // this indicates that either the worker or the manager was restarted.
   if (request.type_case() != proto::WorkerRequest::kStartTraining &&
       request.type_case() != proto::WorkerRequest::kGetLabelStatistics &&
       request.type_case() != proto::WorkerRequest::kSetInitialPredictions &&
@@ -143,11 +217,15 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
     if (!received_initial_predictions_) {
       missing_data = true;
     }
-    if (request.type_case() != proto::WorkerRequest::kStartNewIter &&
-        request.type_case() != proto::WorkerRequest::kCreateCheckpoint &&
-        iter_idx_ == -1) {
-      missing_data = true;
+
+    if (GetWorkerType() == WorkerType::kTRAINER) {
+      if (request.type_case() != proto::WorkerRequest::kStartNewIter &&
+          request.type_case() != proto::WorkerRequest::kCreateCheckpoint &&
+          iter_idx_ == -1) {
+        missing_data = true;
+      }
     }
+
     if (missing_data) {
       // The worker was restarted during the training of this tree. Tell the
       // manager to restart the training of this tree.
@@ -174,8 +252,17 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
         PreloadFutureOwnedFeatures(request.future_owned_features()).status());
   }
 
+  const auto check_worker_type =
+      [this](const WorkerType& expected_worker_type) -> absl::Status {
+    if (GetWorkerType() != expected_worker_type) {
+      return absl::InternalError("Unexpected worker type");
+    }
+    return absl::OkStatus();
+  };
+
   switch (request.type_case()) {
     case proto::WorkerRequest::kGetLabelStatistics:
+      RETURN_IF_ERROR(check_worker_type(WorkerType::kTRAINER));
       RETURN_IF_ERROR(
           GetLabelStatistics(request.get_label_statistics(),
                              result.mutable_get_label_statistics()));
@@ -188,26 +275,31 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
       break;
 
     case proto::WorkerRequest::kStartNewIter:
+      RETURN_IF_ERROR(check_worker_type(WorkerType::kTRAINER));
       RETURN_IF_ERROR(StartNewIter(request.start_new_iter(),
                                    result.mutable_start_new_iter()));
       break;
 
     case proto::WorkerRequest::kFindSplits:
+      RETURN_IF_ERROR(check_worker_type(WorkerType::kTRAINER));
       RETURN_IF_ERROR(
           FindSplits(request.find_splits(), result.mutable_find_splits()));
       break;
 
     case proto::WorkerRequest::kEvaluateSplits:
+      RETURN_IF_ERROR(check_worker_type(WorkerType::kTRAINER));
       RETURN_IF_ERROR(EvaluateSplits(request.evaluate_splits(),
                                      result.mutable_evaluate_splits()));
       break;
 
     case proto::WorkerRequest::kShareSplits:
+      RETURN_IF_ERROR(check_worker_type(WorkerType::kTRAINER));
       RETURN_IF_ERROR(ShareSplits(request.share_splits(),
                                   result.mutable_share_splits(), &result));
       break;
 
     case proto::WorkerRequest::kGetSplitValue:
+      RETURN_IF_ERROR(check_worker_type(WorkerType::kTRAINER));
       // TODO(gbm): Since the answer is large and the same for all the workers,
       // can the answer be somehow not duplicated in memory?
       RETURN_IF_ERROR(GetSplitValue(request.get_split_value(),
@@ -224,11 +316,20 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
       break;
 
     case proto::WorkerRequest::kCreateCheckpoint:
+      RETURN_IF_ERROR(check_worker_type(WorkerType::kTRAINER));
       RETURN_IF_ERROR(CreateCheckpoint(request.create_checkpoint(),
                                        result.mutable_create_checkpoint()));
       break;
 
+    case proto::WorkerRequest::kCreateEvaluationCheckpoint:
+      RETURN_IF_ERROR(check_worker_type(WorkerType::kEVALUATOR));
+      RETURN_IF_ERROR(CreateEvaluationCheckpoint(
+          request.create_evaluation_checkpoint(),
+          result.mutable_create_evaluation_checkpoint()));
+      break;
+
     case proto::WorkerRequest::kStartTraining:
+      RETURN_IF_ERROR(check_worker_type(WorkerType::kTRAINER));
       RETURN_IF_ERROR(StartTraining(request.start_training(),
                                     result.mutable_start_training()));
       break;
@@ -244,28 +345,40 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
   }
   result.set_runtime_seconds(absl::ToDoubleSeconds(runtime));
 
-  // Update the manager about pre-loading status.
-  result.set_preloading_work_in_progress(
-      dataset_->IsNonBlockingLoadingInProgress());
+  if (GetWorkerType() == WorkerType::kTRAINER) {
+    // Update the manager about training dataset loading status (in case the
+    // dataset allocation was changed by the load balancer).
+    result.set_preloading_work_in_progress(
+        dataset_->IsNonBlockingLoadingInProgress());
+  }
 
   return result.SerializeAsString();
 }
 
 void DistributedGradientBoostedTreesWorker::MaybeSimulateFailure(
     const proto::WorkerRequest::TypeCase request_type) {
-  if (iter_idx_ > 8) {
-    if (((iter_idx_ * NumWorkers() + WorkerIdx()) % 12) == request_type) {
-      if (debug_forced_failure_.find(request_type) ==
-          debug_forced_failure_.end()) {
-        debug_forced_failure_.insert(request_type);
-        LOG(WARNING) << "[!!!!!] Simulate the failure and restart of worker #"
-                     << WorkerIdx() << " on message " << request_type
-                     << " and iteration " << iter_idx_;
+  const int num_iter_without_failure = 8;
+  if (iter_idx_ < num_iter_without_failure) {
+    return;
+  }
 
-        // Reset the worker to its initial state.
-        received_initial_predictions_ = false;
-        iter_idx_ = -1;
-      }
+  // The index of the requests in WorkerRequest::type.
+  std::vector<int> possible_request_ids{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 17};
+
+  const int target_request_type =
+      possible_request_ids[(iter_idx_ * NumWorkers() + WorkerIdx()) %
+                           possible_request_ids.size()];
+  if (target_request_type == request_type) {
+    if (debug_forced_failure_.find(request_type) ==
+        debug_forced_failure_.end()) {
+      debug_forced_failure_.insert(request_type);
+      LOG(WARNING) << "[!!!!!] Simulate the failure and restart of worker #"
+                   << WorkerIdx() << " on message " << request_type
+                   << " and iteration " << iter_idx_;
+
+      // Reset the worker to its initial state.
+      received_initial_predictions_ = false;
+      iter_idx_ = -1;
     }
   }
 }
@@ -312,7 +425,8 @@ absl::Status DistributedGradientBoostedTreesWorker::GetLabelStatistics(
   return absl::OkStatus();
 }
 
-absl::Status DistributedGradientBoostedTreesWorker::InitializerWorkingMemory(
+absl::Status
+DistributedGradientBoostedTreesWorker::InitializeTrainingWorkerMemory(
     int num_weak_models) {
   const auto& spe_config = welcome_.train_config().GetExtension(
       proto::distributed_gradient_boosted_trees_config);
@@ -374,11 +488,21 @@ absl::Status DistributedGradientBoostedTreesWorker::SetInitialPredictions(
     LOG(INFO) << "Initialize initial predictions";
   }
 
-  gradient_boosted_trees::internal::SetInitialPredictions(
-      initial_predictions, dataset_->num_examples(), &predictions_);
+  if (GetWorkerType() == WorkerType::kTRAINER) {
+    gradient_boosted_trees::internal::SetInitialPredictions(
+        initial_predictions, dataset_->num_examples(), &predictions_);
+    RETURN_IF_ERROR(InitializeTrainingWorkerMemory(initial_predictions.size()));
+  } else if (GetWorkerType() == WorkerType::kEVALUATOR) {
+    gradient_boosted_trees::internal::SetInitialPredictions(
+        initial_predictions, validation_.dataset->nrow(),
+        &validation_.predictions);
+  } else {
+    return absl::InternalError("Unknown worker type");
+  }
+
   received_initial_predictions_ = true;
 
-  return InitializerWorkingMemory(initial_predictions.size());
+  return absl::OkStatus();
 }
 
 absl::Status DistributedGradientBoostedTreesWorker::StartNewIter(
@@ -674,7 +798,6 @@ DistributedGradientBoostedTreesWorker::PreloadFutureOwnedFeatures(
   }
 }
 
-
 absl::Status DistributedGradientBoostedTreesWorker::
     MergingSplitEvaluationToLastSplitEvaluation(
         proto::WorkerResult::GetSplitValue* src_split_values) {
@@ -710,7 +833,6 @@ absl::Status DistributedGradientBoostedTreesWorker::ShareSplits(
     const proto::WorkerRequest::ShareSplits& request,
     proto::WorkerResult::ShareSplits* answer,
     proto::WorkerResult* generic_answer) {
-
   // Request the split evaluation from other workers.
   for (const auto& items : request.request().items()) {
     proto::WorkerRequest generic_other_request;
@@ -720,7 +842,6 @@ absl::Status DistributedGradientBoostedTreesWorker::ShareSplits(
                                                           items.src_worker()));
   }
   const int num_requests = request.request().items_size();
-
 
   // Aggregate all the split evaluations.
   for (int reply_idx = 0; reply_idx < num_requests; reply_idx++) {
@@ -832,6 +953,18 @@ absl::Status DistributedGradientBoostedTreesWorker::GetSplitValue(
 absl::Status DistributedGradientBoostedTreesWorker::EndIter(
     const proto::WorkerRequest::EndIter& request,
     proto::WorkerResult::EndIter* answer) {
+  if (GetWorkerType() == WorkerType::kTRAINER) {
+    return EndIterTrainingWorker(request, answer);
+  } else if (GetWorkerType() == WorkerType::kEVALUATOR) {
+    return EndIterEvaluationWorker(request, answer);
+  } else {
+    return absl::InternalError("Unknown worker type");
+  }
+}
+
+absl::Status DistributedGradientBoostedTreesWorker::EndIterTrainingWorker(
+    const proto::WorkerRequest::EndIter& request,
+    proto::WorkerResult::EndIter* answer) {
   for (int weak_model_idx = 0; weak_model_idx < weak_models_.size();
        weak_model_idx++) {
     const auto& weak_model = weak_models_[weak_model_idx];
@@ -849,10 +982,149 @@ absl::Status DistributedGradientBoostedTreesWorker::EndIter(
     std::vector<float> secondary_metric;
     RETURN_IF_ERROR(
         Loss(dataset_.get(), predictions_, &loss, &secondary_metric));
-    answer->set_training_loss(loss);
-    *answer->mutable_training_metrics() = {secondary_metric.begin(),
-                                           secondary_metric.end()};
+    answer->mutable_training()->set_loss(loss);
+    *answer->mutable_training()->mutable_metrics() = {secondary_metric.begin(),
+                                                      secondary_metric.end()};
+    answer->mutable_training()->set_num_examples(dataset_->num_examples());
   }
+
+  return absl::OkStatus();
+}
+
+absl::Status DistributedGradientBoostedTreesWorker::EndIterEvaluationWorker(
+    const proto::WorkerRequest::EndIter& request,
+    proto::WorkerResult::EndIter* answer) {
+  // Grab + send the result of any pending evaluation.
+  if (HasPendingValidationThread()) {
+    RETURN_IF_ERROR(JoinValidationThread());
+    *answer->add_validations() = validation_.evaluation;
+  }
+
+  // Unserialize the new trees into a GBT model without bias (since the bias is
+  // already applied at the initialization of the prediction accumulator).
+  auto partial_model =
+      absl::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
+  partial_model->set_data_spec(welcome_.dataspec());
+  const auto& spe_config = welcome_.train_config().GetExtension(
+      proto::distributed_gradient_boosted_trees_config);
+  partial_model->set_loss(spe_config.gbt().loss());
+
+  // The model is used to accumulate pre-activation predictions.
+  partial_model->set_output_logits(true);
+  partial_model->mutable_initial_predictions()->assign(request.new_trees_size(),
+                                                       0.f);
+  partial_model->set_num_trees_per_iter(request.new_trees_size());
+  InitializeModelWithAbstractTrainingConfig(welcome_.train_config(),
+                                            welcome_.train_config_linking(),
+                                            partial_model.get());
+  for (const auto& src_weak_model : request.new_trees()) {
+    auto dst_weak_model = absl::make_unique<decision_tree::DecisionTree>();
+    EndIterTreeProtoReader stream(src_weak_model);
+    RETURN_IF_ERROR(dst_weak_model->ReadNodes(&stream));
+    partial_model->AddTree(std::move(dst_weak_model));
+  }
+
+  // Compile the model into an engine.
+  // Note: We currently only support models that are compatible with at least
+  // one fast engine.
+  ASSIGN_OR_RETURN(validation_.weak_model, partial_model->BuildFastEngine());
+
+  // Start the evaluation thread.
+  RETURN_IF_ERROR(RunValidationThread(request.iter_idx()));
+
+  // If the evaluation is blocking; wait for it to finish.
+  if (request.has_synchronous_validation()) {
+    RETURN_IF_ERROR(JoinValidationThread());
+    *answer->add_validations() = validation_.evaluation;
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status DistributedGradientBoostedTreesWorker::RunValidationThread(
+    const int iter_idx) {
+  if (HasPendingValidationThread()) {
+    return absl::InvalidArgumentError("Thread already running");
+  }
+  validation_.evaluation.set_iter_idx(iter_idx);
+  validation_.weak_model_thread =
+      absl::make_unique<utils::concurrency::Thread>([this]() {
+        validation_.status = EvaluateWeakModelOnvalidationDataset();
+      });
+  return absl::OkStatus();
+}
+
+absl::Status DistributedGradientBoostedTreesWorker::JoinValidationThread() {
+  if (!HasPendingValidationThread()) {
+    return absl::InvalidArgumentError("No thread to join");
+  }
+  validation_.weak_model_thread->Join();
+  validation_.weak_model_thread = {};
+  return absl::OkStatus();
+}
+
+bool DistributedGradientBoostedTreesWorker::HasPendingValidationThread() {
+  return validation_.weak_model_thread != nullptr;
+}
+
+absl::Status
+DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
+  DCHECK(validation_.dataset);
+  DCHECK(validation_.weak_model);
+
+  // Run the weak model in batch mode over the validation dataset.
+  // TODO(gbm): Multi-thread evaluation.
+  const size_t batch_size = 1000;
+  const auto num_prediction_dimensions =
+      validation_.weak_model->NumPredictionDimension();
+  const size_t num_examples = validation_.dataset->nrow();
+  auto examples = validation_.weak_model->AllocateExamples(
+      std::min(batch_size, num_examples));
+  const size_t num_batches = (num_examples + batch_size - 1) / batch_size;
+
+  DCHECK_EQ(validation_.predictions.size(),
+            num_examples * num_prediction_dimensions);
+
+  std::vector<float> batch_predictions;
+  batch_predictions.reserve(batch_size * num_prediction_dimensions);
+
+  for (size_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
+    const size_t begin_example_idx = batch_idx * batch_size;
+    const size_t end_example_idx =
+        std::min(begin_example_idx + batch_size, num_examples);
+
+    const size_t num_examples_in_batch = end_example_idx - begin_example_idx;
+    RETURN_IF_ERROR(serving::CopyVerticalDatasetToAbstractExampleSet(
+        *validation_.dataset,
+        /*begin_example_idx=*/begin_example_idx,
+        /*end_example_idx=*/end_example_idx, validation_.weak_model->features(),
+        examples.get()));
+
+    validation_.weak_model->Predict(*examples, num_examples_in_batch,
+                                    &batch_predictions);
+
+    DCHECK_EQ(batch_predictions.size(),
+              num_examples_in_batch * num_prediction_dimensions);
+    const auto offset = begin_example_idx * num_prediction_dimensions;
+    for (size_t pred_idx = 0; pred_idx < batch_predictions.size(); pred_idx++) {
+      validation_.predictions[offset + pred_idx] += batch_predictions[pred_idx];
+    }
+  }
+
+  // Evaluate the validation predictions.
+  // TODO(gbm): Multi-thread evaluation.
+  float loss_value;
+  std::vector<float> secondary_metric;
+  RETURN_IF_ERROR(
+      loss_->Loss(*validation_.dataset, welcome_.train_config_linking().label(),
+                  validation_.predictions, validation_.weights,
+                  /*ranking_index=*/nullptr, &loss_value, &secondary_metric));
+
+  validation_.evaluation.set_loss(loss_value);
+  validation_.evaluation.set_num_examples(validation_.dataset->nrow());
+  validation_.evaluation.set_sum_weights(validation_.sum_weights);
+  *validation_.evaluation.mutable_metrics() = {secondary_metric.begin(),
+                                               secondary_metric.end()};
 
   return absl::OkStatus();
 }
@@ -862,21 +1134,37 @@ absl::Status DistributedGradientBoostedTreesWorker::RestoreCheckpoint(
     proto::WorkerResult::RestoreCheckpoint* answer) {
   LOG(INFO) << "Restore checkpoint to iter " << request.iter_idx() << " (was "
             << iter_idx_ << " before)";
-  iter_idx_ = request.iter_idx();
-  const auto path =
-      file::JoinPath(welcome_.work_directory(), kFileNameCheckPoint,
-                     absl::StrCat(iter_idx_), "predictions");
-  predictions_.clear();
-  // All the predictions are stored in a single shard.
-  RETURN_IF_ERROR(
-      distributed_decision_tree::dataset_cache::ShardedFloatColumnReader::
-          ReadAndAppend(path, 0, request.num_shards(), &predictions_));
-  received_initial_predictions_ = true;
-  RETURN_IF_ERROR(InitializerWorkingMemory(request.num_weak_models()));
 
-  // The worker will receive a "StartNewIter" message with "iter_idx=iter_idx_"
-  // (before --) next.
-  iter_idx_--;
+  if (GetWorkerType() == WorkerType::kTRAINER) {
+    iter_idx_ = request.iter_idx();
+    const auto path = file::JoinPath(request.checkpoint_dir(), "predictions");
+    predictions_.clear();
+    // Reads all the predictions.
+    RETURN_IF_ERROR(
+        distributed_decision_tree::dataset_cache::ShardedFloatColumnReader::
+            ReadAndAppend(path, 0, request.num_shards(), &predictions_));
+    received_initial_predictions_ = true;
+    RETURN_IF_ERROR(InitializeTrainingWorkerMemory(request.num_weak_models()));
+
+    // The worker will receive a "StartNewIter" message with
+    // "iter_idx=iter_idx_" (before --) next.
+    iter_idx_--;
+
+  } else if (GetWorkerType() == WorkerType::kEVALUATOR) {
+    // Evaluation worker.
+
+    // Read the predictions of my worker only.
+    const auto path = ValidationPredictionCheckpointPath(
+        request.checkpoint_dir(), EvaluationWorkerIdx(),
+        NumEvaluationWorkers());
+    validation_.predictions.clear();
+    RETURN_IF_ERROR(
+        distributed_decision_tree::dataset_cache::FloatColumnReader::
+            ReadAndAppend(path, &validation_.predictions));
+    received_initial_predictions_ = true;
+  } else {
+    return absl::InternalError("Unknown worker type");
+  }
 
   return absl::OkStatus();
 }
@@ -889,6 +1177,8 @@ absl::Status DistributedGradientBoostedTreesWorker::CreateCheckpoint(
   answer->set_shard_idx(request.shard_idx());
   answer->set_path(path);
 
+  // Export the predictions of a single shard (even though I have all the shards
+  // in memory).
   distributed_decision_tree::dataset_cache::FloatColumnWriter writer;
   RETURN_IF_ERROR(writer.Open(path));
   size_t begin_idx = request.begin_example_idx() * weak_models_.size();
@@ -896,6 +1186,26 @@ absl::Status DistributedGradientBoostedTreesWorker::CreateCheckpoint(
   RETURN_IF_ERROR(writer.WriteValues(
       absl::MakeSpan(predictions_).subspan(begin_idx, end_idx - begin_idx)));
   RETURN_IF_ERROR(writer.Close());
+  return absl::OkStatus();
+}
+
+absl::Status DistributedGradientBoostedTreesWorker::CreateEvaluationCheckpoint(
+    const proto::WorkerRequest::CreateEvaluationCheckpoint& request,
+    proto::WorkerResult::CreateEvaluationCheckpoint* answer) {
+  // Flush the pending validation evaluations.
+  if (HasPendingValidationThread()) {
+    RETURN_IF_ERROR(JoinValidationThread());
+    *answer->add_validations() = validation_.evaluation;
+  }
+
+  // Export the worker predictions.
+  const auto path = ValidationPredictionCheckpointPath(
+      request.checkpoint_dir(), EvaluationWorkerIdx(), NumEvaluationWorkers());
+  distributed_decision_tree::dataset_cache::FloatColumnWriter writer;
+  RETURN_IF_ERROR(writer.Open(path));
+  RETURN_IF_ERROR(writer.WriteValues(validation_.predictions));
+  RETURN_IF_ERROR(writer.Close());
+
   return absl::OkStatus();
 }
 

@@ -55,6 +55,15 @@ message DistributedGradientBoostedTreesTrainingConfig {
   optional double checkpoint_interval_seconds = 6
       [default = 600];  // Default to 10 minutes.
 
+  // Ratio of workers used for evaluation. The remaining workers are used for
+  // training. If no validation dataset is available, all the workers are used
+  // for training independently of the value of "ratio_evaluation_workers".
+  //
+  // Validation and training are running concurently. Increase this value if
+  // the validation takes more time than the training (High average duration of
+  // the"EndIter" stage; see the training logs).
+  optional float ratio_evaluation_workers = 9 [default = 0.1];
+
   optional Internal internal = 7;
 
   message Internal {

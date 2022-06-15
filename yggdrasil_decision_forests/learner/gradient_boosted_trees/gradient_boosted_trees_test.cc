@@ -478,7 +478,7 @@ TEST_F(GradientBoostedTreesOnAdult, Honest) {
 TEST_F(GradientBoostedTreesOnAdult, ValidVerticalDataset) {
   pass_validation_dataset_ = true;
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.86119, 0.004);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8736, 0.004);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.30955, 0.04);
 }
 
@@ -487,7 +487,7 @@ TEST_F(GradientBoostedTreesOnAdult, ValidPathDataset) {
   pass_training_dataset_as_path_ = true;
   pass_validation_dataset_ = true;
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.86119, 0.004);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.87369, 0.004);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.30955, 0.04);
 }
 

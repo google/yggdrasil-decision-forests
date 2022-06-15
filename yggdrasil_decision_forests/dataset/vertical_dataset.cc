@@ -49,7 +49,7 @@ constexpr VerticalDataset::DiscretizedNumericalColumn::Format
 constexpr uint64_t VerticalDataset::HashColumn::kNaValue;
 
 namespace {
-using ::yggdrasil_decision_forests::dataset::CsvRowToExample;
+
 // Symbol used for the string representation of column values.
 constexpr char kNaSymbol[] = "NA";  // NA=non-available i.e. missing value.
 constexpr char kEmptySymbol[] = "EMPTY";

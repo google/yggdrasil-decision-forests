@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
 #include "gmock/gmock.h"
+#include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -27,7 +28,7 @@ namespace model {
 namespace distributed_gradient_boosted_trees {
 namespace {
 
-using testing::ElementsAre;
+using test::EqualsProto;
 
 class DatasetAdult : public utils::TrainAndTestTester {
  public:
@@ -53,6 +54,8 @@ class DatasetAdult : public utils::TrainAndTestTester {
            .distributed_gradient_boosted_trees_config] {
         checkpoint_interval_trees: 50
         worker_logs: false
+        # With 10 total workers, 2 are used for evaluation.
+        ratio_evaluation_workers: 0.2
         gbt { export_logs_during_training_in_trees: 30 }
       }
     )pb");
@@ -109,6 +112,22 @@ TEST_F(DatasetAdult, BaseWithFailure) {
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
 }
 
+// Train and test a model on the adult dataset with workers continuously
+// failing and requiring checkpoint restoration for both the training and
+// validation workers.
+TEST_F(DatasetAdult, BaseWithFailureAndManualValidation) {
+  auto* spe_config = train_config_.MutableExtension(
+      distributed_gradient_boosted_trees::proto::
+          distributed_gradient_boosted_trees_config);
+  spe_config->mutable_internal()->set_simulate_worker_failure(true);
+  spe_config->set_checkpoint_interval_trees(5);
+  pass_validation_dataset_ = true;
+  TrainAndEvaluateModel();
+  // Note: This result does not take early stopping into account.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
+}
+
 // Train and test a model on the adult dataset with aggressive (64 unique
 // values) forced discretization of the numerical features.
 TEST_F(DatasetAdult, ForceNumericalDiscretization) {
@@ -150,6 +169,26 @@ TEST_F(DatasetAdult, AttributeSampling) {
   // Note: This result does not take early stopping into account.
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.01);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
+}
+
+TEST_F(DatasetAdult, ManualValidation) {
+  SetNumWorkers(10);
+  pass_validation_dataset_ = true;
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
+
+  auto* gbt_model =
+      dynamic_cast<const gradient_boosted_trees::GradientBoostedTreesModel*>(
+          model_.get());
+
+  // Note: With early stopping, the non-distributed implementation of GBT has a
+  // validation loss of 0.57404.
+  EXPECT_NEAR(gbt_model->validation_loss(), 0.5859, 0.04);
+  // (currently) There is not any early stopping.
+  EXPECT_EQ(gbt_model->training_logs().number_of_trees_in_final_model(), 300);
+  // (currently) There is one evaluation for each iteration.
+  EXPECT_EQ(gbt_model->training_logs().entries_size(), 300);
 }
 
 // Makes sure the exact same tree structure is learned by the distributed and
@@ -335,6 +374,28 @@ TEST_F(DatasetAbalone, Base) {
   TrainAndEvaluateModel();
   // Note: This result does not take early stopping into account.
   EXPECT_NEAR(metric::RMSE(evaluation_), 2.205387, 0.01);
+}
+
+TEST(ProtoIO, Base) {
+  const decision_tree::proto::Node node_1 = PARSE_TEST_PROTO(R"pb(
+    num_pos_training_examples_without_weight: 5
+  )pb");
+  const decision_tree::proto::Node node_2 = PARSE_TEST_PROTO(R"pb(
+    num_pos_training_examples_without_weight: 10
+  )pb");
+
+  proto::WorkerRequest::EndIter::Tree dst;
+  EndIterTreeProtoWriter writter(&dst);
+  EXPECT_OK(writter.Write(node_1));
+  EXPECT_OK(writter.Write(node_2));
+
+  decision_tree::proto::Node read_node;
+  EndIterTreeProtoReader reader(dst);
+  EXPECT_TRUE(reader.Next(&read_node).value());
+  EXPECT_THAT(read_node, EqualsProto(node_1));
+  EXPECT_TRUE(reader.Next(&read_node).value());
+  EXPECT_THAT(read_node, EqualsProto(node_2));
+  EXPECT_FALSE(reader.Next(&read_node).value());
 }
 
 }  // namespace

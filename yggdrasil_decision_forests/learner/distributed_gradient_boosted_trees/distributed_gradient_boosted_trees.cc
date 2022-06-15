@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
@@ -28,6 +29,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/snapshot.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
@@ -255,13 +257,17 @@ DistributedGradientBoostedTreesLearner::TrainWithStatus(
         typed_path, data_spec));
   }
 
+  if (typed_valid_path.has_value()) {
+    // TODO(gbm): Support for validation dataset in cache format.
+  }
+
   // Train the model.
   monitoring.BeginTraining();
-  ASSIGN_OR_RETURN(
-      auto model,
-      internal::TrainWithCache(updated_deployment, config, config_link,
-                               spe_config, dataset_cache_path, work_directory,
-                               data_spec, log_directory(), &monitoring));
+  ASSIGN_OR_RETURN(auto model,
+                   internal::TrainWithCache(
+                       updated_deployment, config, config_link, spe_config,
+                       dataset_cache_path, typed_valid_path, work_directory,
+                       data_spec, log_directory(), &monitoring));
 
   utils::usage::OnTrainingEnd(data_spec, config, config_link,
                               /*num_examples=*/-1, *model,
@@ -371,7 +377,9 @@ TrainWithCache(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
-    const absl::string_view cache_path, const absl::string_view work_directory,
+    const absl::string_view cache_path,
+    const absl::optional<std::string>& typed_valid_path,
+    const absl::string_view work_directory,
     const dataset::proto::DataSpecification& data_spec,
     const absl::string_view& log_directory, internal::Monitoring* monitoring) {
   RETURN_IF_ERROR(InitializeDirectoryStructure(work_directory));
@@ -388,19 +396,43 @@ TrainWithCache(
       distributed_decision_tree::dataset_cache::LoadCacheMetadata(cache_path));
   std::vector<int> input_features = {config_link.features().begin(),
                                      config_link.features().end()};
-  ASSIGN_OR_RETURN(const auto num_workers,
+  ASSIGN_OR_RETURN(const auto num_all_workers,
                    distribute::NumWorkers(deployment.distribute()));
+
+  // Determine the number of each worker type.
+  int num_train_workers, num_eval_workers;
+  std::vector<ValidationDataset> validation_dataset_per_worker;
+  if (typed_valid_path.has_value()) {
+    RETURN_IF_ERROR(DivideWorkers(num_all_workers,
+                                  spe_config.ratio_evaluation_workers(),
+                                  &num_train_workers, &num_eval_workers));
+
+    // Split the validation dataset among the evaluation workers.
+    ASSIGN_OR_RETURN(
+        validation_dataset_per_worker,
+        DivideValidationDataset(typed_valid_path.value(), num_eval_workers));
+    LOG(INFO) << "Of the " << num_all_workers << " workers, use "
+              << num_train_workers << " for training and " << num_eval_workers
+              << " for evaluation";
+  } else {
+    num_train_workers = num_all_workers;
+    num_eval_workers = 0;
+  }
+
+  // Accumulator of validation loss and metrics.
+  PartialEvaluationAggregator validation_aggregator(num_eval_workers);
 
   ASSIGN_OR_RETURN(auto load_balancer,
                    distributed_decision_tree::LoadBalancer::Create(
-                       input_features, num_workers, cache_metadata,
+                       input_features, num_train_workers, cache_metadata,
                        spe_config.load_balancer()));
 
   // Initializer the distribute manager.
   ASSIGN_OR_RETURN(auto distribute_manager,
                    InitializeDistributionManager(
                        deployment, config, config_link, spe_config, cache_path,
-                       work_directory, data_spec, load_balancer));
+                       work_directory, data_spec, validation_dataset_per_worker,
+                       load_balancer));
 
   // Warn the workers that the training will start.
   RETURN_IF_ERROR(
@@ -426,25 +458,25 @@ TrainWithCache(
     proto::Checkpoint checkpoint_metadata;
     RETURN_IF_ERROR(RestoreManagerCheckpoint(
         last_checkpoint_idx.value(), work_directory, &model, &label_statistics,
-        &checkpoint_metadata));
+        &checkpoint_metadata, &validation_aggregator));
     model->set_data_spec(data_spec);
     InitializeModelWithAbstractTrainingConfig(config, config_link, model.get());
     RETURN_IF_ERROR(EmitRestoreCheckpoint(
         last_checkpoint_idx.value(), checkpoint_metadata.num_shards(),
-        model->num_trees_per_iter(), distribute_manager.get(), monitoring));
+        model->num_trees_per_iter(), work_directory, distribute_manager.get(),
+        monitoring, &load_balancer));
   } else {
     // Initializing a new model.
     ASSIGN_OR_RETURN(model, InitializeModel(config, config_link, spe_config,
                                             data_spec, *loss));
-
     // TODO(gbm): Send a ping to all the workers to make sure they all start
     // loading the dataset cache immediately (instead of waiting the first
     // request).
 
     LOG(INFO) << "Asking one worker for the initial label statistics";
-    ASSIGN_OR_RETURN(
-        label_statistics,
-        EmitGetLabelStatistics(distribute_manager.get(), monitoring));
+    ASSIGN_OR_RETURN(label_statistics,
+                     EmitGetLabelStatistics(distribute_manager.get(),
+                                            monitoring, &load_balancer));
     LOG(INFO) << "Training dataset label statistics:\n"
               << label_statistics.DebugString();
 
@@ -453,8 +485,9 @@ TrainWithCache(
     model->set_initial_predictions(initial_predictions);
     model->set_num_trees_per_iter(initial_predictions.size());
 
-    RETURN_IF_ERROR(EmitSetInitialPredictions(
-        label_statistics, distribute_manager.get(), monitoring));
+    RETURN_IF_ERROR(EmitSetInitialPredictions(label_statistics,
+                                              distribute_manager.get(),
+                                              monitoring, &load_balancer));
   }
 
   // Name of the evaluated metrics.
@@ -480,14 +513,15 @@ TrainWithCache(
       last_checkpoint_idx = iter_idx;
       RETURN_IF_ERROR(CreateCheckpoint(iter_idx, *model, work_directory,
                                        label_statistics,
-                                       distribute_manager.get(), monitoring));
+                                       distribute_manager.get(), monitoring,
+                                       &load_balancer, &validation_aggregator));
     }
 
     const auto iter_status = RunIteration(
         iter_idx, config_link, spe_config, weak_learner_train_config,
         set_leaf_functor, &load_balancer, data_spec, metric_names,
         input_features, log_directory, model.get(), &training_evaluation,
-        distribute_manager.get(), &random, monitoring);
+        distribute_manager.get(), &random, monitoring, &validation_aggregator);
     if (!iter_status.ok()) {
       LOG(WARNING) << "Iteration issue: " << iter_status.message();
     }
@@ -506,15 +540,16 @@ TrainWithCache(
 
       iter_idx = resync_iter_idx;
       proto::Checkpoint checkpoint_metadata;
-      RETURN_IF_ERROR(RestoreManagerCheckpoint(resync_iter_idx, work_directory,
-                                               &model, &label_statistics,
-                                               &checkpoint_metadata));
+      RETURN_IF_ERROR(RestoreManagerCheckpoint(
+          resync_iter_idx, work_directory, &model, &label_statistics,
+          &checkpoint_metadata, &validation_aggregator));
       model->set_data_spec(data_spec);
       InitializeModelWithAbstractTrainingConfig(config, config_link,
                                                 model.get());
       RETURN_IF_ERROR(EmitRestoreCheckpoint(
           resync_iter_idx, checkpoint_metadata.num_shards(),
-          model->num_trees_per_iter(), distribute_manager.get(), monitoring));
+          model->num_trees_per_iter(), work_directory, distribute_manager.get(),
+          monitoring, &load_balancer));
 
       minimum_iter_for_new_checkpoint = iter_idx + 1;
       // Restart this iteration.
@@ -528,13 +563,32 @@ TrainWithCache(
     // Create the final checkpoint
     RETURN_IF_ERROR(CreateCheckpoint(iter_idx, *model, work_directory,
                                      label_statistics, distribute_manager.get(),
-                                     monitoring));
+                                     monitoring, &load_balancer,
+                                     &validation_aggregator));
   }
 
   // Display the final training logs.
+  absl::optional<proto::Evaluation> previous_validation_evaluation;
+  if (validation_aggregator.Active() && iter_idx > 0) {
+    ASSIGN_OR_RETURN(previous_validation_evaluation,
+                     validation_aggregator.GetAggregated(iter_idx - 1));
+  }
   LOG(INFO) << "Training done. Final model: "
-            << TrainingLog(*model, training_evaluation, spe_config,
+            << TrainingLog(*model, training_evaluation,
+                           previous_validation_evaluation, spe_config,
                            metric_names, monitoring, load_balancer);
+
+  // Finalize the model with the assuption that all the trees are used i.e. not
+  // early stopping.
+  if (model->training_logs().entries_size() > 0) {
+    const auto& last_entry = model->training_logs().entries(
+        model->training_logs().entries_size() - 1);
+    if (last_entry.has_validation_loss()) {
+      model->set_validation_loss(last_entry.validation_loss());
+    }
+  }
+  model->mutable_training_logs()->set_number_of_trees_in_final_model(
+      model->NumTrees() / model->num_trees_per_iter());
 
   // Export training logs.
   if (!log_directory.empty()) {
@@ -558,21 +612,42 @@ absl::Status SkipAsyncAnswers(int num_skip,
 std::string TrainingLog(
     const gradient_boosted_trees::GradientBoostedTreesModel& model,
     const Evaluation& training_evaluation,
+    const absl::optional<proto::Evaluation>& previous_validation_evaliation,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const std::vector<std::string>& metric_names,
     internal::Monitoring* monitoring,
     const distributed_decision_tree::LoadBalancer& load_balancer) {
+  // Progression.
   auto log = absl::Substitute(
-      "num-trees:$0/$1 train-loss:$2",
+      "num-trees:$0/$1",
       model.decision_trees().size() / model.num_trees_per_iter(),
-      spe_config.gbt().num_trees(), training_evaluation.loss);
+      spe_config.gbt().num_trees());
+
+  // Validation metrics.
+  if (previous_validation_evaliation.has_value()) {
+    absl::StrAppendFormat(&log, " valid-loss:%f",
+                          previous_validation_evaliation.value().loss());
+    for (int metric_idx = 0;
+         metric_idx < previous_validation_evaliation.value().metrics_size();
+         metric_idx++) {
+      absl::StrAppendFormat(
+          &log, " valid-%s:%f", metric_names[metric_idx],
+          previous_validation_evaliation.value().metrics(metric_idx));
+    }
+  }
+
+  // Training metrics.
+  absl::StrAppendFormat(&log, " train-loss:%f", training_evaluation.loss);
   for (int metric_idx = 0; metric_idx < training_evaluation.metrics.size();
        metric_idx++) {
     absl::StrAppendFormat(&log, " train-%s:%f", metric_names[metric_idx],
                           training_evaluation.metrics[metric_idx]);
   }
+
+  // Computation resource monitor.
   absl::StrAppend(&log, " ", monitoring->InlineLogs());
 
+  // Load balancer.
   absl::StrAppend(&log, "\nBalancer: ", load_balancer.Info(false));
   return log;
 }
@@ -589,11 +664,12 @@ absl::Status RunIteration(
     gradient_boosted_trees::GradientBoostedTreesModel* model,
     Evaluation* training_evaluation,
     distribute::AbstractManager* distribute_manager, utils::RandomEngine* rnd,
-    internal::Monitoring* monitoring) {
+    internal::Monitoring* monitoring,
+    PartialEvaluationAggregator* validation_aggregator) {
   monitoring->NewIter();
-  ASSIGN_OR_RETURN(
-      const auto weak_learner_label_statistics,
-      EmitStartNewIter(iter_idx, (*rnd)(), distribute_manager, monitoring));
+  ASSIGN_OR_RETURN(const auto weak_learner_label_statistics,
+                   EmitStartNewIter(iter_idx, (*rnd)(), distribute_manager,
+                                    monitoring, load_balancer));
 
   WeakModels weak_models(model->num_trees_per_iter());
   for (int weak_model_idx = 0; weak_model_idx < weak_models.size();
@@ -616,8 +692,8 @@ absl::Status RunIteration(
        layer_idx++) {
     ASSIGN_OR_RETURN(
         const auto splits_per_weak_models,
-        EmitFindSplits(spe_config, features, load_balancer, weak_models,
-                       distribute_manager, rnd, monitoring));
+        EmitFindSplits(spe_config, features, weak_models, distribute_manager,
+                       rnd, monitoring, load_balancer));
 
     // Check if there is at least one open node.
     bool has_open_node = false;
@@ -642,18 +718,22 @@ absl::Status RunIteration(
     }
 
     // Request for the workers to evaluate the splits.
-    RETURN_IF_ERROR(EmitEvaluateSplits(splits_per_weak_models, load_balancer,
-                                       distribute_manager, rnd, monitoring));
+    RETURN_IF_ERROR(EmitEvaluateSplits(splits_per_weak_models,
+                                       distribute_manager, rnd, monitoring,
+                                       load_balancer));
 
     // Request for the workers to share the evaluation results,
     // update the tree structures, example->node mapping and label
     // statistics
-    RETURN_IF_ERROR(EmitShareSplits(splits_per_weak_models, load_balancer,
-                                    distribute_manager, monitoring));
+    RETURN_IF_ERROR(EmitShareSplits(splits_per_weak_models, distribute_manager,
+                                    monitoring, load_balancer));
   }
 
-  RETURN_IF_ERROR(EmitEndIter(iter_idx, distribute_manager, training_evaluation,
-                              monitoring));
+  const bool is_last_iteration = iter_idx == spe_config.gbt().num_trees() - 1;
+
+  RETURN_IF_ERROR(EmitEndIter(
+      iter_idx, is_last_iteration, weak_models, distribute_manager,
+      training_evaluation, monitoring, load_balancer, validation_aggregator));
 
   // Move the new trees in the model.
   for (int weak_model_idx = 0; weak_model_idx < weak_models.size();
@@ -664,15 +744,30 @@ absl::Status RunIteration(
             std::move(*weak_model.tree_builder->mutable_tree())));
   }
 
-  // TODO(gbm): Validation.
   // TODO(gbm): Early stopping.
   // TODO(gbm): Maximum training time.
   // TODO(gbm): Training interruption.
 
+  // Note: The valiation evaluation is asynchronous and is generally (unless a
+  // checkpoint was just made, or this is the last iteration) late by one
+  // iteration.
+  absl::optional<proto::Evaluation> validation_evaluation;
+  if (validation_aggregator->Active() && iter_idx > 0) {
+    ASSIGN_OR_RETURN(validation_evaluation,
+                     validation_aggregator->GetAggregated(iter_idx - 1));
+    auto& previous_log = *model->mutable_training_logs()->mutable_entries(
+        model->training_logs().entries_size() - 1);
+    previous_log.set_validation_loss(validation_evaluation.value().loss());
+    *previous_log.mutable_validation_secondary_metrics() = {
+        validation_evaluation.value().metrics().begin(),
+        validation_evaluation.value().metrics().end()};
+  }
+
   // Display training logs.
   if (monitoring->ShouldDisplayLogs()) {
-    LOG(INFO) << TrainingLog(*model, *training_evaluation, spe_config,
-                             metric_names, monitoring, *load_balancer);
+    LOG(INFO) << TrainingLog(*model, *training_evaluation,
+                             validation_evaluation, spe_config, metric_names,
+                             monitoring, *load_balancer);
   }
 
   // Record training logs.
@@ -683,6 +778,16 @@ absl::Status RunIteration(
       training_evaluation->metrics.begin(), training_evaluation->metrics.end()};
   log_entry->mutable_validation_secondary_metrics()->Resize(
       model->training_logs().secondary_metric_names_size(), 0);
+
+  if (validation_aggregator->Active() && is_last_iteration) {
+    // In the last iteration, the last validation is done synchronously.
+    ASSIGN_OR_RETURN(const auto validation_evaluation,
+                     validation_aggregator->GetAggregated(iter_idx));
+    log_entry->set_validation_loss(validation_evaluation.loss());
+    *log_entry->mutable_validation_secondary_metrics() = {
+        validation_evaluation.metrics().begin(),
+        validation_evaluation.metrics().end()};
+  }
 
   // Export training logs.
   if (!log_directory.empty() &&
@@ -744,7 +849,9 @@ absl::Status CreateCheckpoint(
     const absl::string_view work_directory,
     const decision_tree::proto::LabelStatistics& label_statistics,
     distribute::AbstractManager* distribute_manager,
-    internal::Monitoring* monitoring) {
+    internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer,
+    PartialEvaluationAggregator* validation_aggregator) {
   monitoring->BeginStage(internal::Monitoring::kCreateCheckpoint);
   LOG(INFO) << "Start creating checkpoint for iteration " << iter_idx;
   const auto begin_create_checkpoint = absl::Now();
@@ -760,14 +867,19 @@ absl::Status CreateCheckpoint(
       work_directory, kFileNameCheckPoint, absl::StrCat(iter_idx));
   RETURN_IF_ERROR(file::RecursivelyCreateDir(checkpoint_dir, file::Defaults()));
 
+  // Save the worker-side checkpoint content.
+  // Also retreive the "validation_aggregator" with any pending evaluation on
+  // the validation dataset.
+  RETURN_IF_ERROR(EmitCreateCheckpoint(
+      iter_idx, label_statistics.num_examples(), checkpoint.num_shards(),
+      work_directory, distribute_manager, monitoring, load_balancer,
+      validation_aggregator));
+  RETURN_IF_ERROR(validation_aggregator->Export(
+      checkpoint.mutable_validation_aggregator()));
+
   // Save the model structure.
   RETURN_IF_ERROR(model.Save(file::JoinPath(checkpoint_dir, "model"),
                              /*io_options=*/{/*file_prefix=*/""}));
-
-  // Save the worker-side checkpoint content.
-  RETURN_IF_ERROR(EmitCreateCheckpoint(
-      iter_idx, label_statistics.num_examples(), checkpoint.num_shards(),
-      work_directory, distribute_manager, monitoring));
 
   RETURN_IF_ERROR(
       file::SetBinaryProto(file::JoinPath(checkpoint_dir, "checkpoint"),
@@ -787,7 +899,8 @@ absl::Status RestoreManagerCheckpoint(
     int iter_idx, absl::string_view work_directory,
     std::unique_ptr<gradient_boosted_trees::GradientBoostedTreesModel>* model,
     decision_tree::proto::LabelStatistics* label_statistics,
-    proto::Checkpoint* checkpoint) {
+    proto::Checkpoint* checkpoint,
+    PartialEvaluationAggregator* validation_aggregator) {
   LOG(INFO) << "Restoring model from checkpoint at iteration " << iter_idx;
   const auto checkpoint_dir = file::JoinPath(
       work_directory, kFileNameCheckPoint, absl::StrCat(iter_idx));
@@ -799,6 +912,9 @@ absl::Status RestoreManagerCheckpoint(
       absl::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
   RETURN_IF_ERROR(model->get()->Load(file::JoinPath(checkpoint_dir, "model"),
                                      /*io_options=*/{/*file_prefix=*/""}));
+
+  RETURN_IF_ERROR(
+      validation_aggregator->Import(checkpoint->validation_aggregator()));
   return absl::OkStatus();
 }
 
@@ -827,6 +943,7 @@ InitializeDistributionManager(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     absl::string_view cache_path, absl::string_view work_directory,
     const dataset::proto::DataSpecification& data_spec,
+    const std::vector<ValidationDataset>& validation_dataset_per_worker,
     const distributed_decision_tree::LoadBalancer& load_balancer) {
   proto::WorkerWelcome welcome;
   welcome.set_work_directory(std::string(work_directory));
@@ -835,6 +952,10 @@ InitializeDistributionManager(
   *welcome.mutable_train_config_linking() = config_link;
   *welcome.mutable_deployment_config() = deployment;
   *welcome.mutable_dataspec() = data_spec;
+  welcome.set_num_train_workers(load_balancer.NumWorkers());
+  *welcome.mutable_validation_dataset_per_worker() = {
+      validation_dataset_per_worker.begin(),
+      validation_dataset_per_worker.end()};
 
   // Copy "load_balancer" to "welcome.feature_ownership()".
   const auto feature_ownership = load_balancer.FeaturesPerWorkers();
@@ -853,7 +974,8 @@ InitializeDistributionManager(
 }
 
 utils::StatusOr<decision_tree::proto::LabelStatistics> EmitGetLabelStatistics(
-    distribute::AbstractManager* distribute, internal::Monitoring* monitoring) {
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer) {
   monitoring->BeginStage(internal::Monitoring::kGetLabelStatistics);
   proto::WorkerRequest generic_request;
   // The request has not payload.
@@ -874,7 +996,8 @@ utils::StatusOr<decision_tree::proto::LabelStatistics> EmitGetLabelStatistics(
 
 absl::Status EmitSetInitialPredictions(
     const decision_tree::proto::LabelStatistics& label_statistics,
-    distribute::AbstractManager* distribute, internal::Monitoring* monitoring) {
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer) {
   monitoring->BeginStage(internal::Monitoring::kSetInitialPredictions);
   proto::WorkerRequest generic_request;
   auto& request = *generic_request.mutable_set_initial_predictions();
@@ -905,7 +1028,8 @@ utils::StatusOr<std::vector<decision_tree::proto::LabelStatistics>>
 EmitStartNewIter(const int iter_idx,
                  const utils::RandomEngine::result_type seed,
                  distribute::AbstractManager* distribute,
-                 internal::Monitoring* monitoring) {
+                 internal::Monitoring* monitoring,
+                 distributed_decision_tree::LoadBalancer* load_balancer) {
   monitoring->BeginStage(internal::Monitoring::kStartNewIter);
   std::vector<decision_tree::proto::LabelStatistics> root_label_statistics;
 
@@ -916,25 +1040,26 @@ EmitStartNewIter(const int iter_idx,
   request.set_seed(seed);
 
   // TODO(gbm): Implement multicast operations.
-  for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
+  for (int worker_idx = 0; worker_idx < load_balancer->NumWorkers();
        worker_idx++) {
     RETURN_IF_ERROR(
         distribute->AsynchronousProtoRequest(generic_request, worker_idx));
   }
 
   // TODO(gbm): No need for an answer.
-  for (int reply_idx = 0; reply_idx < distribute->NumWorkers(); reply_idx++) {
+  for (int reply_idx = 0; reply_idx < load_balancer->NumWorkers();
+       reply_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
         distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
 
     if (generic_result.request_restart_iter()) {
-      RETURN_IF_ERROR(SkipAsyncAnswers(distribute->NumWorkers() - reply_idx - 1,
-                                       distribute));
+      RETURN_IF_ERROR(SkipAsyncAnswers(
+          load_balancer->NumWorkers() - reply_idx - 1, distribute));
       return absl::DataLossError("");
     }
     if (!generic_result.has_start_new_iter()) {
-      return absl::InternalError("Unexpected answer. Expecting StartNewIter");
+      return absl::InternalError("Unexpected answer. Expecting StartNewIter.");
     }
     const auto& result = generic_result.start_new_iter();
 
@@ -950,15 +1075,15 @@ EmitStartNewIter(const int iter_idx,
 utils::StatusOr<std::vector<distributed_decision_tree::SplitPerOpenNode>>
 EmitFindSplits(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
-    const std::vector<int>& features,
-    distributed_decision_tree::LoadBalancer* load_balancer,
-    const WeakModels& weak_models, distribute::AbstractManager* distribute,
-    utils::RandomEngine* rnd, internal::Monitoring* monitoring) {
+    const std::vector<int>& features, const WeakModels& weak_models,
+    distribute::AbstractManager* distribute, utils::RandomEngine* rnd,
+    internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer) {
   monitoring->BeginStage(internal::Monitoring::kFindSplits);
   const auto begin = absl::Now();
 
   FeaturesPerWorkerWeakModelAndNode sampled_features;
-  RETURN_IF_ERROR(SampleInputFeatures(spe_config, distribute->NumWorkers(),
+  RETURN_IF_ERROR(SampleInputFeatures(spe_config, load_balancer->NumWorkers(),
                                       features, *load_balancer, weak_models,
                                       &sampled_features, rnd));
 
@@ -966,7 +1091,7 @@ EmitFindSplits(
   // account network communication or worker restarts.
   std::vector<distributed_decision_tree::LoadBalancer::Measure>
       runtime_per_workers;
-  runtime_per_workers.resize(distribute->NumWorkers());
+  runtime_per_workers.resize(load_balancer->NumWorkers());
 
   std::vector<std::vector<int>> feature_per_workers;
   if (load_balancer->is_dynamic_balancing_active()) {
@@ -975,7 +1100,7 @@ EmitFindSplits(
 
   // Send the requests.
   int num_requests = 0;
-  for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
+  for (int worker_idx = 0; worker_idx < load_balancer->NumWorkers();
        worker_idx++) {
     proto::WorkerRequest generic_request;
     auto& request = *generic_request.mutable_find_splits();
@@ -1018,8 +1143,8 @@ EmitFindSplits(
         const auto generic_result,
         distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
     if (generic_result.request_restart_iter()) {
-      RETURN_IF_ERROR(SkipAsyncAnswers(distribute->NumWorkers() - reply_idx - 1,
-                                       distribute));
+      RETURN_IF_ERROR(
+          SkipAsyncAnswers(num_requests - reply_idx - 1, distribute));
       return absl::DataLossError("");
     }
     monitoring->FindSplitWorkerReplyTime(generic_result.worker_idx(),
@@ -1070,9 +1195,9 @@ EmitFindSplits(
 absl::Status EmitEvaluateSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    distributed_decision_tree::LoadBalancer* load_balancer,
     distribute::AbstractManager* distribute, utils::RandomEngine* rnd,
-    internal::Monitoring* monitoring) {
+    internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer) {
   monitoring->BeginStage(internal::Monitoring::kEvaluateSplits);
 
   proto::WorkerRequest generic_request;
@@ -1083,19 +1208,20 @@ absl::Status EmitEvaluateSplits(
   }
 
   // TODO(gbm): Implement multicast operations.
-  for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
+  for (int worker_idx = 0; worker_idx < load_balancer->NumWorkers();
        worker_idx++) {
     RETURN_IF_ERROR(
         distribute->AsynchronousProtoRequest(generic_request, worker_idx));
   }
 
-  for (int reply_idx = 0; reply_idx < distribute->NumWorkers(); reply_idx++) {
+  for (int reply_idx = 0; reply_idx < load_balancer->NumWorkers();
+       reply_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
         distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
     if (generic_result.request_restart_iter()) {
-      RETURN_IF_ERROR(SkipAsyncAnswers(distribute->NumWorkers() - reply_idx - 1,
-                                       distribute));
+      RETURN_IF_ERROR(SkipAsyncAnswers(
+          load_balancer->NumWorkers() - reply_idx - 1, distribute));
       return absl::DataLossError("");
     }
     if (!generic_result.has_evaluate_splits()) {
@@ -1110,8 +1236,8 @@ absl::Status EmitEvaluateSplits(
 absl::Status EmitShareSplits(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
-    distributed_decision_tree::LoadBalancer* load_balancer,
-    distribute::AbstractManager* distribute, internal::Monitoring* monitoring) {
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer) {
   monitoring->BeginStage(internal::Monitoring::kShareSplits);
 
   ASSIGN_OR_RETURN(const auto active_features,
@@ -1160,25 +1286,46 @@ absl::Status EmitShareSplits(
   return absl::OkStatus();
 }
 
-absl::Status EmitEndIter(int iter_idx, distribute::AbstractManager* distribute,
+absl::Status EmitEndIter(int iter_idx, bool is_last_iteration,
+                         const WeakModels& weak_models,
+                         distribute::AbstractManager* distribute,
                          absl::optional<Evaluation*> training_evaluation,
-                         internal::Monitoring* monitoring) {
+                         internal::Monitoring* monitoring,
+                         distributed_decision_tree::LoadBalancer* load_balancer,
+                         PartialEvaluationAggregator* validation_aggregator) {
   monitoring->BeginStage(internal::Monitoring::kEndIter);
 
-  proto::WorkerRequest generic_request;
-  auto& request = *generic_request.mutable_end_iter();
-  request.set_iter_idx(iter_idx);
+  // Request for the trainer workers.
+  proto::WorkerRequest generic_trainer_request;
+  auto& trainer_request = *generic_trainer_request.mutable_end_iter();
+  trainer_request.set_iter_idx(iter_idx);
+
+  // Request for the evaluation workers.
+  proto::WorkerRequest generic_evaluator_request;
+  auto& evaluator_request = *generic_evaluator_request.mutable_end_iter();
+  evaluator_request.set_iter_idx(iter_idx);
+  evaluator_request.set_synchronous_validation(is_last_iteration);
+  for (const auto& weak_model : weak_models) {
+    // Copy the new tree.
+    // TODO(gbm): Serialize the tree only one time instead of for each worker.
+    EndIterTreeProtoWriter stream(evaluator_request.add_new_trees());
+    RETURN_IF_ERROR(weak_model.tree_builder->tree().WriteNodes(&stream));
+  }
 
   // TODO(gbm): Implement multicast operations.
   for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
        worker_idx++) {
-    if (training_evaluation.has_value()) {
-      // The first worker is in charge of computing the training loss.
-      request.set_compute_training_loss(worker_idx == 0);
+    if (worker_idx < load_balancer->NumWorkers()) {
+      if (training_evaluation.has_value()) {
+        // The first worker is in charge of computing the training loss.
+        trainer_request.set_compute_training_loss(worker_idx == 0);
+      }
+      RETURN_IF_ERROR(distribute->AsynchronousProtoRequest(
+          generic_trainer_request, worker_idx));
+    } else {
+      RETURN_IF_ERROR(distribute->AsynchronousProtoRequest(
+          generic_evaluator_request, worker_idx));
     }
-
-    RETURN_IF_ERROR(
-        distribute->AsynchronousProtoRequest(generic_request, worker_idx));
   }
 
   // TODO(gbm): No need for an answer.
@@ -1195,16 +1342,22 @@ absl::Status EmitEndIter(int iter_idx, distribute::AbstractManager* distribute,
       return absl::InternalError("Unexpected answer. Expecting EndIter");
     }
 
-    // Get the loss value.
     const auto& result = generic_result.end_iter();
-    if (result.has_training_loss()) {
+    if (result.has_training()) {
+      // Get the training loss value.
       if (!training_evaluation.has_value()) {
         return absl::InternalError("Receiving a non requested loss");
       }
 
-      training_evaluation.value()->loss = result.training_loss();
-      training_evaluation.value()->metrics = {result.training_metrics().begin(),
-                                              result.training_metrics().end()};
+      training_evaluation.value()->loss = result.training().loss();
+      training_evaluation.value()->metrics = {
+          result.training().metrics().begin(),
+          result.training().metrics().end()};
+    }
+
+    for (const auto& validation : result.validations()) {
+      // Get the validation evaluation of the previous or current iteration.
+      RETURN_IF_ERROR(validation_aggregator->AddPartial(validation));
     }
   }
 
@@ -1212,10 +1365,11 @@ absl::Status EmitEndIter(int iter_idx, distribute::AbstractManager* distribute,
   return absl::OkStatus();
 }
 
-absl::Status EmitRestoreCheckpoint(const int iter_idx, const int num_shards,
-                                   const int num_weak_models,
-                                   distribute::AbstractManager* distribute,
-                                   internal::Monitoring* monitoring) {
+absl::Status EmitRestoreCheckpoint(
+    const int iter_idx, const int num_shards, const int num_weak_models,
+    const absl::string_view work_directory,
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer) {
   monitoring->BeginStage(internal::Monitoring::kRestoreCheckpoint);
 
   proto::WorkerRequest generic_request;
@@ -1223,6 +1377,8 @@ absl::Status EmitRestoreCheckpoint(const int iter_idx, const int num_shards,
   request.set_iter_idx(iter_idx);
   request.set_num_shards(num_shards);
   request.set_num_weak_models(num_weak_models);
+  request.set_checkpoint_dir(file::JoinPath(work_directory, kFileNameCheckPoint,
+                                            absl::StrCat(iter_idx)));
 
   // TODO(gbm): Implement multicast operations.
   for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
@@ -1246,11 +1402,15 @@ absl::Status EmitRestoreCheckpoint(const int iter_idx, const int num_shards,
   return absl::OkStatus();
 }
 
-absl::Status EmitCreateCheckpoint(const int iter_idx, const size_t num_examples,
-                                  const int num_shards,
-                                  const absl::string_view work_directory,
-                                  distribute::AbstractManager* distribute,
-                                  internal::Monitoring* monitoring) {
+absl::Status EmitCreateCheckpoint(
+    const int iter_idx, const size_t num_examples, const int num_shards,
+    const absl::string_view work_directory,
+    distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
+    distributed_decision_tree::LoadBalancer* load_balancer,
+    PartialEvaluationAggregator* validation_aggregator) {
+  const auto checkpoint_dir = file::JoinPath(
+      work_directory, kFileNameCheckPoint, absl::StrCat(iter_idx));
+
   const int max_retries = 3 * num_shards;
   int retries = 0;
 
@@ -1263,6 +1423,8 @@ absl::Status EmitCreateCheckpoint(const int iter_idx, const size_t num_examples,
             std::min(num_examples, (shard_idx + 1) * num_example_per_shard)};
   };
 
+  // Send the checkpoint requrest to a subset of the training workers.
+  int num_requests = 0;
   for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
     proto::WorkerRequest generic_request;
     auto& request = *generic_request.mutable_create_checkpoint();
@@ -1271,61 +1433,101 @@ absl::Status EmitCreateCheckpoint(const int iter_idx, const size_t num_examples,
     request.set_end_example_idx(example_range.second);
     request.set_shard_idx(shard_idx);
     generic_request.set_request_id(shard_idx);
-    RETURN_IF_ERROR(distribute->AsynchronousProtoRequest(generic_request));
+    const int worker_idx = shard_idx % load_balancer->NumWorkers();
+    RETURN_IF_ERROR(
+        distribute->AsynchronousProtoRequest(generic_request, worker_idx));
+    num_requests++;
   }
 
-  const auto checkpoint_dir = file::JoinPath(
-      work_directory, kFileNameCheckPoint, absl::StrCat(iter_idx));
+  // Send the checkpoint requrest to all the evaluation workers.
+  //
+  // Note: Exceptionnaly, we are sending two different types of requests at the
+  // same time to make the checkpoint creation more efficient.
+  for (int worker_idx = load_balancer->NumWorkers();
+       worker_idx < distribute->NumWorkers(); worker_idx++) {
+    proto::WorkerRequest generic_request;
+    auto& request = *generic_request.mutable_create_evaluation_checkpoint();
+    request.set_checkpoint_dir(checkpoint_dir);
+    RETURN_IF_ERROR(
+        distribute->AsynchronousProtoRequest(generic_request, worker_idx));
+    num_requests++;
+  }
 
-  for (int answer_idx = 0; answer_idx < num_shards; answer_idx++) {
+  for (int answer_idx = 0; answer_idx < num_requests; answer_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
         distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
 
-    if (generic_result.request_restart_iter()) {
-      const int new_worker_idx =
-          (generic_result.worker_idx() + 1) % distribute->NumWorkers();
-      // The worker was restarted and it misses the data required to create the
-      // checkpoint. Re-send the request to another worker.
-      LOG(WARNING) << "Worker #" << generic_result.worker_idx()
-                   << " does not have the right data to create the "
-                      "checkpoint. Trying worker #"
-                   << new_worker_idx << " instead";
+    const bool is_training_worker =
+        generic_result.worker_idx() < load_balancer->NumWorkers();
 
-      retries++;
-      if (retries > max_retries) {
+    if (generic_result.request_restart_iter()) {
+      if (!is_training_worker) {
+        // Evaluation worker. Just fail.
         return absl::DataLossError(
             absl::Substitute("Impossible to create a checkpoint for iter #$0 "
-                             "because none of the workers are available.",
+                             "because an evaluation worker is not available.",
                              iter_idx));
+      } else {
+        // Training worker. Try another worker.
+
+        const int new_worker_idx =
+            (generic_result.worker_idx() + 1) % load_balancer->NumWorkers();
+        // The worker was restarted and it misses the data required to create
+        // the checkpoint. Re-send the request to another worker.
+        LOG(WARNING) << "Worker #" << generic_result.worker_idx()
+                     << " does not have the right data to create the "
+                        "checkpoint. Trying worker #"
+                     << new_worker_idx << " instead";
+
+        retries++;
+        if (retries > max_retries) {
+          return absl::DataLossError(
+              absl::Substitute("Impossible to create a checkpoint for iter #$0 "
+                               "because none of the workers are available.",
+                               iter_idx));
+        }
+
+        // Send the request to another worker.
+        proto::WorkerRequest generic_request;
+        auto& request = *generic_request.mutable_create_checkpoint();
+        const auto example_range = shard_idx_to_example_idx_range(
+            generic_result.create_checkpoint().shard_idx());
+        request.set_begin_example_idx(example_range.first);
+        request.set_end_example_idx(example_range.second);
+        request.set_shard_idx(generic_result.request_id());
+        generic_request.set_request_id(generic_result.request_id());
+        RETURN_IF_ERROR(distribute->AsynchronousProtoRequest(generic_request,
+                                                             new_worker_idx));
+        answer_idx--;
+        continue;
       }
-
-      // Send the request to another worker.
-      proto::WorkerRequest generic_request;
-      auto& request = *generic_request.mutable_create_checkpoint();
-      const auto example_range = shard_idx_to_example_idx_range(
-          generic_result.create_checkpoint().shard_idx());
-      request.set_begin_example_idx(example_range.first);
-      request.set_end_example_idx(example_range.second);
-      request.set_shard_idx(generic_result.request_id());
-      generic_request.set_request_id(generic_result.request_id());
-      RETURN_IF_ERROR(distribute->AsynchronousProtoRequest(generic_request,
-                                                           new_worker_idx));
-      answer_idx--;
-      continue;
     }
 
-    if (!generic_result.has_create_checkpoint()) {
-      return absl::InternalError(
-          "Unexpected answer. Expecting CreateCheckpoint");
+    if (is_training_worker) {
+      if (!generic_result.has_create_checkpoint()) {
+        return absl::InternalError(
+            "Unexpected answer. Expecting CreateCheckpoint");
+      }
+      const auto& result = generic_result.create_checkpoint();
+      RETURN_IF_ERROR(file::Rename(
+          result.path(),
+          file::JoinPath(
+              checkpoint_dir,
+              distributed_decision_tree::dataset_cache::ShardFilename(
+                  "predictions", result.shard_idx(), num_shards)),
+          file::Defaults()));
+    } else {
+      if (!generic_result.has_create_evaluation_checkpoint()) {
+        return absl::InternalError(
+            "Unexpected answer. Expecting CreateEvaluationCheckpoint");
+      }
+      const auto& result = generic_result.create_evaluation_checkpoint();
+      for (const auto& validation : result.validations()) {
+        // Get the validation evaluation of the previous or current iteration.
+        RETURN_IF_ERROR(validation_aggregator->AddPartial(validation));
+      }
     }
-    const auto& result = generic_result.create_checkpoint();
-    RETURN_IF_ERROR(file::Rename(
-        result.path(),
-        file::JoinPath(checkpoint_dir,
-                       distributed_decision_tree::dataset_cache::ShardFilename(
-                           "predictions", result.shard_idx(), num_shards)),
-        file::Defaults()));
   }
   return absl::OkStatus();
 }
@@ -1340,13 +1542,14 @@ absl::Status EmitStartTraining(
   generic_request.mutable_start_training();
 
   // TODO(gbm): Implement multicast operations.
-  for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
+  for (int worker_idx = 0; worker_idx < load_balancer->NumWorkers();
        worker_idx++) {
     RETURN_IF_ERROR(
         distribute->AsynchronousProtoRequest(generic_request, worker_idx));
   }
 
-  for (int reply_idx = 0; reply_idx < distribute->NumWorkers(); reply_idx++) {
+  for (int reply_idx = 0; reply_idx < load_balancer->NumWorkers();
+       reply_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
         distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
@@ -1363,7 +1566,7 @@ absl::Status EmitStartTraining(
     // Most of the time is used for the workers to load the dataset.
     LOG_INFO_EVERY_N_SEC(60, _ << "\tLoading dataset in workers "
                                << (reply_idx + 1) << " / "
-                               << distribute->NumWorkers()
+                               << load_balancer->NumWorkers()
                                << " [duration: " << absl::Now() - begin << "]");
   }
   LOG(INFO) << "Worker ready to train in " << absl::Now() - begin;
@@ -1706,6 +1909,120 @@ absl::Status SetSplitsInPlan(
       }
     }
   }
+  return absl::OkStatus();
+}
+
+absl::Status DivideWorkers(const int num_all_workers,
+                           const float ratio_evaluation_workers,
+                           int* num_train_workers, int* num_eval_workers) {
+  *num_eval_workers =
+      std::max<int>(1, ratio_evaluation_workers * num_all_workers);
+  *num_train_workers = num_all_workers - *num_eval_workers;
+  if (*num_train_workers == 0) {
+    return absl::InvalidArgumentError(
+        "Not enough workers for both training and evaluation.");
+  }
+  return absl::OkStatus();
+}
+
+utils::StatusOr<std::vector<ValidationDataset>> DivideValidationDataset(
+    const absl::string_view typed_path, const int num_workers) {
+  DCHECK_GT(num_workers, 0);
+
+  // List the files.
+  std::vector<std::string> shards;
+  std::string type;
+  std::string non_typed_path;
+  ASSIGN_OR_RETURN(std::tie(type, non_typed_path),
+                   dataset::SplitTypeAndPath(typed_path));
+  RETURN_IF_ERROR(utils::ExpandInputShards(non_typed_path, &shards));
+
+  // List the files for each workers.
+  std::vector<std::vector<std::string>> shards_per_worker(num_workers);
+  for (int shard_idx = 0; shard_idx < shards.size(); shard_idx++) {
+    const int worker_idx = shard_idx % num_workers;
+    shards_per_worker[worker_idx].push_back(shards[shard_idx]);
+  }
+
+  // Compile the files into a single comma separated path.
+  std::vector<ValidationDataset> dataset_per_worker(num_workers);
+  for (int worker_idx = 0; worker_idx < num_workers; worker_idx++) {
+    if (!shards_per_worker[worker_idx].empty()) {
+      dataset_per_worker[worker_idx] = absl::StrCat(
+          type, ":", absl::StrJoin(shards_per_worker[worker_idx], ","));
+    }
+  }
+
+  return dataset_per_worker;
+}
+
+absl::Status PartialEvaluationAggregator::AddPartial(
+    const proto::Evaluation& evaluation) {
+  auto& item = (*data_.mutable_items())[evaluation.iter_idx()];
+
+  if (item.num_fragments() == 0) {
+    // Record the evaluation.
+    *item.mutable_evaluation() = evaluation;
+  } else {
+    // Merges two metrics weighted by "sum_weights".
+    const auto merge_metric = [&](const float previous_value,
+                                  const float new_value) {
+      return (previous_value * item.evaluation().sum_weights() +
+              new_value * evaluation.sum_weights()) /
+             (item.evaluation().sum_weights() + evaluation.sum_weights());
+    };
+
+    // Merge the loss and emtrics weighted by "sum_weights".
+    item.mutable_evaluation()->set_loss(
+        merge_metric(item.evaluation().loss(), evaluation.loss()));
+    if (item.mutable_evaluation()->metrics_size() !=
+        evaluation.metrics_size()) {
+      return absl::InvalidArgumentError("Unexpected number of metric values.");
+    }
+    for (int metric_idx = 0; metric_idx < evaluation.metrics_size();
+         metric_idx++) {
+      item.mutable_evaluation()->set_metrics(
+          metric_idx, merge_metric(item.evaluation().metrics(metric_idx),
+                                   evaluation.metrics(metric_idx)));
+    }
+
+    // Add the example count and weights.
+    item.mutable_evaluation()->set_sum_weights(item.evaluation().sum_weights() +
+                                               evaluation.sum_weights());
+    item.mutable_evaluation()->set_num_examples(
+        item.evaluation().num_examples() + evaluation.num_examples());
+  }
+
+  item.set_num_fragments(item.num_fragments() + 1);
+  if (item.num_fragments() > data_.num_fragments()) {
+    return absl::InvalidArgumentError(
+        "Too many fragments recevied for a given iter_idx");
+  }
+
+  return absl::OkStatus();
+}
+
+utils::StatusOr<proto::Evaluation> PartialEvaluationAggregator::GetAggregated(
+    const int iter_idx) const {
+  const auto it = data_.items().find(iter_idx);
+  if (it == data_.items().end()) {
+    return absl::NotFoundError("");
+  }
+  if (it->second.num_fragments() != data_.num_fragments()) {
+    return absl::InvalidArgumentError("Incomplete evaluation");
+  }
+  return it->second.evaluation();
+}
+
+absl::Status PartialEvaluationAggregator::Export(
+    proto::PartialEvaluationAggregator* proto) {
+  *proto = data_;
+  return absl::OkStatus();
+}
+
+absl::Status PartialEvaluationAggregator::Import(
+    const proto::PartialEvaluationAggregator& proto) {
+  data_ = proto;
   return absl::OkStatus();
 }
 

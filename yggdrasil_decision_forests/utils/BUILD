@@ -163,6 +163,7 @@ cc_library_ydf(
         ":compatibility",
         ":filesystem",
         ":logging",
+        ":protobuf",
         ":status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
