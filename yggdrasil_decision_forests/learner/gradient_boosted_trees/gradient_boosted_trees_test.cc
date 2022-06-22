@@ -356,8 +356,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
@@ -377,8 +377,8 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However, logloss
   // is significantly better (which is expected as, unlike RF, GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
@@ -400,8 +400,8 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaZero) {
   TrainAndEvaluateModel();
 
   // Similar metrics as with log loss.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8602, 0.003);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.3178, 0.004);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8602, 0.003);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.3178, 0.004);
 }
 
 // Train and test a model on the adult dataset with focal loss, now with
@@ -420,8 +420,8 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaHalf) {
 
   // Slighly better accuracy, but worse log loss; we are not
   // optimizing for log loss directly any more.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.003);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.3310, 0.004);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.003);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.3310, 0.004);
 }
 
 // Train and test a model on the adult dataset with focal loss, now with
@@ -440,8 +440,8 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaTwo) {
 
   // Even slightly better accuracy (could be just noise, but illustrative),
   // log loss deviates even more
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8608, 0.003);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4192, 0.009);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8608, 0.003);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.4192, 0.009);
 }
 
 // Train and test a model on the adult dataset with focal loss, adding a
@@ -461,8 +461,8 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaTwoAlphaQuarter) {
   TrainAndEvaluateModel();
 
   // Worse accuracy but smaller log loss due to low alpha
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8300, 0.004);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4032, 0.02);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8300, 0.004);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.4032, 0.02);
 }
 
 // Separate the examples used for the structure and the leaves of the model.
@@ -471,24 +471,26 @@ TEST_F(GradientBoostedTreesOnAdult, Honest) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->mutable_decision_tree()->mutable_honest();
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8556, 0.004);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.30955, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8556, 0.004);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.30955, 0.04);
 }
 // Train a GBT with a validation dataset provided as a VerticalDataset.
 TEST_F(GradientBoostedTreesOnAdult, ValidVerticalDataset) {
   pass_validation_dataset_ = true;
+  inject_random_noise_ = true;
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8736, 0.004);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.30955, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8707, 0.0054);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.2986, 0.005);
 }
 
 // Train a GBT with a validation dataset provided as a path.
 TEST_F(GradientBoostedTreesOnAdult, ValidPathDataset) {
   pass_training_dataset_as_path_ = true;
   pass_validation_dataset_ = true;
+  inject_random_noise_ = true;
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.87369, 0.004);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.30955, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8708, 0.0053);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.2983, 0.0046);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, VariableImportance) {
@@ -565,7 +567,7 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingExact) {
   LOG(INFO) << "Evaluation:" << metric::TextReport(evaluation).value();
 
   // Sharded model is "good".
-  EXPECT_NEAR(metric::Accuracy(evaluation), 0.8665, 0.008);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation), 0.8665, 0.008);
 }
 
 // Model trained with the sharded algorithm and sampling.
@@ -588,7 +590,8 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingSampling) {
   const auto sharded_sampled_evaluation =
       sharded_sampled_model->Evaluate(test_ds_, {}, &rnd);
 
-  EXPECT_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.86180, 0.006);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.86180,
+                         0.006);
 }
 
 // Model trained with the sharded algorithm and sampling.
@@ -611,7 +614,8 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingSamplingRecycle) {
   const auto sharded_sampled_evaluation =
       sharded_sampled_model->Evaluate(test_ds_, {}, &rnd);
 
-  EXPECT_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.86088, 0.005);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(sharded_sampled_evaluation), 0.86088,
+                         0.005);
 }
 
 // Train and test a model on the adult dataset using random categorical splits.
@@ -628,8 +632,8 @@ TEST_F(GradientBoostedTreesOnAdult, RandomCategorical) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.005);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.005);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
@@ -650,8 +654,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseNoQuickScorer) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8549, 0.015);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8549, 0.015);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
@@ -672,8 +676,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseConcurrentDeprecated) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Train and test a model on the adult dataset.
@@ -690,8 +694,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseConcurrent) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Train and test a model on the adult dataset with Goss sampling.
@@ -704,8 +708,8 @@ TEST_F(GradientBoostedTreesOnAdult, GossDeprecated) {
   gbt_config->set_use_goss(true);
   TrainAndEvaluateModel();
 
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8528, 0.015);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8528, 0.015);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Train and test a model on the adult dataset with Goss sampling.
@@ -718,8 +722,8 @@ TEST_F(GradientBoostedTreesOnAdult, Goss) {
   gbt_config->mutable_gradient_one_side_sampling();
   TrainAndEvaluateModel();
 
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8528, 0.015);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8528, 0.015);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Train and test a model on the adult dataset.
@@ -737,8 +741,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDiscretizedNumerical) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.015);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.015);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Train and test a model on the adult dataset.
@@ -759,8 +763,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseAggresiveDiscretizedNumerical) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8562, 0.005);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8562, 0.005);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, BaseWithWeights) {
@@ -773,8 +777,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseWithWeights) {
 
   TrainAndEvaluateModel(/*numerical_weight_attribute=*/"age");
 
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.845, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.845, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, NumCandidateAttributeRatio) {
@@ -791,8 +795,8 @@ TEST_F(GradientBoostedTreesOnAdult, NumCandidateAttributeRatio) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Train and test a model on the adult dataset.
@@ -808,8 +812,8 @@ TEST_F(GradientBoostedTreesOnAdult, LeafWiseGrow) {
 
   TrainAndEvaluateModel();
 
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Train and test a model on the adult dataset with L2 regularization.
@@ -827,8 +831,8 @@ TEST_F(GradientBoostedTreesOnAdult, L2Regularization) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Multiclass version of the algorithm on the binary class adult dataset.
@@ -845,8 +849,8 @@ TEST_F(GradientBoostedTreesOnAdult, FakeMulticlass) {
 
   // Note: As expected, the results are similar to the binary class
   // implementation.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Multiclass version of the algorithm on the binary class adult dataset with L2
@@ -865,8 +869,8 @@ TEST_F(GradientBoostedTreesOnAdult, FakeMulticlassL2Regularization) {
 
   // Note: As expected, the results are similar to the binary class
   // implementation.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
 }
 
 // Train and test a model on the adult dataset for a maximum given duration.
@@ -985,8 +989,8 @@ TEST_F(GradientBoostedTreesOnAdult, Dart) {
   TrainAndEvaluateModel();
 
   // Note: Dart seems to be unstable.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.874, 0.015);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.283, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.874, 0.015);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.283, 0.04);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, Hessian) {
@@ -999,8 +1003,8 @@ TEST_F(GradientBoostedTreesOnAdult, Hessian) {
 
   TrainAndEvaluateModel();
 
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.86, 0.015);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.283, 0.05);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.86, 0.015);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.283, 0.05);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianRandomCategorical) {
@@ -1014,8 +1018,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianRandomCategorical) {
 
   TrainAndEvaluateModel();
 
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.86, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.283, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.86, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.283, 0.04);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianDiscretizedNumerical) {
@@ -1029,8 +1033,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianDiscretizedNumerical) {
 
   TrainAndEvaluateModel();
 
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.86, 0.015);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.283, 0.05);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.86, 0.015);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.283, 0.05);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianL2Categorical) {
@@ -1044,8 +1048,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianL2Categorical) {
 
   TrainAndEvaluateModel();
 
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.86, 0.015);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.283, 0.05);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.86, 0.015);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.283, 0.05);
 }
 
 // Helper for the training and testing on two non-overlapping samples from the
@@ -1066,7 +1070,7 @@ class GradientBoostedTreesOnAbalone : public utils::TrainAndTestTester {
 
 TEST_F(GradientBoostedTreesOnAbalone, Base) {
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::RMSE(evaluation_), 2.119, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::RMSE(evaluation_), 2.119, 0.01);
 }
 
 TEST_F(GradientBoostedTreesOnAbalone, L2Regularization) {
@@ -1074,7 +1078,7 @@ TEST_F(GradientBoostedTreesOnAbalone, L2Regularization) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_l2_regularization(0.1f);
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::RMSE(evaluation_), 2.1339, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::RMSE(evaluation_), 2.1339, 0.01);
 }
 
 TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
@@ -1083,7 +1087,7 @@ TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::RMSE(evaluation_), 2.079, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::RMSE(evaluation_), 2.079, 0.01);
 }
 
 class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {
@@ -1102,8 +1106,8 @@ class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {
 
 TEST_F(GradientBoostedTreesOnIris, Base) {
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.02);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.22079, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.02);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.22079, 0.04);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 
@@ -1112,8 +1116,8 @@ TEST_F(GradientBoostedTreesOnIris, Hessian) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_use_hessian_gain(true);
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.02);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1360, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.02);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.1360, 0.04);
 }
 
 TEST_F(GradientBoostedTreesOnIris, Dart) {
@@ -1123,8 +1127,8 @@ TEST_F(GradientBoostedTreesOnIris, Dart) {
   gbt_config->mutable_dart()->set_dropout_rate(0.1f);
   gbt_config->mutable_decision_tree()->set_num_candidate_attributes(8);
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.03);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1618, 0.06);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.9599, 0.03);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.1618, 0.06);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 
@@ -1144,8 +1148,8 @@ class GradientBoostedTreesOnDNA : public utils::TrainAndTestTester {
 
 TEST_F(GradientBoostedTreesOnDNA, Base) {
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9529, 0.02);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1465, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.9529, 0.02);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.1465, 0.04);
   // Note: R RandomForest has an OOB accuracy of 0.909.
 }
 
@@ -1154,15 +1158,15 @@ TEST_F(GradientBoostedTreesOnDNA, Hessian) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_use_hessian_gain(true);
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9554, 0.02);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1397, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.9554, 0.02);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.1397, 0.04);
 }
 
 TEST_F(GradientBoostedTreesOnDNA, BaseBooleanAsNumerical) {
   guide_filename_ = "dna_guide.pbtxt";
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9529, 0.02);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1465, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.9529, 0.02);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.1465, 0.04);
   // Note: R RandomForest has an OOB accuracy of 0.909.
 }
 
@@ -1172,8 +1176,8 @@ TEST_F(GradientBoostedTreesOnDNA, HessianBooleanAsNumerical) {
   gbt_config->set_use_hessian_gain(true);
   guide_filename_ = "dna_guide.pbtxt";
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9548, 0.02);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.1443, 0.04);
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.9548, 0.02);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.1443, 0.04);
 }
 
 TEST(GradientBoostedTrees, SetHyperParameters) {

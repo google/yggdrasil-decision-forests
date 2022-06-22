@@ -44,6 +44,7 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "absl/random/random.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -166,6 +167,15 @@ class TrainAndTestTester : public ::testing::Test {
   // If true, show the entire model structure (e.g. show the decision trees) in
   // the logs.
   bool show_full_model_structure_ = false;
+
+  // If false, models trained and and evaluated in unit tests are expected to
+  // always be the same for a given implementation of the pseudo random number
+  // generator and a given version of the code. If true, training noise in
+  // injected through initial dataset shuffeling and randomization of the pseudo
+  // random number generator seed.
+  //
+  // TODO(gbm): Default to true.
+  bool inject_random_noise_ = false;
 
  private:
   std::pair<std::string, std::string> GetTrainAndTestDatasetPaths();
@@ -319,7 +329,50 @@ absl::Status ExportUpliftPredictionsToTFUpliftCsvFormat(
     const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
     absl::string_view output_csv_path);
 
+// Internal implementation of "YDF_EXPECT_METRIC_NEAR".
+void InternalExportMetricCondition(const absl::string_view test,
+                                   const double value, const double center,
+                                   const double margin,
+                                   const absl::string_view metric,
+                                   const int line,
+                                   const absl::string_view file);
+
+// Gets the name of the current test.
+template <typename T>
+std::string InternalGetTestName(T* t) {
+  int status;
+  const auto type_id_name = typeid(*t).name();
+  char* demangled = abi::__cxa_demangle(type_id_name, 0, 0, &status);
+  if (demangled) {
+    std::string result(demangled);
+    free(demangled);
+    auto last_idx = result.find_last_of("::");
+    if (last_idx != std::string::npos) {
+      result = result.substr(last_idx + 1);
+    }
+    return result;
+  }
+  return type_id_name;
+}
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
+
+// Checks that "value" is in [center-margin, center+margin].
+#define YDF_EXPECT_METRIC_NEAR(value, center, margin)                        \
+  ::yggdrasil_decision_forests::utils::InternalExportMetricCondition(        \
+      ::yggdrasil_decision_forests::utils::InternalGetTestName(this), value, \
+      center, margin, #value, __LINE__, __FILE__)
+
+// If set, exports the metric conditions (both valid and invalid) tested by
+// "YDF_EXPECT_METRIC_NEAR" in csv files in the directory specified by
+// "EXPORT_METRIC_CONDITION". Note: The directory should be already existing.
+// This command is compatible with "--runs_per_test" (e.g. --runs_per_test=50).
+//
+// EXPORT_METRIC_CONDITION is especially useful with tests with
+// "inject_random_noise_=true" in order to study the distibution of metrics and
+// better adjust the valid range.
+//
+// #define EXPORT_METRIC_CONDITION "/tmp/metric_condition"
 
 #endif  // YGGDRASIL_DECISION_FORESTS_TOOL_TEST_UTILS_H_

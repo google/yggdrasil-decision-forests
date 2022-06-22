@@ -15,6 +15,9 @@
 
 #include "yggdrasil_decision_forests/utils/test_utils.h"
 
+#include <cxxabi.h>
+
+#include <algorithm>
 #include <memory>
 #include <random>
 #include <string>
@@ -23,6 +26,8 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/random/distributions.h"
+#include "absl/random/random.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -57,9 +62,22 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
+
+namespace {
+
+void ShuffleDataset(dataset::VerticalDataset* dataset) {
+  absl::BitGen bitgen;
+  std::vector<dataset::VerticalDataset::row_t> example_idxs(dataset->nrow());
+  std::iota(example_idxs.begin(), example_idxs.end(), 0);
+  std::shuffle(example_idxs.begin(), example_idxs.end(), bitgen);
+  *dataset = dataset->Extract(example_idxs).value();
+}
+
+}  // namespace
 
 void TrainAndTestTester::ConfigureForSyntheticDataset() {
   auto cat_int = guide_.add_column_guides();
@@ -114,6 +132,12 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   // Configure the learner.
   CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
+
+  if (inject_random_noise_ && !learner_->training_config().has_random_seed()) {
+    absl::BitGen bitgen;
+    learner_->mutable_training_config()->set_random_seed(bitgen());
+  }
+
   if (generic_parameters_.has_value()) {
     CHECK_OK(learner_->SetHyperParameters(generic_parameters_.value()));
   }
@@ -344,6 +368,14 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
       train_dataset_ = train_dataset_.Extract(train_example_idxs).value();
     }
 
+    if (inject_random_noise_) {
+      ShuffleDataset(&train_dataset_);
+      ShuffleDataset(&test_dataset_);
+      if (pass_validation_dataset_) {
+        ShuffleDataset(&valid_dataset_);
+      }
+    }
+
     return;
   }
 
@@ -364,6 +396,7 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
   for (dataset::VerticalDataset::row_t example_idx = 0;
        example_idx < dataset.nrow(); example_idx++) {
     // Down-sampling of examples.
+    // TODO(gbm): Make the split deterministic.
     if (dataset_sampling_ < dist_01(rnd)) {
       continue;
     }
@@ -411,6 +444,13 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
   train_dataset_ = dataset.Extract(train_example_idxs).value();
   test_dataset_ = dataset.Extract(test_example_idxs).value();
   valid_dataset_ = dataset.Extract(valid_example_idxs).value();
+
+  if (inject_random_noise_) {
+    ShuffleDataset(&train_dataset_);
+    ShuffleDataset(&test_dataset_);
+    ShuffleDataset(&valid_dataset_);
+  }
+
   LOG(INFO) << "Number of examples: train:" << train_dataset_.nrow()
             << " valid:" << valid_dataset_.nrow()
             << " test:" << test_dataset_.nrow();
@@ -746,6 +786,37 @@ absl::Status ExportUpliftPredictionsToTFUpliftCsvFormat(
   RETURN_IF_ERROR(output_handle->Close());
   LOG(INFO) << "Uplift predictions exported to: " << output_csv_path;
   return absl::OkStatus();
+}
+
+void InternalExportMetricCondition(const absl::string_view test,
+                                   const double value, const double center,
+                                   const double margin,
+                                   const absl::string_view metric,
+                                   const int line,
+                                   const absl::string_view file) {
+  const auto filename = file::GetBasename(file);
+  const auto abs_diff = std::abs(value - center);
+  const auto success = abs_diff < margin;
+#ifdef EXPORT_METRIC_CONDITION
+  const auto uid = GenUniqueId();
+  const auto path =
+      file::JoinPath(EXPORT_METRIC_CONDITION, absl::StrCat(uid, ".csv"));
+  std::string content =
+      absl::StrCat("test,value,center,margin,metric,line,filename,success\n",
+                   test, ",", value, ",", center, ",", margin, ",", metric, ",",
+                   line, ",", filename, ",", success);
+  CHECK_OK(file::SetContent(path, content));
+#endif
+  if (!success) {
+    EXPECT_TRUE(false) << "Non satified range condition for " << metric
+                       << " in " << test << "\ndefined at\n"
+                       << file << ":" << line << "\nThe metric value " << value
+                       << " is not in " << center << " +- " << margin
+                       << ".\ni.e. not in [" << (center - margin) << " , "
+                       << (center + margin)
+                       << "].\nThe absolute value of the difference is "
+                       << abs_diff << ".";
+  }
 }
 
 }  // namespace utils
