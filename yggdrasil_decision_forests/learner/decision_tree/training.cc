@@ -1907,10 +1907,10 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
   if (num_label_classes == 3) {
     // Binary classification.
     if (weights.empty()) {
-      LabelUnweightedBinaryCategoricalOneValueBucket::Filler label_filler(
-          labels);
-      LabelUnweightedBinaryCategoricalOneValueBucket::Initializer initializer(
-          label_distribution);
+      LabelBinaryCategoricalOneValueBucket</*weighted=*/false>::Filler
+          label_filler(labels, weights);
+      LabelBinaryCategoricalOneValueBucket</*weighted=*/false>::Initializer
+          initializer(label_distribution);
 
       if (sorting_strategy ==
               proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -1943,10 +1943,10 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
           selected_examples, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx, condition, &cache->cache_v2);
     } else {
-      LabelBinaryCategoricalOneValueBucket::Filler label_filler(labels,
-                                                                weights);
-      LabelBinaryCategoricalOneValueBucket::Initializer initializer(
-          label_distribution);
+      LabelBinaryCategoricalOneValueBucket</*weighted=*/true>::Filler
+          label_filler(labels, weights);
+      LabelBinaryCategoricalOneValueBucket</*weighted=*/true>::Initializer
+          initializer(label_distribution);
 
       if (sorting_strategy ==
               proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -2034,18 +2034,19 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
   if (num_label_classes == 3) {
     // Binary classification.
     if (weights.empty()) {
-      LabelUnweightedBinaryCategoricalBucket::Filler label_filler(
-          labels, {}, label_distribution);
-      LabelUnweightedBinaryCategoricalBucket::Initializer initializer(
+      LabelBinaryCategoricalBucket</*weighted=*/false>::Filler label_filler(
+          labels, weights, label_distribution);
+      LabelBinaryCategoricalBucket</*weighted=*/false>::Initializer initializer(
           label_distribution);
 
       return FindBestSplit_LabelUnweightedBinaryClassificationFeatureDiscretizedNumerical(  // NOLINT(whitespace/line_length)
           selected_examples, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx, condition, &cache->cache_v2);
     } else {
-      LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
-                                                        label_distribution);
-      LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+      LabelBinaryCategoricalBucket</*weighted=*/true>::Filler label_filler(
+          labels, weights, label_distribution);
+      LabelBinaryCategoricalBucket</*weighted=*/true>::Initializer initializer(
+          label_distribution);
 
       return FindBestSplit_LabelBinaryClassificationFeatureDiscretizedNumerical(
           selected_examples, feature_filler, label_filler, initializer,
@@ -2371,20 +2372,21 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
   if (num_label_classes == 3) {
     // Binary classification.
     if (weights.empty()) {
-      LabelUnweightedBinaryCategoricalBucket::Filler label_filler(
+      LabelBinaryCategoricalBucket</*weighted=*/false>::Filler label_filler(
           labels, {}, label_distribution);
 
-      LabelUnweightedBinaryCategoricalBucket::Initializer initializer(
+      LabelBinaryCategoricalBucket</*weighted=*/false>::Initializer initializer(
           label_distribution);
 
       return FindBestSplit_LabelUnweightedBinaryClassificationFeatureNACart(
           selected_examples, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx, condition, &cache->cache_v2);
     } else {
-      LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
-                                                        label_distribution);
+      LabelBinaryCategoricalBucket</*weighted=*/true>::Filler label_filler(
+          labels, weights, label_distribution);
 
-      LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+      LabelBinaryCategoricalBucket</*weighted=*/true>::Initializer initializer(
+          label_distribution);
 
       return FindBestSplit_LabelBinaryClassificationFeatureNACart(
           selected_examples, feature_filler, label_filler, initializer,
@@ -2470,20 +2472,21 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
     // Binary classification.
     if (weights.empty()) {
       // Unweighted classes
-      LabelUnweightedBinaryCategoricalBucket::Filler label_filler(
+      LabelBinaryCategoricalBucket</*weighted=*/false>::Filler label_filler(
           labels, {}, label_distribution);
 
-      LabelUnweightedBinaryCategoricalBucket::Initializer initializer(
+      LabelBinaryCategoricalBucket</*weighted=*/false>::Initializer initializer(
           label_distribution);
 
       return FindBestSplit_LabelUnweightedBinaryClassificationFeatureBooleanCart(  // NOLINT(whitespace/line_length)
           selected_examples, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx, condition, &cache->cache_v2);
     } else {
-      LabelBinaryCategoricalBucket::Filler label_filler(labels, weights,
-                                                        label_distribution);
+      LabelBinaryCategoricalBucket</*weighted=*/true>::Filler label_filler(
+          labels, weights, label_distribution);
 
-      LabelBinaryCategoricalBucket::Initializer initializer(label_distribution);
+      LabelBinaryCategoricalBucket</*weighted=*/true>::Initializer initializer(
+          label_distribution);
 
       return FindBestSplit_LabelBinaryClassificationFeatureBooleanCart(
           selected_examples, feature_filler, label_filler, initializer,
@@ -3228,7 +3231,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
     // Binary classification.
     if (weights.empty()) {
       return FindSplitLabelClassificationFeatureCategorical<
-          LabelUnweightedBinaryCategoricalBucket,
+          LabelBinaryCategoricalBucket</*weighted=*/false>,
           FeatureCategoricalLabelUnweightedBinaryCategorical,
           LabelBinaryCategoricalScoreAccumulator>(
           selected_examples, weights, attributes, labels, num_attribute_classes,
@@ -3236,7 +3239,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
           label_distribution, attribute_idx, random, condition, cache);
     } else {
       return FindSplitLabelClassificationFeatureCategorical<
-          LabelBinaryCategoricalBucket,
+          LabelBinaryCategoricalBucket</*weighted=*/true>,
           FeatureCategoricalLabelBinaryCategorical,
           LabelBinaryCategoricalScoreAccumulator>(
           selected_examples, weights, attributes, labels, num_attribute_classes,

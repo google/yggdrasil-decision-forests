@@ -163,24 +163,37 @@ using FeatureIsMissingLabelCategorical = ExampleBucketSet<
 
 // Label: Binary Categorical.
 
+using LabelWeightedBinaryCategoricalOneValueBucket =
+    LabelBinaryCategoricalOneValueBucket<true>;
+
+using LabelWeightedBinaryCategoricalBucket = LabelBinaryCategoricalBucket<true>;
+
 using FeatureNumericalLabelBinaryCategoricalOneValue =
-    ExampleBucketSet<ExampleBucket<FeatureNumericalBucket,
-                                   LabelBinaryCategoricalOneValueBucket>>;
+    ExampleBucketSet<ExampleBucket<
+        FeatureNumericalBucket, LabelWeightedBinaryCategoricalOneValueBucket>>;
 
 using FeatureDiscretizedNumericalLabelBinaryCategorical =
     ExampleBucketSet<ExampleBucket<FeatureDiscretizedNumericalBucket,
-                                   LabelBinaryCategoricalBucket>>;
+                                   LabelWeightedBinaryCategoricalBucket>>;
 
-using FeatureCategoricalLabelBinaryCategorical = ExampleBucketSet<
-    ExampleBucket<FeatureCategoricalBucket, LabelBinaryCategoricalBucket>>;
+using FeatureCategoricalLabelBinaryCategorical =
+    ExampleBucketSet<ExampleBucket<FeatureCategoricalBucket,
+                                   LabelWeightedBinaryCategoricalBucket>>;
 
 using FeatureBooleanLabelBinaryCategorical = ExampleBucketSet<
-    ExampleBucket<FeatureBooleanBucket, LabelBinaryCategoricalBucket>>;
+    ExampleBucket<FeatureBooleanBucket, LabelWeightedBinaryCategoricalBucket>>;
 
-using FeatureIsMissingLabelBinaryCategorical = ExampleBucketSet<
-    ExampleBucket<FeatureIsMissingBucket, LabelBinaryCategoricalBucket>>;
+using FeatureIsMissingLabelBinaryCategorical =
+    ExampleBucketSet<ExampleBucket<FeatureIsMissingBucket,
+                                   LabelWeightedBinaryCategoricalBucket>>;
 
 // Label: Unweighted Binary Categorical.
+
+using LabelUnweightedBinaryCategoricalOneValueBucket =
+    LabelBinaryCategoricalOneValueBucket<false>;
+
+using LabelUnweightedBinaryCategoricalBucket =
+    LabelBinaryCategoricalBucket<false>;
 
 using FeatureNumericalLabelUnweightedBinaryCategoricalOneValue =
     ExampleBucketSet<
