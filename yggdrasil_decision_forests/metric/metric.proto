@@ -184,6 +184,19 @@ message EvaluationResults {
     // For example, in case of single-treatment vs control, "num_treatments=2"
     // and the treatment value will be 1 (control) or 2 (treatment).
     optional int32 num_treatments = 3;
+    // The Conditional Average Treatment Effect Calibration metrics
+    // (cate_calbration) computes the l2 expected calibration error of a binary
+    // treatment uplift model. Miscalibration is a phenomenon that magnitute
+    // of a treatment effect is overestimated due to overfitting CATE
+    // training data. Here we use the expected "l2 norm of difference between
+    // 1) predicted CATE, and 2) unbiased estimation of observed CATE" over all
+    // uplift values.
+    //
+    // The metrics value is greater than 0, with lower values being more
+    // desirable, i.e. "more calibrated". This metric is defined in
+    // equation (2.4) of paper "Calibration Error for Heterogeneous Treatment
+    // Effects", by Xu et al. (https://arxiv.org/pdf/2203.13364.pdf)
+    optional double cate_calibration = 4;
   }
 
   // Number of predictions (weighted by example weight).
@@ -305,8 +318,10 @@ message MetricAccessor {
   message Uplift {
     oneof type {
       Qini qini = 1;
+      CateCalibration cate_calibration = 2;
     }
     message Qini {}
+    message CateCalibration {}
   }
 }
 

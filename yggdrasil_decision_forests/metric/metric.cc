@@ -1026,6 +1026,10 @@ double Qini(const proto::EvaluationResults& eval) {
   return eval.uplift().qini();
 }
 
+double CateCalibration(const proto::EvaluationResults& eval) {
+  return eval.uplift().cate_calibration();
+}
+
 float DefaultRMSE(const proto::EvaluationResults& eval) {
   if (eval.count_predictions() == 0) {
     return std::numeric_limits<float>::quiet_NaN();
@@ -1619,6 +1623,8 @@ utils::StatusOr<double> GetMetricUplift(
   switch (metric.type_case()) {
     case proto::MetricAccessor::Uplift::kQini:
       return Qini(evaluation);
+    case proto::MetricAccessor::Uplift::kCateCalibration:
+      return CateCalibration(evaluation);
     default:
       return absl::InvalidArgumentError("Not implemented");
   }
