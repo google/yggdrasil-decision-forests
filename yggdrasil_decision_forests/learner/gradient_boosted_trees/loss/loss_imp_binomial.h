@@ -104,13 +104,13 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
       const std::vector<GradientData>& gradients,
       int label_col_idx) const override;
 
-  void SetLeaf(const dataset::VerticalDataset& train_dataset,
+  absl::Status SetLeaf(const dataset::VerticalDataset& train_dataset,
                const std::vector<UnsignedExampleIdx>& selected_examples,
-               const std::vector<float>& weights,
-               const model::proto::TrainingConfig& config,
-               const model::proto::TrainingConfigLinking& config_link,
-               const std::vector<float>& predictions, int label_col_idx,
-               decision_tree::NodeWithChildren* node) const;
+      const std::vector<float>& weights,
+      const model::proto::TrainingConfig& config,
+      const model::proto::TrainingConfigLinking& config_link,
+      const std::vector<float>& predictions, int label_col_idx,
+      decision_tree::NodeWithChildren* node) const;
 
   utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
   SetLeafFunctorFromLabelStatistics() const override {

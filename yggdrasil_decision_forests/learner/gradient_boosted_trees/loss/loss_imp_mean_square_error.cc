@@ -148,9 +148,9 @@ absl::Status MeanSquaredErrorLoss::SetLeaf(
     const model::proto::TrainingConfigLinking& config_link,
     const std::vector<float>& predictions, const int label_col_idx,
     decision_tree::NodeWithChildren* node) const {
-  decision_tree::SetRegressionLabelDistribution(
+  RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
       train_dataset, selected_examples, weights, config_link,
-      node->mutable_node());
+      node->mutable_node()));
 
   // Set the value of the leaf to be the residual:
   //   label[i] - prediction

@@ -37,4 +37,8 @@
     }                                                         \
   }
 
+#ifndef NOTREACHED
+#define NOTREACHED() DCHECK(false);
+#endif
+
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_LOGGING_H_

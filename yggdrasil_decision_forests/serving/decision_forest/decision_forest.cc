@@ -1340,7 +1340,7 @@ inline bool EvalCondition(const typename Model::NodeType* node,
     }
 
     default:
-      DCHECK(false);
+      NOTREACHED();
       return false;
   }
 }

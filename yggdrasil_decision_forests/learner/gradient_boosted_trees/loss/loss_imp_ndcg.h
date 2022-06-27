@@ -100,15 +100,15 @@ class NDCGLoss : public AbstractLoss {
 
 REGISTER_AbstractGradientBoostedTreeLoss(NDCGLoss, "LAMBDA_MART_NDCG5");
 
-void SetLeafNDCG(const dataset::VerticalDataset& train_dataset,
+absl::Status SetLeafNDCG(const dataset::VerticalDataset& train_dataset,
                  const std::vector<UnsignedExampleIdx>& selected_examples,
-                 const std::vector<float>& weights,
-                 const model::proto::TrainingConfig& config,
-                 const model::proto::TrainingConfigLinking& config_link,
-                 const std::vector<float>& predictions,
-                 const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-                 const std::vector<GradientData>& gradients, int label_col_idx,
-                 decision_tree::NodeWithChildren* node);
+    const std::vector<float>& weights,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const std::vector<float>& predictions,
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
+    const std::vector<GradientData>& gradients, int label_col_idx,
+    decision_tree::NodeWithChildren* node);
 
 }  // namespace gradient_boosted_trees
 }  // namespace model

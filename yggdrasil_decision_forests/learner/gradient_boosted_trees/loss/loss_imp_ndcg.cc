@@ -201,16 +201,16 @@ decision_tree::CreateSetLeafValueFunctor NDCGLoss::SetLeafFunctor(
     const std::vector<float>& predictions,
     const std::vector<GradientData>& gradients, const int label_col_idx) const {
   return [this, &predictions, &gradients, label_col_idx](
-             const dataset::VerticalDataset& train_dataset,
+          const dataset::VerticalDataset& train_dataset,
              const std::vector<UnsignedExampleIdx>& selected_examples,
-             const std::vector<float>& weights,
-             const model::proto::TrainingConfig& config,
-             const model::proto::TrainingConfigLinking& config_link,
-             decision_tree::NodeWithChildren* node) {
-    return SetLeafNDCG(train_dataset, selected_examples, weights, config,
-                       config_link, predictions, gbt_config_, gradients,
-                       label_col_idx, node);
-  };
+          const std::vector<float>& weights,
+          const model::proto::TrainingConfig& config,
+          const model::proto::TrainingConfigLinking& config_link,
+          decision_tree::NodeWithChildren* node) {
+        return SetLeafNDCG(train_dataset, selected_examples, weights, config,
+                           config_link, predictions, gbt_config_, gradients,
+                           label_col_idx, node);
+      };
 }
 
 absl::Status NDCGLoss::UpdatePredictions(
@@ -250,20 +250,20 @@ absl::Status NDCGLoss::Loss(const std::vector<float>& labels,
   return absl::OkStatus();
 }
 
-void SetLeafNDCG(const dataset::VerticalDataset& train_dataset,
+absl::Status SetLeafNDCG(const dataset::VerticalDataset& train_dataset,
                  const std::vector<UnsignedExampleIdx>& selected_examples,
-                 const std::vector<float>& weights,
-                 const model::proto::TrainingConfig& config,
-                 const model::proto::TrainingConfigLinking& config_link,
-                 const std::vector<float>& predictions,
-                 const proto::GradientBoostedTreesTrainingConfig& gbt_config,
+    const std::vector<float>& weights,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const std::vector<float>& predictions,
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
                  const std::vector<GradientData>& gradients,
                  const int label_col_idx,
-                 decision_tree::NodeWithChildren* node) {
+    decision_tree::NodeWithChildren* node) {
   if (!gbt_config.use_hessian_gain()) {
-    decision_tree::SetRegressionLabelDistribution(
+    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
         train_dataset, selected_examples, weights, config_link,
-        node->mutable_node());
+        node->mutable_node()));
   }
 
   const auto& gradient_data = gradients.front().gradient;
@@ -298,6 +298,7 @@ void SetLeafNDCG(const dataset::VerticalDataset& train_dataset,
       decision_tree::l1_threshold(sum_weighted_gradient,
                                   gbt_config.l1_regularization()) /
       (sum_weighted_second_order_derivative + gbt_config.l2_regularization()));
+  return absl::OkStatus();
 }
 
 }  // namespace gradient_boosted_trees

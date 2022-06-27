@@ -200,7 +200,7 @@ struct FeatureDiscretizedNumericalBucket {
   static constexpr bool kRequireSorting = false;
 
   bool operator<(const FeatureDiscretizedNumericalBucket& other) const {
-    DCHECK(false);
+    NOTREACHED();
     return true;
   }
 
@@ -287,7 +287,7 @@ struct FeatureCategoricalBucket {
   static constexpr bool kRequireSorting = false;
 
   bool operator<(const FeatureCategoricalBucket& other) const {
-    DCHECK(false);
+    NOTREACHED();
     return true;
   }
 
@@ -412,7 +412,7 @@ struct FeatureBooleanBucket {
   static constexpr bool kRequireSorting = false;
 
   bool operator<(const FeatureBooleanBucket& other) const {
-    DCHECK(false);
+    NOTREACHED();
     return true;
   }
 
@@ -476,7 +476,7 @@ struct FeatureIsMissingBucket {
   static constexpr bool kRequireSorting = false;
 
   bool operator<(const FeatureIsMissingBucket& other) const {
-    DCHECK(false);
+    NOTREACHED();
     return true;
   }
 

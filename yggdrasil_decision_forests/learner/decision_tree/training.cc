@@ -84,17 +84,15 @@ NumTrialsForRandomCategoricalSplit(const proto::Categorical::Random& config) {
 }
 
 // Set the label value for a classification label on a vertical dataset.
-void SetClassificationLabelDistribution(
+absl::Status SetClassificationLabelDistribution(
     const dataset::VerticalDataset& dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
-  // TODO(b/223183975): Update.
-  const auto* const labels =
-      dataset
-          .ColumnWithCastWithStatus<
-              dataset::VerticalDataset::CategoricalColumn>(config_link.label())
-          .value();
+  ASSIGN_OR_RETURN(
+      const auto* const labels,
+      dataset.ColumnWithCastWithStatus<
+          dataset::VerticalDataset::CategoricalColumn>(config_link.label()));
   utils::IntegerDistributionDouble label_distribution;
   const int32_t num_classes = dataset.data_spec()
                                   .columns(config_link.label())
@@ -111,27 +109,25 @@ void SetClassificationLabelDistribution(
   }
   label_distribution.Save(node->mutable_classifier()->mutable_distribution());
   node->mutable_classifier()->set_top_value(label_distribution.TopClass());
+  return absl::OkStatus();
 }
 
-void SetCategoricalUpliftLabelDistribution(
+absl::Status SetCategoricalUpliftLabelDistribution(
     const dataset::VerticalDataset& dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   DCHECK(!weights.empty());
   // TODO(b/223183975): Update.
-  const auto* const outcomes =
-      dataset
-          .ColumnWithCastWithStatus<
-              dataset::VerticalDataset::CategoricalColumn>(config_link.label())
-          .value();
+  ASSIGN_OR_RETURN(
+      const auto* const outcomes,
+      dataset.ColumnWithCastWithStatus<
+          dataset::VerticalDataset::CategoricalColumn>(config_link.label()));
 
-  const auto* const treatments =
-      dataset
-          .ColumnWithCastWithStatus<
+  ASSIGN_OR_RETURN(const auto* const treatments,
+                   dataset.ColumnWithCastWithStatus<
               dataset::VerticalDataset::CategoricalColumn>(
-              config_link.uplift_treatment())
-          .value();
+                       config_link.uplift_treatment()));
 
   const auto& outcome_spec = dataset.data_spec().columns(config_link.label());
   const auto& treatment_spec =
@@ -148,9 +144,10 @@ void SetCategoricalUpliftLabelDistribution(
                                      weights[example_idx]);
   }
   internal::UpliftLabelDistToLeaf(label_dist, node->mutable_uplift());
+  return absl::OkStatus();
 }
 
-void SetRegressiveUpliftLabelDistribution(
+absl::Status SetRegressiveUpliftLabelDistribution(
     const dataset::VerticalDataset& dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -176,6 +173,7 @@ void SetRegressiveUpliftLabelDistribution(
                                    weights[example_idx]);
   }
   internal::UpliftLabelDistToLeaf(label_dist, node->mutable_uplift());
+  return absl::OkStatus();
 }
 
 // Compute the ratio of true label for all attribute values.
@@ -451,7 +449,7 @@ bool IsPresortingOnNumericalSplitMoreEfficient(
 
 }  // namespace
 
-void SetLabelDistribution(
+absl::Status SetLabelDistribution(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -460,31 +458,33 @@ void SetLabelDistribution(
     NodeWithChildren* node) {
   switch (config.task()) {
     case model::proto::Task::CLASSIFICATION:
-      SetClassificationLabelDistribution(train_dataset, selected_examples,
-                                         weights, config_link,
-                                         node->mutable_node());
+      RETURN_IF_ERROR(SetClassificationLabelDistribution(
+          train_dataset, selected_examples, weights, config_link,
+          node->mutable_node()));
       break;
 
     case model::proto::Task::REGRESSION:
-      SetRegressionLabelDistribution(train_dataset, selected_examples, weights,
-                                     config_link, node->mutable_node());
+      RETURN_IF_ERROR(SetRegressionLabelDistribution(
+          train_dataset, selected_examples, weights, config_link,
+          node->mutable_node()));
       break;
 
     case model::proto::Task::CATEGORICAL_UPLIFT:
-      SetCategoricalUpliftLabelDistribution(train_dataset, selected_examples,
-                                            weights, config_link,
-                                            node->mutable_node());
+      RETURN_IF_ERROR(SetCategoricalUpliftLabelDistribution(
+          train_dataset, selected_examples, weights, config_link,
+          node->mutable_node()));
       break;
 
     case model::proto::Task::NUMERICAL_UPLIFT:
-      SetRegressiveUpliftLabelDistribution(train_dataset, selected_examples,
-                                           weights, config_link,
-                                           node->mutable_node());
+      RETURN_IF_ERROR(SetRegressiveUpliftLabelDistribution(
+          train_dataset, selected_examples, weights, config_link,
+          node->mutable_node()));
       break;
 
     default:
-      DCHECK(false);
+      NOTREACHED();
   }
+  return absl::OkStatus();
 }
 
 // Specialization in the case of classification.
@@ -1110,7 +1110,7 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
       }
       break;
     default:
-      CHECK(false);
+      NOTREACHED();
   }
 
   return response;
@@ -1184,9 +1184,9 @@ utils::StatusOr<bool> FindBestConditionSingleThreadManager(
       // Nothing to do.
       break;
     case proto::DecisionTreeTrainingConfig::kSparseObliqueSplit:
-      ASSIGN_OR_RETURN(
-          found_good_condition,
-          FindBestConditionSparseOblique(
+          ASSIGN_OR_RETURN(
+              found_good_condition,
+              FindBestConditionSparseOblique(
               train_dataset, selected_examples, weights, config, config_link,
               dt_config, parent, internal_config, label_stats, {},
               best_condition, random, &cache->splitter_cache_list[0]));
@@ -1471,7 +1471,7 @@ utils::StatusOr<bool> FindBestConditionConcurrentManager(
 
     {
       // Record, but do not process, the worker response.
-      SplitterWorkResponse& response = maybe_response.value();
+    SplitterWorkResponse& response = maybe_response.value();
 
       // Release the cache immediately to be reused by other workers.
       cache->available_cache_idxs.push_front(response.manager_data.cache_idx);
@@ -1499,7 +1499,7 @@ utils::StatusOr<bool> FindBestConditionConcurrentManager(
           durable_response.condition_idx = -1;
           durable_response.status = SplitSearchResult::kNoBetterSplitFound;
         }
-      } else {
+        } else {
         // Return the condition to the condition pool.
         cache->available_condition_idxs.push_front(
             response.manager_data.condition_idx);
@@ -1531,10 +1531,10 @@ utils::StatusOr<bool> FindBestConditionConcurrentManager(
         if (process_split_score > best_split_score) {
           if (best_condition_idx != -1) {
             cache->available_condition_idxs.push_front(best_condition_idx);
-          }
+        }
           best_condition_idx = durable_response->condition_idx;
           best_split_score = process_split_score;
-        } else {
+      } else {
           // Return the condition to the condition pool.
           cache->available_condition_idxs.push_front(
               durable_response->condition_idx);
@@ -3528,23 +3528,24 @@ void GenerateRandomImputationOnColumn(
   CHECK_OK(src->ExtractAndAppend(source_indices, dst));
 }
 
-void SetRegressionLabelDistribution(
+absl::Status SetRegressionLabelDistribution(
     const dataset::VerticalDataset& dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   DCHECK(!weights.empty());
-  const auto* const labels =
+  ASSIGN_OR_RETURN(
+      const auto* const labels,
       dataset
           .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
-              config_link.label())
-          .value();
+              config_link.label()));
   utils::NormalDistributionDouble label_distribution;
   for (const UnsignedExampleIdx example_idx : selected_examples) {
     label_distribution.Add(labels->values()[example_idx], weights[example_idx]);
   }
   label_distribution.Save(node->mutable_regressor()->mutable_distribution());
   node->mutable_regressor()->set_top_value(label_distribution.Mean());
+  return absl::OkStatus();
 }
 
 void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
@@ -3642,8 +3643,8 @@ absl::Status GrowTreeBestFirstGlobal(
   const auto ingest_node =
       [&](const std::vector<UnsignedExampleIdx>& example_idxs,
           NodeWithChildren* node, const int depth) -> absl::Status {
-    internal_config.set_leaf_value_functor(train_dataset, example_idxs, weights,
-                                           config, config_link, node);
+    RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
+        train_dataset, example_idxs, weights, config, config_link, node));
 
     if (example_idxs.size() < dt_config.min_examples() ||
         (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth())) {
@@ -3857,8 +3858,8 @@ absl::Status NodeTrain(
     return absl::InternalError("No example feed to the no trainer");
   }
   // Set the node value (i.e. the label distribution).
-  internal_config.set_leaf_value_functor(train_dataset, selected_examples,
-                                         weights, config, config_link, node);
+  RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
+      train_dataset, selected_examples, weights, config, config_link, node));
   node->mutable_node()->set_num_pos_training_examples_without_weight(
       selected_examples.size());
 
@@ -3868,9 +3869,9 @@ absl::Status NodeTrain(
        internal_config.timeout < absl::Now())) {
     if (optional_leaf_examples) {
       // Override the leaf values.
-      internal_config.set_leaf_value_functor(train_dataset,
-                                             *optional_leaf_examples, weights,
-                                             config, config_link, node);
+      RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
+          train_dataset, *optional_leaf_examples, weights, config, config_link,
+          node));
     }
 
     // Stop the growth of the branch.

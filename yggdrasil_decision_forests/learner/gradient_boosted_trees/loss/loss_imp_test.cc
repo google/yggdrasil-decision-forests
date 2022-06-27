@@ -273,9 +273,9 @@ TEST(GradientBoostedTrees, SetLabelDistributionBinomialLogLikelihood) {
   gbt_config.set_shrinkage(1.f);
 
   decision_tree::NodeWithChildren node;
-  loss_imp.SetLeaf(gradient_dataset, selected_examples, weights, config,
-                   config_link, predictions,
-                   /* label_col_idx= */ 1, &node);
+  CHECK_OK(loss_imp.SetLeaf(gradient_dataset, selected_examples, weights,
+                            config, config_link, predictions,
+                            /* label_col_idx= */ 1, &node));
 
   // Node output: Half positive, half negative.
   // (2*(1-0.5)+2*(0-0.5))/( 4*0.5*(1-0.5) ) => 0

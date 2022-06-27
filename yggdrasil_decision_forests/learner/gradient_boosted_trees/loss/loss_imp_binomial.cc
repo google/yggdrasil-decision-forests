@@ -201,7 +201,7 @@ BinomialLogLikelihoodLoss::SetLeafFunctor(
   };
 }
 
-void BinomialLogLikelihoodLoss::SetLeaf(
+absl::Status BinomialLogLikelihoodLoss::SetLeaf(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -210,9 +210,9 @@ void BinomialLogLikelihoodLoss::SetLeaf(
     const std::vector<float>& predictions, const int label_col_idx,
     decision_tree::NodeWithChildren* node) const {
   if (!gbt_config_.use_hessian_gain()) {
-    decision_tree::SetRegressionLabelDistribution(
+    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
         train_dataset, selected_examples, weights, config_link,
-        node->mutable_node());
+        node->mutable_node()));
     // Even if "use_hessian_gain" is not enabled for the splits. We use a
     // Newton step in the leaves i.e. if "use_hessian_gain" is false, we need
     // all the information.
@@ -264,6 +264,7 @@ void BinomialLogLikelihoodLoss::SetLeaf(
   node->mutable_node()->mutable_regressor()->set_top_value(
       utils::clamp(leaf_value, -gbt_config_.clamp_leaf_logit(),
                    gbt_config_.clamp_leaf_logit()));
+  return absl::OkStatus();
 }
 
 absl::Status BinomialLogLikelihoodLoss::UpdatePredictions(

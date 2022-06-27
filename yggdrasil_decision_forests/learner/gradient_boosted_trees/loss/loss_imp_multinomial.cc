@@ -156,7 +156,7 @@ MultinomialLogLikelihoodLoss::SetLeafFunctor(
       };
 }
 
-void MultinomialLogLikelihoodLoss::SetLeaf(
+absl::Status MultinomialLogLikelihoodLoss::SetLeaf(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -167,9 +167,9 @@ void MultinomialLogLikelihoodLoss::SetLeaf(
   // Initialize the distribution (as the "top_value" is overridden right
   // after.
   if (!gbt_config_.use_hessian_gain()) {
-    decision_tree::SetRegressionLabelDistribution(
+    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
         train_dataset, selected_examples, weights, config_link,
-        node->mutable_node());
+        node->mutable_node()));
   }
 
   // Set the value of the leaf to:
@@ -177,13 +177,13 @@ void MultinomialLogLikelihoodLoss::SetLeaf(
   //  (1-|grad[i]|))
   //
   // Note: The leaf value does not depend on the label value (directly).
-  // TODO(b/223183975): Fix
-  const auto& grad =
+  ASSIGN_OR_RETURN(
+      const auto& column,
       train_dataset
           .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
-              config_link.label())
-          .value()
-          ->values();
+              config_link.label()));
+  const auto& grad = column->values();
+
   double numerator = 0;
   double denominator = 0;
   double sum_weights = 0;
@@ -220,6 +220,7 @@ void MultinomialLogLikelihoodLoss::SetLeaf(
   node->mutable_node()->mutable_regressor()->set_top_value(
       utils::clamp(leaf_value, -gbt_config_.clamp_leaf_logit(),
                    gbt_config_.clamp_leaf_logit()));
+  return absl::OkStatus();
 }
 
 absl::Status MultinomialLogLikelihoodLoss::UpdatePredictions(

@@ -273,7 +273,7 @@ struct SplitterConcurrencySetup {
 
 // Signature of a function that sets the value (i.e. the prediction) of a leaf
 // from the gradient data.
-typedef std::function<void(
+typedef std::function<absl::Status(
     const dataset::VerticalDataset&, const std::vector<UnsignedExampleIdx>&,
     const std::vector<float>&, const model::proto::TrainingConfig&,
     const model::proto::TrainingConfigLinking&, NodeWithChildren* node)>
@@ -322,7 +322,7 @@ class Preprocessing {
 // The default policy to set the value of a leaf.
 // - Distribution of the labels for classification.
 // - Mean of the labels for regression.
-void SetLabelDistribution(
+absl::Status SetLabelDistribution(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -332,7 +332,7 @@ void SetLabelDistribution(
 
 // Default policy to set the label value of a leaf in a regression tree i.e. set
 // the value to the mean of the labels.
-void SetRegressionLabelDistribution(
+absl::Status SetRegressionLabelDistribution(
     const dataset::VerticalDataset& dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -1023,10 +1023,10 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
                            const std::vector<UnsignedExampleIdx>& examples,
                            const proto::NodeCondition& condition,
                            bool dataset_is_dense,
-                           bool error_on_wrong_splitter_statistics,
+    bool error_on_wrong_splitter_statistics,
                            std::vector<UnsignedExampleIdx>* positive_examples,
                            std::vector<UnsignedExampleIdx>* negative_examples,
-                           const bool examples_are_training_examples = true);
+    const bool examples_are_training_examples = true);
 
 // Copies the content on uplift categorical leaf output to a label distribution.
 void UpliftLeafToLabelDist(const decision_tree::proto::NodeUpliftOutput& leaf,

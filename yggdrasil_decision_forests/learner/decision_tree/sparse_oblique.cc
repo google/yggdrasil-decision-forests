@@ -166,19 +166,20 @@ class ProjectionEvaluator {
         *std::max_element(numerical_features.begin(), numerical_features.end());
     numerical_attributes_.assign(max_feature_idx + 1, nullptr);
     for (const auto attribute_idx : numerical_features) {
-      // TODO(b/223183975): Update.
-      const auto* column =
-          train_dataset
-              .ColumnWithCastWithStatus<
-                  dataset::VerticalDataset::NumericalColumn>(attribute_idx)
-              .value();
-      numerical_attributes_[attribute_idx] = &column->values();
+      const auto column_or = train_dataset.ColumnWithCastWithStatus<
+          dataset::VerticalDataset::NumericalColumn>(attribute_idx);
+      constructor_status_.Update(column_or.status());
+      if (!constructor_status_.ok()) {
+        break;
+      }
+      numerical_attributes_[attribute_idx] = &column_or.value()->values();
     }
   }
 
-  void Evaluate(const Projection& projection,
+  absl::Status Evaluate(const Projection& projection,
                 const std::vector<UnsignedExampleIdx>& selected_examples,
                 std::vector<float>* values) {
+    RETURN_IF_ERROR(constructor_status_);
     values->resize(selected_examples.size());
     for (size_t selected_idx = 0; selected_idx < selected_examples.size();
          selected_idx++) {
@@ -194,11 +195,13 @@ class ProjectionEvaluator {
       }
       (*values)[selected_idx] = value;
     }
+    return absl::OkStatus();
   }
 
  private:
   // Non-owning pointer to numerical attributes.
   std::vector<const std::vector<float>*> numerical_attributes_;
+  absl::Status constructor_status_;
 };
 
 // Replacement value of the projection when one of the input feature is missing.
@@ -285,8 +288,8 @@ utils::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
                      &current_projection, random);
 
     // Pre-compute the result of the current_projection.
-    projection_evaluator.Evaluate(current_projection, selected_examples,
-                                  &projection_values);
+    RETURN_IF_ERROR(projection_evaluator.Evaluate(
+        current_projection, selected_examples, &projection_values));
 
     const auto na_replacement =
         DefaultProjectionValue(current_projection, train_dataset.data_spec());
