@@ -752,9 +752,6 @@ class VerticalDataset {
 
     const AbstractColumn* column;
     std::unique_ptr<AbstractColumn> owned_column;
-
-    ColumnContainer& operator=(ColumnContainer&&) = default;
-    ColumnContainer(ColumnContainer&&) = default;
   };
 
   // Columns.
