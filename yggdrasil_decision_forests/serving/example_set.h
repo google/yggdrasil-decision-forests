@@ -495,6 +495,8 @@ class AbstractExampleSet {
   virtual utils::StatusOr<dataset::proto::Example> ExtractProtoExample(
       const int example_idx, const FeaturesDefinition& features) const = 0;
 
+  // No not use this method anymore. Instead, use "TfExampleToExampleSet" in
+  // "yggdrasil_decision_forests/dataset/tensorflow/tf_example.h".
   virtual absl::Status FromTensorflowExample(
       const tensorflow::Example& src, const int example_idx,
       const FeaturesDefinition& features) = 0;
