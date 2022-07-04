@@ -40,8 +40,8 @@
 // Usage example:
 //  ./build_docker.sh ... builds the docker image
 //  ./run_docker.sh   ... runs the docker image, will start a model server on port 8081
-//  ./send_request.sh ... will send a request to localhost:8081, model server calls
-//                    ... model predict and returns the response
+//  ./send_request.sh ... will send a http request to localhost:8081/predict
+//                    ... the model server calls model predict and returns the response
 //
 
 #include "absl/flags/flag.h"
