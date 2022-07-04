@@ -51,6 +51,16 @@ ABSL_FLAG(std::string, dataspec, "",
           "Input data specification path. This file is generally created "
           "with :infer_dataspec and inspected with :show_dataspec.");
 
+ABSL_FLAG(bool, dataspec_is_binary, false,
+          "If true, the dataspec is a binary proto. If false (default), the "
+          "dataspec is a text proto. The :infer_dataspec cli generates text "
+          "proto dataspec, while the dataspec contained in a model is encoded "
+          "as a binary proto.");
+
+ABSL_FLAG(bool, ignore_missing_columns, false,
+          "If false (default), fails if one of the column in the dataspec is "
+          "missing. If true, fill missing columns with \"missing values\".");
+
 constexpr char kUsageMessage[] =
     "Converts a dataset from one format to another. The dataspec of the "
     "dataset should be available.";
@@ -66,13 +76,25 @@ void ConvertDataset() {
 
   // Load the dataspec.
   dataset::proto::DataSpecification data_spec;
-  QCHECK_OK(file::GetTextProto(absl::GetFlag(FLAGS_dataspec), &data_spec,
-                               file::Defaults()));
+
+  if (absl::GetFlag(FLAGS_dataspec_is_binary)) {
+    QCHECK_OK(file::GetBinaryProto(absl::GetFlag(FLAGS_dataspec), &data_spec,
+                                   file::Defaults()));
+  } else {
+    QCHECK_OK(file::GetTextProto(absl::GetFlag(FLAGS_dataspec), &data_spec,
+                                 file::Defaults()));
+  }
+
+  absl::optional<std::vector<int>> ensure_non_missing;
+  if (absl::GetFlag(FLAGS_ignore_missing_columns)) {
+    // Ignore all missing columns.
+    ensure_non_missing = std::vector<int>{};
+  }
 
   // Create the reader.
-  auto reader =
-      dataset::CreateExampleReader(absl::GetFlag(FLAGS_input), data_spec)
-          .value();
+  auto reader = dataset::CreateExampleReader(absl::GetFlag(FLAGS_input),
+                                             data_spec, ensure_non_missing)
+                    .value();
 
   // Create the writer.
   auto writer =
