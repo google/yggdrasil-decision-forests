@@ -39,7 +39,7 @@
 //
 // Usage example:
 //  ./build_docker.sh ... builds the docker image
-//  ./run_docker.sh   ... starts the docker image, will start a model server on port 8081
+//  ./run_docker.sh   ... runs the docker image, will start a model server on port 8081
 //  ./send_request.sh ... will send a request to localhost:8081, model server calls
 //                    ... model predict and returns the response
 //
