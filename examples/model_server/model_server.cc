@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-// Beginner example for the C++ interface.
+// Model server example for the C++ interface.
 //
 // This program do the following:
 //   - Scan the dataset columns to create a dataspec.
@@ -38,7 +38,10 @@
 // or a small number of C++ calls.
 //
 // Usage example:
-//  ./compile_and_run.sh
+//  ./build_docker.sh ... builds the docker image
+//  ./run_docker.sh   ... starts the docker image, will start a model server on port 8081
+//  ./send_request.sh ... will send a request to localhost:8081, model server calls
+//                    ... model predict and returns the response
 //
 
 #include "absl/flags/flag.h"
