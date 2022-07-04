@@ -70,9 +70,8 @@ namespace json = boost::json;     // from <boost/json/src.hpp>
 namespace beast = boost::beast;   // from <boost/beast.hpp>
 namespace http = beast::http;     // from <boost/beast/http.hpp>
 namespace net = boost::asio;      // from <boost/asio.hpp>
+namespace tcp = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 namespace ygg = yggdrasil_decision_forests;
-
-using tcp = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 
 const std::string SERVER_ADDRESS = "0.0.0.0";
 const unsigned short SERVER_PORT = 8081;
@@ -255,7 +254,7 @@ private:
 
             std::stringstream ss;
             ss << batch_of_predictions[0];
-
+            
             json::object obj;
             obj["res"] = ss.str();
             beast::ostream(response_.body()) << json::serialize(obj);
