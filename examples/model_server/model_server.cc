@@ -70,6 +70,8 @@ namespace json = boost::json;     // from <boost/json/src.hpp>
 namespace beast = boost::beast;   // from <boost/beast.hpp>
 namespace http = beast::http;     // from <boost/beast/http.hpp>
 namespace net = boost::asio;      // from <boost/asio.hpp>
+namespace ygg = yggdrasil_decision_forests;
+
 using tcp = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 
 const std::string SERVER_ADDRESS = "0.0.0.0";
@@ -82,8 +84,6 @@ ABSL_FLAG(std::string, dataset_dir,
 
 ABSL_FLAG(std::string, output_dir, "/tmp/yggdrasil_decision_forest",
           "Output directory for the model and evaluation");
-
-namespace ygg = yggdrasil_decision_forests;
 
 struct serving_data
 {
@@ -234,7 +234,7 @@ private:
                 serving_data_ = &it->second;
             }
 
-            // Allocate a batch of 1 examples.
+            // Allocate a batch of 1 example.
             std::unique_ptr<ygg::serving::AbstractExampleSet> examples =
                 serving_data_->serving_engine_->AllocateExamples(1);
 
@@ -256,9 +256,8 @@ private:
             std::stringstream ss;
             ss << batch_of_predictions[0];
 
-            json::object obj; // construct an empty object
+            json::object obj;
             obj["res"] = ss.str();
-
             beast::ostream(response_.body()) << json::serialize(obj);
         }
         else
