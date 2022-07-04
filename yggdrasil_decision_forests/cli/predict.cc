@@ -59,9 +59,14 @@ void ConvertDataset() {
   const auto& label_column = model->data_spec().columns(model->label_col_idx());
 
   // Load dataset.
+  //
+  // The columns corresponding to the model input features are required (i.e.
+  // loading the dataset will fail if one of them is missing). The other columns
+  // (e.g. label, weights) are optional.
   dataset::VerticalDataset dataset;
-  QCHECK_OK(LoadVerticalDataset(absl::GetFlag(FLAGS_dataset),
-                                model->data_spec(), &dataset));
+  QCHECK_OK(LoadVerticalDataset(
+      absl::GetFlag(FLAGS_dataset), model->data_spec(), &dataset,
+      /*ensure_non_missing=*/model->input_features()));
 
   // Compute the predictions.
   std::vector<model::proto::Prediction> predictions;
