@@ -195,6 +195,19 @@ private:
         {
             const auto model_path = file::JoinPath(absl::GetFlag(FLAGS_output_dir), "model");
             auto parsed_data = json::parse(req);
+            auto json_object = parsed_data.as_object();
+
+            if (json_object.find("model_id") != json_object.end() &&
+                json_object.find("age") != json_object.end() &&
+                json_object.find("education") != json_object.end())
+            {
+                response_.set(http::field::content_type, "application/json");
+                json::object obj;
+                obj["error"] = std::string("Invalid json request");
+                beast::ostream(response_.body()) << json::serialize(obj);
+                return;
+            }
+
             std::string model_id = json::value_to<std::string>(parsed_data.at("model_id"));
 
             if (!endsWith(model_path, model_id))
