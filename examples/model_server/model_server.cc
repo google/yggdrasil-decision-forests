@@ -200,9 +200,9 @@ private:
             auto parsed_data = json::parse(req);
             auto json_object = parsed_data.as_object();
 
-            if (json_object.find("model_id") != json_object.end() &&
-                json_object.find("age") != json_object.end() &&
-                json_object.find("education") != json_object.end())
+            if (json_object.find("model_id") == json_object.end() ||
+                json_object.find("age") == json_object.end() ||
+                json_object.find("education") == json_object.end())
             {
                 response_.set(http::field::content_type, "application/json");
                 json::object obj;
