@@ -21,6 +21,13 @@ RUN cp -r $HOME/bin/bazel* /usr/bin/
 
 ADD . $HOME
 
+# begin hack
+# get the files associated with the tensorflow target, but do not build yet
+# issue: https://github.com/tensorflow/tensorflow/issues/56399
+RUN bazel fetch @org_tensorflow//tensorflow
+RUN sed -i -e "218s/result\.stderr or //" $(find /home/developer/.cache/bazel -path "*/org_tensorflow/third_party/remote_config/common.bzl")
+# end hack
+
 # Compile and run the model server example
 WORKDIR ./examples/model_server
 CMD ["./compile_and_run.sh"]
