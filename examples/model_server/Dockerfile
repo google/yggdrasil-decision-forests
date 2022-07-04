@@ -19,6 +19,8 @@ RUN chmod +x bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 RUN ./bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh --user
 RUN cp -r $HOME/bin/bazel* /usr/bin/
 
+RUN pip3 install numpy
+
 ADD . $HOME
 
 WORKDIR ./examples/model_server
