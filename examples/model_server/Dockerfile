@@ -23,7 +23,7 @@ RUN pip3 install numpy
 
 ADD . $HOME
 
-WORKDIR ./examples/model_server
+WORKDIR /home/developer/examples/model_server
 
 # Compile the model server example
 RUN bazel build --config=linux_cpp17 --config=linux_avx2 //:model_server_cc

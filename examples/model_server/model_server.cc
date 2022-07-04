@@ -58,6 +58,7 @@
 #include <boost/beast/version.hpp>
 #include <boost/asio.hpp>
 #include <boost/json/src.hpp>
+
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
@@ -188,7 +189,7 @@ private:
 
     // Construct a response message based on the program state.
     void
-    create_response(std::string req)
+    create_response(const std::string &req)
     {
         if (request_.target() == "/predict")
         {
