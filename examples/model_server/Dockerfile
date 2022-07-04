@@ -19,9 +19,6 @@ RUN chmod +x bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 RUN ./bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh --user
 RUN cp -r $HOME/bin/bazel* /usr/bin/
 
-# Install tensorflow_decision_forests
-RUN pip3 install -vv tensorflow_decision_forests
-
 ADD . $HOME
 
 # Compile and run the model server example
