@@ -1069,7 +1069,7 @@ TEST_F(RandomForestOnSimPTE, Base) {
 
   TrainAndEvaluateModel();
   // Note: A Qini of ~0.1 is expected with a simple Random Forest model.
-  EXPECT_NEAR(metric::Qini(evaluation_), 0.105709, 0.001);
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.105709, 0.002);
 
   // Export the labels+predictions for external evaluation.
   const auto uplift_pred_csv_path =
@@ -1092,7 +1092,7 @@ TEST_F(RandomForestOnSimPTE, Honest) {
   rf_config->set_bootstrap_size_ratio(0.5);
 
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Qini(evaluation_), 0.106705, 0.002);
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.106705, 0.004);
 }
 
 TEST_F(RandomForestOnSimPTE, LowerBound) {

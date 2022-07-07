@@ -1087,7 +1087,7 @@ TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   TrainAndEvaluateModel();
-  YDF_EXPECT_METRIC_NEAR(metric::RMSE(evaluation_), 2.079, 0.01);
+  YDF_EXPECT_METRIC_NEAR(metric::RMSE(evaluation_), 2.079, 0.02);
 }
 
 class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {
