@@ -364,7 +364,6 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
     // "candidate_attr_value".
     utils::BinaryToNormalDistributionDouble candidate_split_label_distribution =
         split_label_distribution;
-    int64_t num_preset_in_negative_set = 0;
     int64_t num_absent_in_negative_set = 0;
     for (size_t select_idx = 0; select_idx < selected_examples.size();
          select_idx++) {
@@ -399,7 +398,6 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
       }
 
       if (match) {
-        num_preset_in_negative_set++;
         // Add the example to the positive set and remove it from the
         // negative.
         candidate_split_label_distribution.mutable_pos()->Add(
@@ -2210,9 +2208,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
   FeatureNumericalBucket::Filler feature_filler(selected_examples.size(),
                                                 na_replacement, attributes);
 
-  LabelHessianNumericalOneValueBucket::Filler label_filler(
-      gradients, hessians, weights, internal_config.hessian_l1,
-      internal_config.hessian_l2_numerical);
+  LabelHessianNumericalOneValueBucket::Filler label_filler(gradients, hessians,
+                                                           weights);
 
   LabelHessianNumericalOneValueBucket::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
@@ -2767,7 +2764,6 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
       // "candidate_attr_value".
       utils::BinaryToIntegerConfusionMatrixDouble
           candidate_split_label_distribution = split_label_distribution;
-      int64_t num_preset_in_negative_set = 0;
       int64_t num_absent_in_negative_set = 0;
       for (size_t select_idx = 0; select_idx < selected_examples.size();
            select_idx++) {
@@ -2802,7 +2798,6 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
         }
 
         if (match) {
-          num_preset_in_negative_set++;
           // Add the example to the positive set and remove it from the
           // negative.
           float weight = weights.empty() ? 1.f : weights[example_idx];

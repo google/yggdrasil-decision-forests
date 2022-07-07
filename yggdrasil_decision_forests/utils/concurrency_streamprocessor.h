@@ -103,8 +103,8 @@ template <typename Input, typename Output>
 StreamProcessor<Input, Output>::StreamProcessor(
     std::string name, int num_threads, std::function<Output(Input, int)> call,
     bool result_in_order)
-    : name_(std::move(name)),
-      num_threads_(num_threads),
+    : num_threads_(num_threads),
+      name_(std::move(name)),
       call_(std::move(call)),
       result_in_order_(result_in_order) {}
 
@@ -112,8 +112,8 @@ template <typename Input, typename Output>
 StreamProcessor<Input, Output>::StreamProcessor(
     std::string name, int num_threads, std::function<Output(Input)> call,
     bool result_in_order)
-    : name_(std::move(name)),
-      num_threads_(num_threads),
+    : num_threads_(num_threads),
+      name_(std::move(name)),
       result_in_order_(result_in_order) {
   call_ = [call](Input input, int) -> Output { return call(std::move(input)); };
 }

@@ -36,6 +36,12 @@ config_setting(
     values = {"define": "std_synchronization_primitives=1"},
 )
 
+# Webassembly compilation.
+config_setting(
+    name = "wasm_target",
+    values = {"cpu": "wasm"},
+)
+
 # Number of bits required to represent the number of examples in a training
 # dataset for "{Unsigned,Signed}ExampleIdx" in "learner/types.h".
 #

@@ -78,6 +78,7 @@ cc_library_ydf(
     visibility = ["//visibility:private"],
     linkopts = select({
         "@platforms//os:linux": ["-lstdc++fs"],  # Required for gcc<=8.
+        "//yggdrasil_decision_forests:wasm_target":[],
         "//conditions:default": [],
     }),
     deps = [

@@ -110,6 +110,16 @@ build:windows --host_copt=/Oi
 build:windows --copt=/GL
 build:windows --host_copt=/GL
 
+# Wasm
+build:wasm --crosstool_top=@emsdk//emscripten_toolchain:everything
+build:wasm --cpu=wasm
+build:wasm --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+build:wasm --copt="-Wno-deprecated-non-prototype"
+build:wasm --copt="-Wno-unused-value"
+build:wasm --copt="-Wno-unused-function"
+build:wasm --spawn_strategy=local
+build:wasm --cxxopt=-std=c++17
+build:wasm --host_cxxopt="-fno-exceptions"
 
 # TensorFlow specific.
 build:use_tensorflow_io --define=use_tensorflow_io=1

@@ -160,19 +160,14 @@ AreaUnderCurve ComputeAuuc(const std::vector<Example>& sorted_items,
   }
 
   // Count the number of examples in control and treatment.
-  double sum_treatment_outcomes = 0;
-  double sum_control_outcomes = 0;
-
   double sum_treatments = 0;
   double sum_controls = 0;
 
   double sum_weights = 0;
   for (const auto& example : sorted_items) {
     if (example.treatment == positive_treatment) {
-      sum_treatment_outcomes += example.weight * example.outcome;
       sum_treatments += example.weight;
     } else {
-      sum_control_outcomes += example.weight * example.outcome;
       sum_controls += example.weight;
     }
     sum_weights += example.weight;

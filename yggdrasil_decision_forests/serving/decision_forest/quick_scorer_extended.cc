@@ -944,10 +944,8 @@ std::string DescribeQuickScorer(const Model& model, const bool detailed) {
   absl::SubstituteAndAppend(&structure, "Output leaf values ($0):\n",
                             model.leaf_values.size());
   if (detailed) {
-    int leaf_idx = 0;
     for (const auto& leaf_value : model.leaf_values) {
       absl::SubstituteAndAppend(&structure, " $0", leaf_value);
-      ++leaf_idx;
     }
     absl::StrAppend(&structure, "\n\n");
   }

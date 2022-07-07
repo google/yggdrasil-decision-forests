@@ -38,11 +38,9 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
 
   double sum_gradients = 0;
   double sum_hessians = 0;
-  double sum_weights = 0;
 
   switch (label_statistics.type_case()) {
     case decision_tree::proto::LabelStatistics::kRegressionWithHessian:
-      sum_weights = label_statistics.regression_with_hessian().labels().count();
       sum_gradients = label_statistics.regression_with_hessian().labels().sum();
       sum_hessians = label_statistics.regression_with_hessian().sum_hessian();
       break;

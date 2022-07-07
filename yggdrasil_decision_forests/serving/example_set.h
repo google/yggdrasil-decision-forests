@@ -615,7 +615,8 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   // Set the value of a boolean feature.
   // Note: Boolean features can also be provided as numerical features.
   void SetBoolean(const int example_idx, const BooleanFeatureId feature_id,
-                  const bool value, const FeaturesDefinition& features) {
+                  const bool value,
+                  const FeaturesDefinition& features) override {
     SetNumerical(example_idx, NumericalFeatureId{feature_id.index},
                  value ? 1.f : 0.f, features);
   }

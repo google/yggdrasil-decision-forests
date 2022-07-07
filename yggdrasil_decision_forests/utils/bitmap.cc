@@ -234,8 +234,13 @@ MultibitWriter::MultibitWriter(const int32_t bits_by_elements,
     : bits_by_elements_(bits_by_elements),
       size_(size),
       bitmap_(*bitmap),
-      index_(0),
-      check_full_write_(true) {}
+      index_(0)
+#ifndef NDEBUG
+      ,
+      check_full_write_(true)
+#endif
+{
+}
 
 MultibitWriter::MultibitWriter(const int32_t bits_by_elements,
                                const uint64_t size, const uint64_t begin,
@@ -243,8 +248,12 @@ MultibitWriter::MultibitWriter(const int32_t bits_by_elements,
     : bits_by_elements_(bits_by_elements),
       size_(size),
       bitmap_(*bitmap),
-      index_(begin),
-      check_full_write_(false) {
+      index_(begin)
+#ifndef NDEBUG
+      ,
+      check_full_write_(false)
+#endif
+{
   DCHECK_LE(begin, size);
   const int64_t num_bits = begin * bits_by_elements;
   cur_ = num_bits / 8;
@@ -278,7 +287,9 @@ void MultibitWriter::Write(const uint64_t value) {
 
 void MultibitWriter::Finish() {
   DCHECK(!finish_called_);
+#ifndef NDEBUG
   DCHECK(!check_full_write_ || index_ == size_);
+#endif
   finish_called_ = true;
   if (sub_cur_ > 0) {
     const int num_tails = (sub_cur_ + 7) / 8;

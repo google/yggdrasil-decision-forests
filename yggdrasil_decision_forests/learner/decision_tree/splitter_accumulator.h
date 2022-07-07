@@ -949,13 +949,8 @@ struct LabelHessianNumericalOneValueBucket {
    public:
     Filler(const std::vector<float>& gradients,
            const std::vector<float>& hessians,
-           const std::vector<float>& weights, const double hessian_l1,
-           const double hessian_l2)
-        : gradients_(gradients),
-          hessians_(hessians),
-          weights_(weights),
-          hessian_l1_(hessian_l1),
-          hessian_l2_(hessian_l2) {
+           const std::vector<float>& weights)
+        : gradients_(gradients), hessians_(hessians), weights_(weights) {
       DCHECK(!weights.empty());
     }
 
@@ -1011,9 +1006,6 @@ struct LabelHessianNumericalOneValueBucket {
     const std::vector<float>& gradients_;
     const std::vector<float>& hessians_;
     const std::vector<float>& weights_;
-
-    const double hessian_l1_;
-    const double hessian_l2_;
   };
 
   friend std::ostream& operator<<(

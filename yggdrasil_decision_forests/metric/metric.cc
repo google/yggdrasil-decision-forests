@@ -1706,13 +1706,7 @@ utils::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric) {
       return false;
 
     case proto::MetricAccessor::kRanking:
-      switch (metric.ranking().Type_case()) {
-        case proto::MetricAccessor::Uplift::kQini:
-          return true;
-        default:
-          break;
-      }
-      break;
+      return true;
 
     case proto::MetricAccessor::kUplift:
       switch (metric.uplift().type_case()) {

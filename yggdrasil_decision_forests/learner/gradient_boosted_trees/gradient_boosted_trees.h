@@ -69,7 +69,7 @@ namespace model {
 namespace gradient_boosted_trees {
 
 namespace internal {
-class AllTrainingConfiguration;
+struct AllTrainingConfiguration;
 };
 
 // A GBT learner i.e. takes as input a dataset and outputs a GBT model.

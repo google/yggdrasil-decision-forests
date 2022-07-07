@@ -120,10 +120,12 @@ class CondVar {
   absl::CondVar cv_;
 };
 
+#ifndef GUARDED_BY
 #define GUARDED_BY(x) ABSL_GUARDED_BY(x)
 #define LOCKS_EXCLUDED(x) ABSL_LOCKS_EXCLUDED(x)
 #define GUARDED_BY(x) ABSL_GUARDED_BY(x)
 #define EXCLUSIVE_LOCKS_REQUIRED(x) ABSL_EXCLUSIVE_LOCKS_REQUIRED(x)
+#endif
 
 #define GLOBAL_MUTEX(x) \
   ABSL_CONST_INIT utils::concurrency::Mutex x(absl::kConstInit);

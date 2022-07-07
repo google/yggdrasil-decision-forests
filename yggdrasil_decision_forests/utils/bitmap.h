@@ -224,8 +224,10 @@ class MultibitWriter {
   uint64_t buffer_ = 0;
   // Index of the next to write element.
   uint64_t index_;
+#ifndef NDEBUG
   // If true, "Finish" checks that "size_" elements have been written.
   bool check_full_write_;
+#endif
   // Was "Finish" called?
   bool finish_called_ = false;
 };
