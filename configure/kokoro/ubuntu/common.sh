@@ -51,9 +51,8 @@ capture_test_logs() {
   chmod -R -x+X $DST
 
   # Converts the file with sponge extension.
-  # Currently crashes the Kokoro pipeline.
-  # find -L "$DST" -name "test.log" -exec rename 's/test.log/sponge_log.log/' {} \;
-  # find -L "$DST" -name "test.xml" -exec rename 's/test.xml/sponge_log.xml/' {} \;
+  find -L "$DST" -name "test.log" -exec rename 's/test.log/sponge_log.log/' {} \;
+  find -L "$DST" -name "test.xml" -exec rename 's/test.xml/sponge_log.xml/' {} \;
 }
 trap capture_test_logs EXIT
 
