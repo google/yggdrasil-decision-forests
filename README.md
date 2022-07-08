@@ -5,9 +5,9 @@
 **Yggdrasil Decision Forests** (**YDF**) is a collection of state-of-the-art
 algorithms for the training, serving and interpretation of **Decision Forest**
 models. The library is developed in C++ and available in C++, CLI
-(command-line-interface, i.e. shell commands) and in TensorFlow under the name
+(command-line-interface, i.e. shell commands), in TensorFlow under the name
 [TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests)
-(TF-DF).
+(TF-DF), and in Javascript (inference only).
 
 Developing models in TF-DF and productionizing them (possibly including
 re-training) in C++ with YDF allows both for a flexible and fast development and
@@ -88,6 +88,7 @@ The following resources are available:
 -   [Known issues](documentation/known_issues.md)
 -   [Changelog](CHANGELOG.md)
 -   [TensorFlow Decision Forest](https://github.com/tensorflow/decision-forests)
+-   [Javascript port](port/javascript)
 
 ## Installation from pre-compiled binaries
 
