@@ -32,7 +32,8 @@ absl::Status ExportPredictions(
     const std::vector<model::proto::Prediction>& predictions,
     model::proto::Task task, const dataset::proto::Column& label_column,
     absl::string_view typed_prediction_path,
-    const int num_records_by_shard_in_output) {
+    const int num_records_by_shard_in_output,
+    const absl::optional<std::string> prediction_key) {
   // Determines the container for the predictions.
   std::string prediction_path, prediction_format;
   ASSIGN_OR_RETURN(std::tie(prediction_format, prediction_path),
@@ -54,7 +55,8 @@ absl::Status ExportPredictions(
 
   // Save the prediction as a collection (e.g. tfrecord or csv) of
   // proto::Examples.
-  ASSIGN_OR_RETURN(auto dataspec, PredictionDataspec(task, label_column));
+  ASSIGN_OR_RETURN(auto dataspec,
+                   PredictionDataspec(task, label_column, prediction_key));
   ASSIGN_OR_RETURN(auto writer, dataset::CreateExampleWriter(
                                     typed_prediction_path, dataspec,
                                     num_records_by_shard_in_output));
@@ -62,7 +64,8 @@ absl::Status ExportPredictions(
   for (const auto& prediction : predictions) {
     // Convert the prediction into an example.
     RETURN_IF_ERROR(PredictionToExample(task, label_column, prediction,
-                                        &prediction_as_example));
+                                        &prediction_as_example,
+                                        prediction_key));
     RETURN_IF_ERROR(writer->Write(prediction_as_example));
   }
   return absl::OkStatus();
@@ -71,7 +74,8 @@ absl::Status ExportPredictions(
 absl::Status PredictionToExample(
     model::proto::Task task, const dataset::proto::Column& label_col,
     const model::proto::Prediction& prediction,
-    dataset::proto::Example* prediction_as_example) {
+    dataset::proto::Example* prediction_as_example,
+    const absl::optional<std::string> prediction_key) {
   prediction_as_example->clear_attributes();
   switch (task) {
     case model::proto::Task::CLASSIFICATION: {
@@ -115,6 +119,13 @@ absl::Status PredictionToExample(
     default:
       return absl::InvalidArgumentError("Non supported class");
   }
+
+  // Export the prediction keys.
+  // Column spec for the prediction key.
+  if (prediction_key.has_value()) {
+    prediction_as_example->add_attributes()->set_text(prediction.example_key());
+  }
+
   return absl::OkStatus();
 }
 
@@ -192,7 +203,8 @@ absl::Status ExampleToPrediction(
 }
 
 utils::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
-    const model::proto::Task task, const dataset::proto::Column& label_col) {
+    const model::proto::Task task, const dataset::proto::Column& label_col,
+    const absl::optional<std::string> prediction_key) {
   dataset::proto::DataSpecification dataspec;
 
   switch (task) {
@@ -228,6 +240,13 @@ utils::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
       LOG(FATAL) << "Non supported task.";
       break;
   }
+
+  // Column spec for the prediction key.
+  if (prediction_key.has_value()) {
+    dataset::AddColumn(prediction_key.value(),
+                       dataset::proto::ColumnType::STRING, &dataspec);
+  }
+
   return dataspec;
 }
 

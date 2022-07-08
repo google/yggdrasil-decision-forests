@@ -24,6 +24,12 @@ ROOT_DIR="$TEST_SRCDIR/yggdrasil_decision_forests/yggdrasil_decision_forests"
 TRAIN_DS="csv:$ROOT_DIR/test_data/dataset/adult_train.csv"
 TEST_DS="csv:$ROOT_DIR/test_data/dataset/adult_test.csv"
 
+# Utility to remove the type of a typed path. For example "csv:/file"
+# befores "/file".
+function untype() {
+  echo "${1#*:}"
+}
+
 CLI="$ROOT_DIR/cli"
 
 # Generate the dataspec for the training dataspec.
@@ -73,6 +79,12 @@ $CLI/predict --dataset=$TEST_DS --model=$MODEL --output=$PREDICTIONS --alsologto
 # Benchmark the inference speed of the model.
 BENCHMARK="$TEST_TMPDIR/benchmark.txt"
 $CLI/benchmark_inference --dataset=$TEST_DS --model=$MODEL --alsologtostderr | tee $BENCHMARK
+
+# Create a new column in the test dataset and export it with predict.
+PREDICTIONS_WITH_KEY="csv:$TEST_TMPDIR/prediction_test_with_key.csv"
+TEST_DS_WITH_KEY="csv:$TEST_TMPDIR/test_dataset_with_key.csv"
+awk '{ if (NR==1) { print $0 ",key" } else { print $0 ",row_" NR-2 } }' $(untype $TEST_DS) > $(untype $TEST_DS_WITH_KEY)
+$CLI/predict --dataset=$TEST_DS_WITH_KEY --model=$MODEL --output=$PREDICTIONS_WITH_KEY --key=key --alsologtostderr
 
 # Show the content of the working directory.
 ls -l $TEST_TMPDIR

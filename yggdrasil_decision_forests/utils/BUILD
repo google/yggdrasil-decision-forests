@@ -574,10 +574,12 @@ cc_library_ydf(
     }),
     deps = [
         ":compatibility",
-        ":distribution_cc_proto",
-        ":status_macros",
         ":distribution",
+        ":distribution_cc_proto",
+        ":sharded_io_tfrecord",
+        ":status_macros",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/types:optional",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
@@ -585,11 +587,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:formats",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/model:prediction_cc_proto",
-    ] + select({
-        "//yggdrasil_decision_forests:use_tensorflow_io": [":sharded_io_tfrecord"],
-        "//conditions:default": [
-        ],
-    }),
+    ],
 )
 
 cc_library_ydf(

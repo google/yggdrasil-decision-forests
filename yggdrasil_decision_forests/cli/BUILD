@@ -116,6 +116,7 @@ cc_binary_ydf(
         ":all_file_systems",
         "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
+        "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",

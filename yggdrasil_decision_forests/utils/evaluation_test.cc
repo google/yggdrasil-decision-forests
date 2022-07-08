@@ -120,6 +120,30 @@ TEST(Evaluation, ExportPredictionsToDataset) {
   EXPECT_EQ(csv_content, "label\n1\n2\n3\n");
 }
 
+TEST(Evaluation, ExportPredictionsWithKeyToDataset) {
+  std::vector<model::proto::Prediction> predictions;
+  predictions.push_back(
+      PARSE_TEST_PROTO("regression { value: 1 } example_key: \"k1\" "));
+  predictions.push_back(
+      PARSE_TEST_PROTO("regression { value: 2 } example_key: \"k2\" "));
+  predictions.push_back(
+      PARSE_TEST_PROTO("regression { value: 3 } example_key: \"k3\" "));
+
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "label" }
+  )pb");
+
+  const auto prediction_path =
+      file::JoinPath(test::TmpDirectory(), "predictions.csv");
+  EXPECT_OK(ExportPredictions(predictions, model::proto::Task::REGRESSION,
+                              dataspec.columns(0),
+                              absl::StrCat("csv:", prediction_path), -1,
+                              /*prediction_key=*/"key"));
+
+  std::string csv_content = file::GetContent(prediction_path).value();
+  EXPECT_EQ(csv_content, "label,key\n1,k1\n2,k2\n3,k3\n");
+}
+
 #ifdef YDF_EVAL_TFRECORD
 TEST(Evaluation, ExportPredictionsToTFRecord) {
   std::vector<model::proto::Prediction> predictions;
