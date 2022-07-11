@@ -50,7 +50,8 @@ class ClassificationLabelFiller {
  public:
   // How to represent a label value.
   typedef int16_t Label;
-  typedef decision_tree::LabelCategoricalBucket LabelBucket;
+  // TODO(b/225812418): Add special handling for unit weights.
+  typedef decision_tree::LabelCategoricalBucket</*weighted*/ true> LabelBucket;
   typedef decision_tree::LabelCategoricalScoreAccumulator Accumulator;
   typedef LabelBucket::Initializer AccumulatorInitializer;
 

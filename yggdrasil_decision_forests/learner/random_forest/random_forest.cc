@@ -419,15 +419,14 @@ RandomForestLearner::TrainWithStatus(
   // all the examples have the same weight.
   //
   // Currently, this feature is supported for:
-  // - Binary classification without oblique splits (default) and with local
+  // - Classification without oblique splits (default) and with local
   //   imputation policy (default) to handle missing values.
   bool use_optimized_unit_weights = false;
   if (training_config().task() == model::proto::Task::CLASSIFICATION &&
       rf_config.decision_tree().split_axis_case() !=
           decision_tree::proto::DecisionTreeTrainingConfig::
               kSparseObliqueSplit) {
-    // Only use optimized unit weights for binary classification for now.
-    if (config_link.num_label_classes() == 3) use_optimized_unit_weights = true;
+    use_optimized_unit_weights = true;
   }
 
   RETURN_IF_ERROR(dataset::GetWeights(train_dataset, config_link, &weights,

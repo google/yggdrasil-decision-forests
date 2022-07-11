@@ -1979,39 +1979,79 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
     }
   } else {
     // Multi-class classification.
-    LabelCategoricalOneValueBucket::Filler label_filler(labels, weights);
-    LabelCategoricalOneValueBucket::Initializer initializer(label_distribution);
+    if (weights.empty()) {
+      LabelCategoricalOneValueBucket</*weighted=*/false>::Filler label_filler(
+          labels, weights);
+      LabelCategoricalOneValueBucket</*weighted=*/false>::Initializer
+          initializer(label_distribution);
 
-    if (sorting_strategy ==
-            proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-        sorting_strategy ==
-            proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
-      if (!internal_config.preprocessing) {
-        LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                      "strategy";
-      }
       if (sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
-          IsPresortingOnNumericalSplitMoreEfficient(
-              selected_examples.size(),
-              internal_config.preprocessing->num_examples())) {
-        const auto& sorted_attributes =
-            internal_config.preprocessing
-                ->presorted_numerical_features()[attribute_idx];
-        return ScanSplitsPresortedSparse<
-            FeatureNumericalLabelCategoricalOneValue,
-            LabelCategoricalScoreAccumulator>(
-            internal_config.preprocessing->num_examples(), selected_examples,
-            sorted_attributes.items, feature_filler, label_filler, initializer,
-            min_num_obs, attribute_idx,
-            internal_config.duplicated_selected_examples, condition,
-            &cache->cache_v2);
+              proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+          sorting_strategy ==
+              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+        if (!internal_config.preprocessing) {
+          LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                        "strategy";
+        }
+        if (sorting_strategy ==
+                proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
+            IsPresortingOnNumericalSplitMoreEfficient(
+                selected_examples.size(),
+                internal_config.preprocessing->num_examples())) {
+          const auto& sorted_attributes =
+              internal_config.preprocessing
+                  ->presorted_numerical_features()[attribute_idx];
+          return ScanSplitsPresortedSparse<
+              FeatureNumericalLabelUnweightedCategoricalOneValue,
+              LabelCategoricalScoreAccumulator>(
+              internal_config.preprocessing->num_examples(), selected_examples,
+              sorted_attributes.items, feature_filler, label_filler,
+              initializer, min_num_obs, attribute_idx,
+              internal_config.duplicated_selected_examples, condition,
+              &cache->cache_v2);
+        }
       }
-    }
 
-    return FindBestSplit_LabelClassificationFeatureNumerical(
-        selected_examples, feature_filler, label_filler, initializer,
-        min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      return FindBestSplit_LabelUnweightedClassificationFeatureNumerical(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    } else {
+      LabelCategoricalOneValueBucket</*weighted=*/true>::Filler label_filler(
+          labels, weights);
+      LabelCategoricalOneValueBucket</*weighted=*/true>::Initializer
+          initializer(label_distribution);
+
+      if (sorting_strategy ==
+              proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
+          sorting_strategy ==
+              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+        if (!internal_config.preprocessing) {
+          LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                        "strategy";
+        }
+        if (sorting_strategy ==
+                proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
+            IsPresortingOnNumericalSplitMoreEfficient(
+                selected_examples.size(),
+                internal_config.preprocessing->num_examples())) {
+          const auto& sorted_attributes =
+              internal_config.preprocessing
+                  ->presorted_numerical_features()[attribute_idx];
+          return ScanSplitsPresortedSparse<
+              FeatureNumericalLabelCategoricalOneValue,
+              LabelCategoricalScoreAccumulator>(
+              internal_config.preprocessing->num_examples(), selected_examples,
+              sorted_attributes.items, feature_filler, label_filler,
+              initializer, min_num_obs, attribute_idx,
+              internal_config.duplicated_selected_examples, condition,
+              &cache->cache_v2);
+        }
+      }
+
+      return FindBestSplit_LabelClassificationFeatureNumerical(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    }
   }
 }
 
@@ -2052,13 +2092,25 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
     }
   } else {
     // Multi-class classification.
-    LabelCategoricalBucket::Filler label_filler(labels, weights,
-                                                label_distribution);
-    LabelCategoricalBucket::Initializer initializer(label_distribution);
+    if (weights.empty()) {
+      LabelCategoricalBucket</*weighted=*/false>::Filler label_filler(
+          labels, weights, label_distribution);
+      LabelCategoricalBucket</*weighted=*/false>::Initializer initializer(
+          label_distribution);
 
-    return FindBestSplit_LabelClassificationFeatureDiscretizedNumerical(
-        selected_examples, feature_filler, label_filler, initializer,
-        min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      return FindBestSplit_LabelUnweightedClassificationFeatureDiscretizedNumerical(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    } else {
+      LabelCategoricalBucket</*weighted=*/true>::Filler label_filler(
+          labels, weights, label_distribution);
+      LabelCategoricalBucket</*weighted=*/true>::Initializer initializer(
+          label_distribution);
+
+      return FindBestSplit_LabelClassificationFeatureDiscretizedNumerical(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    }
   }
 }
 
@@ -2391,13 +2443,25 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
     }
   } else {
     // Multi-class classification.
-    LabelCategoricalBucket::Filler label_filler(labels, weights,
-                                                label_distribution);
-    LabelCategoricalBucket::Initializer initializer(label_distribution);
+    if (weights.empty()) {
+      LabelCategoricalBucket</*weighted=*/false>::Filler label_filler(
+          labels, weights, label_distribution);
+      LabelCategoricalBucket</*weighted=*/false>::Initializer initializer(
+          label_distribution);
 
-    return FindBestSplit_LabelClassificationFeatureNACart(
-        selected_examples, feature_filler, label_filler, initializer,
-        min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      return FindBestSplit_LabelUnweightedClassificationFeatureNACart(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    } else {
+      LabelCategoricalBucket</*weighted=*/true>::Filler label_filler(
+          labels, weights, label_distribution);
+      LabelCategoricalBucket</*weighted=*/true>::Initializer initializer(
+          label_distribution);
+
+      return FindBestSplit_LabelClassificationFeatureNACart(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    }
   }
 }
 
@@ -2468,7 +2532,6 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
   if (num_label_classes == 3) {
     // Binary classification.
     if (weights.empty()) {
-      // Unweighted classes
       LabelBinaryCategoricalBucket</*weighted=*/false>::Filler label_filler(
           labels, {}, label_distribution);
 
@@ -2491,14 +2554,27 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
     }
   } else {
     // Multi-class classification.
-    LabelCategoricalBucket::Filler label_filler(labels, weights,
-                                                label_distribution);
+    if (weights.empty()) {
+      LabelCategoricalBucket</*weighted=*/false>::Filler label_filler(
+          labels, weights, label_distribution);
 
-    LabelCategoricalBucket::Initializer initializer(label_distribution);
+      LabelCategoricalBucket</*weighted=*/false>::Initializer initializer(
+          label_distribution);
 
-    return FindBestSplit_LabelClassificationFeatureBooleanCart(
-        selected_examples, feature_filler, label_filler, initializer,
-        min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      return FindBestSplit_LabelUnweightedClassificationFeatureBooleanCart(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    } else {
+      LabelCategoricalBucket</*weighted=*/true>::Filler label_filler(
+          labels, weights, label_distribution);
+
+      LabelCategoricalBucket</*weighted=*/true>::Initializer initializer(
+          label_distribution);
+
+      return FindBestSplit_LabelClassificationFeatureBooleanCart(
+          selected_examples, feature_filler, label_filler, initializer,
+          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+    }
   }
 }
 
@@ -3243,12 +3319,22 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
     }
   } else {
     // Multi-class classification.
-    return FindSplitLabelClassificationFeatureCategorical<
-        LabelCategoricalBucket, FeatureCategoricalLabelCategorical,
-        LabelCategoricalScoreAccumulator>(
-        selected_examples, weights, attributes, labels, num_attribute_classes,
-        num_label_classes, na_replacement, min_num_obs, dt_config,
-        label_distribution, attribute_idx, random, condition, cache);
+    if (weights.empty()) {
+      return FindSplitLabelClassificationFeatureCategorical<
+          LabelCategoricalBucket</*weighted=*/false>,
+          FeatureCategoricalLabelUnweightedCategorical,
+          LabelCategoricalScoreAccumulator>(
+          selected_examples, weights, attributes, labels, num_attribute_classes,
+          num_label_classes, na_replacement, min_num_obs, dt_config,
+          label_distribution, attribute_idx, random, condition, cache);
+    } else {
+      return FindSplitLabelClassificationFeatureCategorical<
+          LabelCategoricalBucket</*weighted=*/true>,
+          FeatureCategoricalLabelCategorical, LabelCategoricalScoreAccumulator>(
+          selected_examples, weights, attributes, labels, num_attribute_classes,
+          num_label_classes, na_replacement, min_num_obs, dt_config,
+          label_distribution, attribute_idx, random, condition, cache);
+    }
   }
 }
 

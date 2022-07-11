@@ -56,6 +56,44 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
+namespace internal {
+
+// Bucket data containers.
+//
+// Bucket definitions are templated to facilitate code reuse. Since buckets are
+// constructed many times, it's worth saving memory aggressively and only
+// construct fields that will actually be used. C++ does not support 0-byte
+// objects, hence the unused fields cannot be set to void. Empty structs would
+// occupy 1 byte for the unused field. Combining two fields into a struct is
+// therefore the most space-efficient alternative.
+struct BooleanValueAndWeight {
+  bool value;
+  float weight;
+};
+
+struct BooleanValueOnly {
+  bool value;
+};
+
+struct IntegerValueAndWeight {
+  int value;
+  float weight;
+};
+
+struct IntegerValueOnly {
+  int value;
+};
+
+struct SumTruesAndWeights {
+  double sum_trues;
+  double sum_weights;
+};
+
+struct SumTruesOnly {
+  double sum_trues;
+};
+
+}  // namespace internal
 
 // ===============
 // Feature Buckets
@@ -756,7 +794,7 @@ struct LabelHessianNumericalScoreAccumulator {
 // Initialize and empty an accumulator.
 // void InitEmpty(ScoreAccumulator* acc) const;
 //
-// Initialize an accumulator and set it to conain all the training examples.
+// Initialize an accumulator and set it to contain all the training examples.
 // void InitFull(ScoreAccumulator* acc) const;
 //
 // Normalize the score of the bucket. The final split score is:
@@ -774,7 +812,7 @@ struct LabelNumericalOneValueBucket {
   }
 
   void SubToScoreAcc(LabelNumericalScoreAccumulator* acc) const {
-    acc->label.Add(value, -weight);
+    acc->label.Sub(value, weight);
   }
 
   class Initializer {
@@ -836,7 +874,7 @@ struct LabelNumericalOneValueBucket {
     template <typename ExampleIdx>
     void SubDirectToScoreAcc(const ExampleIdx example_idx,
                              LabelNumericalScoreAccumulator* acc) const {
-      acc->label.Add(label_[example_idx], -weights_[example_idx]);
+      acc->label.Sub(label_[example_idx], weights_[example_idx]);
     }
 
     template <typename ExampleIdx>
@@ -851,8 +889,8 @@ struct LabelNumericalOneValueBucket {
     void SubDirectToScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
         LabelNumericalScoreAccumulator* acc) const {
-      acc->label.Add(label_[example_idx],
-                     -weights_[example_idx] * num_duplicates);
+      acc->label.Sub(label_[example_idx],
+                     weights_[example_idx] * num_duplicates);
     }
 
     template <typename ExampleIdx>
@@ -1019,9 +1057,12 @@ inline std::ostream& operator<<(
   return os;
 }
 
+template <bool weighted>
 struct LabelCategoricalOneValueBucket {
-  int value;
-  float weight;
+  typedef typename std::conditional_t<weighted, internal::IntegerValueAndWeight,
+                                      internal::IntegerValueOnly>
+      ValueAndMaybeWeight;
+  ValueAndMaybeWeight content;
 
   // Not called "kCount" because this is used as a template parameter and
   // expects the name to be `count` (in other such structs it is not a
@@ -1029,11 +1070,19 @@ struct LabelCategoricalOneValueBucket {
   static constexpr int count = 1;  // NOLINT
 
   void AddToScoreAcc(LabelCategoricalScoreAccumulator* acc) const {
-    acc->label.Add(value, weight);
+    if constexpr (weighted) {
+      acc->label.Add(content.value, content.weight);
+    } else {
+      acc->label.Add(content.value);
+    }
   }
 
   void SubToScoreAcc(LabelCategoricalScoreAccumulator* acc) const {
-    acc->label.Add(value, -weight);
+    if constexpr (weighted) {
+      acc->label.Sub(content.value, content.weight);
+    } else {
+      acc->label.Sub(content.value);
+    }
   }
 
   class Initializer {
@@ -1071,51 +1120,77 @@ struct LabelCategoricalOneValueBucket {
    public:
     Filler(const std::vector<int>& label, const std::vector<float>& weights)
         : label_(label), weights_(weights) {
-      DCHECK_EQ(weights.size(), label.size());
+      if constexpr (weighted) {
+        DCHECK_EQ(weights.size(), label.size());
+      } else {
+        DCHECK(weights.empty());
+      }
     }
 
-    void InitializeAndZero(LabelCategoricalOneValueBucket* acc) const {}
+    void InitializeAndZero(
+        LabelCategoricalOneValueBucket<weighted>* bucket) const {}
 
-    void Finalize(LabelCategoricalOneValueBucket* acc) const {}
+    void Finalize(LabelCategoricalOneValueBucket<weighted>* bucket) const {}
 
-    void ConsumeExample(const UnsignedExampleIdx example_idx,
-                        LabelCategoricalOneValueBucket* acc) const {
-      acc->value = label_[example_idx];
-      acc->weight = weights_[example_idx];
+    void ConsumeExample(
+        const UnsignedExampleIdx example_idx,
+        LabelCategoricalOneValueBucket<weighted>* bucket) const {
+      bucket->content.value = label_[example_idx];
+      if constexpr (weighted) {
+        bucket->content.weight = weights_[example_idx];
+      }
     }
 
     template <typename ExampleIdx>
     void AddDirectToScoreAcc(const ExampleIdx example_idx,
                              LabelCategoricalScoreAccumulator* acc) const {
-      acc->label.Add(label_[example_idx], weights_[example_idx]);
+      if constexpr (weighted) {
+        acc->label.Add(label_[example_idx], weights_[example_idx]);
+      } else {
+        acc->label.Add(label_[example_idx]);
+      }
     }
 
     template <typename ExampleIdx>
     void SubDirectToScoreAcc(const ExampleIdx example_idx,
                              LabelCategoricalScoreAccumulator* acc) const {
-      acc->label.Add(label_[example_idx], -weights_[example_idx]);
+      if constexpr (weighted) {
+        acc->label.Sub(label_[example_idx], weights_[example_idx]);
+      } else {
+        acc->label.Sub(label_[example_idx]);
+      }
     }
 
     template <typename ExampleIdx>
     void AddDirectToScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
         LabelCategoricalScoreAccumulator* acc) const {
-      acc->label.Add(label_[example_idx],
-                     weights_[example_idx] * num_duplicates);
+      if constexpr (weighted) {
+        acc->label.Add(label_[example_idx],
+                       weights_[example_idx] * num_duplicates);
+      } else {
+        acc->label.Add(label_[example_idx], num_duplicates);
+      }
     }
 
     template <typename ExampleIdx>
     void SubDirectToScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
         LabelCategoricalScoreAccumulator* acc) const {
-      acc->label.Add(label_[example_idx],
-                     -weights_[example_idx] * num_duplicates);
+      if constexpr (weighted) {
+        acc->label.Sub(label_[example_idx],
+                       weights_[example_idx] * num_duplicates);
+      } else {
+        acc->label.Sub(label_[example_idx], num_duplicates);
+      }
     }
 
     template <typename ExampleIdx>
     void Prefetch(const ExampleIdx example_idx) const {
       PREFETCH(&label_[example_idx]);
-      PREFETCH(&weights_[example_idx]);
+      if constexpr (weighted) {
+        PREFETCH(&weights_[example_idx]);
+      }
     }
 
    private:
@@ -1127,29 +1202,25 @@ struct LabelCategoricalOneValueBucket {
                                   const LabelCategoricalOneValueBucket& data);
 };
 
-inline std::ostream& operator<<(std::ostream& os,
-                                const LabelCategoricalOneValueBucket& data) {
-  os << "value:" << data.value << " weight:" << data.weight
+inline std::ostream& operator<<(
+    std::ostream& os,
+    const LabelCategoricalOneValueBucket</*weighted=*/true>& data) {
+  os << "value:" << data.content.value << " weight:" << data.content.weight
      << " count:" << data.count;
+  return os;
+}
+
+inline std::ostream& operator<<(
+    std::ostream& os,
+    const LabelCategoricalOneValueBucket</*weighted=*/false>& data) {
+  os << "value:" << data.content.value << " count:" << data.count;
   return os;
 }
 
 template <bool weighted>
 struct LabelBinaryCategoricalOneValueBucket {
-  // Since this object is constructed many times, it's worth saving memory
-  // aggressively. Since C++ does not support 0-byte objects, the conditional
-  // cannot be set to void. Setting the conditional to an empty struct would
-  // still use 1 byte. The construction below has size 1 if unweighted is true
-  // and size 8 (due to alignment) if unweighted is false. This is the same size
-  // as in a non-templated version that constructs two different buckets.
-  struct ValueAndWeight {
-    bool value;
-    float weight;
-  };
-  struct ValueOnly {
-    bool value;
-  };
-  typedef typename std::conditional_t<weighted, ValueAndWeight, ValueOnly>
+  typedef typename std::conditional_t<weighted, internal::BooleanValueAndWeight,
+                                      internal::BooleanValueOnly>
       ValueAndMaybeWeight;
   ValueAndMaybeWeight content;
 
@@ -1621,6 +1692,7 @@ inline std::ostream& operator<<(std::ostream& os,
   return os;
 }
 
+template <bool weighted>
 struct LabelCategoricalBucket {
   utils::IntegerDistributionDouble value;
   int64_t count;
@@ -1699,7 +1771,11 @@ struct LabelCategoricalBucket {
         : label_(label),
           weights_(weights),
           num_classes_(label_distribution.NumClasses()) {
-      DCHECK_EQ(weights.size(), label.size());
+      if constexpr (weighted) {
+        DCHECK_EQ(weights.size(), label.size());
+      } else {
+        DCHECK(weights.empty());
+      }
     }
 
     void InitializeAndZero(LabelCategoricalBucket* acc) const {
@@ -1712,7 +1788,11 @@ struct LabelCategoricalBucket {
 
     void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelCategoricalBucket* acc) const {
-      acc->value.Add(label_[example_idx], weights_[example_idx]);
+      if constexpr (weighted) {
+        acc->value.Add(label_[example_idx], weights_[example_idx]);
+      } else {
+        acc->value.Add(label_[example_idx]);
+      }
       acc->count++;
     }
 
@@ -1727,7 +1807,14 @@ struct LabelCategoricalBucket {
 };
 
 inline std::ostream& operator<<(std::ostream& os,
-                                const LabelCategoricalBucket& data) {
+                                const LabelCategoricalBucket<true>& data) {
+  os << "value:{obs:" << data.value.NumObservations()
+     << "} count:" << data.count;
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const LabelCategoricalBucket<false>& data) {
   os << "value:{obs:" << data.value.NumObservations()
      << "} count:" << data.count;
   return os;
@@ -1735,22 +1822,9 @@ inline std::ostream& operator<<(std::ostream& os,
 
 template <bool weighted>
 struct LabelBinaryCategoricalBucket {
-  // Since this object is constructed many times, it's worth saving memory
-  // aggressively. Since C++ does not support 0-byte objects, the conditional
-  // cannot be set to void. Setting the conditional to an empty struct would
-  // still use 1 byte. The construction below has size 1 if unweighted is true
-  // and size 8 (due to alignment) if unweighted is false. This is the same size
-  // as in a non-templated version that constructs two different buckets.
-  struct SumTruesAndWeights {
-    double sum_trues;
-    double sum_weights;
-  };
-  struct SumTruesOnly {
-    double sum_trues;
-  };
-  typedef
-      typename std::conditional_t<weighted, SumTruesAndWeights, SumTruesOnly>
-          SumTruesAndMaybeWeights;
+  typedef typename std::conditional_t<weighted, internal::SumTruesAndWeights,
+                                      internal::SumTruesOnly>
+      SumTruesAndMaybeWeights;
   SumTruesAndMaybeWeights content;
   int64_t count;
 
