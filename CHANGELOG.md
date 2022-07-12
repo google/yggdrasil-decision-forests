@@ -5,6 +5,7 @@
 ### Features
 
 -   Multithreading of the oblique splitter for gradient boosted tree models.
+-   Support for Javascript + WebAssembly inference of model.
 
 ## 0.2.4 - 2022-05-17
 

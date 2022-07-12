@@ -2,6 +2,10 @@
 
 See "../README.md" for details.
 
+See
+[here](https://achoum.github.io/yggdrasil_decision_forests_js_example/example.html)
+for a live version of this example.
+
 ## Data
 
 The `model.zip` was created as:

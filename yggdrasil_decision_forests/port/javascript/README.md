@@ -11,7 +11,8 @@ This library is compatible with TensorFlow Decision Forests models.
 The [example/](example) directory (i.e.
 `yggdrasil_decision_forests/port/javascript/example/example.html`) contains a
 running example of YDF model inference in a webpage. The following section
-details how this example work.
+details how this example work. A live example is available
+[here](https://achoum.github.io/yggdrasil_decision_forests_js_example/example.html).
 
 **Note:** The shell commands below should be run from the Yggdrasil root
 directory i.e. the directory containing `CHANGELOG.md`.
@@ -80,8 +81,16 @@ options:
 ```shell
 # Compile Yggdrasil Decision Forest Webassembly inference
 # The result is available at "bazel-bin/yggdrasil_decision_forests/port/javascript/ydf.zip"
-bazel build -c opt --config=wasm //yggdrasil_decision_forests/port/javascript:create_release
+# Note: You can skip the "--config=lto --config=size" flags to speed-up compilation at the expense of a larger binary.
+bazel build -c opt --config=lto --config=size --config=wasm //yggdrasil_decision_forests/port/javascript:create_release
 ```
+
+If you get the error `Exception: FROZEN_CACHE is set` during the compilation,
+you need to disable the frozen cache (i.e. set `FROZEN_CACHE=False` in the
+`emscripten_config` Emscripten configuration file located in the Bazel cache
+e.g. `~/.cache/bazel/.../external/emsdk/emscripten_toolchain`). See details
+[here](https://github.com/emscripten-core/emsdk/issues/971). Alternatively, you
+can remove the `--config=lto` statement in the compilation command.
 
 **Step 5**
 
