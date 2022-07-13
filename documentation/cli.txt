@@ -70,6 +70,8 @@ predict: Apply a model on a dataset and export the predictions to disk.
 
   Flags from cli/predict.cc:
     --dataset (Typed path to dataset i.e. [type]:[path] format.); default: "";
+    --key (If set, copies the column "key" in the output prediction file. This
+      key column cannot be an input feature of the model.); default: "";
     --model (Model directory.); default: "";
     --num_records_by_shard_in_output (Number of records per output shards. Only
       valid if the output path is sharded (e.g. contains @10).); default: -1;
@@ -114,6 +116,13 @@ convert_dataset: Converts a dataset from one format to another. The dataspec of 
   Flags from cli/convert_dataset.cc:
     --dataspec (Input data specification path. This file is generally created
       with :infer_dataspec and inspected with :show_dataspec.); default: "";
+    --dataspec_is_binary (If true, the dataspec is a binary proto. If false
+      (default), the dataspec is a text proto. The :infer_dataspec cli generates
+      text proto dataspec, while the dataspec contained in a model is encoded as
+      a binary proto.); default: false;
+    --ignore_missing_columns (If false (default), fails if one of the column in
+      the dataspec is missing. If true, fill missing columns with "missing
+      values".); default: false;
     --input (Input dataset specified with [type]:[path] format.); default: "";
     --output (Output dataset specified with [type]:[path] format.); default: "";
     --shard_size (Number of record per output shards. Only valid if the output
@@ -141,6 +150,20 @@ benchmark_inference: Benchmarks the inference time of a model with the available
       default: 20;
     --warmup_runs (Number of runs through the dataset before the benchmark.);
       default: 1;
+
+Try --helpfull to get a list of all flags or --help=substring shows help for
+flags which include specified substring in either in the name, or description or
+path.
+
+
+edit_model: Edits a trained model.
+
+  Flags from cli/edit_model.cc:
+    --input (Input model directory.); default: "__NO__SET__";
+    --new_file_prefix (New prefix in the filenames.); default: "__NO__SET__";
+    --new_label_name (New label name.); default: "__NO__SET__";
+    --new_weights_name (New weights name.); default: "__NO__SET__";
+    --output (Output model directory.); default: "__NO__SET__";
 
 Try --helpfull to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or

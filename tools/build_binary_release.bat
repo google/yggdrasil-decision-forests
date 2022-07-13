@@ -30,6 +30,7 @@ copy configure\cli_readme.txt dist\README
  .\%CLI%\predict.exe^
  .\%CLI%\infer_dataspec.exe^
  .\%CLI%\evaluate.exe^
+ .\%CLI%\edit_model.exe^
  .\%CLI%\convert_dataset.exe^
  .\%CLI%\benchmark_inference.exe^
  .\%CLI%\utils\synthetic_dataset.exe^

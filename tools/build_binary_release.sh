@@ -36,6 +36,7 @@ zip -j cli_linux.zip \
   evaluate \
   convert_dataset \
   benchmark_inference \
+  edit_model \
   utils/synthetic_dataset \
   ../utils/distribute/implementations/grpc/grpc_worker_main
 popd
