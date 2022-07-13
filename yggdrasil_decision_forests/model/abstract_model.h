@@ -404,6 +404,15 @@ class AbstractModel {
     return &hyperparameter_optimizer_logs_;
   }
 
+  // Clear the model from any information that is not required for model
+  // serving. This function is called when the model is trained with
+  // "pure_serving_model=true", or when using the "--pure_serving" operation in
+  // the ":edit_model" tool.
+  //
+  // Warning: Sub implementation of this methods are expected to call the parent
+  // implementation.
+  virtual absl::Status MakePureServing();
+
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 
@@ -467,6 +476,10 @@ class AbstractModel {
 
   absl::optional<proto::HyperparametersOptimizerLogs>
       hyperparameter_optimizer_logs_;
+
+  // Indicate if a model is pure for serving i.e. the model was tripped of all
+  // information not required for serving.
+  bool is_pure_model_ = false;
 
   // Note: New fields should be registered in:
   // - The proto serialization functions.

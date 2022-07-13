@@ -255,6 +255,8 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   const auto evaluation_loaded_model =
       loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
 
+  // Test that the exported model evaluation is the same as the original model
+  // evaluation.
   check_evaluation_is_equal(evaluation_, evaluation_loaded_model);
 
   // Ensure that the predictions of the semi-fast engine are similar as the
@@ -270,6 +272,13 @@ void TrainAndTestTester::TrainAndEvaluateModel(
       loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
   check_evaluation_is_equal(evaluation_loaded_model,
                             evaluation_loaded_model_no_fast_engine);
+
+  // Test that the pure version of the model is equal to the non-pure version.
+  EXPECT_OK(loaded_model->MakePureServing());
+  rnd.seed(1234);
+  const auto evaluation_loaded_and_pure_model =
+      loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+  check_evaluation_is_equal(evaluation_, evaluation_loaded_and_pure_model);
 }
 
 std::pair<std::string, std::string>

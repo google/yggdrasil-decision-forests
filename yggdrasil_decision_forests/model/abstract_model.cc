@@ -68,6 +68,7 @@ void AbstractModel::ExportProto(const AbstractModel& model,
   proto->set_label_col_idx(model.label_col_idx_);
   proto->set_ranking_group_col_idx(model.ranking_group_col_idx_);
   proto->set_uplift_treatment_col_idx(model.uplift_treatment_col_idx_);
+  proto->set_is_pure_model(model.is_pure_model_);
 
   *proto->mutable_input_features() = {model.input_features_.begin(),
                                       model.input_features_.end()};
@@ -95,6 +96,7 @@ void AbstractModel::ImportProto(const proto::AbstractModel& proto,
   model->label_col_idx_ = proto.label_col_idx();
   model->ranking_group_col_idx_ = proto.ranking_group_col_idx();
   model->uplift_treatment_col_idx_ = proto.uplift_treatment_col_idx();
+  model->is_pure_model_ = proto.is_pure_model();
   model->input_features_.assign(proto.input_features().begin(),
                                 proto.input_features().end());
   if (proto.has_weights()) {
@@ -1270,6 +1272,13 @@ absl::Status AbstractModel::ValidateModelIOOptions(
         "model::SaveModel(), a prefix is automatically chosen, if possible.");
   }
   return absl::OkStatus();
+}
+
+absl::Status AbstractModel::MakePureServing() {
+  is_pure_model_ = true;
+  precomputed_variable_importances_.clear();
+  hyperparameter_optimizer_logs_ = {};
+  return Validate();
 }
 
 }  // namespace model

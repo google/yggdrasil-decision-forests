@@ -58,6 +58,10 @@ ABSL_FLAG(std::string, new_label_name, kStringNoSet, "New label name.");
 ABSL_FLAG(std::string, new_weights_name, kStringNoSet, "New weights name.");
 ABSL_FLAG(std::string, new_file_prefix, kStringNoSet,
           "New prefix in the filenames.");
+ABSL_FLAG(std::string, pure_serving, kStringNoSet,
+          "Clear the model from any information that is not required for model "
+          "serving.This includes debugging, model interpretation and other "
+          "meta-data. Can reduce significantly the size of the model.");
 
 constexpr char kUsageMessage[] = "Edits a trained model.";
 
@@ -99,6 +103,11 @@ void EditModel() {
     auto* weight_column = model->mutable_data_spec()->mutable_columns(
         weights.value().attribute_idx());
     weight_column->set_name(absl::GetFlag(FLAGS_new_weights_name));
+  }
+
+  // Pure serving
+  if (absl::GetFlag(FLAGS_pure_serving) != kStringNoSet) {
+    QCHECK_OK(model->MakePureServing());
   }
 
   // Change how the model is exported.

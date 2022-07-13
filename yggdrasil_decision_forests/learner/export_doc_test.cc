@@ -91,15 +91,81 @@ TEST(ExportDoc, Base) {
           {"FakeLearner2", "FakeLearner3"})
           .value();
 
-  LOG(INFO) << content;
+  LOG(INFO) << "======\n" << content << "\n=========";
 
   EXPECT_EQ(content, R"(## FakeLearner2
 
-No generic hyper-parameters. Use the <a href="_learner/fakelearner2.proto">FakeLearner2</a> TrainingConfig proto instead.
+<font size="2">
+
+### Training configuration
+
+- <a href="_learner/abstract_learner.proto">learner/abstract_learner.proto</a>
+
+### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+
+#### [maximum_model_size_in_memory_in_bytes](_learner/abstract_learner.protomaximum_model_size_in_memory_in_bytes)
+
+ - **Type:** Real **Default:** -1
+
+ - Limit the size of the model when stored in ram. Different algorithms can enforce this limit differently. Note that when models are compiled into an inference, the size of the inference engine is generally much smaller than the original model.
+
+#### [maximum_training_duration_seconds](_learner/abstract_learner.protomaximum_training_duration_seconds)
+
+ - **Type:** Real **Default:** -1
+
+ - Maximum training duration of the model expressed in seconds. Each learning algorithm is free to use this parameter at it sees fit. Enabling maximum training duration makes the model training non-deterministic.
+
+#### [pure_serving_model](_learner/abstract_learner.protopure_serving_model)
+
+ - **Type:** Categorical **Default:** false **Possible values:** true, false
+
+ - Clear the model from any information that is not required for model serving. This includes debugging, model interpretation and other meta-data. The size of the serialized model can be reduced significatively (50% model size reduction is common). This parameter has no impact on the quality, serving speed or RAM usage of model serving.
+
+#### [random_seed](_learner/abstract_learner.protorandom_seed)
+
+ - **Type:** Integer **Default:** 123456
+
+ - Random seed for the training of the model. Learners are expected to be deterministic by the random seed.
+
+</font>
+
 
 ## FakeLearner3
 
-No generic hyper-parameters. Use the <a href="_learner/fakelearner3.proto">FakeLearner3</a> TrainingConfig proto instead.
+<font size="2">
+
+### Training configuration
+
+- <a href="_learner/abstract_learner.proto">learner/abstract_learner.proto</a>
+
+### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+
+#### [maximum_model_size_in_memory_in_bytes](_learner/abstract_learner.protomaximum_model_size_in_memory_in_bytes)
+
+ - **Type:** Real **Default:** -1
+
+ - Limit the size of the model when stored in ram. Different algorithms can enforce this limit differently. Note that when models are compiled into an inference, the size of the inference engine is generally much smaller than the original model.
+
+#### [maximum_training_duration_seconds](_learner/abstract_learner.protomaximum_training_duration_seconds)
+
+ - **Type:** Real **Default:** -1
+
+ - Maximum training duration of the model expressed in seconds. Each learning algorithm is free to use this parameter at it sees fit. Enabling maximum training duration makes the model training non-deterministic.
+
+#### [pure_serving_model](_learner/abstract_learner.protopure_serving_model)
+
+ - **Type:** Categorical **Default:** false **Possible values:** true, false
+
+ - Clear the model from any information that is not required for model serving. This includes debugging, model interpretation and other meta-data. The size of the serialized model can be reduced significatively (50% model size reduction is common). This parameter has no impact on the quality, serving speed or RAM usage of model serving.
+
+#### [random_seed](_learner/abstract_learner.protorandom_seed)
+
+ - **Type:** Integer **Default:** 123456
+
+ - Random seed for the training of the model. Learners are expected to be deterministic by the random seed.
+
+</font>
+
 
 ## FakeLearner1
 

@@ -605,6 +605,27 @@ GradientBoostedTreesModel::GetVariableImportance(absl::string_view key) const {
   return general_vi.status();
 }
 
+absl::Status GradientBoostedTreesModel::MakePureServing() {
+  training_logs_.Clear();
+  for (auto& tree : decision_trees_) {
+    tree->IterateOnMutableNodes(
+        [](decision_tree::NodeWithChildren* node, const int depth) {
+          if (node->IsLeaf()) {
+            // Remove the unused information.
+            auto* output = node->mutable_node()->mutable_regressor();
+            output->clear_sum_gradients();
+            output->clear_sum_hessians();
+            output->clear_sum_weights();
+            output->clear_distribution();
+          } else {
+            // Remove the label information from the non-leaf nodes.
+            node->mutable_node()->clear_output();
+          }
+        });
+  }
+  return AbstractModel::MakePureServing();
+}
+
 REGISTER_AbstractModel(GradientBoostedTreesModel,
                        GradientBoostedTreesModel::kRegisteredName);
 

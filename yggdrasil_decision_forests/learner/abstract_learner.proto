@@ -143,6 +143,13 @@ message TrainingConfig {
   // is not set, it will be automatically set to the training date.
   optional Metadata metadata = 13;
 
+  // Clear the model from any information that is not required for model
+  // serving. This includes debugging, model interpretation and other meta-data.
+  // The size of the serialized model can be reduced significatively (50% model
+  // size reduction is common). This parameter has no impact on the quality,
+  // serving speed or RAM usage of model serving.
+  optional bool pure_serving_model = 14 [default = false];
+
   // Learner specific configuration/hyper-parameters.
   // The message/extension is dependent on the "learner". For example, see
   // "yggdrasil_decision_forests/learner/random_forest.proto" for the parameters

@@ -280,6 +280,13 @@ TEST_F(RandomForestOnAdult, Base) {
             train_dataset_.nrow() + 1 /*the header*/);
 }
 
+TEST_F(RandomForestOnAdult, PureServingModel) {
+  train_config_.set_pure_serving_model(true);
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
+}
+
 // Separate the examples used for the structure and the leaves of the model.
 TEST_F(RandomForestOnAdult, Honest) {
   auto* rf_config = train_config_.MutableExtension(
@@ -579,6 +586,24 @@ TEST_F(RandomForestOnAdult, SparseOblique) {
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.855, 0.01);
+}
+
+TEST_F(RandomForestOnAdult, MakingAModelPurePureServingModel) {
+  TrainAndEvaluateModel();
+
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
+  const auto pre_pruning_size = model_->ModelSizeInBytes().value();
+  LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
+
+  CHECK_OK(model_->MakePureServing());
+
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
+
+  const auto post_pruning_size = model_->ModelSizeInBytes().value();
+  LOG(INFO) << "post_pruning_size:" << post_pruning_size;
+  EXPECT_LE(static_cast<float>(post_pruning_size) / pre_pruning_size, 0.80);
 }
 
 // Helper for the training and testing on two non-overlapping samples from the

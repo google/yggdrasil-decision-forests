@@ -900,6 +900,11 @@ RandomForestLearner::TrainWithStatus(
       mdl->AvailableStructuralVariableImportances()));
 
   decision_tree::SetLeafIndices(mdl->mutable_decision_trees());
+
+  if (config_with_default.pure_serving_model()) {
+    RETURN_IF_ERROR(mdl->MakePureServing());
+  }
+
   return std::move(mdl);
 }
 

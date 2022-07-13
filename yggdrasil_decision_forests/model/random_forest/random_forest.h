@@ -208,6 +208,8 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
 
   void set_num_pruned_nodes(int64_t value) { num_pruned_nodes_ = value; }
 
+  absl::Status MakePureServing() override;
+
  private:
   // The decision trees.
   std::vector<std::unique_ptr<decision_tree::DecisionTree>> decision_trees_;

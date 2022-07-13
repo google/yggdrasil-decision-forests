@@ -269,6 +269,10 @@ DistributedGradientBoostedTreesLearner::TrainWithStatus(
                        dataset_cache_path, typed_valid_path, work_directory,
                        data_spec, log_directory(), &monitoring));
 
+  if (config.pure_serving_model()) {
+    RETURN_IF_ERROR(model->MakePureServing());
+  }
+
   utils::usage::OnTrainingEnd(data_spec, config, config_link,
                               /*num_examples=*/-1, *model,
                               absl::Now() - begin_training);

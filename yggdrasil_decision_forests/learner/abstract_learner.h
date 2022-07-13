@@ -197,6 +197,16 @@ static constexpr char kHParamMaximumTrainingDurationSeconds[] =
 static constexpr char kHParamMaximumModelSizeInMemoryInBytes[] =
     "maximum_model_size_in_memory_in_bytes";
 static constexpr char kHParamRandomSeed[] = "random_seed";
+static constexpr char kHParamPureServingModel[] = "pure_serving_model";
+
+// The values kTrue and kFalse represent boolean values of a categorical
+// hyper-parameter.
+// TODO(gbm): Add direct support for boolean hyper-parameter. Note: users are
+// generally not using those hyper-parameter directly. Instead generic
+// hyper-parameter are used in several sub-modules (automatic generation of
+// documentation, generation of python code, hyper-parameter tuning, etc.).
+constexpr char kTrue[] = "true";
+constexpr char kFalse[] = "false";
 
 // Check a set of hyper parameter against an hyper parameter specification.
 absl::Status CheckGenericHyperParameterSpecification(

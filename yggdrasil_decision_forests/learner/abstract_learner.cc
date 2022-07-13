@@ -505,6 +505,14 @@ absl::Status AbstractLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamPureServingModel);
+    if (hparam.has_value()) {
+      training_config_.set_pure_serving_model(
+          hparam.value().value().categorical() == kTrue);
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -540,6 +548,19 @@ AbstractLearner::GetGenericHyperParameterSpecification() const {
         "learner/abstract_learner.proto");
     param.mutable_documentation()->set_description(
         R"(Random seed for the training of the model. Learners are expected to be deterministic by the random seed.)");
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamPureServingModel);
+    param.mutable_categorical()->set_default_value(
+        default_config.pure_serving_model() ? kTrue : kFalse);
+    param.mutable_categorical()->add_possible_values(kTrue);
+    param.mutable_categorical()->add_possible_values(kFalse);
+    param.mutable_documentation()->set_proto_path(
+        "learner/abstract_learner.proto");
+    param.mutable_documentation()->set_description(
+        R"(Clear the model from any information that is not required for model serving. This includes debugging, model interpretation and other meta-data. The size of the serialized model can be reduced significatively (50% model size reduction is common). This parameter has no impact on the quality, serving speed or RAM usage of model serving.)");
   }
 
   return hparam_def;

@@ -964,6 +964,10 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 
   RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
 
+  if (config.train_config.pure_serving_model()) {
+    RETURN_IF_ERROR(mdl->MakePureServing());
+  }
+
   utils::usage::OnTrainingEnd(
       data_spec, config.train_config, config.train_config_link,
       /*num_examples=*/-1, *mdl, absl::Now() - begin_training);
@@ -1516,6 +1520,10 @@ GradientBoostedTreesLearner::TrainWithStatus(
                               *mdl, absl::Now() - begin_training);
 
   decision_tree::SetLeafIndices(mdl->mutable_decision_trees());
+
+  if (config.train_config.pure_serving_model()) {
+    RETURN_IF_ERROR(mdl->MakePureServing());
+  }
   return std::move(mdl);
 }
 

@@ -634,6 +634,23 @@ int RandomForestModel::MinNumberObs() const {
   return min_num_obs;
 }
 
+absl::Status RandomForestModel::MakePureServing() {
+  out_of_bag_evaluations_.clear();
+  mean_decrease_in_accuracy_.clear();
+  mean_increase_in_rmse_.clear();
+  num_pruned_nodes_ = {};
+  for (auto& tree : decision_trees_) {
+    tree->IterateOnMutableNodes(
+        [](decision_tree::NodeWithChildren* node, const int depth) {
+          if (!node->IsLeaf()) {
+            // Remove the label information from the non-leaf nodes.
+            node->mutable_node()->clear_output();
+          }
+        });
+  }
+  return AbstractModel::MakePureServing();
+}
+
 namespace internal {
 std::string EvaluationSnippet(
     const metric::proto::EvaluationResults& evaluation) {

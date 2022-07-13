@@ -1052,6 +1052,38 @@ TEST_F(GradientBoostedTreesOnAdult, HessianL2Categorical) {
   YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.283, 0.05);
 }
 
+TEST_F(GradientBoostedTreesOnAdult, PureServingModel) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  train_config_.set_pure_serving_model(true);
+  TrainAndEvaluateModel();
+
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+}
+
+TEST_F(GradientBoostedTreesOnAdult, MakingAModelPurePureServingModel) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  TrainAndEvaluateModel();
+
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+  const auto pre_pruning_size = model_->ModelSizeInBytes().value();
+  LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
+
+  CHECK_OK(model_->MakePureServing());
+
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.0025);
+  YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.320, 0.04);
+
+  const auto post_pruning_size = model_->ModelSizeInBytes().value();
+  LOG(INFO) << "post_pruning_size:" << post_pruning_size;
+  EXPECT_LE(static_cast<float>(post_pruning_size) / pre_pruning_size, 0.80);
+}
+
 // Helper for the training and testing on two non-overlapping samples from the
 // Abalone dataset.
 class GradientBoostedTreesOnAbalone : public utils::TrainAndTestTester {

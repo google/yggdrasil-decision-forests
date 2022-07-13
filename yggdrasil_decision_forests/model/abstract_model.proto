@@ -82,6 +82,10 @@ message AbstractModel {
 
   // Logs of the automated hyper-parameter tuning of the model.
   optional HyperparametersOptimizerLogs hyperparameter_optimizer_logs = 11;
+
+  // Indicate if a model is pure for serving i.e. the model was tripped of all
+  // information not required for serving.
+  optional bool is_pure_model = 12 [default = false];
 }
 
 // Information about the model.

@@ -155,6 +155,8 @@ class GradientBoostedTreesModel : public AbstractModel,
   // Adds a new tree to the model.
   void AddTree(std::unique_ptr<decision_tree::DecisionTree> decision_tree);
 
+  absl::Status MakePureServing() override;
+
  private:
   void PredictClassification(const dataset::VerticalDataset& dataset,
                              dataset::VerticalDataset::row_t row_idx,
