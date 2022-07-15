@@ -21,4 +21,5 @@ cc_binary(
         "@ydf//yggdrasil_decision_forests/utils:filesystem",
         "@ydf//yggdrasil_decision_forests/utils:logging",
     ],
+    tags = ["manual"],
 )

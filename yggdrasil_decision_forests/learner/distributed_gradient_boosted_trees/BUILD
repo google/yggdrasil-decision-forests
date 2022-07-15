@@ -142,4 +142,5 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test_utils",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",
     ],
+    tags = ["manual"],
 )

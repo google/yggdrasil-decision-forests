@@ -21,6 +21,7 @@ genrule(
     srcs = ["wrapper.js"],
     outs = ["wrapper.lds"],
     cmd = "cat $(SRCS) > $@",
+    tags = ["manual"],
     visibility = ["//visibility:private"],
 )
 
@@ -81,6 +82,7 @@ genrule(
     srcs = [":inference_wasm"],
     outs = ["inference.wasm"],
     cmd = "cp $(BINDIR)/yggdrasil_decision_forests/port/javascript/inference_wasm/inference.wasm $(@D)/",
+    tags = ["manual"],
 )
 
 # Extract the merged emscriptten js + wrapper file.
@@ -89,6 +91,7 @@ genrule(
     srcs = [":inference_wasm"],
     outs = ["inference.js"],
     cmd = "cp $(BINDIR)/yggdrasil_decision_forests/port/javascript/inference_wasm/inference.js $(@D)/",
+    tags = ["manual"],
 )
 
 # Zip the library.
@@ -102,4 +105,5 @@ genrule(
     cmd = "zip -j $@ $(locations :extract_wasm_file) $(locations :extract_js_file) && " +
           "echo Zipfile information: && zipinfo $@ && " +
           "echo Zipfile ls: && ls -lh $@",
+    tags = ["manual"],
 )

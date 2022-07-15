@@ -81,6 +81,10 @@ cc_library_ydf(
         "//yggdrasil_decision_forests:wasm_target":[],
         "//conditions:default": [],
     }),
+    target_compatible_with = select({
+        "//yggdrasil_decision_forests:use_tensorflow_io": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":bytestream",
         ":compatibility",

@@ -105,7 +105,7 @@ absl::Status DistributeCLIManager::ScheduleNow(
     const absl::string_view command, const absl::optional<std::string>& uid) {
   proto::Request generic_request;
   auto& request = *generic_request.mutable_command();
-  *request.mutable_command() = command;
+  *request.mutable_command() = std::string(command);
   if (uid.has_value()) {
     *request.mutable_internal_command_id() =
         CommandToInternalCommandId(uid.value());
