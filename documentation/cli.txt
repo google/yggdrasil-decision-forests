@@ -164,6 +164,10 @@ edit_model: Edits a trained model.
     --new_label_name (New label name.); default: "__NO__SET__";
     --new_weights_name (New weights name.); default: "__NO__SET__";
     --output (Output model directory.); default: "__NO__SET__";
+    --pure_serving (Clear the model from any information that is not required
+      for model serving.This includes debugging, model interpretation and other
+      meta-data. Can reduce significantly the size of the model.);
+      default: "__NO__SET__";
 
 Try --helpfull to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or

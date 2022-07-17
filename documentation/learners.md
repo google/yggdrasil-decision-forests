@@ -304,6 +304,16 @@ the gradient of the loss relative to the model output).
 -   Maximum number of decision trees. The effective number of trained tree can
     be smaller if early stopping is enabled.
 
+#### [pure_serving_model](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:pure_serving_model)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   Clear the model from any information that is not required for model serving.
+    This includes debugging, model interpretation and other meta-data. The size
+    of the serialized model can be reduced significatively (50% model size
+    reduction is common). This parameter has no impact on the quality, serving
+    speed or RAM usage of model serving.
+
 #### [random_seed](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:random_seed)
 
 -   **Type:** Integer **Default:** 123456
@@ -396,7 +406,8 @@ the gradient of the loss relative to the model output).
 #### [uplift_split_score](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_split_score)
 
 -   **Type:** Categorical **Default:** KULLBACK_LEIBLER **Possible values:**
-    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS
+    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS,
+    CONSERVATIVE_EUCLIDEAN_DISTANCE, CED
 
 -   For uplift models only. Splitter score i.e. score optimized by the splitters. The scores are introduced in "Decision trees for uplift modeling with single and multiple treatments", Rzepakowski et al. Notation: `p` probability / average value of the positive outcome, `q` probability / average value in the control group.<br>- `KULLBACK_LEIBLER` or `KL`: - p log (p/q)<br>- `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2<br>- `CHI_SQUARED` or `CS`: (p-q)^2/q<br>
 
@@ -672,6 +683,16 @@ It is probably the most well-known of the Decision Forest training algorithms.
     increase the quality of the model at the expense of size, training speed,
     and inference latency.
 
+#### [pure_serving_model](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:pure_serving_model)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   Clear the model from any information that is not required for model serving.
+    This includes debugging, model interpretation and other meta-data. The size
+    of the serialized model can be reduced significatively (50% model size
+    reduction is common). This parameter has no impact on the quality, serving
+    speed or RAM usage of model serving.
+
 #### [random_seed](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:random_seed)
 
 -   **Type:** Integer **Default:** 123456
@@ -742,7 +763,8 @@ It is probably the most well-known of the Decision Forest training algorithms.
 #### [uplift_split_score](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_split_score)
 
 -   **Type:** Categorical **Default:** KULLBACK_LEIBLER **Possible values:**
-    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS
+    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS,
+    CONSERVATIVE_EUCLIDEAN_DISTANCE, CED
 
 -   For uplift models only. Splitter score i.e. score optimized by the splitters. The scores are introduced in "Decision trees for uplift modeling with single and multiple treatments", Rzepakowski et al. Notation: `p` probability / average value of the positive outcome, `q` probability / average value in the control group.<br>- `KULLBACK_LEIBLER` or `KL`: - p log (p/q)<br>- `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2<br>- `CHI_SQUARED` or `CS`: (p-q)^2/q<br>
 
@@ -931,6 +953,16 @@ used to grow the tree while the second is used to prune the tree.
     as well as -1. If not set or equal to -1, the `num_candidate_attributes` is
     used.
 
+#### [pure_serving_model](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:pure_serving_model)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   Clear the model from any information that is not required for model serving.
+    This includes debugging, model interpretation and other meta-data. The size
+    of the serialized model can be reduced significatively (50% model size
+    reduction is common). This parameter has no impact on the quality, serving
+    speed or RAM usage of model serving.
+
 #### [random_seed](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:random_seed)
 
 -   **Type:** Integer **Default:** 123456
@@ -991,7 +1023,8 @@ used to grow the tree while the second is used to prune the tree.
 #### [uplift_split_score](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_split_score)
 
 -   **Type:** Categorical **Default:** KULLBACK_LEIBLER **Possible values:**
-    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS
+    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS,
+    CONSERVATIVE_EUCLIDEAN_DISTANCE, CED
 
 -   For uplift models only. Splitter score i.e. score optimized by the splitters. The scores are introduced in "Decision trees for uplift modeling with single and multiple treatments", Rzepakowski et al. Notation: `p` probability / average value of the positive outcome, `q` probability / average value in the control group.<br>- `KULLBACK_LEIBLER` or `KL`: - p log (p/q)<br>- `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2<br>- `CHI_SQUARED` or `CS`: (p-q)^2/q<br>
 
@@ -1106,6 +1139,16 @@ algorithm for an introduction to GBTs.
 
 -   Maximum number of decision trees. The effective number of trained tree can
     be smaller if early stopping is enabled.
+
+#### [pure_serving_model](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:pure_serving_model)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   Clear the model from any information that is not required for model serving.
+    This includes debugging, model interpretation and other meta-data. The size
+    of the serialized model can be reduced significatively (50% model size
+    reduction is common). This parameter has no impact on the quality, serving
+    speed or RAM usage of model serving.
 
 #### [random_seed](../yggdrasil_decision_forests/learner/abstract_learner.proto?q=symbol:random_seed)
 
