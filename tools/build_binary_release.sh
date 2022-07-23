@@ -43,4 +43,4 @@ popd
 
 mkdir -p dist
 mv ${CLI}/cli_linux.zip dist/
-zip ${CLI}/cli_linux.zip LICENSE CHANGELOG.md
+zip dist/cli_linux.zip LICENSE CHANGELOG.md
