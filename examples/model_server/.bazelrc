@@ -1,0 +1,80 @@
+# This file contains default flags for Bazel compilation. It is a copy of the
+# .bazelrc file in Yggdrasil Decision Forests root directory.
+
+# Common flags.
+common --experimental_repo_remote_exec
+
+# Required for bazel <=4, fails with bazel >= 5.
+# common --incompatible_restrict_string_escapes=false
+
+build -c opt
+build --spawn_strategy=standalone
+build --announce_rc
+build --noincompatible_strict_action_env
+
+# Enable after adding python headers to protobuf.
+build --define=use_fast_cpp_protos=true
+build --define=allow_oversize_protos=true
+build --define=grpc_no_ares=true
+
+# Nice print
+build:linux --copt=-fdiagnostics-color=always
+build --color=yes
+
+# Suppress C++ compiler warnings.
+build:linux --copt=-w
+build:linux --host_copt=-w
+build:macos --copt=-w
+build:windows --copt=/W0
+
+# Build mode.
+build:linux_cpp17 --cxxopt=-std=c++17
+build:linux_cpp17 --host_cxxopt=-std=c++17
+build:linux_cpp17 --config=linux
+
+build:linux_cpp14 --cxxopt=-std=c++14
+build:linux_cpp14 --host_cxxopt=-std=c++14
+build:linux_cpp14 --config=linux
+
+build:macos --cxxopt=-std=c++17
+build:macos --host_cxxopt=-std=c++17
+
+build:windows_cpp14 --cxxopt=/std:c++14
+build:windows_cpp14 --host_cxxopt=/std:c++14
+build:windows_cpp14 --config=windows
+
+build:windows_cpp17 --cxxopt=/std:c++17
+build:windows_cpp17 --host_cxxopt=/std:c++17
+build:windows_cpp17 --config=windows
+
+# Instruction set optimizations
+build:linux_avx2 --copt=-mavx2
+build:windows_avx2 --copt=/arch:AVX2
+
+# Misc build options we need for windows.
+build:windows --copt=/D_USE_MATH_DEFINES
+build:windows --host_copt=/D_USE_MATH_DEFINES
+build:windows --copt=-DWIN32_LEAN_AND_MEAN
+build:windows --host_copt=-DWIN32_LEAN_AND_MEAN
+build:windows --copt=-DNOGDI
+build:windows --host_copt=-DNOGDI
+build:windows --linkopt=/NDEBUG
+build:windows --host_linkopt=/NDEBUG
+build:windows --linkopt=/OPT:REF
+build:windows --host_linkopt=/OPT:REF
+build:windows --linkopt=/OPT:ICF
+build:windows --host_linkopt=/OPT:ICF
+build:windows --experimental_strict_action_env=true
+build:windows --copt=/experimental:preprocessor
+build:windows --host_copt=/experimental:preprocessor
+build:windows --materialize_param_files
+build:windows --features=compiler_param_file
+build:windows --verbose_failures
+build:windows --copt=/Oi
+build:windows --host_copt=/Oi
+build:windows --copt=/GL
+build:windows --host_copt=/GL
+
+
+# TensorFlow specific.
+build:use_tensorflow_io --define=use_tensorflow_io=1
