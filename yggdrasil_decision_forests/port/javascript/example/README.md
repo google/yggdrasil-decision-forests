@@ -11,7 +11,7 @@ for a live version of this example.
 The `model.zip` was created as:
 
 ```shell
-zip -r -j third_party/yggdrasil_decision_forests/ports/javascript/model.zip \
+zip -r -j third_party/yggdrasil_decision_forests/port/javascript/model.zip \
   third_party/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt
 ```
 

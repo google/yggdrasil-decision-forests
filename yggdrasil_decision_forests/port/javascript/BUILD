@@ -52,8 +52,6 @@ cc_binary(
     ],
     tags = [
         "manual",
-        "nobuilder",
-        "notap",
     ],
     visibility = ["//visibility:private"],
     deps = [
@@ -72,7 +70,6 @@ wasm_cc_binary(
     cc_target = ":inference",
     tags = [
         "manual",
-        "notap",
     ],
 )
 
