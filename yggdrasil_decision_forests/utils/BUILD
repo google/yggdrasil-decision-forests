@@ -709,6 +709,22 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "plot",
+    srcs = ["plot.cc"],
+    hdrs = ["plot.h"],
+    deps = [
+        ":compatibility",
+        ":html",
+        ":logging",
+        ":status_macros",
+        ":uid",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "//util/task:status",
+    ],
+)
+
 # Bzl Libraries
 # =============
 
@@ -1023,5 +1039,17 @@ cc_test(
         ":math",
         ":test",
         "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "plot_test",
+    srcs = ["plot_test.cc"],
+    deps = [
+        ":filesystem",
+        ":plot",
+        ":test",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/memory",
     ],
 )
