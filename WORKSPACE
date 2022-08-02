@@ -15,6 +15,7 @@ load("//third_party/tensorflow:workspace.bzl", tensorflow = "deps")
 #load("//third_party/farmhash:workspace.bzl", farmhash = "deps")
 load("//third_party/boost:workspace.bzl", boost = "deps")
 # load("//third_party/grpc:workspace.bzl", grpc = "deps")
+load("//third_party/rapidjson:workspace.bzl", rapidjson = "deps")
 
 gtest()
 absl()
@@ -24,6 +25,7 @@ tensorflow()
 #farmhash()
 boost()
 # grpc()  # We use the protobuf linked in tensorflow.
+rapidjson()
 
 # The initialization of YDF dependencies is commented. TensorFlow
 # is in charge of initializing them.
