@@ -444,6 +444,7 @@ cc_library_ydf(
     hdrs = ["histogram.h"],
     deps = [
         ":accurate_sum",
+        ":logging",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
     ],

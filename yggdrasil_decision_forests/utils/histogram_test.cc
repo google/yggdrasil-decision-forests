@@ -27,6 +27,8 @@ namespace utils {
 namespace histogram {
 namespace {
 
+using testing::ElementsAre;
+
 TEST(Histogram, UniformInt) {
   EXPECT_EQ(Histogram<int>::MakeUniform({}).ToString(),
             R"(Count: 0 Average: 0 StdDev: 0
@@ -99,6 +101,33 @@ Min: -50 Max: 50 Ignored: 0
 ----------------------------------------------
 [ -50,  50] 2 100.00% 100.00% ##########
 )");
+
+  EXPECT_EQ(
+      Histogram<int>::MakeUniform({-50, 50}, /*max_bins=*/5, /*weights=*/{4, 2})
+          .ToString(),
+      R"(Count: 6 Average: -16.6667 StdDev: 89.7527
+Min: -50 Max: 50 Ignored: 0
+----------------------------------------------
+[ -50, -30) 4  66.67%  66.67% ##########
+[ -30, -10) 0   0.00%  66.67%
+[ -10,  10) 0   0.00%  66.67%
+[  10,  30) 0   0.00%  66.67%
+[  30,  50] 2  33.33% 100.00% #####
+)");
+}
+
+TEST(Histogram, UniformFloat) {
+  EXPECT_EQ(Histogram<float>::MakeUniform({-50, 20.5, 20.7, 50}, /*max_bins=*/5)
+                .ToString(),
+            R"(Count: 4 Average: 10.3 StdDev: 36.8252
+Min: -50 Max: 50 Ignored: 0
+----------------------------------------------
+[   -50, -29.8) 1  25.00%  25.00% #####
+[ -29.8,  -9.6) 0   0.00%  25.00%
+[  -9.6,  10.6) 0   0.00%  25.00%
+[  10.6,  30.8) 2  50.00%  75.00% ##########
+[  30.8,    50] 1  25.00% 100.00% #####
+)");
 }
 
 TEST(Histogram, UniformIntRnd) {
@@ -109,6 +138,50 @@ TEST(Histogram, UniformIntRnd) {
     values.push_back(dist(rnd));
   }
   LOG(INFO) << Histogram<int>::MakeUniform(values).ToString();
+}
+
+TEST(Histogram, UniformFloatRnd) {
+  std::vector<float> values;
+  utils::RandomEngine rnd;
+  std::normal_distribution<double> dist(20, 40);
+  for (int i = 0; i < 10000; i++) {
+    values.push_back(dist(rnd));
+  }
+  LOG(INFO) << Histogram<float>::MakeUniform(values).ToString();
+}
+
+TEST(Histogram, UniformFloatWithWeightsRnd) {
+  utils::RandomEngine rnd;
+  std::normal_distribution<double> dist(20, 40);
+  std::uniform_real_distribution<double> dist2(0, 1);
+  std::vector<float> values, weights;
+  for (int i = 0; i < 10000; i++) {
+    values.push_back(dist(rnd));
+    weights.push_back(dist2(rnd));
+  }
+  LOG(INFO) << Histogram<float>::MakeUniform(values, 10, weights).ToString();
+}
+
+TEST(Metric, BucketizedContainer) {
+  // The bin boundaries are [1, 1.5, 2, 2.5, 3].
+  BucketizedContainer<float, int> container(1.f, 3.f, 4);
+  // Bin 1
+  container[1.f]++;
+  container[1.2f]++;
+  // Bin 2
+  container[1.5f]++;
+  // Bin 3
+  container[2.2f]++;
+  // Bin 3
+  container[2.7f]++;
+  container[3.f]++;
+  EXPECT_THAT(container.ContentArray(), ElementsAre(2, 1, 1, 2));
+}
+
+TEST(Metric, BucketizedContainerCollapsed) {
+  BucketizedContainer<float, int> container(1.f, 1.f, 3);
+  container[1.f] = 5;
+  EXPECT_THAT(container.ContentArray(), ElementsAre(0, 0, 5));
 }
 
 }  // namespace

@@ -24,12 +24,14 @@
 #define YGGDRASIL_DECISION_FORESTS_UTILS_HISTOGRAM_H_
 
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/accurate_sum.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -43,17 +45,23 @@ class Histogram {
 
   // Histogram from data.
   static Histogram MakeUniform(const std::vector<T>& values,
-                               size_t max_bins = 10);
+                               size_t max_bins = 10,
+                               const std::vector<float>& weights = {});
 
   std::string ToString() const;
 
+  const std::vector<T>& bounds() const { return bounds_; }
+  const std::vector<double>& counts() const { return counts_; }
+  const T minimum() const { return minimum_; }
+  const T maximum() const { return maximum_; }
+
  private:
-  std::vector<size_t> counts_;
+  std::vector<double> counts_;
   std::vector<T> bounds_;
   T minimum_ = 0;
   T maximum_ = 0;
-  size_t sum_counts_ = 0;
-  size_t sum_count_ignored_ = 0;
+  double sum_counts_ = 0;
+  double sum_count_ignored_ = 0;
   double mean_ = 0;
   double sd_ = 0;
 };
@@ -66,13 +74,11 @@ int NumCharacters(T value) {
 
 template <typename T>
 Histogram<T> Histogram<T>::MakeUniform(const std::vector<T>& values,
-                                       size_t max_bins) {
-  // While likely functional (except for infinities, NaN, and tight boundaries),
-  // the code was not tested for float values.
-  static_assert(std::numeric_limits<T>::is_integer,
-                "Only support integer types");
-
+                                       size_t max_bins,
+                                       const std::vector<float>& weights) {
   Histogram<T> hist;
+
+  DCHECK(weights.empty() || weights.size() == values.size());
 
   // Empty histogram.
   if (values.empty()) {
@@ -108,11 +114,16 @@ Histogram<T> Histogram<T>::MakeUniform(const std::vector<T>& values,
   // Accumulators for the mean and standard deviation.
   AccurateSum sum;
   AccurateSum sum_square;
+  AccurateSum sum_weights;
 
-  for (const auto value : values) {
-    const double double_value = static_cast<double>(value);
+  for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {
+    const auto value = values[value_idx];
+    const float weight = weights.empty() ? 1.0 : weights[value_idx];
+
+    const double double_value = static_cast<double>(value) * weight;
     sum.Add(double_value);
     sum_square.Add(double_value * double_value);
+    sum_weights.Add(weight);
 
     // Find bin with binary search.
     auto it_bound =
@@ -120,28 +131,28 @@ Histogram<T> Histogram<T>::MakeUniform(const std::vector<T>& values,
     // Values outside of the bounds are ignored.
     // The upper bound of the last/top bin is inclusive.
     if (it_bound == hist.bounds_.begin()) {
-      hist.sum_count_ignored_++;
+      hist.sum_count_ignored_ += weight;
       continue;
     }
     if (it_bound == hist.bounds_.end()) {
       if (value == hist.bounds_.back()) {
         it_bound--;
       } else {
-        hist.sum_count_ignored_++;
+        hist.sum_count_ignored_ += weight;
         continue;
       }
     }
     const auto bin_idx = std::distance(hist.bounds_.begin(), it_bound) - 1;
 
     // Update bin.
-    hist.counts_[bin_idx]++;
-    hist.sum_counts_++;
+    hist.counts_[bin_idx] += weight;
+    hist.sum_counts_ += weight;
   }
 
   // Set statistics.
-  hist.mean_ = sum.Sum() / values.size();
+  hist.mean_ = sum.Sum() / sum_weights.Sum();
   hist.sd_ =
-      std::sqrt(sum_square.Sum() / values.size() - hist.mean_ * hist.mean_);
+      std::sqrt(sum_square.Sum() / sum_weights.Sum() - hist.mean_ * hist.mean_);
 
   return hist;
 }
@@ -180,12 +191,11 @@ std::string Histogram<T>::ToString() const {
     }
 
     cumulative_count += count;
-
-    const double ratio =
-        100. * count / std::max(static_cast<size_t>(1), sum_counts_);
+    const double eps = std::numeric_limits<double>::epsilon();
+    const double ratio = 100. * count / std::max(eps, sum_counts_);
     const double cumulative_ratio =
-        100. * cumulative_count / std::max(static_cast<size_t>(1), sum_counts_);
-    absl::StrAppendFormat(&report, "[ %*d, %*d%c %*d %6.2f%% %6.2f%%",
+        100. * cumulative_count / std::max(eps, sum_counts_);
+    absl::StrAppendFormat(&report, "[ %*g, %*g%c %*g %6.2f%% %6.2f%%",
                           print_bound_size, bounds_[bin_idx], print_bound_size,
                           bounds_[bin_idx + 1], closing_bracket,
                           print_count_size, count, ratio, cumulative_ratio);
@@ -196,6 +206,43 @@ std::string Histogram<T>::ToString() const {
   }
   return report;
 }
+// Divide a finite segment "[min_value, max_value]" into a set of "num_bins"
+// contiguous non-overlapping equally-sized intervals. Each interval maps to an
+// object "Content". Given a number "p \in [min_value, max_value]", the matching
+// bin can be retrieved with the "[]" operator.
+template <typename Key, typename Content>
+class BucketizedContainer {
+ public:
+  BucketizedContainer(const Key& min_value, const Key& max_value,
+                      const int num_bins)
+      : content_(num_bins), min_value_(min_value), max_value_(max_value) {
+    DCHECK_GT(num_bins, 0);
+  }
+
+  Content& operator[](const Key& key) { return content_[Index(key)]; }
+
+  std::vector<Content>& ContentArray() { return content_; }
+
+  int NumBins() const { return content_.size(); }
+
+  Key BinCenter(const int bin_idx) const {
+    return min_value_ + bin_idx * (max_value_ - min_value_) / content_.size();
+  }
+
+ private:
+  int Index(const Key& key) {
+    DCHECK_GE(key, min_value_);
+    DCHECK_LE(key, max_value_);
+    if (key == max_value_) {
+      return content_.size() - 1;
+    }
+    return content_.size() * (key - min_value_) / (max_value_ - min_value_);
+  }
+
+  std::vector<Content> content_;
+  Key min_value_;
+  Key max_value_;
+};
 
 }  // namespace histogram
 }  // namespace utils
