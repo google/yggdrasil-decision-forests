@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "absl/status/status.h"
 #if defined YGG_TFRECORD_PREDICTIONS
 #include "yggdrasil_decision_forests/utils/sharded_io_tfrecord.h"
 #endif
@@ -28,12 +29,30 @@
 namespace yggdrasil_decision_forests {
 namespace utils {
 
+utils::StatusOr<PredictionFormat> ParsePredictionFormat(
+    absl::string_view value) {
+  if (value == "kRaw") {
+    return PredictionFormat::kRaw;
+  }
+  if (value == "kSimple") {
+    return PredictionFormat::kSimple;
+  }
+  if (value == "kRich") {
+    return PredictionFormat::kRich;
+  }
+  if (value == "kFull") {
+    return PredictionFormat::kFull;
+  }
+  return absl::InvalidArgumentError(absl::StrCat("Unknown format ", value));
+}
+
 absl::Status ExportPredictions(
     const std::vector<model::proto::Prediction>& predictions,
     model::proto::Task task, const dataset::proto::Column& label_column,
     absl::string_view typed_prediction_path,
     const int num_records_by_shard_in_output,
-    const absl::optional<std::string> prediction_key) {
+    const absl::optional<std::string> prediction_key,
+    const PredictionFormat format) {
   // Determines the container for the predictions.
   std::string prediction_path, prediction_format;
   ASSIGN_OR_RETURN(std::tie(prediction_format, prediction_path),
@@ -55,8 +74,8 @@ absl::Status ExportPredictions(
 
   // Save the prediction as a collection (e.g. tfrecord or csv) of
   // proto::Examples.
-  ASSIGN_OR_RETURN(auto dataspec,
-                   PredictionDataspec(task, label_column, prediction_key));
+  ASSIGN_OR_RETURN(auto dataspec, PredictionDataspec(task, label_column,
+                                                     prediction_key, format));
   ASSIGN_OR_RETURN(auto writer, dataset::CreateExampleWriter(
                                     typed_prediction_path, dataspec,
                                     num_records_by_shard_in_output));
@@ -64,8 +83,8 @@ absl::Status ExportPredictions(
   for (const auto& prediction : predictions) {
     // Convert the prediction into an example.
     RETURN_IF_ERROR(PredictionToExample(task, label_column, prediction,
-                                        &prediction_as_example,
-                                        prediction_key));
+                                        &prediction_as_example, prediction_key,
+                                        format));
     RETURN_IF_ERROR(writer->Write(prediction_as_example));
   }
   return absl::OkStatus();
@@ -75,7 +94,8 @@ absl::Status PredictionToExample(
     model::proto::Task task, const dataset::proto::Column& label_col,
     const model::proto::Prediction& prediction,
     dataset::proto::Example* prediction_as_example,
-    const absl::optional<std::string> prediction_key) {
+    const absl::optional<std::string> prediction_key,
+    const PredictionFormat format) {
   prediction_as_example->clear_attributes();
   switch (task) {
     case model::proto::Task::CLASSIFICATION: {
@@ -85,12 +105,46 @@ absl::Status PredictionToExample(
           prediction.classification().distribution().counts_size()) {
         return absl::InvalidArgumentError("Wrong number of classes.");
       }
-      for (int label_value = 1; label_value < num_label_values; label_value++) {
+
+      // Note: The kRaw format is the only format that does not contain the
+      // output class.
+      if (format != PredictionFormat::kRaw) {
+        prediction_as_example->add_attributes()->set_categorical(
+            prediction.classification().value());
+      }
+
+      // Predicted probability of predicted class.
+      if (format == PredictionFormat::kRich) {
+        DCHECK_GT(prediction.classification().distribution().sum(), 0);
         const float prediction_proba =
-            prediction.classification().distribution().counts(label_value) /
+            prediction.classification().distribution().counts(
+                prediction.classification().value()) /
             prediction.classification().distribution().sum();
         prediction_as_example->add_attributes()->set_numerical(
             prediction_proba);
+      }
+
+      // Predicted probability of all the classes.
+      if (format == PredictionFormat::kRaw ||
+          format == PredictionFormat::kFull) {
+        const int num_label_values =
+            label_col.categorical().number_of_unique_values();
+        if (num_label_values !=
+            prediction.classification().distribution().counts_size()) {
+          return absl::InvalidArgumentError("Wrong number of classes.");
+        }
+        // We don't export the prediction for the out-of-dictionary item label
+        // value (value 0). See kOutOfDictionaryItemKey in "data_spec.h" for
+        // details.
+        DCHECK_GT(prediction.classification().distribution().sum(), 0);
+        for (int label_value = 1; label_value < num_label_values;
+             ++label_value) {
+          const float prediction_proba =
+              prediction.classification().distribution().counts(label_value) /
+              prediction.classification().distribution().sum();
+          prediction_as_example->add_attributes()->set_numerical(
+              prediction_proba);
+        }
       }
     } break;
     case model::proto::Task::REGRESSION:
@@ -204,7 +258,8 @@ absl::Status ExampleToPrediction(
 
 utils::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
     const model::proto::Task task, const dataset::proto::Column& label_col,
-    const absl::optional<std::string> prediction_key) {
+    const absl::optional<std::string> prediction_key,
+    const PredictionFormat format) {
   dataset::proto::DataSpecification dataspec;
 
   switch (task) {
@@ -213,10 +268,33 @@ utils::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
       // (out-of-dictionary) item.
       const int num_label_values =
           static_cast<int>(label_col.categorical().number_of_unique_values());
-      for (int label_value = 1; label_value < num_label_values; label_value++) {
-        dataset::AddColumn(absl::StrCat(dataset::CategoricalIdxToRepresentation(
-                               label_col, label_value)),
+
+      if (format != PredictionFormat::kRaw) {
+        auto* col = dataset::AddColumn(label_col.name(),
+                                       dataset::proto::ColumnType::CATEGORICAL,
+                                       &dataspec);
+        *col->mutable_categorical() = label_col.categorical();
+      }
+
+      // Predicted probability of predicted class.
+      if (format == PredictionFormat::kRich) {
+        dataset::AddColumn(/*name=*/absl::StrCat("Conf.", label_col.name()),
                            dataset::proto::ColumnType::NUMERICAL, &dataspec);
+      }
+
+      // Predicted probability of all the classes.
+      if (format == PredictionFormat::kRaw ||
+          format == PredictionFormat::kFull) {
+        // We don't export the prediction for the out-of-dictionary item label
+        // value (value 0). See kOutOfDictionaryItemKey in "data_spec.h" for
+        // details.
+        for (int label_value = 1; label_value < num_label_values;
+             ++label_value) {
+          dataset::AddColumn(
+              /*name=*/absl::StrCat(dataset::CategoricalIdxToRepresentation(
+                  label_col, label_value)),
+              dataset::proto::ColumnType::NUMERICAL, &dataspec);
+        }
       }
     } break;
     case model::proto::Task::REGRESSION:

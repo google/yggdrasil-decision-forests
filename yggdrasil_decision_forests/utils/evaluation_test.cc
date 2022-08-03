@@ -34,7 +34,7 @@ namespace utils {
 namespace {
 
 using test::EqualsProto;
-using testing::ElementsAre;
+using ::testing::StrEq;
 
 TEST(Evaluation, PredictionToExampleClassification) {
   dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
@@ -100,7 +100,7 @@ TEST(Evaluation, PredictionToExampleRegression) {
               EqualsProto(expected_prediction_as_example));
 }
 
-TEST(Evaluation, ExportPredictionsToDataset) {
+TEST(Evaluation, ExportRegressionPredictionsToDatasetRaw) {
   std::vector<model::proto::Prediction> predictions;
   predictions.push_back(PARSE_TEST_PROTO("regression { value: 1 }"));
   predictions.push_back(PARSE_TEST_PROTO("regression { value: 2 }"));
@@ -114,7 +114,9 @@ TEST(Evaluation, ExportPredictionsToDataset) {
       file::JoinPath(test::TmpDirectory(), "predictions.csv");
   EXPECT_OK(ExportPredictions(predictions, model::proto::Task::REGRESSION,
                               dataspec.columns(0),
-                              absl::StrCat("csv:", prediction_path), -1));
+                              absl::StrCat("csv:", prediction_path),
+                              /*num_records_by_shard_in_output=*/-1,
+                              /*prediction_key=*/{}, PredictionFormat::kRaw));
 
   std::string csv_content = file::GetContent(prediction_path).value();
   EXPECT_EQ(csv_content, "label\n1\n2\n3\n");
@@ -137,11 +139,208 @@ TEST(Evaluation, ExportPredictionsWithKeyToDataset) {
       file::JoinPath(test::TmpDirectory(), "predictions.csv");
   EXPECT_OK(ExportPredictions(predictions, model::proto::Task::REGRESSION,
                               dataspec.columns(0),
-                              absl::StrCat("csv:", prediction_path), -1,
+                              absl::StrCat("csv:", prediction_path),
+                              /*num_records_by_shard_in_output=*/-1,
                               /*prediction_key=*/"key"));
 
   std::string csv_content = file::GetContent(prediction_path).value();
   EXPECT_EQ(csv_content, "label,key\n1,k1\n2,k2\n3,k3\n");
+}
+
+TEST(Evaluation, ExportClassificationPredictionsToDatasetRaw) {
+  std::vector<model::proto::Prediction> predictions;
+  predictions.push_back(PARSE_TEST_PROTO(R"pb(
+    classification {
+      value: 1
+      distribution { counts: 0 counts: 8 counts: 2 sum: 10 }
+    }
+  )pb"));
+  predictions.push_back(PARSE_TEST_PROTO(R"pb(
+    classification {
+      value: 2
+      distribution { counts: 0 counts: 0 counts: 5 sum: 5 }
+    }
+  )pb"));
+
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: CATEGORICAL
+      name: "label"
+      categorical {
+        number_of_unique_values: 3
+        items {
+          key: "OOD"
+          value { index: 0 }
+        }
+        items {
+          key: "X"
+          value { index: 1 }
+        }
+        items {
+          key: "Y"
+          value { index: 2 }
+        }
+      }
+    }
+  )pb");
+
+  const auto prediction_path =
+      file::JoinPath(test::TmpDirectory(), "predictions.csv");
+  EXPECT_OK(ExportPredictions(predictions, model::proto::Task::CLASSIFICATION,
+                              dataspec.columns(0),
+                              absl::StrCat("csv:", prediction_path),
+                              /*num_records_by_shard_in_output=*/-1,
+                              /*prediction_key=*/{}, PredictionFormat::kRaw));
+
+  std::string csv_content = file::GetContent(prediction_path).value();
+  EXPECT_THAT(csv_content, StrEq("X,Y\n0.8,0.2\n0,1\n"));
+}
+
+TEST(Evaluation, ExportClassificationPredictionsToDatasetSimple) {
+  std::vector<model::proto::Prediction> predictions;
+  predictions.push_back(PARSE_TEST_PROTO(R"pb(
+    classification {
+      value: 1
+      distribution { counts: 0 counts: 8 counts: 2 sum: 10 }
+    }
+  )pb"));
+  predictions.push_back(PARSE_TEST_PROTO(R"pb(
+    classification {
+      value: 2
+      distribution { counts: 0 counts: 0 counts: 5 sum: 5 }
+    }
+  )pb"));
+
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: CATEGORICAL
+      name: "label"
+      categorical {
+        number_of_unique_values: 3
+        items {
+          key: "OOD"
+          value { index: 0 }
+        }
+        items {
+          key: "X"
+          value { index: 1 }
+        }
+        items {
+          key: "Y"
+          value { index: 2 }
+        }
+      }
+    }
+  )pb");
+
+  const auto prediction_path =
+      file::JoinPath(test::TmpDirectory(), "predictions.csv");
+  EXPECT_OK(ExportPredictions(
+      predictions, model::proto::Task::CLASSIFICATION, dataspec.columns(0),
+      absl::StrCat("csv:", prediction_path),
+      /*num_records_by_shard_in_output=*/-1, /*prediction_key=*/{},
+      PredictionFormat::kSimple));
+
+  std::string csv_content = file::GetContent(prediction_path).value();
+  EXPECT_THAT(csv_content, StrEq("label\nX\nY\n"));
+}
+
+TEST(Evaluation, ExportClassificationPredictionsToDatasetRich) {
+  std::vector<model::proto::Prediction> predictions;
+  predictions.push_back(PARSE_TEST_PROTO(R"pb(
+    classification {
+      value: 1
+      distribution { counts: 0 counts: 8 counts: 2 sum: 10 }
+    }
+  )pb"));
+  predictions.push_back(PARSE_TEST_PROTO(R"pb(
+    classification {
+      value: 2
+      distribution { counts: 0 counts: 0 counts: 5 sum: 5 }
+    }
+  )pb"));
+
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: CATEGORICAL
+      name: "label"
+      categorical {
+        number_of_unique_values: 3
+        items {
+          key: "OOD"
+          value { index: 0 }
+        }
+        items {
+          key: "X"
+          value { index: 1 }
+        }
+        items {
+          key: "Y"
+          value { index: 2 }
+        }
+      }
+    }
+  )pb");
+
+  const auto prediction_path =
+      file::JoinPath(test::TmpDirectory(), "predictions.csv");
+  EXPECT_OK(ExportPredictions(predictions, model::proto::Task::CLASSIFICATION,
+                              dataspec.columns(0),
+                              absl::StrCat("csv:", prediction_path),
+                              /*num_records_by_shard_in_output=*/-1,
+                              /*prediction_key=*/{}, PredictionFormat::kRich));
+
+  std::string csv_content = file::GetContent(prediction_path).value();
+  EXPECT_THAT(csv_content, StrEq("label,Conf.label\nX,0.8\nY,1\n"));
+}
+
+TEST(Evaluation, ExportClassificationPredictionsToDatasetFull) {
+  std::vector<model::proto::Prediction> predictions;
+  predictions.push_back(PARSE_TEST_PROTO(R"pb(
+    classification {
+      value: 1
+      distribution { counts: 0 counts: 8 counts: 2 sum: 10 }
+    }
+  )pb"));
+  predictions.push_back(PARSE_TEST_PROTO(R"pb(
+    classification {
+      value: 2
+      distribution { counts: 0 counts: 0 counts: 5 sum: 5 }
+    }
+  )pb"));
+
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: CATEGORICAL
+      name: "label"
+      categorical {
+        number_of_unique_values: 3
+        items {
+          key: "OOD"
+          value { index: 0 }
+        }
+        items {
+          key: "X"
+          value { index: 1 }
+        }
+        items {
+          key: "Y"
+          value { index: 2 }
+        }
+      }
+    }
+  )pb");
+
+  const auto prediction_path =
+      file::JoinPath(test::TmpDirectory(), "predictions.csv");
+  EXPECT_OK(ExportPredictions(predictions, model::proto::Task::CLASSIFICATION,
+                              dataspec.columns(0),
+                              absl::StrCat("csv:", prediction_path),
+                              /*num_records_by_shard_in_output=*/-1,
+                              /*prediction_key=*/{}, PredictionFormat::kFull));
+
+  std::string csv_content = file::GetContent(prediction_path).value();
+  EXPECT_THAT(csv_content, StrEq("label,X,Y\nX,0.8,0.2\nY,0,1\n"));
 }
 
 #ifdef YDF_EVAL_TFRECORD
@@ -178,6 +377,21 @@ TEST(Evaluation, ExportPredictionsToTFRecord) {
   EXPECT_FALSE(reader->Next(&prediction).value());
 }
 #endif
+
+TEST(Evaluation, ParsePredictionFormat) {
+  EXPECT_THAT(ParsePredictionFormat("non existing value").status(),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+
+  for (const auto& [str, value] :
+       std::vector<std::pair<std::string, PredictionFormat>>{
+           {"kRaw", PredictionFormat::kRaw},
+           {"kSimple", PredictionFormat::kSimple},
+           {"kRich", PredictionFormat::kRich},
+           {"kFull", PredictionFormat::kFull},
+       }) {
+    EXPECT_EQ(ParsePredictionFormat(str).value(), value);
+  }
+}
 
 }  // namespace
 }  // namespace utils
