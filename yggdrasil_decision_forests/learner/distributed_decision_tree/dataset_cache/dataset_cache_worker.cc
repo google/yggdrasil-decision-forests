@@ -40,7 +40,7 @@ using Blob = distribute::Blob;
 
 // Number of threads for IO operations.
 //
-// TODO(gbm): Parametrize.
+// TODO: Parametrize.
 constexpr int kNumThreads = 10;
 
 absl::Status SeparateNumericalColumn(const int column_idx,
@@ -201,7 +201,7 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
   LOG(INFO) << "Separate dataset columns on " << request.dataset_path();
   result->set_shard_idx(request.shard_idx());
 
-  // TODO(gbm): Use a dataset reader directly with multi-threaded reading.
+  // TODO: Use a dataset reader directly with multi-threaded reading.
   LOG(INFO) << "Reading dataset";
   dataset::VerticalDataset dataset;
   dataset::LoadConfig load_dataset_config;
@@ -271,7 +271,7 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
   // Read the values.
   LOG(INFO) << "Allocate " << request.num_examples()
             << " examples for column  #" << request.column_idx();
-  // TODO(gbm): Read the shards in parallel.
+  // TODO: Read the shards in parallel.
   std::vector<std::pair<float, model::SignedExampleIdx>> value_and_example_idxs(
       request.num_examples());
   LOG(INFO) << "Start reading column  #" << request.column_idx();
@@ -383,7 +383,7 @@ absl::Status CreateDatasetCacheWorker::ExportSortedNumericalColumn(
   example_idx_buffer.reserve(kIOBufferSizeInBytes /
                              sizeof(model::SignedExampleIdx));
 
-  // TODO(gbm): Distribute writing.
+  // TODO: Distribute writing.
   const auto delta_bit_mask = MaskDeltaBit(request.num_examples());
   for (size_t sorted_idx = 0; sorted_idx < value_and_example_idxs.size();
        sorted_idx++) {

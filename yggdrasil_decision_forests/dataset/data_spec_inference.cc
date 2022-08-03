@@ -156,7 +156,7 @@ void UpdateComputeSpecDiscretizedNumerical(
     const float value, proto::Column* column,
     proto::DataSpecificationAccumulator::Column* accumulator) {
   if (!std::isnan(value)) {
-    // TODO(gbm): Use absl::bit_cast.
+    // TODO: Use absl::bit_cast.
     const uint32_t int_value = *reinterpret_cast<const uint32_t*>(&value);
     (*accumulator->mutable_discretized_numerical())[int_value]++;
   }
@@ -385,7 +385,7 @@ absl::Status CreateDataSpecWithStatus(
   // each column.
   proto::DataSpecificationAccumulator accumulator;
   InitializeDataspecAccumulator(*data_spec, &accumulator);
-  // TODO(gbm): Call ComputeColumnStatistics in parallel other the different
+  // TODO: Call ComputeColumnStatistics in parallel other the different
   // paths.
   RETURN_IF_ERROR(
       creator->ComputeColumnStatistics(paths, guide, data_spec, &accumulator));

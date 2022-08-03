@@ -62,7 +62,7 @@ message Query {
   optional string config_path = 2;
   optional uint64 manager_uid = 3;
   optional int32 worker_idx = 4;
-  // TODO(gbm): Send the configuration directly if necessary?
+  // TODO: Send the configuration directly if necessary?
 }
 
 message Answer {

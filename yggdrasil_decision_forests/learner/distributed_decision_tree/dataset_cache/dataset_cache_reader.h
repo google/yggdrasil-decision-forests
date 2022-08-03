@@ -49,7 +49,7 @@ class DatasetCacheReader {
       absl::string_view path, const proto::DatasetCacheReaderOptions& options);
 
   ~DatasetCacheReader() {
-    // TODO(gbm): Interrupt the non-blocking feature loading (if any).
+    // TODO: Interrupt the non-blocking feature loading (if any).
     // CHECK_OK(WaitFeatureLoadingIsDone());
     if (non_blocking_.loading_thread) {
       non_blocking_.loading_thread->Join();

@@ -95,7 +95,7 @@ absl::Status MeanSquaredErrorLoss::UpdateGradients(
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
-  // TODO(gbm): Implement thread_pool.
+  // TODO: Implement thread_pool.
 
   // Set the gradient to:
   //   label - prediction

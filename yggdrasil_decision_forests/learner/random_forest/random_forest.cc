@@ -358,7 +358,7 @@ RandomForestLearner::TrainWithStatus(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
-  // TODO(gbm): Divide function into smaller blocks.
+  // TODO: Divide function into smaller blocks.
   const auto begin_training = absl::Now();
   RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
 

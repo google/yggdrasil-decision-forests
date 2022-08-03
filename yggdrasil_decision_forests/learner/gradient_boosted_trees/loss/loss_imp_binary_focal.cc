@@ -163,7 +163,7 @@ absl::Status BinaryFocalLoss::TemplatedUpdateGradients(
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   static_assert(std::is_integral<T>::value, "Integral required.");
-  // TODO(gbm): Implement thread_pool.
+  // TODO: Implement thread_pool.
 
   if (gradients->size() != 1) {
     return absl::InternalError("Wrong gradient shape");
@@ -273,7 +273,7 @@ absl::Status BinaryFocalLoss::SetLeaf(
   }
 
   // Set the value of the leaf to the sum(gradients) / sum(hessians)
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   const auto* labels =
       train_dataset
           .ColumnWithCastWithStatus<

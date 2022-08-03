@@ -164,7 +164,7 @@ class Model {
    * memory manually by calling "model.unload()". Not "unloading" the model
    * will result in a memory leak.
    *
-   * TODO(gbm): Unload the model automatically using "finalizers" once available
+   * TODO: Unload the model automatically using "finalizers" once available
    * in JS.
    *
    * See

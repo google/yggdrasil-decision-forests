@@ -154,7 +154,7 @@ absl::Status IntegerColumnWriter::WriteValuesWithCast(
     }
   }
 #endif
-  // TODO(gbm): Keep a buffer in between calls.
+  // TODO: Keep a buffer in between calls.
   std::vector<DstValue> dst_values(values.begin(), values.end());
   return file_.Write(
       absl::string_view(reinterpret_cast<const char*>(dst_values.data()),

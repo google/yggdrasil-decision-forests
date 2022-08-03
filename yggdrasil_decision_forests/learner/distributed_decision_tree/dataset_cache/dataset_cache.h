@@ -151,7 +151,7 @@ absl::Status SortNumericalColumns(
     proto::CacheMetadata* cache_metadata);
 
 // Initializes the meta-data content from the dataspec, column and configs.
-// TODO(gbm): Make "InitializeMetadata" return a "CacheMetadata" directly.
+// TODO: Make "InitializeMetadata" return a "CacheMetadata" directly.
 absl::Status InitializeMetadata(
     const dataset::proto::DataSpecification& data_spec,
     const std::vector<int>& columns,

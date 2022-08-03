@@ -413,7 +413,7 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
   for (dataset::VerticalDataset::row_t example_idx = 0;
        example_idx < dataset.nrow(); example_idx++) {
     // Down-sampling of examples.
-    // TODO(gbm): Make the split deterministic.
+    // TODO: Make the split deterministic.
     if (dataset_sampling_ < dist_01(rnd)) {
       continue;
     }

@@ -215,7 +215,7 @@ HyperParameterOptimizerLearner::TrainWithStatus(
                        train_dataset, valid_dataset, &best_model, &logs));
   LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
 
-  // TODO(gbm): Record the logs.
+  // TODO: Record the logs.
 
   if (spe_config.retrain_final_model()) {
     // Train a model on the entire train dataset using the best hyperparameters.
@@ -317,7 +317,7 @@ HyperParameterOptimizerLearner::TrainWithStatus(
           data_spec, typed_valid_path, &best_model, manager.get(), &logs));
   LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
 
-  // TODO(gbm): Record the logs.
+  // TODO: Record the logs.
 
   if (spe_config.retrain_final_model()) {
     // Train a model on the entire train dataset using the best hyperparameters.

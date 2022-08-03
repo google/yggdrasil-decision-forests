@@ -205,7 +205,7 @@ absl::Status FillNumericalAccumulator(
         num_delta_bits++;
       }
 
-      // TODO(gbm): Maybe. Compile time condition.
+      // TODO: Maybe. Compile time condition.
       NodeIndex node_idx;
       if (has_multiple_node_idxs) {
         // Retrieve the node containing the example.
@@ -303,7 +303,7 @@ absl::Status FillCategoricalFeatureBuckets(
       DCHECK_GE(value, 0);
       DCHECK_LT(value, num_feature_values);
 
-      // TODO(gbm): Maybe. Compile time condition.
+      // TODO: Maybe. Compile time condition.
       NodeIndex node_idx;
       if (has_multiple_node_idxs) {
         // Retrieve the node containing the example.
@@ -358,7 +358,7 @@ absl::Status FillDiscretizedNumericalAccumulatorPartial(
       DCHECK_GE(value, 0);
       DCHECK_LT(value, num_feature_values);
 
-      // TODO(gbm): Maybe. Compile time condition.
+      // TODO: Maybe. Compile time condition.
       NodeIndex node_idx;
       if (has_multiple_node_idxs) {
         // Retrieve the node containing the example.
@@ -412,7 +412,7 @@ absl::Status FillDiscretizedNumericalAccumulator(
       DCHECK_GE(value, 0);
       DCHECK_LT(value, num_feature_values);
 
-      // TODO(gbm): Maybe. Compile time condition.
+      // TODO: Maybe. Compile time condition.
       NodeIndex node_idx;
       if (has_multiple_node_idxs) {
         // Retrieve the node containing the example.
@@ -684,7 +684,7 @@ absl::Status FindSortedNumericalThreshold(
         std::numeric_limits<double>::quiet_NaN());
 
     for (const auto target_value : target_delta_values) {
-      // TODO(gbm): Implement a "skip" method in the reader.
+      // TODO: Implement a "skip" method in the reader.
       DCHECK(!delta_values.empty());
 
       while (target_value.delta_value_idx >=

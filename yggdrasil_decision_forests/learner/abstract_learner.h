@@ -201,7 +201,7 @@ static constexpr char kHParamPureServingModel[] = "pure_serving_model";
 
 // The values kTrue and kFalse represent boolean values of a categorical
 // hyper-parameter.
-// TODO(gbm): Add direct support for boolean hyper-parameter. Note: users are
+// TODO: Add direct support for boolean hyper-parameter. Note: users are
 // generally not using those hyper-parameter directly. Instead generic
 // hyper-parameter are used in several sub-modules (automatic generation of
 // documentation, generation of python code, hyper-parameter tuning, etc.).

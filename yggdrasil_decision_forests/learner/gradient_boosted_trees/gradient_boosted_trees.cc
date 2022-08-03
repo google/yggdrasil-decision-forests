@@ -483,7 +483,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   // - No support for the DART algorithm.
   // - No support for Ranking.
 
-  // TODO(gbm): Splitting method.
+  // TODO: Splitting method.
 
   const auto begin_training = absl::Now();
 

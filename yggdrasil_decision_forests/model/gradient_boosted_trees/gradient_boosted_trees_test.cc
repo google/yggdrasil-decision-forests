@@ -34,7 +34,7 @@ std::string TestDataDir() {
 
 TEST(GradientBoostedTrees, SaveAndLoadModelWithoutPrefix) {
   std::unique_ptr<model::AbstractModel> original_model;
-  // TODO(b/227344233): Simplify this test by having it use a toy model.
+  // TODO: Simplify this test by having it use a toy model.
   EXPECT_OK(model::LoadModel(
       file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
       &original_model));
@@ -82,7 +82,7 @@ TEST(GradientBoostedTrees, SaveAndLoadModelWithPrefix) {
 
 TEST(GradientBoostedTrees, SaveAndLoadModelWithAutodetectedPrefix) {
   std::unique_ptr<model::AbstractModel> original_model;
-  // TODO(b/227344233): Simplify this test by having it use the toy model
+  // TODO: Simplify this test by having it use the toy model
   // defined above.
   EXPECT_OK(model::LoadModel(
       file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),

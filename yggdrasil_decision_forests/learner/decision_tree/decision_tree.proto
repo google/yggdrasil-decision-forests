@@ -239,7 +239,7 @@ message DecisionTreeTrainingConfig {
 
       // Score: (p-q)^2
       // Categorical outcome only.
-      // TODO(gbm): Add numerical outcome.
+      // TODO: Add numerical outcome.
       EUCLIDEAN_DISTANCE = 1;
 
       // Score: (p-q)^2/q

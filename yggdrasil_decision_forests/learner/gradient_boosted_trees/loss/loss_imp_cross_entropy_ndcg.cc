@@ -71,7 +71,7 @@ absl::Status CrossEntropyNDCGLoss::UpdateGradients(
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
-  // TODO(gbm): Implement thread_pool.
+  // TODO: Implement thread_pool.
 
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
   std::vector<float>& second_order_derivative_data = *((*gradients)[0].hessian);

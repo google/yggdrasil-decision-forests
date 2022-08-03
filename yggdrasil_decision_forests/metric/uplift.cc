@@ -99,7 +99,7 @@ absl::Status FinalizeUpliftMetricsFromSampledPredictions(
   if (num_treatments != 2) {
     return absl::InvalidArgumentError(
         "Only binary treatment is currently supported.");
-    // TODO(gbm): Implement the Expected Response metric for the
+    // TODO: Implement the Expected Response metric for the
     // multi-treatment.
   }
 

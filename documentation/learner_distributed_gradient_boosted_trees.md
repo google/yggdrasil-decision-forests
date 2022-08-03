@@ -83,7 +83,7 @@ compilation option.
 
 Finally, each worker require an extra 1bit per example and per worker.
 
-TODO(gbm): Update doc when the load balancer is available.
+TODO: Update doc when the load balancer is available.
 
 ### RAM IO (memory bandwidth)
 

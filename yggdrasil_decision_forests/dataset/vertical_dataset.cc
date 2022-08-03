@@ -134,7 +134,7 @@ int VerticalDataset::ColumnNameToColumnIdx(absl::string_view name) const {
 void VerticalDataset::AppendExample(
     const proto::Example& example,
     const absl::optional<std::vector<int>> load_columns) {
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   CHECK_OK(AppendExampleWithStatus(example, load_columns));
 }
 
@@ -784,7 +784,7 @@ VerticalDataset::DiscretizedNumericalColumn::ToStringWithDigitPrecision(
   if (IsNa(row)) {
     return kNaSymbol;
   }
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   const float value =
       DiscretizedNumericalToNumerical(col_spec, values()[row]).value();
   return absl::StrFormat("%.*g", digit_precision, value);
@@ -896,7 +896,7 @@ absl::Status VerticalDataset::Append(const VerticalDataset& src,
 void MapExampleToProtoExample(
     const std::unordered_map<std::string, std::string>& src,
     const proto::DataSpecification& data_spec, proto::Example* dst) {
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   CHECK_OK(MapExampleToProtoExampleWithStatus(src, data_spec, dst));
 }
 
@@ -931,7 +931,7 @@ ProtoExampleToMapExample(const proto::Example& src,
 
 void VerticalDataset::AppendExample(
     const std::unordered_map<std::string, std::string>& example) {
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   CHECK_OK(AppendExampleWithStatus(example));
 }
 

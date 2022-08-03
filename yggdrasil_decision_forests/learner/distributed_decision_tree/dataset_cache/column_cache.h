@@ -164,7 +164,7 @@ class IntegerColumnReader : public AbstractIntegerColumnIterator<Value> {
 };
 
 // Reads a sequence of integer values from a sharded set of files.
-// TODO(gbm): Multi-thread reading.
+// TODO: Multi-thread reading.
 template <typename Value>
 class ShardedIntegerColumnReader : public AbstractIntegerColumnIterator<Value> {
  public:

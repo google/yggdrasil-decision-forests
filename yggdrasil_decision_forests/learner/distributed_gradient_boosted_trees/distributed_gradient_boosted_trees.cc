@@ -246,7 +246,7 @@ DistributedGradientBoostedTreesLearner::TrainWithStatus(
         updated_deployment, train_path, dataset_cache_path, config_link,
         spe_config, data_spec));
 
-    // TODO(gbm): Delete the partial dataset cache.
+    // TODO: Delete the partial dataset cache.
   } else {
     // The dataset is stored in a generic format.
 
@@ -258,7 +258,7 @@ DistributedGradientBoostedTreesLearner::TrainWithStatus(
   }
 
   if (typed_valid_path.has_value()) {
-    // TODO(gbm): Support for validation dataset in cache format.
+    // TODO: Support for validation dataset in cache format.
   }
 
   // Train the model.
@@ -292,7 +292,7 @@ absl::Status SetDefaultHyperParameters(
   RETURN_IF_ERROR(gradient_boosted_trees::internal::SetDefaultHyperParameters(
       spe_config->mutable_gbt()));
 
-  // TODO(gbm): Call "SetDefaultHyperParameters" of GBT.
+  // TODO: Call "SetDefaultHyperParameters" of GBT.
 
   // Select the loss function.
   if (spe_config->mutable_gbt()->loss() ==
@@ -473,7 +473,7 @@ TrainWithCache(
     // Initializing a new model.
     ASSIGN_OR_RETURN(model, InitializeModel(config, config_link, spe_config,
                                             data_spec, *loss));
-    // TODO(gbm): Send a ping to all the workers to make sure they all start
+    // TODO: Send a ping to all the workers to make sure they all start
     // loading the dataset cache immediately (instead of waiting the first
     // request).
 
@@ -538,7 +538,7 @@ TrainWithCache(
           utils::GetGreatestSnapshot(SnapshotDirectory(work_directory));
       if (!resync_iter_idx_status.ok()) {
         LOG(WARNING) << "No existing snapshot. Restart training from start.";
-        // TODO(gbm): Restart training without rebooting the trainer.
+        // TODO: Restart training without rebooting the trainer.
       }
       auto resync_iter_idx = resync_iter_idx_status.value();
 
@@ -748,9 +748,9 @@ absl::Status RunIteration(
             std::move(*weak_model.tree_builder->mutable_tree())));
   }
 
-  // TODO(gbm): Early stopping.
-  // TODO(gbm): Maximum training time.
-  // TODO(gbm): Training interruption.
+  // TODO: Early stopping.
+  // TODO: Maximum training time.
+  // TODO: Training interruption.
 
   // Note: The valiation evaluation is asynchronous and is generally (unless a
   // checkpoint was just made, or this is the last iteration) late by one
@@ -1007,14 +1007,14 @@ absl::Status EmitSetInitialPredictions(
   auto& request = *generic_request.mutable_set_initial_predictions();
   *request.mutable_label_statistics() = label_statistics;
 
-  // TODO(gbm): Implement multicast operations.
+  // TODO: Implement multicast operations.
   for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
        worker_idx++) {
     RETURN_IF_ERROR(
         distribute->AsynchronousProtoRequest(generic_request, worker_idx));
   }
 
-  // TODO(gbm): No need for an answer.
+  // TODO: No need for an answer.
   for (int reply_idx = 0; reply_idx < distribute->NumWorkers(); reply_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
@@ -1043,14 +1043,14 @@ EmitStartNewIter(const int iter_idx,
   request.set_iter_uid(utils::GenUniqueId());
   request.set_seed(seed);
 
-  // TODO(gbm): Implement multicast operations.
+  // TODO: Implement multicast operations.
   for (int worker_idx = 0; worker_idx < load_balancer->NumWorkers();
        worker_idx++) {
     RETURN_IF_ERROR(
         distribute->AsynchronousProtoRequest(generic_request, worker_idx));
   }
 
-  // TODO(gbm): No need for an answer.
+  // TODO: No need for an answer.
   for (int reply_idx = 0; reply_idx < load_balancer->NumWorkers();
        reply_idx++) {
     ASSIGN_OR_RETURN(
@@ -1119,7 +1119,7 @@ EmitFindSplits(
     RETURN_IF_ERROR(
         SetLoadBalancingRequest(worker_idx, load_balancer, &generic_request));
 
-    // TODO(gbm): Only ask for splits is num_selected_features>0. Note: The
+    // TODO: Only ask for splits is num_selected_features>0. Note: The
     // worker's code for FindSplit is responsible to clear the local split
     // evaluation.
 
@@ -1211,7 +1211,7 @@ absl::Status EmitEvaluateSplits(
         splits, request.add_split_per_weak_model());
   }
 
-  // TODO(gbm): Implement multicast operations.
+  // TODO: Implement multicast operations.
   for (int worker_idx = 0; worker_idx < load_balancer->NumWorkers();
        worker_idx++) {
     RETURN_IF_ERROR(
@@ -1311,12 +1311,12 @@ absl::Status EmitEndIter(int iter_idx, bool is_last_iteration,
   evaluator_request.set_synchronous_validation(is_last_iteration);
   for (const auto& weak_model : weak_models) {
     // Copy the new tree.
-    // TODO(gbm): Serialize the tree only one time instead of for each worker.
+    // TODO: Serialize the tree only one time instead of for each worker.
     EndIterTreeProtoWriter stream(evaluator_request.add_new_trees());
     RETURN_IF_ERROR(weak_model.tree_builder->tree().WriteNodes(&stream));
   }
 
-  // TODO(gbm): Implement multicast operations.
+  // TODO: Implement multicast operations.
   for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
        worker_idx++) {
     if (worker_idx < load_balancer->NumWorkers()) {
@@ -1332,7 +1332,7 @@ absl::Status EmitEndIter(int iter_idx, bool is_last_iteration,
     }
   }
 
-  // TODO(gbm): No need for an answer.
+  // TODO: No need for an answer.
   for (int reply_idx = 0; reply_idx < distribute->NumWorkers(); reply_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
@@ -1384,14 +1384,14 @@ absl::Status EmitRestoreCheckpoint(
   request.set_checkpoint_dir(file::JoinPath(work_directory, kFileNameCheckPoint,
                                             absl::StrCat(iter_idx)));
 
-  // TODO(gbm): Implement multicast operations.
+  // TODO: Implement multicast operations.
   for (int worker_idx = 0; worker_idx < distribute->NumWorkers();
        worker_idx++) {
     RETURN_IF_ERROR(
         distribute->AsynchronousProtoRequest(generic_request, worker_idx));
   }
 
-  // TODO(gbm): No need for an answer.
+  // TODO: No need for an answer.
   for (int reply_idx = 0; reply_idx < distribute->NumWorkers(); reply_idx++) {
     ASSIGN_OR_RETURN(
         const auto generic_result,
@@ -1545,7 +1545,7 @@ absl::Status EmitStartTraining(
   proto::WorkerRequest generic_request;
   generic_request.mutable_start_training();
 
-  // TODO(gbm): Implement multicast operations.
+  // TODO: Implement multicast operations.
   for (int worker_idx = 0; worker_idx < load_balancer->NumWorkers();
        worker_idx++) {
     RETURN_IF_ERROR(
@@ -1678,7 +1678,7 @@ absl::Status SampleFeatures(const std::vector<int>& features,
     return absl::OkStatus();
   }
 
-  // TODO(gbm): Use std::sample when available.
+  // TODO: Use std::sample when available.
   *sampled_features = features;
   std::shuffle(sampled_features->begin(), sampled_features->end(), *rnd);
   sampled_features->resize(num_sampled_features);

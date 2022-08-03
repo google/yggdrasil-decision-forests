@@ -38,7 +38,7 @@ namespace {
 // sensitivity to slow worker (higher is better), and the Ram usage of the
 // workers (lower is better).
 //
-// TODO(gbm): Parametrize or set automatically according to the amount of
+// TODO: Parametrize or set automatically according to the amount of
 // available RAM / CPU on each worker.
 constexpr int kNumParallelQueriesPerWorker = 5;
 
@@ -49,7 +49,7 @@ constexpr int kNumParallelQueriesPerWorker = 5;
 constexpr int kNumShardPerWorkers = 10;
 
 // List the typed shards and prefix from a typed sharded dataset path.
-// TODO(gbm): Distribute or multi-thread the listing of shards for large
+// TODO: Distribute or multi-thread the listing of shards for large
 // datasets.
 //
 // For example:
@@ -151,7 +151,7 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
   metadata.set_num_examples(data_spec.created_num_rows());
   metadata.set_num_shards_in_feature_cache(partial_meta_data.num_shards());
 
-  // TODO(gbm): Index the categorical-string features.
+  // TODO: Index the categorical-string features.
 
   // Copy / transform the raw feature values.
   RETURN_IF_ERROR(internal::ConvertPartialToFinalRawData(

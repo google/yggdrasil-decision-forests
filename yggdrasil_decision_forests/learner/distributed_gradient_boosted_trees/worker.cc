@@ -107,7 +107,7 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     }
 
     // Load the dataset in memory.
-    // TODO(gbm): Only load the necessary columns.
+    // TODO: Only load the necessary columns.
     validation_.dataset = absl::make_unique<dataset::VerticalDataset>();
     if (welcome_.validation_dataset_per_worker(EvaluationWorkerIdx()).empty()) {
       // Empty dataset.
@@ -300,7 +300,7 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
 
     case proto::WorkerRequest::kGetSplitValue:
       RETURN_IF_ERROR(check_worker_type(WorkerType::kTRAINER));
-      // TODO(gbm): Since the answer is large and the same for all the workers,
+      // TODO: Since the answer is large and the same for all the workers,
       // can the answer be somehow not duplicated in memory?
       RETURN_IF_ERROR(GetSplitValue(request.get_split_value(),
                                     result.mutable_get_split_value()));
@@ -711,7 +711,7 @@ absl::Status DistributedGradientBoostedTreesWorker::UpdateOwnedFeatures(
   }
 
   if (dataset_->IsNonBlockingLoadingInProgress()) {
-    // TODO(gbm): Just wait?
+    // TODO: Just wait?
     return absl::InternalError(absl::StrCat(
         "Unexpected change of loaded features while a non-blocking loading is "
         "in progress on worker #",
@@ -1073,7 +1073,7 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
   DCHECK(validation_.weak_model);
 
   // Run the weak model in batch mode over the validation dataset.
-  // TODO(gbm): Multi-thread evaluation.
+  // TODO: Multi-thread evaluation.
   const size_t batch_size = 1000;
   const auto num_prediction_dimensions =
       validation_.weak_model->NumPredictionDimension();

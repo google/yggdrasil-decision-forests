@@ -271,7 +271,7 @@ class AbstractModel {
   //
   // Does not set the ground truth and the weight fields in "prediction".
   //
-  // TODO(b/223183975): Add status.
+  // TODO: Add status.
   virtual void Predict(const dataset::VerticalDataset& dataset,
                        dataset::VerticalDataset::row_t row_idx,
                        proto::Prediction* prediction) const = 0;
@@ -287,7 +287,7 @@ class AbstractModel {
   //
   // Does not set the ground truth and the weight fields in "prediction".
   //
-  // TODO(b/223183975): Add status.
+  // TODO: Add status.
   virtual void Predict(const dataset::proto::Example& example,
                        proto::Prediction* prediction) const = 0;
 
@@ -470,7 +470,7 @@ class AbstractModel {
   // of the task=CLASSIFICATION model might not be a probability.
   bool classification_outputs_probabilities_ = true;
 
-  // TODO(gbm): Use proto::Metadata.
+  // TODO: Use proto::Metadata.
   // Note: Cannot use proto::Metadata with the version of protobuf linked by TF.
   MetaData metadata_;
 

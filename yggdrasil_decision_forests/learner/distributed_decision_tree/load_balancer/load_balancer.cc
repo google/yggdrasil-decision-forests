@@ -170,7 +170,7 @@ utils::StatusOr<bool> LoadBalancer::AddWorkDurationMeasurement(
       continue;
     }
 
-    // TODO(gbm): Use circular buffer.
+    // TODO: Use circular buffer.
     worker.measures.insert(worker.measures.begin(), measure);
     if (worker.measures.size() > options_.estimation_window_length()) {
       worker.measures.resize(options_.estimation_window_length());
@@ -426,7 +426,7 @@ absl::Status LoadBalancer::TryCreateBalancingOrders() {
     const auto src_worker = time_per_worker[src_time_idx].worker_idx;
     const auto dst_worker = time_per_worker[dst_time_idx].worker_idx;
 
-    // TODO(gbm): After the first one, all the other transfer costs are free.
+    // TODO: After the first one, all the other transfer costs are free.
     const double gain = time_per_worker[src_time_idx].time_per_features -
                         time_per_worker[dst_time_idx].time_per_features;
     if (gain <= 0) {
@@ -498,7 +498,7 @@ const std::vector<int>& LoadBalancer::FeaturesPerWorker(int worker) const {
 
 utils::StatusOr<double> LoadBalancer::CostPerFeatureType(
     int feature, const dataset_cache::proto::CacheMetadata& cache_metadata) {
-  // TODO(gbm): Tune these costs.
+  // TODO: Tune these costs.
   const double very_large = 1000000;
   const auto& col_metadata = cache_metadata.columns(feature);
   switch (col_metadata.type_case()) {

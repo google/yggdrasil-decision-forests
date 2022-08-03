@@ -120,7 +120,7 @@ metric::proto::EvaluationResults AbstractModel::Evaluate(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
     std::vector<model::proto::Prediction>* predictions) const {
-  // TODO(223183975): Fix.
+  // TODO: Fix.
   return EvaluateWithStatus(dataset, option, rnd, predictions).value();
 }
 
@@ -128,7 +128,7 @@ metric::proto::EvaluationResults AbstractModel::Evaluate(
     const absl::string_view typed_path,
     const metric::proto::EvaluationOptions& option,
     utils::RandomEngine* rnd) const {
-  // TODO(223183975): Fix.
+  // TODO: Fix.
   return EvaluateWithStatus(typed_path, option, rnd).value();
 }
 

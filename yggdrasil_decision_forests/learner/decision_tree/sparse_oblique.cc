@@ -273,7 +273,7 @@ utils::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
   ProjectionEvaluator projection_evaluator(train_dataset,
                                            config_link.numerical_features());
 
-  // TODO(gbm): To cache.
+  // TODO: To cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);
   const auto selected_weights = Extract(weights, selected_examples);
 

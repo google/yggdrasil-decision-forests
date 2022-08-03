@@ -174,7 +174,7 @@ class TrainAndTestTester : public ::testing::Test {
   // injected through initial dataset shuffeling and randomization of the pseudo
   // random number generator seed.
   //
-  // TODO(gbm): Default to true.
+  // TODO: Default to true.
   bool inject_random_noise_ = false;
 
  private:

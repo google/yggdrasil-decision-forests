@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-// TODO(gbm): Split the test by implementation.
+// TODO: Split the test by implementation.
 // Note: Do not add anymore loss test in this file. Instead, create a loss
 // specific test.
 
@@ -155,7 +155,7 @@ TEST(GradientBoostedTrees, UpdateGradientsBinaryFocalLoss) {
 
   const float test_prec = 0.000001f;
 
-  // TODO(gbm): Implement and use "AllElementsNear" matcher.
+  // TODO: Implement and use "AllElementsNear" matcher.
   ASSERT_THAT(gradients.front().gradient, SizeIs(4));
   // Values validated with tensorflow focal loss implementation
   // (tfa.losses.sigmoid_focal_crossentropy).

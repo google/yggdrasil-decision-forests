@@ -1047,7 +1047,7 @@ TEST(Metric, EvaluationOfRanking) {
   // R=1
   EXPECT_NEAR(MRR(eval), 1.0, 0.01);
 
-  // TODO(b/233555814): Fix.
+  // TODO: Fix.
   // EXPECT_NEAR(PrecisionAt1(eval), 1.0, 0.01);
 
   EXPECT_EQ(eval.ranking().num_groups(), 1);

@@ -40,7 +40,7 @@ namespace utils {
 
 // Name of the user.
 inline absl::optional<std::string> UserName() {
-   // TODO(gbm): Platform specific implementation.
+   // TODO: Platform specific implementation.
    return {};
 }
 

@@ -53,7 +53,7 @@ utils::StatusOr<float> GetWeightWithStatus(
     const proto::Example& example,
     const proto::LinkedWeightDefinition& weight_definition);
 
-// TODO(b/223183975): Update.
+// TODO: Update.
 float GetWeight(const VerticalDataset& dataset, VerticalDataset::row_t row,
                 const proto::LinkedWeightDefinition& weight_definition);
 float GetWeight(const proto::Example& example,

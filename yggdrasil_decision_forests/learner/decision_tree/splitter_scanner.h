@@ -76,7 +76,7 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
 
-// TODO(gbm): Explain the expected signature of FeatureBucket and LabelBucket.
+// TODO: Explain the expected signature of FeatureBucket and LabelBucket.
 template <typename FeatureBucket, typename LabelBucket>
 struct ExampleBucket {
   FeatureBucket feature;
@@ -1036,7 +1036,7 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
     const auto best_feature_value = feature_filler.GetValue(
         sorted_attributes[best_sorted_example_idx].example_idx_and_extra &
         example_idx_mask);
-    // TODO(gbm): Experiment with random splits in ]best_previous_feature_value,
+    // TODO: Experiment with random splits in ]best_previous_feature_value,
     // best_feature_value[.
 
     feature_filler.SetConditionFinalFromThresholds(

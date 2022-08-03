@@ -614,7 +614,7 @@ class VerticalDataset {
   template <typename T>
   utils::StatusOr<const T*> ColumnWithCastWithStatus(int col) const;
 
-  // TODO(b/223183975): Fix
+  // TODO: Fix
   template <typename T>
   const T* ColumnWithCast(int col) const;
 
@@ -636,7 +636,7 @@ class VerticalDataset {
   template <typename T>
   utils::StatusOr<T*> MutableColumnWithCastWithStatus(int col);
 
-  // TODO(b/223183975): Fix
+  // TODO: Fix
   template <typename T>
   T* MutableColumnWithCast(int col);
 
@@ -909,7 +909,7 @@ utils::StatusOr<const T*> VerticalDataset::ColumnWithCastWithStatus(
 
 template <typename T>
 const T* VerticalDataset::ColumnWithCast(int col) const {
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   return ColumnWithCastWithStatus<T>(col).value();
 }
 
@@ -946,7 +946,7 @@ utils::StatusOr<T*> VerticalDataset::MutableColumnWithCastWithStatus(int col) {
 
 template <typename T>
 T* VerticalDataset::MutableColumnWithCast(int col) {
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   return MutableColumnWithCastWithStatus<T>(col).value();
 }
 

@@ -543,7 +543,7 @@ std::vector<std::string> RandomForestModel::AvailableVariableImportances()
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
     case model::proto::Task::NUMERICAL_UPLIFT:
-      // TODO(gbm): Add uplift variable importances.
+      // TODO: Add uplift variable importances.
       break;
     default:
       LOG(FATAL) << "RandomForest for task " << model::proto::Task_Name(task())

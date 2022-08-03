@@ -222,7 +222,7 @@ absl::Status BinomialLogLikelihoodLoss::SetLeaf(
   //   (\sum_i weight[i] * (label[i] - p[i]) ) / (\sum_i weight[i] * p[i] *
   //   (1-p[i]))
   // with: p[i] = 1/(1+exp(-prediction)
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   const auto* labels =
       train_dataset
           .ColumnWithCastWithStatus<

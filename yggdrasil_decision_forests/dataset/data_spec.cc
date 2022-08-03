@@ -241,7 +241,7 @@ bool IsNumerical(ColumnType type) {
 
 int32_t CategoricalStringToValue(const std::string& value,
                                  const proto::Column& col_spec) {
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   return CategoricalStringToValueWithStatus(value, col_spec).value();
 }
 

@@ -79,7 +79,7 @@ absl::Status MultinomialLogLikelihoodLoss::TemplatedUpdateGradients(
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   static_assert(std::is_integral<T>::value, "Integral required.");
-  // TODO(gbm): Implement thread_pool.
+  // TODO: Implement thread_pool.
 
   // Set the gradient to:
   //   label_i - pred_i

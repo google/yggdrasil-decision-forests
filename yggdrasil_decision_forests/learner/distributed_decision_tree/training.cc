@@ -479,7 +479,7 @@ absl::Status TreeBuilder::FindBestSplitsWithFeatureCategorical(
         "training. Set categorical.algorithm_case=CART or disable distributed "
         "training.");
   }
-  // TODO(gbm): Implement the random splitter.
+  // TODO: Implement the random splitter.
 
   switch (config_.task()) {
     case model::proto::CLASSIFICATION: {
@@ -1058,7 +1058,7 @@ absl::Status UpdateExampleNodeMap(
     readers[node_idx].Open(split_evaluation[node_idx].data(), num_elements);
   }
 
-  // TODO(gbm): In parallel.
+  // TODO: In parallel.
   for (ExampleIndex example_idx = 0; example_idx < example_to_node->size();
        example_idx++) {
     auto& node_idx = (*example_to_node)[example_idx];

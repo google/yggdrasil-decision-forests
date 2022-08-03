@@ -118,7 +118,7 @@ absl::Status SetCategoricalUpliftLabelDistribution(
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   DCHECK(!weights.empty());
-  // TODO(b/223183975): Update.
+  // TODO: Update.
   ASSIGN_OR_RETURN(
       const auto* const outcomes,
       dataset.ColumnWithCastWithStatus<
@@ -3362,7 +3362,7 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureNumericalCart(
   LabelUpliftCategoricalOneValueBucket::Filler label_filler(
       label_stats.outcome_values, label_stats.treatment_values, weights);
 
-  // TODO(gbm): Add support for-presorted splitting.
+  // TODO: Add support for-presorted splitting.
 
   return FindBestSplit_LabelUpliftClassificationFeatureNumerical(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
@@ -3393,7 +3393,7 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureNumericalCart(
   LabelUpliftNumericalOneValueBucket::Filler label_filler(
       label_stats.outcome_values, label_stats.treatment_values, weights);
 
-  // TODO(gbm): Add support for pre-sorted splitting.
+  // TODO: Add support for pre-sorted splitting.
 
   return FindBestSplit_LabelUpliftNumericalFeatureNumerical(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
@@ -3427,7 +3427,7 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
       label_stats.treatment_values, weights,
       dt_config.uplift().empty_bucket__ordering());
 
-  // TODO(gbm): Add support for pre-sorted splitting.
+  // TODO: Add support for pre-sorted splitting.
 
   const auto algorithm =
       (num_attribute_classes < dt_config.categorical().arity_limit_for_random())
@@ -3480,7 +3480,7 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
       label_stats.treatment_values, weights,
       dt_config.uplift().empty_bucket__ordering());
 
-  // TODO(gbm): Add support for pre-sorted splitting.
+  // TODO: Add support for pre-sorted splitting.
 
   const auto algorithm =
       (num_attribute_classes < dt_config.categorical().arity_limit_for_random())

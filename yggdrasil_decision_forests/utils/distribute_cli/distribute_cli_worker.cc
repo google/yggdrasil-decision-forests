@@ -75,7 +75,7 @@ absl::Status Worker::RunCommand(const absl::string_view command,
   }
 
   std::string end_of_logs;
-  // TODO(gbm): Only remember the end of the file.
+  // TODO: Only remember the end of the file.
   const auto end_of_logs_or = file::GetContent(log_path);
   if (end_of_logs_or.ok()) {
     end_of_logs = std::move(end_of_logs_or).value();
@@ -103,7 +103,7 @@ absl::Status Worker::Setup(Blob serialized_welcome) {
 
 absl::Status Worker::Command(const proto::Request::Command& request,
                              proto::Result::Command* result) {
-  // TODO(gbm): Kill the command if "done_was_called_" becomes true.
+  // TODO: Kill the command if "done_was_called_" becomes true.
 
   result->set_internal_command_id(request.internal_command_id());
 

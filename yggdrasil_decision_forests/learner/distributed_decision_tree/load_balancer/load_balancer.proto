@@ -57,7 +57,7 @@ message LoadBalancerOptions {
   // of their features taken.
   optional float median_margin_ratio = 6 [default = 2.0];
 
-  // TODO(gbm): Implement multi-hops synchronization.
+  // TODO: Implement multi-hops synchronization.
 
   optional Internal internal = 8;
 
