@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <regex>  // NOLINT
 
+#include "absl/status/status.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -86,11 +87,22 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
     std::string regexp_filename =
         absl::StrReplaceAll(filename, {{".", "\\."}, {"*", ".*"}, {"?", "."}});
     std::regex regexp_pattern(regexp_filename);
-    for (auto& path : std::filesystem::directory_iterator(search_dir)) {
-      if (std::regex_match(path.path().filename().string(), regexp_pattern)) {
-        results->push_back(path.path().string());
+    std::error_code error;
+
+    const std::filesystem::directory_iterator path_end;
+    for (auto path = std::filesystem::directory_iterator(search_dir, error);
+         !error && path != path_end; path.increment(error)) {
+      if (!path->is_regular_file(error)) {
+        continue;
+      }
+      if (std::regex_match(path->path().filename().string(), regexp_pattern)) {
+        results->push_back(path->path().string());
       }
     }
+    if (error) {
+      return absl::InvalidArgumentError(error.message());
+    }
+
     std::sort(results->begin(), results->end());
     return absl::OkStatus();
   } catch (const std::exception& e) {
