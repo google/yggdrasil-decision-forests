@@ -34,11 +34,11 @@ namespace dataset {
 
 // Load the dataset content from a file (or a set of files).
 //
-// If "ensure_non_missing" is not provided, all the columns specified in
+// If "required_columns" is not provided, all the columns specified in
 // "data_spec" should be present in the dataset (some of the values can still
-// be missing). If "ensure_non_missing" is provided, only the columns in
-// "ensure_non_missing" should be present. If a column non defined in
-// "ensure_non_missing" is not present, all its value will be assumed to be
+// be missing). If "required_columns" is provided, only the columns in
+// "required_columns" should be present. If a column non defined in
+// "required_columns" is not present, all its value will be assumed to be
 // "missing".
 //
 // Args:
@@ -46,9 +46,9 @@ namespace dataset {
 //     "csv:/tmp/dataset.csv". Support sharding, globbing and comma separate
 //     paths.
 //   data_spec: Definition of the dataset columns. dataset: Where to store the
-//     dataset. ensure_non_missing: Control if non existing features are
+//     dataset. required_columns: Control if non existing features are
 //     allowed. See comment above for the specific semantic of
-//     "ensure_non_missing".
+//     "required_columns".
 //   num_threads: Number of reading threads. Only used for multi-sharded
 //     datasets. num_threads=1 is more memory efficient than num_threads>1.
 //   load_columns: If specified, only load this subset of columns.
@@ -67,7 +67,7 @@ struct LoadConfig {
 absl::Status LoadVerticalDataset(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
     VerticalDataset* dataset,
-    absl::optional<std::vector<int>> ensure_non_missing = {},
+    absl::optional<std::vector<int>> required_columns = {},
     const LoadConfig& config = {});
 
 // Save the dataset to a file (or a set of files). If

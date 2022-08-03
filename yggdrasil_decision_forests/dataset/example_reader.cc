@@ -39,7 +39,7 @@ namespace dataset {
 utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>> ensure_non_missing) {
+    const absl::optional<std::vector<int>> required_columns) {
   std::string sharded_path;
   proto::DatasetFormat format;
   std::tie(sharded_path, format) = GetDatasetPathAndType(typed_path);
@@ -47,7 +47,7 @@ utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
   const std::string& format_name = proto::DatasetFormat_Name(format);
   ASSIGN_OR_RETURN(auto reader,
                    ExampleReaderInterfaceRegisterer::Create(
-                       format_name, data_spec, ensure_non_missing),
+                       format_name, data_spec, required_columns),
                    _ << "When creating an example reader to read "
                      << sharded_path
                      << ". Make sure the format dependency is linked");

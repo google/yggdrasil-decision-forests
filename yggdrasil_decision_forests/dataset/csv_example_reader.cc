@@ -42,8 +42,8 @@ using proto::ColumnType;
 
 CsvExampleReader::Implementation::Implementation(
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>> ensure_non_missing)
-    : data_spec_(data_spec), ensure_non_missing_(ensure_non_missing) {}
+    const absl::optional<std::vector<int>> required_columns)
+    : data_spec_(data_spec), required_columns_(required_columns) {}
 
 absl::Status CsvExampleReader::Implementation::OpenShard(
     const absl::string_view path) {
@@ -59,8 +59,8 @@ absl::Status CsvExampleReader::Implementation::OpenShard(
 
   if (csv_header_.empty()) {
     csv_header_ = {new_header->begin(), new_header->end()};
-    RETURN_IF_ERROR(BuildColIdxToFeatureLabelIdx(data_spec_, csv_header_,
-                                                 &col_idx_to_field_idx_));
+    RETURN_IF_ERROR(BuildColIdxToFeatureLabelIdx(
+        data_spec_, csv_header_, required_columns_, &col_idx_to_field_idx_));
   } else {
     if (!std::equal(csv_header_.begin(), csv_header_.end(), new_header->begin(),
                     new_header->end())) {
@@ -86,8 +86,8 @@ utils::StatusOr<bool> CsvExampleReader::Implementation::NextInShard(
 
 CsvExampleReader::CsvExampleReader(
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>> ensure_non_missing)
-    : sharded_csv_reader_(data_spec, ensure_non_missing) {}
+    const absl::optional<std::vector<int>> required_columns)
+    : sharded_csv_reader_(data_spec, required_columns) {}
 
 // Does this value looks like to be a numerical value?
 bool LooksLikeANumber(const absl::string_view value) {
@@ -281,7 +281,7 @@ absl::Status CsvDataSpecCreator::ComputeColumnStatistics(
     if (csv_header.empty()) {
       // Create the dataspec columns.
       csv_header = {row->begin(), row->end()};
-      RETURN_IF_ERROR(BuildColIdxToFeatureLabelIdx(*data_spec, csv_header,
+      RETURN_IF_ERROR(BuildColIdxToFeatureLabelIdx(*data_spec, csv_header, {},
                                                    &col_idx_to_field_idx));
     } else {
       if (!std::equal(csv_header.begin(), csv_header.end(), row->begin(),

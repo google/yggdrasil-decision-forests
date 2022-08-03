@@ -51,12 +51,23 @@ constexpr auto kDiscretizedNumericalMissingValue =
 constexpr char CSV_NA[] = "na";
 constexpr char CSV_NA_V2[] = "nan";
 
-// Build the mapping from col idx to a given vector of field names. If one of
-// the field does not exist i.e. a column name is not matched to field, the
-// function fails.
+// Build the mapping from col idx to a given vector of field names.
+//
+// If "required_columns" is not provided, all the columns are required.
+// If "required_columns" is provided, only the columns in "required_columns" are
+// required. Missing and non-required column receive the field index -1.
+//
+// For example, if "required_columns={1,2}" and if column "3" is not in the
+// fields (i.e. column  "3" is missing), the column "3 will be considered to be
+// filled with missing values. However, if column "1" is not in the fields, and
+// error will be raised.
+//
+// Another example, if "required_columns={}", andy column can be missing. Such
+// missing column will be filled with missing values.
 absl::Status BuildColIdxToFeatureLabelIdx(
     const proto::DataSpecification& data_spec,
     const std::vector<std::string>& fields,
+    const absl::optional<std::vector<int>>& required_columns,
     std::vector<int>* col_idx_to_field_idx);
 
 // Returns a sorted list (in increasing order of column idx) of column idxs from
@@ -78,6 +89,8 @@ absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
                                 proto::Example* example);
 
 // Converts a single row from a csv into an Example.
+// If col_idx_to_field_idx[i] == -1, all the values of the i-th column are
+// replaced by empty values.
 absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
                              const proto::DataSpecification& data_spec,
                              const std::vector<int>& col_idx_to_field_idx,

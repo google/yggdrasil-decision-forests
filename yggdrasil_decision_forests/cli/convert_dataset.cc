@@ -85,15 +85,15 @@ void ConvertDataset() {
                                  file::Defaults()));
   }
 
-  absl::optional<std::vector<int>> ensure_non_missing;
+  absl::optional<std::vector<int>> required_columns;
   if (absl::GetFlag(FLAGS_ignore_missing_columns)) {
     // Ignore all missing columns.
-    ensure_non_missing = std::vector<int>{};
+    required_columns = std::vector<int>{};
   }
 
   // Create the reader.
   auto reader = dataset::CreateExampleReader(absl::GetFlag(FLAGS_input),
-                                             data_spec, ensure_non_missing)
+                                             data_spec, required_columns)
                     .value();
 
   // Create the writer.

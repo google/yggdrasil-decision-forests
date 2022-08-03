@@ -242,7 +242,7 @@ AbstractLearner::TrainWithStatus(
 
   dataset::VerticalDataset train_dataset;
   RETURN_IF_ERROR(LoadVerticalDataset(typed_path, data_spec, &train_dataset,
-                                      /*ensure_non_missing=*/{},
+                                      /*required_columns=*/{},
                                       dataset_loading_config));
 
   RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
@@ -253,7 +253,7 @@ AbstractLearner::TrainWithStatus(
   if (typed_valid_path.has_value()) {
     RETURN_IF_ERROR(LoadVerticalDataset(
         typed_valid_path.value(), data_spec, &valid_dataset_data,
-        /*ensure_non_missing=*/{}, dataset_loading_config));
+        /*required_columns=*/{}, dataset_loading_config));
     valid_dataset = valid_dataset_data;
   }
   return TrainWithStatus(train_dataset, valid_dataset);

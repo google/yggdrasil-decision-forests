@@ -241,8 +241,8 @@ absl::Status UpdateDataSpecWithTFExample(
 
 TFExampleReaderToExampleReader::TFExampleReaderToExampleReader(
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>> ensure_non_missing)
-    : data_spec_(data_spec), ensure_non_missing_(ensure_non_missing) {}
+    const absl::optional<std::vector<int>> required_columns)
+    : data_spec_(data_spec), required_columns_(required_columns) {}
 
 absl::Status TFExampleReaderToExampleReader::Open(
     absl::string_view sharded_path) {

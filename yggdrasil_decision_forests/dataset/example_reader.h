@@ -54,16 +54,16 @@ namespace dataset {
 //   - sstable of tf.Examples
 //   - recordio of tf.Examples
 //
-// If "ensure_non_missing" is not provided, all the columns specified in
+// If "required_columns" is not provided, all the columns specified in
 // "data_spec" should be present in the dataset (some of the values can still
-// be missing). If "ensure_non_missing" is provided, only the columns in
-// "ensure_non_missing" should be present. If a column non defined in
-// "ensure_non_missing" is not present, all its value will be assumed to be
+// be missing). If "required_columns" is provided, only the columns in
+// "required_columns" should be present. If a column non defined in
+// "required_columns" is not present, all its value will be assumed to be
 // "missing".
 //
 utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
-    absl::optional<std::vector<int>> ensure_non_missing = {});
+    absl::optional<std::vector<int>> required_columns = {});
 
 // Checks if the format of a typed dataset is supported i.e. a dataset reader is
 // registered for this format. Returns true, if the format is supported. Returns

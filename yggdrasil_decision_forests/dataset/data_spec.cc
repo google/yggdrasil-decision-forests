@@ -270,6 +270,7 @@ utils::StatusOr<int32_t> CategoricalStringToValueWithStatus(
 absl::Status BuildColIdxToFeatureLabelIdx(
     const proto::DataSpecification& data_spec,
     const std::vector<std::string>& fields,
+    const absl::optional<std::vector<int>>& required_columns,
     std::vector<int>* col_idx_to_field_idx) {
   col_idx_to_field_idx->resize(data_spec.columns_size());
   for (int col_idx = 0; col_idx < data_spec.columns_size(); col_idx++) {
@@ -277,11 +278,26 @@ absl::Status BuildColIdxToFeatureLabelIdx(
     auto it_col_in_feature_names =
         std::find(fields.begin(), fields.end(), col_name);
     if (it_col_in_feature_names == fields.end()) {
+      // The dataspec column does not exist in the fields.
+
+      if (required_columns.has_value()) {
+        const bool column_is_optional =
+            std::find(required_columns.value().begin(),
+                      required_columns.value().end(),
+                      col_idx) == required_columns.value().end();
+        if (column_is_optional) {
+          (*col_idx_to_field_idx)[col_idx] = -1;
+          continue;
+        }
+      }
+
       return absl::InvalidArgumentError(absl::StrCat(
           "The column \"", col_name,
           "\" specified in the datasetspec was not found in the csv."));
+    } else {
+      (*col_idx_to_field_idx)[col_idx] =
+          it_col_in_feature_names - fields.begin();
     }
-    (*col_idx_to_field_idx)[col_idx] = it_col_in_feature_names - fields.begin();
   }
   return absl::OkStatus();
 }

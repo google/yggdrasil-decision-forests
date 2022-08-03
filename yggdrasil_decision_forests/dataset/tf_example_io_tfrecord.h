@@ -49,8 +49,8 @@ class TFRecordTFEToExampleReaderInterface
  public:
   TFRecordTFEToExampleReaderInterface(
       const proto::DataSpecification& data_spec,
-      absl::optional<std::vector<int>> ensure_non_missing)
-      : TFExampleReaderToExampleReader(data_spec, ensure_non_missing) {}
+      absl::optional<std::vector<int>> required_columns)
+      : TFExampleReaderToExampleReader(data_spec, required_columns) {}
 
   std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
     return absl::make_unique<TFRecordTFExampleReader>();

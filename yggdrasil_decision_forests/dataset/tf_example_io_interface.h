@@ -94,7 +94,7 @@ class TFExampleReaderToExampleReader : public ExampleReaderInterface {
 
   TFExampleReaderToExampleReader(
       const proto::DataSpecification& data_spec,
-      absl::optional<std::vector<int>> ensure_non_missing);
+      absl::optional<std::vector<int>> required_columns);
 
   absl::Status Open(absl::string_view sharded_path) override;
 
@@ -104,7 +104,7 @@ class TFExampleReaderToExampleReader : public ExampleReaderInterface {
   std::unique_ptr<AbstractTFExampleReader> tf_reader_;
   tensorflow::Example tfexample_buffer_;
   const proto::DataSpecification data_spec_;
-  const absl::optional<std::vector<int>> ensure_non_missing_;
+  const absl::optional<std::vector<int>> required_columns_;
 };
 
 // Wrapper around a TFExampleReader with the signature of an dataspec generator.

@@ -46,7 +46,7 @@ namespace {
 absl::Status LoadVerticalDatasetSingleThread(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec, VerticalDataset* dataset,
-    absl::optional<std::vector<int>> ensure_non_missing,
+    absl::optional<std::vector<int>> required_columns,
     const LoadConfig& config) {
   // Initialize dataset.
   dataset->set_data_spec(data_spec);
@@ -55,7 +55,7 @@ absl::Status LoadVerticalDatasetSingleThread(
 
   // Read and record the examples.
   ASSIGN_OR_RETURN(auto reader, CreateExampleReader(typed_path, data_spec,
-                                                    ensure_non_missing));
+                                                    required_columns));
 
   // Number of skipped example because of "config.load_example".
   std::size_t skipped_examples = 0;
@@ -97,12 +97,12 @@ struct BlockOfExamples {
 // Reads a shard.
 utils::StatusOr<std::unique_ptr<BlockOfExamples>> LoadShard(
     const proto::DataSpecification& data_spec, const absl::string_view prefix,
-    const absl::optional<std::vector<int>>& ensure_non_missing,
+    const absl::optional<std::vector<int>>& required_columns,
     const absl::string_view shard) {
   auto block = absl::make_unique<BlockOfExamples>();
   ASSIGN_OR_RETURN(auto reader,
                    CreateExampleReader(absl::StrCat(prefix, ":", shard),
-                                       data_spec, ensure_non_missing));
+                                       data_spec, required_columns));
   auto* example = google::protobuf::Arena::CreateMessage<proto::Example>(&block->arena);
   utils::StatusOr<bool> status;
   while ((status = reader->Next(example)).ok() && status.value()) {
@@ -117,7 +117,7 @@ utils::StatusOr<std::unique_ptr<BlockOfExamples>> LoadShard(
 absl::Status LoadVerticalDataset(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec, VerticalDataset* dataset,
-    absl::optional<std::vector<int>> ensure_non_missing,
+    absl::optional<std::vector<int>> required_columns,
     const LoadConfig& config) {
   // Extract the shards from the dataset path.
   std::string path, prefix;
@@ -128,7 +128,7 @@ absl::Status LoadVerticalDataset(
   if (shards.size() <= 1 || config.num_threads <= 1) {
     // Loading in a single thread.
     return LoadVerticalDatasetSingleThread(typed_path, data_spec, dataset,
-                                           ensure_non_missing, config);
+                                           required_columns, config);
   }
 
   // Initialize dataset.
@@ -139,7 +139,7 @@ absl::Status LoadVerticalDataset(
   // Reads the examples in a shard.
   const auto load_shard = [&](const std::string shard)
       -> utils::StatusOr<std::unique_ptr<BlockOfExamples>> {
-    return LoadShard(data_spec, prefix, ensure_non_missing, shard);
+    return LoadShard(data_spec, prefix, required_columns, shard);
   };
 
   utils::concurrency::StreamProcessor<

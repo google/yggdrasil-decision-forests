@@ -827,6 +827,26 @@ TEST(Dataset, GenDiscretizedBoundariesWithSpecialValues) {
               ElementsAre(1.5, 2.5, 3.5, std::nextafter(5.f, 4.f)));
 }
 
+TEST(Dataset, BuildColIdxToFeatureLabelIdx) {
+  const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+      R"pb(
+        columns { type: NUMERICAL name: "a" }
+        columns { type: NUMERICAL name: "b" }
+      )pb");
+  std::vector<int> map;
+  EXPECT_THAT(BuildColIdxToFeatureLabelIdx(data_spec, {"a"}, {}, &map),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+
+  EXPECT_THAT(BuildColIdxToFeatureLabelIdx(data_spec, {"a"},
+                                           std::vector<int>{0, 1}, &map),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+
+  EXPECT_OK(BuildColIdxToFeatureLabelIdx(data_spec, {"a"}, std::vector<int>{0},
+                                         &map));
+
+  EXPECT_THAT(map, ElementsAre(0, -1));
+}
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

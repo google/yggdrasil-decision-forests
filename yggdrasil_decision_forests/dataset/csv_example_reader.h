@@ -45,9 +45,8 @@ namespace dataset {
 // interface.
 class CsvExampleReader final : public ExampleReaderInterface {
  public:
-  explicit CsvExampleReader(
-      const proto::DataSpecification& data_spec,
-      absl::optional<std::vector<int>> ensure_non_missing);
+  explicit CsvExampleReader(const proto::DataSpecification& data_spec,
+                            absl::optional<std::vector<int>> required_columns);
 
   utils::StatusOr<bool> Next(proto::Example* example) override {
     return sharded_csv_reader_.Next(example);
@@ -60,9 +59,8 @@ class CsvExampleReader final : public ExampleReaderInterface {
  private:
   class Implementation final : public utils::ShardedReader<proto::Example> {
    public:
-    explicit Implementation(
-        const proto::DataSpecification& data_spec,
-        absl::optional<std::vector<int>> ensure_non_missing);
+    explicit Implementation(const proto::DataSpecification& data_spec,
+                            absl::optional<std::vector<int>> required_columns);
 
    protected:
     // Opens the .csv file at "path", and check that the header is as expected.
@@ -85,7 +83,7 @@ class CsvExampleReader final : public ExampleReaderInterface {
     // Header of the csv file.
     std::vector<std::string> csv_header_;
 
-    const absl::optional<std::vector<int>> ensure_non_missing_;
+    const absl::optional<std::vector<int>> required_columns_;
   };
 
   Implementation sharded_csv_reader_;
