@@ -202,10 +202,18 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   // Evaluate the model.
   utils::RandomEngine rnd(1234);
   evaluation_ = model_->Evaluate(test_dataset_, eval_options_, &rnd);
-  std::string evaluation_description;
-  CHECK_OK(
-      metric::AppendTextReportWithStatus(evaluation_, &evaluation_description));
+
+  // Print the model evaluation.
+  const auto evaluation_description = metric::TextReport(evaluation_).value();
   LOG(INFO) << "Evaluation:\n" << evaluation_description;
+
+  // Export the evaluation to a html file.
+  std::string html_evaluation_report;
+  CHECK_OK(metric::AppendHtmlReport(evaluation_, &html_evaluation_report));
+  const auto html_report_path =
+      file::JoinPath(test::TmpDirectory(), test_dir_, "evaluation.html");
+  LOG(INFO) << "Export html report to: " << html_report_path;
+  CHECK_OK(file::SetContent(html_report_path, html_evaluation_report));
 
   if (!check_model) {
     return;

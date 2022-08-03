@@ -47,6 +47,9 @@ ABSL_FLAG(std::string, options, "",
           "Path to optional evaluation configuration. proto::EvaluationOptions "
           "Text proto.");
 
+ABSL_FLAG(std::string, format, "text",
+          "Output format of the evaluation. Can be: text, html.");
+
 constexpr char kUsageMessage[] = "Evaluates a model.";
 
 namespace yggdrasil_decision_forests {
@@ -82,9 +85,19 @@ void Evaluate() {
   // evaluate model.
   evaluation = model->Evaluate(absl::GetFlag(FLAGS_dataset), options, &rnd);
 
-  std::string text_report;
-  CHECK_OK(metric::AppendTextReportWithStatus(evaluation, &text_report));
-  std::cout << "Evaluation:" << std::endl << text_report;
+  const auto format = absl::GetFlag(FLAGS_format);
+  if (format == "text") {
+    std::string report;
+    CHECK_OK(metric::AppendTextReportWithStatus(evaluation, &report));
+    std::cout << "Evaluation:" << std::endl << report;
+  } else if (format == "html") {
+    std::string report;
+    CHECK_OK(metric::AppendHtmlReport(evaluation, &report));
+    std::cout << report;
+  } else {
+    LOG(FATAL) << "Unknown output format: " << format
+               << ". Possible values are: text, html.";
+  }
 }
 
 }  // namespace cli

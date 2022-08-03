@@ -44,6 +44,14 @@ absl::Status AppendTextReportRanking(const proto::EvaluationResults& eval,
 absl::Status AppendTextReportUplift(const proto::EvaluationResults& eval,
                                     std::string* report);
 
+// Add the report in a html format.
+struct HtmlReportOptions {
+  bool include_text_report = true;
+};
+absl::Status AppendHtmlReport(const proto::EvaluationResults& eval,
+                              std::string* html_report,
+                              const HtmlReportOptions& options = {});
+
 }  // namespace metric
 }  // namespace yggdrasil_decision_forests
 

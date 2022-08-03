@@ -152,6 +152,31 @@ using Html = internal::Html;
 // Tags.
 
 template <typename... Args>
+Html H1(Args... args) {
+  return internal::Tag("h1", args...);
+}
+
+template <typename... Args>
+Html H2(Args... args) {
+  return internal::Tag("h2", args...);
+}
+
+template <typename... Args>
+Html H3(Args... args) {
+  return internal::Tag("h3", args...);
+}
+
+template <typename... Args>
+Html H4(Args... args) {
+  return internal::Tag("h4", args...);
+}
+
+template <typename... Args>
+Html Pre(Args... args) {
+  return internal::Tag("pre", args...);
+}
+
+template <typename... Args>
 Html Th(Args... args) {
   return internal::Tag("th", args...);
 }

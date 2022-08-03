@@ -36,6 +36,11 @@ absl::Status Curve::Check() const {
   return absl::OkStatus();
 }
 
+absl::Status Bars::Check() const {
+  STATUS_CHECK(centers.size() == heights.size());
+  return absl::OkStatus();
+}
+
 absl::Status Plot::Check() const {
   for (const auto& item : items) {
     RETURN_IF_ERROR(item->Check());
@@ -61,14 +66,26 @@ absl::Status MultiPlot::Check() const {
   return absl::OkStatus();
 }
 
+absl::Status Bars::FromHistogram(
+    const utils::histogram::Histogram<float>& hist) {
+  centers.clear();
+  heights.clear();
+  for (int bucket_idx = 0; bucket_idx < hist.counts().size(); bucket_idx++) {
+    heights.push_back(hist.counts()[bucket_idx]);
+    centers.push_back(
+        (hist.bounds()[bucket_idx] + hist.bounds()[bucket_idx + 1]) / 2);
+  }
+  return absl::OkStatus();
+}
+
 utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
                                           const ExportOptions& options) {
   if (options.run_checks) {
     RETURN_IF_ERROR(plot.Check());
   }
   switch (options.target_library) {
-    case TargetLibrary::kC3JS:
-      return internal::c3js::ExportToHtml(plot, options);
+    case TargetLibrary::kPlotly:
+      return internal::plotly::ExportToHtml(plot, options);
   }
 }
 
@@ -81,10 +98,9 @@ utils::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
   std::string html;
 
   // Create a grid of size num_cols x num_rows.
-  absl::SubstituteAndAppend(&html,
-                            "<div style='display: grid; gap: 0px; "
-                            "grid-template-columns: repeat($0, $1fr);'>",
-                            multiplot.num_rows, multiplot.num_cols);
+  absl::StrAppend(&html,
+                  "<div style='display: grid; gap: 0px; "
+                  "grid-auto-columns: min-content;'>");
 
   for (int item_idx = 0; item_idx < multiplot.items.size(); item_idx++) {
     const auto& item = multiplot.items[item_idx];
@@ -112,58 +128,77 @@ utils::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
 }
 
 namespace internal {
-namespace c3js {
 
-// Adds the c3js header.
-absl::Status AppendC3header(std::string* html) {
-  // Note: There is a tight compatibility matching between the version of c3 and
-  // d3.
+namespace plotly {
+
+// Adds the plotly header.
+absl::Status AppendHeader(std::string* html) {
   absl::SubstituteAndAppend(
-      html,
-      R"(
-<link href="$0" rel="stylesheet">
-<script src="$1" charset="utf-8"></script>
-<script src="$2"></script>
-)",
-      "https://www.gstatic.com/external_hosted/c3/c3.min.css",
-      "https://d3js.org/d3.v3.min.js",
-      "https://www.gstatic.com/external_hosted/c3/c3.min.js");
+      html, "<script src='$0'></script>",
+      "https://www.gstatic.com/external_hosted/plotly/plotly.min.js");
   return absl::OkStatus();
-}
-
-// Adds a new column in "column" format.
-void NewColumn(const absl::string_view key, const std::vector<double>& values,
-               ExportAccumulator* export_acc) {
-  absl::SubstituteAndAppend(&export_acc->data_columns, "\n['$0', ", key);
-  absl::StrAppend(&export_acc->data_columns, absl::StrJoin(values, ","));
-  absl::StrAppend(&export_acc->data_columns, "],");
 }
 
 absl::Status ExportCurveToHtml(const Curve& curve, const int item_idx,
                                const ExportOptions& options,
                                ExportAccumulator* export_acc) {
-  // Note: The main_col_name is not displayed in the plot. Instead, it is the
-  // way to reference the plot item.
-  const auto main_col_name = absl::StrCat("curve_", item_idx);
+  absl::StrAppend(&export_acc->data, "{\n");
 
-  // Y values.
-  NewColumn(main_col_name, curve.ys, export_acc);
-
-  // X values.
+  // Xs.
   if (!curve.xs.empty()) {
-    const std::string x_col_name = absl::StrCat("curve_", item_idx, "_x");
-    NewColumn(x_col_name, curve.xs, export_acc);
-    absl::SubstituteAndAppend(&export_acc->data_xs, "'$0': '$1',",
-                              main_col_name, x_col_name);
+    absl::SubstituteAndAppend(&export_acc->data, "x: [$0],\n",
+                              absl::StrJoin(curve.xs, ","));
   }
 
-  // Display label.
-  const auto effective_label = curve.label.empty()
-                                   ? absl::StrCat("item ", item_idx)
-                                   : html::Escape(curve.label);
-  absl::SubstituteAndAppend(&export_acc->data_names, " $0: '$1',",
-                            main_col_name, effective_label);
+  std::string line_style;
+  switch (curve.style) {
+    case LineStyle::SOLID:
+      line_style = "solid";
+      break;
+    case LineStyle::DOTTED:
+      line_style = "dot";
+      break;
+  }
 
+  absl::SubstituteAndAppend(&export_acc->data, R"(y: [$0],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: '$1',
+  width: 1
+},
+)",
+                            absl::StrJoin(curve.ys, ","),  // $0
+                            line_style                     // $1
+  );
+
+  // Label.
+  if (!curve.label.empty()) {
+    absl::SubstituteAndAppend(&export_acc->data, "name: '$0',\n", curve.label);
+  }
+
+  absl::StrAppend(&export_acc->data, "},\n");
+  return absl::OkStatus();
+}
+
+absl::Status ExportBarsToHtml(const Bars& bars, const int item_idx,
+                              const ExportOptions& options,
+                              ExportAccumulator* export_acc) {
+  absl::StrAppend(&export_acc->data, "{\n");
+
+  absl::SubstituteAndAppend(&export_acc->data, "x: [$0],\n",
+                            absl::StrJoin(bars.centers, ","));
+
+  absl::SubstituteAndAppend(&export_acc->data, R"(y: [$0],
+type: 'bar',
+)",
+                            absl::StrJoin(bars.heights, ","));
+
+  if (!bars.label.empty()) {
+    absl::SubstituteAndAppend(&export_acc->data, "name: '$0',\n", bars.label);
+  }
+
+  absl::StrAppend(&export_acc->data, "},\n");
   return absl::OkStatus();
 }
 
@@ -178,8 +213,13 @@ absl::Status ExportPlotItemToHtml(const PlotItem* item, const int item_idx,
     return ExportCurveToHtml(*curve, item_idx, options, export_acc);
   }
 
+  const auto* bars = dynamic_cast<const Bars*>(item);
+  if (bars) {
+    return ExportBarsToHtml(*bars, item_idx, options, export_acc);
+  }
+
   return absl::UnimplementedError(
-      "Support for this plot item not implemented in c3js");
+      "Support for this plot item not implemented in plotly");
 }
 
 // Specialization of ExportToHtml for c3js.
@@ -198,30 +238,10 @@ utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
 
   // Library header
   if (options.first_export) {
-    RETURN_IF_ERROR(AppendC3header(&html));
+    RETURN_IF_ERROR(AppendHeader(&html));
   }
 
   ExportAccumulator export_acc;
-
-  // Plot title
-  if (!plot.title.empty()) {
-    absl::SubstituteAndAppend(&export_acc.extra, "\ntitle: { text: '$0'},",
-                              html::Escape(plot.title));
-  }
-
-  // Axes
-  if (!plot.x_axis.label.empty()) {
-    absl::SubstituteAndAppend(
-        &export_acc.axis,
-        "\nx: { label: { text: '$0', position: 'outer-center' } },",
-        html::Escape(plot.x_axis.label));
-  }
-  if (!plot.y_axis.label.empty()) {
-    absl::SubstituteAndAppend(
-        &export_acc.axis,
-        "\ny: { label: { text: '$0', position: 'outer-middle' } },",
-        html::Escape(plot.y_axis.label));
-  }
 
   // Items in the plot.
   for (int item_idx = 0; item_idx < plot.items.size(); item_idx++) {
@@ -232,30 +252,61 @@ utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
 
   // Export the html
   absl::SubstituteAndAppend(&html,
-                            R"(<div id="$0"></div>
+                            R"(
+<div id="$0" style="display: inline-block;" ></div>
 <script>
-var $0 = c3.generate({
-  bindto: '#$0',
-  data: {
-      columns: [$1
-      ],
-      names: {$2
+  Plotly.newPlot(
+    '$0',
+    [$1],
+    {
+      width: $5,
+      height: $6,
+      title: '$2',
+      showlegend: $7,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '$3',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '$4',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
       },
-      xs: {$3
-      },
-  },
-  axis: {$4
-  },$5
-});
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,
+    }
+  );
 </script>
 )",
-                            chart_id, export_acc.data_columns,
-                            export_acc.data_names, export_acc.data_xs,
-                            export_acc.axis, export_acc.extra);
+                            chart_id,                            // $0
+                            export_acc.data,                     // $1
+                            html::Escape(plot.title),            // $2
+                            html::Escape(plot.x_axis.label),     // $3
+                            html::Escape(plot.y_axis.label),     // $4
+                            options.width,                       // $5
+                            options.height,                      // $6
+                            plot.show_legend ? "true" : "false"  // $7
+  );
   return html;
 }
+}  // namespace plotly
 
-}  // namespace c3js
 }  // namespace internal
 }  // namespace plot
 }  // namespace utils

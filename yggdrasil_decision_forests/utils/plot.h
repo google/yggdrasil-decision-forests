@@ -14,7 +14,7 @@
  */
 
 // Plot is a library to create simple plots, and export them in other plotting
-// libraries (currently, only c3js).
+// libraries (currently, only plotly).
 //
 // This library does not aim to be a complete plotting library. Instead, it
 // should only implement what is needed by the yggdrasil library. For a more
@@ -44,6 +44,7 @@
 
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/histogram.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -51,25 +52,21 @@ namespace plot {
 
 namespace internal {
 
-// Function related to the export to the c3js library.
-namespace c3js {
+// Function related to the export to the plotly library.
+namespace plotly {
 
 // Plot in construction.
 struct ExportAccumulator {
-  // The name of those field match the fields of c3.
-  std::string data_columns;
-  std::string data_names;
-  std::string data_xs;
-  std::string axis;
-  std::string extra;
+  // The name of those field match the plotly fields.
+  std::string data;
 };
 
-}  // namespace c3js
+}  // namespace plotly
 }  // namespace internal
 
 // What library to use to export the plots.
 enum class TargetLibrary {
-  kC3JS,  // See c3js.org
+  kPlotly,  // See plotly.com/javascript
 };
 
 // Configuration to export the plot to html.
@@ -81,7 +78,11 @@ struct ExportOptions {
   bool run_checks = true;
 
   // The library to use to export the plot.
-  TargetLibrary target_library = TargetLibrary::kC3JS;
+  TargetLibrary target_library = TargetLibrary::kPlotly;
+
+  // Dimension of the plot in px.
+  int width = 600;
+  int height = 400;
 };
 
 // A plot item is the base class for plot content.
@@ -89,6 +90,9 @@ struct PlotItem {
   virtual absl::Status Check() const = 0;
   virtual ~PlotItem() = default;
 };
+
+// Line drawing style.
+enum class LineStyle { SOLID, DOTTED };
 
 // A curve is a set of connected points.
 struct Curve : PlotItem {
@@ -104,6 +108,22 @@ struct Curve : PlotItem {
   // List of x values. If empty, the xs are taken in [0, ys.length). If not
   // empty, should be of the same size as "ys".
   std::vector<double> xs;
+
+  LineStyle style = LineStyle::SOLID;
+};
+
+// A curve is a set of connected points.
+struct Bars : PlotItem {
+  absl::Status Check() const override;
+
+  absl::Status FromHistogram(const utils::histogram::Histogram<float>& hist);
+
+  // Display label. Used in the legend.
+  // Leave empty for default label.
+  std::string label;
+
+  std::vector<double> heights;
+  std::vector<double> centers;
 };
 
 // An axis of the plot.
@@ -129,6 +149,9 @@ struct Plot {
   // The x (horizontal) and y (vertical) axis.
   Axis x_axis;
   Axis y_axis;
+
+  // Show the plot legend.
+  bool show_legend = true;
 };
 
 struct MultiPlotItem {
@@ -168,13 +191,13 @@ utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
                                           const ExportOptions& options = {});
 
 namespace internal {
-namespace c3js {
+namespace plotly {
 
-// Specialization of ExportToHtml to c3js.
+// Specialization of ExportToHtml to plotly.
 utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
                                           const ExportOptions& options);
 
-}  // namespace c3js
+}  // namespace plotly
 }  // namespace internal
 
 }  // namespace plot

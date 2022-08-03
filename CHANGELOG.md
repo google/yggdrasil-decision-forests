@@ -1,5 +1,9 @@
 # Changelog
 
+### Features
+
+-   Creation of html evaluation report with plots (e.g., ROC, PR-ROC).
+
 ## 0.2.5 - 2022-06-15
 
 ### Features

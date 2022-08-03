@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/metric/metric.h"
 
 #include <functional>
+#include <limits>
 #include <random>
 #include <vector>
 
@@ -171,14 +172,15 @@ absl::Status BuildROCCurveFromSortedPredictions(
   // Note: The threshold will be set at the end.
   *curve->Add() = accumulator;
 
-  // Top right point. Note: Why -1? -> We need a finite threshold smaller than
+  const float eps = 0.1f;
+  // Top right point. Note: Why -eps? -> We need a finite threshold smaller than
   // any observed prediction.
-  // Bottom left point. Note: Why +1? -> We need a finite threshold larger
+  // Bottom left point. Note: Why +eps? -> We need a finite threshold larger
   // than any observed prediction.
   if (curve->size() >= 2) {
-    (*curve)[0].set_threshold((*curve)[0].threshold() - 1);
+    (*curve)[0].set_threshold((*curve)[0].threshold() - eps);
     const auto n = curve->size();
-    (*curve)[n - 1].set_threshold((*curve)[n - 2].threshold() + 1);
+    (*curve)[n - 1].set_threshold((*curve)[n - 2].threshold() + eps);
   }
   return absl::OkStatus();
 }

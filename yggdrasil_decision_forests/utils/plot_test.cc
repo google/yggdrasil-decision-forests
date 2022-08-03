@@ -87,28 +87,59 @@ TEST(Plot, Base) {
   CHECK_OK(file::SetContent(path, html_plot));
 
   // The plot has been checked by hand.
-  EXPECT_EQ(html_plot, R"(
-<link href="https://www.gstatic.com/external_hosted/c3/c3.min.css" rel="stylesheet">
-<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-<script src="https://www.gstatic.com/external_hosted/c3/c3.min.js"></script>
-<div id="chard_1"></div>
+  EXPECT_EQ(
+      html_plot,
+      R"(<script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chard_1" style="display: inline-block;" ></div>
 <script>
-var chard_1 = c3.generate({
-  bindto: '#chard_1',
-  data: {
-      columns: [
-['curve_0', 2,0.5,4],
-['curve_0_x', 1,2,3],
-      ],
-      names: { curve_0: 'curve 1',
+  Plotly.newPlot(
+    'chard_1',
+    [{
+x: [1,2,3],
+y: [2,0.5,4],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'curve 1',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: 'Hello world',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
       },
-      xs: {'curve_0': 'curve_0_x',
-      },
-  },
-  axis: {
-  },
-title: { text: 'Hello world'},
-});
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,
+    }
+  );
 </script>
 )");
 }
@@ -154,11 +185,11 @@ TEST(MultiPlot, Base) {
     plot.chart_id = "chard_3";
     plot.title = "Plot 3";
 
-    auto curve = absl::make_unique<Curve>();
-    curve->label = "curve 3";
-    curve->xs = {10, 11, 15};
-    curve->ys = {7, 9, 2};
-    plot.items.push_back(std::move(curve));
+    auto bars = absl::make_unique<Bars>();
+    bars->label = "bars 3";
+    bars->centers = {10, 11, 15};
+    bars->heights = {7, 9, 2};
+    plot.items.push_back(std::move(bars));
 
     multiplot.items.push_back({std::move(plot), 0, 1, 2, 1});
   }
@@ -171,70 +202,175 @@ TEST(MultiPlot, Base) {
   // The plot has been checked by hand.
   EXPECT_EQ(
       html_plot,
-      R"(<div style='display: grid; gap: 0px; grid-template-columns: repeat(2, 2fr);'><div style='grid-row:1 / 2; grid-column:2 / 1;'>
-<link href="https://www.gstatic.com/external_hosted/c3/c3.min.css" rel="stylesheet">
-<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-<script src="https://www.gstatic.com/external_hosted/c3/c3.min.js"></script>
-<div id="chard_1"></div>
+      R"(<div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / 2; grid-column:2 / 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chard_1" style="display: inline-block;" ></div>
 <script>
-var chard_1 = c3.generate({
-  bindto: '#chard_1',
-  data: {
-      columns: [
-['curve_0', 2,0.5,4],
-['curve_0_x', 1,2,3],
-      ],
-      names: { curve_0: 'curve 1',
+  Plotly.newPlot(
+    'chard_1',
+    [{
+x: [1,2,3],
+y: [2,0.5,4],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'curve 1',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: 'Plot 1',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'x axis',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'y axis',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
       },
-      xs: {'curve_0': 'curve_0_x',
-      },
-  },
-  axis: {
-x: { label: { text: 'x axis', position: 'outer-center' } },
-y: { label: { text: 'y axis', position: 'outer-middle' } },
-  },
-title: { text: 'Plot 1'},
-});
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,
+    }
+  );
 </script>
-</div><div style='grid-row:1 / 2; grid-column:3 / 2;'><div id="chard_2"></div>
+</div><div style='grid-row:1 / 2; grid-column:3 / 2;'>
+<div id="chard_2" style="display: inline-block;" ></div>
 <script>
-var chard_2 = c3.generate({
-  bindto: '#chard_2',
-  data: {
-      columns: [
-['curve_0', 7,9,2],
-['curve_0_x', 10,11,15],
-      ],
-      names: { curve_0: 'curve 2',
+  Plotly.newPlot(
+    'chard_2',
+    [{
+x: [10,11,15],
+y: [7,9,2],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'curve 2',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: 'Plot 2',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
       },
-      xs: {'curve_0': 'curve_0_x',
-      },
-  },
-  axis: {
-  },
-title: { text: 'Plot 2'},
-});
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,
+    }
+  );
 </script>
-</div><div style='grid-row:2 / 3; grid-column:3 / 1;'><div id="chard_3"></div>
+</div><div style='grid-row:2 / 3; grid-column:3 / 1;'>
+<div id="chard_3" style="display: inline-block;" ></div>
 <script>
-var chard_3 = c3.generate({
-  bindto: '#chard_3',
-  data: {
-      columns: [
-['curve_0', 7,9,2],
-['curve_0_x', 10,11,15],
-      ],
-      names: { curve_0: 'curve 3',
+  Plotly.newPlot(
+    'chard_3',
+    [{
+x: [10,11,15],
+y: [7,9,2],
+type: 'bar',
+name: 'bars 3',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: 'Plot 3',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
       },
-      xs: {'curve_0': 'curve_0_x',
-      },
-  },
-  axis: {
-  },
-title: { text: 'Plot 3'},
-});
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,
+    }
+  );
 </script>
 </div></div>)");
+}
+
+TEST(Bars, FromHistogram) {
+  Bars bars;
+  const auto hist =
+      utils::histogram::Histogram<float>::MakeUniform({1, 1, 5, 10, 11}, 3);
+  CHECK_OK(bars.FromHistogram(hist));
+
+  const float eps = 0.0001;
+  EXPECT_EQ(bars.centers.size(), 3);
+  EXPECT_NEAR(bars.centers[0], 2.83333, eps);
+  EXPECT_NEAR(bars.centers[1], 6.5, eps);
+  EXPECT_NEAR(bars.centers[2], 9.66667, eps);
+  EXPECT_EQ(bars.heights.size(), 3);
+  EXPECT_NEAR(bars.heights[0], 2, eps);
+  EXPECT_NEAR(bars.heights[1], 1, eps);
+  EXPECT_NEAR(bars.heights[2], 2, eps);
 }
 
 }  // namespace

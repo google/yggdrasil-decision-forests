@@ -191,10 +191,13 @@ std::string Histogram<T>::ToString() const {
     }
 
     cumulative_count += count;
-    const double eps = std::numeric_limits<double>::epsilon();
-    const double ratio = 100. * count / std::max(eps, sum_counts_);
-    const double cumulative_ratio =
-        100. * cumulative_count / std::max(eps, sum_counts_);
+    double ratio = 0;
+    double cumulative_ratio = 0;
+    if (sum_counts_ > 0) {
+      ratio = 100. * count / sum_counts_;
+      cumulative_ratio = 100. * cumulative_count / sum_counts_;
+    }
+
     absl::StrAppendFormat(&report, "[ %*g, %*g%c %*g %6.2f%% %6.2f%%",
                           print_bound_size, bounds_[bin_idx], print_bound_size,
                           bounds_[bin_idx + 1], closing_bracket,

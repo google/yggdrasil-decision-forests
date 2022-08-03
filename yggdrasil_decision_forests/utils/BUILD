@@ -716,6 +716,7 @@ cc_library_ydf(
     hdrs = ["plot.h"],
     deps = [
         ":compatibility",
+        ":histogram",
         ":html",
         ":logging",
         ":status_macros",

@@ -277,7 +277,6 @@ utils::StatusOr<float> OneSidedMcNemarTest(
       n21 += eval_results1.sampled_predictions(i).weight();
     }
   }
-
   if (n12 + n21 == 0.0) {
     return 1.0;
   }

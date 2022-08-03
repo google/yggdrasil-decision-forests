@@ -103,12 +103,16 @@ cc_library_ydf(
     deps = [
         ":metric",
         ":metric_cc_proto",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:distribution",
+        "//yggdrasil_decision_forests/utils:histogram",
+        "//yggdrasil_decision_forests/utils:html",
+        "//yggdrasil_decision_forests/utils:plot",
         "//yggdrasil_decision_forests/utils:status_macros",
     ],
 )
@@ -178,6 +182,20 @@ cc_test(
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:test",
+    ],
+)
+
+cc_test(
+    name = "report_test",
+    srcs = ["report_test.cc"],
+    deps = [
+        ":metric",
+        ":metric_cc_proto",
+        ":report",
+        "@com_google_googletest//:gtest_main",
+        "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:test",
     ],

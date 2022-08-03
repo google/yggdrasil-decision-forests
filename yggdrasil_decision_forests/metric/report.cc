@@ -18,6 +18,7 @@
 #include <string>
 #include <utility>
 
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
@@ -25,6 +26,9 @@
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
+#include "yggdrasil_decision_forests/utils/histogram.h"
+#include "yggdrasil_decision_forests/utils/html.h"
+#include "yggdrasil_decision_forests/utils/plot.h"
 
 namespace yggdrasil_decision_forests {
 namespace metric {
@@ -35,6 +39,284 @@ namespace {
 template <typename T>
 std::string PairToString(const std::pair<T, T>& p) {
   return absl::StrCat(p.first, " ", p.second);
+}
+
+absl::Status PlotClassificationCurves(const proto::Roc& roc,
+                                      const absl::string_view label,
+                                      utils::plot::Plot* roc_plot,
+                                      utils::plot::Plot* pr_plot,
+                                      utils::plot::Plot* tv_plot,
+                                      utils::plot::Plot* ta_plot) {
+  auto roc_curve = absl::make_unique<utils::plot::Curve>();
+  auto pr_curve = absl::make_unique<utils::plot::Curve>();
+  auto tv_curve = absl::make_unique<utils::plot::Curve>();
+  auto ta_curve = absl::make_unique<utils::plot::Curve>();
+
+  roc_curve->label = std::string(label);
+  pr_curve->label = std::string(label);
+  tv_curve->label = std::string(label);
+  ta_curve->label = std::string(label);
+
+  for (const auto& point : roc.curve()) {
+    roc_curve->xs.push_back(internal::RocFPR(point));
+    roc_curve->ys.push_back(internal::RocTPR(point));
+
+    pr_curve->xs.push_back(internal::RocTPR(point));
+    pr_curve->ys.push_back(internal::RocPrecision(point));
+
+    tv_curve->xs.push_back(point.threshold());
+    tv_curve->ys.push_back(internal::RocPositiveRatio(point));
+
+    ta_curve->xs.push_back(point.threshold());
+    ta_curve->ys.push_back(internal::RocAccuracy(point));
+  }
+
+  roc_plot->items.push_back(std::move(roc_curve));
+  pr_plot->items.push_back(std::move(pr_curve));
+  tv_plot->items.push_back(std::move(tv_curve));
+  ta_plot->items.push_back(std::move(ta_curve));
+  return absl::OkStatus();
+}
+
+// Creates the HTML report for a classication evaluation.
+absl::Status AppendHtmlReportClassiciation(const proto::EvaluationResults& eval,
+                                           const HtmlReportOptions& options,
+                                           utils::html::Html* html) {
+  if (eval.classification().rocs().empty()) {
+    return absl::OkStatus();
+  }
+
+  utils::plot::MultiPlot multiplot;
+  multiplot.items.resize(4);
+  multiplot.num_cols = 2;
+  multiplot.num_rows = 2;
+
+  auto& roc_plot = multiplot.items[0];
+  roc_plot.plot.title = "ROC";
+  roc_plot.plot.x_axis.label = "False positive rate";
+  roc_plot.plot.y_axis.label = "True positive rate (Recall)";
+
+  auto& pr_plot = multiplot.items[1];
+  pr_plot.col = 1;
+  pr_plot.plot.title = "Precision Recall";
+  pr_plot.plot.x_axis.label = "Recall";
+  pr_plot.plot.y_axis.label = "Precision";
+
+  auto& tv_plot = multiplot.items[2];
+  tv_plot.row = 1;
+  tv_plot.plot.title = "Threshold / Volume";
+  tv_plot.plot.x_axis.label = "Threshold";
+  tv_plot.plot.y_axis.label = "Volume";
+
+  auto& ta_plot = multiplot.items[3];
+  ta_plot.row = 1;
+  ta_plot.col = 1;
+  ta_plot.plot.title = "Threshold / Accuracy";
+  ta_plot.plot.x_axis.label = "Threshold";
+  ta_plot.plot.y_axis.label = "Accuracy";
+
+  // Note: We start at roc_idx=1 as roc_idx=0 correspond to the "OOV vs others".
+
+  for (int roc_idx = 0; roc_idx < eval.classification().rocs().size();
+       roc_idx++) {
+    const auto& roc = eval.classification().rocs(roc_idx);
+    if (!roc.has_auc()) {
+      continue;
+    }
+    const auto positive_label_value =
+        dataset::CategoricalIdxToRepresentation(eval.label_column(), roc_idx);
+    const auto label = absl::StrCat(positive_label_value, " vs others");
+    RETURN_IF_ERROR(PlotClassificationCurves(
+        eval.classification().rocs(roc_idx), label, &roc_plot.plot,
+        &pr_plot.plot, &tv_plot.plot, &ta_plot.plot));
+  }
+
+  ASSIGN_OR_RETURN(const auto multiplot_html,
+                   utils::plot::ExportToHtml(multiplot));
+  html->AppendRaw(multiplot_html);
+  return absl::OkStatus();
+}
+
+// Plot the distribution between two continuous variables.
+void PlotConditionalVariables(const std::vector<float>& var_1,
+                              const std::vector<float>& var_2,
+                              const std::vector<float>& weights,
+                              const float var_1_min, const float var_1_max,
+                              const int num_bins, utils::plot::Plot* plot) {
+  CHECK_EQ(var_1.size(), var_2.size());
+  CHECK_EQ(var_1.size(), weights.size());
+
+  // Compute the distribution of var_2 for a set of non-overlapping contiguous
+  // segments of var1.
+  struct ValuesAndWeights {
+    double sum_value;
+    double sum_weight;
+
+    void add(const float value, const float weight) {
+      sum_value += value;
+      sum_weight += weight;
+    }
+
+    float mean() const { return sum_value / sum_weight; }
+  };
+  utils::histogram::BucketizedContainer<float, ValuesAndWeights> buckets(
+      var_1_min, var_1_max, num_bins);
+  for (int idx = 0; idx < var_1.size(); idx++) {
+    buckets[var_1[idx]].add(var_2[idx], weights[idx]);
+  }
+
+  // Plot the mean of var2 for each segment of var1.
+  auto curve_mean = absl::make_unique<utils::plot::Curve>();
+
+  for (int bin_idx = 0; bin_idx < num_bins; bin_idx++) {
+    const auto& bucket = buckets.ContentArray()[bin_idx];
+    if (bucket.sum_weight == 0) {
+      continue;
+    }
+    const float center = buckets.BinCenter(bin_idx);
+    curve_mean->xs.push_back(center);
+    curve_mean->ys.push_back(bucket.mean());
+  }
+
+  plot->items.push_back(std::move(curve_mean));
+}
+
+// Creates the HTML report for a regression evaluation.
+absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
+                                        const HtmlReportOptions& options,
+                                        utils::html::Html* html) {
+  utils::plot::MultiPlot multiplot;
+  multiplot.items.resize(6);
+  multiplot.num_cols = 3;
+  multiplot.num_rows = 2;
+
+  auto& res_plot = multiplot.items[0];
+  res_plot.plot.title = "Residual Histogram";
+  res_plot.plot.x_axis.label = "False positive rate";
+  res_plot.plot.y_axis.label = "True positive rate (Recall)";
+  res_plot.plot.show_legend = false;
+
+  auto& gt_plot = multiplot.items[1];
+  gt_plot.col = 1;
+  gt_plot.plot.title = "Ground Truth Histogram";
+  gt_plot.plot.x_axis.label = "Recall";
+  gt_plot.plot.y_axis.label = "Precision";
+  gt_plot.plot.show_legend = false;
+
+  auto& pred_plot = multiplot.items[2];
+  pred_plot.col = 2;
+  pred_plot.plot.title = "Prediction Histogram";
+  pred_plot.plot.x_axis.label = "Threshold";
+  pred_plot.plot.y_axis.label = "Volume";
+  pred_plot.plot.show_legend = false;
+
+  auto& gt_pred_plot = multiplot.items[3];
+  gt_pred_plot.row = 1;
+  gt_pred_plot.plot.title = "Ground Truth vs Predictions";
+  gt_pred_plot.plot.x_axis.label = "Ground truth";
+  gt_pred_plot.plot.y_axis.label = "Prediction";
+  gt_pred_plot.plot.show_legend = false;
+
+  auto& pred_res_plot = multiplot.items[4];
+  pred_res_plot.row = 1;
+  pred_res_plot.col = 1;
+  pred_res_plot.plot.title = "Predictions vs Residual";
+  pred_res_plot.plot.x_axis.label = "Prediction";
+  pred_res_plot.plot.y_axis.label = "Residual";
+  pred_res_plot.plot.show_legend = false;
+
+  auto& gt_res_plot = multiplot.items[5];
+  gt_res_plot.row = 1;
+  gt_res_plot.col = 2;
+  gt_res_plot.plot.title = "Ground Truth vs Residual";
+  gt_res_plot.plot.x_axis.label = "Ground truth";
+  gt_res_plot.plot.y_axis.label = "Residual";
+  gt_res_plot.plot.show_legend = false;
+
+  // Determine the minimum and maximum values of specific variables. For
+  // example, "prediction_bounds" will be the minimum and maximum prediction
+  // value.
+  MinMaxStream<float> prediction_bounds;
+  MinMaxStream<float> ground_truth_bounds;
+  MinMaxStream<float> residual_bounds;
+
+  for (const auto& pred : eval.sampled_predictions()) {
+    const float prediction = pred.regression().value();
+    const float ground_truth = pred.regression().ground_truth();
+    const float residual = ground_truth - prediction;
+
+    prediction_bounds.visit(prediction);
+    ground_truth_bounds.visit(ground_truth);
+    residual_bounds.visit(residual);
+  }
+
+  // Conditional plots.
+  std::vector<float> weights, predictions, ground_truths, residuals;
+  weights.reserve(eval.sampled_predictions_size());
+  predictions.reserve(eval.sampled_predictions_size());
+  ground_truths.reserve(eval.sampled_predictions_size());
+  residuals.reserve(eval.sampled_predictions_size());
+
+  for (const auto& pred : eval.sampled_predictions()) {
+    const float prediction = pred.regression().value();
+    const float ground_truth = pred.regression().ground_truth();
+    const float residual = ground_truth - prediction;
+    const float weight = pred.weight();
+
+    ground_truths.push_back(ground_truth);
+    predictions.push_back(prediction);
+    residuals.push_back(residual);
+    weights.push_back(weight);
+  }
+
+  // Add diagonals to gt vs pred plot.
+  {
+    const auto minimum_model_output = ground_truth_bounds.min();
+    const auto maximum_model_output = ground_truth_bounds.max();
+    auto diagonal = absl::make_unique<utils::plot::Curve>();
+    diagonal->xs = {minimum_model_output, maximum_model_output};
+    diagonal->ys = {minimum_model_output, maximum_model_output};
+    diagonal->style = utils::plot::LineStyle::DOTTED;
+    gt_pred_plot.plot.items.push_back(std::move(diagonal));
+  }
+
+  // Number of bins of the histograms and the calibration plots.
+  //
+  // If the predictions are uniformly distributed, we expect for each bin of the
+  // residual histogram to contains approximately 2.5% of the observations.
+  const int num_bins = 40;
+
+  // Plot the conditional plots
+  PlotConditionalVariables(ground_truths, predictions, weights,
+                           ground_truth_bounds.min(), ground_truth_bounds.max(),
+                           num_bins, &gt_pred_plot.plot);
+  PlotConditionalVariables(ground_truths, residuals, weights,
+                           ground_truth_bounds.min(), ground_truth_bounds.max(),
+                           num_bins, &pred_res_plot.plot);
+  PlotConditionalVariables(predictions, residuals, weights,
+                           prediction_bounds.min(), prediction_bounds.max(),
+                           num_bins, &gt_res_plot.plot);
+
+  // Plot the histograms
+  const auto add_histogram = [&weights](
+                                 const std::vector<float>& values,
+                                 utils::plot::Plot* plot) -> absl::Status {
+    auto bars = absl::make_unique<utils::plot::Bars>();
+    const auto hist = utils::histogram::Histogram<float>::MakeUniform(
+        values, num_bins, weights);
+    RETURN_IF_ERROR(bars->FromHistogram(hist));
+    plot->items.push_back(std::move(bars));
+    return absl::OkStatus();
+  };
+
+  RETURN_IF_ERROR(add_histogram(residuals, &res_plot.plot));
+  RETURN_IF_ERROR(add_histogram(predictions, &pred_plot.plot));
+  RETURN_IF_ERROR(add_histogram(ground_truths, &gt_plot.plot));
+
+  ASSIGN_OR_RETURN(const auto multiplot_html,
+                   utils::plot::ExportToHtml(multiplot));
+  html->AppendRaw(multiplot_html);
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -263,6 +545,37 @@ absl::Status AppendTextReportUplift(const proto::EvaluationResults& eval,
       report, "Number of treatments: ", eval.uplift().num_treatments(), "\n");
   absl::StrAppend(report, "AUUC: ", AUUC(eval), "\n");
   absl::StrAppend(report, "Qini: ", Qini(eval), "\n");
+  return absl::OkStatus();
+}
+
+absl::Status AppendHtmlReport(const proto::EvaluationResults& eval,
+                              std::string* html_report,
+                              const HtmlReportOptions& options) {
+  namespace h = utils::html;
+
+  h::Html html;
+
+  html.Append(h::H1("Evaluation report"));
+
+  if (options.include_text_report) {
+    ASSIGN_OR_RETURN(const auto text_report, TextReport(eval));
+    html.Append(h::Pre(text_report));
+  }
+
+  switch (eval.type_case()) {
+    case proto::EvaluationResults::TypeCase::kClassification:
+      RETURN_IF_ERROR(AppendHtmlReportClassiciation(eval, options, &html));
+      break;
+
+    case proto::EvaluationResults::TypeCase::kRegression:
+      RETURN_IF_ERROR(AppendHtmlReportRegression(eval, options, &html));
+      break;
+
+    default:
+      break;
+  }
+
+  absl::StrAppend(html_report, std::string(html.content()));
   return absl::OkStatus();
 }
 
