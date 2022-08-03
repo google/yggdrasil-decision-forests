@@ -722,7 +722,6 @@ cc_library_ydf(
         ":uid",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "//util/task:status",
     ],
 )
 
