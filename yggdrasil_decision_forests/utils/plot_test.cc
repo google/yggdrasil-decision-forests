@@ -373,6 +373,31 @@ TEST(Bars, FromHistogram) {
   EXPECT_NEAR(bars.heights[2], 2, eps);
 }
 
+TEST(Bars, PlotPlacer) {
+  MultiPlot multiplot;
+  auto placer = PlotPlacer::Create(3, 2, &multiplot).value();
+  auto* plot_1 = placer.NewPlot().value();
+  auto* plot_2 = placer.NewPlot().value();
+  auto* plot_3 = placer.NewPlot().value();
+  CHECK_OK(placer.Finalize());
+
+  EXPECT_EQ(multiplot.num_cols, 2);
+  EXPECT_EQ(multiplot.num_rows, 2);
+  EXPECT_EQ(multiplot.items.size(), 3);
+
+  EXPECT_EQ(plot_1, &multiplot.items[0].plot);
+  EXPECT_EQ(multiplot.items[0].col, 0);
+  EXPECT_EQ(multiplot.items[0].row, 0);
+
+  EXPECT_EQ(plot_2, &multiplot.items[1].plot);
+  EXPECT_EQ(multiplot.items[1].col, 1);
+  EXPECT_EQ(multiplot.items[1].row, 0);
+
+  EXPECT_EQ(plot_3, &multiplot.items[2].plot);
+  EXPECT_EQ(multiplot.items[2].col, 0);
+  EXPECT_EQ(multiplot.items[2].row, 1);
+}
+
 }  // namespace
 }  // namespace plot
 }  // namespace utils

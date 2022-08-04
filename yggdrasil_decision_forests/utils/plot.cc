@@ -127,6 +127,47 @@ utils::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
   return html;
 }
 
+utils::StatusOr<PlotPlacer> PlotPlacer::Create(int num_plots, int max_num_cols,
+                                               MultiPlot* multiplot) {
+  STATUS_CHECK_GT(num_plots, 0);
+  STATUS_CHECK_GT(max_num_cols, 0);
+  STATUS_CHECK(multiplot);
+
+  const int num_cols = std::min(num_plots, max_num_cols);
+  DCHECK_GT(num_cols, 0);
+
+  // Integer ceil.
+  const int num_rows = (num_plots + num_cols - 1) / num_cols;
+
+  return PlotPlacer(num_plots, num_cols, num_rows, multiplot);
+}
+
+PlotPlacer::PlotPlacer(const int num_plots, const int num_cols,
+                       const int num_rows, MultiPlot* multiplot)
+    : num_plots_(num_plots), multiplot_(multiplot) {
+  multiplot_->items.resize(num_plots);
+  multiplot_->num_cols = num_cols;
+  multiplot_->num_rows = num_rows;
+}
+
+utils::StatusOr<Plot*> PlotPlacer::NewPlot() {
+  STATUS_CHECK(multiplot_);
+  STATUS_CHECK_LT(num_new_plots_, num_plots_);
+  STATUS_CHECK(!finalize_called_);
+  auto& item = multiplot_->items[num_new_plots_];
+  item.col = num_new_plots_ % multiplot_->num_cols;
+  item.row = num_new_plots_ / multiplot_->num_cols;
+  num_new_plots_++;
+  return &item.plot;
+}
+
+absl::Status PlotPlacer::Finalize() {
+  STATUS_CHECK(!finalize_called_);
+  STATUS_CHECK_EQ(num_new_plots_, num_plots_);
+  finalize_called_ = true;
+  return absl::OkStatus();
+}
+
 namespace internal {
 
 namespace plotly {

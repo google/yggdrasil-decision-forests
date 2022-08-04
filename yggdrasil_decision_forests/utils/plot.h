@@ -190,6 +190,53 @@ utils::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
 utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
                                           const ExportOptions& options = {});
 
+// Utility to place plots in a multi-plot. This class sets automatically all the
+// num_{cols,rows}, col and row fields in a multiplot and its sub-plots. The
+// plots are organized in a column-minor, row-major way.
+//
+// Usage example:
+//
+//   MultiPlot multiplot;
+//   ASSIGN_OR_RETURN(auto placer, PlotPlacer::Create(4, 2, &multiplot));
+//   ASSIGN_OR_RETURN(auto* plot_1, placer.NewPlot());
+//   ASSIGN_OR_RETURN(auto* plot_2, placer.NewPlot());
+//   ASSIGN_OR_RETURN(auto* plot_3, placer.NewPlot());
+//   ASSIGN_OR_RETURN(auto* plot_4, placer.NewPlot());
+//   RETURN_IF_ERROR(placer.Finalize());
+//
+class PlotPlacer {
+ public:
+  // Create a placer.
+  //
+  // Args:
+  //  multiplot: A non-owning pointer to the multi-plot that will contain the
+  //    plots. The multiplot object should outlive the PlotPlacer.
+  //  num_plots: Number of plots to add in the multiplot.
+  //  max_num_cols: Maximum number of columns in the multi-plot.
+  static utils::StatusOr<PlotPlacer> Create(int num_plots, int max_num_cols,
+                                            MultiPlot* multiplot);
+
+  // Adds and returns a new plot. Returns a non-owning pointer to the plot.
+  utils::StatusOr<Plot*> NewPlot();
+
+  // To be called after all the calls to "NewPlot".
+  // This method ensures that "NewPlot" was called "num_plots" times.
+  absl::Status Finalize();
+
+ private:
+  PlotPlacer(int num_plots, int num_cols, int num_rows, MultiPlot* multiplot);
+
+  // Constructor arguments.
+  int num_plots_;
+  MultiPlot* multiplot_;
+
+  // True iff. "Finalize" was called.
+  bool finalize_called_ = false;
+
+  // Number of times "NewPlot" was called.
+  int num_new_plots_ = 0;
+};
+
 namespace internal {
 namespace plotly {
 
