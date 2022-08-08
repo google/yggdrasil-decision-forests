@@ -124,10 +124,12 @@ message EvaluationResults {
     repeated Roc rocs = 2;
     // Sum of the log loss.
     optional double sum_log_loss = 3 [default = 0];
+    // Unused entry.
+    reserved 4;
     // Accuracy of the model. If both "accuracy" and "confusion" is specified,
     // they represent the same value.
     optional double accuracy = 5;
-    // Next ID: 5
+    // Next ID: 6
   }
 
   message Regression {
