@@ -47,6 +47,13 @@ absl::Status AppendTextReportUplift(const proto::EvaluationResults& eval,
 // Add the report in a html format.
 struct HtmlReportOptions {
   bool include_text_report = true;
+
+  // Size of the plots.
+  int plot_width = 600;
+  int plot_height = 400;
+
+  // Maximum number of plots side by side.
+  int num_plots_per_columns = 3;
 };
 absl::Status AppendHtmlReport(const proto::EvaluationResults& eval,
                               std::string* html_report,

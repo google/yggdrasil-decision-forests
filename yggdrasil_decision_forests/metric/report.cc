@@ -87,33 +87,31 @@ absl::Status AppendHtmlReportClassiciation(const proto::EvaluationResults& eval,
   }
 
   utils::plot::MultiPlot multiplot;
-  multiplot.items.resize(4);
-  multiplot.num_cols = 2;
-  multiplot.num_rows = 2;
+  ASSIGN_OR_RETURN(auto placer,
+                   utils::plot::PlotPlacer::Create(
+                       4, options.num_plots_per_columns, &multiplot));
 
-  auto& roc_plot = multiplot.items[0];
-  roc_plot.plot.title = "ROC";
-  roc_plot.plot.x_axis.label = "False positive rate";
-  roc_plot.plot.y_axis.label = "True positive rate (Recall)";
+  ASSIGN_OR_RETURN(auto* roc_plot, placer.NewPlot());
+  roc_plot->title = "ROC";
+  roc_plot->x_axis.label = "False positive rate";
+  roc_plot->y_axis.label = "True positive rate (Recall)";
 
-  auto& pr_plot = multiplot.items[1];
-  pr_plot.col = 1;
-  pr_plot.plot.title = "Precision Recall";
-  pr_plot.plot.x_axis.label = "Recall";
-  pr_plot.plot.y_axis.label = "Precision";
+  ASSIGN_OR_RETURN(auto* pr_plot, placer.NewPlot());
+  pr_plot->title = "Precision Recall";
+  pr_plot->x_axis.label = "Recall";
+  pr_plot->y_axis.label = "Precision";
 
-  auto& tv_plot = multiplot.items[2];
-  tv_plot.row = 1;
-  tv_plot.plot.title = "Threshold / Volume";
-  tv_plot.plot.x_axis.label = "Threshold";
-  tv_plot.plot.y_axis.label = "Volume";
+  ASSIGN_OR_RETURN(auto* tv_plot, placer.NewPlot());
+  tv_plot->title = "Threshold / Volume";
+  tv_plot->x_axis.label = "Threshold";
+  tv_plot->y_axis.label = "Volume";
 
-  auto& ta_plot = multiplot.items[3];
-  ta_plot.row = 1;
-  ta_plot.col = 1;
-  ta_plot.plot.title = "Threshold / Accuracy";
-  ta_plot.plot.x_axis.label = "Threshold";
-  ta_plot.plot.y_axis.label = "Accuracy";
+  ASSIGN_OR_RETURN(auto* ta_plot, placer.NewPlot());
+  ta_plot->title = "Threshold / Accuracy";
+  ta_plot->x_axis.label = "Threshold";
+  ta_plot->y_axis.label = "Accuracy";
+
+  RETURN_IF_ERROR(placer.Finalize());
 
   // Note: We start at roc_idx=1 as roc_idx=0 correspond to the "OOV vs others".
 
@@ -126,13 +124,16 @@ absl::Status AppendHtmlReportClassiciation(const proto::EvaluationResults& eval,
     const auto positive_label_value =
         dataset::CategoricalIdxToRepresentation(eval.label_column(), roc_idx);
     const auto label = absl::StrCat(positive_label_value, " vs others");
-    RETURN_IF_ERROR(PlotClassificationCurves(
-        eval.classification().rocs(roc_idx), label, &roc_plot.plot,
-        &pr_plot.plot, &tv_plot.plot, &ta_plot.plot));
+    RETURN_IF_ERROR(
+        PlotClassificationCurves(eval.classification().rocs(roc_idx), label,
+                                 roc_plot, pr_plot, tv_plot, ta_plot));
   }
 
+  utils::plot::ExportOptions plot_options;
+  plot_options.width = options.plot_width;
+  plot_options.height = options.plot_height;
   ASSIGN_OR_RETURN(const auto multiplot_html,
-                   utils::plot::ExportToHtml(multiplot));
+                   utils::plot::ExportToHtml(multiplot, plot_options));
   html->AppendRaw(multiplot_html);
   return absl::OkStatus();
 }
@@ -186,52 +187,47 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
                                         const HtmlReportOptions& options,
                                         utils::html::Html* html) {
   utils::plot::MultiPlot multiplot;
-  multiplot.items.resize(6);
-  multiplot.num_cols = 3;
-  multiplot.num_rows = 2;
+  ASSIGN_OR_RETURN(auto placer,
+                   utils::plot::PlotPlacer::Create(
+                       6, options.num_plots_per_columns, &multiplot));
 
-  auto& res_plot = multiplot.items[0];
-  res_plot.plot.title = "Residual Histogram";
-  res_plot.plot.x_axis.label = "False positive rate";
-  res_plot.plot.y_axis.label = "True positive rate (Recall)";
-  res_plot.plot.show_legend = false;
+  ASSIGN_OR_RETURN(auto* res_plot, placer.NewPlot());
+  res_plot->title = "Residual Histogram";
+  res_plot->x_axis.label = "False positive rate";
+  res_plot->y_axis.label = "True positive rate (Recall)";
+  res_plot->show_legend = false;
 
-  auto& gt_plot = multiplot.items[1];
-  gt_plot.col = 1;
-  gt_plot.plot.title = "Ground Truth Histogram";
-  gt_plot.plot.x_axis.label = "Recall";
-  gt_plot.plot.y_axis.label = "Precision";
-  gt_plot.plot.show_legend = false;
+  ASSIGN_OR_RETURN(auto* gt_plot, placer.NewPlot());
+  gt_plot->title = "Ground Truth Histogram";
+  gt_plot->x_axis.label = "Recall";
+  gt_plot->y_axis.label = "Precision";
+  gt_plot->show_legend = false;
 
-  auto& pred_plot = multiplot.items[2];
-  pred_plot.col = 2;
-  pred_plot.plot.title = "Prediction Histogram";
-  pred_plot.plot.x_axis.label = "Threshold";
-  pred_plot.plot.y_axis.label = "Volume";
-  pred_plot.plot.show_legend = false;
+  ASSIGN_OR_RETURN(auto* pred_plot, placer.NewPlot());
+  pred_plot->title = "Prediction Histogram";
+  pred_plot->x_axis.label = "Threshold";
+  pred_plot->y_axis.label = "Volume";
+  pred_plot->show_legend = false;
 
-  auto& gt_pred_plot = multiplot.items[3];
-  gt_pred_plot.row = 1;
-  gt_pred_plot.plot.title = "Ground Truth vs Predictions";
-  gt_pred_plot.plot.x_axis.label = "Ground truth";
-  gt_pred_plot.plot.y_axis.label = "Prediction";
-  gt_pred_plot.plot.show_legend = false;
+  ASSIGN_OR_RETURN(auto* gt_pred_plot, placer.NewPlot());
+  gt_pred_plot->title = "Ground Truth vs Predictions";
+  gt_pred_plot->x_axis.label = "Ground truth";
+  gt_pred_plot->y_axis.label = "Prediction";
+  gt_pred_plot->show_legend = false;
 
-  auto& pred_res_plot = multiplot.items[4];
-  pred_res_plot.row = 1;
-  pred_res_plot.col = 1;
-  pred_res_plot.plot.title = "Predictions vs Residual";
-  pred_res_plot.plot.x_axis.label = "Prediction";
-  pred_res_plot.plot.y_axis.label = "Residual";
-  pred_res_plot.plot.show_legend = false;
+  ASSIGN_OR_RETURN(auto* pred_res_plot, placer.NewPlot());
+  pred_res_plot->title = "Predictions vs Residual";
+  pred_res_plot->x_axis.label = "Prediction";
+  pred_res_plot->y_axis.label = "Residual";
+  pred_res_plot->show_legend = false;
 
-  auto& gt_res_plot = multiplot.items[5];
-  gt_res_plot.row = 1;
-  gt_res_plot.col = 2;
-  gt_res_plot.plot.title = "Ground Truth vs Residual";
-  gt_res_plot.plot.x_axis.label = "Ground truth";
-  gt_res_plot.plot.y_axis.label = "Residual";
-  gt_res_plot.plot.show_legend = false;
+  ASSIGN_OR_RETURN(auto* gt_res_plot, placer.NewPlot());
+  gt_res_plot->title = "Ground Truth vs Residual";
+  gt_res_plot->x_axis.label = "Ground truth";
+  gt_res_plot->y_axis.label = "Residual";
+  gt_res_plot->show_legend = false;
+
+  RETURN_IF_ERROR(placer.Finalize());
 
   // Determine the minimum and maximum values of specific variables. For
   // example, "prediction_bounds" will be the minimum and maximum prediction
@@ -277,7 +273,7 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
     diagonal->xs = {minimum_model_output, maximum_model_output};
     diagonal->ys = {minimum_model_output, maximum_model_output};
     diagonal->style = utils::plot::LineStyle::DOTTED;
-    gt_pred_plot.plot.items.push_back(std::move(diagonal));
+    gt_pred_plot->items.push_back(std::move(diagonal));
   }
 
   // Number of bins of the histograms and the calibration plots.
@@ -289,13 +285,13 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
   // Plot the conditional plots
   PlotConditionalVariables(ground_truths, predictions, weights,
                            ground_truth_bounds.min(), ground_truth_bounds.max(),
-                           num_bins, &gt_pred_plot.plot);
+                           num_bins, gt_pred_plot);
   PlotConditionalVariables(ground_truths, residuals, weights,
                            ground_truth_bounds.min(), ground_truth_bounds.max(),
-                           num_bins, &pred_res_plot.plot);
+                           num_bins, pred_res_plot);
   PlotConditionalVariables(predictions, residuals, weights,
                            prediction_bounds.min(), prediction_bounds.max(),
-                           num_bins, &gt_res_plot.plot);
+                           num_bins, gt_res_plot);
 
   // Plot the histograms
   const auto add_histogram = [&weights](
@@ -309,12 +305,15 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
     return absl::OkStatus();
   };
 
-  RETURN_IF_ERROR(add_histogram(residuals, &res_plot.plot));
-  RETURN_IF_ERROR(add_histogram(predictions, &pred_plot.plot));
-  RETURN_IF_ERROR(add_histogram(ground_truths, &gt_plot.plot));
+  RETURN_IF_ERROR(add_histogram(residuals, res_plot));
+  RETURN_IF_ERROR(add_histogram(predictions, pred_plot));
+  RETURN_IF_ERROR(add_histogram(ground_truths, gt_plot));
 
+  utils::plot::ExportOptions plot_options;
+  plot_options.width = options.plot_width;
+  plot_options.height = options.plot_height;
   ASSIGN_OR_RETURN(const auto multiplot_html,
-                   utils::plot::ExportToHtml(multiplot));
+                   utils::plot::ExportToHtml(multiplot, plot_options));
   html->AppendRaw(multiplot_html);
   return absl::OkStatus();
 }
