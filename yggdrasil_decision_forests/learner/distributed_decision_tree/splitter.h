@@ -372,6 +372,7 @@ absl::Status FillDiscretizedNumericalAccumulatorPartial(
 
       } else {
         node_idx = 0;
+        DCHECK_LT(example_idx, common.example_to_node.size());
         DCHECK_EQ(common.example_to_node[example_idx], 0);
         DCHECK(is_target_node[0]);
       }

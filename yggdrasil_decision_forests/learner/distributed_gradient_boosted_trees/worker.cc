@@ -92,6 +92,7 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
         welcome_.owned_features(WorkerIdx()).features();
     auto read_options = spe_config.dataset_reader_options();
     *read_options.mutable_features() = worker_features;
+    read_options.set_load_all_features(false);
     ASSIGN_OR_RETURN(
         dataset_,
         distributed_decision_tree::dataset_cache::DatasetCacheReader::Create(

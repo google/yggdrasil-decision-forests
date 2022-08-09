@@ -47,10 +47,17 @@ utils::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
 
   // List the features available to the reader.
   if (options.features().empty()) {
-    // Make all the features available.
-    cache->features_.resize(cache->meta_data_.columns_size());
-    std::iota(cache->features_.begin(), cache->features_.end(), 0);
+    if (options.load_all_features()) {
+      // Make all the features available.
+      cache->features_.resize(cache->meta_data_.columns_size());
+      std::iota(cache->features_.begin(), cache->features_.end(), 0);
+    }
   } else {
+    if (options.load_all_features()) {
+      return absl::InvalidArgumentError(
+          "Not allowed configuration: \"features\" is not empty and "
+          "\"load_all_features\" is true.");
+    }
     cache->features_ = {options.features().begin(), options.features().end()};
   }
   std::sort(cache->features_.begin(), cache->features_.end());

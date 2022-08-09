@@ -282,8 +282,11 @@ message CacheMetadata {
 
 message DatasetCacheReaderOptions {
   // Indices of the features accessible in reading operations.
-  // If empty, all the features are available.
   repeated int32 features = 1 [packed = true];
+
+  // If set, loads all the available features. In this case, "features"  should
+  // be empty.
+  optional bool load_all_features = 4 [default = true];
 
   // Number of values to read at each reading call.
   optional int32 reading_buffer = 2 [default = 2000];
