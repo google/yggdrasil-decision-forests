@@ -2,6 +2,8 @@
 
 ### Features
 
+-   Go (GoLang) inference API (Beta): simple engine written in Go to do
+    inference on YDF and TF-DF models.
 -   Creation of html evaluation report with plots (e.g., ROC, PR-ROC).
 
 ## 0.2.5 - 2022-06-15
