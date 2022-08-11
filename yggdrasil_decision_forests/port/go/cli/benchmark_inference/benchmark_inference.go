@@ -53,7 +53,7 @@ import (
 	"time"
 
 	"flag"
-	model_io "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/io"
+	model_io "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/io/canonical"
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/serving/engine"
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/serving/example"
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/serving"

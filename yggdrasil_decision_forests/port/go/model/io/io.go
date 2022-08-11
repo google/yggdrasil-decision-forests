@@ -13,7 +13,9 @@
  * limitations under the License.
  */
 
-// Package io contains utilities to save and load models.
+// Package io contains utilities to save and load models. It doesn't include any actual model
+// type support by default. Consider using instead the subpackage `canonical` that includes
+// the canonical (standard) model types support.
 package io
 
 import (
@@ -29,8 +31,6 @@ import (
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/utils/file"
 	// End of external dependencies.
 
-	// Include "canonical" model support.
-	_ "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/canonical"
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model"
 )
 
