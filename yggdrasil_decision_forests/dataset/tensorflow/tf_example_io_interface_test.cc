@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/dataset/example_writer.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
 
 #include <memory>
 #include <string>
@@ -21,10 +21,11 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
+#include "tensorflow/core/example/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/example_writer.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -33,6 +34,8 @@
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
+
+using test::EqualsProto;
 
 proto::DataSpecification CreateDataspec() {
   return PARSE_TEST_PROTO(
@@ -74,22 +77,85 @@ proto::Example CreateExample() {
       )pb");
 }
 
-TEST(CreateExampleWriter, Csv) {
+std::string DatasetDir() {
+  return file::JoinPath(test::DataRootDirectory(),
+                        "yggdrasil_decision_forests/"
+                        "test_data/dataset");
+}
+
+std::string ToyDatasetTypedPathTFExampleTFRecord() {
+  return absl::StrCat("tfrecord+tfe:",
+                      file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2"));
+}
+
+TEST(DataSpecUtil, TFExampleReader) {
+  for (const auto& dataset_path : {ToyDatasetTypedPathTFExampleTFRecord()}) {
+    auto reader = CreateTFExampleReader(dataset_path).value();
+    tensorflow::Example example;
+    int num_rows = 0;
+    while (reader->Next(&example).value()) {
+      num_rows++;
+    }
+    EXPECT_EQ(num_rows, 4);
+  }
+}
+
+TEST(CreateExampleWriter, TFRecord) {
   const proto::DataSpecification data_spec = CreateDataspec();
   const proto::Example example = CreateExample();
 
-  const std::string output_dataset_path_csv =
-      file::JoinPath(test::TmpDirectory(), "test.csv");
-
+  const std::string typed_output_dataset_path_recordio_tfe = absl::StrCat(
+      "tfrecord+tfe:", file::JoinPath(test::TmpDirectory(), "test.tfrecord"));
   {
     auto writer_or_status = CreateExampleWriter(
-        absl::StrCat("csv:", output_dataset_path_csv), data_spec, -1);
+        typed_output_dataset_path_recordio_tfe, data_spec, -1);
     auto writer = std::move(writer_or_status.value());
     EXPECT_OK(writer->Write(example));
   }
 
-  std::string content = file::GetContent(output_dataset_path_csv).value();
-  EXPECT_EQ(content, "a,b,c,d,e,f,g,h\n0.5,0 1,0 1,1,0 1,0 1,1,hello\n");
+  auto tfrecord_tfe_reader =
+      CreateTFExampleReader(typed_output_dataset_path_recordio_tfe);
+  tensorflow ::Example read_example;
+  EXPECT_TRUE(tfrecord_tfe_reader.value()->Next(&read_example).value());
+  const tensorflow::Example expected_read_example = PARSE_TEST_PROTO(
+      R"pb(
+        features {
+          feature {
+            key: "a"
+            value { float_list { value: 0.5 } }
+          }
+          feature {
+            key: "b"
+            value { float_list { value: 0 value: 1 } }
+          }
+          feature {
+            key: "c"
+            value { float_list { value: 0 value: 1 } }
+          }
+          feature {
+            key: "d"
+            value { int64_list { value: 1 } }
+          }
+          feature {
+            key: "e"
+            value { int64_list { value: 0 value: 1 } }
+          }
+          feature {
+            key: "f"
+            value { int64_list { value: 0 value: 1 } }
+          }
+          feature {
+            key: "g"
+            value { float_list { value: 1 } }
+          }
+          feature {
+            key: "h"
+            value { bytes_list { value: "hello" } }
+          }
+        }
+      )pb");
+  EXPECT_THAT(read_example, EqualsProto(expected_read_example));
+  EXPECT_FALSE(tfrecord_tfe_reader.value()->Next(&read_example).value());
 }
 
 }  // namespace dataset

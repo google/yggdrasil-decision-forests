@@ -42,6 +42,23 @@ absl::Status TfExampleToExampleSet(const ::tensorflow::Example& src,
                                    const serving::FeaturesDefinition& features,
                                    serving::AbstractExampleSet* dst);
 
+namespace internal {
+// Get the float value contained in a feature. Can return NaN. Fails if
+// the feature contains more than one value.
+utils::StatusOr<float> GetSingleFloatFromTFFeature(
+    const tensorflow::Feature& feature, const proto::Column& col);
+
+// Get all the float values contained in a feature.
+absl::Status GetNumericalValuesFromTFFeature(const tensorflow::Feature& feature,
+                                             const proto::Column& col,
+                                             std::vector<float>* values);
+
+// Get the categorical tokens in a feature.
+absl::Status GetCategoricalTokensFromTFFeature(
+    const tensorflow::Feature& feature, const proto::Column& col,
+    std::vector<std::string>* tokens);
+
+}  // namespace internal
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
 

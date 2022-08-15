@@ -15,25 +15,20 @@
 
 // Support for dataset stored as TFRecord of tf.Examples.
 //
-#ifndef YGGDRASIL_DECISION_FORESTS_DATASET_TF_EXAMPLE_IO_TFRECORD_H_
-#define YGGDRASIL_DECISION_FORESTS_DATASET_TF_EXAMPLE_IO_TFRECORD_H_
+#ifndef YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_TF_EXAMPLE_IO_TFRECORD_H_
+#define YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_TF_EXAMPLE_IO_TFRECORD_H_
 
 #include <memory>
 #include <vector>
 
 #include "absl/memory/memory.h"
-#include "absl/status/status.h"
-#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "tensorflow/core/example/example.pb.h"
-#include "tensorflow/core/lib/io/record_reader.h"
-#include "tensorflow/core/platform/file_system.h"
-#include "tensorflow/core/platform/tstring.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
-#include "yggdrasil_decision_forests/dataset/tf_example_io_interface.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
 #include "yggdrasil_decision_forests/utils/sharded_io_tfrecord.h"
 
 namespace yggdrasil_decision_forests {
@@ -49,8 +44,8 @@ class TFRecordTFEToExampleReaderInterface
  public:
   TFRecordTFEToExampleReaderInterface(
       const proto::DataSpecification& data_spec,
-      absl::optional<std::vector<int>> required_columns)
-      : TFExampleReaderToExampleReader(data_spec, required_columns) {}
+      absl::optional<std::vector<int>> ensure_non_missing)
+      : TFExampleReaderToExampleReader(data_spec, ensure_non_missing) {}
 
   std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
     return absl::make_unique<TFRecordTFExampleReader>();
@@ -92,4 +87,4 @@ REGISTER_ExampleWriterInterface(TFRecordTFEToExampleWriterInterface,
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
 
-#endif  // YGGDRASIL_DECISION_FORESTS_DATASET_TF_EXAMPLE_IO_TFRECORD_H_
+#endif  // YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_TF_EXAMPLE_IO_TFRECORD_H_

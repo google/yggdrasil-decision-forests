@@ -17,7 +17,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "tensorflow/core/example/feature_util.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
@@ -31,7 +30,7 @@ using test::EqualsProto;
 using test::StatusIs;
 
 dataset::proto::DataSpecification ToyDataSpec() {
-  return PARSE_TEST_PROTO(R"(
+  return PARSE_TEST_PROTO(R"pb(
     # Id:0
     columns {
       type: NUMERICAL
@@ -198,7 +197,7 @@ dataset::proto::DataSpecification ToyDataSpec() {
       size: 2
       type: DISCRETIZED_NUMERICAL
     }
-  )");
+  )pb");
 }
 
 struct ToyModel : EmptyModel {
@@ -333,7 +332,7 @@ TEST(ExampleSet, ExtractProtoExampleMissing) {
   ToyModel::ExampleSet example_set(5, model);
   example_set.FillMissing(model);
   const dataset::proto::Example expected_example = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes {}
         attributes {}
         attributes {}
@@ -349,7 +348,7 @@ TEST(ExampleSet, ExtractProtoExampleMissing) {
         attributes {}
         attributes {}
         attributes {}
-      )");
+      )pb");
   EXPECT_THAT(example_set.ExtractProtoExample(0, model).value(),
               EqualsProto(expected_example));
   EXPECT_THAT(example_set.ExtractProtoExample(1, model).value(),
@@ -364,7 +363,7 @@ TEST(ExampleSet, ExtractProtoExampleMissingManually) {
   SetToyValues(model, &example_set, /*apply_fill_missing=*/false,
                /*apply_set_missing=*/true, /*apply_set_values=*/false);
   const dataset::proto::Example expected_example = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes {}
         attributes {}
         attributes {}
@@ -380,7 +379,7 @@ TEST(ExampleSet, ExtractProtoExampleMissingManually) {
         attributes {}
         attributes {}
         attributes {}
-      )");
+      )pb");
   EXPECT_THAT(example_set.ExtractProtoExample(0, model).value(),
               EqualsProto(expected_example));
 }
@@ -391,7 +390,7 @@ TEST(ExampleSet, ExtractProtoManualExample) {
   SetToyValues(model, &example_set);
 
   const dataset::proto::Example expected_example_0 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes {}
         attributes {}
         attributes {}
@@ -407,12 +406,12 @@ TEST(ExampleSet, ExtractProtoManualExample) {
         attributes {}
         attributes {}
         attributes {}
-      )");
+      )pb");
   EXPECT_THAT(example_set.ExtractProtoExample(0, model).value(),
               EqualsProto(expected_example_0));
 
   const dataset::proto::Example expected_example_1 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes { numerical: 1.0 }
         attributes { categorical: 1 }
         attributes { categorical: 1 }
@@ -428,7 +427,7 @@ TEST(ExampleSet, ExtractProtoManualExample) {
         attributes { discretized_numerical: 2 }
         attributes { discretized_numerical: 2 }
         attributes { boolean: true }
-      )");
+      )pb");
   EXPECT_THAT(example_set.ExtractProtoExample(1, model).value(),
               EqualsProto(expected_example_1));
 }
@@ -438,7 +437,7 @@ TEST(ExampleSet, FromProtoExample) {
   ToyModel::ExampleSet example_set(5, model);
 
   const dataset::proto::Example example_0 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes {}
         attributes {}
         attributes {}
@@ -454,13 +453,13 @@ TEST(ExampleSet, FromProtoExample) {
         attributes {}
         attributes {}
         attributes {}
-      )");
+      )pb");
   EXPECT_OK(example_set.FromProtoExample(example_0, 0, model));
   EXPECT_THAT(example_set.ExtractProtoExample(0, model).value(),
               EqualsProto(example_0));
 
   const dataset::proto::Example example_1 = PARSE_TEST_PROTO(
-      R"(
+      R"pb(
         attributes { numerical: 1.0 }
         attributes { categorical: 1 }
         attributes { categorical: 1 }
@@ -476,96 +475,11 @@ TEST(ExampleSet, FromProtoExample) {
         attributes { discretized_numerical: 2 }
         attributes { discretized_numerical: 2 }
         attributes { boolean: true }
-      )");
+      )pb");
 
   EXPECT_OK(example_set.FromProtoExample(example_1, 1, model));
   EXPECT_THAT(example_set.ExtractProtoExample(1, model).value(),
               EqualsProto(example_1));
-}
-
-TEST(ExampleSet, FromTensorflowExample) {
-  ToyModel model;
-  ToyModel::ExampleSet example_set(5, model);
-
-  tensorflow::Example example;
-  tensorflow::SetFeatureValues({3.0f}, "a", &example);
-  tensorflow::SetFeatureValues<int64_t>({1}, "b", &example);
-  tensorflow::SetFeatureValues({"y_c"}, "c", &example);
-  tensorflow::SetFeatureValues<int64_t>({2, 3}, "d", &example);
-  tensorflow::SetFeatureValues({"y_d", "z_d"}, "e", &example);
-  tensorflow::SetFeatureValues({1.9}, "f", &example);
-  tensorflow::SetFeatureValues({10.f, 11.f, 12.f}, "g", &example);
-  tensorflow::SetFeatureValues({1.5f, 1.5f}, "i", &example);
-  tensorflow::SetFeatureValues({1.0f}, "j", &example);
-  EXPECT_OK(example_set.FromTensorflowExample(example, 0, model));
-  const dataset::proto::Example expected_example = PARSE_TEST_PROTO(
-      R"(
-        attributes { numerical: 3.0 }
-        attributes { categorical: 1 }
-        attributes { categorical: 1 }
-        attributes { categorical_set { values: 2 values: 3 } }
-        attributes { categorical_set { values: 1 values: 2 } }
-        attributes {}
-        attributes { discretized_numerical: 2 }
-        attributes { numerical: 10 }
-        attributes { numerical: 11 }
-        attributes { numerical: 12 }
-        attributes {}
-        attributes {}
-        attributes { discretized_numerical: 2 }
-        attributes { discretized_numerical: 2 }
-        attributes { boolean: true }
-      )");
-  EXPECT_THAT(example_set.ExtractProtoExample(0, model).value(),
-              EqualsProto(expected_example));
-
-  tensorflow::Example example_1 = example;
-  tensorflow::SetFeatureValues({1.0f}, "a", &example_1);
-  EXPECT_OK(example_set.FromTensorflowExample(example_1, 1, model));
-  const dataset::proto::Example expected_example_2 = PARSE_TEST_PROTO(
-      R"(
-        attributes { numerical: 1.0 }
-        attributes { categorical: 1 }
-        attributes { categorical: 1 }
-        attributes { categorical_set { values: 2 values: 3 } }
-        attributes { categorical_set { values: 1 values: 2 } }
-        attributes {}
-        attributes { discretized_numerical: 2 }
-        attributes { numerical: 10 }
-        attributes { numerical: 11 }
-        attributes { numerical: 12 }
-        attributes {}
-        attributes {}
-        attributes { discretized_numerical: 2 }
-        attributes { discretized_numerical: 2 }
-        attributes { boolean: true }
-      )");
-  EXPECT_THAT(example_set.ExtractProtoExample(1, model).value(),
-              EqualsProto(expected_example_2));
-
-  tensorflow::Example example_2 = example;
-  tensorflow::SetFeatureValues({1.0f, 2.0f}, "a", &example_2);
-  EXPECT_THAT(example_set.FromTensorflowExample(example_2, 1, model),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       "Too many values for feature: a"));
-
-  tensorflow::Example example_3 = example;
-  tensorflow::SetFeatureValues<int64_t>({1, 2}, "b", &example_3);
-  EXPECT_THAT(example_set.FromTensorflowExample(example_3, 1, model),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       "Too many values for feature: b"));
-
-  tensorflow::Example example_4 = example;
-  tensorflow::SetFeatureValues({"1.0f"}, "a", &example_4);
-  EXPECT_THAT(example_set.FromTensorflowExample(example_4, 1, model),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       "Feature a is not numerical."));
-
-  tensorflow::Example example_5 = example;
-  tensorflow::SetFeatureValues({10.f, 11.f, 12.f, 13.f}, "g", &example_5);
-  EXPECT_THAT(
-      example_set.FromTensorflowExample(example_5, 1, model),
-      StatusIs(absl::StatusCode::kInvalidArgument, "Wrong number of values."));
 }
 
 }  // namespace

@@ -18,16 +18,16 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_DATA_SPEC_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_DATA_SPEC_H_
 
+#include <stdint.h>
+
 #include <limits>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "tensorflow/core/example/example.pb.h"
-#include "tensorflow/core/example/feature.pb.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -83,11 +83,6 @@ absl::Status GetSingleColumnIdxFromName(
     absl::string_view column_name_regex,
     const dataset::proto::DataSpecification& data_spec, int32_t* column_idx);
 
-// Converts a tf.Example into an Example.
-absl::Status TfExampleToExample(const tensorflow::Example& tf_example,
-                                const proto::DataSpecification& data_spec,
-                                proto::Example* example);
-
 // Converts a single row from a csv into an Example.
 // If col_idx_to_field_idx[i] == -1, all the values of the i-th column are
 // replaced by empty values.
@@ -102,15 +97,6 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
 absl::Status ExampleToCsvRow(const proto::Example& example,
                              const proto::DataSpecification& data_spec,
                              std::vector<std::string>* csv_fields);
-
-// Converts a proto::Example into a tensorflow::Example.
-void ExampleToTfExample(const proto::Example& example,
-                        const proto::DataSpecification& data_spec,
-                        tensorflow::Example* tf_example);
-
-absl::Status ExampleToTfExampleWithStatus(
-    const proto::Example& example, const proto::DataSpecification& data_spec,
-    tensorflow::Example* tf_example);
 
 // Returns the index of the column with the corresponding name. Raise an error
 // if the column does not exist.
@@ -185,21 +171,6 @@ bool IsCategorical(proto::ColumnType type);
 
 // Is this column numerical?
 bool IsNumerical(proto::ColumnType type);
-
-// Get the float value contained in a feature. Can return NaN. Fails if
-// the feature contains more than one value.
-utils::StatusOr<float> GetSingleFloatFromTFFeature(
-    const tensorflow::Feature& feature, const proto::Column& col);
-
-// Get all the float values contained in a feature.
-absl::Status GetNumericalValuesFromTFFeature(const tensorflow::Feature& feature,
-                                             const proto::Column& col,
-                                             std::vector<float>* values);
-
-// Get the categorical tokens in a feature.
-absl::Status GetCategoricalTokensFromTFFeature(
-    const tensorflow::Feature& feature, const proto::Column& col,
-    std::vector<std::string>* tokens);
 
 // Converts a discretized numerical value into a numerical value.
 utils::StatusOr<float> DiscretizedNumericalToNumerical(

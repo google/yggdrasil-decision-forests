@@ -17,15 +17,30 @@
 set BAZEL=bazel-4.0.0-windows-x86_64.exe
 %BAZEL% version
 
-# Without TensorFlow IO.
-set FLAGS=--config=windows_cpp17
-%BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli/...:all || goto :error
-%BAZEL% test %FLAGS% //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc || goto :error
+set TF_SUPPORT=0
 
-# With TensorFlow IO.
-set FLAGS=--config=windows_cpp14 --config=use_tensorflow_io
-%BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli/...:all || goto :error
-%BAZEL% test %FLAGS% //yggdrasil_decision_forests/...: //examples:beginner_cc || goto :error
+IF %TF_SUPPORT%==0 (
+
+  copy /Y WORKSPACE_NO_TF WORKSPACE
+
+  set FLAGS=--config=windows_cpp17
+  %BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli:all || goto :error
+
+) ELSE (
+
+  copy /Y WORKSPACE_WITH_TF WORKSPACE
+
+  # Without TensorFlow IO.
+  set FLAGS=--config=windows_cpp17
+  %BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli/...:all || goto :error
+  %BAZEL% test %FLAGS% //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc || goto :error
+
+  # With TensorFlow IO.
+  set FLAGS=--config=windows_cpp14 --config=use_tensorflow_io
+  %BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli/...:all || goto :error
+  %BAZEL% test %FLAGS% //yggdrasil_decision_forests/...: //examples:beginner_cc || goto :error
+
+)
 
 goto :EOF
 :error

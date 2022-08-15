@@ -59,7 +59,7 @@
 #include "tensorflow/core/example/feature.pb.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
-#include "yggdrasil_decision_forests/dataset/tf_example_io_interface.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"

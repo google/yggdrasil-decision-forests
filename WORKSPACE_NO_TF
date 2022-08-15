@@ -4,8 +4,6 @@
 # with WORKSPACE_WITH_TF, and use the "--config=use_tensorflow_io" flag. See
 # tools/test_bazel_with_tf.sh for more details.
 #
-# WARNING: This file is a copy of WORKSPACE_NO_TF. Keep both files in sync.
-#
 
 workspace(name = "yggdrasil_decision_forests")
 

@@ -13,7 +13,9 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/dataset/tf_example_io_interface.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
+
+#include <stdint.h>
 
 #include <algorithm>
 #include <memory>
@@ -24,8 +26,9 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
 #include "tensorflow/core/example/example.pb.h"
 #include "tensorflow/core/example/feature.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -34,8 +37,10 @@
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow/tf_example.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -195,15 +200,16 @@ absl::Status UpdateDataSpecWithTFExampleBase(
     }
     // Mean of single dimension numerical columns.
     if (IsNumerical(col->type()) && !IsMultiDimensional(col->type())) {
-      ASSIGN_OR_RETURN(const float num_value,
-                       GetSingleFloatFromTFFeature(it_feature->second, *col));
+      ASSIGN_OR_RETURN(
+          const float num_value,
+          internal::GetSingleFloatFromTFFeature(it_feature->second, *col));
       RETURN_IF_ERROR(UpdateNumericalColumnSpec(num_value, col, col_acc));
     }
 
     if (IsCategorical(col->type())) {
       std::vector<std::string> tokens;
-      RETURN_IF_ERROR(
-          GetCategoricalTokensFromTFFeature(it_feature->second, *col, &tokens));
+      RETURN_IF_ERROR(internal::GetCategoricalTokensFromTFFeature(
+          it_feature->second, *col, &tokens));
       if (!IsMultiDimensional(col->type()) && tokens.empty()) {
         col->set_count_nas(col->count_nas() + 1);
         continue;
@@ -212,14 +218,16 @@ absl::Status UpdateDataSpecWithTFExampleBase(
     }
 
     if (col->type() == ColumnType::DISCRETIZED_NUMERICAL) {
-      ASSIGN_OR_RETURN(const float num_value,
-                       GetSingleFloatFromTFFeature(it_feature->second, *col));
+      ASSIGN_OR_RETURN(
+          const float num_value,
+          internal::GetSingleFloatFromTFFeature(it_feature->second, *col));
       UpdateComputeSpecDiscretizedNumerical(num_value, col, col_acc);
     }
 
     if (col->type() == ColumnType::BOOLEAN) {
-      ASSIGN_OR_RETURN(const float num_value,
-                       GetSingleFloatFromTFFeature(it_feature->second, *col));
+      ASSIGN_OR_RETURN(
+          const float num_value,
+          internal::GetSingleFloatFromTFFeature(it_feature->second, *col));
       UpdateComputeSpecBooleanFeature(num_value, col);
     }
   }
@@ -241,8 +249,8 @@ absl::Status UpdateDataSpecWithTFExample(
 
 TFExampleReaderToExampleReader::TFExampleReaderToExampleReader(
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>> required_columns)
-    : data_spec_(data_spec), required_columns_(required_columns) {}
+    const absl::optional<std::vector<int>> ensure_non_missing)
+    : data_spec_(data_spec), ensure_non_missing_(ensure_non_missing) {}
 
 absl::Status TFExampleReaderToExampleReader::Open(
     absl::string_view sharded_path) {
@@ -257,7 +265,8 @@ utils::StatusOr<bool> TFExampleReaderToExampleReader::Next(
   if (!did_read) {
     return false;
   }
-  RETURN_IF_ERROR(TfExampleToExample(tfexample_buffer_, data_spec_, example));
+  RETURN_IF_ERROR(
+      TfExampleToYdfExample(tfexample_buffer_, data_spec_, example));
   return true;
 }
 
@@ -482,7 +491,7 @@ absl::Status TFExampleWriterToExampleWriter::Open(
 absl::Status TFExampleWriterToExampleWriter::Write(
     const proto::Example& example) {
   RETURN_IF_ERROR(
-      ExampleToTfExampleWithStatus(example, data_spec_, &tfexample_buffer_));
+      YdfExampleToTfExample(example, data_spec_, &tfexample_buffer_));
   return tf_writer_->Write(tfexample_buffer_);
 }
 

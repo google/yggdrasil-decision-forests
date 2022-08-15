@@ -36,8 +36,10 @@
 // Alternatively, a dependency to ":all_tf_example_io_interfaces" can be created
 // to add support to all supported formats.
 
-#ifndef YGGDRASIL_DECISION_FORESTS_DATASET_TF_EXAMPLE_IO_INTERFACE_H_
-#define YGGDRASIL_DECISION_FORESTS_DATASET_TF_EXAMPLE_IO_INTERFACE_H_
+#ifndef YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_TF_EXAMPLE_IO_INTERFACE_H_
+#define YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_TF_EXAMPLE_IO_INTERFACE_H_
+
+#include <stdint.h>
 
 #include <memory>
 #include <string>
@@ -94,7 +96,7 @@ class TFExampleReaderToExampleReader : public ExampleReaderInterface {
 
   TFExampleReaderToExampleReader(
       const proto::DataSpecification& data_spec,
-      absl::optional<std::vector<int>> required_columns);
+      absl::optional<std::vector<int>> ensure_non_missing);
 
   absl::Status Open(absl::string_view sharded_path) override;
 
@@ -104,7 +106,7 @@ class TFExampleReaderToExampleReader : public ExampleReaderInterface {
   std::unique_ptr<AbstractTFExampleReader> tf_reader_;
   tensorflow::Example tfexample_buffer_;
   const proto::DataSpecification data_spec_;
-  const absl::optional<std::vector<int>> required_columns_;
+  const absl::optional<std::vector<int>> ensure_non_missing_;
 };
 
 // Wrapper around a TFExampleReader with the signature of an dataspec generator.
@@ -157,4 +159,4 @@ proto::ColumnType InferType(const proto::DataSpecificationGuide& guide,
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
 
-#endif  // YGGDRASIL_DECISION_FORESTS_DATASET_TF_EXAMPLE_IO_INTERFACE_H_
+#endif  // YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_TF_EXAMPLE_IO_INTERFACE_H_

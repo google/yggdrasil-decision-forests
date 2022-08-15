@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/dataset/tf_example_io_tfrecord.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_tfrecord.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {}  // namespace dataset

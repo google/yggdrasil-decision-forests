@@ -35,16 +35,4 @@ def load_dependencies(repo_name = "", exclude_repo = []):
         grpc()
 
     if "rapidjson" not in exclude_repo:
-        rapidjson()
-
-    # Inject transitive dependencies
-    # Note: Bazel does not automatically inject transitive dependencies.
-
-    # Protobuf.
-    # Needs to be called before tensorflow because of a collision with Six.
-    #load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-    #protobuf_deps()
-
-    # TensorFlow.
-    #load("@org_tensorflow//tensorflow:workspace.bzl", "tf_workspace")
-    #tf_workspace(tf_repo_name = "org_tensorflow")
+        rapidjson(prefix = repo_name)

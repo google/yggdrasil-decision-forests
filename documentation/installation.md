@@ -25,9 +25,9 @@ interfaces.
 
 <!--te-->
 
-## Installation pre-compiled command-line-interface
+## Pre-compiled command-line-interface
 
-Pre-compiled binaries are available as
+Download and unpack the pre-compiled binaries available as
 [github releases](https://github.com/google/yggdrasil-decision-forests/releases)
 .
 
@@ -43,48 +43,68 @@ Pre-compiled binaries are available as
 -   Python's numpy
 -   MSYS2 (Windows)
 
-First install [Bazelisk](https://bazel.build/install).
+First install [Bazel](https://bazel.build/install) or
+[Bazelisk](https://bazel.build/install/bazelisk) (recommended).
 
-Note: If you need to use an old version of Bazel e.g. you might have to
-uncomment the `common --incompatible_restrict_string_escapes=false` line in
-`.bazelrc`.
+Note: Using an older version of Bazel is possible, but you might need to fiddle
+with the compilation flags. For example, adding `common
+--incompatible_restrict_string_escapes=false` line in `.bazelrc` is necessary
+for Bazel<=4.
 
--   On linux: `sudo apt update && sudo apt install bazel`
-
--   On windows: Follow
-    [the guide](https://docs.bazel.build/versions/4.0.0/install-windows.html).
-
--   On Mac: Follow
-    [the guide](https://docs.bazel.build/versions/master/install-os-x.html#install-with-installer-mac-os-x)
-    or install bazel / bazelisk with [homebrew](https://brew.sh/): `brew install
-    bazel` or `brew install bazelisk`. We recommend bazelisk, as it will select
-    an appropriate version of bazel for the project automatically.
-
-For more details (and troubleshooting), see the
-[Bazel installation guide](https://docs.bazel.build/versions/4.0.0/install.html)
-.
-
-Once Bazel is installed, clone the github repository and start the compilation:
+Once Bazel/Bazelisk is installed, clone the github repository:
 
 ```shell
 git clone https://github.com/google/yggdrasil-decision-forests.git
 cd yggdrasil-decision-forests
-
-bazel build //yggdrasil_decision_forests/...:all --config=<platform config>
 ```
 
-For example:
-
-### Linux / MacOS
+and compile the library:
 
 ```shell
-git clone https://github.com/google/yggdrasil-decision-forests.git
-cd yggdrasil-decision-forests
+# Compile on Linux
+./tools/test_bazel_no_tf.sh
 
-bazel build //yggdrasil_decision_forests/cli/...:all --config=linux_cpp17 --config=linux_avx2
+# Compile on Windows
+./tools/test_bazel_no_tf.bat
+```
+
+## Calling Bazel directly
+
+Alternatively, you can compile the library by calling bazel directly (i.e.`bazel
+build`) as follow:
+
+First, select the workspace depending on your needs for TensorFlow datasets (not
+recommended for first time users). The library and CLI support both options, but
+some of the units tests requires the TensorFlow dataset option.
+
+```shell
+# No support for TensorFlow datasets.
+# Equivalent to ./tools/test_bazel_no_tf.sh
+cp WORKSPACE_NO_TF WORKSPACE
+
+# Support for TensorFlow datasets.
+# Equivalent to ./tools/test_bazel_with_tf.sh
+cp WORKSPACE_WITH_TF WORKSPACE
+```
+
+Then compile the library with:
+
+```shell
+# Compile on Linux
+bazel build //yggdrasil_decision_forests/cli:all --config=linux_cpp17 --config=linux_avx2
+
+# Compile on Windows
+bazel build //yggdrasil_decision_forests/cli:all --config=windows_cpp17 --config=windows_avx2
+
+# Compile on MacOS
+bazel build //yggdrasil_decision_forests/cli:all --config=macos
 ```
 
 *Note:* You can specify the compiler with `--repo_env=CC`. For example:
+
+## OS specific instructions
+
+### Linux / MacOS
 
 ```shell
 # Compile with GCC9
@@ -94,8 +114,8 @@ bazel build //yggdrasil_decision_forests/cli/...:all --config=linux_cpp17 --conf
 ... --repo_env=CC=clang
 ```
 
-*Note:* On MacOS you may need to `brew install numpy` if a version installed via
-pip is not available on the paths used by bazel.
+*Note:* On MacOS, you may need to `brew install numpy` if a version installed
+via pip is not available on the paths used by bazel.
 
 ### Windows
 
@@ -121,17 +141,17 @@ set BAZEL_VC_FULL_VERSION=14.28.29910
 
 **Important remarks**
 
--   The `.bazelrc` file contains implicit options used by the build.
+-   The `.bazelrc` file contains implicit build options.
 -   By default, the binaries will not be compiled with support for TensorFlow IO
-    and dataset formats. Support can be added with `--config=use_tensorflow_io`.
-    In this case, a small fraction of TensorFlow is compiled. Some of the unit
-    test require `--config=use_tensorflow_io`.
+    and dataset formats. Support can be added with `--config=use_tensorflow_io`
+    and with the correct WORKSPACE file. In this case, a small fraction of
+    TensorFlow is compiled.
 -   TensorFlow does not support C++17 on Windows. If using `use_tensorflow_io`,
     you have to use C++14 i.e. `--config=windows_cpp14`.
 
 ## Running a minimal example
 
-The CLI binaries are now be available in the
+Once the compilation is done, the CLI binaries are available in
 `bazel-bin/yggdrasil_decision_forests/cli` directory. For example,
 `bazel-bin/yggdrasil_decision_forests/cli/train` trains a model. Alternatively,
 if you downloaded the binaries, extract them to the project root. Then, to run
@@ -316,8 +336,16 @@ http_archive(
 )
 
 load("@ydf//yggdrasil_decision_forests:library.bzl",
-     ydf_load_deps="load_dependencies")
+     ydf_load_deps="load_dependencies", exclude_repo="tensorflow")
 ydf_load_deps(repo_name="@ydf")
+
+# Load the dependencies of YDF that cannot be loaded above.
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+protobuf_deps()
+load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+grpc_deps()
+load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
+grpc_extra_deps()
 ```
 
 **Remarks :** `ydf_load_deps` injects the required dependencies (e.g. absl,

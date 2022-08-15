@@ -14,27 +14,14 @@ http_archive(
 # path = "../../",
 # )
 
+# Load the dependencies of YDF.
 load("@ydf//yggdrasil_decision_forests:library.bzl", ydf_load_deps = "load_dependencies")
-ydf_load_deps(repo_name = "@ydf")
+ydf_load_deps(repo_name = "@ydf", exclude_repo="tensorflow")
 
-# TensorFlow is used to read and write TFRecord, and for IO operations if
-# use_tensorflow_io=1. In both case, only a small fraction of TF will be
-# compiled.
-#
-# TF will inject Bazel Skylib.
-
-http_archive(
-    name = "org_tensorflow",
-    sha256 = "9f2dac244e5af6c6a13a7dad6481e390174ac989931942098e7a4373f1bccfc2",
-    strip_prefix = "tensorflow-2.9.1",
-    urls = ["https://github.com/tensorflow/tensorflow/archive/refs/tags/v2.9.1.zip"],
-)
-
-load("@org_tensorflow//tensorflow:workspace3.bzl", tf1="workspace")
-tf1()
-load("@org_tensorflow//tensorflow:workspace2.bzl", tf2="workspace")
-tf2()
-load("@org_tensorflow//tensorflow:workspace1.bzl", tf3="workspace")
-tf3()
-load("@org_tensorflow//tensorflow:workspace0.bzl", tf4="workspace")
-tf4()
+# Load the dependencies of YDF that cannot be loaded above.
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+protobuf_deps()
+load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+grpc_deps()
+load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
+grpc_extra_deps()

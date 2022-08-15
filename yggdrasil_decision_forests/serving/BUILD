@@ -27,15 +27,30 @@ cc_library_ydf(
     ],
 )
 
+# TODO: Remove dependency to TF in this rule.
 cc_library_ydf(
     name = "example_set",
-    srcs = [
-        "example_set.cc",
-    ],
-    hdrs = [
-        "example_set.h",
-    ],
+    srcs = ["example_set.cc"],
+    hdrs = ["example_set.h"],
     deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/types:span",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/utils:compatibility",
+        "//yggdrasil_decision_forests/utils:status_macros",
+    ],
+)
+
+cc_library_ydf(
+    name = "tf_example",
+    srcs = ["tf_example.cc"],
+    hdrs = ["tf_example.h"],
+    deps = [
+        ":example_set",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
@@ -44,7 +59,13 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:status_macros",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+    }),
 )
 
 cc_library_ydf(
@@ -96,8 +117,25 @@ cc_test(
     deps = [
         ":example_set",
         "@com_google_googletest//:gtest_main",
-        "@org_tensorflow//tensorflow/core/example:feature_util",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/utils:test",
+    ],
+)
+
+cc_test(
+    name = "tf_example_test",
+    srcs = ["tf_example_test.cc"],
+    deps = [
+        ":example_set",
+        ":tf_example",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@org_tensorflow//tensorflow/core/example:example_protos_cc",
+        "@org_tensorflow//tensorflow/core/example:feature_util",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:test",
     ],
 )
