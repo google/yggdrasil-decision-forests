@@ -49,11 +49,11 @@ model, err := model_io.LoadModel(runfiles.Path(modelPath))
 // be discarded, only hte prepared "engine" is needed.
 engine, err := serving.NewEngine(model)
 
-// b/235436797: When running a model trained with the TensorFlow Decision
-// Forests API (in TensorFlow python, as opposed from the command-line), 
-// use the `NewEngineWithCompatibility` method instead. When the
-// bug will be resolved, "NewEngine" will automatically apply the correct
-// compatibility.
+// When running a model trained with the TensorFlow Decision Forests API (in
+// TensorFlow python, as opposed from the command-line), use the
+// `NewEngineWithCompatibility` method instead. This is a temporary
+// compatibility issue, and will be resolved soon, when "NewEngine" will
+// automatically apply the correct compatibility.
 engine, err := serving.NewEngineWithCompatibility(model, example.CompatibilityTensorFlowDecisionForests)
 
 // Indices for the input features of the model.
