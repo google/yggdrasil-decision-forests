@@ -129,7 +129,6 @@ cc_test(
         ":example_set",
         ":tf_example",
         "@com_google_googletest//:gtest_main",
-        "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@org_tensorflow//tensorflow/core/example:example_protos_cc",
         "@org_tensorflow//tensorflow/core/example:feature_util",
