@@ -72,6 +72,10 @@ $CLI/show_model --model=$MODEL --engines --alsologtostderr | tee $MODEL_INFO
 EVALUATION="$TEST_TMPDIR/evaluation.txt"
 $CLI/evaluate --dataset=$TEST_DS --model=$MODEL --alsologtostderr | tee $EVALUATION
 
+# Evaluate the model again, but export the result in an html file (with plots).
+HTML_EVALUATION="$TEST_TMPDIR/evaluation.html"
+$CLI/evaluate --dataset=$TEST_DS --model=$MODEL --format=html --alsologtostderr > $HTML_EVALUATION
+
 # Export the predictions of the model.
 PREDICTIONS="csv:$TEST_TMPDIR/prediction_test.csv"
 $CLI/predict --dataset=$TEST_DS --model=$MODEL --output=$PREDICTIONS --alsologtostderr
