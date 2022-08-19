@@ -45,6 +45,7 @@ MATCHER_P(StatusIs, type, "Status is " + testing::PrintToString(type)) {
   return arg.code() == type;
 }
 
+// Ensures that two protos are equal.
 MATCHER_P(EqualsProto, expected,
           "Proto is equal to:\n" + expected.DebugString()) {
   return google::protobuf::util::MessageDifferencer::Equivalent(arg, expected);

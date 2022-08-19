@@ -131,6 +131,9 @@ namespace {
 constexpr char kBaseGradientColumnName[] = "__gradient__";
 constexpr char kBaseHessianColumnName[] = "__hessian__";
 
+// Filename of the file containing the early stopping state in a checkpoint.
+constexpr char kEarlyStoppingCheckpoint[] = "early_stopping.pb";
+
 // Name of the gradient column in the gradient dataset.
 std::string GradientColumnName(const int grad_idx) {
   return absl::StrCat(kBaseGradientColumnName, grad_idx);
@@ -1192,7 +1195,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
     const auto snapshot_idx_or = utils::GetGreatestSnapshot(snapshot_directory);
     if (snapshot_idx_or.ok()) {
       // Load the snapshot.
-      LOG(INFO) << "Resume the GBT training from tree #"
+      LOG(INFO) << "Resume the GBT training from iteration #"
                 << snapshot_idx_or.value();
       const auto model_path =
           file::JoinPath(deployment_.cache_path(),
@@ -1200,7 +1203,14 @@ GradientBoostedTreesLearner::TrainWithStatus(
       // Load the model structure.
       RETURN_IF_ERROR(
           mdl->Load(model_path, /*io_options=*/{/*file_prefix=*/""}));
-      iter_idx = mdl->NumTrees();
+      iter_idx = mdl->NumTrees() / mdl->num_trees_per_iter();
+
+      // Load the state of the early stopping state manager.
+      proto::EarlyStoppingSnapshot early_stopping_snapshot;
+      RETURN_IF_ERROR(file::GetBinaryProto(
+          file::JoinPath(model_path, kEarlyStoppingCheckpoint),
+          &early_stopping_snapshot, file::Defaults()));
+      RETURN_IF_ERROR(early_stopping.Load(early_stopping_snapshot));
 
       // Recompute the prediction caches.
       auto time_begin_recompute_accumulators = absl::Now();
@@ -1462,6 +1472,11 @@ GradientBoostedTreesLearner::TrainWithStatus(
       RETURN_IF_ERROR(
           mdl->Save(model_path, /*io_options=*/{/*file_prefix=*/""}));
 
+      // Save the early stopping manager state.
+      RETURN_IF_ERROR(file::SetBinaryProto(
+          file::JoinPath(model_path, kEarlyStoppingCheckpoint),
+          early_stopping.Save(), file::Defaults()));
+
       // Record the snapshot.
       RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
 
@@ -1484,6 +1499,11 @@ GradientBoostedTreesLearner::TrainWithStatus(
       // Save the model structure.
       RETURN_IF_ERROR(
           mdl->Save(model_path, /*io_options=*/{/*file_prefix=*/""}));
+
+      // Save the early stopping manager state.
+      RETURN_IF_ERROR(file::SetBinaryProto(
+          file::JoinPath(model_path, kEarlyStoppingCheckpoint),
+          early_stopping.Save(), file::Defaults()));
 
       // Record the snapshot.
       RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
@@ -2874,6 +2894,33 @@ bool EarlyStopping::ShouldStop() {
     return true;
   }
   return false;
+}
+
+proto::EarlyStoppingSnapshot EarlyStopping::Save() const {
+  proto::EarlyStoppingSnapshot p;
+  p.set_best_loss(best_loss_);
+  p.set_last_loss(last_loss_);
+  p.set_best_num_trees(best_num_trees_);
+  p.set_last_num_trees(last_num_trees_);
+  p.set_num_trees_look_ahead(num_trees_look_ahead_);
+  p.set_trees_per_iterations(trees_per_iterations_);
+
+  *p.mutable_best_metrics() = {best_metrics_.begin(), best_metrics_.end()};
+  *p.mutable_last_metrics() = {last_metrics_.begin(), last_metrics_.end()};
+  return p;
+}
+
+absl::Status EarlyStopping::Load(const proto::EarlyStoppingSnapshot& p) {
+  best_loss_ = p.best_loss();
+  last_loss_ = p.last_loss();
+  best_num_trees_ = p.best_num_trees();
+  last_num_trees_ = p.last_num_trees();
+  num_trees_look_ahead_ = p.num_trees_look_ahead();
+  trees_per_iterations_ = p.trees_per_iterations();
+
+  best_metrics_ = {p.best_metrics().begin(), p.best_metrics().end()};
+  last_metrics_ = {p.last_metrics().begin(), p.last_metrics().end()};
+  return absl::OkStatus();
 }
 
 void SetInitialPredictions(const std::vector<float>& initial_predictions,

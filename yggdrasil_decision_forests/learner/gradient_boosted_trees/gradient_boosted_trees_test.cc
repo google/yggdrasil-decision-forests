@@ -69,7 +69,8 @@ namespace gradient_boosted_trees {
 namespace {
 
 using test::EqualsProto;
-using testing::ElementsAre;
+using ::testing::ElementsAre;
+using ::testing::Not;
 
 std::string DatasetDir() {
   return file::JoinPath(
@@ -1389,28 +1390,150 @@ TEST_F(GradientBoostedTreesOnAdult, InterruptAndResumeTraining) {
   gbt_config->set_early_stopping(
       proto::GradientBoostedTreesTrainingConfig::NONE);
 
-  // Train for 5 seconds.
+  // Train for 10 seconds.
   interrupt_training_after = absl::Seconds(10);
   check_model = false;
   TrainAndEvaluateModel();
   auto interrupted_model = std::move(model_);
 
+  const auto get_gbt = [](const std::unique_ptr<model::AbstractModel>& mdl) {
+    return dynamic_cast<const GradientBoostedTreesModel*>(mdl.get());
+  };
+
   // Resume the training with 100 extra trees.
-  gbt_config->set_num_trees(
-      dynamic_cast<const GradientBoostedTreesModel*>(interrupted_model.get())
-          ->NumTrees() +
-      100);
+  gbt_config->set_num_trees(get_gbt(interrupted_model)->NumTrees() + 100);
   interrupt_training_after = {};
   check_model = true;
   TrainAndEvaluateModel();
   auto resumed_model = std::move(model_);
 
-  EXPECT_EQ(
-      dynamic_cast<const GradientBoostedTreesModel*>(interrupted_model.get())
-              ->NumTrees() +
-          100,
-      dynamic_cast<const GradientBoostedTreesModel*>(resumed_model.get())
-          ->NumTrees());
+  // Ensures that the final model contains +100 iterations from the interrupted
+  // model.
+  EXPECT_EQ(get_gbt(interrupted_model)->NumTrees() + 100,
+            get_gbt(resumed_model)->NumTrees());
+}
+
+TEST_F(GradientBoostedTreesOnIris, InterruptAndResumeTraining) {
+  // Train a model for a few seconds, interrupt its training, and resume it.
+
+  deployment_config_.set_cache_path(
+      file::JoinPath(test::TmpDirectory(), "cache_iris"));
+  deployment_config_.set_try_resume_training(true);
+  deployment_config_.set_resume_training_snapshot_interval_seconds(1);
+
+  // Configure a training that would take a long time.
+  // Note: The quality of this model will be poor as it will overfit strongly
+  // the training dataset.
+  auto* gbt_config =
+      train_config_.MutableExtension(proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100000);
+  gbt_config->set_early_stopping(
+      proto::GradientBoostedTreesTrainingConfig::NONE);
+
+  // Train for 5 seconds.
+  interrupt_training_after = absl::Seconds(5);
+  check_model = false;
+  TrainAndEvaluateModel();
+  auto interrupted_model = std::move(model_);
+
+  const auto get_gbt = [](const std::unique_ptr<model::AbstractModel>& mdl) {
+    return dynamic_cast<const GradientBoostedTreesModel*>(mdl.get());
+  };
+
+  const int num_classes = 3;  // The dataset contains 3 classes.
+  EXPECT_EQ(get_gbt(interrupted_model)->num_trees_per_iter(), num_classes);
+
+  // Resume the training with 100 extra trees.
+  // There are 3 trees per iterations (because the dataset contains 3 classes).
+  gbt_config->set_num_trees(
+      get_gbt(interrupted_model)->NumTrees() / num_classes + 100);
+  interrupt_training_after = {};
+  check_model = true;
+  TrainAndEvaluateModel();
+  auto resumed_model = std::move(model_);
+
+  // Ensures that the final model contains +100 iterations from the interrupted
+  // model.
+  EXPECT_EQ(get_gbt(interrupted_model)->NumTrees() + 100 * num_classes,
+            get_gbt(resumed_model)->NumTrees());
+}
+
+TEST(EarlyStopping, Interruption) {
+  internal::EarlyStopping manager(/*early_stopping_num_trees_look_ahead=*/2);
+  manager.set_trees_per_iterations(1);
+  EXPECT_FALSE(manager.ShouldStop());
+
+  CHECK_OK(manager.Update(/*validation_loss=*/10,
+                          /*validation_secondary_metrics=*/{},
+                          /*num_trees=*/0));
+  EXPECT_FALSE(manager.ShouldStop());
+
+  CHECK_OK(manager.Update(9, {}, 1));
+  EXPECT_FALSE(manager.ShouldStop());
+
+  CHECK_OK(manager.Update(8, {}, 2));
+  EXPECT_FALSE(manager.ShouldStop());
+
+  CHECK_OK(manager.Update(7, {}, 3));
+  EXPECT_FALSE(manager.ShouldStop());
+
+  CHECK_OK(manager.Update(8, {}, 4));
+  EXPECT_FALSE(manager.ShouldStop());
+
+  // This is the lowest (i.e. best) loss.
+  CHECK_OK(manager.Update(6, {}, 5));
+  EXPECT_FALSE(manager.ShouldStop());
+
+  CHECK_OK(manager.Update(7, {}, 6));
+  EXPECT_FALSE(manager.ShouldStop());
+
+  CHECK_OK(manager.Update(8, {}, 7));
+  EXPECT_TRUE(manager.ShouldStop());
+
+  EXPECT_EQ(manager.best_num_trees(), 5);
+  EXPECT_EQ(manager.best_loss(), 6);
+}
+
+TEST(EarlyStopping, Serialize) {
+  internal::EarlyStopping a(/*early_stopping_num_trees_look_ahead=*/2);
+  internal::EarlyStopping b(2);
+  a.set_trees_per_iterations(1);
+
+  // Make some updates.
+  CHECK_OK(a.Update(/*validation_loss=*/10,
+                    /*validation_secondary_metrics=*/{},
+                    /*num_trees=*/0));
+  CHECK_OK(a.Update(9, {}, 1));
+
+  // Check the internal representation of "a".
+  const proto::EarlyStoppingSnapshot expected = PARSE_TEST_PROTO(
+      R"pb(
+        best_loss: 9
+        last_loss: 9
+        best_num_trees: 1
+        last_num_trees: 1
+        num_trees_look_ahead: 2
+        trees_per_iterations: 1
+      )pb");
+  EXPECT_THAT(a.Save(), EqualsProto(expected));
+
+  // At this point "a" and "b" should be different.
+  EXPECT_THAT(a.Save(), Not(EqualsProto(b.Save())));
+  // Synchronize "a" and "b".
+  EXPECT_OK(b.Load(a.Save()));
+
+  // At this point "a" and "b" should be equal.
+  EXPECT_THAT(a.Save(), EqualsProto(b.Save()));
+
+  // Makes the same updates to "a" and "b".
+  CHECK_OK(a.Update(8, {}, 2));
+  CHECK_OK(a.Update(7, {}, 3));
+
+  CHECK_OK(b.Update(8, {}, 2));
+  CHECK_OK(b.Update(7, {}, 3));
+
+  // At this point "a" and "b" should still be equal.
+  EXPECT_THAT(a.Save(), EqualsProto(b.Save()));
 }
 
 }  // namespace

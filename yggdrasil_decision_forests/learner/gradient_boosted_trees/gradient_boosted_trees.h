@@ -122,10 +122,8 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamValidationIntervalInTrees[] =
       "validation_interval_in_trees";
   static constexpr char kHParamLoss[] = "loss";
-  static constexpr char kHParamFocalLossGamma[] =
-      "focal_loss_gamma";
-  static constexpr char kHParamFocalLossAlpha[] =
-      "focal_loss_alpha";
+  static constexpr char kHParamFocalLossGamma[] = "focal_loss_gamma";
+  static constexpr char kHParamFocalLossAlpha[] = "focal_loss_alpha";
 
   utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
@@ -435,7 +433,14 @@ class EarlyStopping {
     trees_per_iterations_ = trees_per_iterations;
   }
 
+  // Exports the internal representation of the class to a proto.
+  proto::EarlyStoppingSnapshot Save() const;
+
+  // Restores the internal representation of the class from a proto.
+  absl::Status Load(const proto::EarlyStoppingSnapshot& p);
+
  private:
+
   // Minimum validation loss over all the step of the model. Only valid if
   // "min_validation_loss_num_trees>=0".
   float best_loss_ = 0.f;
@@ -452,6 +457,7 @@ class EarlyStopping {
   int num_trees_look_ahead_;
 
   int trees_per_iterations_ = -1;
+
 };
 
 // Computes the loss best adapted to the problem.

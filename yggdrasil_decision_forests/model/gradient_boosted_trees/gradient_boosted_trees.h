@@ -82,7 +82,10 @@ class GradientBoostedTreesModel : public AbstractModel,
   // "NodeWithChildren".
   bool IsMissingValueConditionResultFollowGlobalImputation() const;
 
-  // Number of trees in the model.
+  // Number of trees in the model. Note that this value can be different from
+  // the "num_trees" parameter used during training for two reasons: (1) Early
+  // stopping was triggered, (2) the model is trained with multiple trees per
+  // iteration.
   size_t NumTrees() const { return decision_trees_.size(); }
   int num_trees() const override { return NumTrees(); }
 
