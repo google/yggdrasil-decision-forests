@@ -581,7 +581,6 @@ cc_library_ydf(
         ":compatibility",
         ":distribution",
         ":distribution_cc_proto",
-        ":sharded_io_tfrecord",
         ":status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:optional",
