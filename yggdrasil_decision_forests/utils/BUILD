@@ -53,6 +53,15 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "testing_macros",
+    testonly = 1,
+    hdrs = [
+        "testing_macros.h",
+    ],
+    deps = [],
+)
+
 alias(
     name = "filesystem",
     actual = select({
@@ -834,6 +843,17 @@ cc_test(
         ":compatibility",
         ":logging",
         ":status_macros",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_test(
+    name = "testing_macros_test",
+    srcs = ["testing_macros_test.cc"],
+    deps = [
+        ":compatibility",
+        ":testing_macros",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
     ],

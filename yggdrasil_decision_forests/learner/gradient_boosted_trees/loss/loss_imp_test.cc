@@ -13,10 +13,6 @@
  * limitations under the License.
  */
 
-// TODO: Split the test by implementation.
-// Note: Do not add anymore loss test in this file. Instead, create a loss
-// specific test.
-
 #include "gmock/gmock.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
@@ -33,6 +29,8 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 namespace {
+
+// TODO: Split the tests by implementation.
 
 using testing::ElementsAre;
 using testing::FloatNear;
@@ -57,18 +55,6 @@ dataset::VerticalDataset CreateToyDataset() {
   return dataset;
 }
 
-TEST(GradientBoostedTrees, InitialPredictionsBinomialLogLikelihood) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights{1.f, 1.f, 1.f, 1.f};
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
-  const auto init_pred =
-      loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 1, weights)
-          .value();
-  EXPECT_EQ(init_pred.size(), 1);
-  EXPECT_EQ(init_pred[0], 0.f);
-}
-
 TEST(GradientBoostedTrees, InitialPredictionsSquareError) {
   const auto dataset = CreateToyDataset();
   std::vector<float> weights{1.f, 1.f, 1.f, 1.f};
@@ -91,36 +77,6 @@ TEST(GradientBoostedTrees, InitialPredictionsMultinomialLogLikelihood) {
           .value();
   EXPECT_EQ(init_pred.size(), 2);
   EXPECT_EQ(init_pred, std::vector<float>({0.f, 0.f}));
-}
-
-TEST(GradientBoostedTrees, UpdateGradientsBinomialLogLikelihood) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights(dataset.nrow(), 1.f);
-
-  dataset::VerticalDataset gradient_dataset;
-  std::vector<GradientData> gradients;
-  std::vector<float> predictions;
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
-  CHECK_OK(internal::CreateGradientDataset(dataset,
-                                           /* label_col_idx= */ 1,
-                                           /*hessian_splits=*/false, loss_imp,
-                                           &gradient_dataset, &gradients,
-                                           &predictions));
-
-  internal::SetInitialPredictions(
-      loss_imp
-          .InitialPredictions(dataset,
-                              /* label_col_idx =*/1, weights)
-          .value(),
-      dataset.nrow(), &predictions);
-
-  utils::RandomEngine random(1234);
-  CHECK_OK(loss_imp.UpdateGradients(
-      gradient_dataset, /* label_col_idx= */ 1, predictions,
-      /*ranking_index=*/nullptr, &gradients, &random));
-
-  EXPECT_THAT(gradients.front().gradient, ElementsAre(-0.5f, 0.5, -0.5f, 0.5f));
 }
 
 TEST(GradientBoostedTrees, UpdateGradientsBinaryFocalLoss) {
@@ -247,46 +203,6 @@ TEST(GradientBoostedTrees, UpdateGradientsSquaredError) {
               ElementsAre(1.f - 2.5f, 2.f - 2.5f, 3.f - 2.5f, 4.f - 2.5f));
 }
 
-TEST(GradientBoostedTrees, SetLabelDistributionBinomialLogLikelihood) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights(dataset.nrow(), 1.f);
-
-  std::vector<GradientData> gradients;
-
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
-  dataset::VerticalDataset gradient_dataset;
-  CHECK_OK(internal::CreateGradientDataset(dataset,
-                                           /* label_col_idx= */ 1,
-                                           /*hessian_splits=*/false, loss_imp,
-                                           &gradient_dataset, &gradients,
-                                           nullptr));
-  EXPECT_EQ(gradients.size(), 1);
-
-  std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
-  std::vector<float> predictions(dataset.nrow(), 0.f);
-
-  model::proto::TrainingConfig config;
-  model::proto::TrainingConfigLinking config_link;
-  config_link.set_label(2);  // Gradient column.
-  proto::GradientBoostedTreesTrainingConfig gbt_config;
-  gbt_config.set_shrinkage(1.f);
-
-  decision_tree::NodeWithChildren node;
-  CHECK_OK(loss_imp.SetLeaf(gradient_dataset, selected_examples, weights,
-                            config, config_link, predictions,
-                            /* label_col_idx= */ 1, &node));
-
-  // Node output: Half positive, half negative.
-  // (2*(1-0.5)+2*(0-0.5))/( 4*0.5*(1-0.5) ) => 0
-  EXPECT_EQ(node.node().regressor().top_value(), 0);
-  // Distribution of the gradients:
-  EXPECT_EQ(node.node().regressor().distribution().sum(), 0);
-  EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
-  // Same as the number of examples in the dataset.
-  EXPECT_EQ(node.node().regressor().distribution().count(), 4.);
-}
-
 TEST(GradientBoostedTrees, SetLabelDistributionSquaredError) {
   const auto dataset = CreateToyDataset();
   std::vector<float> weights(dataset.nrow(), 1.f);
@@ -323,30 +239,6 @@ TEST(GradientBoostedTrees, SetLabelDistributionSquaredError) {
   EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
   // Same as the number of examples in the dataset.
   EXPECT_EQ(node.node().regressor().distribution().count(), 4.);
-}
-
-TEST(GradientBoostedTrees, ComputeLoss) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights(dataset.nrow(), 1.f);
-  std::vector<float> predictions(dataset.nrow(), 0.f);
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
-  float loss_value;
-  std::vector<float> secondary_metric;
-  CHECK_OK(loss_imp.Loss(dataset,
-                         /* label_col_idx= */ 1, predictions, weights, nullptr,
-                         &loss_value, &secondary_metric));
-
-  EXPECT_NEAR(loss_value, 2 * std::log(2), 0.0001);
-  EXPECT_EQ(secondary_metric.size(), 1);
-  EXPECT_NEAR(secondary_metric[0], 0.5f, 0.0001);
-}
-
-TEST(GradientBoostedTrees, SecondaryMetricName) {
-  const auto dataset = CreateToyDataset();
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
-  EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("accuracy"));
 }
 
 TEST(GradientBoostedTrees, RankingIndex) {
