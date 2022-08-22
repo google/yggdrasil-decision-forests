@@ -84,7 +84,7 @@ New or changes of algorithms are integrated in one of two ways:
 
 ## How to test the code
 
-New code should be tested on what they do :).
+New (and old!) code should be tested on what it does :).
 
 In addition to fine-grain testing, code involving new training algorithms should
 be tested using the end-to-end testing utility `utils/test_utils.h`.
