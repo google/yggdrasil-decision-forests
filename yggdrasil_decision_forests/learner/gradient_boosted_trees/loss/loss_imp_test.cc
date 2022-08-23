@@ -20,7 +20,6 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_binomial.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_cross_entropy_ndcg.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_mean_square_error.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_multinomial.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_ndcg.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -65,18 +64,6 @@ TEST(GradientBoostedTrees, InitialPredictionsSquareError) {
           .value();
   EXPECT_EQ(init_pred.size(), 1);
   EXPECT_EQ(init_pred[0], (1.f + 2.f + 3.f + 4.f) / 4.f);  // Mean.
-}
-
-TEST(GradientBoostedTrees, InitialPredictionsMultinomialLogLikelihood) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights{1.f, 1.f, 1.f, 1.f};
-  const auto loss_imp = MultinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
-  const auto init_pred =
-      loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 1, weights)
-          .value();
-  EXPECT_EQ(init_pred.size(), 2);
-  EXPECT_EQ(init_pred, std::vector<float>({0.f, 0.f}));
 }
 
 TEST(GradientBoostedTrees, UpdateGradientsBinaryFocalLoss) {

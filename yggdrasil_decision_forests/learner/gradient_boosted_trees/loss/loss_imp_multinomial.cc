@@ -60,9 +60,11 @@ utils::StatusOr<std::vector<float>>
 MultinomialLogLikelihoodLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     const std::vector<float>& weights) const {
-  // In Friedman paper (https://statweb.stanford.edu/~jhf/ftp/trebst.pdf),
-  // the initial prediction is 0 for multi-class classification (algorithm
-  // 6).
+  // YDF follows Friedman's paper "Greedy Function Approximation: A Gradient
+  // Boosting Machine" (https://statweb.stanford.edu/~jhf/ftp/trebst.pdf),
+  // setting the initial prediction to 0 for multi-class classification
+  // (Algorithm 6).
+  // TODO: Experiment with different initial predictions.
   return std::vector<float>(dimension_, 0);
 }
 
