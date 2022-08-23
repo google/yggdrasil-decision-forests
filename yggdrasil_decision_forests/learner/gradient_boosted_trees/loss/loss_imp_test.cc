@@ -19,7 +19,6 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_binary_focal.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_binomial.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_cross_entropy_ndcg.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_mean_square_error.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_ndcg.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -31,7 +30,6 @@ namespace {
 
 // TODO: Split the tests by implementation.
 
-using testing::ElementsAre;
 using testing::FloatNear;
 using testing::NotNull;
 using testing::SizeIs;
@@ -52,18 +50,6 @@ dataset::VerticalDataset CreateToyDataset() {
   CHECK_OK(dataset.AppendExampleWithStatus({{"a", "3"}, {"b", "1"}}));
   CHECK_OK(dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "2"}}));
   return dataset;
-}
-
-TEST(GradientBoostedTrees, InitialPredictionsSquareError) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights{1.f, 1.f, 1.f, 1.f};
-  const auto loss_imp = MeanSquaredErrorLoss({}, model::proto::Task::REGRESSION,
-                                             dataset.data_spec().columns(0));
-  const auto init_pred =
-      loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 0, weights)
-          .value();
-  EXPECT_EQ(init_pred.size(), 1);
-  EXPECT_EQ(init_pred[0], (1.f + 2.f + 3.f + 4.f) / 4.f);  // Mean.
 }
 
 TEST(GradientBoostedTrees, UpdateGradientsBinaryFocalLoss) {
@@ -156,76 +142,6 @@ TEST(GradientBoostedTrees, UpdateGradientsBinaryFocalLossCustomPredictions) {
   EXPECT_THAT(hessian[1], FloatNear(0.00633879f, test_prec));
   EXPECT_THAT(hessian[2], FloatNear(0.0553163f, test_prec));
   EXPECT_THAT(hessian[3], FloatNear(0.226232f, test_prec));
-}
-
-TEST(GradientBoostedTrees, UpdateGradientsSquaredError) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights(dataset.nrow(), 1.f);
-
-  dataset::VerticalDataset gradient_dataset;
-  std::vector<GradientData> gradients;
-  std::vector<float> predictions;
-  const auto loss_imp = MeanSquaredErrorLoss({}, model::proto::Task::REGRESSION,
-                                             dataset.data_spec().columns(0));
-  CHECK_OK(internal::CreateGradientDataset(dataset,
-                                           /* label_col_idx= */ 0,
-                                           /*hessian_splits=*/false, loss_imp,
-                                           &gradient_dataset, &gradients,
-                                           &predictions));
-
-  internal::SetInitialPredictions(
-      loss_imp
-          .InitialPredictions(dataset,
-                              /* label_col_idx =*/0, weights)
-          .value(),
-      dataset.nrow(), &predictions);
-
-  utils::RandomEngine random(1234);
-  CHECK_OK(loss_imp.UpdateGradients(gradient_dataset,
-                                    /* label_col_idx= */ 0, predictions,
-                                    /*ranking_index=*/nullptr, &gradients,
-                                    &random));
-
-  EXPECT_THAT(gradients.front().gradient,
-              ElementsAre(1.f - 2.5f, 2.f - 2.5f, 3.f - 2.5f, 4.f - 2.5f));
-}
-
-TEST(GradientBoostedTrees, SetLabelDistributionSquaredError) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights(dataset.nrow(), 1.f);
-
-  proto::GradientBoostedTreesTrainingConfig gbt_config;
-  gbt_config.set_shrinkage(1.f);
-  std::vector<GradientData> gradients;
-  dataset::VerticalDataset gradient_dataset;
-  const auto loss_imp =
-      MeanSquaredErrorLoss(gbt_config, model::proto::Task::REGRESSION,
-                           dataset.data_spec().columns(0));
-  CHECK_OK(internal::CreateGradientDataset(dataset,
-                                           /* label_col_idx= */ 0,
-                                           /*hessian_splits=*/false, loss_imp,
-                                           &gradient_dataset, &gradients,
-                                           nullptr));
-  EXPECT_EQ(gradients.size(), 1);
-
-  std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
-  std::vector<float> predictions(dataset.nrow(), 0.f);
-
-  model::proto::TrainingConfig config;
-  model::proto::TrainingConfigLinking config_link;
-  config_link.set_label(2);  // Gradient column.
-
-  decision_tree::NodeWithChildren node;
-  CHECK_OK(loss_imp.SetLeaf(gradient_dataset, selected_examples, weights,
-                            config, config_link, predictions,
-                            /* label_col_idx= */ 0, &node));
-
-  EXPECT_EQ(node.node().regressor().top_value(), 2.5f);  // Mean of the labels.
-  // Distribution of the gradients:
-  EXPECT_EQ(node.node().regressor().distribution().sum(), 0);
-  EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
-  // Same as the number of examples in the dataset.
-  EXPECT_EQ(node.node().regressor().distribution().count(), 4.);
 }
 
 TEST(GradientBoostedTrees, RankingIndex) {
