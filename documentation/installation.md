@@ -10,8 +10,10 @@ interfaces.
 
 *   [Installation](#installation)
     *   [Table of Contents](#table-of-contents)
-    *   [Installation pre-compiled command-line-interface](#installation-pre-compiled-command-line-interface)
+    *   [Pre-compiled command-line-interface](#pre-compiled-command-line-interface)
     *   [Compile command-line-interface from source](#compile-command-line-interface-from-source)
+    *   [Calling Bazel directly](#calling-bazel-directly)
+    *   [OS specific instructions](#os-specific-instructions)
         *   [Linux / MacOS](#linux--macos)
         *   [Windows](#windows)
     *   [Running a minimal example](#running-a-minimal-example)

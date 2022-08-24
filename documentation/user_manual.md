@@ -14,8 +14,6 @@ It is complementary to the beginner example available in `examples/`.
     *   [Dataset path and format](#dataset-path-and-format)
     *   [Learners and Models](#learners-and-models)
     *   [Distributed Training](#distributed-training)
-        *   [GRPC distribute implementation (recommended)](#grpc-distribute-implementation-recommended)
-        *   [TF_DIST distribute implementation](#tf_dist-distribute-implementation)
     *   [Meta-Learner](#meta-learner)
     *   [Model/Learner Evaluation](#modellearner-evaluation)
     *   [Experiment](#experiment)
@@ -37,6 +35,7 @@ It is complementary to the beginner example available in `examples/`.
     *   [Model Inference](#model-inference)
         *   [Fast engine](#fast-engine)
         *   [Serving TensorFlow Decision Forests model](#serving-tensorflow-decision-forests-model)
+    *   [Registered classes](#registered-classes)
     *   [Advanced features](#advanced-features)
 
 <!--te-->
@@ -858,6 +857,71 @@ you have feed the pre-processed example to the Yggdrasil C++ API.
 For example, if a TF-DF model is trained with a TF-Hub text embedding module in
 the pre-processing stage, you have to feed the embeddings to the Yggdrasil C++
 API.
+
+## Registered classes
+
+Yggdrasil decision forest's source code is divided into *modules*. Different
+modules implement different functions such as learning algorithms, models,
+support for dataset formats, etc.
+
+Modules are controlled by a registration mechanism through Bazel dependency
+rules: To enable a module, a dependency to this module should be added to
+**any** of the `cc_library` or `cc_binary` of the code. Note that adding modules
+also increases the size of the binary.
+
+For simplicity, CLI tools in `yggdrasil_decision_forests/cli` are compiled with
+all the available modules.
+
+When using the C++ API, the dependency to modules should be added manually. For
+example, to support training of `RANDOM_FOREST` models, the binary/library needs
+to depend on the "yggdrasil_decision_forests/learner/random_forest" rule.
+
+An error of the type "No class registered with key..." or "Unknown item ... in
+class pool" indicates that a dependency to a required module is missing.
+
+Yggdrasil decision forest also defines module groups that contain all the
+modules of a certain type. For example, the rule
+`yggdrasil_decision_forests/learner:all_learners` injects all the available
+learning algorithms (including the `:random_forest` one mentioned above).
+
+Following is the list the available module path and registration keys.
+
+**Learning algorithms**
+
+-   learner/cart CART
+-   learner/distributed_gradient_boosted_trees
+    DISTRIBUTED_GRADIENT_BOOSTED_TREES
+-   learner/gradient_boosted_trees GRADIENT_BOOSTED_TREES
+-   learner/random_forest RANDOM_FOREST
+-   learner/hyperparameters_optimizer HYPERPARAMETER_OPTIMIZER
+
+**Models**
+
+-   model/gradient_boosted_trees GRADIENT_BOOSTED_TREES
+-   model/random_forest RANDOM_FOREST
+
+**Inference engines**
+
+-   serving/decision_forest:register_engines
+
+**Dataset IO**
+
+-   dataset:csv_example_reader FORMAT_CSV (reading only)
+-   dataset:csv_example_writer FORMAT_CSV (writing only)
+-   dataset:tf_example_io_tfrecord FORMAT_TFE_TFRECORD
+-   dataset:capacitor_example_reader FORMAT_CAPACITOR
+-   dataset:tf_example_io_recordio FORMAT_TFE_RECORDIO
+-   dataset:tf_example_io_sstable FORMAT_TFE_SSTABLE
+
+**Distributed computation backends**
+
+-   utils/distribute/implementations/multi_thread MULTI_THREAD
+-   utils/distribute/implementations/grpc GRPC
+-   tensorflow_decision_forests/tensorflow/distribute:tf_distribution TF_DIST
+
+**Losses for the gradient boosted trees learner**
+
+-   learner/gradient_boosted_trees/loss/loss_imp_*
 
 ## Advanced features
 

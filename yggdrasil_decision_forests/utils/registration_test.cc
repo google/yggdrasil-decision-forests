@@ -81,9 +81,10 @@ TEST(Registration, WithConstructorArguments) {
             "SubClassA1Titi");
   EXPECT_EQ(BaseClassARegisterer::Create("A2", "Tata").value()->Result(),
             "SubClassA2Tata");
-  EXPECT_THAT(BaseClassARegisterer::Create("A3", "Tata").status(),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       "Unknown item A3 in class pool"));
+  EXPECT_THAT(
+      BaseClassARegisterer::Create("A3", "Tata").status(),
+      StatusIs(absl::StatusCode::kInvalidArgument,
+               "No class registered with key \"A3\" in the class pool"));
 }
 
 TEST(Registration, WithOutConstructorArguments) {

@@ -102,6 +102,8 @@ evaluate: Evaluates a model.
 
   Flags from cli/evaluate.cc:
     --dataset (Typed path to dataset i.e. [type]:[path] format.); default: "";
+    --format (Output format of the evaluation. Can be: text, html.);
+      default: "text";
     --model (Model directory.); default: "";
     --options (Path to optional evaluation configuration.
       proto::EvaluationOptions Text proto.); default: "";

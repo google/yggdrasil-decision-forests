@@ -148,8 +148,11 @@ class ClassPool {
       return item->Create(args...);
     }
     return absl::InvalidArgumentError(absl::Substitute(
-        "Unknown item $0 in class pool $1. Registered elements are $2", name,
-        typeid(Interface).name(), absl::StrJoin(InternalGetNames(), ",")));
+        "No class registered with key \"$0\" in the class pool \"$1\". "
+        "Registered classes are \"$2\". Add as a dependency the cc_library "
+        "rule that defines this class in your BUILD file.",
+        name, typeid(Interface).name(),
+        absl::StrJoin(InternalGetNames(), ",")));
   }
 
  private:
