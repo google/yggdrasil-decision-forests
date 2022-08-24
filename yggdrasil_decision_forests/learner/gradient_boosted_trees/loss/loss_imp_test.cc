@@ -13,11 +13,8 @@
  * limitations under the License.
  */
 
-#include "gmock/gmock.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_binary_focal.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_binomial.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_cross_entropy_ndcg.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_ndcg.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -29,10 +26,6 @@ namespace gradient_boosted_trees {
 namespace {
 
 // TODO: Split the tests by implementation.
-
-using testing::FloatNear;
-using testing::NotNull;
-using testing::SizeIs;
 
 dataset::VerticalDataset CreateToyDataset() {
   dataset::VerticalDataset dataset;
@@ -50,98 +43,6 @@ dataset::VerticalDataset CreateToyDataset() {
   CHECK_OK(dataset.AppendExampleWithStatus({{"a", "3"}, {"b", "1"}}));
   CHECK_OK(dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "2"}}));
   return dataset;
-}
-
-TEST(GradientBoostedTrees, UpdateGradientsBinaryFocalLoss) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights(dataset.nrow(), 1.f);
-
-  dataset::VerticalDataset gradient_dataset;
-  std::vector<GradientData> gradients;
-  std::vector<float> predictions;
-  proto::GradientBoostedTreesTrainingConfig config;
-  config.set_use_hessian_gain(true);
-  const auto loss_imp =
-      BinaryFocalLoss(config, model::proto::Task::CLASSIFICATION,
-                      dataset.data_spec().columns(1));
-  CHECK_OK(internal::CreateGradientDataset(dataset,
-                                           /* label_col_idx= */ 1,
-                                           /*hessian_splits=*/false, loss_imp,
-                                           &gradient_dataset, &gradients,
-                                           &predictions));
-
-  internal::SetInitialPredictions(
-      loss_imp
-          .InitialPredictions(dataset,
-                              /* label_col_idx =*/1, weights)
-          .value(),
-      dataset.nrow(), &predictions);
-
-  utils::RandomEngine random(1234);
-  CHECK_OK(loss_imp.UpdateGradients(
-      gradient_dataset, /* label_col_idx= */ 1, predictions,
-      /*ranking_index=*/nullptr, &gradients, &random));
-
-  const float test_prec = 0.000001f;
-
-  // TODO: Implement and use "AllElementsNear" matcher.
-  ASSERT_THAT(gradients.front().gradient, SizeIs(4));
-  // Values validated with tensorflow focal loss implementation
-  // (tfa.losses.sigmoid_focal_crossentropy).
-  EXPECT_THAT(gradients.front().gradient[0], FloatNear(-0.149143f, test_prec));
-  EXPECT_THAT(gradients.front().gradient[1], FloatNear(0.149143f, test_prec));
-  EXPECT_THAT(gradients.front().gradient[2], FloatNear(-0.149143f, test_prec));
-  EXPECT_THAT(gradients.front().gradient[3], FloatNear(0.149143f, test_prec));
-
-  ASSERT_THAT(gradients.front().hessian, NotNull());
-  const std::vector<float>& hessian = *gradients.front().hessian;
-  EXPECT_THAT(hessian, SizeIs(4));
-  EXPECT_THAT(hessian[0], FloatNear(0.199572f, test_prec));
-  EXPECT_THAT(hessian[1], FloatNear(0.199572f, test_prec));
-  EXPECT_THAT(hessian[2], FloatNear(0.199572f, test_prec));
-  EXPECT_THAT(hessian[3], FloatNear(0.199572f, test_prec));
-}
-
-TEST(GradientBoostedTrees, UpdateGradientsBinaryFocalLossCustomPredictions) {
-  const auto dataset = CreateToyDataset();
-  std::vector<float> weights(dataset.nrow(), 1.f);
-
-  dataset::VerticalDataset gradient_dataset;
-  std::vector<GradientData> gradients;
-  std::vector<float> predictions;
-  proto::GradientBoostedTreesTrainingConfig config;
-  config.set_use_hessian_gain(true);
-  const auto loss_imp =
-      BinaryFocalLoss(config, model::proto::Task::CLASSIFICATION,
-                      dataset.data_spec().columns(1));
-  CHECK_OK(internal::CreateGradientDataset(dataset,
-                                           /* label_col_idx= */ 1,
-                                           /*hessian_splits=*/false, loss_imp,
-                                           &gradient_dataset, &gradients,
-                                           &predictions));
-
-  const double test_prec = 0.000001f;
-
-  predictions = {2.0, 2.0, -1.0, -1.0};
-
-  utils::RandomEngine random(1234);
-  CHECK_OK(loss_imp.UpdateGradients(
-      gradient_dataset, /* label_col_idx= */ 1, predictions,
-      /*ranking_index=*/nullptr, &gradients, &random));
-
-  ASSERT_THAT(gradients.front().gradient, SizeIs(4));
-  EXPECT_THAT(gradients.front().gradient[0], FloatNear(-0.538357f, test_prec));
-  EXPECT_THAT(gradients.front().gradient[1], FloatNear(0.00243547f, test_prec));
-  EXPECT_THAT(gradients.front().gradient[2], FloatNear(-0.0262906f, test_prec));
-  EXPECT_THAT(gradients.front().gradient[3], FloatNear(0.384117f, test_prec));
-
-  ASSERT_THAT(gradients.front().hessian, NotNull());
-  const std::vector<float>& hessian = *gradients.front().hessian;
-  EXPECT_THAT(hessian, SizeIs(4));
-  EXPECT_THAT(hessian[0], FloatNear(0.0772814f, test_prec));
-  EXPECT_THAT(hessian[1], FloatNear(0.00633879f, test_prec));
-  EXPECT_THAT(hessian[2], FloatNear(0.0553163f, test_prec));
-  EXPECT_THAT(hessian[3], FloatNear(0.226232f, test_prec));
 }
 
 TEST(GradientBoostedTrees, RankingIndex) {
