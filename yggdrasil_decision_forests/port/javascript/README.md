@@ -25,10 +25,10 @@ the available APIs. See the
 
 -   C++:
     [user manual](https://github.com/google/yggdrasil-decision-forests/blob/main/documentation/user_manual.md),
-    [example](https://source.corp.google.com/piper///depot/google3/third_party/yggdrasil_decision_forests/examples/beginner.cc).
+    [example](https://github.com/google/yggdrasil-decision-forests/blob/main/examples/beginner.cc).
 -   CLI:
     [user manual](https://github.com/google/yggdrasil-decision-forests/blob/main/documentation/user_manual.md),
-    [example](https://source.corp.google.com/piper///depot/google3/third_party/yggdrasil_decision_forests/examples/beginner.sh).
+    [example](https://github.com/google/yggdrasil-decision-forests/blob/main/examples/beginner.sh).
 -   Python (with TensorFlow Decision Forests):
     [website](https://www.tensorflow.org/decision_forests),
     [examples](https://www.tensorflow.org/decision_forests/tutorials). The
