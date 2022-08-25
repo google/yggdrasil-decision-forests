@@ -269,24 +269,6 @@ cc_test(
 
 # Test
 # ========
-cc_test(
-    name = "loss_imp_test",
-    srcs = ["loss_imp_test.cc"],
-    deps = [
-        ":all_implementations",
-        ":loss_imp_binary_focal",
-        ":loss_imp_binomial",
-        ":loss_imp_cross_entropy_ndcg",
-        ":loss_imp_mean_square_error",
-        ":loss_imp_multinomial",
-        ":loss_imp_ndcg",
-        "@com_google_googletest//:gtest_main",
-        "//yggdrasil_decision_forests/dataset:vertical_dataset",
-        "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
-        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
-        "//yggdrasil_decision_forests/utils:test",
-    ],
-)
 
 cc_test(
     name = "loss_imp_binomial_test",
@@ -337,6 +319,22 @@ cc_test(
     srcs = ["loss_imp_binary_focal_test.cc"],
     deps = [
         ":loss_imp_binary_focal",
+        "@com_google_googletest//:gtest_main",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+    ],
+)
+
+cc_test(
+    name = "loss_imp_ndcg_test",
+    srcs = ["loss_imp_ndcg_test.cc"],
+    deps = [
+        ":loss_imp_cross_entropy_ndcg",
+        ":loss_imp_ndcg",
+        ":loss_interface",
         "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
