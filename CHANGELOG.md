@@ -1,5 +1,7 @@
 # Changelog
 
+## 1.0.0rc0 - 2022-08-25
+
 ### Features
 
 -   Go (GoLang) inference API (Beta): simple engine written in Go to do
