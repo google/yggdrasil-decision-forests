@@ -2,4 +2,7 @@
 -   [User manual](user_manual.md)
 -   [CLI one pager](cli.txt)
 -   [Developer manual](developer_manual.md)
+  -   [Directory structure](directory_structure.md)
+-   [Installation](installation.md)
 -   [List of learning algorithms](learners.md)
+-   [Known issues](known_issues.md)
