@@ -23,7 +23,7 @@ import (
 
 	dataspec_pb "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/dataset/proto"
 	model_pb "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/proto"
-	rf_pb "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/model/random_forest"
+	rf_pb "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/randomforest/proto"
 	dt "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/decisiontree"
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model"
 
