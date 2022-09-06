@@ -112,7 +112,7 @@ func testEngine(t *testing.T, model model.Model, engine engine.Engine, datasetPa
 
 		// Print the examples
 		if batchIdx == 0 {
-			fmt.Println(examples.ToStringDebug())
+			//fmt.Println(examples.ToStringDebug())
 		}
 
 		// Generate the predictions.
@@ -149,6 +149,16 @@ func checkPredictions(t *testing.T,
 		} else {
 			// Multi-class classification.
 			t.Fatal("Multi class classification not supported")
+		}
+
+	case model_pb.Task_REGRESSION:
+	case model_pb.Task_RANKING:
+		test.CheckEq(t, len(goldenPredictionsHeader), 1, "Unexpected gold prediction shape")
+		for exampleIdx := beginIdx; exampleIdx < endIdx; exampleIdx++ {
+			exampleIdxInBatch := exampleIdx - beginIdx
+			test.CheckNearFloat32(t, predictions[exampleIdxInBatch],
+				goldenPredictionsFloat32[exampleIdx][0], 0.0001,
+				fmt.Sprintf("non matching predictions for example %v", exampleIdx))
 		}
 
 	default:
@@ -197,6 +207,46 @@ func TestAdultBinaryClassGBTYdfFormat(t *testing.T) {
 		"yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt",
 		"yggdrasil_decision_forests/test_data/dataset/adult_test.csv",
 		"yggdrasil_decision_forests/test_data/prediction/adult_test_binary_class_gbdt.csv",
+		false)
+}
+
+func TestAbaloneRegressionGBTYdfFormat(t *testing.T) {
+	testModel(t,
+		"yggdrasil_decision_forests/test_data/model/abalone_regression_gbdt",
+		"yggdrasil_decision_forests/test_data/dataset/abalone.csv",
+		"yggdrasil_decision_forests/test_data/prediction/abalone_regression_gbdt.csv",
+		false)
+}
+
+func TestSyntheticRankingGBTYdfFormat(t *testing.T) {
+	testModel(t,
+		"yggdrasil_decision_forests/test_data/model/synthetic_ranking_gbdt",
+		"yggdrasil_decision_forests/test_data/dataset/synthetic_ranking_test.csv",
+		"yggdrasil_decision_forests/test_data/prediction/synthetic_ranking_gbdt_test.csv",
+		false)
+}
+
+func TestAdultBinaryClassRFYdfFormat(t *testing.T) {
+	testModel(t,
+		"yggdrasil_decision_forests/test_data/model/adult_binary_class_rf",
+		"yggdrasil_decision_forests/test_data/dataset/adult_test.csv",
+		"yggdrasil_decision_forests/test_data/prediction/adult_test_binary_class_rf.csv",
+		false)
+}
+
+func TestAdultBinaryClassObliqueRFYdfFormat(t *testing.T) {
+	testModel(t,
+		"yggdrasil_decision_forests/test_data/model/adult_binary_class_oblique_rf",
+		"yggdrasil_decision_forests/test_data/dataset/adult_test.csv",
+		"yggdrasil_decision_forests/test_data/prediction/adult_test_binary_class_oblique_rf.csv",
+		false)
+}
+
+func TestAbaloneRegressionClassClassRFYdfFormat(t *testing.T) {
+	testModel(t,
+		"yggdrasil_decision_forests/test_data/model/abalone_regression_rf",
+		"yggdrasil_decision_forests/test_data/dataset/abalone.csv",
+		"yggdrasil_decision_forests/test_data/prediction/abalone_regression_rf.csv",
 		false)
 }
 

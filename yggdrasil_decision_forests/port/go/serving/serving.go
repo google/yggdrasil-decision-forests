@@ -24,6 +24,7 @@ import (
 	model_pb "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/proto"
 	gbt "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/gradientboostedtrees"
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model"
+	rf "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/randomforest"
 	df_engine "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/serving/decisionforest"
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/serving/engine"
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/serving/example"
@@ -55,6 +56,11 @@ func NewEngineWithCompatibility(model model.Model, compatibility example.Compati
 	if gbtModel, match := model.(*gbt.Model); match {
 		return newEngineGbt(gbtModel, compatibility)
 	}
+
+	if rfModel, match := model.(*rf.Model); match {
+		return newEngineRf(rfModel, compatibility)
+	}
+
 	return nil, fmt.Errorf("No engine compatible to the model")
 }
 
@@ -65,6 +71,23 @@ func newEngineGbt(model *gbt.Model, compatibility example.CompatibilityType) (en
 		if numClasses == 3 {
 			return df_engine.NewBinaryClassificationGBDTGenericEngine(model, compatibility)
 		}
+	case model_pb.Task_REGRESSION:
+		return df_engine.NewRegressionGBDTGenericEngine(model, compatibility)
+	case model_pb.Task_RANKING:
+		return df_engine.NewRankingGBDTGenericEngine(model, compatibility)
+	}
+	return nil, fmt.Errorf("No engine compatible to the model")
+}
+
+func newEngineRf(model *rf.Model, compatibility example.CompatibilityType) (engine.Engine, error) {
+	switch model.Header().GetTask() {
+	case model_pb.Task_CLASSIFICATION:
+		numClasses := model.Dataspec().GetColumns()[model.Header().GetLabelColIdx()].GetCategorical().GetNumberOfUniqueValues()
+		if numClasses == 3 {
+			return df_engine.NewBinaryClassificationRFGenericEngine(model, compatibility)
+		}
+	case model_pb.Task_REGRESSION:
+		return df_engine.NewRegressionRFGenericEngine(model, compatibility)
 	}
 	return nil, fmt.Errorf("No engine compatible to the model")
 }

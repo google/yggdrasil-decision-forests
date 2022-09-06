@@ -23,6 +23,7 @@ import (
 
 	dt "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/decisiontree"
 	gbt "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/gradientboostedtrees"
+	rf "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/randomforest"
 	"github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/serving/example"
 
 	dataspec_pb "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/dataset/proto"
@@ -423,6 +424,16 @@ func newOneDimensionEngine(activation ActivationSignature,
 	return engine, nil
 }
 
+// setLeafOneDimensionRegressive sets the value of a single dimension regressive leaf.
+func setLeafOneDimensionRegressive(srcNode *dt.Node, dstNode *genericNode) error {
+	if srcNode.RawNode.GetRegressor() == nil {
+		return fmt.Errorf("Invalid leaf")
+	}
+	// "condition" contains the float32 value of the leaf.
+	dstNode.condition = math.Float32bits(srcNode.RawNode.GetRegressor().GetTopValue())
+	return nil
+}
+
 // NewBinaryClassificationGBDTGenericEngine creates an engine for a binary
 // classification GBT model.
 func NewBinaryClassificationGBDTGenericEngine(model *gbt.Model, compatibility example.CompatibilityType) (*OneDimensionEngine, error) {
@@ -433,19 +444,96 @@ func NewBinaryClassificationGBDTGenericEngine(model *gbt.Model, compatibility ex
 		return nil, fmt.Errorf("Incompatible loss. Expecting log likelihood")
 	}
 
-	setLeaf := func(srcNode *dt.Node, dstNode *genericNode) error {
-		if srcNode.RawNode.GetRegressor() == nil {
-			return fmt.Errorf("Invalid leaf")
-		}
-		// "condition" contains the float32 value of the leaf.
-		dstNode.condition = math.Float32bits(srcNode.RawNode.GetRegressor().GetTopValue())
-		return nil
-	}
 	engine, err := newOneDimensionEngine(activationSigmoid,
 		model.Forest,
 		model.Header(),
 		model.Dataspec(),
-		model.GbtHeader.GetInitialPredictions()[0], setLeaf, compatibility)
+		model.GbtHeader.GetInitialPredictions()[0], setLeafOneDimensionRegressive, compatibility)
+	return engine, err
+}
+
+// NewRegressionGBDTGenericEngine creates an engine for a regression GBT model.
+func NewRegressionGBDTGenericEngine(model *gbt.Model, compatibility example.CompatibilityType) (*OneDimensionEngine, error) {
+	if len(model.GbtHeader.GetInitialPredictions()) != 1 {
+		return nil, fmt.Errorf("Invalid initial predictions")
+	}
+	if model.GbtHeader.GetLoss() != gbt_pb.Loss_SQUARED_ERROR {
+		return nil, fmt.Errorf("Incompatible loss. Expecting squared error")
+	}
+
+	engine, err := newOneDimensionEngine(activationIdentity,
+		model.Forest,
+		model.Header(),
+		model.Dataspec(),
+		model.GbtHeader.GetInitialPredictions()[0], setLeafOneDimensionRegressive, compatibility)
+	return engine, err
+}
+
+// NewRankingGBDTGenericEngine creates an engine for a regression GBT model.
+func NewRankingGBDTGenericEngine(model *gbt.Model, compatibility example.CompatibilityType) (*OneDimensionEngine, error) {
+	if len(model.GbtHeader.GetInitialPredictions()) != 1 {
+		return nil, fmt.Errorf("Invalid initial predictions")
+	}
+	if model.GbtHeader.GetLoss() != gbt_pb.Loss_LAMBDA_MART_NDCG5 &&
+		model.GbtHeader.GetLoss() != gbt_pb.Loss_XE_NDCG_MART {
+		return nil, fmt.Errorf("Incompatible loss. Expecting squared error")
+	}
+
+	engine, err := newOneDimensionEngine(activationIdentity,
+		model.Forest,
+		model.Header(),
+		model.Dataspec(),
+		model.GbtHeader.GetInitialPredictions()[0], setLeafOneDimensionRegressive, compatibility)
+	return engine, err
+}
+
+// NewBinaryClassificationRFGenericEngine creates an engine for a binary
+// classification RF model.
+func NewBinaryClassificationRFGenericEngine(model *rf.Model, compatibility example.CompatibilityType) (*OneDimensionEngine, error) {
+	setLeaf := func(srcNode *dt.Node, dstNode *genericNode) error {
+		if srcNode.RawNode.GetClassifier() == nil {
+			return fmt.Errorf("Invalid leaf")
+		}
+		// "condition" contains the float32 value of the leaf.
+
+		var leafValue float32 = 0
+		if model.RfHeader.GetWinnerTakeAllInference() {
+			if srcNode.RawNode.GetClassifier().GetTopValue() == 2 {
+				leafValue = 1.0 / float32(len(model.Forest.Trees))
+			}
+		} else {
+			leafValue = float32(srcNode.RawNode.GetClassifier().GetDistribution().GetCounts()[2] /
+				(srcNode.RawNode.GetClassifier().GetDistribution().GetSum() * float64(len(model.Forest.Trees))))
+		}
+
+		dstNode.condition = math.Float32bits(leafValue)
+		return nil
+	}
+	engine, err := newOneDimensionEngine(activationIdentity,
+		model.Forest,
+		model.Header(),
+		model.Dataspec(),
+		0, setLeaf, compatibility)
+	return engine, err
+}
+
+// NewRegressionRFGenericEngine creates an engine for a regression RF model.
+func NewRegressionRFGenericEngine(model *rf.Model, compatibility example.CompatibilityType) (*OneDimensionEngine, error) {
+	setLeaf := func(srcNode *dt.Node, dstNode *genericNode) error {
+		if srcNode.RawNode.GetRegressor() == nil {
+			return fmt.Errorf("Invalid leaf")
+		}
+
+		var leafValue = srcNode.RawNode.GetRegressor().GetTopValue() / float32(len(model.Forest.Trees))
+		// "condition" contains the float32 value of the leaf.
+		dstNode.condition = math.Float32bits(leafValue)
+		return nil
+	}
+	engine, err := newOneDimensionEngine(activationIdentity,
+		model.Forest,
+		model.Header(),
+		model.Dataspec(),
+		0, setLeaf, compatibility)
 	return engine, err
 }
 

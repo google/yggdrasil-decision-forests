@@ -30,18 +30,32 @@
 # by the Go OSS port. The small wrapper it creates could be created manually,
 # but it's an error prone process, hence the script.
 #
+# Requrements
+#
+#   - Go
+#   - Protocol buffer for Go:  protoc
+#   - Go plugins for the protocol compiler
+#
 # Steps to run it:
-# 
+#
 # 1. Go (`cd`) the citc client, under `google3/third_party/yggdrasil_decision_forests/port/go`.
 #    directory.
+#
+#    $ cd third_party/yggdrasil_decision_forests/port/go
+#
 # 2. Execute the script. It will generate the corresponding directories and
 #    thin wrapper go code.
-# 3. Create/snapshot a CL with the changes.
-# 4. Run copybara to generate a local OSS version with the new code.
+# 3. Create/snapshot a CL with the changes and upload it to Critique. Save the
+#    CL number.
 #
-#    $ g4 upload -c "${CL}" && rm -rf "${HOME}/git/yggdrasil-decision-forests" \
+#    $ CL=<the actual CL number>
+#
+# 4. Go back (`cd`) to `google3` and run copybara to generate a local OSS
+#    version with the new code.
+#
+#    $ rm -rf "${HOME}/git/yggdrasil-decision-forests" \
 #      && /google/bin/releases/copybara/public/copybara/copybara \
-#         third_party/yggdrasil_decision_forests/copy.bara.sky \
+#         ../../../../third_party/yggdrasil_decision_forests/copy.bara.sky \
 #         presubmit_piper_to_gerrit "${CL}" --dry-run --init-history --squash \
 #         --force --git-destination-path ${HOME}/git/yggdrasil-decision-forests\
 #         --ignore-noop
@@ -86,7 +100,9 @@ proto_files="$(
 		perl -ne 's/.*?\s+\"(.*)\"/$1/g; s/_go_proto/.proto/g; s|google3/third_party/yggdrasil_decision_forests/||g; print;' | sort | uniq) 
 	utils/distribution.proto 
 	dataset/weight.proto
-	model/hyperparameter.proto"
+	model/hyperparameter.proto
+  metric/metric.proto
+  model/prediction.proto"
 
 # Convert a name to Ga package name: that is, without "_".
 function go_name() {
