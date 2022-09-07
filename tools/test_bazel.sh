@@ -22,9 +22,12 @@
 #
 # Usage example:
 #
+#   # Compilation without TF support.
 #   ./tools/test_bazel.sh
-#   TF_SUPPORT=1 && ./tools/test_bazel.sh
-
+#    
+#   # Compilation with TF support.
+#   TF_SUPPORT=1 ./tools/test_bazel.sh
+#
 set -xev
 
 if [ -z "${TF_SUPPORT}"] || [ "${TF_SUPPORT}" = 0 ]; then
