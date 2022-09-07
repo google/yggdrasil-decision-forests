@@ -9,6 +9,7 @@
 -   Creation of html evaluation report with plots (e.g., ROC, PR-ROC).
 -   Add support for Random Forest, CART, regressive GBT and Ranking GBT models
     in the Go API.
+-   Add customization of the number of IO threads in the deployment proto.
 
 ## 0.2.5 - 2022-06-15
 

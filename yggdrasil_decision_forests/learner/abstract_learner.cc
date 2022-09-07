@@ -238,7 +238,8 @@ AbstractLearner::TrainWithStatus(
   proto::TrainingConfigLinking link_config;
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(training_config_,
                                                       data_spec, &link_config));
-  const auto dataset_loading_config = OptimalDatasetLoadingConfig(link_config);
+  auto dataset_loading_config = OptimalDatasetLoadingConfig(link_config);
+  dataset_loading_config.num_threads = deployment().num_io_threads();
 
   dataset::VerticalDataset train_dataset;
   RETURN_IF_ERROR(LoadVerticalDataset(typed_path, data_spec, &train_dataset,

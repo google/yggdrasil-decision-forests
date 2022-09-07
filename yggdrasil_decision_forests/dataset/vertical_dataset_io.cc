@@ -225,8 +225,9 @@ absl::Status LoadVerticalDataset(
   processor.JoinAllAndStopThreads();
   LOG_INFO_EVERY_N_SEC(
       30, _ << dataset->nrow() << " examples and " << loaded_shards
-            << " shards scanned in total. Memory: " << dataset->MemorySummary()
-            << ". " << skipped_examples << " ("
+            << " shards read in total with " << config.num_threads
+            << " threads. Memory: " << dataset->MemorySummary() << ". "
+            << skipped_examples << " ("
             << 100 * skipped_examples /
                    std::max<size_t>(1, dataset->nrow() + skipped_examples)
             << "%) examples have been skipped.");

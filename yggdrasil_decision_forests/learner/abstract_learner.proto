@@ -31,7 +31,7 @@ import "yggdrasil_decision_forests/utils/distribute/distribute.proto";
 // If not specified, more consumer will assume local computation with multiple
 // threads.
 message DeploymentConfig {
-  // Next ID: 7
+  // Next ID: 9
 
   // Path to temporary directory available to the training algorithm.
   // Currently cache_path is only used (and required) by the
@@ -55,6 +55,11 @@ message DeploymentConfig {
   // Indicative number of seconds in between snapshots when
   // "try_resume_training=True". Might be ignored by some algorithms.
   optional int64 resume_training_snapshot_interval_seconds = 7 [default = 1800];
+
+  // Number of threads to use for IO operations e.g. reading a dataset from
+  // disk. Increasing this value can speed-up IO operations when IO operations
+  // are either latency or cpu bounded.
+  optional int32 num_io_threads = 8 [default = 10];
 
   // Computation distribution engine.
   oneof execution {
