@@ -46,7 +46,6 @@ namespace {
 
 using test::EqualsProto;
 using test::StatusIs;
-using testing::ElementsAre;
 
 std::string TestDataDir() {
   return file::JoinPath(test::DataRootDirectory(),
@@ -432,6 +431,40 @@ TEST(Model, AbstractAttributesSizeInBytes) {
   FakeModelWithEngine model;
   // The model size is compiler+arch dependent.
   EXPECT_GT(model.AbstractAttributesSizeInBytes(), 0);
+}
+
+TEST(AppendPredictions, FromVerticalDataset) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &model));
+
+  dataset::VerticalDataset dataset;
+  EXPECT_OK(LoadVerticalDataset(
+      absl::StrCat("csv:",
+                   file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
+      model->data_spec(), &dataset));
+
+  utils::RandomEngine rnd;
+  std::vector<model::proto::Prediction> predictions;
+  EXPECT_OK(model->AppendPredictions(dataset, /*add_ground_truth=*/true,
+                                     &predictions));
+  EXPECT_EQ(predictions.size(), 9769);
+
+  EXPECT_THAT(predictions.front(),
+              EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                              R"pb(
+                                classification {
+                                  value: 1
+                                  distribution {
+                                    counts: 0
+                                    counts: 0.9878693
+                                    counts: 0.012130676
+                                    sum: 1
+                                  }
+                                  ground_truth: 1
+                                })pb")
+                              .value()));
 }
 
 }  // namespace

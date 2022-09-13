@@ -185,17 +185,64 @@ AbstractModel::EvaluateOverrideType(
 absl::Status AbstractModel::AppendPredictions(
     const dataset::VerticalDataset& dataset, const bool add_ground_truth,
     std::vector<model::proto::Prediction>* predictions) const {
-  proto::Prediction prediction;
-  for (dataset::VerticalDataset::row_t test_row_idx = 0;
-       test_row_idx < dataset.nrow(); test_row_idx++) {
-    LOG_INFO_EVERY_N_SEC(30, _ << (test_row_idx + 1) << "/" << dataset.nrow()
-                               << " predictions generated.");
-    Predict(dataset, test_row_idx, &prediction);
-    if (add_ground_truth) {
-      RETURN_IF_ERROR(SetGroundTruth(dataset, test_row_idx, &prediction));
+  DCHECK(predictions);
+
+  predictions->reserve(predictions->size() + dataset.nrow());
+  auto engine_or_status = BuildFastEngine();
+  if (engine_or_status.ok()) {
+    const auto& engine = engine_or_status.value();
+    // Evaluate using the semi-fast generic engine.
+
+    const auto& engine_features = engine->features();
+    const int num_prediction_dimensions = engine->NumPredictionDimension();
+
+    const int64_t total_num_examples = dataset.nrow();
+    constexpr int64_t kMaxBatchSize = 100;
+    const int64_t batch_size = std::min(kMaxBatchSize, total_num_examples);
+
+    auto batch_of_examples = engine->AllocateExamples(batch_size);
+    const int64_t num_batches =
+        (total_num_examples + batch_size - 1) / batch_size;
+
+    std::vector<float> batch_of_predictions;
+    proto::Prediction prediction;
+    for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
+      const int64_t begin_example_idx = batch_idx * batch_size;
+      const int64_t end_example_idx =
+          std::min(begin_example_idx + batch_size, total_num_examples);
+      const int effective_batch_size = end_example_idx - begin_example_idx;
+      RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
+          dataset, begin_example_idx, end_example_idx, engine_features,
+          batch_of_examples.get()));
+      engine->Predict(*batch_of_examples, effective_batch_size,
+                      &batch_of_predictions);
+      for (int sub_example_idx = 0; sub_example_idx < effective_batch_size;
+           sub_example_idx++) {
+        FloatToProtoPrediction(batch_of_predictions, sub_example_idx, task(),
+                               num_prediction_dimensions, &prediction);
+        RETURN_IF_ERROR(SetGroundTruth(
+            dataset, begin_example_idx + sub_example_idx, &prediction));
+        if (predictions) {
+          predictions->push_back(prediction);
+        }
+      }
     }
-    predictions->push_back(prediction);
+
+  } else {
+    // Evaluate using the (slow) generic inference.
+    proto::Prediction prediction;
+    for (dataset::VerticalDataset::row_t test_row_idx = 0;
+         test_row_idx < dataset.nrow(); test_row_idx++) {
+      LOG_INFO_EVERY_N_SEC(30, _ << (test_row_idx + 1) << "/" << dataset.nrow()
+                                 << " predictions generated.");
+      Predict(dataset, test_row_idx, &prediction);
+      if (add_ground_truth) {
+        RETURN_IF_ERROR(SetGroundTruth(dataset, test_row_idx, &prediction));
+      }
+      predictions->push_back(prediction);
+    }
   }
+
   return absl::OkStatus();
 }
 
