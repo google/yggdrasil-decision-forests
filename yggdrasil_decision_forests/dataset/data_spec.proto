@@ -51,7 +51,7 @@ package yggdrasil_decision_forests.dataset.proto;
 message DataSpecification {
   // The columns.
   repeated Column columns = 1;
-  // The number of rows of the dataset used to create this dataset (if a
+  // The number of rows of the dataset used to create this dataspec (if a
   // dataset was used).
   optional int64 created_num_rows = 2;
   // Meta-data about features that were unstacked e.g. with the
