@@ -22,13 +22,11 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "tensorflow/core/platform/file_system.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 
 // Wrappers to shield tensorflow macros from yggdrasil macros.
 namespace tensorflow {
-class RandomAccessFile;
-class WritableFile;
-
 class RandomAccessFileWrapper {
  public:
   explicit RandomAccessFileWrapper(RandomAccessFile* item) : item_(item) {}
