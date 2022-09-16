@@ -168,9 +168,7 @@ utils::StatusOr<std::string> ExportHParamSpecToMarkdown(
     absl::StrAppend(&result, "\n");
   }
 
-  absl::StrAppend(&result,
-                  "### Generic Hyper-parameters (compatible with TensorFlow "
-                  "Decision Forests)\n\n");
+  absl::StrAppend(&result, "### Generic Hyper-parameters\n\n");
 
   // Sort the field alphabetically.
   std::vector<

@@ -20,7 +20,7 @@ the gradient of the loss relative to the model output).
 -   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto">learner/gradient_boosted_trees/gradient_boosted_trees.proto</a>
 
-### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+### Generic Hyper-parameters
 
 #### [adapt_subsample_for_maximum_training_duration](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:adapt_subsample_for_maximum_training_duration)
 
@@ -452,7 +452,7 @@ pruning. Each tree is trained on a random subset of the original training
 dataset (sampled with replacement).
 
 The algorithm is unique in that it is robust to overfitting, even in extreme
-cases e.g. when there is more features than training examples.
+cases e.g. when there are more features than training examples.
 
 It is probably the most well-known of the Decision Forest training algorithms.
 
@@ -462,7 +462,7 @@ It is probably the most well-known of the Decision Forest training algorithms.
 -   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/random_forest/random_forest.proto">learner/random_forest/random_forest.proto</a>
 
-### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+### Generic Hyper-parameters
 
 #### [adapt_bootstrap_size_ratio_for_maximum_training_duration](../yggdrasil_decision_forests/learner/random_forest/random_forest.proto?q=symbol:adapt_bootstrap_size_ratio_for_maximum_training_duration)
 
@@ -793,7 +793,7 @@ used to grow the tree while the second is used to prune the tree.
 -   <a href="../yggdrasil_decision_forests/learner/cart/cart.proto">learner/cart/cart.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 
-### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+### Generic Hyper-parameters
 
 #### [allow_na_conditions](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:allow_na_conditions)
 
@@ -1053,7 +1053,7 @@ algorithm for an introduction to GBTs.
 -   <a href="../yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto">learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto">learner/gradient_boosted_trees/gradient_boosted_trees.proto</a>
 
-### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+### Generic Hyper-parameters
 
 #### [apply_link_function](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:apply_link_function)
 

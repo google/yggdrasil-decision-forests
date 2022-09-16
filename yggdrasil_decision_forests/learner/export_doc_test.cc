@@ -101,7 +101,7 @@ TEST(ExportDoc, Base) {
 
 - <a href="_learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 
-### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+### Generic Hyper-parameters
 
 #### [maximum_model_size_in_memory_in_bytes](_learner/abstract_learner.protomaximum_model_size_in_memory_in_bytes)
 
@@ -138,7 +138,7 @@ TEST(ExportDoc, Base) {
 
 - <a href="_learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 
-### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+### Generic Hyper-parameters
 
 #### [maximum_model_size_in_memory_in_bytes](_learner/abstract_learner.protomaximum_model_size_in_memory_in_bytes)
 
@@ -171,7 +171,7 @@ TEST(ExportDoc, Base) {
 
 <font size="2">
 
-### Generic Hyper-parameters (compatible with TensorFlow Decision Forests)
+### Generic Hyper-parameters
 
 #### a
 

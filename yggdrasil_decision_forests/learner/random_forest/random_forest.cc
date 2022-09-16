@@ -220,7 +220,7 @@ RandomForestLearner::GetGenericHyperParameterSpecification() const {
   hparam_def.mutable_documentation()->set_description(
       R"(A Random Forest (https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf) is a collection of deep CART decision trees trained independently and without pruning. Each tree is trained on a random subset of the original training  dataset (sampled with replacement).
 
-The algorithm is unique in that it is robust to overfitting, even in extreme cases e.g. when there is more features than training examples.
+The algorithm is unique in that it is robust to overfitting, even in extreme cases e.g. when there are more features than training examples.
 
 It is probably the most well-known of the Decision Forest training algorithms.)");
 

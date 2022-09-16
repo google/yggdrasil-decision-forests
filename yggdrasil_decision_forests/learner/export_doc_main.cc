@@ -23,8 +23,27 @@
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
+ABSL_FLAG(std::string, url_type, "GITHUB",
+          "Type of url to the protobuffer definition.");
+
+// Converts a source file path (relative to the ydf directory) and search
+// keyword into an url. When openning this url, the user expects to see the
+// source file content.
 std::string url(absl::string_view path, absl::string_view keyword) {
-  return std::string(path);
+  const auto& url_type = absl::GetFlag(FLAGS_url_type);
+  if (url_type == "GITHUB") {
+    // Local github path.
+    return std::string(path);
+  }
+  else if (url_type == "READ_THE_DOCS") {
+    // Use absolute github paths.
+    return absl::StrCat(
+        "https://github.com/google/yggdrasil-decision-forests/blob/main/"
+        "yggdrasil_decision_forests/",
+        path);
+  } else {
+    LOG(FATAL) << "Unknown --url_type value";
+  }
 }
 
 int main(int argc, char** argv) {
