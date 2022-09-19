@@ -62,7 +62,7 @@ TEST(ShardedIO, ShardedReader) {
   };
 
   TestShardedReader test;
-  EXPECT_OK(test.Open({"a", "b"}));
+  EXPECT_OK(test.Open(std::vector<std::string>{"a", "b"}));
   std::string value;
   EXPECT_TRUE(test.Next(&value).value());
   EXPECT_EQ(value, "a0");
