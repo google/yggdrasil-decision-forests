@@ -639,19 +639,11 @@ cc_library_ydf(
 cc_library_ydf(
     name = "compatibility",
     hdrs = ["compatibility.h"],
-    defines = select({
-        "//yggdrasil_decision_forests:no_absl_statusor": ["YGG_ABSL_NO_STATUSOR"],
-        "//conditions:default": [],
-    }),
     deps = [
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:optional",
-    ] + select({
-        "//yggdrasil_decision_forests:no_absl_statusor": [
-            "@com_google_absl//absl/status:status",
-        ],
-        "//conditions:default": ["@com_google_absl//absl/status:statusor"],
-    }),
+    ],
 )
 
 cc_library_ydf(

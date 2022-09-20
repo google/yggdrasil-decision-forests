@@ -64,6 +64,7 @@ cc_library_ydf(
     deps = [
         ":utils",
         "@com_google_absl//absl/base:config",
+        "@com_google_absl//absl/numeric:bits",
         "@com_google_absl//absl/status",
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",

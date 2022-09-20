@@ -17,6 +17,7 @@
 
 #include <limits>
 
+#include "absl/numeric/bits.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
@@ -72,7 +73,7 @@ std::string ShardMetadataPath(absl::string_view directory, int shard_idx) {
 }
 
 uint64_t MaskDeltaBit(uint64_t num_examples) {
-  return uint64_t{1} << (64 - utils::CountLeadingZeroes64(num_examples));
+  return uint64_t{1} << (64 - absl::countl_zero(num_examples));
 }
 
 uint64_t MaskExampleIdx(uint64_t num_examples) {

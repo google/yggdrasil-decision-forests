@@ -24,6 +24,7 @@
 #endif
 
 #include "absl/base/config.h"
+#include "absl/numeric/bits.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
@@ -70,9 +71,7 @@ void aligned_free(void* mem) {
 
 // Returns the number of trailing 0-bits in x, starting at the least significant
 // bit position. If x is 0, the result is undefined.
-int FindLSBSetNonZero64(uint64_t n) {
-  return utils::CountTrailingZeroesNonzero64(n);
-}
+int FindLSBSetNonZero64(uint64_t n) { return absl::countr_zero(n); }
 
 // Activation function for binary classification GBDT trained with Binomial
 // LogLikelihood loss.

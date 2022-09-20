@@ -50,17 +50,17 @@ else
   ${BAZEL} version
 
   echo "====================================================="
-  echo "1. With TensorFlow IO, c++14 and without abslStatusOr"
+  echo "1. With TensorFlow IO, c++14"
   echo "====================================================="
 
-  # With TensorFlow IO, without StatusOr (c++14 with gcc8)
-  FLAGS="--config=linux_cpp14 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io --define=no_absl_statusor=1 --repo_env=CC=gcc-8"
+  # With TensorFlow IO, (c++14 with gcc8)
+  FLAGS="--config=linux_cpp14 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io --repo_env=CC=gcc-8"
   time ${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
   time ${BAZEL} test //yggdrasil_decision_forests/{cli,dataset,learner,metric,model,serving}/...:all ${FLAGS}
 
 
   echo "====================================================="
-  echo "2. Without TensorFlow IO, c++17 and with abslStatusOr"
+  echo "2. Without TensorFlow IO, c++17"
   echo "====================================================="
 
   # Without TensorFlow IO (c++17)
@@ -69,7 +69,7 @@ else
   time ${BAZEL} test //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc ${FLAGS}
 
   echo "=================================================="
-  echo "3. With TensorFlow IO, c++17 and with abslStatusOr"
+  echo "3. With TensorFlow IO, c++17"
   echo "=================================================="
 
   # With TensorFlow IO (c++17)

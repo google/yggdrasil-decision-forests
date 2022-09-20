@@ -23,12 +23,6 @@ config_setting(
     values = {"define": "tensorflow_with_header_lib=1"},
 )
 
-# If set, don't use absl's version of StatusOr.
-config_setting(
-    name = "no_absl_statusor",
-    values = {"define": "no_absl_statusor=1"},
-)
-
 # If not set (default), use absl concurrency primitives (e.g. absl::Mutex).
 # If set, use the std concurrency primitives (e.g. std::mutex)
 config_setting(

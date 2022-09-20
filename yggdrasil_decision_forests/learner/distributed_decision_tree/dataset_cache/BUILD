@@ -103,6 +103,7 @@ cc_library_ydf(
     hdrs = ["dataset_cache_common.h"],
     deps = [
         ":column_cache",
+        "@com_google_absl//absl/numeric:bits",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/learner:types",

@@ -26,9 +26,6 @@
 #     c++ Standard Library <filesystem>. Note: <filesystem> does not exist in
 #     cpp<=14 and it had some issue with gcc<=8. Required to consume dataset
 #     encoded as TFRecord of TF.Examples.
-#   no_absl_statusor=1: Use the internal version of StatusOr. Otherwise, use the
-#     Absl's StatusOr. This is necessary when compiling TensorFlow as it uses
-#     a pre-StatusOr version of absl.
 #   tensorflow_with_header_lib=1: Uses tensorflow header only library. Useful to
 #     use tensorflow dynamic linking. Otherwise, links tensorflow statically (if
 #     tensorflow is used).
