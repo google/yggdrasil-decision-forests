@@ -60,7 +60,8 @@ if [[ ! -z ${BUILD+z} ]]; then
 
   BAZEL="./bazelisk"
   FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io --repo_env=CC=clang-10"
-  ${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
+  ${BAZEL} build //yggdrasil_decision_forests/cli/...:all \
+    //yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_worker_main ${FLAGS}
 
   chmod -R a+rw .
 fi
