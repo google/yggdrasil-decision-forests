@@ -43,6 +43,7 @@
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
+#include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
@@ -836,6 +837,16 @@ void AbstractModel::AppendDescriptionAndStatistics(
   absl::StrAppend(description, "\n");
   AppendAllVariableImportanceDescription(description);
   absl::StrAppend(description, "\n");
+
+  const auto self_evaluation_description =
+      metric::TextReport(ValidationEvaluation());
+  if (self_evaluation_description.ok()) {
+    LOG(INFO) << "Model self evaluation:\n"
+              << self_evaluation_description.value();
+  } else {
+    absl::StrAppend(description, "Cannot compute model self evaluation:",
+                    self_evaluation_description.status().message(), "\n");
+  }
 
   if (hyperparameter_optimizer_logs_.has_value()) {
     AppendHyperparameterOptimizerLogs(description);

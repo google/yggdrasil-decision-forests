@@ -53,6 +53,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:weight_cc_proto",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",
+        "//yggdrasil_decision_forests/metric:report",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:fast_engine",
         "//yggdrasil_decision_forests/utils:compatibility",

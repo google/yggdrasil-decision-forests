@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -486,11 +487,13 @@ void GradientBoostedTreesModel::AppendModelStructure(
 metric::proto::EvaluationResults
 GradientBoostedTreesModel::ValidationEvaluation() const {
   if (std::isnan(validation_loss_)) {
-    LOG(FATAL) << "Validation evaluation not available for the Gradient "
-                  "Boosted Tree model as no validation dataset was provided "
-                  "for training (i.e. validation_set_ratio == 0).";
+    LOG(WARNING) << "Validation evaluation not available for the Gradient "
+                    "Boosted Tree model as no validation dataset was provided "
+                    "for training (i.e. validation_set_ratio == 0).";
+    return {};
   }
   metric::proto::EvaluationResults validation_evaluation;
+  validation_evaluation.set_task(task_);
   validation_evaluation.set_loss_value(validation_loss_);
   validation_evaluation.set_loss_name(proto::Loss_Name(loss_));
 
@@ -545,6 +548,50 @@ void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
 
   StrAppendForestStructureStatistics(data_spec(), decision_trees(),
                                      description);
+
+  // Training logs.
+  if (!training_logs_.entries().empty()) {
+    absl::StrAppend(description, "\nTraining logs:\n");
+    absl::StrAppend(description, "Number of iteration to final model: ",
+                    training_logs_.number_of_trees_in_final_model(), "\n");
+    int entry_idx = 0;
+    while (entry_idx < training_logs_.entries().size()) {
+      const auto& entry = training_logs_.entries(entry_idx);
+      absl::StrAppendFormat(description,
+                            "\tIter:%d train-loss:%f valid-loss:%f ",
+                            entry.number_of_trees(), entry.training_loss(),
+                            entry.validation_loss());
+      for (int metric_idx = 0;
+           metric_idx < training_logs_.secondary_metric_names_size();
+           metric_idx++) {
+        // Metric name.
+        const auto& metric_name =
+            training_logs_.secondary_metric_names(metric_idx);
+
+        // Metric values.
+        float train_value = std::numeric_limits<float>::quiet_NaN();
+        float valid_value = std::numeric_limits<float>::quiet_NaN();
+        if (metric_idx < entry.training_secondary_metrics().size()) {
+          train_value = entry.training_secondary_metrics(metric_idx);
+        }
+        if (metric_idx < entry.validation_secondary_metrics().size()) {
+          valid_value = entry.validation_secondary_metrics(metric_idx);
+        }
+
+        absl::StrAppendFormat(description, " train-%s:%f valid-%s:%f",
+                              metric_name, train_value, metric_name,
+                              valid_value);
+      }
+      absl::StrAppend(description, "\n");
+
+      // Print the first 5 entries, and then, print once every 10 entries.
+      if (entry_idx < 5) {
+        entry_idx++;
+      } else {
+        entry_idx += 10;
+      }
+    }
+  }
 
   if (full_definition) {
     absl::StrAppend(description, "\nModel Structure:\n");

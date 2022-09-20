@@ -41,6 +41,14 @@ std::string PairToString(const std::pair<T, T>& p) {
   return absl::StrCat(p.first, " ", p.second);
 }
 
+// Adds the string "<key>: <value>\n" is "value is not Nan.
+void AppendKeyValueIfNotNan(std::string* dst, absl::string_view key,
+                            float value) {
+  if (!std::isnan(value)) {
+    absl::StrAppend(dst, key, ": ", value, "\n");
+  }
+}
+
 absl::Status PlotClassificationCurves(const proto::Roc& roc,
                                       const absl::string_view label,
                                       utils::plot::Plot* roc_plot,
@@ -333,12 +341,21 @@ void AppendTextReport(const proto::EvaluationResults& eval,
 
 absl::Status AppendTextReportWithStatus(const proto::EvaluationResults& eval,
                                         std::string* report) {
-  absl::StrAppend(report, "Number of predictions (without weights): ",
-                  eval.count_predictions_no_weight(), "\n");
-  absl::StrAppend(report, "Number of predictions (with weights): ",
-                  eval.count_predictions(), "\n");
-  absl::StrAppend(report, "Task: ", model::proto::Task_Name(eval.task()), "\n");
-  absl::StrAppend(report, "Label: ", eval.label_column().name(), "\n");
+  if (eval.has_count_predictions_no_weight()) {
+    absl::StrAppend(report, "Number of predictions (without weights): ",
+                    eval.count_predictions_no_weight(), "\n");
+  }
+  if (eval.has_count_predictions()) {
+    absl::StrAppend(report, "Number of predictions (with weights): ",
+                    eval.count_predictions(), "\n");
+  }
+  if (eval.has_task()) {
+    absl::StrAppend(report, "Task: ", model::proto::Task_Name(eval.task()),
+                    "\n");
+  }
+  if (eval.has_label_column()) {
+    absl::StrAppend(report, "Label: ", eval.label_column().name(), "\n");
+  }
   if (eval.has_loss_value()) {
     absl::StrAppend(report, "Loss (", eval.loss_name(),
                     "): ", eval.loss_value(), "\n");
@@ -369,20 +386,23 @@ absl::Status AppendTextReportClassification(
   absl::SubstituteAndAppend(report, "Accuracy: $0  CI95[W][$1]\n",
                             Accuracy(eval),
                             PairToString(AccuracyConfidenceInterval(eval)));
-  absl::StrAppend(report, "LogLoss: ", LogLoss(eval), "\n");
-  absl::StrAppend(report, "ErrorRate: ", ErrorRate(eval), "\n");
+
+  AppendKeyValueIfNotNan(report, "LogLoss: ", LogLoss(eval));
+  AppendKeyValueIfNotNan(report, "ErrorRate: ", ErrorRate(eval));
   absl::StrAppend(report, "\n");
 
-  absl::StrAppend(report, "Default Accuracy: ", DefaultAccuracy(eval), "\n");
-  absl::StrAppend(report, "Default LogLoss: ", DefaultLogLoss(eval), "\n");
-  absl::StrAppend(report, "Default ErrorRate: ", DefaultErrorRate(eval), "\n");
+  AppendKeyValueIfNotNan(report, "Default Accuracy: ", DefaultAccuracy(eval));
+  AppendKeyValueIfNotNan(report, "Default LogLoss: ", DefaultLogLoss(eval));
+  AppendKeyValueIfNotNan(report, "Default ErrorRate: ", DefaultErrorRate(eval));
   absl::StrAppend(report, "\n");
 
-  absl::StrAppend(report, "Confusion Table:\n");
-  utils::IntegersConfusionMatrixDouble confusion;
-  confusion.Load(eval.classification().confusion());
-  RETURN_IF_ERROR(confusion.AppendTextReport(eval.label_column(), report));
-  absl::StrAppend(report, "\n");
+  if (eval.classification().has_confusion()) {
+    absl::StrAppend(report, "Confusion Table:\n");
+    utils::IntegersConfusionMatrixDouble confusion;
+    confusion.Load(eval.classification().confusion());
+    RETURN_IF_ERROR(confusion.AppendTextReport(eval.label_column(), report));
+    absl::StrAppend(report, "\n");
+  }
 
   // Print a description of a X@Y metric. For example:
   // " Recall: 0.1 -> Precision: 0.2 CI95[0.1 0.3] [threshold: 0.3]";
@@ -492,7 +512,7 @@ absl::Status AppendTextReportRegression(const proto::EvaluationResults& eval,
   }
   absl::StrAppend(report, "\n");
 
-  absl::StrAppend(report, "Default RMSE: ", DefaultRMSE(eval), "\n");
+  AppendKeyValueIfNotNan(report, "Default RMSE: ", DefaultRMSE(eval));
   return absl::OkStatus();
 }
 

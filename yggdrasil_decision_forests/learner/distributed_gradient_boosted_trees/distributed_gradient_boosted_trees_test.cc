@@ -212,6 +212,10 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
   LOG(INFO) << "Training classical algorithm";
   TrainAndEvaluateModel();
   // Note: The description includes a details of the tree structure.
+  auto* gbt_model =
+      dynamic_cast<gradient_boosted_trees::GradientBoostedTreesModel*>(
+          model_.get());
+  gbt_model->mutable_training_logs()->Clear();
   const auto description_classical = model_->DescriptionAndStatistics(true);
 
   // Distributed algorithm.
@@ -245,6 +249,10 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
   LOG(INFO) << "Training distributed algorithm";
   TrainAndEvaluateModel();
   // Note: The description includes a details of the tree structure.
+  auto* distributed_gbt_model =
+      dynamic_cast<gradient_boosted_trees::GradientBoostedTreesModel*>(
+          model_.get());
+  distributed_gbt_model->mutable_training_logs()->Clear();
   const auto description_distributed = model_->DescriptionAndStatistics(true);
 
   EXPECT_EQ(description_classical, description_distributed);

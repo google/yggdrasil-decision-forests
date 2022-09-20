@@ -604,9 +604,10 @@ RandomForestModel::GetVariableImportance(absl::string_view key) const {
 metric::proto::EvaluationResults RandomForestModel::ValidationEvaluation()
     const {
   if (out_of_bag_evaluations_.empty()) {
-    LOG(FATAL) << "Cannot call ValidationEvaluation on a Random Forest model "
-                  "without OOB evaluation. The model should be trained with "
-                  "compute_oob_performances:true.";
+    LOG(WARNING) << "Cannot call ValidationEvaluation on a Random Forest model "
+                    "without OOB evaluation. The model should be trained with "
+                    "compute_oob_performances:true.";
+    return {};
   }
   return out_of_bag_evaluations_.back().evaluation();
 }
