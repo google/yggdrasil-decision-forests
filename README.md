@@ -88,7 +88,7 @@ The following resources are available:
 -   [Known issues](documentation/known_issues.md)
 -   [Changelog](CHANGELOG.md)
 -   [TensorFlow Decision Forest](https://github.com/tensorflow/decision-forests)
--   [Javascript port](port/javascript)
+-   [Javascript port](yggdrasil_decision_forests/port/javascript)
 
 ## Installation from pre-compiled binaries
 
