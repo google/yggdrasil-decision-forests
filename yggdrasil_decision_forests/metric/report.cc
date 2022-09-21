@@ -500,9 +500,11 @@ absl::Status AppendTextReportRegression(const proto::EvaluationResults& eval,
                                         std::string* report) {
   absl::StrAppend(report, "RMSE: ", RMSE(eval));
 
-  const auto closed_ci = RMSEConfidenceInterval(eval);
-  absl::SubstituteAndAppend(report, " CI95[X2][$0 $1]", closed_ci.first,
-                            closed_ci.second);
+  if (eval.count_predictions_no_weight() > 0) {
+    const auto closed_ci = RMSEConfidenceInterval(eval);
+    absl::SubstituteAndAppend(report, " CI95[X2][$0 $1]", closed_ci.first,
+                              closed_ci.second);
+  }
 
   if (eval.regression().has_bootstrap_rmse_lower_bounds_95p()) {
     absl::SubstituteAndAppend(

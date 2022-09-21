@@ -1732,6 +1732,11 @@ std::pair<float, float> RMSEConfidenceInterval(
     const proto::EvaluationResults& eval, const float confidence_level) {
   const double sampled_sd = RMSE(eval);
   const auto n = eval.count_predictions_no_weight();
+  if (n <= 0) {
+    return {std::numeric_limits<double>::quiet_NaN(),
+            std::numeric_limits<double>::quiet_NaN()};
+  }
+
   const auto chi_square = boost::math::chi_squared_distribution<double>(n);
   const double q1 = quantile(chi_square, 1 - (1. - confidence_level) / 2);
   const double q2 = quantile(chi_square, (1. - confidence_level) / 2);
