@@ -102,9 +102,11 @@ utils::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
     RETURN_IF_ERROR(GetLearner(train_config, &learner));
     ASSIGN_OR_RETURN(const auto specifications,
                      learner->GetGenericHyperParameterSpecification());
-    ASSIGN_OR_RETURN(auto sub_content, ExportHParamSpecToMarkdown(
-                                           learner->training_config().learner(),
-                                           specifications, gen_doc_url));
+    const auto templates = learner->PredefinedHyperParameters();
+    ASSIGN_OR_RETURN(
+        auto sub_content,
+        ExportHParamSpecToMarkdown(learner->training_config().learner(),
+                                   specifications, templates, gen_doc_url));
     absl::StrAppendFormat(&content, "## %s\n\n%s\n\n", learner_name,
                           sub_content);
   }
@@ -115,6 +117,7 @@ utils::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
 utils::StatusOr<std::string> ExportHParamSpecToMarkdown(
     absl::string_view learner_key,
     const proto::GenericHyperParameterSpecification& hparams,
+    const std::vector<proto::PredefinedHyperParameterTemplate>& templates,
     const DocumentationUrlFunctor& gen_doc_url) {
   // Check if the set of generic hyper-parameters is empty.
   // Note: "kHParamMaximumTrainingDurationSeconds" is added to most learners
@@ -160,12 +163,67 @@ utils::StatusOr<std::string> ExportHParamSpecToMarkdown(
     }
   }
   if (!protos.empty()) {
-    absl::StrAppend(&result, "### Training configuration\n\n");
+    absl::StrAppend(&result,
+                    "### Training configuration\n\nFollowing are the "
+                    "protobuffer definitions used in TrainingConfiguration to "
+                    "set learner hyper-parameters.\n\n");
     for (const auto& proto : protos) {
       absl::SubstituteAndAppend(&result, "- <a href=\"$0\">$1</a>\n",
                                 gen_doc_url(proto, {}), proto);
     }
     absl::StrAppend(&result, "\n");
+  }
+
+  if (!templates.empty()) {
+    absl::StrAppend(&result, "### Hyper-parameter templates\n\n");
+
+    absl::StrAppend(&result,
+                    "Following are the hyper-parameter templates. Those are "
+                    "hyper-parameter configurations that are generally before "
+                    "better than the default hyper-parameter values. You can "
+                    "copy them manually in your training config (CLI and C++ "
+                    "API), or use the `hyperparameter_template` argument "
+                    "(TensorFlow Decision Forests).\n\n");
+
+    for (const auto& template_item : templates) {
+      absl::SubstituteAndAppend(&result, "**$0@$1**\n\n", template_item.name(),
+                                template_item.version());
+      absl::StrAppend(&result, template_item.description(), "\n\n");
+
+      for (const auto& field : template_item.parameters().fields()) {
+        absl::SubstituteAndAppend(&result, "- `$0`: ", field.name());
+
+        switch (field.value().Type_case()) {
+          case proto::GenericHyperParameters::Value::kReal:
+            absl::StrAppend(&result, field.value().real());
+            break;
+
+          case proto::GenericHyperParameters::Value::kCategorical:
+            absl::StrAppend(&result, field.value().categorical());
+            break;
+
+          case proto::GenericHyperParameters::Value::kInteger:
+            absl::StrAppend(&result, field.value().integer());
+            break;
+
+          case proto::GenericHyperParameters::Value::kCategoricalList:
+            absl::StrAppend(
+                &result, "[",
+                absl::StrJoin(field.value().categorical_list().values().begin(),
+                              field.value().categorical_list().values().end(),
+                              ","),
+                "]");
+            break;
+
+          case proto::GenericHyperParameters::Value::TYPE_NOT_SET:
+            absl::StrAppend(&result, "Unknown");
+            break;
+        }
+
+        absl::StrAppend(&result, "\n");
+      }
+      absl::StrAppend(&result, "\n\n");
+    }
   }
 
   absl::StrAppend(&result, "### Generic Hyper-parameters\n\n");
@@ -229,8 +287,9 @@ utils::StatusOr<std::string> ExportHParamSpecToMarkdown(
         const auto value = hparam.second.categorical();
         absl::SubstituteAndAppend(&result, "**Type:** Categorical list");
       } break;
-      default:
-        LOG(FATAL) << "Not implemented";
+      case proto::GenericHyperParameterSpecification::Value::TYPE_NOT_SET:
+        absl::StrAppend(&result, "Unknown");
+        break;
     }
 
     absl::SubstituteAndAppend(

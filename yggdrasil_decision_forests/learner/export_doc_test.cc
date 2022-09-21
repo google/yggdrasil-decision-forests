@@ -19,6 +19,8 @@
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -91,13 +93,19 @@ TEST(ExportDoc, Base) {
           {"FakeLearner2", "FakeLearner3"})
           .value();
 
-  LOG(INFO) << "======\n" << content << "\n=========";
+  const std::string content_path =
+      file::JoinPath(test::TmpDirectory(), "content.csv");
+  EXPECT_OK(file::SetContent(content_path, content));
+
+  LOG(INFO) << "Exporting content to: " << content_path;
 
   EXPECT_EQ(content, R"(## FakeLearner2
 
 <font size="2">
 
 ### Training configuration
+
+Following are the protobuffer definitions used in TrainingConfiguration to set learner hyper-parameters.
 
 - <a href="_learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 
@@ -135,6 +143,8 @@ TEST(ExportDoc, Base) {
 <font size="2">
 
 ### Training configuration
+
+Following are the protobuffer definitions used in TrainingConfiguration to set learner hyper-parameters.
 
 - <a href="_learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 

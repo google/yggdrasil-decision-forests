@@ -1,11 +1,10 @@
 # Training APIs
 
 YDF is available in different programming languages / APIs both for model
-training and model serving.
-
-Model and training configurations are compatible in between APIs. It is common
-to develop a model with one API (e.g., Python API) and then to deploy it with
-another API (e.g., C++ API).
+training and model serving. Model and training configurations are
+cross-compatible in between APIs. For example, it is common to develop a model
+with one API (e.g., Python API) and then to deploy it with another API (e.g.,
+C++ API).
 
 The following APIs available for **model training**. The list of APIs available
 for **model serving** is available on [this page](serving_apis).

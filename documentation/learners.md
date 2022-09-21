@@ -16,9 +16,37 @@ the gradient of the loss relative to the model output).
 
 ### Training configuration
 
+Following are the protobuffer definitions used in TrainingConfiguration to set
+learner hyper-parameters.
+
 -   <a href="../yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto">learner/gradient_boosted_trees/gradient_boosted_trees.proto</a>
+
+### Hyper-parameter templates
+
+Following are the hyper-parameter templates. Those are hyper-parameter
+configurations that are generally before better than the default hyper-parameter
+values. You can copy them manually in your training config (CLI and C++ API), or
+use the `hyperparameter_template` argument (TensorFlow Decision Forests).
+
+**better_default@1**
+
+A configuration that is generally better than the default parameters without
+being more expensive.
+
+-   `growing_strategy`: BEST_FIRST_GLOBAL
+
+**benchmark_rank1@1**
+
+Top ranking hyper-parameters on our benchmark slightly modified to run in
+reasonable time.
+
+-   `growing_strategy`: BEST_FIRST_GLOBAL
+-   `categorical_algorithm`: RANDOM
+-   `split_axis`: SPARSE_OBLIQUE
+-   `sparse_oblique_normalization`: MIN_MAX
+-   `sparse_oblique_num_projections_exponent`: 1
 
 ### Generic Hyper-parameters
 
@@ -458,9 +486,37 @@ It is probably the most well-known of the Decision Forest training algorithms.
 
 ### Training configuration
 
+Following are the protobuffer definitions used in TrainingConfiguration to set
+learner hyper-parameters.
+
 -   <a href="../yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/random_forest/random_forest.proto">learner/random_forest/random_forest.proto</a>
+
+### Hyper-parameter templates
+
+Following are the hyper-parameter templates. Those are hyper-parameter
+configurations that are generally before better than the default hyper-parameter
+values. You can copy them manually in your training config (CLI and C++ API), or
+use the `hyperparameter_template` argument (TensorFlow Decision Forests).
+
+**better_default@1**
+
+A configuration that is generally better than the default parameters without
+being more expensive.
+
+-   `winner_take_all`: true
+
+**benchmark_rank1@1**
+
+Top ranking hyper-parameters on our benchmark slightly modified to run in
+reasonable time.
+
+-   `winner_take_all`: true
+-   `categorical_algorithm`: RANDOM
+-   `split_axis`: SPARSE_OBLIQUE
+-   `sparse_oblique_normalization`: MIN_MAX
+-   `sparse_oblique_num_projections_exponent`: 1
 
 ### Generic Hyper-parameters
 
@@ -789,6 +845,9 @@ used to grow the tree while the second is used to prune the tree.
 
 ### Training configuration
 
+Following are the protobuffer definitions used in TrainingConfiguration to set
+learner hyper-parameters.
+
 -   <a href="../yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/cart/cart.proto">learner/cart/cart.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
@@ -1047,6 +1106,9 @@ the documentation of the non-distributed Gradient Boosted Tree learning
 algorithm for an introduction to GBTs.
 
 ### Training configuration
+
+Following are the protobuffer definitions used in TrainingConfiguration to set
+learner hyper-parameters.
 
 -   <a href="../yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>

@@ -1,12 +1,3 @@
-
-.. warning::
-  This is the new documentation of YDF and TF-DF on ReadTheDocs. This documentation
-  is currently being assembled, and therefore it is incomplete.
-  For the documentation of Yggdrasil Decision Forests and TensorFlow Decision Forests
-  visit respectively the `YDF Github page <https://github.com/google/yggdrasil-decision-forests>`_
-  and the `TF-DF page <https://www.tensorflow.org/decision_forests>`_ on TensorFlow.org.
-
-
 .. image:: image/ydf_logo.png
   :width: 200
   :alt: Yggdrasil Decision Forests logo
@@ -46,7 +37,9 @@ Content
   :caption: CLI API
 
   Quick start <cli_quick_start>
+  Install <cli_install>
   cli_commands
+  User manual <cli_user_manual>
 
 .. toctree::
   :maxdepth: 1
@@ -61,7 +54,9 @@ Content
   :caption: Reference
 
   apis
+  improve_model
   hyper_parameters
+  What are decision forests <https://developers.google.com/machine-learning/decision-forests>
   features
   lts
 
@@ -70,13 +65,18 @@ Content
   :caption: Deploy a model
 
   serving_apis
+  C++ <cpp_serving>
+  Go <go_serving>
+  JavaScript <js_serving>
+  TF Serving <tf_serving>
+  Benchmark <benchmark_inference>
+  convert_model
 
 .. toctree::
   :maxdepth: 1
   :caption: Resources
 
   ydf_changelog
-  Google's Decision Forest class <https://developers.google.com/machine-learning/decision-forests>
   YDF on Github <https://github.com/google/yggdrasil-decision-forests>
   TF-DF on Github <https://github.com/tensorflow/decision-forests>
   TF-DF on tf.org <https://www.tensorflow.org/decision_forests>

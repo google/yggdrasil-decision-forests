@@ -196,5 +196,7 @@ cc_test(
         ":abstract_learner_cc_proto",
         ":export_doc",
         "@com_google_googletest//:gtest_main",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:test",
     ],
 )

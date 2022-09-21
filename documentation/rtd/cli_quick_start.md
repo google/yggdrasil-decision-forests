@@ -20,12 +20,12 @@ The latest CLI release of YDF is available on the
 
 ```shell
 # Download and extract the last CLI release of YDF.
-wget https://github.com/google/yggdrasil-decision-forests/releases/download/0.2.5/cli_linux.zip
+wget https://github.com/google/yggdrasil-decision-forests/releases/download/1.0.0/cli_linux.zip
 unzip cli_linux.zip
 ```
 
 Alternatively, YDF can be compiled from sources following
-[those instructions](https://github.com/google/yggdrasil-decision-forests/blob/main/documentation/installation.md#compile-command-line-interface-from-source).
+[the CLI Install instructions](cli_install).
 
 Each binary in the release archive executes a different task. For example, the
 `train` command trains a model. Each command is explained in the

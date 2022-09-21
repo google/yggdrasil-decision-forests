@@ -42,6 +42,7 @@ intersphinx_mapping = {
 }
 intersphinx_disabled_domains = ["std"]
 
+myst_heading_anchors = 3
 
 html_theme = "sphinx_book_theme"
 html_logo = "image/both_logo.png"

@@ -47,6 +47,7 @@ utils::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
 utils::StatusOr<std::string> ExportHParamSpecToMarkdown(
     absl::string_view learner_key,
     const proto::GenericHyperParameterSpecification& hparams,
+    const std::vector<proto::PredefinedHyperParameterTemplate>& templates,
     const DocumentationUrlFunctor& gen_doc_url);
 
 }  // namespace model
