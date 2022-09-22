@@ -56,6 +56,7 @@ Content
   apis
   improve_model
   hyper_parameters
+  metrics
   What are decision forests <https://developers.google.com/machine-learning/decision-forests>
   features
   lts

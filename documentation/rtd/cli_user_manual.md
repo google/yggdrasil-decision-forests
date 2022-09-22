@@ -140,7 +140,7 @@ Terminology:
 When stored as a raw file, a dataspec can be read directly. Following is the raw
 definition of the dataspec printed above.
 
-```proto
+```python
 columns {
     name: "attribute_1"
     type: NUMERICAL
@@ -182,7 +182,7 @@ categorical. Following is an example of *dataspec guide* that forces all the
 attributes with a name starting with the "enum_" prefix to be detected as
 categorical.
 
-```proto
+```python
 column_guides {
     column_name_pattern: "^foo.*" # Regular expression
     type: CATEGORICAL # Force this semantic.
@@ -488,7 +488,7 @@ Various aspects of the HPO can be configured. The main configuration nobs are.
 The following example shows the TrainingConfig configuration of the
 hyper-parameter optimizer for a Gradient boosted trees model.
 
-```proto
+```python
 task: CLASSIFICATION
 learner: "HYPERPARAMETER_OPTIMIZER"
 label: "income"
@@ -627,7 +627,7 @@ Training configuration is:
 
 **train_config.pbtxt**
 
-```proto
+```python
 learner: "DISTRIBUTED_GRADIENT_BOOSTED_TREES"
 task: CLASSIFICATION
 label: "income"
@@ -710,6 +710,11 @@ ls
   --deployment=deploy_config.pbtxt\
   --output=model
 ```
+
+[This example](https://github.com/google/yggdrasil-decision-forests/blob/main/examples/distributed_training.sh)
+demonstrates distributed training by running all the workers on the same
+machine. This is effectively not distributed training, but this is an easy way
+to test it.
 
 The example above used the `GRPC` DEE. Different DEE determines how distributed
 computation primitives are executed. The choice of the DEE does not impact the

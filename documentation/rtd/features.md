@@ -2,14 +2,18 @@
 
 This page lists all the features of YDF.
 
-## Learning algorithm
+## Learning algorithms
 
 -   CART
 -   Random Forest
 -   Gradient Boosted (Decision) Trees
 -   Distributed Gradient Boosted (Decision) Trees
 
-## Types of problems
+## Meta-learning algorithm
+
+-   Automatic hyper-parameter optimizer
+
+## Supported of problems
 
 -   Classification (binary and multi-class)
 -   Regression
@@ -17,7 +21,7 @@ This page lists all the features of YDF.
 -   Uplift
 -   Weighted
 
-## Type of features
+## Supported input features
 
 -   Automatic feature type detection and dictionary building.
 -   Numerical
@@ -25,10 +29,6 @@ This page lists all the features of YDF.
 -   Boolean
 -   Categorical-set
 -   Missing
-
-## Meta-learning algorithm
-
--   Automatic hyper-parameter optimizer
 
 ## Inference
 

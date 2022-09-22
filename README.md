@@ -3,22 +3,24 @@
 </p>
 
 **Yggdrasil Decision Forests** (**YDF**) is a collection of state-of-the-art
-algorithms for the training, serving and interpretation of **Decision Forest**
-models. The library is developed in C++ and available in C++, CLI
-(command-line-interface, i.e. shell commands), in TensorFlow under the name
+algorithms for the training, serving, and interpretation of **Decision Forest**
+models. The library is available in C++, CLI (command-line-interface, i.e. shell
+commands), in TensorFlow under the name
 [TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests)
-(TF-DF), and in Javascript (inference only).
+(TF-DF), Go and in Javascript (inference only). YDF is supported on Linux,
+Windows, macOS, Raspberry, and Arduino (experimental).
 
-Developing models in TF-DF and productionizing them (possibly including
-re-training) in C++ with YDF allows both for a flexible and fast development and
-an efficient and safe serving.
+See [the documentation 📕](https://ydf.readthedocs.org/) more details.
 
 ## Usage example
 
-Train, evaluate and benchmark the speed of a model in a few shell lines with the
-CLI interface:
+Train, evaluate, and benchmark the speed of a model in a few shell lines with
+the CLI interface:
 
 ```shell
+# Download YDF.
+wget https://github.com/google/yggdrasil-decision-forests/releases/download/1.0.0/cli_linux.zip
+unzip cli_linux.zip
 # Training configuration
 echo 'label:"my_label" learner:"RANDOM_FOREST" ' > config.pbtxt
 # Scan the dataset
@@ -31,7 +33,7 @@ evaluate --dataset="csv:test.csv" --model="my_model" > evaluation.txt
 benchmark_inference --dataset="csv:test.csv" --model="my_model" > benchmark.txt
 ```
 
-(see the [examples/beginner.sh](examples/beginner.sh) for more details)
+(based on [examples/beginner.sh](examples/beginner.sh))
 
 or use the C++ interface:
 
@@ -53,7 +55,7 @@ auto model = learner->Train(dataset_path, spec);
 SaveModel("my_model", model.get());
 ```
 
-(see the [examples/beginner.cc](examples/beginner.cc) for more details)
+(based on [examples/beginner.cc](examples/beginner.cc))
 
 or use the Keras/Python interface of TensorFlow Decision Forests:
 
@@ -72,108 +74,32 @@ model.save("project/model")
 ```
 
 (see
-[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests)
-for more details)
+[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests))
 
 ## Documentation & Resources
 
 The following resources are available:
 
--   [Examples](examples) (C++ and CLI)
--   [User manual](documentation/user_manual.md)
--   [CLI one pager](documentation/cli.txt)
--   [Developer manual](documentation/developer_manual.md)
--   [List of learning algorithms](documentation/learners.md)
+-   [📕 Documentation](https://ydf.readthedocs.io/en/latest/)
 -   [Issue tracker](https://github.com/google/yggdrasil-decision-forests/issues)
--   [Known issues](documentation/known_issues.md)
--   [Changelog](CHANGELOG.md)
+-   [Changelog](https://ydf.readthedocs.io/en/latest/ydf_changelog.html)
 -   [TensorFlow Decision Forest](https://github.com/tensorflow/decision-forests)
--   [Javascript port](yggdrasil_decision_forests/port/javascript)
-
-## Installation from pre-compiled binaries
-
-Download one of the
-[build releases](https://github.com/google/yggdrasil-decision-forests/releases),
-and then run `examples/beginner.{sh,bat}`.
-
-## Installation from Source
-
-On linux, install
-[Bazel](https://docs.bazel.build/versions/4.0.0/getting-started.html) and run:
-
-```shell
-git clone https://github.com/google/yggdrasil-decision-forests.git
-cd yggdrasil_decision_forests
-bazel build //yggdrasil_decision_forests/cli:all --config=linux_cpp17 --config=linux_avx2
-
-# Then, run the example:
-examples/beginner.sh
-```
-
-See the [installation](documentation/installation.md) page for more details,
-troubleshooting and alternative installation solutions.
-
-Yggdrasil was successfully compiled and run on:
-
--   Linux Debian 5
--   Windows 10
--   MacOS 10
--   Raspberry Pi 4 Rev 2
-
-Inference of Yggdrasil models is also available on:
-
--   *[Experimental; No support]* Arduino Uno R3 (see
-    [project](https://github.com/achoum/ardwino-tensorflow-decision-forests))
-
-**Note:** Tell us if you were able to compile and run Yggdrasil on any other
-architecture :).
-
-## Long-time-support commitments
-
-### Inference and serving
-
--   The serving code is isolated from the rest of the framework (i.e., training,
-    evaluation) and has minimal dependencies.
--   Changes to serving-related code are guaranteed to be backward compatible.
--   Model inference is deterministic: the same example is guaranteed to yield
-    the same prediction.
--   Learners and models are extensively tested, including integration testing on
-    real datasets; and, there exists no execution path in the serving code that
-    crashes as a result of an error; Instead, in case of failure (e.g.,
-    malformed input example), the inference code returns a util::Status.
-
-### Training
-
--   Hyper-parameters' semantic is never modified.
--   The default value of hyper-parameters is never modified.
--   The default value of a newly-introduced hyper-parameter is set in such a way
-    that the hyper-parameter is effectively disabled.
-
-## Quality Assurance
-
-The following mechanisms will be put in place to ensure the quality of the
-library:
-
--   Peer-reviewing.
--   Unit testing.
--   Training benchmarks with ranges of acceptable evaluation metrics.
--   Sanitizers.
+-   [Long time support](https://ydf.readthedocs.io/en/latest/lts.html)
 
 ## Contributing
 
 Contributions to TensorFlow Decision Forests and Yggdrasil Decision Forests are
-welcome. If you want to contribute, make sure to review the
-[user manual](documentation/user_manual.md),
-[developer manual](documentation/developer_manual.md) and
+welcome. If you want to contribute, check the
 [contribution guidelines](CONTRIBUTING.md).
 
 ## Credits
 
-TensorFlow Decision Forests was developed by:
+Yggdrasil Decision Forests and TensorFlow Decision Forests are developed by:
 
 -   Mathieu Guillame-Bert (gbm AT google DOT com)
 -   Jan Pfeifer (janpf AT google DOT com)
 -   Sebastian Bruch (sebastian AT bruch DOT io)
+-   Richard Stotz (richardstotz AT google DOT com)
 -   Arvind Srinivasan (arvnd AT google DOT com)
 
 ## License
