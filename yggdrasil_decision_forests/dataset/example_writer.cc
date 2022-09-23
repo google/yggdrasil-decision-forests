@@ -22,6 +22,7 @@
 
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -30,14 +31,13 @@
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
 
-utils::StatusOr<std::unique_ptr<ExampleWriterInterface>> CreateExampleWriter(
+absl::StatusOr<std::unique_ptr<ExampleWriterInterface>> CreateExampleWriter(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
     const int64_t num_records_by_shard) {
   std::string sharded_path;

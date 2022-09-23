@@ -29,6 +29,7 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -44,7 +45,6 @@
 #include "yggdrasil_decision_forests/model/decision_tree/structure_analysis.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -631,7 +631,7 @@ GradientBoostedTreesModel::AvailableStructuralVariableImportances() const {
   return variable_importances;
 }
 
-utils::StatusOr<std::vector<model::proto::VariableImportance>>
+absl::StatusOr<std::vector<model::proto::VariableImportance>>
 GradientBoostedTreesModel::GetVariableImportance(absl::string_view key) const {
   const auto general_vi = AbstractModel::GetVariableImportance(key);
   if (general_vi.ok()) {

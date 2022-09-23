@@ -18,7 +18,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
@@ -47,7 +47,7 @@ TEST(StatusMacros, RETURN_IF_ERROR) {
 }
 
 TEST(StatusMacros, ASSIGN_OR_RETURN_2ARGS) {
-  const auto f = [](const int a) -> utils::StatusOr<int> {
+  const auto f = [](const int a) -> absl::StatusOr<int> {
     if (a < 0) {
       return absl::InvalidArgumentError("A is lower than zero.");
     }
@@ -65,7 +65,7 @@ TEST(StatusMacros, ASSIGN_OR_RETURN_2ARGS) {
 }
 
 TEST(StatusMacros, ASSIGN_OR_RETURN_3ARGS) {
-  const auto f = [](const int a) -> utils::StatusOr<int> {
+  const auto f = [](const int a) -> absl::StatusOr<int> {
     if (a < 0) {
       return absl::InvalidArgumentError("A is lower than zero.");
     }

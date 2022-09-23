@@ -71,6 +71,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
@@ -130,7 +131,7 @@ struct NumericalOrCategoricalValue {
 //   Numerical feature: Mean value.
 //   Categotical feature: Most frequent value.
 template <typename Value>
-utils::StatusOr<Value> GetDefaultValue(const dataset::proto::Column& col_spec);
+absl::StatusOr<Value> GetDefaultValue(const dataset::proto::Column& col_spec);
 
 // How is a batch of examples stored in memory.
 enum class ExampleFormat {
@@ -181,8 +182,8 @@ struct UnstackedFeature {
 
 std::ostream& operator<<(std::ostream& os, const FeatureDef& feature);
 
-utils::StatusOr<FeatureDef> FindFeatureDef(const std::vector<FeatureDef>& defs,
-                                           int spec_feature_idx);
+absl::StatusOr<FeatureDef> FindFeatureDef(const std::vector<FeatureDef>& defs,
+                                          int spec_feature_idx);
 
 const FeatureDef* FindFeatureDefFromInternalIndex(
     const std::vector<FeatureDef>& defs, int internal_index);
@@ -211,7 +212,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   // Gets the feature def of a feature from its name.
   // Returns an invalid status if the feature was not found or if the feature
   // is not used by the model as input.
-  utils::StatusOr<const FeatureDef*> FindFeatureDefByName(
+  absl::StatusOr<const FeatureDef*> FindFeatureDefByName(
       const absl::string_view name) const {
     auto cached_feature_it = feature_def_cache_.find(name);
     if (cached_feature_it != feature_def_cache_.end()) {
@@ -247,7 +248,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   }
 
   // Gets the unstacked feature definition from its name.
-  utils::StatusOr<const UnstackedFeature*> FindUnstackedFeatureDefByName(
+  absl::StatusOr<const UnstackedFeature*> FindUnstackedFeatureDefByName(
       const absl::string_view name) const {
     auto it_index = indexed_unstacked_features_.find(name);
     if (it_index == indexed_unstacked_features_.end()) {
@@ -258,7 +259,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   }
 
   // Get the identifier of a numerical feature.
-  utils::StatusOr<NumericalFeatureId> GetNumericalFeatureId(
+  absl::StatusOr<NumericalFeatureId> GetNumericalFeatureId(
       const absl::string_view name) const {
     ASSIGN_OR_RETURN(const auto* def, FindFeatureDefByName(name));
     if (def->type != dataset::proto::ColumnType::NUMERICAL &&
@@ -270,7 +271,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
     return NumericalFeatureId{def->internal_idx};
   }
 
-  utils::StatusOr<NumericalFeatureId> GetNumericalFeatureId(
+  absl::StatusOr<NumericalFeatureId> GetNumericalFeatureId(
       const int feature_spec_idx) const {
     ASSIGN_OR_RETURN(const auto def,
                      FindFeatureDef(fixed_length_features(), feature_spec_idx));
@@ -283,18 +284,18 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
     return NumericalFeatureId{def.internal_idx};
   }
 
-  utils::StatusOr<BooleanFeatureId> GetBooleanFeatureId(
+  absl::StatusOr<BooleanFeatureId> GetBooleanFeatureId(
       const absl::string_view name) const {
     return GetNumericalFeatureId(name);
   }
 
-  utils::StatusOr<BooleanFeatureId> GetBooleanFeatureId(
+  absl::StatusOr<BooleanFeatureId> GetBooleanFeatureId(
       const int feature_spec_idx) const {
     return GetNumericalFeatureId(feature_spec_idx);
   }
 
   // Get the identifier of a categorical feature.
-  utils::StatusOr<CategoricalFeatureId> GetCategoricalFeatureId(
+  absl::StatusOr<CategoricalFeatureId> GetCategoricalFeatureId(
       const absl::string_view name) const {
     ASSIGN_OR_RETURN(const auto* def, FindFeatureDefByName(name));
     if (def->type != dataset::proto::ColumnType::CATEGORICAL) {
@@ -304,7 +305,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
     return CategoricalFeatureId{def->internal_idx};
   }
 
-  utils::StatusOr<CategoricalFeatureId> GetCategoricalFeatureId(
+  absl::StatusOr<CategoricalFeatureId> GetCategoricalFeatureId(
       const int feature_spec_idx) const {
     ASSIGN_OR_RETURN(const auto def,
                      FindFeatureDef(fixed_length_features(), feature_spec_idx));
@@ -316,13 +317,13 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   }
 
   // Get the identifier of a categorical-set feature.
-  utils::StatusOr<CategoricalSetFeatureId> GetCategoricalSetFeatureId(
+  absl::StatusOr<CategoricalSetFeatureId> GetCategoricalSetFeatureId(
       const absl::string_view name) const {
     ASSIGN_OR_RETURN(const auto* def, FindFeatureDefByName(name));
     return CategoricalSetFeatureId{def->internal_idx};
   }
 
-  utils::StatusOr<CategoricalSetFeatureId> GetCategoricalSetFeatureId(
+  absl::StatusOr<CategoricalSetFeatureId> GetCategoricalSetFeatureId(
       const int feature_spec_idx) const {
     ASSIGN_OR_RETURN(const auto def, FindFeatureDef(categorical_set_features(),
                                                     feature_spec_idx));
@@ -330,7 +331,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   }
 
   // Get the identifier of a multi-dimensional numerical feature.
-  utils::StatusOr<MultiDimNumericalFeatureId> GetMultiDimNumericalFeatureId(
+  absl::StatusOr<MultiDimNumericalFeatureId> GetMultiDimNumericalFeatureId(
       const absl::string_view name) const {
     // Get the unstacked feature information.
     const auto it_index = indexed_unstacked_features_.find(name);
@@ -509,7 +510,7 @@ class AbstractExampleSet {
                                         const int example_idx,
                                         const FeaturesDefinition& features) = 0;
 
-  virtual utils::StatusOr<dataset::proto::Example> ExtractProtoExample(
+  virtual absl::StatusOr<dataset::proto::Example> ExtractProtoExample(
       const int example_idx, const FeaturesDefinition& features) const = 0;
 
   virtual void Clear() = 0;
@@ -536,51 +537,51 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   static constexpr auto kFormat = format;
 
   // Get the identifier of a numerical feature.
-  static utils::StatusOr<NumericalFeatureId> GetNumericalFeatureId(
+  static absl::StatusOr<NumericalFeatureId> GetNumericalFeatureId(
       const absl::string_view name, const Model& model) {
     return model.features().GetNumericalFeatureId(name);
   }
 
-  static utils::StatusOr<NumericalFeatureId> GetNumericalFeatureId(
+  static absl::StatusOr<NumericalFeatureId> GetNumericalFeatureId(
       const int feature_spec_idx, const Model& model) {
     return model.features().GetNumericalFeatureId(feature_spec_idx);
   }
 
   // Get the identifier of a boolean feature.
-  static utils::StatusOr<BooleanFeatureId> GetBooleanFeatureId(
+  static absl::StatusOr<BooleanFeatureId> GetBooleanFeatureId(
       const absl::string_view name, const Model& model) {
     return model.features().GetBooleanFeatureId(name);
   }
 
-  static utils::StatusOr<BooleanFeatureId> GetBooleanFeatureId(
+  static absl::StatusOr<BooleanFeatureId> GetBooleanFeatureId(
       const int feature_spec_idx, const Model& model) {
     return model.features().GetBooleanFeatureId(feature_spec_idx);
   }
 
   // Get the identifier of a categorical feature.
-  static utils::StatusOr<CategoricalFeatureId> GetCategoricalFeatureId(
+  static absl::StatusOr<CategoricalFeatureId> GetCategoricalFeatureId(
       const absl::string_view name, const Model& model) {
     return model.features().GetCategoricalFeatureId(name);
   }
 
-  static utils::StatusOr<CategoricalFeatureId> GetCategoricalFeatureId(
+  static absl::StatusOr<CategoricalFeatureId> GetCategoricalFeatureId(
       const int feature_spec_idx, const Model& model) {
     return model.features().GetCategoricalFeatureId(feature_spec_idx);
   }
 
   // Get the identifier of a categorical-set feature.
-  static utils::StatusOr<CategoricalSetFeatureId> GetCategoricalSetFeatureId(
+  static absl::StatusOr<CategoricalSetFeatureId> GetCategoricalSetFeatureId(
       const absl::string_view name, const Model& model) {
     return model.features().GetCategoricalSetFeatureId(name);
   }
 
-  static utils::StatusOr<CategoricalSetFeatureId> GetCategoricalSetFeatureId(
+  static absl::StatusOr<CategoricalSetFeatureId> GetCategoricalSetFeatureId(
       const int feature_spec_idx, const Model& model) {
     return model.features().GetCategoricalSetFeatureId(feature_spec_idx);
   }
 
   // Get the identifier of a multi-dimensional numerical feature.
-  static utils::StatusOr<MultiDimNumericalFeatureId>
+  static absl::StatusOr<MultiDimNumericalFeatureId>
   GetMultiDimNumericalFeatureId(const absl::string_view name,
                                 const Model& model) {
     return model.features().GetMultiDimNumericalFeatureId(name);
@@ -938,12 +939,12 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   // the conversion ExampleSet to proto::Example is not perfectly accurate:
   //   - Cannot distinguish between missing feature and the missing replacement
   //     value for numerical and categorical features.
-  utils::StatusOr<dataset::proto::Example> ExtractProtoExample(
+  absl::StatusOr<dataset::proto::Example> ExtractProtoExample(
       const int example_idx, const Model& model) const {
     return ExtractProtoExample(example_idx, model.features());
   }
 
-  utils::StatusOr<dataset::proto::Example> ExtractProtoExample(
+  absl::StatusOr<dataset::proto::Example> ExtractProtoExample(
       const int example_idx, const FeaturesDefinition& features) const override;
 
   // Set the value of one example from a proto::Example.
@@ -1044,9 +1045,8 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
 
 // Converts a Vertical dataset into an example set.
 template <typename Model>
-typename utils::StatusOr<typename Model::ExampleSet>
-VerticalDatasetToExampleSet(const dataset::VerticalDataset& dataset,
-                            const Model& model) {
+typename absl::StatusOr<typename Model::ExampleSet> VerticalDatasetToExampleSet(
+    const dataset::VerticalDataset& dataset, const Model& model) {
   typename Model::ExampleSet examples(dataset.nrow(), model);
 
   RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
@@ -1201,7 +1201,7 @@ ExampleSetNumericalOrCategoricalFlat<Model, format>::FromProtoExample(
 }
 
 template <typename Model, ExampleFormat format>
-utils::StatusOr<dataset::proto::Example>
+absl::StatusOr<dataset::proto::Example>
 ExampleSetNumericalOrCategoricalFlat<Model, format>::ExtractProtoExample(
     const int example_idx, const FeaturesDefinition& features) const {
   dataset::proto::Example example;

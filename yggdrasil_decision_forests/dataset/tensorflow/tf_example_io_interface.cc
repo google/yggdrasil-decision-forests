@@ -26,6 +26,7 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -38,7 +39,6 @@
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow/tf_example.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -64,7 +64,7 @@ struct InferTypeInfo {
   bool ignore_feature = false;
 };
 
-utils::StatusOr<std::unique_ptr<AbstractTFExampleReader>> CreateTFExampleReader(
+absl::StatusOr<std::unique_ptr<AbstractTFExampleReader>> CreateTFExampleReader(
     const absl::string_view typed_path) {
   std::string sharded_path;
   proto::DatasetFormat format;
@@ -79,7 +79,7 @@ utils::StatusOr<std::unique_ptr<AbstractTFExampleReader>> CreateTFExampleReader(
   return std::move(reader);
 }
 
-utils::StatusOr<std::unique_ptr<AbstractTFExampleWriter>> CreateTFExampleWriter(
+absl::StatusOr<std::unique_ptr<AbstractTFExampleWriter>> CreateTFExampleWriter(
     const absl::string_view typed_path, const int64_t num_records_by_shard) {
   std::string sharded_path;
   proto::DatasetFormat format;
@@ -259,7 +259,7 @@ absl::Status TFExampleReaderToExampleReader::Open(
   return absl::OkStatus();
 }
 
-utils::StatusOr<bool> TFExampleReaderToExampleReader::Next(
+absl::StatusOr<bool> TFExampleReaderToExampleReader::Next(
     proto::Example* example) {
   ASSIGN_OR_RETURN(bool did_read, tf_reader_->Next(&tfexample_buffer_));
   if (!did_read) {
@@ -391,7 +391,7 @@ absl::Status TFExampleReaderToDataSpecCreator::ComputeColumnStatistics(
   return absl::OkStatus();
 }
 
-utils::StatusOr<int64_t> TFExampleReaderToDataSpecCreator::CountExamples(
+absl::StatusOr<int64_t> TFExampleReaderToDataSpecCreator::CountExamples(
     absl::string_view path) {
   auto reader = CreateReader();
   RETURN_IF_ERROR(reader->Open(path));

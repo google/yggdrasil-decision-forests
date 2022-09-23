@@ -26,11 +26,11 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/hash.h"
 
 namespace yggdrasil_decision_forests {
@@ -102,7 +102,7 @@ absl::Status ExampleToCsvRow(const proto::Example& example,
 // if the column does not exist.
 int GetColumnIdxFromName(absl::string_view name,
                          const proto::DataSpecification& data_spec);
-utils::StatusOr<int> GetColumnIdxFromNameWithStatus(
+absl::StatusOr<int> GetColumnIdxFromNameWithStatus(
     absl::string_view name, const proto::DataSpecification& data_spec);
 
 // Returns the index of the column with the corresponding name. Returns  an
@@ -127,7 +127,7 @@ std::string PrintHumanReadable(const proto::DataSpecification& data_spec,
 
 // Returns the integer representation of a categorical value provided as a
 // string.
-utils::StatusOr<int32_t> CategoricalStringToValueWithStatus(
+absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
     const std::string& value, const proto::Column& col_spec);
 
 int32_t CategoricalStringToValue(const std::string& value,
@@ -173,7 +173,7 @@ bool IsCategorical(proto::ColumnType type);
 bool IsNumerical(proto::ColumnType type);
 
 // Converts a discretized numerical value into a numerical value.
-utils::StatusOr<float> DiscretizedNumericalToNumerical(
+absl::StatusOr<float> DiscretizedNumericalToNumerical(
     const proto::Column& col_spec, DiscretizedNumericalIndex value);
 
 // Determines a set of histogram-like boundaries of a discretized numerical
@@ -196,7 +196,7 @@ utils::StatusOr<float> DiscretizedNumericalToNumerical(
 //    that require their own bin. E.g. if 5 is in "special_values", and if
 //    "candidates" contains values both greater and smaller than 5 (e.g. -3, 1,
 //    6, 10) there will be a bin [5-eps, 5+eps[.
-utils::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
+absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
     const std::vector<std::pair<float, int>>& candidates, int maximum_num_bins,
     int min_obs_in_bins, const std::vector<float>& special_values);
 

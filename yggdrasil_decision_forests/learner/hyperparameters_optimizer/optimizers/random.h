@@ -34,7 +34,7 @@ class RandomOptimizer : public OptimizerInterface {
   RandomOptimizer(const proto::Optimizer& config,
                   const model::proto::HyperParameterSpace& space);
 
-  utils::StatusOr<NextCandidateStatus> NextCandidate(
+  absl::StatusOr<NextCandidateStatus> NextCandidate(
       model::proto::GenericHyperParameters* candidate) override;
 
   absl::Status ConsumeEvaluation(
@@ -96,11 +96,11 @@ namespace internal {
 // "weight" is specified, it is applied as a coefficient factor over the uniform
 // sampling.
 absl::Status UpdateWeights(model::proto::HyperParameterSpace* space);
-utils::StatusOr<double> UpdateWeights(
+absl::StatusOr<double> UpdateWeights(
     model::proto::HyperParameterSpace::Field* field);
 
-utils::StatusOr<size_t> Sample(std::vector<float>& weights,
-                               utils::RandomEngine* random);
+absl::StatusOr<size_t> Sample(std::vector<float>& weights,
+                              utils::RandomEngine* random);
 
 }  // namespace internal
 

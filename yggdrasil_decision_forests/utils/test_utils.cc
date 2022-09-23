@@ -29,6 +29,7 @@
 #include "absl/random/distributions.h"
 #include "absl/random/random.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
@@ -54,7 +55,6 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
@@ -164,7 +164,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   const auto begin_training = absl::Now();
 
-  utils::StatusOr<std::unique_ptr<model::AbstractModel>> model_or;
+  absl::StatusOr<std::unique_ptr<model::AbstractModel>> model_or;
   // Train the model.
   if (pass_training_dataset_as_path_) {
     // Export the training dataset into a set of sharded files.

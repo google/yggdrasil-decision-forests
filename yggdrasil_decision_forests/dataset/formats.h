@@ -24,9 +24,9 @@
 #include <string>
 #include <utility>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -47,7 +47,7 @@ std::pair<std::string, proto::DatasetFormat> GetDatasetPathAndType(
     absl::string_view typed_path);
 
 // Same as "GetDatasetPathAndType", but return a status in case of error.
-utils::StatusOr<std::pair<std::string, proto::DatasetFormat>>
+absl::StatusOr<std::pair<std::string, proto::DatasetFormat>>
 GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path);
 
 // Tests if a string is a typed path.
@@ -55,7 +55,7 @@ bool IsTypedPath(absl::string_view maybe_typed_path);
 
 // Splits a "[type]:[path]" into a pair of strings "type" and "path". Do not
 // check that "type" is a valid type of "path" a valid path.
-utils::StatusOr<std::pair<std::string, std::string>> SplitTypeAndPath(
+absl::StatusOr<std::pair<std::string, std::string>> SplitTypeAndPath(
     absl::string_view typed_path);
 
 // Gets the recommended file extension for a dataset format.

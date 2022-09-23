@@ -21,8 +21,8 @@
 #include <string>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
 
 namespace yggdrasil_decision_forests {
@@ -38,7 +38,7 @@ class FastEngineFactory {
   virtual std::string name() const = 0;
 
   // Creates an engine. The model can be discarded after the call.
-  virtual utils::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
+  virtual absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
       const AbstractModel* const model) const = 0;
 
   // Checks if an engine is compatible with a model.

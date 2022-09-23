@@ -25,6 +25,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
 #include "boost/math/distributions/binomial.hpp"
@@ -35,7 +36,6 @@
 #include "yggdrasil_decision_forests/metric/ranking_mrr.h"
 #include "yggdrasil_decision_forests/metric/ranking_ndcg.h"
 #include "yggdrasil_decision_forests/metric/uplift.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -186,7 +186,7 @@ absl::Status BuildROCCurveFromSortedPredictions(
 }
 
 // Return the index of a x@y metric from the y constraint value.
-utils::StatusOr<int> XAtYMetricIndexFromConstraint(
+absl::StatusOr<int> XAtYMetricIndexFromConstraint(
     const google::protobuf::RepeatedPtrField<proto::Roc::XAtYMetric>& x_at_ys,
     const float y_constraint, const float margin = 0.0001f) {
   for (int x_at_y_idx = 0; x_at_y_idx < x_at_ys.size(); x_at_y_idx++) {
@@ -1277,9 +1277,9 @@ absl::Status MergeEvaluation(const proto::EvaluationOptions& option,
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::unordered_map<std::string, std::string>>
-ExtractFlatMetrics(const absl::string_view model_name,
-                   const proto::EvaluationResults& evaluation) {
+absl::StatusOr<std::unordered_map<std::string, std::string>> ExtractFlatMetrics(
+    const absl::string_view model_name,
+    const proto::EvaluationResults& evaluation) {
   std::unordered_map<std::string, std::string> flat_metrics;
   flat_metrics[kLabelModel] = std::string(model_name);
 
@@ -1427,9 +1427,8 @@ ExtractFlatMetrics(const absl::string_view model_name,
   return flat_metrics;
 }
 
-utils::StatusOr<std::unordered_map<std::string, std::string>>
-ExtractFlatMetrics(absl::string_view model_name,
-                   absl::string_view evaluation_file) {
+absl::StatusOr<std::unordered_map<std::string, std::string>> ExtractFlatMetrics(
+    absl::string_view model_name, absl::string_view evaluation_file) {
   ASSIGN_OR_RETURN(auto serialized_content, file::GetContent(evaluation_file));
   proto::EvaluationResults evaluation;
   evaluation.ParsePartialFromString(std::move(serialized_content));
@@ -1492,7 +1491,7 @@ namespace {
 
 // Specialization of GetMetric.
 
-utils::StatusOr<double> GetMetricClassificationOneVsOthers(
+absl::StatusOr<double> GetMetricClassificationOneVsOthers(
     const proto::EvaluationResults& evaluation,
     const proto::MetricAccessor::Classification::OneVsOther& metric) {
   const int num_label_classes =
@@ -1579,7 +1578,7 @@ utils::StatusOr<double> GetMetricClassificationOneVsOthers(
   }
 }
 
-utils::StatusOr<double> GetMetricClassification(
+absl::StatusOr<double> GetMetricClassification(
     const proto::EvaluationResults& evaluation,
     const proto::MetricAccessor::Classification& metric) {
   switch (metric.Type_case()) {
@@ -1595,7 +1594,7 @@ utils::StatusOr<double> GetMetricClassification(
   }
 }
 
-utils::StatusOr<double> GetMetricRegression(
+absl::StatusOr<double> GetMetricRegression(
     const proto::EvaluationResults& evaluation,
     const proto::MetricAccessor::Regression& metric) {
   switch (metric.Type_case()) {
@@ -1606,7 +1605,7 @@ utils::StatusOr<double> GetMetricRegression(
   }
 }
 
-utils::StatusOr<double> GetMetricRanking(
+absl::StatusOr<double> GetMetricRanking(
     const proto::EvaluationResults& evaluation,
     const proto::MetricAccessor::Ranking& metric) {
   switch (metric.Type_case()) {
@@ -1619,7 +1618,7 @@ utils::StatusOr<double> GetMetricRanking(
   }
 }
 
-utils::StatusOr<double> GetMetricUplift(
+absl::StatusOr<double> GetMetricUplift(
     const proto::EvaluationResults& evaluation,
     const proto::MetricAccessor::Uplift& metric) {
   switch (metric.type_case()) {
@@ -1647,8 +1646,8 @@ absl::Status GetMetricFatalMissing(const absl::string_view required,
 
 }  // namespace
 
-utils::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
-                                  const proto::MetricAccessor& metric) {
+absl::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
+                                 const proto::MetricAccessor& metric) {
   switch (metric.Task_case()) {
     case proto::MetricAccessor::kClassification:
       if (!evaluation.has_classification()) {
@@ -1680,7 +1679,7 @@ utils::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
   }
 }
 
-utils::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric) {
+absl::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric) {
   switch (metric.Task_case()) {
     case proto::MetricAccessor::kClassification:
       switch (metric.classification().Type_case()) {
@@ -1803,9 +1802,9 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
   return eval;
 }
 
-utils::StatusOr<double> RMSE(const std::vector<float>& labels,
-                             const std::vector<float>& predictions,
-                             const std::vector<float>& weights) {
+absl::StatusOr<double> RMSE(const std::vector<float>& labels,
+                            const std::vector<float>& predictions,
+                            const std::vector<float>& weights) {
   STATUS_CHECK_EQ(labels.size(), predictions.size());
   STATUS_CHECK_EQ(labels.size(), weights.size());
   double sum_loss = 0;
@@ -1826,8 +1825,8 @@ utils::StatusOr<double> RMSE(const std::vector<float>& labels,
   }
 }
 
-utils::StatusOr<double> RMSE(const std::vector<float>& labels,
-                             const std::vector<float>& predictions) {
+absl::StatusOr<double> RMSE(const std::vector<float>& labels,
+                            const std::vector<float>& predictions) {
   STATUS_CHECK_EQ(labels.size(), predictions.size());
 
   double sum_loss = 0;

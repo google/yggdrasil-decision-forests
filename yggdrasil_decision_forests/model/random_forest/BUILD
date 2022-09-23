@@ -19,6 +19,7 @@ cc_library_ydf(
     deps = [
         ":random_forest_cc_proto",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
@@ -31,7 +32,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:distribution",
         "//yggdrasil_decision_forests/utils:distribution_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",

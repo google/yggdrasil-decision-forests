@@ -23,9 +23,9 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -53,7 +53,7 @@ absl::Status LoadTreesFromDisk(
 // Gets the recommended format to store decision trees with
 // SaveTreesToDisk among the registered ones. At least one
 // format should be registered.
-utils::StatusOr<std::string> RecommendedSerializationFormat();
+absl::StatusOr<std::string> RecommendedSerializationFormat();
 
 }  // namespace decision_tree
 }  // namespace model

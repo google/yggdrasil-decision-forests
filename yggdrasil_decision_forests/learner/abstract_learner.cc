@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -228,8 +229,7 @@ std::unique_ptr<AbstractModel> AbstractLearner::Train(
   return TrainWithStatus(typed_path, data_spec).value();
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
-AbstractLearner::TrainWithStatus(
+absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
     const absl::optional<std::string>& typed_valid_path) const {
@@ -517,7 +517,7 @@ absl::Status AbstractLearner::SetHyperParametersImpl(
   return absl::OkStatus();
 }
 
-utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+absl::StatusOr<model::proto::GenericHyperParameterSpecification>
 AbstractLearner::GetGenericHyperParameterSpecification() const {
   model::proto::GenericHyperParameterSpecification hparam_def;
   const proto::TrainingConfig default_config;
@@ -578,7 +578,7 @@ metric::proto::EvaluationResults EvaluateLearner(
       .value();
 }
 
-utils::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
+absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
     const model::AbstractLearner& learner,
     const dataset::VerticalDataset& dataset,
     const utils::proto::FoldGenerator& fold_generator,
@@ -751,7 +751,7 @@ absl::Status AbstractLearner::CheckCapabilities() const {
   return absl::OkStatus();
 }
 
-utils::StatusOr<proto::HyperParameterSpace>
+absl::StatusOr<proto::HyperParameterSpace>
 AbstractLearner::PredefinedHyperParameterSpace() const {
   return absl::InvalidArgumentError(
       absl::Substitute("Learner $0 does not provide a default hyper-parameter "

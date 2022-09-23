@@ -18,6 +18,7 @@ cc_library_ydf(
         "gradient_boosted_trees.h",
     ],
     deps = [
+        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:all_implementations",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_interface",

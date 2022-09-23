@@ -24,6 +24,7 @@ cc_library_ydf(
     ],
     deps = [
         "@com_google_protobuf//:protobuf_lite",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:optional",
         "//yggdrasil_decision_forests/learner:types",
         ":decision_tree_cc_proto",
@@ -67,7 +68,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:bitmap",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:logging",
-        "//yggdrasil_decision_forests/utils:synchronization_primitives",
     ],
 )
 
@@ -79,11 +79,11 @@ cc_library_ydf(
         ":decision_tree_cc_proto",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "//yggdrasil_decision_forests/learner:abstract_learner",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:hyper_parameters",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",

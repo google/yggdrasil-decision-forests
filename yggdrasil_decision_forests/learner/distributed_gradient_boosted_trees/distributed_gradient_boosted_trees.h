@@ -43,6 +43,7 @@
 #include <memory>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -55,7 +56,6 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 
 namespace yggdrasil_decision_forests {
@@ -77,12 +77,12 @@ class DistributedGradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamForceNumericalDiscretization[] =
       "force_numerical_discretization";
 
-  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override;
 
-  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path) const override;
@@ -90,7 +90,7 @@ class DistributedGradientBoostedTreesLearner : public AbstractLearner {
   absl::Status SetHyperParametersImpl(
       utils::GenericHyperParameterConsumer* generic_hyper_params) override;
 
-  utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+  absl::StatusOr<model::proto::GenericHyperParameterSpecification>
   GetGenericHyperParameterSpecification() const override;
 
   model::proto::LearnerCapabilities Capabilities() const override;
@@ -218,7 +218,7 @@ class PartialEvaluationAggregator {
   // Retrives a full evaluation. Fails if the evaluation cannot be fulled build
   // i.e. if there are less than "num_fragments" evaluations with the requested
   // "iter_idx".
-  utils::StatusOr<proto::Evaluation> GetAggregated(const int iter_idx) const;
+  absl::StatusOr<proto::Evaluation> GetAggregated(const int iter_idx) const;
 
   // The aggregator can receive evaluations.
   bool Active() const { return data_.num_fragments() > 0; }
@@ -259,7 +259,7 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
     const dataset::proto::DataSpecification& data_spec);
 
 // Initiliaze the model for training.
-utils::StatusOr<
+absl::StatusOr<
     std::unique_ptr<gradient_boosted_trees::GradientBoostedTreesModel>>
 InitializeModel(
     const model::proto::TrainingConfig& config,
@@ -269,7 +269,7 @@ InitializeModel(
     const gradient_boosted_trees::AbstractLoss& loss);
 
 // Train the model from a dataset cache.
-utils::StatusOr<
+absl::StatusOr<
     std::unique_ptr<gradient_boosted_trees::GradientBoostedTreesModel>>
 TrainWithCache(
     const model::proto::DeploymentConfig& deployment,
@@ -338,7 +338,7 @@ std::string TrainingLog(
 
 absl::Status InitializeDirectoryStructure(absl::string_view work_directory);
 
-utils::StatusOr<std::unique_ptr<distribute::AbstractManager>>
+absl::StatusOr<std::unique_ptr<distribute::AbstractManager>>
 InitializeDistributionManager(
     const model::proto::DeploymentConfig& deployment,
     const model::proto::TrainingConfig& config,
@@ -353,7 +353,7 @@ InitializeDistributionManager(
 // {stage_name} work. All these functions are blocking. See "worker.proto" for
 // the definition of the stages.
 
-utils::StatusOr<decision_tree::proto::LabelStatistics> EmitGetLabelStatistics(
+absl::StatusOr<decision_tree::proto::LabelStatistics> EmitGetLabelStatistics(
     distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
     distributed_decision_tree::LoadBalancer* load_balancer);
 
@@ -362,13 +362,13 @@ absl::Status EmitSetInitialPredictions(
     distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
     distributed_decision_tree::LoadBalancer* load_balancer);
 
-utils::StatusOr<std::vector<decision_tree::proto::LabelStatistics>>
+absl::StatusOr<std::vector<decision_tree::proto::LabelStatistics>>
 EmitStartNewIter(int iter_idx, utils::RandomEngine::result_type seed,
                  distribute::AbstractManager* distribute,
                  internal::Monitoring* monitoring,
                  distributed_decision_tree::LoadBalancer* load_balancer);
 
-utils::StatusOr<std::vector<distributed_decision_tree::SplitPerOpenNode>>
+absl::StatusOr<std::vector<distributed_decision_tree::SplitPerOpenNode>>
 EmitFindSplits(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const std::vector<int>& features, const WeakModels& weak_models,
@@ -425,7 +425,7 @@ absl::Status SetLoadBalancingRequest(
 // Computes the list of active workers (i.e. workers having a job to do) and the
 // features they have to check. Returns a mapping worker_idx -> weak_model_idx
 // -> split_idx.
-utils::StatusOr<WorkersToFeaturesMap> BuildActiveWorkers(
+absl::StatusOr<WorkersToFeaturesMap> BuildActiveWorkers(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models,
     const distributed_decision_tree::LoadBalancer& load_balancer,
@@ -440,7 +440,7 @@ struct ActiveFeature {
   std::vector<Item> splits;
 };
 typedef absl::flat_hash_map<int, ActiveFeature> ActiveFeaturesMap;
-utils::StatusOr<ActiveFeaturesMap> ActiveFeatures(
+absl::StatusOr<ActiveFeaturesMap> ActiveFeatures(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models);
 
@@ -477,7 +477,7 @@ absl::Status DivideWorkers(int num_all_workers,
                            int* num_train_workers, int* num_eval_workers);
 
 // Splits the validation dataset among the evaluation workers.
-utils::StatusOr<std::vector<ValidationDataset>> DivideValidationDataset(
+absl::StatusOr<std::vector<ValidationDataset>> DivideValidationDataset(
     const absl::string_view typed_path, const int num_workers);
 
 }  // namespace internal

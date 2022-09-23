@@ -21,9 +21,9 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -53,7 +53,7 @@ class GenericHyperParameterConsumer {
 };
 
 // Tests if the default value of a field satisfy a condition.
-utils::StatusOr<bool> SatisfyDefaultCondition(
+absl::StatusOr<bool> SatisfyDefaultCondition(
     const model::proto::GenericHyperParameterSpecification::Value& value,
     const model::proto::GenericHyperParameterSpecification::Conditional&
         condition);

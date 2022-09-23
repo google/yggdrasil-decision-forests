@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
@@ -38,7 +39,6 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -74,7 +74,7 @@ class RandomForestLearner : public AbstractLearner {
   static constexpr char kHParamSamplingWithReplacement[] =
       "sampling_with_replacement";
 
-  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override;
@@ -90,10 +90,10 @@ class RandomForestLearner : public AbstractLearner {
   absl::Status SetHyperParametersImpl(
       utils::GenericHyperParameterConsumer* generic_hyper_params) override;
 
-  utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+  absl::StatusOr<model::proto::GenericHyperParameterSpecification>
   GetGenericHyperParameterSpecification() const override;
 
-  utils::StatusOr<model::proto::HyperParameterSpace>
+  absl::StatusOr<model::proto::HyperParameterSpace>
   PredefinedHyperParameterSpace() const override;
 
   std::vector<model::proto::PredefinedHyperParameterTemplate>
@@ -154,7 +154,7 @@ void UpdateOOBPredictionsWithNewTree(
 
 // Evaluates the OOB predictions. Examples without any tree predictions are
 // skipped.
-utils::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
+absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
     int uplift_treatment_col_idx,

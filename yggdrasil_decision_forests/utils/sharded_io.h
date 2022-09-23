@@ -22,9 +22,9 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -66,7 +66,7 @@ class ShardedReader : public ProtoReaderInterface<T> {
 
   // Try to retrieve the next available value. If no more value are
   // available, returns false.
-  utils::StatusOr<bool> Next(T* value);
+  absl::StatusOr<bool> Next(T* value);
 
  protected:
   // Start reading a given file (i.e. not a sharded path).
@@ -74,12 +74,12 @@ class ShardedReader : public ProtoReaderInterface<T> {
 
   // Try to retive the next available example in the last file open with
   // "OpenShard". Returns false if no more examples are available.
-  virtual utils::StatusOr<bool> NextInShard(T* value) = 0;
+  virtual absl::StatusOr<bool> NextInShard(T* value) = 0;
 
  private:
   // Try to open the next file in "paths_". If all files have been read, returns
   // false.
-  utils::StatusOr<bool> OpenNextShard();
+  absl::StatusOr<bool> OpenNextShard();
 
   // List of files to read.
   std::vector<std::string> paths_;
@@ -187,7 +187,7 @@ absl::Status ShardedReader<T>::Open(const std::vector<std::string>& paths) {
 }
 
 template <typename T>
-utils::StatusOr<bool> ShardedReader<T>::Next(T* value) {
+absl::StatusOr<bool> ShardedReader<T>::Next(T* value) {
   bool has_next_shard;
   do {
     ASSIGN_OR_RETURN(bool has_next, NextInShard(value));
@@ -200,7 +200,7 @@ utils::StatusOr<bool> ShardedReader<T>::Next(T* value) {
 }
 
 template <typename T>
-utils::StatusOr<bool> ShardedReader<T>::OpenNextShard() {
+absl::StatusOr<bool> ShardedReader<T>::OpenNextShard() {
   cur_path_idx_++;
   if (cur_path_idx_ >= paths_.size()) {
     return false;

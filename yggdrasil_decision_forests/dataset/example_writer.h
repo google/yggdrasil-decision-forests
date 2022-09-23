@@ -35,13 +35,11 @@
 
 #include <memory>
 
-#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
-#include "yggdrasil_decision_forests/utils/filesystem.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -49,7 +47,7 @@ namespace dataset {
 // Creates a stream writer of proto::Example from any of the supported dataset
 // output formats. If num_records_by_shard==-1, all the examples are written in
 // the first shard.
-utils::StatusOr<std::unique_ptr<ExampleWriterInterface>> CreateExampleWriter(
+absl::StatusOr<std::unique_ptr<ExampleWriterInterface>> CreateExampleWriter(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
     int64_t num_records_by_shard = -1);
 

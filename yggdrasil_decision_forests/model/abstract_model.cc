@@ -28,6 +28,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
@@ -50,7 +51,6 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
@@ -133,7 +133,7 @@ metric::proto::EvaluationResults AbstractModel::Evaluate(
   return EvaluateWithStatus(typed_path, option, rnd).value();
 }
 
-utils::StatusOr<metric::proto::EvaluationResults>
+absl::StatusOr<metric::proto::EvaluationResults>
 AbstractModel::EvaluateWithStatus(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
@@ -148,7 +148,7 @@ AbstractModel::EvaluateWithStatus(
   return eval;
 }
 
-utils::StatusOr<metric::proto::EvaluationResults>
+absl::StatusOr<metric::proto::EvaluationResults>
 AbstractModel::EvaluateWithStatus(
     const absl::string_view typed_path,
     const metric::proto::EvaluationOptions& option,
@@ -163,7 +163,7 @@ AbstractModel::EvaluateWithStatus(
   return eval;
 }
 
-utils::StatusOr<metric::proto::EvaluationResults>
+absl::StatusOr<metric::proto::EvaluationResults>
 AbstractModel::EvaluateOverrideType(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option,
@@ -939,7 +939,7 @@ absl::Status AbstractModel::PrecomputeVariableImportances(
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::vector<proto::VariableImportance>>
+absl::StatusOr<std::vector<proto::VariableImportance>>
 AbstractModel::GetVariableImportance(absl::string_view key) const {
   const auto vi_it = precomputed_variable_importances_.find(key);
   if (vi_it == precomputed_variable_importances_.end()) {
@@ -1243,7 +1243,7 @@ AbstractModel::ListCompatibleFastEngines() const {
   return compatible_engines;
 }
 
-utils::StatusOr<std::unique_ptr<serving::FastEngine>>
+absl::StatusOr<std::unique_ptr<serving::FastEngine>>
 AbstractModel::BuildFastEngine() const {
   if (!allow_fast_engine_) {
     return absl::NotFoundError("allow_fast_engine is set to false.");

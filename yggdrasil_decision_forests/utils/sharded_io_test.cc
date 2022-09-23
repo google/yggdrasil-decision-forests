@@ -21,9 +21,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
@@ -47,7 +47,7 @@ TEST(ShardedIO, ShardedReader) {
       next_value_ = 0;
       return absl::OkStatus();
     }
-    utils::StatusOr<bool> NextInShard(std::string* value) override {
+    absl::StatusOr<bool> NextInShard(std::string* value) override {
       if (next_value_ == 2) {
         return false;
       }

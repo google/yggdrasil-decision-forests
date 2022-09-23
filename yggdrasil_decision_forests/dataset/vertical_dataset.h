@@ -35,12 +35,12 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -612,7 +612,7 @@ class VerticalDataset {
   // The ownership of the column array is not transferred, don't delete the
   // column.
   template <typename T>
-  utils::StatusOr<const T*> ColumnWithCastWithStatus(int col) const;
+  absl::StatusOr<const T*> ColumnWithCastWithStatus(int col) const;
 
   // TODO: Fix
   template <typename T>
@@ -634,7 +634,7 @@ class VerticalDataset {
   // Retrieve and cast a column to the specified class. Fails if the type is not
   // compatible.
   template <typename T>
-  utils::StatusOr<T*> MutableColumnWithCastWithStatus(int col);
+  absl::StatusOr<T*> MutableColumnWithCastWithStatus(int col);
 
   // TODO: Fix
   template <typename T>
@@ -659,14 +659,14 @@ class VerticalDataset {
 
   // Extract a subset of observations from the dataset.
   template <typename T>
-  utils::StatusOr<VerticalDataset> Extract(const std::vector<T>& indices) const;
+  absl::StatusOr<VerticalDataset> Extract(const std::vector<T>& indices) const;
 
   // Copy the dataset while changing its dataspec.
   // When a column is present in the new dataspec but not in the old one:
   //   If this column is present in "required_column_idxs", an error is raised.
   //   If this column is not present in "required_column_idxs", the column is
   //   created and filled with "NA" values.
-  utils::StatusOr<VerticalDataset> ConvertToGivenDataspec(
+  absl::StatusOr<VerticalDataset> ConvertToGivenDataspec(
       const proto::DataSpecification& new_data_spec,
       const std::vector<int>& required_column_idxs) const;
 
@@ -682,13 +682,13 @@ class VerticalDataset {
   absl::Status CreateColumnsFromDataspec();
 
   // Add and initialize a new column to the dataspec.
-  utils::StatusOr<AbstractColumn*> AddColumn(const proto::Column& column_spec);
+  absl::StatusOr<AbstractColumn*> AddColumn(const proto::Column& column_spec);
 
-  utils::StatusOr<proto::Column*> AddColumn(const absl::string_view name,
-                                            const proto::ColumnType type);
+  absl::StatusOr<proto::Column*> AddColumn(const absl::string_view name,
+                                           const proto::ColumnType type);
 
   // Similar to "AddColumn", but replace an existing column.
-  utils::StatusOr<AbstractColumn*> ReplaceColumn(
+  absl::StatusOr<AbstractColumn*> ReplaceColumn(
       int column_idx, const proto::Column& column_spec);
 
   // Add a new column to the list of columns. The dataset takes ownership of the
@@ -778,7 +778,7 @@ void MapExampleToProtoExample(
 
 // Reverse of "MapExampleToProtoExample". Convert an example into a map of
 // example representations.
-utils::StatusOr<std::unordered_map<std::string, std::string>>
+absl::StatusOr<std::unordered_map<std::string, std::string>>
 ProtoExampleToMapExample(const proto::Example& src,
                          const proto::DataSpecification& data_spec);
 
@@ -892,7 +892,7 @@ absl::Status VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
 }
 
 template <typename T>
-utils::StatusOr<const T*> VerticalDataset::ColumnWithCastWithStatus(
+absl::StatusOr<const T*> VerticalDataset::ColumnWithCastWithStatus(
     int col) const {
   static_assert(std::is_base_of<AbstractColumn, T>::value,
                 "The template class argument does not derive AbstractColumn.");
@@ -930,7 +930,7 @@ const T* VerticalDataset::ColumnWithCastOrNull(int col) const {
 }
 
 template <typename T>
-utils::StatusOr<T*> VerticalDataset::MutableColumnWithCastWithStatus(int col) {
+absl::StatusOr<T*> VerticalDataset::MutableColumnWithCastWithStatus(int col) {
   static_assert(std::is_base_of<AbstractColumn, T>::value,
                 "The template class argument does not derive  AbstractColumn.");
   auto* abstract_column = mutable_column(col);
@@ -959,7 +959,7 @@ T* VerticalDataset::MutableColumnWithCastOrNull(int col) {
 }
 
 template <typename T>
-utils::StatusOr<VerticalDataset> VerticalDataset::Extract(
+absl::StatusOr<VerticalDataset> VerticalDataset::Extract(
     const std::vector<T>& indices) const {
   VerticalDataset dst;
   dst.data_spec_ = data_spec_;

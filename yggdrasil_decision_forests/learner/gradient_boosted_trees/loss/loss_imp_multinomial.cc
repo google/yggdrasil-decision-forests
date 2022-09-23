@@ -25,6 +25,7 @@
 #include "absl/container/fixed_array.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -56,7 +57,7 @@ absl::Status MultinomialLogLikelihoodLoss::Status() const {
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::vector<float>>
+absl::StatusOr<std::vector<float>>
 MultinomialLogLikelihoodLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     const std::vector<float>& weights) const {
@@ -68,7 +69,7 @@ MultinomialLogLikelihoodLoss::InitialPredictions(
   return std::vector<float>(dimension_, 0);
 }
 
-utils::StatusOr<std::vector<float>>
+absl::StatusOr<std::vector<float>>
 MultinomialLogLikelihoodLoss::InitialPredictions(
     const decision_tree::proto::LabelStatistics& label_statistics) const {
   return std::vector<float>(dimension_, 0);

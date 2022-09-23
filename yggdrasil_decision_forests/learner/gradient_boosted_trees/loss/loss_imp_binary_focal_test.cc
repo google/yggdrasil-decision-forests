@@ -37,7 +37,7 @@ using ::testing::SizeIs;
 // Margin of error for numerical tests.
 constexpr float kTestPrecision = 0.000001f;
 
-utils::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
+absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   dataset::VerticalDataset dataset;
   // TODO Replace by a modern function when possible.
   *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(

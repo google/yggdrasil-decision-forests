@@ -39,7 +39,7 @@ class TFRecordShardedReader : public ShardedReader<T> {
  public:
   TFRecordShardedReader() = default;
   absl::Status OpenShard(absl::string_view path) override;
-  utils::StatusOr<bool> NextInShard(T* example) override;
+  absl::StatusOr<bool> NextInShard(T* example) override;
 
  private:
   std::unique_ptr<tensorflow::io::SequentialRecordReader> reader_;
@@ -80,7 +80,7 @@ absl::Status TFRecordShardedReader<T>::OpenShard(const absl::string_view path) {
 }
 
 template <typename T>
-utils::StatusOr<bool> TFRecordShardedReader<T>::NextInShard(T* example) {
+absl::StatusOr<bool> TFRecordShardedReader<T>::NextInShard(T* example) {
   const auto tf_status = reader_->ReadRecord(&buffer_);
   if (tf_status.ok()) {
     // Valid example.

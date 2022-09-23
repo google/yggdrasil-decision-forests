@@ -18,6 +18,7 @@ cc_library_ydf(
     ],
     deps = [
         ":tf_example",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:optional",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
@@ -49,6 +50,7 @@ cc_library_ydf(
     srcs = ["tf_example.cc"],
     hdrs = ["tf_example.h"],
     deps = [
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings:str_format",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
@@ -114,6 +116,7 @@ cc_test(
     deps = [
         ":tf_example_io_interface",
         ":tf_example_io_tfrecord",
+        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_writer",

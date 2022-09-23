@@ -71,6 +71,7 @@ cc_library_ydf(
         ":abstract_learner_cc_proto",
         ":types",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:optional",
@@ -127,8 +128,8 @@ cc_library_ydf(
         ":abstract_learner",
         ":abstract_learner_cc_proto",
         ":learner_library",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:status_macros",
     ],
 )

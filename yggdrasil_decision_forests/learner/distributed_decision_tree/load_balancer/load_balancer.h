@@ -58,10 +58,10 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_LOAD_BALANCER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_LOAD_BALANCER_H_
 
+#include "absl/status/statusor.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
@@ -98,17 +98,17 @@ class LoadBalancer {
   };
 
   // Initialize the load balancer.
-  static utils::StatusOr<LoadBalancer> Create(
+  static absl::StatusOr<LoadBalancer> Create(
       const std::vector<int>& features, int num_workers,
       const dataset_cache::proto::CacheMetadata& cache_metadata,
       const proto::LoadBalancerOptions& options);
 
   // Gets the index of the workers currently owning a given feature.
-  utils::StatusOr<int> FeatureOwner(int feature) const;
+  absl::StatusOr<int> FeatureOwner(int feature) const;
 
   // Adds a new work time measurement. Possibly, triggers the dynamic
   // balancing of the features and propose some pending changes (return true).
-  utils::StatusOr<bool> AddWorkDurationMeasurement(
+  absl::StatusOr<bool> AddWorkDurationMeasurement(
       const std::vector<Measure>& measure_per_workers);
 
   // Adds a new feature loading time measurement. At least one measure of
@@ -164,7 +164,7 @@ class LoadBalancer {
   // round, the 10 workers than now have the evaluation split (the original
   // worker and the 9 new ones) will share it to the remaining 90 workers (9
   // output communication for each).
-  utils::StatusOr<proto::SplitSharingPlan> MakeSplitSharingPlan(
+  absl::StatusOr<proto::SplitSharingPlan> MakeSplitSharingPlan(
       const std::vector<int>& feature_idxs);
 
  private:
@@ -227,10 +227,10 @@ class LoadBalancer {
   absl::Status CreateRandomBalancingOrders();
 
   // Estimate the time is takes for a worker to load a new feature.
-  utils::StatusOr<double> EstimateFeatureLoadingTime() const;
+  absl::StatusOr<double> EstimateFeatureLoadingTime() const;
 
   // Relative cost of each feature.
-  utils::StatusOr<double> CostPerFeatureType(
+  absl::StatusOr<double> CostPerFeatureType(
       int feature, const dataset_cache::proto::CacheMetadata& cache_metadata);
 
   int GetWorstCandidateWallTime(

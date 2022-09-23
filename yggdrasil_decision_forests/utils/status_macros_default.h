@@ -40,13 +40,13 @@
 #define TOKEN_PASTE(x, y) x##y
 #define CONCATENATE(x, y) TOKEN_PASTE(x, y)
 
-// Evaluates an expression returning a utils::StatusOr. Returns with the status
+// Evaluates an expression returning a absl::StatusOr. Returns with the status
 // if the status is not "OK". Move the value to "lhs" and continue the execution
 // otherwise.
 //
 // Usage example:
 //   absl::Status f() {
-//     auto g = []() -> utils::StatusOr<int> { ... };
+//     auto g = []() -> absl::StatusOr<int> { ... };
 //     ASSIGN_OR_RETURN(const auto x, g());
 //     return absl::OKStatus();
 //   }
@@ -55,7 +55,7 @@
 //
 // Usage example:
 //   absl::Status f() {
-//     auto g = []() -> utils::StatusOr<int> { ... };
+//     auto g = []() -> absl::StatusOr<int> { ... };
 //     ASSIGN_OR_RETURN(const auto x, g(), _  << "Extra information");
 //     return absl::OKStatus();
 //   }

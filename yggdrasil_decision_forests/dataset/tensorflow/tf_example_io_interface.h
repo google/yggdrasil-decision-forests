@@ -46,6 +46,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "tensorflow/core/example/example.pb.h"
 #include "tensorflow/core/example/feature.pb.h"
@@ -54,7 +55,6 @@
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 
@@ -80,11 +80,11 @@ REGISTRATION_CREATE_POOL(AbstractTFExampleWriter);
   REGISTRATION_REGISTER_CLASS(name, key, AbstractTFExampleWriter)
 
 // Creates a tf.example read from a type sharded path.
-utils::StatusOr<std::unique_ptr<AbstractTFExampleReader>> CreateTFExampleReader(
+absl::StatusOr<std::unique_ptr<AbstractTFExampleReader>> CreateTFExampleReader(
     absl::string_view typed_path);
 
 // Creates a tf.example writer from a type sharded path.
-utils::StatusOr<std::unique_ptr<AbstractTFExampleWriter>> CreateTFExampleWriter(
+absl::StatusOr<std::unique_ptr<AbstractTFExampleWriter>> CreateTFExampleWriter(
     absl::string_view typed_path, int64_t num_records_by_shard);
 
 // Wrapper around a TFExampleReader with the signature of an Example reader.
@@ -100,7 +100,7 @@ class TFExampleReaderToExampleReader : public ExampleReaderInterface {
 
   absl::Status Open(absl::string_view sharded_path) override;
 
-  utils::StatusOr<bool> Next(proto::Example* example) override;
+  absl::StatusOr<bool> Next(proto::Example* example) override;
 
  private:
   std::unique_ptr<AbstractTFExampleReader> tf_reader_;
@@ -125,7 +125,7 @@ class TFExampleReaderToDataSpecCreator : public AbstractDataSpecCreator {
       proto::DataSpecification* data_spec,
       proto::DataSpecificationAccumulator* accumulator) override;
 
-  utils::StatusOr<int64_t> CountExamples(absl::string_view path) override;
+  absl::StatusOr<int64_t> CountExamples(absl::string_view path) override;
 };
 
 // Example writer made as a wrapper around a tf.Example writer.

@@ -60,7 +60,7 @@ std::string MarkDownInTable(std::string content) {
 
 }  // namespace
 
-utils::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
+absl::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
     std::vector<std::string> learners,
     const DocumentationUrlFunctor& gen_doc_url,
     const std::vector<std::string>& ordering) {
@@ -114,7 +114,7 @@ utils::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
   return content;
 }
 
-utils::StatusOr<std::string> ExportHParamSpecToMarkdown(
+absl::StatusOr<std::string> ExportHParamSpecToMarkdown(
     absl::string_view learner_key,
     const proto::GenericHyperParameterSpecification& hparams,
     const std::vector<proto::PredefinedHyperParameterTemplate>& templates,

@@ -52,7 +52,7 @@ DistributedGradientBoostedTreesLearner::Capabilities() const {
   return capabilities;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 DistributedGradientBoostedTreesLearner::TrainWithStatus(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
@@ -112,7 +112,7 @@ absl::Status DistributedGradientBoostedTreesLearner::SetHyperParametersImpl(
   return absl::OkStatus();
 }
 
-utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+absl::StatusOr<model::proto::GenericHyperParameterSpecification>
 DistributedGradientBoostedTreesLearner::GetGenericHyperParameterSpecification()
     const {
   ASSIGN_OR_RETURN(auto hparam_def,
@@ -197,7 +197,7 @@ DistributedGradientBoostedTreesLearner::GetGenericHyperParameterSpecification()
   return hparam_def;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 DistributedGradientBoostedTreesLearner::TrainWithStatus(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
@@ -374,7 +374,7 @@ absl::Status CreateDatasetCache(
   return absl::OkStatus();
 }
 
-utils::StatusOr<
+absl::StatusOr<
     std::unique_ptr<gradient_boosted_trees::GradientBoostedTreesModel>>
 TrainWithCache(
     const model::proto::DeploymentConfig& deployment,
@@ -807,7 +807,7 @@ absl::Status RunIteration(
   return absl::OkStatus();
 }
 
-utils::StatusOr<
+absl::StatusOr<
     std::unique_ptr<gradient_boosted_trees::GradientBoostedTreesModel>>
 InitializeModel(
     const model::proto::TrainingConfig& config,
@@ -939,7 +939,7 @@ bool ShouldCreateCheckpoint(
   return false;
 }
 
-utils::StatusOr<std::unique_ptr<distribute::AbstractManager>>
+absl::StatusOr<std::unique_ptr<distribute::AbstractManager>>
 InitializeDistributionManager(
     const model::proto::DeploymentConfig& deployment,
     const model::proto::TrainingConfig& config,
@@ -977,7 +977,7 @@ InitializeDistributionManager(
       /*parallel_execution_per_worker=*/10);
 }
 
-utils::StatusOr<decision_tree::proto::LabelStatistics> EmitGetLabelStatistics(
+absl::StatusOr<decision_tree::proto::LabelStatistics> EmitGetLabelStatistics(
     distribute::AbstractManager* distribute, internal::Monitoring* monitoring,
     distributed_decision_tree::LoadBalancer* load_balancer) {
   monitoring->BeginStage(internal::Monitoring::kGetLabelStatistics);
@@ -1028,7 +1028,7 @@ absl::Status EmitSetInitialPredictions(
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::vector<decision_tree::proto::LabelStatistics>>
+absl::StatusOr<std::vector<decision_tree::proto::LabelStatistics>>
 EmitStartNewIter(const int iter_idx,
                  const utils::RandomEngine::result_type seed,
                  distribute::AbstractManager* distribute,
@@ -1076,7 +1076,7 @@ EmitStartNewIter(const int iter_idx,
   return root_label_statistics;
 }
 
-utils::StatusOr<std::vector<distributed_decision_tree::SplitPerOpenNode>>
+absl::StatusOr<std::vector<distributed_decision_tree::SplitPerOpenNode>>
 EmitFindSplits(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const std::vector<int>& features, const WeakModels& weak_models,
@@ -1715,7 +1715,7 @@ absl::Status ExactSampledFeaturesForWorker(
   return absl::OkStatus();
 }
 
-utils::StatusOr<ActiveFeaturesMap> ActiveFeatures(
+absl::StatusOr<ActiveFeaturesMap> ActiveFeatures(
     const std::vector<distributed_decision_tree::SplitPerOpenNode>&
         splits_per_weak_models) {
   ActiveFeaturesMap active_features;
@@ -1929,7 +1929,7 @@ absl::Status DivideWorkers(const int num_all_workers,
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::vector<ValidationDataset>> DivideValidationDataset(
+absl::StatusOr<std::vector<ValidationDataset>> DivideValidationDataset(
     const absl::string_view typed_path, const int num_workers) {
   DCHECK_GT(num_workers, 0);
 
@@ -2006,7 +2006,7 @@ absl::Status PartialEvaluationAggregator::AddPartial(
   return absl::OkStatus();
 }
 
-utils::StatusOr<proto::Evaluation> PartialEvaluationAggregator::GetAggregated(
+absl::StatusOr<proto::Evaluation> PartialEvaluationAggregator::GetAggregated(
     const int iter_idx) const {
   const auto it = data_.items().find(iter_idx);
   if (it == data_.items().end()) {

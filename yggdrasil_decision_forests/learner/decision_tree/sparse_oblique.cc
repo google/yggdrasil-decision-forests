@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "src/google/protobuf/repeated_field.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -33,7 +34,6 @@
 #include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
@@ -232,7 +232,7 @@ int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
 }
 
 template <typename LabelStats>
-utils::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
+absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -340,7 +340,7 @@ utils::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
   return false;
 }
 
-utils::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -358,7 +358,7 @@ utils::StatusOr<bool> FindBestConditionSparseOblique(
       best_condition, random, cache);
 }
 
-utils::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -376,7 +376,7 @@ utils::StatusOr<bool> FindBestConditionSparseOblique(
       best_condition, random, cache);
 }
 
-utils::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,

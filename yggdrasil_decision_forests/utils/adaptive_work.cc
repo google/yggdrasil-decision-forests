@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"

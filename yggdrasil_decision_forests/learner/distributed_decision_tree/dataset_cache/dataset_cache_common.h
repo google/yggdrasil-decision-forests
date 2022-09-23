@@ -18,9 +18,9 @@
 
 #include <string>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/learner/types.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -136,7 +136,7 @@ float DiscretizedNumericalToNumerical(const std::vector<float>& boundaries,
 // "value_and_example_idxs".
 //
 // "value_and_example_idxs" needs to be sorted according to the float value.
-utils::StatusOr<std::vector<float>>
+absl::StatusOr<std::vector<float>>
 ExtractDiscretizedBoundariesWithoutDownsampling(
     const std::vector<std::pair<float, model::SignedExampleIdx>>&
         value_and_example_idxs,
@@ -150,8 +150,7 @@ ExtractDiscretizedBoundariesWithoutDownsampling(
 // quantiles).
 //
 // "value_and_example_idxs" needs to be sorted according to the float value.
-utils::StatusOr<std::vector<float>>
-ExtractDiscretizedBoundariesWithDownsampling(
+absl::StatusOr<std::vector<float>> ExtractDiscretizedBoundariesWithDownsampling(
     const std::vector<std::pair<float, model::SignedExampleIdx>>&
         value_and_example_idxs,
     int64_t num_unique_values, int64_t num_discretized_values);

@@ -237,12 +237,12 @@ class AbstractLabelAccessor {
   virtual ~AbstractLabelAccessor() = default;
 
   // Classification.
-  virtual utils::StatusOr<ClassificationLabelFiller>
+  virtual absl::StatusOr<ClassificationLabelFiller>
   CreateClassificationLabelFiller() const {
     return absl::InternalError(
         "CreateClassificationLabelFiller not implemented");
   }
-  virtual utils::StatusOr<ClassificationLabelFiller::AccumulatorInitializer>
+  virtual absl::StatusOr<ClassificationLabelFiller::AccumulatorInitializer>
   CreateClassificationAccumulatorInitializer(
       const decision_tree::proto::LabelStatistics& statistics) const {
     return absl::InternalError(
@@ -250,11 +250,11 @@ class AbstractLabelAccessor {
   }
 
   // Regression.
-  virtual utils::StatusOr<RegressionLabelFiller> CreateRegressionLabelFiller()
+  virtual absl::StatusOr<RegressionLabelFiller> CreateRegressionLabelFiller()
       const {
     return absl::InternalError("CreateRegressionLabelFiller not implemented");
   }
-  virtual utils::StatusOr<RegressionLabelFiller::AccumulatorInitializer>
+  virtual absl::StatusOr<RegressionLabelFiller::AccumulatorInitializer>
   CreateRegressionAccumulatorInitializer(
       const decision_tree::proto::LabelStatistics& statistics) const {
     return absl::InternalError(
@@ -262,12 +262,12 @@ class AbstractLabelAccessor {
   }
 
   // Regression with hessian information
-  virtual utils::StatusOr<RegressionWithHessianLabelFiller>
+  virtual absl::StatusOr<RegressionWithHessianLabelFiller>
   CreateRegressionWithHessianLabelFiller() const {
     return absl::InternalError(
         "CreateRegressionWithHessianLabelFiller not implemented");
   }
-  virtual utils::StatusOr<
+  virtual absl::StatusOr<
       RegressionWithHessianLabelFiller::AccumulatorInitializer>
   CreateRegressionWithHessianAccumulatorInitializer(
       const decision_tree::proto::LabelStatistics& statistics) const {
@@ -283,12 +283,12 @@ class ClassificationLabelAccessor : public AbstractLabelAccessor {
       const std::vector<float>& weights, const int num_classes)
       : labels_(labels), weights_(weights), num_classes_(num_classes) {}
 
-  utils::StatusOr<ClassificationLabelFiller> CreateClassificationLabelFiller()
+  absl::StatusOr<ClassificationLabelFiller> CreateClassificationLabelFiller()
       const override {
     return ClassificationLabelFiller(labels_, weights_, num_classes_);
   }
 
-  utils::StatusOr<ClassificationLabelFiller::AccumulatorInitializer>
+  absl::StatusOr<ClassificationLabelFiller::AccumulatorInitializer>
   CreateClassificationAccumulatorInitializer(
       const decision_tree::proto::LabelStatistics& statistics) const override {
     return ClassificationLabelFiller::AccumulatorInitializer(statistics);
@@ -307,12 +307,12 @@ class RegressionLabelAccessor : public AbstractLabelAccessor {
       const std::vector<float>& weights)
       : labels_(labels), weights_(weights) {}
 
-  utils::StatusOr<RegressionLabelFiller> CreateRegressionLabelFiller()
+  absl::StatusOr<RegressionLabelFiller> CreateRegressionLabelFiller()
       const override {
     return RegressionLabelFiller(labels_, weights_);
   }
 
-  utils::StatusOr<RegressionLabelFiller::AccumulatorInitializer>
+  absl::StatusOr<RegressionLabelFiller::AccumulatorInitializer>
   CreateRegressionAccumulatorInitializer(
       const decision_tree::proto::LabelStatistics& statistics) const override {
     return RegressionLabelFiller::AccumulatorInitializer(statistics);
@@ -330,12 +330,12 @@ class RegressionWithHessianLabelAccessor : public AbstractLabelAccessor {
                                      const std::vector<float>& weights)
       : labels_(gradients), hessians_(hessians), weights_(weights) {}
 
-  utils::StatusOr<RegressionWithHessianLabelFiller>
+  absl::StatusOr<RegressionWithHessianLabelFiller>
   CreateRegressionWithHessianLabelFiller() const override {
     return RegressionWithHessianLabelFiller(labels_, hessians_, weights_);
   }
 
-  utils::StatusOr<RegressionWithHessianLabelFiller::AccumulatorInitializer>
+  absl::StatusOr<RegressionWithHessianLabelFiller::AccumulatorInitializer>
   CreateRegressionWithHessianAccumulatorInitializer(
       const decision_tree::proto::LabelStatistics& statistics) const override {
     return RegressionWithHessianLabelFiller::AccumulatorInitializer(statistics);

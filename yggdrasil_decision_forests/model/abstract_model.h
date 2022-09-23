@@ -28,6 +28,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -40,7 +41,6 @@
 #include "yggdrasil_decision_forests/model/metadata.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
@@ -94,7 +94,7 @@ class AbstractModel {
   //
   // Because "BuildFastEngine" uses virtual calls, this solution is slower
   // than selecting directly the inference engine at compile time.
-  utils::StatusOr<std::unique_ptr<serving::FastEngine>> BuildFastEngine() const;
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> BuildFastEngine() const;
 
   // List the fast engines compatible with the model.
   std::vector<std::unique_ptr<FastEngineFactory>> ListCompatibleFastEngines()
@@ -193,7 +193,7 @@ class AbstractModel {
   // Evaluates the model on a dataset. Returns a finalized EvaluationResults.
   //
   // If specified, "predictions" will be populated with the predictions.
-  utils::StatusOr<metric::proto::EvaluationResults> EvaluateWithStatus(
+  absl::StatusOr<metric::proto::EvaluationResults> EvaluateWithStatus(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
       std::vector<model::proto::Prediction>* predictions = nullptr) const;
@@ -212,7 +212,7 @@ class AbstractModel {
   // Evaluates the model on a dataset. Returns a finalized EvaluationResults.
   // The random generator "rnd" is used boostrapping of confidence intervals and
   // sub-sampling evaluation (if configured in "option").
-  utils::StatusOr<metric::proto::EvaluationResults> EvaluateWithStatus(
+  absl::StatusOr<metric::proto::EvaluationResults> EvaluateWithStatus(
       const absl::string_view typed_path,
       const metric::proto::EvaluationOptions& option,
       utils::RandomEngine* rnd) const;
@@ -223,7 +223,7 @@ class AbstractModel {
       utils::RandomEngine* rnd) const;
 
   // Similar to "Evaluate", but allow to override the evaluation objective.
-  utils::StatusOr<metric::proto::EvaluationResults> EvaluateOverrideType(
+  absl::StatusOr<metric::proto::EvaluationResults> EvaluateOverrideType(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& option,
       const proto::Task override_task, const int override_label_col_idx,
@@ -330,7 +330,7 @@ class AbstractModel {
   // feature, it does not have to return a variable importance for this feature.
   //
   // When derived, this function should also call its parent implementation.
-  virtual utils::StatusOr<std::vector<proto::VariableImportance>>
+  virtual absl::StatusOr<std::vector<proto::VariableImportance>>
   GetVariableImportance(absl::string_view key) const;
 
   // Create a user readable description of all the variable importance metrics

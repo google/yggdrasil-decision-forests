@@ -135,7 +135,7 @@ void GRPCManager::Worker::StartThreads(int parallel_execution_per_worker,
       [this, manager]() { manager->ProcessGlobalQueries(this); });
 }
 
-utils::StatusOr<int> GRPCManager::NumWorkersInConfiguration(
+absl::StatusOr<int> GRPCManager::NumWorkersInConfiguration(
     const proto::Config& config) const {
   const auto& imp_config = config.GetExtension(proto::grpc);
   switch (imp_config.worker_address_case()) {
@@ -267,7 +267,7 @@ absl::Status GRPCManager::InitializeConfigFile(
   return absl::OkStatus();
 }
 
-utils::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
+absl::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
   if (verbosity_ >= 2) {
     LOG(INFO) << "Emitting blocking request of " << blob.size() << " bytes";
   }
@@ -333,7 +333,7 @@ absl::Status GRPCManager::AsynchronousRequest(Blob blob, int worker_idx) {
   return absl::OkStatus();
 }
 
-utils::StatusOr<Blob> GRPCManager::NextAsynchronousAnswer() {
+absl::StatusOr<Blob> GRPCManager::NextAsynchronousAnswer() {
   auto answer_or = async_pending_answers_.Pop();
   if (!answer_or.has_value()) {
     return absl::OutOfRangeError("No more results available");

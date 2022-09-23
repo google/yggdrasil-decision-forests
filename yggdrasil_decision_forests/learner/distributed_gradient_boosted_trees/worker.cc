@@ -154,7 +154,7 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
   return absl::OkStatus();
 }
 
-utils::StatusOr<distribute::Blob>
+absl::StatusOr<distribute::Blob>
 DistributedGradientBoostedTreesWorker::RunRequest(
     distribute::Blob serialized_request) {
   {
@@ -185,7 +185,7 @@ DistributedGradientBoostedTreesWorker::RunRequest(
   return status_or;
 }
 
-utils::StatusOr<distribute::Blob>
+absl::StatusOr<distribute::Blob>
 DistributedGradientBoostedTreesWorker::RunRequestImp(
     distribute::Blob serialized_request) {
   const auto begin = absl::Now();
@@ -732,7 +732,7 @@ absl::Status DistributedGradientBoostedTreesWorker::UpdateOwnedFeatures(
                                                features_to_unload);
 }
 
-utils::StatusOr<bool>
+absl::StatusOr<bool>
 DistributedGradientBoostedTreesWorker::PreloadFutureOwnedFeatures(
     const proto::WorkerRequest::FutureOwnedFeatures& future_owned_features) {
   const std::vector<int> load_features = {
@@ -1322,7 +1322,7 @@ absl::Status UpdateClosingNodesPredictions(
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::vector<std::vector<int>>> ExtractInputFeaturesPerNodes(
+absl::StatusOr<std::vector<std::vector<int>>> ExtractInputFeaturesPerNodes(
     const proto::WorkerRequest::FindSplits::FeaturePerNode& src) {
   const auto& request_features_per_node = src.features_per_node();
   std::vector<std::vector<int>> dst;

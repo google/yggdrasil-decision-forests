@@ -27,6 +27,7 @@ cc_library_ydf(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "//yggdrasil_decision_forests/dataset:data_spec",
@@ -55,8 +56,8 @@ cc_library_ydf(
     ],
     deps = [
         ":decision_tree_cc_proto",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:registration",
         "//yggdrasil_decision_forests/utils:sharded_io",
     ],

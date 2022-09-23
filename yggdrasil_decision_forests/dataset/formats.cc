@@ -20,12 +20,12 @@
 #include <utility>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
@@ -33,7 +33,7 @@ namespace dataset {
 
 using proto::DatasetFormat;
 
-utils::StatusOr<std::pair<std::string, std::string>> SplitTypeAndPath(
+absl::StatusOr<std::pair<std::string, std::string>> SplitTypeAndPath(
     const absl::string_view typed_path) {
   const int sep_pos = typed_path.find_first_of(':');
   if (sep_pos == -1) {
@@ -54,7 +54,7 @@ std::pair<std::string, proto::DatasetFormat> GetDatasetPathAndType(
   return GetDatasetPathAndTypeOrStatus(typed_path).value();
 }
 
-utils::StatusOr<std::pair<std::string, proto::DatasetFormat>>
+absl::StatusOr<std::pair<std::string, proto::DatasetFormat>>
 GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path) {
   std::string path, prefix;
   std::tie(prefix, path) = SplitTypeAndPath(typed_path).value();

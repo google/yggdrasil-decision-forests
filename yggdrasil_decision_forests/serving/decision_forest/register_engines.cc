@@ -17,6 +17,7 @@
 //
 #include "yggdrasil_decision_forests/serving/decision_forest/register_engines.h"
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
@@ -24,7 +25,6 @@
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended.h"
 #include "yggdrasil_decision_forests/serving/example_set_model_wrapper.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -168,7 +168,7 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
 
   std::vector<std::string> IsBetterThan() const override { return {}; }
 
-  utils::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
       const AbstractModel* const model) const override {
     auto* gbt_model = dynamic_cast<const SourceModel*>(model);
     if (!gbt_model) {
@@ -297,7 +297,7 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
             serving::gradient_boosted_trees::kOptPred};
   }
 
-  utils::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
       const AbstractModel* const model) const override {
     auto* gbt_model = dynamic_cast<const SourceModel*>(model);
     if (!gbt_model) {
@@ -402,7 +402,7 @@ class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
     return {serving::gradient_boosted_trees::kGeneric};
   }
 
-  utils::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
       const AbstractModel* const model) const override {
     auto* gbt_model = dynamic_cast<const SourceModel*>(model);
     if (!gbt_model) {
@@ -474,7 +474,7 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
 
   std::vector<std::string> IsBetterThan() const override { return {}; }
 
-  utils::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
       const AbstractModel* const model) const override {
     auto* rf_model = dynamic_cast<const SourceModel*>(model);
     if (!rf_model) {
@@ -634,7 +634,7 @@ class RandomForestOptPredFastEngineFactory : public model::FastEngineFactory {
     return {serving::random_forest::kGeneric};
   }
 
-  utils::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
       const AbstractModel* const model) const override {
     auto* rf_model = dynamic_cast<const SourceModel*>(model);
     if (!rf_model) {

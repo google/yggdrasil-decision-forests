@@ -1114,7 +1114,7 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
   return response;
 }
 
-utils::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -1160,7 +1160,7 @@ utils::StatusOr<bool> FindBestConditionSparseOblique(
   return false;
 }
 
-utils::StatusOr<bool> FindBestConditionSingleThreadManager(
+absl::StatusOr<bool> FindBestConditionSingleThreadManager(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -1277,7 +1277,7 @@ utils::StatusOr<bool> FindBestConditionSingleThreadManager(
   return found_good_condition;
 }
 
-utils::StatusOr<bool> FindBestConditionConcurrentManager(
+absl::StatusOr<bool> FindBestConditionConcurrentManager(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -1584,7 +1584,7 @@ utils::StatusOr<bool> FindBestConditionConcurrentManager(
   return false;
 }
 
-utils::StatusOr<bool> FindBestConditionManager(
+absl::StatusOr<bool> FindBestConditionManager(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -1606,7 +1606,7 @@ utils::StatusOr<bool> FindBestConditionManager(
       parent, internal_config, label_stats, best_condition, random, cache);
 }
 
-utils::StatusOr<bool> FindBestCondition(
+absl::StatusOr<bool> FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -4052,7 +4052,7 @@ absl::Status NodeTrain(
   return absl::OkStatus();
 }
 
-utils::StatusOr<Preprocessing> PreprocessTrainingDataset(
+absl::StatusOr<Preprocessing> PreprocessTrainingDataset(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,

@@ -31,7 +31,7 @@
 //     return absl::OkStatus();
 //   }
 //
-//   utils::StatusOr<Blob> RunRequest(Blob blob) override {
+//   absl::StatusOr<Blob> RunRequest(Blob blob) override {
 //     LOG(INFo) << "Processing " << blob;
 //     return "MyAnswer";
 //   }
@@ -83,14 +83,14 @@ namespace distribute {
 //     parallel. For example, If parallel_execution_per_worker=1, each worker
 //     will receive only one job at a time.
 //
-utils::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
+absl::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
     const proto::Config& config, absl::string_view worker_name,
     Blob welcome_blob, int parallel_execution_per_worker = 1);
 
 // Gets the number of workers available in a distribute configuration without
 // having to create the distribution manager. If a distribute manager is
 // available, use the "distribute->NumWorkers()" instead.
-utils::StatusOr<int> NumWorkers(const proto::Config& config);
+absl::StatusOr<int> NumWorkers(const proto::Config& config);
 
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

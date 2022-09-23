@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -30,7 +31,6 @@
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
@@ -61,7 +61,7 @@ absl::Status LoadVerticalDatasetSingleThread(
   std::size_t skipped_examples = 0;
 
   proto::Example example;
-  utils::StatusOr<bool> status;
+  absl::StatusOr<bool> status;
   while ((status = reader->Next(&example)).ok() && status.value()) {
     if (config.load_example.has_value() &&
         !config.load_example.value()(example)) {
@@ -95,7 +95,7 @@ struct BlockOfExamples {
 };
 
 // Reads a shard.
-utils::StatusOr<std::unique_ptr<BlockOfExamples>> LoadShard(
+absl::StatusOr<std::unique_ptr<BlockOfExamples>> LoadShard(
     const proto::DataSpecification& data_spec, const absl::string_view prefix,
     const absl::optional<std::vector<int>>& required_columns,
     const absl::string_view shard) {
@@ -104,7 +104,7 @@ utils::StatusOr<std::unique_ptr<BlockOfExamples>> LoadShard(
                    CreateExampleReader(absl::StrCat(prefix, ":", shard),
                                        data_spec, required_columns));
   auto* example = google::protobuf::Arena::CreateMessage<proto::Example>(&block->arena);
-  utils::StatusOr<bool> status;
+  absl::StatusOr<bool> status;
   while ((status = reader->Next(example)).ok() && status.value()) {
     block->examples.push_back(example);
     example = google::protobuf::Arena::CreateMessage<proto::Example>(&block->arena);
@@ -138,12 +138,12 @@ absl::Status LoadVerticalDataset(
 
   // Reads the examples in a shard.
   const auto load_shard = [&](const std::string shard)
-      -> utils::StatusOr<std::unique_ptr<BlockOfExamples>> {
+      -> absl::StatusOr<std::unique_ptr<BlockOfExamples>> {
     return LoadShard(data_spec, prefix, required_columns, shard);
   };
 
   utils::concurrency::StreamProcessor<
-      std::string, utils::StatusOr<std::unique_ptr<BlockOfExamples>>>
+      std::string, absl::StatusOr<std::unique_ptr<BlockOfExamples>>>
       processor("DatasetLoader",
                 std::min<int>(shards.size(), config.num_threads), load_shard,
                 /*result_in_order=*/true);

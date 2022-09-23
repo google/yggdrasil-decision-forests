@@ -25,6 +25,7 @@
 #include <memory>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -32,7 +33,6 @@
 #include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
 namespace yggdrasil_decision_forests {
@@ -49,7 +49,7 @@ class CartLearner : public AbstractLearner {
   // Generic hyper parameter names.
   static constexpr char kHParamValidationRatio[] = "validation_ratio";
 
-  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override;
@@ -59,11 +59,11 @@ class CartLearner : public AbstractLearner {
       utils::GenericHyperParameterConsumer* generic_hyper_params) override;
 
   // Gets the available generic hparams.
-  utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+  absl::StatusOr<model::proto::GenericHyperParameterSpecification>
   GetGenericHyperParameterSpecification() const override;
 
   // Pre-defined hyper-parameter space for hyper-parameter optimization.
-  utils::StatusOr<model::proto::HyperParameterSpace>
+  absl::StatusOr<model::proto::HyperParameterSpace>
   PredefinedHyperParameterSpace() const override;
 
   // Gets a description of what the learning algorithm can do.

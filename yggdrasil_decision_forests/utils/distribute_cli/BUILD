@@ -44,6 +44,7 @@ cc_library_ydf(
     deps = [
         ":common",
         ":distribute_cli_cc_proto",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/utils:filesystem",

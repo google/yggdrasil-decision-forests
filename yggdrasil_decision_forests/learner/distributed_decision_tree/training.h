@@ -132,7 +132,7 @@ typedef std::function<absl::Status(
 class TreeBuilder {
  public:
   // Creates a new builder.
-  static utils::StatusOr<std::unique_ptr<TreeBuilder>> Create(
+  static absl::StatusOr<std::unique_ptr<TreeBuilder>> Create(
       const model::proto::TrainingConfig& config,
       const model::proto::TrainingConfigLinking& config_link,
       const decision_tree::proto::DecisionTreeTrainingConfig& dt_config,
@@ -196,7 +196,7 @@ class TreeBuilder {
       utils::concurrency::BlockingCounter* counter, absl::Status* status) const;
 
   // Applies a list of splits (one for each open node) to the tree structure.
-  utils::StatusOr<NodeRemapping> ApplySplitToTree(
+  absl::StatusOr<NodeRemapping> ApplySplitToTree(
       const SplitPerOpenNode& splits);
 
   // Creates a remapping of example->node that will close all the open nodes.

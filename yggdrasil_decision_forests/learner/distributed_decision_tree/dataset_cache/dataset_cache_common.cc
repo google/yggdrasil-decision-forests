@@ -18,11 +18,11 @@
 #include <limits>
 
 #include "absl/numeric/bits.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 
 namespace yggdrasil_decision_forests {
@@ -108,7 +108,7 @@ DiscretizedIndexedNumericalType NumericalToDiscretizedNumerical(
   return std::distance(boundaries.begin(), it);
 }
 
-utils::StatusOr<std::vector<float>>
+absl::StatusOr<std::vector<float>>
 ExtractDiscretizedBoundariesWithoutDownsampling(
     const std::vector<std::pair<float, model::SignedExampleIdx>>&
         value_and_example_idxs,
@@ -138,8 +138,7 @@ ExtractDiscretizedBoundariesWithoutDownsampling(
   return boundaries;
 }
 
-utils::StatusOr<std::vector<float>>
-ExtractDiscretizedBoundariesWithDownsampling(
+absl::StatusOr<std::vector<float>> ExtractDiscretizedBoundariesWithDownsampling(
     const std::vector<std::pair<float, model::SignedExampleIdx>>&
         value_and_example_idxs,
     int64_t num_unique_values, int64_t num_discretized_values) {

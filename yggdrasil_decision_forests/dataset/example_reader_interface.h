@@ -21,10 +21,10 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
 
 namespace yggdrasil_decision_forests {
@@ -39,7 +39,7 @@ class ExampleReaderInterface {
 
   // Tries to retrieve the next available example. If no more examples are
   // available, returns false.
-  virtual utils::StatusOr<bool> Next(proto::Example* example) = 0;
+  virtual absl::StatusOr<bool> Next(proto::Example* example) = 0;
 };
 
 REGISTRATION_CREATE_POOL(ExampleReaderInterface,

@@ -25,10 +25,10 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
@@ -170,15 +170,13 @@ float DefaultRMSE(const proto::EvaluationResults& eval);
 float DefaultNDCG(const proto::EvaluationResults& eval);
 
 // Export a set of metrics from a model evaluation.
-utils::StatusOr<std::unordered_map<std::string, std::string>>
-ExtractFlatMetrics(absl::string_view model_name,
-                   const proto::EvaluationResults& evaluation);
+absl::StatusOr<std::unordered_map<std::string, std::string>> ExtractFlatMetrics(
+    absl::string_view model_name, const proto::EvaluationResults& evaluation);
 
 // Export a set of metrics from a model evaluation stored in a file. The file
 // should store a serialized binary proto::EvaluationResults.
-utils::StatusOr<std::unordered_map<std::string, std::string>>
-ExtractFlatMetrics(absl::string_view model_name,
-                   absl::string_view evaluation_file);
+absl::StatusOr<std::unordered_map<std::string, std::string>> ExtractFlatMetrics(
+    absl::string_view model_name, absl::string_view evaluation_file);
 
 // List of metric names and accessors for the X@Y metrics.
 struct XAtYAccessor {
@@ -214,13 +212,13 @@ std::string GetPerClassComparisonMetricLabel(
 
 // Returns the numerical metric value defined by "metric" and contained in
 // "evaluation".
-utils::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
-                                  const proto::MetricAccessor& metric);
+absl::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
+                                 const proto::MetricAccessor& metric);
 
 // If true, a higher value for the metric is generally preferable (e.g.
 // accuracy). If false, a lower value is preferable (e.g. loss). Fails if
 // unknown.
-utils::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric);
+absl::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric);
 
 // Computes the minimum and maximum value of a stream of values.
 template <typename T>
@@ -278,11 +276,11 @@ std::vector<MetricDefinition> DefaultMetrics(
     model::proto::Task task, const dataset::proto::Column& label);
 
 // Computes the RMSE of a set of predictions.
-utils::StatusOr<double> RMSE(const std::vector<float>& labels,
-                             const std::vector<float>& predictions,
-                             const std::vector<float>& weights);
-utils::StatusOr<double> RMSE(const std::vector<float>& labels,
-                             const std::vector<float>& predictions);
+absl::StatusOr<double> RMSE(const std::vector<float>& labels,
+                            const std::vector<float>& predictions,
+                            const std::vector<float>& weights);
+absl::StatusOr<double> RMSE(const std::vector<float>& labels,
+                            const std::vector<float>& predictions);
 
 // Gets the threshold on a binary classifier output that maximize accuracy.
 float ComputeThresholdForMaxAccuracy(

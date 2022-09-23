@@ -20,7 +20,7 @@
 namespace yggdrasil_decision_forests {
 namespace utils {
 
-utils::StatusOr<std::string> InputByteStream::ReadAll() {
+absl::StatusOr<std::string> InputByteStream::ReadAll() {
   absl::Cord result;
   char buffer[1024];
   while (true) {
@@ -33,8 +33,8 @@ utils::StatusOr<std::string> InputByteStream::ReadAll() {
   return std::string(result);
 }
 
-utils::StatusOr<int> StringInputByteStream::ReadUpTo(char* buffer,
-                                                     int max_read) {
+absl::StatusOr<int> StringInputByteStream::ReadUpTo(char* buffer,
+                                                    int max_read) {
   const int num_read =
       std::min(static_cast<int>(content_.size()) - current_, max_read);
   if (num_read > 0) {
@@ -44,8 +44,8 @@ utils::StatusOr<int> StringInputByteStream::ReadUpTo(char* buffer,
   return num_read;
 }
 
-utils::StatusOr<bool> StringInputByteStream::ReadExactly(char* buffer,
-                                                         int num_read) {
+absl::StatusOr<bool> StringInputByteStream::ReadExactly(char* buffer,
+                                                        int num_read) {
   if (current_ == content_.size()) {
     return false;
   }

@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -34,7 +35,6 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
@@ -63,11 +63,11 @@ class MeanSquaredErrorLoss : public AbstractLoss {
                      /*.has_hessian =*/false};
   };
 
-  utils::StatusOr<std::vector<float>> InitialPredictions(
+  absl::StatusOr<std::vector<float>> InitialPredictions(
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const override;
 
-  virtual utils::StatusOr<std::vector<float>> InitialPredictions(
+  virtual absl::StatusOr<std::vector<float>> InitialPredictions(
       const decision_tree::proto::LabelStatistics& label_statistics)
       const override;
 
@@ -90,7 +90,7 @@ class MeanSquaredErrorLoss : public AbstractLoss {
                        const std::vector<float>& predictions, int label_col_idx,
                        decision_tree::NodeWithChildren* node) const;
 
-  utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+  absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
   SetLeafFunctorFromLabelStatistics() const override;
 
   absl::Status UpdatePredictions(

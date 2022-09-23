@@ -110,8 +110,7 @@ absl::Status FileInputByteStream::Open(absl::string_view path) {
   return absl::OkStatus();
 }
 
-yggdrasil_decision_forests::utils::StatusOr<int> FileInputByteStream::ReadUpTo(
-    char* buffer, int max_read) {
+absl::StatusOr<int> FileInputByteStream::ReadUpTo(char* buffer, int max_read) {
   absl::string_view result;
   if (max_read > scrath_.size()) {
     scrath_.resize(max_read);
@@ -126,8 +125,8 @@ yggdrasil_decision_forests::utils::StatusOr<int> FileInputByteStream::ReadUpTo(
   return result.size();
 }
 
-yggdrasil_decision_forests::utils::StatusOr<bool>
-FileInputByteStream::ReadExactly(char* buffer, int num_read) {
+absl::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
+                                                      int num_read) {
   absl::string_view result;
   if (num_read > scrath_.size()) {
     scrath_.resize(num_read);
@@ -216,8 +215,7 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
   return absl::OkStatus();
 }
 
-yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
-    absl::string_view path) {
+absl::StatusOr<bool> FileExists(absl::string_view path) {
   const auto exist_status =
       tensorflow::Env::Default()->FileExists(std::string(path));
   if (exist_status.ok()) {

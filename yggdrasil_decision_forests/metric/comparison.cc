@@ -164,7 +164,7 @@ dataset::proto::DataSpecification CreateDataSpecForComparisonTable(
   return data_spec;
 }
 
-utils::StatusOr<std::vector<std::pair<std::string, float>>> OneSidedMcNemarTest(
+absl::StatusOr<std::vector<std::pair<std::string, float>>> OneSidedMcNemarTest(
     const proto::EvaluationResults& eval_results1,
     const proto::EvaluationResults& eval_results2) {
   std::vector<std::pair<std::string, float>> labels_and_p_values;
@@ -219,7 +219,7 @@ utils::StatusOr<std::vector<std::pair<std::string, float>>> OneSidedMcNemarTest(
 
 // This is calculated using McNemar Tests (Description at
 // https://www.mathworks.com/help/stats/testcholdout.html#bup0p8g-1)
-utils::StatusOr<float> OneSidedMcNemarTest(
+absl::StatusOr<float> OneSidedMcNemarTest(
     const proto::EvaluationResults& eval_results1,
     const proto::EvaluationResults& eval_results2, const int roc_idx,
     const float threshold1, const float threshold2) {
@@ -287,7 +287,7 @@ utils::StatusOr<float> OneSidedMcNemarTest(
   return static_cast<float>(pvalue);
 }
 
-utils::StatusOr<float> PairwiseRegressiveResidualTest(
+absl::StatusOr<float> PairwiseRegressiveResidualTest(
     const proto::EvaluationResults& eval_baseline,
     const proto::EvaluationResults& eval_candidate) {
   STATUS_CHECK_EQ(eval_baseline.sampled_predictions_size(),
@@ -315,7 +315,7 @@ utils::StatusOr<float> PairwiseRegressiveResidualTest(
   return PValueMeanIsGreaterThanZero(sample);
 }
 
-utils::StatusOr<float> PairwiseRankingNDCG5Test(
+absl::StatusOr<float> PairwiseRankingNDCG5Test(
     const proto::EvaluationResults& eval_baseline,
     const proto::EvaluationResults& eval_candidate) {
   STATUS_CHECK_EQ(eval_baseline.sampled_predictions_size(),

@@ -57,7 +57,7 @@ bool NeedsEscape(absl::string_view field) {
 
 Reader::Reader(InputByteStream* stream) : stream_(stream) {}
 
-utils::StatusOr<bool> Reader::NextRow(std::vector<absl::string_view>** fields) {
+absl::StatusOr<bool> Reader::NextRow(std::vector<absl::string_view>** fields) {
   // Initialize returned value.
   *fields = &cached_fields_;
 

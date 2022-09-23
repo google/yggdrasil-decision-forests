@@ -68,7 +68,7 @@ class Reader {
   // Reads the next row. The data pointed by "row" is valid until the next call
   // to "NextRow" or until the object is deleted. Returns false when no new rows
   // are available.
-  utils::StatusOr<bool> NextRow(std::vector<absl::string_view>** fields);
+  absl::StatusOr<bool> NextRow(std::vector<absl::string_view>** fields);
 
  private:
   // Current character i.e. the last one read from the file.

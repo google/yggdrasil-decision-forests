@@ -30,10 +30,10 @@ namespace {
 
 // Creates a vector of accumulator initializer. One for each open node.
 template <typename AccumulatorInitializer>
-utils::StatusOr<std::vector<AccumulatorInitializer>>
+absl::StatusOr<std::vector<AccumulatorInitializer>>
 CreateAccumulatorInitializerList(
     const FindBestSplitsCommonArgs& common,
-    utils::StatusOr<AccumulatorInitializer> (AbstractLabelAccessor::*creator)(
+    absl::StatusOr<AccumulatorInitializer> (AbstractLabelAccessor::*creator)(
         const decision_tree::proto::LabelStatistics&) const) {
   std::vector<AccumulatorInitializer> initializers;
   initializers.reserve(common.label_stats_per_open_node.size());
@@ -122,7 +122,7 @@ ExampleToNodeMap CreateExampleToNodeMap(ExampleIndex num_examples) {
   return ExampleToNodeMap(num_examples, 0);
 }
 
-utils::StatusOr<std::unique_ptr<TreeBuilder>> TreeBuilder::Create(
+absl::StatusOr<std::unique_ptr<TreeBuilder>> TreeBuilder::Create(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const decision_tree::proto::DecisionTreeTrainingConfig& dt_config,
@@ -670,7 +670,7 @@ NodeRemapping TreeBuilder::CreateClosingNodeRemapping() const {
   return NodeRemapping{open_nodes_.size(), {kClosedNode, kClosedNode}};
 }
 
-utils::StatusOr<NodeRemapping> TreeBuilder::ApplySplitToTree(
+absl::StatusOr<NodeRemapping> TreeBuilder::ApplySplitToTree(
     const SplitPerOpenNode& splits) {
   if (open_nodes_.size() != splits.size()) {
     return absl::InternalError("Wrong number of internal nodes");

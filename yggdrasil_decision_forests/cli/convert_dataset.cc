@@ -27,13 +27,12 @@
 //     --output=tfrecord+tfe:/my/dataset.tfrecord-tfe
 //
 #include "absl/flags/flag.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_reader.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
-#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 ABSL_FLAG(std::string, input, "",
           "Input dataset specified with [type]:[path] format.");
@@ -104,7 +103,7 @@ void ConvertDataset() {
 
   dataset::proto::Example example;
   int64_t nrow = 0;
-  utils::StatusOr<bool> status;
+  absl::StatusOr<bool> status;
   while ((status = reader->Next(&example)).ok() && status.value()) {
     LOG_INFO_EVERY_N_SEC(30, _ << nrow << " examples converted.");
     QCHECK_OK(writer->Write(example));

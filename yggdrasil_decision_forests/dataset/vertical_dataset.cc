@@ -27,6 +27,7 @@
 
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -34,7 +35,6 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -54,7 +54,7 @@ namespace {
 constexpr char kNaSymbol[] = "NA";  // NA=non-available i.e. missing value.
 constexpr char kEmptySymbol[] = "EMPTY";
 
-utils::StatusOr<std::unique_ptr<VerticalDataset::AbstractColumn>> CreateColumn(
+absl::StatusOr<std::unique_ptr<VerticalDataset::AbstractColumn>> CreateColumn(
     const proto::ColumnType type, const absl::string_view column_name) {
   std::unique_ptr<VerticalDataset::AbstractColumn> col;
   switch (type) {
@@ -194,7 +194,7 @@ VerticalDataset VerticalDataset::ShallowNonOwningClone() const {
   return clone;
 }
 
-utils::StatusOr<VerticalDataset::AbstractColumn*> VerticalDataset::AddColumn(
+absl::StatusOr<VerticalDataset::AbstractColumn*> VerticalDataset::AddColumn(
     const proto::Column& column_spec) {
   *data_spec_.add_columns() = column_spec;
   ASSIGN_OR_RETURN(auto new_column,
@@ -206,7 +206,7 @@ utils::StatusOr<VerticalDataset::AbstractColumn*> VerticalDataset::AddColumn(
   return column;
 }
 
-utils::StatusOr<proto::Column*> VerticalDataset::AddColumn(
+absl::StatusOr<proto::Column*> VerticalDataset::AddColumn(
     const absl::string_view name, const proto::ColumnType type) {
   auto* column_spec = data_spec_.add_columns();
   column_spec->set_name(std::string(name));
@@ -220,9 +220,8 @@ utils::StatusOr<proto::Column*> VerticalDataset::AddColumn(
   return column_spec;
 }
 
-utils::StatusOr<VerticalDataset::AbstractColumn*>
-VerticalDataset::ReplaceColumn(int column_idx,
-                               const proto::Column& column_spec) {
+absl::StatusOr<VerticalDataset::AbstractColumn*> VerticalDataset::ReplaceColumn(
+    int column_idx, const proto::Column& column_spec) {
   DCHECK_GE(column_idx, 0);
   DCHECK_LT(column_idx, columns_.size());
   *data_spec_.mutable_columns(column_idx) = column_spec;
@@ -830,8 +829,7 @@ std::string VerticalDataset::CategoricalListColumn::ToStringWithDigitPrecision(
   return rep;
 }
 
-
-utils::StatusOr<VerticalDataset> VerticalDataset::ConvertToGivenDataspec(
+absl::StatusOr<VerticalDataset> VerticalDataset::ConvertToGivenDataspec(
     const proto::DataSpecification& new_data_spec,
     const std::vector<int>& required_column_idxs) const {
   VerticalDataset new_dataset;
@@ -913,7 +911,7 @@ absl::Status MapExampleToProtoExampleWithStatus(
   return CsvRowToExample(flat_values, data_spec, col_idx_to_field_idx, dst);
 }
 
-utils::StatusOr<std::unordered_map<std::string, std::string>>
+absl::StatusOr<std::unordered_map<std::string, std::string>>
 ProtoExampleToMapExample(const proto::Example& src,
                          const proto::DataSpecification& data_spec) {
   std::unordered_map<std::string, std::string> dst;

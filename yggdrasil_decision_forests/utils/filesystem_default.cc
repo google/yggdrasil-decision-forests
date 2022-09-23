@@ -138,8 +138,7 @@ absl::Status FileInputByteStream::Open(absl::string_view path) {
   return absl::OkStatus();
 }
 
-yggdrasil_decision_forests::utils::StatusOr<int> FileInputByteStream::ReadUpTo(
-    char* buffer, int max_read) {
+absl::StatusOr<int> FileInputByteStream::ReadUpTo(char* buffer, int max_read) {
   const int num_read = std::fread(buffer, sizeof(char), max_read, file_);
   if (num_read < 0) {
     return absl::Status(absl::StatusCode::kUnknown, "Failed to read chunk");
@@ -147,8 +146,8 @@ yggdrasil_decision_forests::utils::StatusOr<int> FileInputByteStream::ReadUpTo(
   return num_read;
 }
 
-ygg::utils::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
-                                                            int num_read) {
+absl::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
+                                                      int num_read) {
   const int read_count = std::fread(buffer, sizeof(char), num_read, file_);
   // read_count: -1=Error, 0=EOF, >0 & <num_read=Partial read, num_read=Success.
   if (read_count < 0 || (read_count > 0 && read_count < num_read)) {
@@ -230,8 +229,7 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
   return absl::OkStatus();
 }
 
-yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
-    absl::string_view path) {
+absl::StatusOr<bool> FileExists(absl::string_view path) {
   return std::filesystem::exists(SV_ABSL_TO_STD(path));
 }
 

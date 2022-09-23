@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
@@ -43,7 +44,6 @@
 #include "yggdrasil_decision_forests/model/decision_tree/structure_analysis.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -575,7 +575,7 @@ RandomForestModel::AvailableStructuralVariableImportances() const {
   return variable_importances;
 }
 
-utils::StatusOr<std::vector<model::proto::VariableImportance>>
+absl::StatusOr<std::vector<model::proto::VariableImportance>>
 RandomForestModel::GetVariableImportance(absl::string_view key) const {
   const auto general_vi = AbstractModel::GetVariableImportance(key);
   if (general_vi.ok()) {

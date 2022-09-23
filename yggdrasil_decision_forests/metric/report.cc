@@ -328,7 +328,7 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
 
 }  // namespace
 
-utils::StatusOr<std::string> TextReport(const proto::EvaluationResults& eval) {
+absl::StatusOr<std::string> TextReport(const proto::EvaluationResults& eval) {
   std::string report;
   RETURN_IF_ERROR(AppendTextReportWithStatus(eval, &report));
   return report;

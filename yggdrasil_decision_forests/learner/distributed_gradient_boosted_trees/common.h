@@ -58,7 +58,7 @@ class EndIterTreeProtoReader
   EndIterTreeProtoReader(const proto::WorkerRequest::EndIter::Tree& src);
   virtual ~EndIterTreeProtoReader() = default;
 
-  utils::StatusOr<bool> Next(decision_tree::proto::Node* value) override;
+  absl::StatusOr<bool> Next(decision_tree::proto::Node* value) override;
 
  private:
   const proto::WorkerRequest::EndIter::Tree& src_;

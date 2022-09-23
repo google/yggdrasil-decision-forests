@@ -43,7 +43,7 @@ absl::Status AbstractWorker::AsynchronousRequestToOtherWorker(Blob blob,
   return hook_->AsynchronousRequestToOtherWorker(blob, worker_idx, this);
 }
 
-utils::StatusOr<Blob> AbstractWorker::NextAsynchronousAnswerFromOtherWorker() {
+absl::StatusOr<Blob> AbstractWorker::NextAsynchronousAnswerFromOtherWorker() {
   return hook_->NextAsynchronousAnswerFromOtherWorker(this);
 }
 
@@ -53,7 +53,7 @@ absl::Status AbstractWorkerHook::AsynchronousRequestToOtherWorker(
       "AsynchronousRequestToOtherWorker Not implemented");
 }
 
-utils::StatusOr<Blob> AbstractWorkerHook::NextAsynchronousAnswerFromOtherWorker(
+absl::StatusOr<Blob> AbstractWorkerHook::NextAsynchronousAnswerFromOtherWorker(
     AbstractWorker* emitter_worker) {
   return absl::InternalError(
       "NextAsynchronousAnswerFromOtherWorker Not implemented");

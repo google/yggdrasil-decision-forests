@@ -21,7 +21,7 @@
 #include <string>
 
 #include "absl/base/macros.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "absl/status/statusor.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -33,15 +33,15 @@ class InputByteStream {
 
   // Reads up to "max_read" bytes of data. Returns the number of read bytes.
   // Returns 0 iif. the stream is over.
-  virtual utils::StatusOr<int> ReadUpTo(char* buffer, int max_read) = 0;
+  virtual absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) = 0;
 
   // Reads exactly to "num_read" bytes of data. Return true if the bytes are
   // read. Return false if the stream was already over. Fails if some but not
   // all bytes where read.
-  virtual utils::StatusOr<bool> ReadExactly(char* buffer, int num_read) = 0;
+  virtual absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) = 0;
 
   // Reads and returns the entire content of the stream.
-  utils::StatusOr<std::string> ReadAll();
+  absl::StatusOr<std::string> ReadAll();
 };
 
 // Wraps a InputByteStream around a std::string.
@@ -49,9 +49,9 @@ class StringInputByteStream : public InputByteStream {
  public:
   StringInputByteStream(std::string content) : content_(std::move(content)) {}
 
-  utils::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
+  absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
 
-  utils::StatusOr<bool> ReadExactly(char* buffer, int num_read) override;
+  absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) override;
 
  private:
   // String content.

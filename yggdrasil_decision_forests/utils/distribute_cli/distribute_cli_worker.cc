@@ -17,6 +17,7 @@
 
 #include <stdio.h>  // popen, pclose
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -166,7 +167,7 @@ absl::Status Worker::Command(const proto::Request::Command& request,
   return absl::OkStatus();
 }
 
-utils::StatusOr<Blob> Worker::RunRequest(Blob serialized_request) {
+absl::StatusOr<Blob> Worker::RunRequest(Blob serialized_request) {
   const auto begin_time = absl::Now();
 
   ASSIGN_OR_RETURN(auto request,

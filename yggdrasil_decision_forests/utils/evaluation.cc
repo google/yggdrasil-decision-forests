@@ -29,7 +29,7 @@
 namespace yggdrasil_decision_forests {
 namespace utils {
 
-utils::StatusOr<PredictionFormat> ParsePredictionFormat(
+absl::StatusOr<PredictionFormat> ParsePredictionFormat(
     absl::string_view value) {
   if (value == "kRaw") {
     return PredictionFormat::kRaw;
@@ -256,7 +256,7 @@ absl::Status ExampleToPrediction(
   return absl::OkStatus();
 }
 
-utils::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
+absl::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
     const model::proto::Task task, const dataset::proto::Column& label_col,
     const absl::optional<std::string> prediction_key,
     const PredictionFormat format) {

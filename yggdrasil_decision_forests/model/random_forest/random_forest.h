@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -38,7 +39,6 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 
 namespace yggdrasil_decision_forests {
@@ -185,7 +185,7 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   // structure.
   std::vector<std::string> AvailableStructuralVariableImportances() const;
 
-  utils::StatusOr<std::vector<model::proto::VariableImportance>>
+  absl::StatusOr<std::vector<model::proto::VariableImportance>>
   GetVariableImportance(absl::string_view key) const override;
 
   metric::proto::EvaluationResults ValidationEvaluation() const override;

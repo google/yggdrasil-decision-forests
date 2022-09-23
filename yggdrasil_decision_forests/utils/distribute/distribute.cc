@@ -20,7 +20,7 @@
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
-utils::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
+absl::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
     const proto::Config& config, const absl::string_view worker_name,
     Blob welcome_blob, int parallel_execution_per_worker) {
   ASSIGN_OR_RETURN(auto manager, AbstractManagerRegisterer::Create(
@@ -30,7 +30,7 @@ utils::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
   return manager;
 }
 
-utils::StatusOr<int> NumWorkers(const proto::Config& config) {
+absl::StatusOr<int> NumWorkers(const proto::Config& config) {
   ASSIGN_OR_RETURN(auto manager, AbstractManagerRegisterer::Create(
                                      config.implementation_key()));
   const auto num_workers = manager->NumWorkersInConfiguration(config);

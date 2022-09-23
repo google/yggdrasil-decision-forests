@@ -38,9 +38,6 @@ inline absl::optional<std::string> UserName() {
    return {};
 }
 
-template <typename T>
-using StatusOr = ::absl::StatusOr<T>;
-
 // Same as std::clamp in >=c++17.
 template <class T>
 constexpr const T& clamp(const T& v, const T& lo, const T& hi) {

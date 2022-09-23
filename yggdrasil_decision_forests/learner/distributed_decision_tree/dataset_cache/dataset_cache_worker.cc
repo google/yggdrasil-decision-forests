@@ -770,7 +770,7 @@ absl::Status CreateDatasetCacheWorker::Setup(Blob serialized_welcome) {
   return absl::OkStatus();
 }
 
-utils::StatusOr<Blob> CreateDatasetCacheWorker::RunRequest(
+absl::StatusOr<Blob> CreateDatasetCacheWorker::RunRequest(
     Blob serialized_request) {
   ASSIGN_OR_RETURN(auto request, utils::ParseBinaryProto<proto::WorkerRequest>(
                                      serialized_request));

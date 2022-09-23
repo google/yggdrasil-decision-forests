@@ -28,6 +28,7 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -35,7 +36,6 @@
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/utils/accurate_sum.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
@@ -104,8 +104,8 @@ void InitializeDataSpecFromColumnNames(
   }
 }
 
-utils::StatusOr<bool> LooksMultiDimensional(const absl::string_view value,
-                                            const Tokenizer& tokenizer) {
+absl::StatusOr<bool> LooksMultiDimensional(const absl::string_view value,
+                                           const Tokenizer& tokenizer) {
   std::vector<std::string> tokens;
   RETURN_IF_ERROR(Tokenize(value, tokenizer, &tokens));
   return tokens.size() >= 2;
@@ -577,7 +577,7 @@ absl::Status UpdateCategoricalIntColumnSpec(
   return absl::OkStatus();
 }
 
-utils::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path) {
+absl::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path) {
   std::string sharded_path;
   proto::DatasetFormat format;
   std::tie(sharded_path, format) = GetDatasetPathAndType(typed_path);

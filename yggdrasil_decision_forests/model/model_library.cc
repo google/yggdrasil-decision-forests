@@ -107,8 +107,8 @@ absl::Status LoadModel(absl::string_view directory,
   return model->get()->Validate();
 }
 
-utils::StatusOr<bool> ModelExists(absl::string_view directory,
-                                  const ModelIOOptions& io_options) {
+absl::StatusOr<bool> ModelExists(absl::string_view directory,
+                                 const ModelIOOptions& io_options) {
   if (io_options.file_prefix) {
     return file::FileExists(file::JoinPath(
         directory,
@@ -117,7 +117,7 @@ utils::StatusOr<bool> ModelExists(absl::string_view directory,
   return DetectFilePrefix(directory).ok();
 }
 
-utils::StatusOr<std::string> DetectFilePrefix(absl::string_view directory) {
+absl::StatusOr<std::string> DetectFilePrefix(absl::string_view directory) {
   std::vector<std::string> done_files;
   RETURN_IF_ERROR(file::Match(
       file::JoinPath(directory, absl::StrCat("*", kModelDataSpecFileName)),

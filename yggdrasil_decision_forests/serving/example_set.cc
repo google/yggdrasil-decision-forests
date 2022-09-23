@@ -16,7 +16,7 @@
 #include "yggdrasil_decision_forests/serving/example_set.h"
 
 #include "absl/status/status.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -26,7 +26,7 @@ using dataset::proto::ColumnType;
 
 // Creates the default value for a numerical only model.
 template <>
-utils::StatusOr<float> GetDefaultValue<float>(
+absl::StatusOr<float> GetDefaultValue<float>(
     const dataset::proto::Column& col_spec) {
   if (col_spec.type() == ColumnType::NUMERICAL ||
       col_spec.type() == ColumnType::DISCRETIZED_NUMERICAL) {
@@ -47,7 +47,7 @@ utils::StatusOr<float> GetDefaultValue<float>(
 
 // Creates the default value for a numerical or categorical only model.
 template <>
-utils::StatusOr<NumericalOrCategoricalValue>
+absl::StatusOr<NumericalOrCategoricalValue>
 GetDefaultValue<NumericalOrCategoricalValue>(
     const dataset::proto::Column& col_spec) {
   switch (col_spec.type()) {
@@ -67,8 +67,8 @@ GetDefaultValue<NumericalOrCategoricalValue>(
   }
 }
 
-utils::StatusOr<FeatureDef> FindFeatureDef(const std::vector<FeatureDef>& defs,
-                                           const int spec_feature_idx) {
+absl::StatusOr<FeatureDef> FindFeatureDef(const std::vector<FeatureDef>& defs,
+                                          const int spec_feature_idx) {
   for (const auto& def : defs) {
     if (def.spec_idx == spec_feature_idx) {
       return def;

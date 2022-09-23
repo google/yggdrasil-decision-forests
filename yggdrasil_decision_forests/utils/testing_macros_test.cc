@@ -19,7 +19,7 @@
 #include "gtest/gtest-spi.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "absl/status/statusor.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -27,7 +27,7 @@ namespace testing_macros {
 namespace {
 
 void FailsForFalse(const bool a) {
-  const auto f = [](const bool a) -> utils::StatusOr<int> {
+  const auto f = [](const bool a) -> absl::StatusOr<int> {
     if (!a) {
       return absl::InvalidArgumentError("a is false");
     }

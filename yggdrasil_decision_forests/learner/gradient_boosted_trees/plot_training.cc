@@ -30,7 +30,7 @@ namespace {
 // Create a multi-plot with a log of training. The plot contains:
 // - The training and validation loss according to the number of trees.
 // - The secondary metric (e.g. accuracy) according to the number of trees.
-utils::StatusOr<simpleplot::MultiPlot> CreatePlotOfLogs(
+absl::StatusOr<simpleplot::MultiPlot> CreatePlotOfLogs(
     const proto::TrainingLogs& training_logs) {
   // Labels of the plot.
   constexpr char kLabelNumTrees[] = "Number of trees";

@@ -25,6 +25,7 @@
 
 #include "absl/base/config.h"
 #include "absl/numeric/bits.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"

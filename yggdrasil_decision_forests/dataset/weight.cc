@@ -22,20 +22,20 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
 
-utils::StatusOr<proto::WeightDefinition> GetUnlinkedWeightDefinition(
+absl::StatusOr<proto::WeightDefinition> GetUnlinkedWeightDefinition(
     const proto::LinkedWeightDefinition& linked_def,
     const proto::DataSpecification& data_spec) {
   proto::WeightDefinition weights;
@@ -141,7 +141,7 @@ float GetWeight(const proto::Example& example,
   return GetWeightWithStatus(example, weight_definition).value();
 }
 
-utils::StatusOr<float> GetWeightWithStatus(
+absl::StatusOr<float> GetWeightWithStatus(
     const proto::Example& example,
     const proto::LinkedWeightDefinition& weight_definition) {
   switch (weight_definition.type_case()) {
@@ -171,7 +171,7 @@ utils::StatusOr<float> GetWeightWithStatus(
   return 1.f;
 }
 
-utils::StatusOr<float> GetWeightWithStatus(
+absl::StatusOr<float> GetWeightWithStatus(
     const VerticalDataset& dataset, VerticalDataset::row_t row,
     const proto::LinkedWeightDefinition& weight_definition) {
   switch (weight_definition.type_case()) {

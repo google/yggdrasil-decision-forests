@@ -126,7 +126,7 @@ int32_t CategoricalStringToValue(const std::string& value,
   return CategoricalStringToValueWithStatus(value, col_spec).value();
 }
 
-utils::StatusOr<int32_t> CategoricalStringToValueWithStatus(
+absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
     const std::string& value, const proto::Column& col_spec) {
   if (col_spec.categorical().is_already_integerized()) {
     int32_t int_value;
@@ -239,7 +239,7 @@ int GetColumnIdxFromName(absl::string_view name,
   return GetColumnIdxFromNameWithStatus(name, data_spec).value();
 }
 
-utils::StatusOr<int> GetColumnIdxFromNameWithStatus(
+absl::StatusOr<int> GetColumnIdxFromNameWithStatus(
     absl::string_view name, const proto::DataSpecification& data_spec) {
   for (int col_idx = 0; col_idx < data_spec.columns_size(); col_idx++) {
     if (data_spec.columns(col_idx).name() == name) {
@@ -757,7 +757,7 @@ proto::Column* AddColumn(const absl::string_view name,
   return col;
 }
 
-utils::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
+absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
     const std::vector<std::pair<float, int>>& candidates, int maximum_num_bins,
     int min_obs_in_bins, const std::vector<float>& special_values) {
   // Algorithm:
@@ -891,7 +891,7 @@ utils::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
   return boundaries;
 }
 
-utils::StatusOr<float> DiscretizedNumericalToNumerical(
+absl::StatusOr<float> DiscretizedNumericalToNumerical(
     const proto::Column& col_spec, const DiscretizedNumericalIndex value) {
   if (value == kDiscretizedNumericalMissingValue) {
     return std::numeric_limits<float>::quiet_NaN();

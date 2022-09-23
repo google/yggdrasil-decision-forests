@@ -19,24 +19,21 @@
 
 namespace file {
 
-yggdrasil_decision_forests::utils::StatusOr<
-    std::unique_ptr<FileInputByteStream>>
-OpenInputFile(absl::string_view path) {
+absl::StatusOr<std::unique_ptr<FileInputByteStream>> OpenInputFile(
+    absl::string_view path) {
   auto reader = absl::make_unique<FileInputByteStream>();
   RETURN_IF_ERROR(reader->Open(path));
   return std::move(reader);
 }
 
-yggdrasil_decision_forests::utils::StatusOr<
-    std::unique_ptr<FileOutputByteStream>>
-OpenOutputFile(absl::string_view path) {
+absl::StatusOr<std::unique_ptr<FileOutputByteStream>> OpenOutputFile(
+    absl::string_view path) {
   auto writer = absl::make_unique<FileOutputByteStream>();
   RETURN_IF_ERROR(writer->Open(path));
   return std::move(writer);
 }
 
-yggdrasil_decision_forests::utils::StatusOr<std::string> GetContent(
-    absl::string_view path) {
+absl::StatusOr<std::string> GetContent(absl::string_view path) {
   ASSIGN_OR_RETURN(auto file_handle, OpenInputFile(path));
   InputFileCloser closer(std::move(file_handle));
   ASSIGN_OR_RETURN(auto content, closer.stream()->ReadAll());

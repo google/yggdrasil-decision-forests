@@ -24,6 +24,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -42,7 +43,6 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/utils/adaptive_work.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -100,14 +100,14 @@ absl::Status CartLearner::SetHyperParametersImpl(
   return absl::OkStatus();
 }
 
-utils::StatusOr<model::proto::HyperParameterSpace>
+absl::StatusOr<model::proto::HyperParameterSpace>
 CartLearner::PredefinedHyperParameterSpace() const {
   model::proto::HyperParameterSpace space;
   decision_tree::PredefinedHyperParameterAxisSplitSpace(&space);
   return space;
 }
 
-utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+absl::StatusOr<model::proto::GenericHyperParameterSpecification>
 CartLearner::GetGenericHyperParameterSpecification() const {
   ASSIGN_OR_RETURN(auto hparam_def,
                    AbstractLearner::GetGenericHyperParameterSpecification());
@@ -136,7 +136,7 @@ CartLearner::GetGenericHyperParameterSpecification() const {
   return hparam_def;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
+absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {

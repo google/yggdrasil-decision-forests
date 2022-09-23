@@ -47,9 +47,7 @@ cc_library_ydf(
     srcs = ["grpc_manager.cc"],
     hdrs = ["grpc_manager.h"],
     deps = [
-        ":grpc_cc_proto",
         ":grpc_grpc_proto",
-        "@com_github_grpc_grpc//:grpc",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_absl//absl/container:node_hash_map",
         "//yggdrasil_decision_forests/utils:concurrency",
@@ -58,7 +56,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "//yggdrasil_decision_forests/utils/distribute:core",
-        "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
         "//yggdrasil_decision_forests/utils/distribute:utils",
     ],
     alwayslink = 1,

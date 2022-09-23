@@ -61,7 +61,7 @@ class WorkerService final : public proto::Server::Service {
   }
 
   // Implementation of the worker->worker async reply.
-  utils::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
+  absl::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
       AbstractWorker* emitter_worker) {
     auto answer = intra_worker_communication_->pending_answers.Pop();
     if (!answer.has_value()) {
@@ -82,7 +82,7 @@ class WorkerService final : public proto::Server::Service {
           std::move(blob), target_worker_idx, emitter_worker);
     }
 
-    utils::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
+    absl::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
         AbstractWorker* emitter_worker) override {
       return parent_->NextAsynchronousAnswerFromOtherWorker(emitter_worker);
     }
@@ -243,8 +243,8 @@ class WorkerService final : public proto::Server::Service {
   }
 
   // Blocking inter worker request.
-  utils::StatusOr<Blob> BlockingInterWorkerRequest(Blob blob,
-                                                   const int target_worker) {
+  absl::StatusOr<Blob> BlockingInterWorkerRequest(Blob blob,
+                                                  const int target_worker) {
     RETURN_IF_ERROR(EnsureIntraWorkerStubIsReady(target_worker));
 
     proto::WorkerQuery query;
@@ -380,7 +380,7 @@ class WorkerService final : public proto::Server::Service {
     utils::concurrency::Channel<std::pair<int, Blob>> pending_queries;
 
     // Answers to this worker queries.
-    utils::concurrency::Channel<utils::StatusOr<Blob>> pending_answers;
+    utils::concurrency::Channel<absl::StatusOr<Blob>> pending_answers;
 
     // Thread emitting and receiving intra-workers requests/answers.
     ThreadVector threads;

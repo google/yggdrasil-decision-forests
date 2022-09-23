@@ -24,6 +24,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -38,7 +39,6 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -57,7 +57,7 @@ absl::Status MeanSquaredErrorLoss::Status() const {
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
+absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     const std::vector<float>& weights) const {
   // Note: The initial value is the weighted mean of the labels.
@@ -84,7 +84,7 @@ utils::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
       static_cast<float>(weighted_sum_values / sum_weights)};
 }
 
-utils::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
+absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
     const decision_tree::proto::LabelStatistics& label_statistics) const {
   const auto stats = label_statistics.regression().labels();
   return std::vector<float>{static_cast<float>(stats.sum() / stats.count())};
@@ -180,7 +180,7 @@ absl::Status MeanSquaredErrorLoss::SetLeaf(
   return absl::OkStatus();
 }
 
-utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
 MeanSquaredErrorLoss::SetLeafFunctorFromLabelStatistics() const {
   return [&](const decision_tree::proto::LabelStatistics& label_stats,
              decision_tree::proto::Node* node) {

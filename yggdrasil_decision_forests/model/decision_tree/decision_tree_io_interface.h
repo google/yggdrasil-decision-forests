@@ -18,9 +18,9 @@
 
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 
@@ -36,7 +36,7 @@ class AbstractFormat;
 //
 // The returned "AbstractFormat" can then be used to create a sequential reader
 // or writer of nodes.
-utils::StatusOr<std::unique_ptr<AbstractFormat>> GetFormatImplementation(
+absl::StatusOr<std::unique_ptr<AbstractFormat>> GetFormatImplementation(
     absl::string_view format);
 
 // Containers/formats available for save/load decision trees to/from disk.

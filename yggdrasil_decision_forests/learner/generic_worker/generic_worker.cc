@@ -124,7 +124,7 @@ absl::Status GenericWorker::Setup(Blob serialized_welcome) {
   return absl::OkStatus();
 }
 
-utils::StatusOr<Blob> GenericWorker::RunRequest(Blob serialized_request) {
+absl::StatusOr<Blob> GenericWorker::RunRequest(Blob serialized_request) {
   ASSIGN_OR_RETURN(auto request,
                    utils::ParseBinaryProto<proto::Request>(serialized_request));
   proto::Result result;

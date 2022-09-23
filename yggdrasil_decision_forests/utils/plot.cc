@@ -16,12 +16,12 @@
 #include "yggdrasil_decision_forests/utils/plot.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/html.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -78,8 +78,8 @@ absl::Status Bars::FromHistogram(
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
-                                          const ExportOptions& options) {
+absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
+                                         const ExportOptions& options) {
   if (options.run_checks) {
     RETURN_IF_ERROR(plot.Check());
   }
@@ -89,8 +89,8 @@ utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
   }
 }
 
-utils::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
-                                          const ExportOptions& options) {
+absl::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
+                                         const ExportOptions& options) {
   if (options.run_checks) {
     RETURN_IF_ERROR(multiplot.Check());
   }
@@ -127,8 +127,8 @@ utils::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
   return html;
 }
 
-utils::StatusOr<PlotPlacer> PlotPlacer::Create(int num_plots, int max_num_cols,
-                                               MultiPlot* multiplot) {
+absl::StatusOr<PlotPlacer> PlotPlacer::Create(int num_plots, int max_num_cols,
+                                              MultiPlot* multiplot) {
   STATUS_CHECK_GT(num_plots, 0);
   STATUS_CHECK_GT(max_num_cols, 0);
   STATUS_CHECK(multiplot);
@@ -150,7 +150,7 @@ PlotPlacer::PlotPlacer(const int num_plots, const int num_cols,
   multiplot_->num_rows = num_rows;
 }
 
-utils::StatusOr<Plot*> PlotPlacer::NewPlot() {
+absl::StatusOr<Plot*> PlotPlacer::NewPlot() {
   STATUS_CHECK(multiplot_);
   STATUS_CHECK_LT(num_new_plots_, num_plots_);
   STATUS_CHECK(!finalize_called_);
@@ -264,8 +264,8 @@ absl::Status ExportPlotItemToHtml(const PlotItem* item, const int item_idx,
 }
 
 // Specialization of ExportToHtml for c3js.
-utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
-                                          const ExportOptions& options) {
+absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
+                                         const ExportOptions& options) {
   if (options.run_checks) {
     RETURN_IF_ERROR(plot.Check());
   }

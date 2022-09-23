@@ -376,7 +376,7 @@ struct InternalTrainConfig {
 
 // Find the best condition for this node. Return true iff a good condition has
 // been found.
-utils::StatusOr<bool> FindBestCondition(
+absl::StatusOr<bool> FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -390,7 +390,7 @@ utils::StatusOr<bool> FindBestCondition(
 
 // Contains logic to switch between a single-threaded splitter and a concurrent
 // implementation.
-utils::StatusOr<bool> FindBestConditionManager(
+absl::StatusOr<bool> FindBestConditionManager(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -404,7 +404,7 @@ utils::StatusOr<bool> FindBestConditionManager(
 
 // This is an implementation of FindBestConditionManager that is optimized for
 // execution in a single thread.
-utils::StatusOr<bool> FindBestConditionSingleThreadManager(
+absl::StatusOr<bool> FindBestConditionSingleThreadManager(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -416,7 +416,7 @@ utils::StatusOr<bool> FindBestConditionSingleThreadManager(
     utils::RandomEngine* random, PerThreadCache* cache);
 
 // This is a concurrent implementation of FindBestConditionManager.
-utils::StatusOr<bool> FindBestConditionConcurrentManager(
+absl::StatusOr<bool> FindBestConditionConcurrentManager(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -863,7 +863,7 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
     SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 // Find the best possible oblique condition.
-utils::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -970,7 +970,7 @@ absl::Status NodeTrain(
     utils::RandomEngine* random, PerThreadCache* cache);
 
 // Preprocess the dataset before any tree training.
-utils::StatusOr<Preprocessing> PreprocessTrainingDataset(
+absl::StatusOr<Preprocessing> PreprocessTrainingDataset(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,

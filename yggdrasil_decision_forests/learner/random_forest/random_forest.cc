@@ -28,6 +28,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -53,7 +54,6 @@
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.pb.h"
 #include "yggdrasil_decision_forests/utils/adaptive_work.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/feature_importance.h"
@@ -177,7 +177,7 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
   return absl::OkStatus();
 }
 
-utils::StatusOr<model::proto::HyperParameterSpace>
+absl::StatusOr<model::proto::HyperParameterSpace>
 RandomForestLearner::PredefinedHyperParameterSpace() const {
   // Note: We don't optimize the number of tree as it is always beneficial
   // metric wise, and we don't optimize the inference time or model size (yet).
@@ -210,7 +210,7 @@ RandomForestLearner::PredefinedHyperParameterSpace() const {
   return space;
 }
 
-utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+absl::StatusOr<model::proto::GenericHyperParameterSpecification>
 RandomForestLearner::GetGenericHyperParameterSpecification() const {
   ASSIGN_OR_RETURN(auto hparam_def,
                    AbstractLearner::GetGenericHyperParameterSpecification());
@@ -353,7 +353,7 @@ absl::Status RandomForestLearner::CheckConfiguration(
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 RandomForestLearner::TrainWithStatus(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
@@ -1009,7 +1009,7 @@ void UpdateOOBPredictionsWithNewTree(
   }
 }
 
-utils::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
+absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
     const int uplift_treatment_col_idx,
@@ -1117,7 +1117,7 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
                              /*for_permutation_importance=*/true));
 
   const auto permutation_evaluation = [&](const int feature_idx)
-      -> utils::StatusOr<absl::optional<metric::proto::EvaluationResults>> {
+      -> absl::StatusOr<absl::optional<metric::proto::EvaluationResults>> {
     if (oob_predictions_per_input_features[feature_idx].empty()) {
       return absl::optional<metric::proto::EvaluationResults>{};
     }

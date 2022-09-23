@@ -63,6 +63,7 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"

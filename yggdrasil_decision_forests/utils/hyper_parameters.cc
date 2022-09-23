@@ -67,7 +67,7 @@ GenericHyperParameterConsumer::CheckThatAllHyperparametersAreConsumed() const {
   return absl::OkStatus();
 }
 
-utils::StatusOr<bool> SatisfyDefaultCondition(
+absl::StatusOr<bool> SatisfyDefaultCondition(
     const model::proto::GenericHyperParameterSpecification::Value& value,
     const model::proto::GenericHyperParameterSpecification::Conditional&
         condition) {

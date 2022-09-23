@@ -31,14 +31,14 @@ class FakeLearner1 : public AbstractLearner {
   explicit FakeLearner1(const proto::TrainingConfig& training_config)
       : AbstractLearner(training_config) {}
 
-  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override {
     return std::unique_ptr<AbstractModel>();
   }
 
-  utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+  absl::StatusOr<model::proto::GenericHyperParameterSpecification>
   GetGenericHyperParameterSpecification() const override {
     model::proto::GenericHyperParameterSpecification spec;
     auto& a = (*spec.mutable_fields())["a"];
@@ -58,7 +58,7 @@ class FakeLearner2 : public AbstractLearner {
   explicit FakeLearner2(const proto::TrainingConfig& training_config)
       : AbstractLearner(training_config) {}
 
-  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override {
@@ -73,7 +73,7 @@ class FakeLearner3 : public AbstractLearner {
   explicit FakeLearner3(const proto::TrainingConfig& training_config)
       : AbstractLearner(training_config) {}
 
-  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override {

@@ -22,6 +22,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -34,7 +35,6 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
@@ -98,7 +98,7 @@ class EngineFactory1 : public model::FastEngineFactory {
 
   std::vector<std::string> IsBetterThan() const override { return {}; }
 
-  utils::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
       const AbstractModel* const model) const override {
     auto* casted_model = dynamic_cast<const FakeModelWithEngine*>(model);
     if (!casted_model) {
@@ -152,7 +152,7 @@ class EngineFactory2 : public model::FastEngineFactory {
 
   std::vector<std::string> IsBetterThan() const override { return {"engine1"}; }
 
-  utils::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
       const AbstractModel* const model) const override {
     auto* casted_model = dynamic_cast<const FakeModelWithEngine*>(model);
     if (!casted_model) {

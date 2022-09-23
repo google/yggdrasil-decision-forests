@@ -22,6 +22,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -30,7 +31,6 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -134,7 +134,7 @@ class FoldGenerator : public ::testing::Test {
     }
   }
 
-  utils::StatusOr<std::string> GenerateFolds() {
+  absl::StatusOr<std::string> GenerateFolds() {
     RETURN_IF_ERROR(utils::GenerateFolds(generator_, &dataset_, &folds_));
     const std::string folds_path =
         file::JoinPath(test::TmpDirectory(), "folds.csv");

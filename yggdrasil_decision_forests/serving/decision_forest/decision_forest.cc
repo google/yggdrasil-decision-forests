@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
@@ -1078,7 +1079,7 @@ absl::Status LoadFlatBatchFromDataset(
     const std::vector<std::string>& feature_names,
     std::vector<Value>* flat_examples, const ExampleFormat example_format,
     absl::optional<int64_t> batch_size,
-    const std::function<utils::StatusOr<Value>(
+    const std::function<absl::StatusOr<Value>(
         const int feature_idx, const int example_idx,
         const std::vector<int>& node_feature_idx_to_spec_feature_idx)>
         get_value) {
@@ -1169,7 +1170,7 @@ absl::Status LoadFlatBatchFromDataset(
   const auto get_value =
       [&](const int node_feature_idx, const int example_idx,
           const std::vector<int>& node_feature_idx_to_spec_feature_idx)
-      -> utils::StatusOr<float> {
+      -> absl::StatusOr<float> {
     const int spec_feature_idx =
         node_feature_idx_to_spec_feature_idx[node_feature_idx];
     if (dataset.column(spec_feature_idx)->type() != ColumnType::NUMERICAL) {
@@ -1204,7 +1205,7 @@ absl::Status LoadFlatBatchFromDataset(
   const auto get_value =
       [&](const int node_feature_idx, const int example_idx,
           const std::vector<int>& node_feature_idx_to_spec_feature_idx)
-      -> utils::StatusOr<NumericalOrCategoricalValue> {
+      -> absl::StatusOr<NumericalOrCategoricalValue> {
     const int spec_feature_idx =
         node_feature_idx_to_spec_feature_idx[node_feature_idx];
     NumericalOrCategoricalValue feature_value;

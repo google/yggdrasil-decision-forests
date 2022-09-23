@@ -23,6 +23,7 @@
 
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
@@ -30,13 +31,12 @@
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
 
-utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
+absl::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec,
     const absl::optional<std::vector<int>> required_columns) {
@@ -55,7 +55,7 @@ utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
   return std::move(reader);
 }
 
-utils::StatusOr<bool> IsFormatSupported(absl::string_view typed_path) {
+absl::StatusOr<bool> IsFormatSupported(absl::string_view typed_path) {
   const auto path_format_or = GetDatasetPathAndTypeOrStatus(typed_path);
   if (!path_format_or.ok()) {
     return false;

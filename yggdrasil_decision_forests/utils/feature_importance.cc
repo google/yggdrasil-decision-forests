@@ -24,6 +24,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -32,7 +33,6 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
@@ -69,7 +69,7 @@ dataset::VerticalDataset ShuffleDatasetColumns(
 absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
-        utils::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
+        absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
             const int feature_idx)>
         get_permutation_evaluation,
     model::AbstractModel* model, int num_rounds) {

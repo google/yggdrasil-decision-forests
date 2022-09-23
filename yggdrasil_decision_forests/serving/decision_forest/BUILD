@@ -19,12 +19,12 @@ cc_library_ydf(
     deps = [
         ":decision_forest",
         ":quick_scorer_extended",
+        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/serving:example_set_model_wrapper",
         "//yggdrasil_decision_forests/serving:fast_engine",
-        "//yggdrasil_decision_forests/utils:compatibility",
     ],
     alwayslink = 1,
 )
@@ -40,6 +40,7 @@ cc_library_ydf(
     deps = [
         ":utils",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
@@ -66,6 +67,7 @@ cc_library_ydf(
         "@com_google_absl//absl/base:config",
         "@com_google_absl//absl/numeric:bits",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",

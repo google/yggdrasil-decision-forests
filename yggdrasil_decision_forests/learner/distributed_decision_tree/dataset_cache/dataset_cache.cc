@@ -67,7 +67,7 @@ absl::Status ListShards(const absl::string_view typed_path,
 
 // Returns "column_idxs" if "column_idxs" is set. Else, returns all the column
 // indices in the dataset.
-utils::StatusOr<std::vector<int>> GetColumnsOrAll(
+absl::StatusOr<std::vector<int>> GetColumnsOrAll(
     const dataset::proto::DataSpecification& data_spec,
     const std::vector<int>* column_idxs,
     const proto::CreateDatasetCacheConfig& config) {
@@ -259,7 +259,7 @@ absl::Status CreateDatasetCacheFromShardedFiles(
   return absl::OkStatus();
 }
 
-utils::StatusOr<proto::CacheMetadata> LoadCacheMetadata(
+absl::StatusOr<proto::CacheMetadata> LoadCacheMetadata(
     const absl::string_view path) {
   proto::CacheMetadata meta_data;
   RETURN_IF_ERROR(file::GetBinaryProto(file::JoinPath(path, kFilenameMetaData),

@@ -22,6 +22,7 @@
 
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
@@ -30,7 +31,6 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -72,7 +72,7 @@ absl::Status CsvExampleReader::Implementation::OpenShard(
   return absl::OkStatus();
 }
 
-utils::StatusOr<bool> CsvExampleReader::Implementation::NextInShard(
+absl::StatusOr<bool> CsvExampleReader::Implementation::NextInShard(
     proto::Example* example) {
   std::vector<absl::string_view>* row;
   ASSIGN_OR_RETURN(const bool has_row, csv_reader_->NextRow(&row));
@@ -310,7 +310,7 @@ absl::Status CsvDataSpecCreator::ComputeColumnStatistics(
   return absl::OkStatus();
 }
 
-utils::StatusOr<int64_t> CsvDataSpecCreator::CountExamples(
+absl::StatusOr<int64_t> CsvDataSpecCreator::CountExamples(
     absl::string_view path) {
   int64_t count = 0;
 
@@ -331,7 +331,7 @@ utils::StatusOr<int64_t> CsvDataSpecCreator::CountExamples(
   return count - 1;
 }
 
-utils::StatusOr<proto::ColumnType> InferType(
+absl::StatusOr<proto::ColumnType> InferType(
     const proto::DataSpecificationGuide& guide, const absl::string_view value,
     const proto::Tokenizer& tokenizer, const ColumnType previous_type) {
   auto type = previous_type;

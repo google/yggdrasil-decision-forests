@@ -23,12 +23,12 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
@@ -48,7 +48,7 @@ class CsvExampleReader final : public ExampleReaderInterface {
   explicit CsvExampleReader(const proto::DataSpecification& data_spec,
                             absl::optional<std::vector<int>> required_columns);
 
-  utils::StatusOr<bool> Next(proto::Example* example) override {
+  absl::StatusOr<bool> Next(proto::Example* example) override {
     return sharded_csv_reader_.Next(example);
   }
 
@@ -67,7 +67,7 @@ class CsvExampleReader final : public ExampleReaderInterface {
     absl::Status OpenShard(absl::string_view path) override;
 
     // Scans a new row in the csv file, and parses it as a proto:Example.
-    utils::StatusOr<bool> NextInShard(proto::Example* example) override;
+    absl::StatusOr<bool> NextInShard(proto::Example* example) override;
 
    private:
     // The data spec.
@@ -104,14 +104,14 @@ class CsvDataSpecCreator : public AbstractDataSpecCreator {
       proto::DataSpecification* data_spec,
       proto::DataSpecificationAccumulator* accumulator) override;
 
-  utils::StatusOr<int64_t> CountExamples(absl::string_view path) override;
+  absl::StatusOr<int64_t> CountExamples(absl::string_view path) override;
 };
 
 REGISTER_AbstractDataSpecCreator(CsvDataSpecCreator, "FORMAT_CSV");
 
 // Determine the most likely type of the attribute according to the current
 // most likely value type and an observed string value.
-utils::StatusOr<proto::ColumnType> InferType(
+absl::StatusOr<proto::ColumnType> InferType(
     const proto::DataSpecificationGuide& guide, absl::string_view value,
     const proto::Tokenizer& tokenizer, proto::ColumnType previous_type);
 

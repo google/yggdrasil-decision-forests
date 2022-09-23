@@ -21,8 +21,8 @@
 
 #include <string>
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -38,13 +38,13 @@ using DocumentationUrlFunctor = std::function<std::string(
 //     Use "AllRegisteredLearners()" for the list of all linked learners.
 //   order: Order in which to display the learners. Remaining learners are
 //     ordered alphabetically after the ones specified in "order".
-utils::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
+absl::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
     std::vector<std::string> learners,
     const DocumentationUrlFunctor& gen_doc_url,
     const std::vector<std::string>& ordering = {});
 
 // Create the Markdown documentation for a set of hyper-parameters.
-utils::StatusOr<std::string> ExportHParamSpecToMarkdown(
+absl::StatusOr<std::string> ExportHParamSpecToMarkdown(
     absl::string_view learner_key,
     const proto::GenericHyperParameterSpecification& hparams,
     const std::vector<proto::PredefinedHyperParameterTemplate>& templates,

@@ -40,10 +40,10 @@
 #include <memory>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -61,7 +61,7 @@ namespace dataset {
 // "required_columns" is not present, all its value will be assumed to be
 // "missing".
 //
-utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
+absl::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
     absl::optional<std::vector<int>> required_columns = {});
 
@@ -69,7 +69,7 @@ utils::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
 // registered for this format. Returns true, if the format is supported. Returns
 // false if the format is not supported. Returns an error if the typed path
 // cannot be parsed. Note: This function does not read the target file.
-utils::StatusOr<bool> IsFormatSupported(absl::string_view typed_path);
+absl::StatusOr<bool> IsFormatSupported(absl::string_view typed_path);
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

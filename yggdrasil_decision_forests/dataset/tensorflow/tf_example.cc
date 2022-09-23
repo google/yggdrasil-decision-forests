@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -34,7 +35,6 @@
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/tf_example.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -374,7 +374,7 @@ absl::Status TfExampleToExampleSet(const ::tensorflow::Example& src,
 
 namespace internal {
 
-utils::StatusOr<float> GetSingleFloatFromTFFeature(
+absl::StatusOr<float> GetSingleFloatFromTFFeature(
     const tensorflow::Feature& feature, const proto::Column& col) {
   float num_value;
   switch (feature.kind_case()) {

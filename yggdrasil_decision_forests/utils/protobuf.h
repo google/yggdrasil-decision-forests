@@ -20,8 +20,8 @@
 
 #include "src/google/protobuf/text_format.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
@@ -29,7 +29,7 @@ namespace utils {
 
 // Unserializes a proto from its text representation.
 template <typename T>
-utils::StatusOr<T> ParseTextProto(absl::string_view raw) {
+absl::StatusOr<T> ParseTextProto(absl::string_view raw) {
   T message;
   if (!google::protobuf::TextFormat::ParseFromString(std::string(raw), &message)) {
     return absl::InvalidArgumentError(
@@ -40,7 +40,7 @@ utils::StatusOr<T> ParseTextProto(absl::string_view raw) {
 
 // Unserializes a proto from its binary representation.
 template <typename T>
-utils::StatusOr<T> ParseBinaryProto(absl::string_view raw) {
+absl::StatusOr<T> ParseBinaryProto(absl::string_view raw) {
   T message;
   if (!message.ParseFromString(std::string(raw))) {
     return absl::InvalidArgumentError(absl::StrCat(
@@ -63,7 +63,7 @@ class ProtoReaderInterface {
  public:
   // Try to retrieve the next available value. If no more value are
   // available, returns false.
-  virtual utils::StatusOr<bool> Next(T* value) = 0;
+  virtual absl::StatusOr<bool> Next(T* value) = 0;
 };
 
 // Interface for the sequential writing of protos.

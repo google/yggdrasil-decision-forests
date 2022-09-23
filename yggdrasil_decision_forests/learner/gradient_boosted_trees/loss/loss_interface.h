@@ -28,6 +28,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
@@ -35,7 +36,6 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/metric/ranking_utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
@@ -175,12 +175,12 @@ class AbstractLoss {
 
   // Initial prediction of the model before any tree is trained. Sometime called
   // the "bias".
-  virtual utils::StatusOr<std::vector<float>> InitialPredictions(
+  virtual absl::StatusOr<std::vector<float>> InitialPredictions(
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const = 0;
 
   // Initial predictions from a pre-aggregated label statistics.
-  virtual utils::StatusOr<std::vector<float>> InitialPredictions(
+  virtual absl::StatusOr<std::vector<float>> InitialPredictions(
       const decision_tree::proto::LabelStatistics& label_statistics) const = 0;
 
   // Returns true iif. the loss needs for the examples to be grouped i.e.
@@ -250,7 +250,7 @@ class AbstractLoss {
       const std::vector<float>& predictions,
       const std::vector<GradientData>& gradients, int label_col_idx) const = 0;
 
-  virtual utils::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+  virtual absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
   SetLeafFunctorFromLabelStatistics() const {
     return absl::InternalError(
         "SetLeafFunctorFromLabelStatistics not implemented");

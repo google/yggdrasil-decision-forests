@@ -18,9 +18,9 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_METRIC_COMPARISON_H_
 #define YGGDRASIL_DECISION_FORESTS_METRIC_COMPARISON_H_
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace metric {
@@ -37,7 +37,7 @@ dataset::proto::DataSpecification CreateDataSpecForComparisonTable(
 // not greater than the accuracy of the "model_2" at threshold "threshold_2".
 // A small p-value (e.g. <0.05) indicates that it is safe to reject the
 // null-hypothesis i.e. deciding that the model 1 is better than the model 2.
-utils::StatusOr<float> OneSidedMcNemarTest(
+absl::StatusOr<float> OneSidedMcNemarTest(
     const proto::EvaluationResults& eval_results1,
     const proto::EvaluationResults& eval_results2, int roc_idx,
     float threshold1, float threshold2);
@@ -50,7 +50,7 @@ utils::StatusOr<float> OneSidedMcNemarTest(
 // An example of a label : '1_vs_the_others@Recall=0.5', which corresponds to
 // comparing the two models at the thresholds where the class '1' has a recall
 // of 0.5 .
-utils::StatusOr<std::vector<std::pair<std::string, float>>> OneSidedMcNemarTest(
+absl::StatusOr<std::vector<std::pair<std::string, float>>> OneSidedMcNemarTest(
     const proto::EvaluationResults& eval_results1,
     const proto::EvaluationResults& eval_results2);
 
@@ -61,7 +61,7 @@ utils::StatusOr<std::vector<std::pair<std::string, float>>> OneSidedMcNemarTest(
 //
 // See https://www.itl.nist.gov/div898/handbook/eda/section3/eda352.htm for more
 // details.
-utils::StatusOr<float> PairwiseRegressiveResidualTest(
+absl::StatusOr<float> PairwiseRegressiveResidualTest(
     const proto::EvaluationResults& eval_baseline,
     const proto::EvaluationResults& eval_candidate);
 
@@ -69,7 +69,7 @@ utils::StatusOr<float> PairwiseRegressiveResidualTest(
 // difference of ndcg of two ranking models.
 //
 // H1: expected_value(residual(candidate) - residual(baseline)) > 0
-utils::StatusOr<float> PairwiseRankingNDCG5Test(
+absl::StatusOr<float> PairwiseRankingNDCG5Test(
     const proto::EvaluationResults& eval_baseline,
     const proto::EvaluationResults& eval_candidate);
 

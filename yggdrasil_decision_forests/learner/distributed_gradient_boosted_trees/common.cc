@@ -41,7 +41,7 @@ EndIterTreeProtoReader::EndIterTreeProtoReader(
     const proto::WorkerRequest::EndIter::Tree& src)
     : src_(src) {}
 
-utils::StatusOr<bool> EndIterTreeProtoReader::Next(
+absl::StatusOr<bool> EndIterTreeProtoReader::Next(
     decision_tree::proto::Node* value) {
   if (next_node_idx_ >= src_.nodes_size()) {
     return false;

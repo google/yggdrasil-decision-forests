@@ -50,7 +50,7 @@ namespace decision_tree {
 // These methods only differ by the type of the "label_stats" argument.
 
 // Classification.
-utils::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -64,7 +64,7 @@ utils::StatusOr<bool> FindBestConditionSparseOblique(
     SplitterPerThreadCache* cache);
 
 // Regression with hessian term.
-utils::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -78,7 +78,7 @@ utils::StatusOr<bool> FindBestConditionSparseOblique(
     SplitterPerThreadCache* cache);
 
 // Regression.
-utils::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionSparseOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,

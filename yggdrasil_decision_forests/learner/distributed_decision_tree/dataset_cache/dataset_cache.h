@@ -105,7 +105,7 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
     const distribute::proto::Config& distribute_config,
     bool delete_source_file);
 
-utils::StatusOr<proto::CacheMetadata> LoadCacheMetadata(absl::string_view path);
+absl::StatusOr<proto::CacheMetadata> LoadCacheMetadata(absl::string_view path);
 
 // Human readable report about the metadata. If "features" is specified,
 // computes the statistics on the "features" features only. Otherwise, computes

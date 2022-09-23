@@ -388,7 +388,7 @@ void AddCategoricalSetFeatures(const proto::SyntheticDatasetOptions& options,
   }
 }
 
-utils::StatusOr<std::vector<Example>> CreateFeatures(
+absl::StatusOr<std::vector<Example>> CreateFeatures(
     const proto::SyntheticDatasetOptions& options, const GeneratorState& state,
     utils::RandomEngine* rnd) {
   std::vector<Example> examples;
@@ -637,7 +637,7 @@ absl::Status WriteExamples(const std::vector<Example>& examples,
   }
 }
 
-utils::StatusOr<GeneratorState> CreateState(
+absl::StatusOr<GeneratorState> CreateState(
     const proto::SyntheticDatasetOptions& options, utils::RandomEngine* rnd) {
   GeneratorState state;
   auto accumulator_dist =

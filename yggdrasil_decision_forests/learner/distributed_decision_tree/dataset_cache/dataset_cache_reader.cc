@@ -38,7 +38,7 @@ std::string DatasetCacheReader::MetadataInformation() const {
   return report;
 }
 
-utils::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
+absl::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
     absl::string_view path, const proto::DatasetCacheReaderOptions& options) {
   const auto begin = absl::Now();
   auto cache = absl::WrapUnique(new DatasetCacheReader(path, options));
@@ -198,7 +198,7 @@ DatasetCacheReader::NonBlockingLoadingInProgressUnloadedFeatures() const {
   return non_blocking_.unload_features;
 }
 
-utils::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
+absl::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
   utils::concurrency::MutexLock lock(&non_blocking_.status_mutex);
   if (non_blocking_.is_running) {
     // Still running.
@@ -567,7 +567,7 @@ const std::vector<float>& DatasetCacheReader::weights() const {
   return weights_;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<ExampleIdxType>>>
+absl::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<ExampleIdxType>>>
 DatasetCacheReader::PresortedNumericalFeatureExampleIterator(
     int column_idx) const {
   if (!meta_data().columns(column_idx).has_numerical()) {
@@ -599,7 +599,7 @@ DatasetCacheReader::PresortedNumericalFeatureExampleIterator(
   return reader;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
+absl::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
 DatasetCacheReader::PresortedNumericalFeatureValueIterator(
     int column_idx) const {
   if (!meta_data().columns(column_idx).has_numerical()) {
@@ -630,7 +630,7 @@ DatasetCacheReader::PresortedNumericalFeatureValueIterator(
   return reader;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
+absl::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
 DatasetCacheReader::InOrderNumericalFeatureValueIterator(int column_idx) const {
   if (!meta_data().columns(column_idx).has_numerical()) {
     return absl::InvalidArgumentError(
@@ -657,7 +657,7 @@ DatasetCacheReader::InOrderNumericalFeatureValueIterator(int column_idx) const {
   return reader;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<CategoricalType>>>
+absl::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<CategoricalType>>>
 DatasetCacheReader::InOrderCategoricalFeatureValueIterator(
     int column_idx) const {
   if (!meta_data().columns(column_idx).has_categorical()) {
@@ -688,7 +688,7 @@ DatasetCacheReader::InOrderCategoricalFeatureValueIterator(
   return reader;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<BooleanType>>>
+absl::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<BooleanType>>>
 DatasetCacheReader::InOrderBooleanFeatureValueIterator(int column_idx) const {
   if (!meta_data().columns(column_idx).has_boolean()) {
     return absl::InvalidArgumentError(
@@ -717,7 +717,7 @@ DatasetCacheReader::InOrderBooleanFeatureValueIterator(int column_idx) const {
   return reader;
 }
 
-utils::StatusOr<std::unique_ptr<
+absl::StatusOr<std::unique_ptr<
     AbstractIntegerColumnIterator<DiscretizedIndexedNumericalType>>>
 DatasetCacheReader::InOrderDiscretizedNumericalFeatureValueIterator(
     int column_idx) const {
@@ -757,7 +757,7 @@ DatasetCacheReader::InOrderDiscretizedNumericalFeatureValueIterator(
   return reader;
 }
 
-utils::StatusOr<std::unique_ptr<
+absl::StatusOr<std::unique_ptr<
     AbstractIntegerColumnIterator<DiscretizedIndexedNumericalType>>>
 DatasetCacheReader::InOrderDiscretizedNumericalFeatureValueIterator(
     int column_idx, size_t begin_idx, size_t end_idx) const {
@@ -983,7 +983,7 @@ absl::Status PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
   return absl::OkStatus();
 }
 
-utils::StatusOr<int64_t> PartialDatasetCacheDataSpecCreator::CountExamples(
+absl::StatusOr<int64_t> PartialDatasetCacheDataSpecCreator::CountExamples(
     absl::string_view path) {
   return absl::UnimplementedError("CountExamples not implemented");
 }

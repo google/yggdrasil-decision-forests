@@ -30,6 +30,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -56,7 +57,6 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/adaptive_work.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/feature_importance.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -457,7 +457,7 @@ GradientBoostedTreesLearner::InitializeModel(
   return mdl;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 GradientBoostedTreesLearner::TrainWithStatus(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
@@ -473,7 +473,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
   return ShardedSamplingTrain(typed_path, data_spec, typed_valid_path);
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 GradientBoostedTreesLearner::ShardedSamplingTrain(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
@@ -617,7 +617,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
        &shard_random_mutex, &dataset_prefix, &data_spec, &config, &mdl,
        &time_accumulators, &last_engine, &num_trees_in_last_engine](
           const std::vector<decision_tree::DecisionTree*>& trees)
-      -> utils::StatusOr<
+      -> absl::StatusOr<
           std::unique_ptr<internal::CompleteTrainingDatasetForWeakLearner>> {
     auto time_begin_load = absl::Now();
     std::vector<std::string> selected_shards;
@@ -978,7 +978,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   return mdl;
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 GradientBoostedTreesLearner::TrainWithStatus(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
@@ -1808,7 +1808,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   return absl::OkStatus();
 }
 
-utils::StatusOr<model::proto::HyperParameterSpace>
+absl::StatusOr<model::proto::HyperParameterSpace>
 GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
   model::proto::HyperParameterSpace space;
 
@@ -1974,7 +1974,7 @@ GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
   return space;
 }
 
-utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+absl::StatusOr<model::proto::GenericHyperParameterSpecification>
 GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
   ASSIGN_OR_RETURN(auto hparam_def,
                    AbstractLearner::GetGenericHyperParameterSpecification());
@@ -2298,7 +2298,7 @@ For example, in the case of binary classification, the pre-link function output 
 
 namespace internal {
 
-utils::StatusOr<proto::Loss> DefaultLoss(
+absl::StatusOr<proto::Loss> DefaultLoss(
     const model::proto::Task task, const dataset::proto::Column& label_spec) {
   if (task == model::proto::Task::CLASSIFICATION &&
       label_spec.type() == dataset::proto::ColumnType::CATEGORICAL) {
@@ -2332,7 +2332,7 @@ utils::StatusOr<proto::Loss> DefaultLoss(
       "No defined default loss for this combination of label type and task");
 }
 
-utils::StatusOr<std::unique_ptr<CompleteTrainingDatasetForWeakLearner>>
+absl::StatusOr<std::unique_ptr<CompleteTrainingDatasetForWeakLearner>>
 LoadCompleteDatasetForWeakLearner(
     const std::vector<std::string>& shards,
     const absl::string_view format_prefix,

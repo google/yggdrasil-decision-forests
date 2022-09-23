@@ -27,9 +27,9 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
 
 namespace yggdrasil_decision_forests {
@@ -72,7 +72,7 @@ class AbstractDataSpecCreator {
       proto::DataSpecificationAccumulator* accumulator) = 0;
 
   // Counts the number of examples.
-  virtual utils::StatusOr<int64_t> CountExamples(absl::string_view path) = 0;
+  virtual absl::StatusOr<int64_t> CountExamples(absl::string_view path) = 0;
 };
 
 REGISTRATION_CREATE_POOL(AbstractDataSpecCreator);
@@ -118,7 +118,7 @@ absl::Status UpdateCategoricalIntColumnSpec(
 // Counts efficiently the number of examples in a dataset.
 // This method is equivalent (but much more efficient) than reading and counting
 // all the examples with "CreateExampleReader".
-utils::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path);
+absl::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path);
 
 // Generate the column guide of a given column (by merging the default column
 // guide and the specific [matched using a regex on the column name]
@@ -168,8 +168,8 @@ absl::Status AddTokensToCategoricalColumnSpec(
     const std::vector<std::string>& tokens, proto::Column* col);
 
 // Does this value looks like to be a multi dimensional value?
-utils::StatusOr<bool> LooksMultiDimensional(absl::string_view value,
-                                            const proto::Tokenizer& tokenizer);
+absl::StatusOr<bool> LooksMultiDimensional(absl::string_view value,
+                                           const proto::Tokenizer& tokenizer);
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

@@ -45,7 +45,7 @@ class DatasetCacheReader {
   //   options: Configure how the cache is read. The default options are
   //     satisfying in most cases.
   //
-  static utils::StatusOr<std::unique_ptr<DatasetCacheReader>> Create(
+  static absl::StatusOr<std::unique_ptr<DatasetCacheReader>> Create(
       absl::string_view path, const proto::DatasetCacheReaderOptions& options);
 
   ~DatasetCacheReader() {
@@ -74,38 +74,37 @@ class DatasetCacheReader {
   //
   // See the documentation of "MaskDeltaBit" and "MaskExampleIdx" for an
   // explanation of the "delta-bit example indices" concept.
-  utils::StatusOr<
-      std::unique_ptr<AbstractIntegerColumnIterator<ExampleIdxType>>>
+  absl::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<ExampleIdxType>>>
   PresortedNumericalFeatureExampleIterator(int column_idx) const;
 
   // Iterator over the sorted unique values of the "column_idx"-th numerical
   // column.
-  utils::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
+  absl::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
   PresortedNumericalFeatureValueIterator(int column_idx) const;
 
   // Iterator over the "column_idx"-th numerical column ordedd by example index.
-  utils::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
+  absl::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
   InOrderNumericalFeatureValueIterator(int column_idx) const;
 
   // Iterator over the "column_idx"-th categorical column ordedd by example
   // index.
-  utils::StatusOr<
+  absl::StatusOr<
       std::unique_ptr<AbstractIntegerColumnIterator<CategoricalType>>>
   InOrderCategoricalFeatureValueIterator(int column_idx) const;
 
   // Iterator over the "column_idx"-th boolean column ordedd by example index.
-  utils::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<BooleanType>>>
+  absl::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<BooleanType>>>
   InOrderBooleanFeatureValueIterator(int column_idx) const;
 
   // Iterator over the "column_idx"-th discretized numerical column ordedd by
   // example index.
-  utils::StatusOr<std::unique_ptr<
+  absl::StatusOr<std::unique_ptr<
       AbstractIntegerColumnIterator<DiscretizedIndexedNumericalType>>>
   InOrderDiscretizedNumericalFeatureValueIterator(int column_idx) const;
 
   // Iterator over a subset of the "column_idx"-th discretized numerical column
   // ordedd by example index.
-  utils::StatusOr<std::unique_ptr<
+  absl::StatusOr<std::unique_ptr<
       AbstractIntegerColumnIterator<DiscretizedIndexedNumericalType>>>
   InOrderDiscretizedNumericalFeatureValueIterator(int column_idx,
                                                   size_t begin_idx,
@@ -173,7 +172,7 @@ class DatasetCacheReader {
   // If the loading in progress just completed, finalize it (i.e. the user can
   // access the feature values and "NonBlockingLoadingInProgress()" will now
   // return false), and return false.
-  utils::StatusOr<bool> CheckAndUpdateNonBlockingLoading();
+  absl::StatusOr<bool> CheckAndUpdateNonBlockingLoading();
 
   // Features being loaded. Empty if there are not features being pre-loaded at
   // this time.
@@ -296,7 +295,7 @@ class PartialDatasetCacheDataSpecCreator : public AbstractDataSpecCreator {
       proto::DataSpecification* data_spec,
       proto::DataSpecificationAccumulator* accumulator) override;
 
-  utils::StatusOr<int64_t> CountExamples(absl::string_view path) override;
+  absl::StatusOr<int64_t> CountExamples(absl::string_view path) override;
 
  private:
   // Compute the statistics of a single column on a single shard.

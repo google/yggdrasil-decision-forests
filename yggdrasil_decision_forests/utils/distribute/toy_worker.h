@@ -52,7 +52,7 @@ class ToyWorker final : public AbstractWorker {
     return absl::OkStatus();
   }
 
-  utils::StatusOr<Blob> RunRequest(Blob blob) override {
+  absl::StatusOr<Blob> RunRequest(Blob blob) override {
     LOG(INFO) << "RunRequest " << blob << " on worker " << WorkerIdx();
     if (absl::StartsWith(blob, "identity")) {
       std::pair<std::string, std::string> items = absl::StrSplit(blob, ':');

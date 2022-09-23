@@ -102,7 +102,7 @@ absl::Status HyperParameterOptimizerLearner::SetHyperParametersImpl(
   return absl::OkStatus();
 }
 
-utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+absl::StatusOr<model::proto::GenericHyperParameterSpecification>
 HyperParameterOptimizerLearner::GetGenericHyperParameterSpecification() const {
   // Returns the hyper-parameters of the base learner.
   const auto& spe_config =
@@ -124,7 +124,7 @@ HyperParameterOptimizerLearner::GetGenericHyperParameterSpecification() const {
   return base_learner->GetGenericHyperParameterSpecification();
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 HyperParameterOptimizerLearner::TrainFromFileOnMemoryDataset(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
@@ -157,7 +157,7 @@ HyperParameterOptimizerLearner::TrainFromFileOnMemoryDataset(
                          valid_dataset_path);
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 HyperParameterOptimizerLearner::TrainWithStatus(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
@@ -256,7 +256,7 @@ absl::Status HyperParameterOptimizerLearner::GetEffectiveConfiguration(
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 HyperParameterOptimizerLearner::TrainWithStatus(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
@@ -344,7 +344,7 @@ HyperParameterOptimizerLearner::TrainWithStatus(
   }
 }
 
-utils::StatusOr<std::unique_ptr<AbstractModel>>
+absl::StatusOr<std::unique_ptr<AbstractModel>>
 HyperParameterOptimizerLearner::TrainRemoteModel(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -379,7 +379,7 @@ HyperParameterOptimizerLearner::TrainRemoteModel(
   return model;
 }
 
-utils::StatusOr<std::unique_ptr<distribute::AbstractManager>>
+absl::StatusOr<std::unique_ptr<distribute::AbstractManager>>
 HyperParameterOptimizerLearner::CreateDistributeManager() const {
   // Configure the working directory.
   if (deployment().cache_path().empty()) {
@@ -405,7 +405,7 @@ HyperParameterOptimizerLearner::CreateDistributeManager() const {
                                    welcome.SerializeAsString());
 }
 
-utils::StatusOr<std::unique_ptr<AbstractLearner>>
+absl::StatusOr<std::unique_ptr<AbstractLearner>>
 HyperParameterOptimizerLearner::HyperParameterOptimizerLearner::
     BuildBaseLearner(
         const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
@@ -416,7 +416,7 @@ HyperParameterOptimizerLearner::HyperParameterOptimizerLearner::
   return base_learner;
 }
 
-utils::StatusOr<model::proto::HyperParameterSpace>
+absl::StatusOr<model::proto::HyperParameterSpace>
 HyperParameterOptimizerLearner::BuildSearchSpace(
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
     const AbstractLearner& base_learner) const {
@@ -424,7 +424,7 @@ HyperParameterOptimizerLearner::BuildSearchSpace(
   return space;
 }
 
-utils::StatusOr<bool> HyperParameterOptimizerLearner::IsMaximization(
+absl::StatusOr<bool> HyperParameterOptimizerLearner::IsMaximization(
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
     const metric::proto::MetricAccessor& metric_accessor) const {
   if (spe_config.evaluation().has_maximize_metric()) {
@@ -433,7 +433,7 @@ utils::StatusOr<bool> HyperParameterOptimizerLearner::IsMaximization(
   return metric::HigherIsBetter(metric_accessor);
 }
 
-utils::StatusOr<model::proto::GenericHyperParameters>
+absl::StatusOr<model::proto::GenericHyperParameters>
 HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -464,11 +464,11 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
     std::unique_ptr<AbstractModel> model;
   };
   utils::concurrency::StreamProcessor<model::proto::GenericHyperParameters,
-                                      utils::StatusOr<Output>>
+                                      absl::StatusOr<Output>>
       async_evaluator(
           "evaluator", deployment().num_threads(),
           [&](const model::proto::GenericHyperParameters& candidate)
-              -> utils::StatusOr<Output> {
+              -> absl::StatusOr<Output> {
             std::unique_ptr<AbstractModel> model;
             ASSIGN_OR_RETURN(
                 const auto score,
@@ -585,7 +585,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
   return best_params;
 }
 
-utils::StatusOr<model::proto::GenericHyperParameters>
+absl::StatusOr<model::proto::GenericHyperParameters>
 HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -750,8 +750,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
   return best_params;
 }
 
-utils::StatusOr<double>
-HyperParameterOptimizerLearner::EvaluateCandidateLocally(
+absl::StatusOr<double> HyperParameterOptimizerLearner::EvaluateCandidateLocally(
     const model::proto::GenericHyperParameters& candidate,
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -779,7 +778,7 @@ HyperParameterOptimizerLearner::EvaluateCandidateLocally(
   return score;
 }
 
-utils::StatusOr<double> HyperParameterOptimizerLearner::EvaluationToScore(
+absl::StatusOr<double> HyperParameterOptimizerLearner::EvaluationToScore(
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
     const metric::proto::EvaluationResults& evaluation) const {
   // Extract the metric to optimize from the evaluation.
@@ -808,7 +807,7 @@ utils::StatusOr<double> HyperParameterOptimizerLearner::EvaluationToScore(
 
 namespace internal {
 
-utils::StatusOr<metric::proto::MetricAccessor> DefaultTargetMetric(
+absl::StatusOr<metric::proto::MetricAccessor> DefaultTargetMetric(
     const metric::proto::EvaluationResults& evaluation) {
   if (evaluation.has_loss_value()) {
     metric::proto::MetricAccessor accessor;

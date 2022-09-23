@@ -38,8 +38,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_BLOB_SEQUENCE_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_BLOB_SEQUENCE_H_
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -49,13 +49,13 @@ namespace blob_sequence {
 class Reader {
  public:
   // Creates a reader attached to a stream. Does not take ownership of "stream".
-  static utils::StatusOr<Reader> Create(utils::InputByteStream* stream);
+  static absl::StatusOr<Reader> Create(utils::InputByteStream* stream);
 
   // Creates a non attached reader.
   Reader() {}
 
   // Reads the next blob. Return false iff no more blobs are available.
-  utils::StatusOr<bool> Read(std::string* blob);
+  absl::StatusOr<bool> Read(std::string* blob);
 
   // Closes the reader. Does not close the stream (passed in the constructor)
   // Should be called BEFORE the stream is closed (if the stream has the concept
@@ -73,7 +73,7 @@ class Writer {
  public:
   // Creates a writer attached to a stream.  Does not take ownership of
   // "stream".
-  static utils::StatusOr<Writer> Create(utils::OutputByteStream* stream);
+  static absl::StatusOr<Writer> Create(utils::OutputByteStream* stream);
 
   // Creates a non attached writer.
   Writer() {}

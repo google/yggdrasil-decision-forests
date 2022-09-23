@@ -103,10 +103,8 @@ class FileInputByteStream
     : public yggdrasil_decision_forests::utils::InputByteStream {
  public:
   absl::Status Open(absl::string_view path);
-  yggdrasil_decision_forests::utils::StatusOr<int> ReadUpTo(
-      char* buffer, int max_read) override;
-  yggdrasil_decision_forests::utils::StatusOr<bool> ReadExactly(
-      char* buffer, int num_read) override;
+  absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
+  absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) override;
   absl::Status Close();
 
  private:
@@ -141,8 +139,7 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
                           int unused);
 
 // Tests if a file exist.
-yggdrasil_decision_forests::utils::StatusOr<bool> FileExists(
-    absl::string_view path);
+absl::StatusOr<bool> FileExists(absl::string_view path);
 
 // Gets the basename of the path.
 //

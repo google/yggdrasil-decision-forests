@@ -20,13 +20,13 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -41,7 +41,7 @@ absl::Status GetGenericHyperParameterSpecification(
   auto& fields = *hparam_def->mutable_fields();
 
   const auto get_params = [&fields](const absl::string_view key)
-      -> utils::StatusOr<
+      -> absl::StatusOr<
           model::proto::GenericHyperParameterSpecification::Value*> {
     if (fields.find(std::string(key)) != fields.end()) {
       return absl::InternalError(

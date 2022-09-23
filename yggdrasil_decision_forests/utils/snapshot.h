@@ -26,7 +26,7 @@
 #define YGGDRASIL_DECISION_FORESTS_UTILS_SNAPSHOT_IO_H_
 
 #include "absl/status/status.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "absl/status/statusor.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -37,7 +37,7 @@ absl::Status AddSnapshot(absl::string_view directory, int index);
 
 // Retrieves the largest snapshot index. Returns an error if not snapshot
 // records are available.
-utils::StatusOr<int> GetGreatestSnapshot(absl::string_view directory);
+absl::StatusOr<int> GetGreatestSnapshot(absl::string_view directory);
 
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

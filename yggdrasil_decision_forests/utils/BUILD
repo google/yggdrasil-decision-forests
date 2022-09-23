@@ -96,11 +96,11 @@ cc_library_ydf(
     }),
     deps = [
         ":bytestream",
-        ":compatibility",
         ":logging_default",
         ":protobuf",
         ":status_macros",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
     ],
@@ -131,6 +131,7 @@ cc_library_ydf(
         ":tensorflow",
         "@com_google_protobuf//:protobuf",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
     ] + select({
@@ -174,12 +175,12 @@ cc_library_ydf(
         "sharded_io.h",
     ],
     deps = [
-        ":compatibility",
         ":filesystem",
         ":logging",
         ":protobuf",
         ":status_macros",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -226,10 +227,10 @@ cc_library_ydf(
         "protobuf.h",
     ],
     deps = [
-        ":compatibility",
         ":logging",
         "@com_google_protobuf//:protobuf",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -243,11 +244,11 @@ cc_library_ydf(
         "registration.h",
     ],
     deps = [
-        ":compatibility",
+        ":synchronization_primitives",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "//yggdrasil_decision_forests/utils:synchronization_primitives",
     ],
 )
 
@@ -260,9 +261,9 @@ cc_library_ydf(
         "bytestream.h",
     ],
     deps = [
-        ":compatibility",
         ":status_macros",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -276,7 +277,6 @@ cc_library_ydf(
     ],
     deps = [
         ":bytestream",
-        ":logging",
         ":status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
@@ -315,7 +315,6 @@ cc_library_ydf(
     deps = [
         ":logging",
         ":synchronization_primitives",
-        "@com_google_absl//absl/status",
     ],
 )
 
@@ -416,12 +415,12 @@ cc_library_ydf(
         "hyper_parameters.h",
     ],
     deps = [
-        ":compatibility",
         ":logging",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/meta:type_traits",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
     ],
@@ -441,10 +440,10 @@ cc_library_ydf(
         ":filesystem",
         ":logging",
         ":status_macros",
+        ":synchronization_primitives",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "//yggdrasil_decision_forests/utils:synchronization_primitives",
     ],
 )
 
@@ -470,8 +469,9 @@ cc_library_ydf(
     deps = [
         ":compatibility",
         ":logging",
+        ":synchronization_primitives",
         "@com_google_absl//absl/base:core_headers",
-        "//yggdrasil_decision_forests/utils:synchronization_primitives",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -510,10 +510,10 @@ cc_library_ydf(
         "feature_importance.h",
     ],
     deps = [
-        ":compatibility",
         ":random",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
@@ -535,7 +535,6 @@ cc_library_ydf(
         "test_utils.h",
     ],
     deps = [
-        ":compatibility",
         ":concurrency",
         ":csv",
         ":distribution_cc_proto",
@@ -548,6 +547,7 @@ cc_library_ydf(
         "@com_google_absl//absl/random",
         "@com_google_absl//absl/random:distributions",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
@@ -587,11 +587,11 @@ cc_library_ydf(
         ],
     }),
     deps = [
-        ":compatibility",
         ":distribution",
         ":distribution_cc_proto",
         ":status_macros",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:optional",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
@@ -652,9 +652,8 @@ cc_library_ydf(
     hdrs = ["blob_sequence.h"],
     deps = [
         ":bytestream",
-        ":compatibility",
-        ":filesystem",
         ":status_macros",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -669,6 +668,7 @@ cc_library_ydf(
         ":sharded_io",
         ":status_macros",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -678,10 +678,9 @@ cc_library_ydf(
     srcs = ["snapshot.cc"],
     hdrs = ["snapshot.h"],
     deps = [
-        ":compatibility",
         ":filesystem",
-        ":status_macros",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -715,13 +714,13 @@ cc_library_ydf(
     srcs = ["plot.cc"],
     hdrs = ["plot.h"],
     deps = [
-        ":compatibility",
         ":histogram",
         ":html",
         ":logging",
         ":status_macros",
         ":uid",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -777,7 +776,7 @@ cc_test(
         # "@com_google_googletest//:gtest_main",  # When fixed
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
-        ":compatibility",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -832,11 +831,11 @@ cc_test(
     name = "status_macros_test",
     srcs = ["status_macros_test.cc"],
     deps = [
-        ":compatibility",
         ":logging",
         ":status_macros",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -844,10 +843,10 @@ cc_test(
     name = "testing_macros_test",
     srcs = ["testing_macros_test.cc"],
     deps = [
-        ":compatibility",
         ":testing_macros",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -926,7 +925,6 @@ cc_test(
         "//yggdrasil_decision_forests/test_data",
     ],
     deps = [
-        ":compatibility",
         ":filesystem",
         ":fold_generator",
         ":status_macros",
@@ -934,6 +932,7 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
@@ -1049,7 +1048,6 @@ cc_test(
     srcs = ["math_test.cc"],
     deps = [
         ":math",
-        ":test",
         "@com_google_googletest//:gtest_main",
     ],
 )

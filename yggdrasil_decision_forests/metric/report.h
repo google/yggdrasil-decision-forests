@@ -18,15 +18,15 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_METRIC_REPORT_H_
 #define YGGDRASIL_DECISION_FORESTS_METRIC_REPORT_H_
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace metric {
 
 // Append a textual report of the evaluation.
-utils::StatusOr<std::string> TextReport(const proto::EvaluationResults& eval);
+absl::StatusOr<std::string> TextReport(const proto::EvaluationResults& eval);
 
 void AppendTextReport(const proto::EvaluationResults& eval,
                       std::string* report);

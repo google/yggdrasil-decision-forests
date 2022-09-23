@@ -40,7 +40,7 @@ using ::testing::SizeIs;
 
 // TODO: Improve testing coverage for NDCG loss functions.
 
-utils::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
+absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   dataset::VerticalDataset dataset;
   // TODO Replace by a modern function when possible.
   *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(

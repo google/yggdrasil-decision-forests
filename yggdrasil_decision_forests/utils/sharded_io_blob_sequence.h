@@ -17,6 +17,7 @@
 #define YGGDRASIL_DECISION_FORESTS_TOOL_SHARDED_IO_BLOG_SEQUENCE_H_
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/blob_sequence.h"
@@ -34,7 +35,7 @@ class BlobSequenceShardedReader : public ShardedReader<T> {
  public:
   BlobSequenceShardedReader() = default;
   absl::Status OpenShard(absl::string_view path) override;
-  utils::StatusOr<bool> NextInShard(T* example) override;
+  absl::StatusOr<bool> NextInShard(T* example) override;
 
  private:
   blob_sequence::Reader reader_;
@@ -74,7 +75,7 @@ absl::Status BlobSequenceShardedReader<T>::OpenShard(
 }
 
 template <typename T>
-utils::StatusOr<bool> BlobSequenceShardedReader<T>::NextInShard(T* example) {
+absl::StatusOr<bool> BlobSequenceShardedReader<T>::NextInShard(T* example) {
   ASSIGN_OR_RETURN(const auto has_content, reader_.Read(&buffer_));
   if (!has_content) {
     return false;

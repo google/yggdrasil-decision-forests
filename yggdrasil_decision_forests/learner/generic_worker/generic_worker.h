@@ -34,7 +34,7 @@ class GenericWorker : public distribute::AbstractWorker {
 
   absl::Status Setup(distribute::Blob serialized_welcome) override;
 
-  utils::StatusOr<distribute::Blob> RunRequest(
+  absl::StatusOr<distribute::Blob> RunRequest(
       distribute::Blob serialized_request) override;
 
   absl::Status Done() override {

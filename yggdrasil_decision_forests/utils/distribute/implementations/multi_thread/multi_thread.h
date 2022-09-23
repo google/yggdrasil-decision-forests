@@ -21,6 +21,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_MULTI_THREAD_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_MULTI_THREAD_H_
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/utils.h"
@@ -41,17 +42,17 @@ class MultiThreadManager : public AbstractManager,
     }
   }
 
-  utils::StatusOr<Blob> BlockingRequest(Blob blob, int worker_idx) override;
+  absl::StatusOr<Blob> BlockingRequest(Blob blob, int worker_idx) override;
 
   absl::Status AsynchronousRequest(Blob blob, int worker_idx) override;
 
-  utils::StatusOr<Blob> NextAsynchronousAnswer() override;
+  absl::StatusOr<Blob> NextAsynchronousAnswer() override;
 
   int NumWorkers() override;
 
   absl::Status Done(absl::optional<bool> kill_worker_manager) override;
 
-  utils::StatusOr<int> NumWorkersInConfiguration(
+  absl::StatusOr<int> NumWorkersInConfiguration(
       const proto::Config& config) const override;
 
   absl::Status SetParallelExecutionPerWorker(int num) override;
@@ -64,7 +65,7 @@ class MultiThreadManager : public AbstractManager,
     return absl::OkStatus();
   }
 
-  virtual utils::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
+  virtual absl::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
       AbstractWorker* emitter_worker) {
     auto answer = workers_[emitter_worker->WorkerIdx()]
                       ->pending_inter_workers_answers.Pop();
@@ -93,7 +94,7 @@ class MultiThreadManager : public AbstractManager,
     // Requesting worker index and payload.
     utils::concurrency::Channel<std::pair<int, Blob>>
         pending_inter_workers_queries;
-    utils::concurrency::Channel<utils::StatusOr<Blob>>
+    utils::concurrency::Channel<absl::StatusOr<Blob>>
         pending_inter_workers_answers;
 
     ThreadVector process_global_queries;
@@ -117,7 +118,7 @@ class MultiThreadManager : public AbstractManager,
   std::atomic<int> next_worker_ = {0};
 
   utils::concurrency::Channel<Blob> pending_queries_;
-  utils::concurrency::Channel<utils::StatusOr<Blob>> pending_answers_;
+  utils::concurrency::Channel<absl::StatusOr<Blob>> pending_answers_;
 
   std::atomic<bool> done_was_called_{false};
 };

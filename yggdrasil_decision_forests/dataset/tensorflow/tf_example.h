@@ -17,6 +17,7 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_TF_EXAMPLE_H_
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "tensorflow/core/example/example.pb.h"
 #include "tensorflow/core/example/feature.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -45,7 +46,7 @@ absl::Status TfExampleToExampleSet(const ::tensorflow::Example& src,
 namespace internal {
 // Get the float value contained in a feature. Can return NaN. Fails if
 // the feature contains more than one value.
-utils::StatusOr<float> GetSingleFloatFromTFFeature(
+absl::StatusOr<float> GetSingleFloatFromTFFeature(
     const tensorflow::Feature& feature, const proto::Column& col);
 
 // Get all the float values contained in a feature.

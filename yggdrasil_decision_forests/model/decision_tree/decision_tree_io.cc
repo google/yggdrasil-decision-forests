@@ -24,11 +24,11 @@
 
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree_io_interface.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -84,7 +84,7 @@ absl::Status LoadTreesFromDisk(
   return absl::OkStatus();
 }
 
-utils::StatusOr<std::string> RecommendedSerializationFormat() {
+absl::StatusOr<std::string> RecommendedSerializationFormat() {
   for (const auto& candidate : {
            "BLOB_SEQUENCE",
        }) {
@@ -97,7 +97,7 @@ utils::StatusOr<std::string> RecommendedSerializationFormat() {
       "disk.");
 }
 
-utils::StatusOr<std::unique_ptr<AbstractFormat>> GetFormatImplementation(
+absl::StatusOr<std::unique_ptr<AbstractFormat>> GetFormatImplementation(
     absl::string_view format) {
   ASSIGN_OR_RETURN(auto imp, AbstractFormatRegisterer::Create(format));
   return std::move(imp);

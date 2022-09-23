@@ -22,6 +22,7 @@
 #include <string>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -30,7 +31,6 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/fold_generator.pb.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
@@ -56,7 +56,7 @@ class AbstractLearner {
   // for validation. If "typed_valid_path" is not provided, a validation dataset
   // will be extracted from the training dataset. If the algorithm does not have
   // the "use_validation_dataset" capability, "typed_valid_path" is ignored.
-  virtual utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path = {}) const;
@@ -68,7 +68,7 @@ class AbstractLearner {
   // for validation. If "valid_dataset" is not provided, a validation dataset
   // will be extracted from the training dataset. If the algorithm does not have
   // the "use_validation_dataset" capability, "valid_dataset" is ignored.
-  virtual utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const = 0;
@@ -112,7 +112,7 @@ class AbstractLearner {
       utils::GenericHyperParameterConsumer* generic_hyper_params);
 
   // Get a description of the generic hyper-parameters supported by the learner.
-  virtual utils::StatusOr<proto::GenericHyperParameterSpecification>
+  virtual absl::StatusOr<proto::GenericHyperParameterSpecification>
   GetGenericHyperParameterSpecification() const;
 
   // Returns a list of hyper-parameter sets that outperforms the default
@@ -127,7 +127,7 @@ class AbstractLearner {
   // Pre-defined space of hyper-parameters to be automatically optimized.
   // Returns a failing status if the learner does not provide a pre-defined
   // space of hyper-parameter to optimize.
-  virtual utils::StatusOr<proto::HyperParameterSpace>
+  virtual absl::StatusOr<proto::HyperParameterSpace>
   PredefinedHyperParameterSpace() const;
 
   // Accessor to the deployment configuration.
@@ -233,7 +233,7 @@ absl::Status CheckGenericHyperParameterSpecification(
 // models at a time might be best i.e. deployment_evaluation = { .num_threads =
 // 1 }.
 
-utils::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
+absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
     const AbstractLearner& learner, const dataset::VerticalDataset& dataset,
     const utils::proto::FoldGenerator& fold_generator,
     const metric::proto::EvaluationOptions& evaluation_options,

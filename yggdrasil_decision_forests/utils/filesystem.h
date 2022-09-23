@@ -24,23 +24,21 @@
 #endif
 // clang-format on
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace file {
 
 // Open a file for reading.
-yggdrasil_decision_forests::utils::StatusOr<
-    std::unique_ptr<FileInputByteStream>>
-OpenInputFile(absl::string_view path);
+absl::StatusOr<std::unique_ptr<FileInputByteStream>> OpenInputFile(
+    absl::string_view path);
 
 // Open a file for writing.
-yggdrasil_decision_forests::utils::StatusOr<
-    std::unique_ptr<FileOutputByteStream>>
-OpenOutputFile(absl::string_view path);
+absl::StatusOr<std::unique_ptr<FileOutputByteStream>> OpenOutputFile(
+    absl::string_view path);
 
 // Reads the content of a file.
-yggdrasil_decision_forests::utils::StatusOr<std::string> GetContent(
-    absl::string_view path);
+absl::StatusOr<std::string> GetContent(absl::string_view path);
 
 // Sets the content of a file.
 absl::Status SetContent(absl::string_view path, absl::string_view content);

@@ -43,7 +43,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/histogram.h"
 
 namespace yggdrasil_decision_forests {
@@ -183,12 +183,12 @@ struct MultiPlot {
 };
 
 // Exports a multi-plot to a html file.
-utils::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
-                                          const ExportOptions& options = {});
+absl::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
+                                         const ExportOptions& options = {});
 
 // Exports a plot to a html file.
-utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
-                                          const ExportOptions& options = {});
+absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
+                                         const ExportOptions& options = {});
 
 // Utility to place plots in a multi-plot. This class sets automatically all the
 // num_{cols,rows}, col and row fields in a multiplot and its sub-plots. The
@@ -213,11 +213,11 @@ class PlotPlacer {
   //    plots. The multiplot object should outlive the PlotPlacer.
   //  num_plots: Number of plots to add in the multiplot.
   //  max_num_cols: Maximum number of columns in the multi-plot.
-  static utils::StatusOr<PlotPlacer> Create(int num_plots, int max_num_cols,
-                                            MultiPlot* multiplot);
+  static absl::StatusOr<PlotPlacer> Create(int num_plots, int max_num_cols,
+                                           MultiPlot* multiplot);
 
   // Adds and returns a new plot. Returns a non-owning pointer to the plot.
-  utils::StatusOr<Plot*> NewPlot();
+  absl::StatusOr<Plot*> NewPlot();
 
   // To be called after all the calls to "NewPlot".
   // This method ensures that "NewPlot" was called "num_plots" times.
@@ -241,8 +241,8 @@ namespace internal {
 namespace plotly {
 
 // Specialization of ExportToHtml to plotly.
-utils::StatusOr<std::string> ExportToHtml(const Plot& plot,
-                                          const ExportOptions& options);
+absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
+                                         const ExportOptions& options);
 
 }  // namespace plotly
 }  // namespace internal

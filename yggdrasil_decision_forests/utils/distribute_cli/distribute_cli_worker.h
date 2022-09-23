@@ -16,6 +16,7 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CLI_WORKER_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CLI_WORKER_H_
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute_cli/common.h"
@@ -29,7 +30,7 @@ class Worker : public distribute::AbstractWorker {
  public:
   absl::Status Setup(distribute::Blob serialized_welcome) override;
 
-  utils::StatusOr<distribute::Blob> RunRequest(
+  absl::StatusOr<distribute::Blob> RunRequest(
       distribute::Blob serialized_request) override;
 
   absl::Status Done() override {

@@ -16,8 +16,8 @@
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers/random.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers/random.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -75,7 +75,7 @@ absl::Status RandomOptimizer::BuildRandomSet(
   return absl::OkStatus();
 }
 
-utils::StatusOr<NextCandidateStatus> RandomOptimizer::NextCandidate(
+absl::StatusOr<NextCandidateStatus> RandomOptimizer::NextCandidate(
     model::proto::GenericHyperParameters* candidate) {
   RETURN_IF_ERROR(constructor_status_);
 
@@ -149,7 +149,7 @@ absl::Status UpdateWeights(model::proto::HyperParameterSpace* space) {
   return absl::OkStatus();
 }
 
-utils::StatusOr<double> UpdateWeights(
+absl::StatusOr<double> UpdateWeights(
     model::proto::HyperParameterSpace::Field* field) {
   if (!field->has_discrete_candidates()) {
     return absl::InvalidArgumentError("Discrete candidate missing");
@@ -212,8 +212,8 @@ utils::StatusOr<double> UpdateWeights(
   return field_weight;
 }
 
-utils::StatusOr<size_t> Sample(std::vector<float>& weights,
-                               utils::RandomEngine* random) {
+absl::StatusOr<size_t> Sample(std::vector<float>& weights,
+                              utils::RandomEngine* random) {
   const double sum = std::accumulate(weights.begin(), weights.end(), 0.0);
   if (sum <= 0) {
     return absl::InvalidArgumentError("Zero weight sum");

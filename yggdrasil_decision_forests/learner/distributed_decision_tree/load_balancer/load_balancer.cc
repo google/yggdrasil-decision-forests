@@ -24,7 +24,7 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace distributed_decision_tree {
 
-utils::StatusOr<LoadBalancer> LoadBalancer::Create(
+absl::StatusOr<LoadBalancer> LoadBalancer::Create(
     const std::vector<int>& features, int num_workers,
     const dataset_cache::proto::CacheMetadata& cache_metadata,
     const proto::LoadBalancerOptions& options) {
@@ -88,7 +88,7 @@ absl::Status LoadBalancer::Initialize(
   return absl::OkStatus();
 }
 
-utils::StatusOr<int> LoadBalancer::FeatureOwner(int feature) const {
+absl::StatusOr<int> LoadBalancer::FeatureOwner(int feature) const {
   if (!features_[feature].active) {
     return absl::InternalError("Non active feature");
   }
@@ -149,7 +149,7 @@ std::string LoadBalancer::Info(bool detailed) const {
   return info;
 }
 
-utils::StatusOr<bool> LoadBalancer::AddWorkDurationMeasurement(
+absl::StatusOr<bool> LoadBalancer::AddWorkDurationMeasurement(
     const std::vector<Measure>& measure_per_workers) {
   if (measure_per_workers.size() != workers_.size()) {
     return absl::InternalError("Wrong number of workers");
@@ -294,7 +294,7 @@ LoadBalancer::CreateWorkTimeEstimatePerWorker() const {
   return estimates;
 }
 
-utils::StatusOr<double> LoadBalancer::EstimateFeatureLoadingTime() const {
+absl::StatusOr<double> LoadBalancer::EstimateFeatureLoadingTime() const {
   if (num_feature_loading_time_ == 0) {
     return absl::InternalError(
         "At least one measurement of feature loading time required.");
@@ -496,7 +496,7 @@ const std::vector<int>& LoadBalancer::FeaturesPerWorker(int worker) const {
   return workers_[worker].features;
 }
 
-utils::StatusOr<double> LoadBalancer::CostPerFeatureType(
+absl::StatusOr<double> LoadBalancer::CostPerFeatureType(
     int feature, const dataset_cache::proto::CacheMetadata& cache_metadata) {
   // TODO: Tune these costs.
   const double very_large = 1000000;
@@ -546,7 +546,7 @@ int LoadBalancer::GetBestCandidateWallTime(
   return -1;
 }
 
-utils::StatusOr<proto::SplitSharingPlan> LoadBalancer::MakeSplitSharingPlan(
+absl::StatusOr<proto::SplitSharingPlan> LoadBalancer::MakeSplitSharingPlan(
     const std::vector<int>& feature_idxs) {
   proto::SplitSharingPlan plan;
   auto& round_1 = *plan.add_rounds();

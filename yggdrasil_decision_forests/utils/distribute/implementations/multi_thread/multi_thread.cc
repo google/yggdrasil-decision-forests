@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.h"
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -25,8 +26,8 @@ namespace distribute {
 
 constexpr char MultiThreadManager::kKey[];
 
-utils::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
-                                                          int worker_idx) {
+absl::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
+                                                         int worker_idx) {
   if (verbosity_ >= 2) {
     LOG(INFO) << "Emitting blocking request of " << blob.size() << " bytes";
   }
@@ -59,7 +60,7 @@ absl::Status MultiThreadManager::AsynchronousRequest(Blob blob,
   return absl::OkStatus();
 }
 
-utils::StatusOr<Blob> MultiThreadManager::NextAsynchronousAnswer() {
+absl::StatusOr<Blob> MultiThreadManager::NextAsynchronousAnswer() {
   if (verbosity_ >= 2) {
     LOG(INFO) << "Wait for next result";
   }
@@ -202,7 +203,7 @@ absl::Status MultiThreadManager::Initialize(const proto::Config& config,
   return absl::OkStatus();
 }
 
-utils::StatusOr<int> MultiThreadManager::NumWorkersInConfiguration(
+absl::StatusOr<int> MultiThreadManager::NumWorkersInConfiguration(
     const proto::Config& config) const {
   const auto& imp_config = config.GetExtension(proto::multi_thread);
   return imp_config.num_workers();

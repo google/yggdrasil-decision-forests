@@ -31,7 +31,7 @@ namespace utils {
 absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
-        utils::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
+        absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
             const int feature_idx)>
         get_permutation_evaluation,
     model::AbstractModel* model, int num_rounds = 1);

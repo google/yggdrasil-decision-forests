@@ -41,6 +41,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"

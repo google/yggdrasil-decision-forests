@@ -72,7 +72,7 @@ cc_library_ydf(
     deps = [
         ":distribute_cc_proto",
         "@com_google_absl//absl/status",
-        "//yggdrasil_decision_forests/utils:compatibility",
+        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:registration",
         "//yggdrasil_decision_forests/utils:status_macros",

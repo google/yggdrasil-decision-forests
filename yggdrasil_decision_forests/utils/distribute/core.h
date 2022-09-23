@@ -19,7 +19,7 @@
 #include <string>
 
 #include "absl/status/status.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
@@ -56,7 +56,7 @@ class AbstractWorker {
   // Callback for the execution of a request.
   // Can be called by different threads at the same time. It is up to the
   // "RunRequest" implementation to handle thread safety.
-  virtual utils::StatusOr<Blob> RunRequest(Blob blob) = 0;
+  virtual absl::StatusOr<Blob> RunRequest(Blob blob) = 0;
 
   // Index of the worker.
   int WorkerIdx() const { return worker_idx_; }
@@ -77,12 +77,12 @@ class AbstractWorker {
 
   // Waits and retrieves the next answer from an
   // AsynchronousRequestToOtherWorker or AsynchronousProtoRequestToOtherWorker.
-  utils::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker();
+  absl::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker();
 
   // Same as "NextAsynchronousAnswerFromOtherWorker", but unserialize the answer
   // into a proto.
   template <typename Result>
-  utils::StatusOr<Result> NextAsynchronousProtoAnswerFromOtherWorker();
+  absl::StatusOr<Result> NextAsynchronousProtoAnswerFromOtherWorker();
 
  private:
   // Initialize the internal fields of the workers. Called before "Setup".
@@ -119,7 +119,7 @@ class AbstractWorkerHook {
       Blob blob, int target_worker_idx, AbstractWorker* emitter_worker);
 
   // Retrieve an answer from a request previously send to another worker.
-  virtual utils::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
+  virtual absl::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
       AbstractWorker* emitter_worker);
 };
 
@@ -133,13 +133,13 @@ class AbstractManager {
 
   // Runs a task and wait for the result.
   // If the worker idx is <0, it is up to the manager to select a worker.
-  virtual utils::StatusOr<Blob> BlockingRequest(Blob blob,
-                                                int worker_idx = -1) = 0;
+  virtual absl::StatusOr<Blob> BlockingRequest(Blob blob,
+                                               int worker_idx = -1) = 0;
 
   // Same as "BlockingRequest", but serialize the blob from a proto.
   template <typename Result, typename Request>
-  utils::StatusOr<Result> BlockingProtoRequest(Request request,
-                                               int worker_idx = -1);
+  absl::StatusOr<Result> BlockingProtoRequest(Request request,
+                                              int worker_idx = -1);
 
   // Runs a task but do not wait for the result. The result can be retrieved by
   // "NextAsynchronousAnswer". If the worker idx is <0, it is up to the manager
@@ -151,11 +151,11 @@ class AbstractManager {
 
   // Waits and retrieves the next answer from an AsynchronousRequest or
   // AsynchronousProtoRequest.
-  virtual utils::StatusOr<Blob> NextAsynchronousAnswer() = 0;
+  virtual absl::StatusOr<Blob> NextAsynchronousAnswer() = 0;
 
   // Same as "NextAsynchronousAnswer", but unserialize the answer into a proto.
   template <typename Result>
-  utils::StatusOr<Result> NextAsynchronousProtoAnswer();
+  absl::StatusOr<Result> NextAsynchronousProtoAnswer();
 
   // Number of workers.
   virtual int NumWorkers() = 0;
@@ -182,7 +182,7 @@ class AbstractManager {
   // Gets the number of workers specified in a configuration without having to
   // "Initialize" the object. The returned number of workers is the same as
   // calling "Initialize" and then "NumWorkers".
-  virtual utils::StatusOr<int> NumWorkersInConfiguration(
+  virtual absl::StatusOr<int> NumWorkersInConfiguration(
       const proto::Config& config) const = 0;
 
   // Initialize the manager. "Initialize" is called by the generic
@@ -198,11 +198,11 @@ class AbstractManager {
     return absl::OkStatus();
   }
 
-  friend utils::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
+  friend absl::StatusOr<std::unique_ptr<AbstractManager>> CreateManager(
       const proto::Config& config, absl::string_view worker_name,
       Blob welcome_blob, int parallel_execution_per_worker);
 
-  friend utils::StatusOr<int> NumWorkers(const proto::Config& config);
+  friend absl::StatusOr<int> NumWorkers(const proto::Config& config);
 };
 
 REGISTRATION_CREATE_POOL(AbstractManager);
@@ -216,7 +216,7 @@ absl::Status InternalInitializeWorker(
     AbstractWorkerHook* worker_implementation = nullptr);
 
 template <typename Result, typename Request>
-utils::StatusOr<Result> AbstractManager::BlockingProtoRequest(
+absl::StatusOr<Result> AbstractManager::BlockingProtoRequest(
     Request request, const int worker_idx) {
   ASSIGN_OR_RETURN(auto serialized_result,
                    BlockingRequest(request.SerializeAsString(), worker_idx));
@@ -230,7 +230,7 @@ absl::Status AbstractManager::AsynchronousProtoRequest(Request request,
 }
 
 template <typename Result>
-utils::StatusOr<Result> AbstractManager::NextAsynchronousProtoAnswer() {
+absl::StatusOr<Result> AbstractManager::NextAsynchronousProtoAnswer() {
   ASSIGN_OR_RETURN(auto serialized_result, NextAsynchronousAnswer());
   return utils::ParseBinaryProto<Result>(serialized_result);
 }
@@ -243,7 +243,7 @@ absl::Status AbstractWorker::AsynchronousProtoRequestToOtherWorker(
 }
 
 template <typename Result>
-utils::StatusOr<Result>
+absl::StatusOr<Result>
 AbstractWorker::NextAsynchronousProtoAnswerFromOtherWorker() {
   ASSIGN_OR_RETURN(auto serialized_result,
                    NextAsynchronousAnswerFromOtherWorker());

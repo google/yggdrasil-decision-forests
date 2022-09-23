@@ -36,7 +36,7 @@ class DistributedGradientBoostedTreesWorker
 
   absl::Status Setup(distribute::Blob serialized_welcome) override;
 
-  utils::StatusOr<distribute::Blob> RunRequest(
+  absl::StatusOr<distribute::Blob> RunRequest(
       distribute::Blob serialized_request) override;
 
   absl::Status Done() override;
@@ -95,7 +95,7 @@ class DistributedGradientBoostedTreesWorker
     kEVALUATOR
   };
 
-  utils::StatusOr<distribute::Blob> RunRequestImp(
+  absl::StatusOr<distribute::Blob> RunRequestImp(
       distribute::Blob serialized_request);
 
   // Simulates worker failures and restart. A failure is artificially generated
@@ -164,7 +164,7 @@ class DistributedGradientBoostedTreesWorker
   // Initiate the pre-loading of features for future usage.
   //
   // True true if any preloading work is in progress.
-  utils::StatusOr<bool> PreloadFutureOwnedFeatures(
+  absl::StatusOr<bool> PreloadFutureOwnedFeatures(
       const proto::WorkerRequest::FutureOwnedFeatures& future_owned_features);
 
   // Merges the split evaluation into the "last_split_evaluation" field of each
@@ -310,7 +310,7 @@ class DistributedGradientBoostedTreesWorker
 };
 
 // Extract the requested features in a FindSplits request.
-utils::StatusOr<std::vector<std::vector<int>>> ExtractInputFeaturesPerNodes(
+absl::StatusOr<std::vector<std::vector<int>>> ExtractInputFeaturesPerNodes(
     const proto::WorkerRequest::FindSplits::FeaturePerNode& src);
 
 // Update the "predictions_" of the examples in nodes closed in

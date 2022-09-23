@@ -21,7 +21,7 @@ namespace yggdrasil_decision_forests {
 namespace utils {
 namespace blob_sequence {
 
-utils::StatusOr<Reader> Reader::Create(utils::InputByteStream* stream) {
+absl::StatusOr<Reader> Reader::Create(utils::InputByteStream* stream) {
   Reader reader;
   reader.stream_ = stream;
 
@@ -40,7 +40,7 @@ utils::StatusOr<Reader> Reader::Create(utils::InputByteStream* stream) {
   return reader;
 }
 
-utils::StatusOr<bool> Reader::Read(std::string* blob) {
+absl::StatusOr<bool> Reader::Read(std::string* blob) {
   internal::RecordHeader header;
   ASSIGN_OR_RETURN(
       auto has_content,
@@ -64,7 +64,7 @@ utils::StatusOr<bool> Reader::Read(std::string* blob) {
 
 absl::Status Reader::Close() { return absl::OkStatus(); }
 
-utils::StatusOr<Writer> Writer::Create(utils::OutputByteStream* stream) {
+absl::StatusOr<Writer> Writer::Create(utils::OutputByteStream* stream) {
   Writer writer;
   writer.stream_ = stream;
 

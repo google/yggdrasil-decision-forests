@@ -18,6 +18,7 @@ cc_library_ydf(
         ":worker_cc_proto",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/dataset:formats",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner:abstract_learner",
@@ -33,7 +34,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:all_implementations",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:snapshot",
@@ -131,7 +131,6 @@ cc_test(
     deps = [
         ":common",
         ":distributed_gradient_boosted_trees",
-        ":distributed_gradient_boosted_trees_cc_proto",
         ":worker",
         "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_worker",

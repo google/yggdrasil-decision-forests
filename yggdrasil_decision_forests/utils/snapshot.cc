@@ -32,7 +32,7 @@ absl::Status AddSnapshot(absl::string_view directory, int index) {
       file::JoinPath(directory, absl::StrCat(kBaseFileName, index)), "");
 }
 
-utils::StatusOr<int> GetGreatestSnapshot(absl::string_view directory) {
+absl::StatusOr<int> GetGreatestSnapshot(absl::string_view directory) {
   std::vector<std::string> results;
   RETURN_IF_ERROR(
       file::Match(file::JoinPath(directory, absl::StrCat(kBaseFileName, "*")),

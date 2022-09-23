@@ -48,6 +48,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -60,7 +61,6 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
@@ -125,12 +125,12 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamFocalLossGamma[] = "focal_loss_gamma";
   static constexpr char kHParamFocalLossAlpha[] = "focal_loss_alpha";
 
-  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override;
 
-  utils::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path = {}) const override;
@@ -146,10 +146,10 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   absl::Status SetHyperParametersImpl(
       utils::GenericHyperParameterConsumer* generic_hyper_params) override;
 
-  utils::StatusOr<model::proto::GenericHyperParameterSpecification>
+  absl::StatusOr<model::proto::GenericHyperParameterSpecification>
   GetGenericHyperParameterSpecification() const override;
 
-  utils::StatusOr<model::proto::HyperParameterSpace>
+  absl::StatusOr<model::proto::HyperParameterSpace>
   PredefinedHyperParameterSpace() const override;
 
   std::vector<model::proto::PredefinedHyperParameterTemplate>
@@ -175,7 +175,7 @@ class GradientBoostedTreesLearner : public AbstractLearner {
       const dataset::proto::DataSpecification& data_spec) const;
 
   // Training with dataset sampling using shards.
-  utils::StatusOr<std::unique_ptr<AbstractModel>> ShardedSamplingTrain(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> ShardedSamplingTrain(
       const absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path) const;
@@ -393,7 +393,7 @@ struct CompleteTrainingDatasetForWeakLearner {
 };
 
 // Loads a dataset for a weak learner.
-utils::StatusOr<std::unique_ptr<CompleteTrainingDatasetForWeakLearner>>
+absl::StatusOr<std::unique_ptr<CompleteTrainingDatasetForWeakLearner>>
 LoadCompleteDatasetForWeakLearner(
     const std::vector<std::string>& shards,
     const absl::string_view format_prefix,
@@ -461,7 +461,7 @@ class EarlyStopping {
 };
 
 // Computes the loss best adapted to the problem.
-utils::StatusOr<proto::Loss> DefaultLoss(
+absl::StatusOr<proto::Loss> DefaultLoss(
     model::proto::Task task, const dataset::proto::Column& label_spec);
 
 void SetInitialPredictions(const std::vector<float>& initial_predictions,

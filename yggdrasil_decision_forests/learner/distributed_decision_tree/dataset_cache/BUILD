@@ -104,13 +104,12 @@ cc_library_ydf(
     deps = [
         ":column_cache",
         "@com_google_absl//absl/numeric:bits",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/learner:types",
         "//yggdrasil_decision_forests/learner/decision_tree:utils",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:filesystem",
-        "//yggdrasil_decision_forests/utils:uid",
     ],
 )
 
@@ -173,7 +172,6 @@ cc_test(
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/utils:filesystem",
-        "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",

@@ -24,7 +24,7 @@ namespace uplift {
 namespace {
 
 // Gets the "outcome" of a prediction.
-utils::StatusOr<float> GetOutcome(const model::proto::Prediction& prediction) {
+absl::StatusOr<float> GetOutcome(const model::proto::Prediction& prediction) {
   switch (prediction.uplift().outcome_type_case()) {
     case model::proto::Prediction::Uplift::kOutcomeCategorical:
       if (prediction.uplift().outcome_categorical() < 1 ||
