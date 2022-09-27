@@ -19,12 +19,33 @@
  */
 
 /**
+ * A std::vector<T>.
+ *
+ * @typedef {{
+ *   size: function(): number,
+ *   get: function(number) : (string|boolean|number|!Object),
+ * }}
+ */
+let CCVector;
+
+/**
+ * A std::vector<std::vector<T>>.
+ *
+ * @typedef {{
+ *   size: function(): number,
+ *   get: function(number) : !CCVector,
+ * }}
+ */
+let CCVectorVector;
+
+/**
  * Structure of the InputFeature defined in "inference.cc".
  *
  * @typedef {{
  *   name: string,
  *   type: string,
  *   internalIdx: number,
+ *   specIdx: number,
  * }}
  */
 let InputFeature;
@@ -50,16 +71,63 @@ let InternalInputFeatures;
 let InternalPredictions;
 
 /**
+ * Internal predictions with a TF-DF signature.
+ *
+ * @typedef {{
+ *   densePredictions: !CCVectorVector,
+ *   denseColRepresentation: !CCVector,
+ * }}
+ */
+let InternalTFDFPredictions;
+
+/**
+ * Option for loading a model.
+ *
+ * @typedef {{
+ *   createdTFDFSignature: boolean,
+ * }}
+ */
+let LoadModelOptions;
+
+/**
+ * Output predictions whe using the TF-DF signature.
+ *
+ * @typedef {{
+ *   densePredictions: !Array<!Array<number>>,
+ *   denseColRepresentation: Array<string>,
+ * }}
+ */
+let TFDFOutputPrediction;
+
+/**
+ * Input features for the TF-DF signature.
+ *
+ * @typedef {{
+ *   numericalFeatures: !Array<!Array<number>>,
+ *   booleanFeatures: !Array<!Array<number>>,
+ *   categoricalIntFeatures: !Array<!Array<number>>,
+ *   categoricalSetIntFeaturesValues: !Array<!Array<number>>,
+ *   categoricalSetIntFeaturesRowSplitsDim1: !Array<!Array<number>>,
+ *   categoricalSetIntFeaturesRowSplitsDim2: !Array<!Array<number>>,
+ *   denseOutputDim: number,
+ * }}
+ */
+let TFDFInput;
+
+/**
  * Structure of the InternalModel defined in "inference.cc".
  *
  * @typedef {{
  *   predict: function(): !InternalPredictions,
+ *   predictTFDFSignature: function(number): !InternalTFDFPredictions,
  *   newBatchOfExamples: function(number),
  *   setNumerical: function(number,number,number),
+ *   setBoolean: function(number,number,number),
  *   setCategoricalInt: function(number,number,number),
  *   setCategoricalString: function(number,number,string),
  *   setCategoricalSetString: function(number,number,!Array<string>),
  *   getInputFeatures: function(): !InternalInputFeatures,
+ *   getProtoInputFeatures: function(): !InternalInputFeatures,
  *   delete: function(),
  * }}
  */
