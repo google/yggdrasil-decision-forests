@@ -8,3 +8,4 @@ sphinx-book-theme>=0.3.3
 sphinx-copybutton>=0.5.0
 sphinx-remove-toctrees
 sphinx_design
+sphinx-sitemap

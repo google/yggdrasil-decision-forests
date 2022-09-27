@@ -4,8 +4,7 @@ project = "Yggdrasil Decision Forests"
 copyright = "2022, Google"
 author = "Mathieu Guillame-Bert"
 
-release = "1.0.1"
-version = "0.2.5"
+html_baseurl = "https://ydf.readthedocs.io/en/latest/"
 
 master_doc = "index"
 
@@ -17,6 +16,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "sphinx_design",
+    "sphinx_sitemap",
     "myst_parser",
 ]
 
@@ -44,11 +44,14 @@ intersphinx_disabled_domains = ["std"]
 
 myst_heading_anchors = 3
 
+templates_path = ["_templates"]
 html_theme = "sphinx_book_theme"
 html_logo = "image/both_logo.png"
 html_theme_options = {
     "logo_only": True,
-    "display_version": False,
+    "repository_url": "https://github.com/google/yggdrasil-decision-forests",
+    "use_repository_button": True,
+    "use_issues_button": True,
 }
 
 epub_show_urls = "footnote"
