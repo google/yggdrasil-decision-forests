@@ -1,6 +1,6 @@
 # How to improve models
 
-This page list methods to improve the quality and speed of YDF models.
+This page list methods to improve the quality, speed and size of YDF models.
 
 ``` {note}
 Learn more about decision forests algorithms in our
@@ -269,4 +269,112 @@ learner: "RANDOM_FOREST"
     categorical { random {} }
   }
 }
+```
+
+## Improving the size of the model
+
+The size of a model is critical in some applications. YDF models range from a
+few KB to a few GB. The following sections list some way you can reduce the size
+of a model.
+
+### 1. Switch from a Random Forest to a Gradient Boosted Trees
+
+Random Forests models are significantly larger and slower than Gradient Boosted
+Trees.
+
+**TensorFlow Decision Forests code**
+
+```python
+# model = tfdf.keras.RandomForestModel()
+model = tfdf.keras.GradientBoostedTreesModel()
+```
+
+### 2. Remove model meta-data
+
+YDF models contain meta-data used for model interpretation and debugging. This
+meta-data is not used for model inference and can be discarded to decrease the
+model size.
+
+The meta-data can be remove with the argument `pure_serving_model=True`.
+
+**TensorFlow Decision Forests code**
+
+```python
+model = tfdf.keras.RandomForestModel(pure_serving_model=True)
+```
+
+**Yggdrasil Decision Forests training configuration**
+
+```python
+pure_serving_model: true
+```
+
+The meta-data of an already existing model can be removed with the the
+`edit_model` tool:
+
+```shell
+# Remove the meta-data from the model
+./edit_model --input=/tmp/model_with_metadata --output=/tmp/model_without_metadata --pure_serving=true
+
+# Look at the size of the model
+du -h /tmp/model_with_metadata
+du -h /tmp/model_without_metadata
+```
+
+Results:
+
+```
+528K /tmp/model_with_metadata
+264K /tmp/model_without_metadata
+```
+
+### 3. Ensure that the model is correctly trained
+
+Unique ID-like features (e.g., user id) that cannot be generated about will make
+the model grow without benefit. Make sure to not include such type of input
+features.
+
+ID-like features can be spotted using the variable importance. They generally
+have high "number of nodes" variable importance while all the other variable
+importance measures are low.
+
+### 4. Reduce the number of trees
+
+The `num_trees` parameter controls the number of trees in the model. Reducing
+this parameter will decrease the size of the model at the expense of the model
+quality.
+
+### 5. Disable `winner_take_all_inference` with Random Forests
+
+The `winner_take_all_inference` parameters (true by default) can make Random
+Forest models large. Try disabling it.
+
+**TensorFlow Decision Forests code**
+
+```python
+model = tfdf.keras.RandomForestModel(winner_take_all=False)
+```
+
+**Yggdrasil Decision Forests training configuration**
+
+```python
+winner_take_all_inference: false
+```
+
+### 6. Set `maximum_model_size_in_memory_in_bytes`
+
+The `maximum_model_size_in_memory_in_bytes` parameter controls the maximize size
+of the model when loaded in memory. By setting this value, you can control the
+final size of the model.
+
+**TensorFlow Decision Forests code**
+
+```python
+model = tfdf.keras.RandomForestModel(maximum_model_size_in_memory_in_bytes=10e+9  # 10GB)
+```
+
+**Yggdrasil Decision Forests training configuration**
+
+```python
+maximum_model_size_in_memory_in_bytes: 10e+9  # 10GB
 ```
