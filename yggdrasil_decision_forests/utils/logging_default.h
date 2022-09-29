@@ -24,6 +24,7 @@
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/status/status.h"
+#include "absl/time/time.h"
 
 ABSL_DECLARE_FLAG(bool, alsologtostderr);
 
@@ -202,7 +203,8 @@ class LogMessage {
         std::clog << "UNDEF";
         break;
     }
-    std::clog << " " << ExtractFilename(file) << ":" << line << "] ";
+    std::clog << " " << absl::Now() << " " << ExtractFilename(file) << ":"
+              << line << "] ";
   }
 
   virtual ~LogMessage() {
