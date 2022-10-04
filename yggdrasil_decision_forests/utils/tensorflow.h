@@ -33,7 +33,7 @@ inline absl::Status ToUtilStatus(const ::tensorflow::Status& s) {
 // Converts absl::Status to tensorflow::Status.
 inline ::tensorflow::Status FromUtilStatus(const absl::Status& s) {
   return s.ok()
-             ? ::tensorflow::Status::OK()
+             ? ::tensorflow::Status()
              : ::tensorflow::Status(tensorflow::error::Code::UNKNOWN,
                                     absl::StrCat("TensorFlow: ", s.ToString()));
 }
@@ -48,7 +48,7 @@ inline ::tensorflow::Status FromUtilStatus(const absl::Status& s) {
 //   tensorflow::Status f() {
 //     auto g = []() -> absl::Status { ... };
 //     TF_RETURN_IF_ERROR_FROM_ABSL_STATUS(g());
-//     return tensorflow::Status::OK();
+//     return tensorflow::Status();
 //   }
 #ifndef TF_RETURN_IF_ERROR_FROM_ABSL_STATUS
 #define TF_RETURN_IF_ERROR_FROM_ABSL_STATUS(expr) \
