@@ -398,6 +398,8 @@ class VerticalDataset {
     void Set(row_t example_idx,
              const proto::Example::Attribute& attribute) override;
 
+    void Set(row_t example_idx, int32_t value);
+
     void ExtractExample(row_t example_idx,
                         proto::Example::Attribute* attribute) const override;
 

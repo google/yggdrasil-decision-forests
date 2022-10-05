@@ -625,6 +625,10 @@ void VerticalDataset::CategoricalColumn::Set(
   }
 }
 
+void VerticalDataset::CategoricalColumn::Set(row_t example_idx, int32_t value) {
+  (*mutable_values())[example_idx] = value;
+}
+
 void VerticalDataset::DiscretizedNumericalColumn::Set(
     row_t example_idx, const proto::Example::Attribute& attribute) {
   if (dataset::IsNa(attribute)) {
