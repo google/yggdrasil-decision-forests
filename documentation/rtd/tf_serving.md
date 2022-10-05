@@ -1,32 +1,38 @@
 # TensorFlow Serving
 
 [TensorFlow Serving](https://www.tensorflow.org/tfx/guide/serving) (TF Serving)
-is a TensorFlow product to run TensorFlow models online in large distributed
-production settings. TF Serving is an executable that load one of several
-TensorFlow SavedModels, and expose model predictions through gRPC and HTTP.
+is a tool to run TensorFlow models online in large production settings using a
+RPC or REST API. TensorFlow Decision Forests (TF-DF) is supported natively by TF
+Serving >=2.11.
 
-TensorFlow Decision Forests (TF-DF) is supported natively by TF Serving >=2.11.
-Previous version of TF Serving requires a special build. For example,
-[this](https://github.com/tensorflow/decision-forests/releases/tag/serving-1.0.1)
-is a build of TF-Serving Nightly 2.11.
+``` {note}
+TensorFlow Serving 2.11 was not yet released (Oct. 2022).
+In the meantime, *TensorFlow Serving 2.11 Nightly* with support with TF-DF is available [here](https://github.com/tensorflow/decision-forests/releases/tag/serving-1.0.1).
 
-TF-DF models are directly compatible with TF Serving. Yggdrasil models need to
-be [converted](convert_model) first.
+Prior version of TF Serving (e.g. TF Serving 2.8-2.10) are compatible with
+TF-DF. However, they requires to be *re-compiled* with TF-DF support
+([instructions](https://github.com/tensorflow/decision-forests/blob/main/documentation/tensorflow_serving.md#compile-tf-seringtf-decision-forests-from-source)).
+```
+
+TF-DF models are directly compatible with TF Serving. Yggdrasil models can be
+used with TF Serving after being
+[converted](https://ydf.readthedocs.io/en/latest/convert_model.html#convert-a-yggdrasil-model-to-a-tensorflow-decision-forests-model)
+first.
 
 ## Limitations
 
-TensorFlow adds a significant amount of overhead over the computation of the
-model. For small models (e.g., models running is less than 1µs), this overhead
-can be of multiple orders of magnitude the cost of the model itself.
+TensorFlow adds a significant amount of computation overhead. For small latency
+sensitive models (e.g., models running is less than 1µs), this overhead can be
+of multiple orders of magnitude the cost of the model itself. In this case, it
+is recommended to run the TF-DF models with
+[Yggdrasil Decision Forests](https://ydf.readthedocs.io).
 
 ## Usage example
 
 The following example shows how to run a TF-DF model in TF Serving:
 
 First, [install TF Serving](https://github.com/tensorflow/serving#set-up). In
-this example, we will use one of a pre-compiled version of TF-Serving + TF-DF.
-In practice, it is better to download the latest version of TF-Serving in a
-docker.
+this example, we will use a pre-compiled version of TF-Serving + TF-DF.
 
 ```shell
 # Download TF Serving
@@ -37,8 +43,7 @@ unzip tensorflow_model_server_linux.zip
 ./tensorflow_model_server --version
 ```
 
-In this example, we need a TF-DF model. We can use a pre-existing TF-DF model
-trained on the Adult dataset.
+In this example, we use an already trained TF-DF model trained.
 
 ```shell
 # Get a TF-DF model
