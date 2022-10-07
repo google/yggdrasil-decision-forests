@@ -13,7 +13,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 # Load third party libraries
 load("//third_party/gtest:workspace.bzl", gtest = "deps")
-load("//third_party/absl:workspace.bzl", absl = "deps")
+# load("//third_party/absl:workspace.bzl", absl = "deps")
 # load("//third_party/protobuf:workspace.bzl", protobuf = "deps")
 load("//third_party/zlib:workspace.bzl", zlib = "deps")
 load("//third_party/tensorflow:workspace.bzl", tensorflow = "deps")
@@ -23,7 +23,7 @@ load("//third_party/boost:workspace.bzl", boost = "deps")
 load("//third_party/rapidjson:workspace.bzl", rapidjson = "deps")
 
 gtest()
-absl()
+# absl()  # We use the abseil linked in tensorflow to avoid package clashes
 # protobuf() # We use the protobuf linked in tensorflow.
 zlib()
 tensorflow()
