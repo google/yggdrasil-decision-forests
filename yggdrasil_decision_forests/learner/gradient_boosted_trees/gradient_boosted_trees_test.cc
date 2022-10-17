@@ -62,6 +62,7 @@
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -78,7 +79,7 @@ std::string DatasetDir() {
       "yggdrasil_decision_forests/test_data/dataset");
 }
 
-dataset::VerticalDataset CreateToyDataset() {
+absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   dataset::VerticalDataset dataset;
   *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "a" }
@@ -88,11 +89,11 @@ dataset::VerticalDataset CreateToyDataset() {
       categorical { number_of_unique_values: 3 is_already_integerized: true }
     }
   )pb");
-  CHECK_OK(dataset.CreateColumnsFromDataspec());
-  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "1"}, {"b", "1"}}));
-  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "2"}, {"b", "2"}}));
-  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "3"}, {"b", "1"}}));
-  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "2"}}));
+  RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
+  RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "1"}, {"b", "1"}}));
+  RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "2"}, {"b", "2"}}));
+  RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "3"}, {"b", "1"}}));
+  RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "2"}}));
   return dataset;
 }
 
@@ -205,7 +206,8 @@ TEST(GradientBoostedTrees, ExtractValidationDatasetWithGroup) {
 }
 
 TEST(GradientBoostedTrees, CreateGradientDataset) {
-  const auto dataset = CreateToyDataset();
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
 
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
@@ -1266,7 +1268,8 @@ TEST(GradientBoostedTrees, SetHyperParameters) {
 }
 
 TEST(DartPredictionAccumulator, Base) {
-  const auto dataset = CreateToyDataset();
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
   std::vector<float> weights(dataset.nrow(), 1.f);
 
   dataset::VerticalDataset gradient_dataset;
@@ -1413,6 +1416,31 @@ TEST_F(GradientBoostedTreesOnAdult, InterruptAndResumeTraining) {
             get_gbt(resumed_model)->NumTrees());
 }
 
+TEST_F(GradientBoostedTreesOnAdult, EarlyStoppingInitialIteration) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  // Configure model training.
+  model::proto::DeploymentConfig deployment_config;
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::CLASSIFICATION);
+  train_config.set_label("b");
+  train_config.add_features("a");
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  auto* gbt_config = train_config.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_early_stopping_num_trees_look_ahead(1);
+  gbt_config->set_validation_set_ratio(0.3f);
+  gbt_config->set_early_stopping_initial_iteration(0);
+  ASSERT_OK(model::GetLearner(train_config, &learner, deployment_config));
+  ASSERT_OK_AND_ASSIGN(const std::unique_ptr<AbstractModel> model,
+                       learner->TrainWithStatus(dataset));
+  const GradientBoostedTreesModel* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model.get());
+  EXPECT_EQ(gbt_model->NumTrees(), 1);
+}
+
 TEST_F(GradientBoostedTreesOnIris, InterruptAndResumeTraining) {
   // Train a model for a few seconds, interrupt its training, and resume it.
 
@@ -1459,51 +1487,63 @@ TEST_F(GradientBoostedTreesOnIris, InterruptAndResumeTraining) {
 }
 
 TEST(EarlyStopping, Interruption) {
-  internal::EarlyStopping manager(/*early_stopping_num_trees_look_ahead=*/2);
+  internal::EarlyStopping manager(/*early_stopping_num_trees_look_ahead=*/2,
+                                  /*initial_iteration=*/0);
+  int iter_idx = 0;
   manager.set_trees_per_iterations(1);
-  EXPECT_FALSE(manager.ShouldStop());
+  EXPECT_FALSE(manager.ShouldStop(iter_idx));
 
+  ++iter_idx;
   CHECK_OK(manager.Update(/*validation_loss=*/10,
                           /*validation_secondary_metrics=*/{},
-                          /*num_trees=*/0));
-  EXPECT_FALSE(manager.ShouldStop());
+                          /*num_trees=*/0, /*current_iter_idx=*/iter_idx));
+  EXPECT_FALSE(manager.ShouldStop(iter_idx));
 
-  CHECK_OK(manager.Update(9, {}, 1));
-  EXPECT_FALSE(manager.ShouldStop());
+  ++iter_idx;
+  CHECK_OK(manager.Update(9, {}, 1, iter_idx));
+  EXPECT_FALSE(manager.ShouldStop(iter_idx));
 
-  CHECK_OK(manager.Update(8, {}, 2));
-  EXPECT_FALSE(manager.ShouldStop());
+  ++iter_idx;
+  CHECK_OK(manager.Update(8, {}, 2, iter_idx));
+  EXPECT_FALSE(manager.ShouldStop(iter_idx));
 
-  CHECK_OK(manager.Update(7, {}, 3));
-  EXPECT_FALSE(manager.ShouldStop());
+  ++iter_idx;
+  CHECK_OK(manager.Update(7, {}, 3, iter_idx));
+  EXPECT_FALSE(manager.ShouldStop(iter_idx));
 
-  CHECK_OK(manager.Update(8, {}, 4));
-  EXPECT_FALSE(manager.ShouldStop());
+  ++iter_idx;
+  CHECK_OK(manager.Update(8, {}, 4, iter_idx));
+  EXPECT_FALSE(manager.ShouldStop(iter_idx));
 
+  ++iter_idx;
   // This is the lowest (i.e. best) loss.
-  CHECK_OK(manager.Update(6, {}, 5));
-  EXPECT_FALSE(manager.ShouldStop());
+  CHECK_OK(manager.Update(6, {}, 5, iter_idx));
+  EXPECT_FALSE(manager.ShouldStop(iter_idx));
 
-  CHECK_OK(manager.Update(7, {}, 6));
-  EXPECT_FALSE(manager.ShouldStop());
+  ++iter_idx;
+  CHECK_OK(manager.Update(7, {}, 6, iter_idx));
+  EXPECT_FALSE(manager.ShouldStop(iter_idx));
 
-  CHECK_OK(manager.Update(8, {}, 7));
-  EXPECT_TRUE(manager.ShouldStop());
+  ++iter_idx;
+  CHECK_OK(manager.Update(8, {}, 7, iter_idx));
+  EXPECT_TRUE(manager.ShouldStop(iter_idx));
 
   EXPECT_EQ(manager.best_num_trees(), 5);
   EXPECT_EQ(manager.best_loss(), 6);
 }
 
 TEST(EarlyStopping, Serialize) {
-  internal::EarlyStopping a(/*early_stopping_num_trees_look_ahead=*/2);
-  internal::EarlyStopping b(2);
+  internal::EarlyStopping a(/*early_stopping_num_trees_look_ahead=*/2,
+                            /*initial_iteration=*/0);
+  internal::EarlyStopping b(2, 1);
   a.set_trees_per_iterations(1);
 
   // Make some updates.
   CHECK_OK(a.Update(/*validation_loss=*/10,
                     /*validation_secondary_metrics=*/{},
-                    /*num_trees=*/0));
-  CHECK_OK(a.Update(9, {}, 1));
+                    /*num_trees=*/0,
+                    /*iter_idx=*/0));
+  CHECK_OK(a.Update(9, {}, 1, 1));
 
   // Check the internal representation of "a".
   const proto::EarlyStoppingSnapshot expected = PARSE_TEST_PROTO(
@@ -1514,6 +1554,7 @@ TEST(EarlyStopping, Serialize) {
         last_num_trees: 1
         num_trees_look_ahead: 2
         trees_per_iterations: 1
+        initial_iteration: 0
       )pb");
   EXPECT_THAT(a.Save(), EqualsProto(expected));
 
@@ -1526,11 +1567,11 @@ TEST(EarlyStopping, Serialize) {
   EXPECT_THAT(a.Save(), EqualsProto(b.Save()));
 
   // Makes the same updates to "a" and "b".
-  CHECK_OK(a.Update(8, {}, 2));
-  CHECK_OK(a.Update(7, {}, 3));
+  CHECK_OK(a.Update(8, {}, 2, 2));
+  CHECK_OK(a.Update(7, {}, 3, 3));
 
-  CHECK_OK(b.Update(8, {}, 2));
-  CHECK_OK(b.Update(7, {}, 3));
+  CHECK_OK(b.Update(8, {}, 2, 2));
+  CHECK_OK(b.Update(7, {}, 3, 3));
 
   // At this point "a" and "b" should still be equal.
   EXPECT_THAT(a.Save(), EqualsProto(b.Save()));

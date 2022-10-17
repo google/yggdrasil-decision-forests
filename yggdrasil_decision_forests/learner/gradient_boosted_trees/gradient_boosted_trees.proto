@@ -23,7 +23,7 @@ import "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted
 
 // Training configuration for the Gradient Boosted Trees algorithm.
 message GradientBoostedTreesTrainingConfig {
-  // Next ID: 37
+  // Next ID: 38
 
   // Basic parameters.
 
@@ -145,8 +145,8 @@ message GradientBoostedTreesTrainingConfig {
     // No early stopping. Train all the "num_trees" trees.
     NONE = 0;
 
-    // Trains all the "num_trees", and then select the subset of trees that
-    // minimize the validation loss.
+    // Trains all the "num_trees", and then selects the subset {1,.., k} of
+    // trees that minimize the validation loss.
     MIN_VALIDATION_LOSS_ON_FULL_MODEL = 1;
 
     // Stops the training training when the validation loss stops decreasing.
@@ -156,12 +156,25 @@ message GradientBoostedTreesTrainingConfig {
     // than the current model.
     //
     // "VALIDATION_LOSS_INCREASE" is more efficient than
-    // "MIN_VALIDATION_LOSS_ON_FULL_MODEL" but can lead to worst models.
+    // "MIN_VALIDATION_LOSS_ON_FULL_MODEL" but can lead to worse models.
     VALIDATION_LOSS_INCREASE = 2;
   }
   optional EarlyStopping early_stopping = 8
       [default = VALIDATION_LOSS_INCREASE];
   optional int32 early_stopping_num_trees_look_ahead = 9 [default = 30];
+
+  // 0-based index of the first iteration considered for early stopping
+  // computation.
+  //
+  // During the first iterations of a learner, the validation loss can be noisy,
+  // since the learner has yet to learn useful information. In particular, the
+  // validation loss during early iterations can be unusually small. This leads
+  // to early stopping while the model still has poor quality. This parameter
+  // specifies the index of the first iteration during which a validation loss
+  // is computed, i.e. the first iteration considered for early stopping
+  // TODO Add this parameter to the list of generic
+  // hyperparameters (learner/gradient_boosted_trees/gradient_boosted_trees.h)
+  optional int32 early_stopping_initial_iteration = 37 [default = 10];
 
   oneof loss_options {
     LambdaMartNdcg lambda_mart_ndcg = 12;
@@ -382,6 +395,7 @@ message EarlyStoppingSnapshot {
   optional int32 last_num_trees = 6;
   optional int32 num_trees_look_ahead = 7;
   optional int32 trees_per_iterations = 8;
+  optional int32 initial_iteration = 9;
 }
 
 extend model.proto.TrainingConfig {

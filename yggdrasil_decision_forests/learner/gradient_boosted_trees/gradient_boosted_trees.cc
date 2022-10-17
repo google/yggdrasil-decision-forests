@@ -230,17 +230,54 @@ absl::Status FinalizeModelWithValidationDataset(
               MIN_VALIDATION_LOSS_ON_FULL_MODEL ||
       config.gbt_config->early_stopping() ==
           proto::GradientBoostedTreesTrainingConfig::VALIDATION_LOSS_INCREASE) {
-    LOG(INFO) << "Truncates the model to " << early_stopping.best_num_trees()
-              << " tree(s) i.e. "
-              << early_stopping.best_num_trees() / mdl->num_trees_per_iter()
-              << "  iteration(s).";
-    if (early_stopping.best_num_trees() < 0) {
-      return absl::InvalidArgumentError(
-          "The model should be evaluated once on the validation dataset.");
+    int early_stopping_initial_iteration =
+        config.gbt_config->early_stopping_initial_iteration();
+    if (mdl->NumTrees() <
+        (early_stopping_initial_iteration + 1) * mdl->num_trees_per_iter()) {
+      LOG(INFO) << "Insufficient number of trees to apply early stopping. "
+                   "Using last loss for metrics.";
+      mdl->set_validation_loss(early_stopping.last_loss());
+      final_secondary_metrics = early_stopping.last_metrics();
+    } else {
+      LOG(INFO) << "Truncates the model to " << early_stopping.best_num_trees()
+                << " tree(s) i.e. "
+                << early_stopping.best_num_trees() / mdl->num_trees_per_iter()
+                << "  iteration(s).";
+      if (early_stopping.best_num_trees() < 0) {
+        return absl::InvalidArgumentError(
+            "The model should be evaluated once on the validation dataset.");
+      }
+
+      mdl->set_validation_loss(early_stopping.best_loss());
+      final_secondary_metrics = early_stopping.best_metrics();
+      mdl->mutable_decision_trees()->resize(early_stopping.best_num_trees());
+
+      DCHECK_EQ(mdl->NumTrees() % mdl->num_trees_per_iter(), 0)
+          << "The number of trees should be divisible by the number of trees "
+             "per "
+             "iteration.";
+
+      if (mdl->NumTrees() ==
+          (early_stopping_initial_iteration + 1) * mdl->num_trees_per_iter()) {
+        LOG(WARNING)
+            << "The best validation loss was obtained during iteration "
+            << early_stopping_initial_iteration
+            << ". This is the first step during which a validation loss was "
+               "computed, hence the validation loss might still have been "
+               "unstable and not optimal. Following are examples of "
+               "hyper-parameter changes that might help with the "
+               "situation. Try them in order: (1) Decrease the 'shrinkage "
+               "rate' parameter (default value of 0.1). For example divide "
+               "its value by 2. (2) Decrease the "
+               "'num_candidate_attributes_ratio' hyper-parameter (default "
+               "value of 1) by 80%. (3) Increase the "
+               "early_stopping_num_trees_look_ahead parameter (e.g., try "
+               "multiplying it by a factor of 2). (4) Use a more expensive "
+               "but stable version of early stopping with "
+               "'early_stopping=MIN_LOSS_FINAL'. (4) Disable early "
+               "stopping completely with 'early_stopping=NONE'.";
+      }
     }
-    mdl->set_validation_loss(early_stopping.best_loss());
-    final_secondary_metrics = early_stopping.best_metrics();
-    mdl->mutable_decision_trees()->resize(early_stopping.best_num_trees());
   } else {
     mdl->set_validation_loss(early_stopping.last_loss());
     final_secondary_metrics = early_stopping.last_metrics();
@@ -432,6 +469,20 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
     }
   }
 
+  int trees_per_iteration = all_config->loss->Shape().gradient_dim;
+  int specified_num_trees = all_config->gbt_config->num_trees();
+  int specified_initial_iteration =
+      all_config->gbt_config->early_stopping_initial_iteration();
+  if (specified_initial_iteration * trees_per_iteration > specified_num_trees) {
+    LOG(WARNING)
+        << "The model configuration specifies " << specified_num_trees
+        << " trees but computation of the validation loss will only start "
+           "at iteration "
+        << specified_initial_iteration << " with " << trees_per_iteration
+        << " trees per iteration. No validation loss will be "
+           "computed, early stopping is not used.";
+  }
+
   return absl::OkStatus();
 }
 
@@ -565,7 +616,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   }
 
   internal::EarlyStopping early_stopping(
-      config.gbt_config->early_stopping_num_trees_look_ahead());
+      config.gbt_config->early_stopping_num_trees_look_ahead(),
+      config.gbt_config->early_stopping_initial_iteration());
 
   // Load the first sample of training dataset.
   int num_sample_train_shards =
@@ -913,14 +965,14 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         }
 
         // Early stopping.
-        RETURN_IF_ERROR(early_stopping.Update(validation_loss,
-                                              validation_secondary_metrics,
-                                              mdl->decision_trees().size()));
+        RETURN_IF_ERROR(
+            early_stopping.Update(validation_loss, validation_secondary_metrics,
+                                  mdl->decision_trees().size(), iter_idx));
 
         if (config.gbt_config->early_stopping() ==
                 proto::GradientBoostedTreesTrainingConfig::
                     VALIDATION_LOSS_INCREASE &&
-            early_stopping.ShouldStop()) {
+            early_stopping.ShouldStop(iter_idx)) {
           break;
         }
       }  // End of validation
@@ -1157,7 +1209,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
   proto::TrainingLogs& training_logs = mdl->training_logs_;
 
   internal::EarlyStopping early_stopping(
-      config.gbt_config->early_stopping_num_trees_look_ahead());
+      config.gbt_config->early_stopping_num_trees_look_ahead(),
+      config.gbt_config->early_stopping_initial_iteration());
   early_stopping.set_trees_per_iterations(mdl->num_trees_per_iter_);
 
   if (config.gbt_config->use_hessian_gain() &&
@@ -1428,14 +1481,14 @@ GradientBoostedTreesLearner::TrainWithStatus(
         }
 
         // Early stopping.
-        RETURN_IF_ERROR(early_stopping.Update(validation_loss,
-                                              validation_secondary_metrics,
-                                              mdl->decision_trees().size()));
+        RETURN_IF_ERROR(
+            early_stopping.Update(validation_loss, validation_secondary_metrics,
+                                  mdl->decision_trees().size(), iter_idx));
 
         if (config.gbt_config->early_stopping() ==
                 proto::GradientBoostedTreesTrainingConfig::
                     VALIDATION_LOSS_INCREASE &&
-            early_stopping.ShouldStop()) {
+            early_stopping.ShouldStop(iter_idx)) {
           break;
         }
       }  // End of validation loss.
@@ -2869,13 +2922,14 @@ std::vector<float> DartPredictionAccumulator::TreeOutputScaling() const {
 
 absl::Status EarlyStopping::Update(
     const float validation_loss,
-    const std::vector<float>& validation_secondary_metrics,
-    const int num_trees) {
+    const std::vector<float>& validation_secondary_metrics, const int num_trees,
+    const int current_iter_idx) {
   if (trees_per_iterations_ == -1) {
     return absl::InternalError(
         "The number of trees per iterations should be set before the update");
   }
-  if (best_num_trees_ == -1 || validation_loss < best_loss_) {
+  if (current_iter_idx >= initial_iteration_ &&
+      (best_num_trees_ == -1 || validation_loss < best_loss_)) {
     best_loss_ = validation_loss;
     best_metrics_ = validation_secondary_metrics;
     best_num_trees_ = num_trees;
@@ -2886,7 +2940,10 @@ absl::Status EarlyStopping::Update(
   return absl::OkStatus();
 }
 
-bool EarlyStopping::ShouldStop() {
+bool EarlyStopping::ShouldStop(const int current_iter_idx) {
+  if (current_iter_idx < initial_iteration_) {
+    return false;
+  }
   if (last_num_trees_ - best_num_trees_ >= num_trees_look_ahead_) {
     LOG(INFO) << "Early stop of the training because the validation "
                  "loss does not decrease anymore. Best valid-loss: "
@@ -2904,6 +2961,7 @@ proto::EarlyStoppingSnapshot EarlyStopping::Save() const {
   p.set_last_num_trees(last_num_trees_);
   p.set_num_trees_look_ahead(num_trees_look_ahead_);
   p.set_trees_per_iterations(trees_per_iterations_);
+  p.set_initial_iteration(initial_iteration_);
 
   *p.mutable_best_metrics() = {best_metrics_.begin(), best_metrics_.end()};
   *p.mutable_last_metrics() = {last_metrics_.begin(), last_metrics_.end()};
@@ -2917,6 +2975,7 @@ absl::Status EarlyStopping::Load(const proto::EarlyStoppingSnapshot& p) {
   last_num_trees_ = p.last_num_trees();
   num_trees_look_ahead_ = p.num_trees_look_ahead();
   trees_per_iterations_ = p.trees_per_iterations();
+  initial_iteration_ = p.initial_iteration();
 
   best_metrics_ = {p.best_metrics().begin(), p.best_metrics().end()};
   last_metrics_ = {p.last_metrics().begin(), p.last_metrics().end()};

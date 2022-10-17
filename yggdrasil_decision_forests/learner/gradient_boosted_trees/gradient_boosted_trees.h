@@ -404,18 +404,22 @@ LoadCompleteDatasetForWeakLearner(
 // Early stopping controller.
 class EarlyStopping {
  public:
-  EarlyStopping(const int early_stopping_num_trees_look_ahead)
-      : num_trees_look_ahead_(early_stopping_num_trees_look_ahead) {}
+  EarlyStopping(const int early_stopping_num_trees_look_ahead,
+                const int initial_iteration)
+      : num_trees_look_ahead_(early_stopping_num_trees_look_ahead),
+        initial_iteration_(initial_iteration) {
+    DCHECK_GE(initial_iteration_, 0);
+  }
 
   // Updates the internal state of the early stopping controller.
   //
   // "set_trees_per_iterations" should be called before the first update.
   absl::Status Update(const float validation_loss,
                       const std::vector<float>& validation_secondary_metrics,
-                      const int num_trees);
+                      const int num_trees, const int current_iter_idx);
 
   // Should the training stop?
-  bool ShouldStop();
+  bool ShouldStop(const int current_iter_idx);
 
   // Best model.
   int best_num_trees() const { return best_num_trees_; }
@@ -455,6 +459,12 @@ class EarlyStopping {
   int last_num_trees_ = 0;
 
   int num_trees_look_ahead_;
+
+  // Iteration that starts the computation of the validation loss.
+  //
+  // See GradientBoostedTreesTrainingConfig::early_stopping_start_iteration for
+  // more details.
+  int initial_iteration_;
 
   int trees_per_iterations_ = -1;
 
