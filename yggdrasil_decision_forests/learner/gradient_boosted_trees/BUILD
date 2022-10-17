@@ -19,6 +19,7 @@ cc_library_ydf(
     ],
     deps = [
         "@com_google_absl//absl/status:statusor",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:all_implementations",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_interface",
@@ -107,7 +108,6 @@ cc_test(
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:data_spec",
@@ -119,6 +119,7 @@ cc_test(
         "//yggdrasil_decision_forests/learner:learner_library",
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:report",

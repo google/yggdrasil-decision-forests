@@ -382,22 +382,6 @@ message GradientBoostedTreesTrainingConfig {
   optional bool compute_permutation_variable_importance = 35 [default = false];
 }
 
-// Representations of the internal memory of the early stopping utility class.
-// This proto is used to serialize the status of the EarlyStopping class when
-// training is interrupted and resumed.
-message EarlyStoppingSnapshot {
-  // The names of the fields match the names of the fields in EarlyStopping.
-  optional float best_loss = 1;
-  optional float last_loss = 2;
-  repeated float last_metrics = 3 [packed = true];
-  repeated float best_metrics = 4 [packed = true];
-  optional int32 best_num_trees = 5;
-  optional int32 last_num_trees = 6;
-  optional int32 num_trees_look_ahead = 7;
-  optional int32 trees_per_iterations = 8;
-  optional int32 initial_iteration = 9;
-}
-
 extend model.proto.TrainingConfig {
   optional GradientBoostedTreesTrainingConfig gradient_boosted_trees_config =
       1004;
