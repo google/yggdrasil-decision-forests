@@ -12,7 +12,8 @@ A GBT (Gradient Boosted [Decision] Tree;
 https://statweb.stanford.edu/~jhf/ftp/trebst.pdf) is a set of shallow decision
 trees trained sequentially. Each tree is trained to predict and then "correct"
 for the errors of the previously trained trees (more precisely each tree predict
-the gradient of the loss relative to the model output).
+the gradient of the loss relative to the model output). GBTs use
+[early stopping](early_stopping.md) to avoid overfitting.
 
 ### Training configuration
 
