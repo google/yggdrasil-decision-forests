@@ -250,7 +250,8 @@ absl::Status Benchmark() {
   LOG(INFO) << "Loading dataset";
   dataset::VerticalDataset dataset;
   RETURN_IF_ERROR(
-      LoadVerticalDataset(dataset_path, model->data_spec(), &dataset));
+      LoadVerticalDataset(dataset_path, model->data_spec(), &dataset,
+                          /*ensure_non_missing=*/model->input_features()));
 
   std::vector<Result> results;
 

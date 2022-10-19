@@ -7,6 +7,8 @@
 -   Early stopping is no longer triggered during first iterations. The initial
     iteration for early stopping can be controlled with the new parameter
     `early_stopping_initial_iteration` in `gradient_boosted_trees.proto`.
+-   Benchmark inference tool does not require for the dataset to contain the
+    label column.
 
 ## 1.0.0 - 2022-09-07
 
