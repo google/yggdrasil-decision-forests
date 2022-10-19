@@ -47,7 +47,7 @@ cc_binary(
         # "-s ASSERTIONS=2",  # Runtime checks for common memory allocation errors.
         "-s DEMANGLE_SUPPORT=1",  # Better function name in stack stace.
         # fetchSettings is included to bypass CORS issues during development
-        "-s INCOMING_MODULE_JS_API=onRuntimeInitialized,fetchSettings,print,printErr",
+        "-s INCOMING_MODULE_JS_API=onRuntimeInitialized,fetchSettings,print,printErr,locateFile",
         "--post-js yggdrasil_decision_forests/port/javascript/wrapper.js",
     ],
     tags = [

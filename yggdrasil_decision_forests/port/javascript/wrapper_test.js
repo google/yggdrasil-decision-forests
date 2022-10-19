@@ -19,7 +19,11 @@ describe('YDF Inference', () => {
 
   beforeAll(async () => {
     // Load library
-    await YggdrasilDecisionForests().then(function(m) {
+    await YggdrasilDecisionForests({
+      locateFile: function(filename, dir) {
+        return dir + filename;
+      }
+    }).then(function(m) {
       ydf = m;
       console.log('The library is loaded');
     });
