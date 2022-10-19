@@ -4,7 +4,9 @@ project = "Yggdrasil Decision Forests"
 copyright = "2022, Google"
 author = "Mathieu Guillame-Bert"
 
-html_baseurl = "https://ydf.readthedocs.io/en/latest/"
+# Example of URL: https://ydf.readthedocs.io/en/latest/apis.html
+html_baseurl = "https://ydf.readthedocs.io/"
+sitemap_url_scheme = "{lang}{version}{link}"
 
 master_doc = "index"
 
