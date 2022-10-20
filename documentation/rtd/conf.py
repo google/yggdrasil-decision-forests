@@ -6,7 +6,7 @@ author = "Mathieu Guillame-Bert"
 
 # Example of URL: https://ydf.readthedocs.io/en/latest/apis.html
 html_baseurl = "https://ydf.readthedocs.io/"
-sitemap_url_scheme = "{lang}{version}{link}"
+sitemap_url_scheme = "{lang}latest/{link}"
 
 master_doc = "index"
 
