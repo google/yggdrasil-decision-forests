@@ -48,7 +48,7 @@ class Worker : public distribute::AbstractWorker {
   proto::Welcome welcome_;
 
   // Set to true when Done is called on the "GenericWorker".
-  std::atomic<bool> done_was_called_ = {false};
+  std::atomic<bool> done_was_called_{false};
 };
 
 }  // namespace distribute_cli

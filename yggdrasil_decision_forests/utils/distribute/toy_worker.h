@@ -54,6 +54,11 @@ class ToyWorker final : public AbstractWorker {
 
   absl::StatusOr<Blob> RunRequest(Blob blob) override {
     LOG(INFO) << "RunRequest " << blob << " on worker " << WorkerIdx();
+
+    if (forbidden) {
+      LOG(FATAL) << "A forbidden worker was called!";
+    }
+
     if (absl::StartsWith(blob, "identity")) {
       std::pair<std::string, std::string> items = absl::StrSplit(blob, ':');
       return items.second;
@@ -104,6 +109,10 @@ class ToyWorker final : public AbstractWorker {
       return absl::StrCat(num_existing_toy_workers_.load());
     } else if (absl::StartsWith(blob, "max_num_existing_toy_workers")) {
       return absl::StrCat(max_num_existing_toy_workers_.load());
+    } else if (blob == "forbidden") {
+      LOG(INFO) << "Set the worker as forbidden";
+      forbidden = true;
+      return "";
     }
     return absl::InvalidArgumentError("Unknown task");
   }
@@ -118,6 +127,8 @@ class ToyWorker final : public AbstractWorker {
   std::string value_;  // For the "get/set" task.
 
   absl::Barrier *barrier_ = nullptr;
+
+  std::atomic<bool> forbidden{false};
 };
 
 constexpr char kToyWorkerKey[] = "ToyWorker";

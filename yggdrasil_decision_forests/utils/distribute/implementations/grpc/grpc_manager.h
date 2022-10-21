@@ -19,12 +19,14 @@
 #define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
 
 #include "grpcpp/channel.h"
+#include "grpcpp/create_channel.h"
 #include "grpcpp/server.h"
 #include "absl/container/node_hash_map.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute/utils.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -56,12 +58,36 @@ class GRPCManager : public AbstractManager {
 
   absl::Status SetParallelExecutionPerWorker(int num) override;
 
+  // Changes the address of a worker. The next requests emited by the manager or
+  // the other workers to worke "worker_idx" will use this new address.
+  absl::Status UpdateWorkerAddress(int worker_idx,
+                                   absl::string_view new_address);
+
+  // Shuts down a worker without updating the manager or any of the other
+  // worker. This function simulates the interruption of the worker process. It
+  // should only be used in unit testing.
+  absl::Status DebugShutdownWorker(int worker_idx);
+
  private:
   struct Worker {
     int worker_idx;
-    std::unique_ptr<proto::Server::Stub> stub;
-    std::string address;
-    std::shared_ptr<grpc::Channel> channel;
+
+    // Connection to the worker.
+    std::unique_ptr<proto::Server::Stub> stub GUARDED_BY(mutex_address);
+
+    // Address currently connected by the stub.
+    std::string connected_address GUARDED_BY(mutex_address);
+
+    // Address of the worker. "expected_address" and "connected_address" might
+    // be different for a short time when a worker is re-located.
+    std::string expected_address GUARDED_BY(mutex_address);
+
+    // Disconnected worker stubs kept until releasing.
+    // TODO: Release the discarded worker stubs.
+    std::vector<std::unique_ptr<proto::Server::Stub>> discarded_stubs_
+        GUARDED_BY(mutex_address);
+
+    utils::concurrency::Mutex mutex_address;
 
     // Async query to execute specific to this worker.
     utils::concurrency::Channel<Blob> async_pending_queries_;
@@ -96,6 +122,9 @@ class GRPCManager : public AbstractManager {
 
   void JoinWorkers();
 
+  // Checks and possibly update the effectively targeted worker.
+  absl::StatusOr<proto::Server::Stub*> UpdateWorkerConnection(Worker* worker);
+
   // Path to serialized worker configuration accessible by all workers.
   proto::WorkerConfig worker_config_;
   int verbosity_;
@@ -117,6 +146,8 @@ class GRPCManager : public AbstractManager {
   // Check if "Done" was called. "Done" will be called as the object destruction
   // if it was not called manually before.
   bool done_was_called_ = false;
+
+  std::shared_ptr<grpc::ChannelCredentials> credential_;
 };
 
 REGISTER_Distribution_Manager(GRPCManager, GRPCManager::kKey);

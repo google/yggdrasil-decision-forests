@@ -20,6 +20,7 @@
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/channel_arguments.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
@@ -147,6 +148,18 @@ class WorkerService final : public proto::Server::Service {
     return grpc::Status::OK;
   }
 
+  grpc::Status UpdateWorkerAddress(
+      grpc::ServerContext* context,
+      const proto::UpdateWorkerAddressQuery* request,
+      proto::Empty* reply) override {
+    LOG(INFO) << "Change address of remote worker #" << request->worker_idx()
+              << " for worker #" << worker_->WorkerIdx();
+    auto& worker = *intra_worker_communication_->workers[request->worker_idx()];
+    utils::concurrency::MutexLock l(&worker.mutex_address);
+    worker.expected_address = request->new_address();
+    return grpc::Status::OK;
+  }
+
   grpc::Status Shutdown(grpc::ServerContext* context,
                         const proto::ShutdownQuery* request,
                         proto::Empty* reply) override {
@@ -229,9 +242,6 @@ class WorkerService final : public proto::Server::Service {
           "Two different managers are fighting for the same worker");
     }
 
-    worker_addresses_ = {request.worker_config().worker_addresses().begin(),
-                         request.worker_config().worker_addresses().end()};
-
     ASSIGN_OR_RETURN(worker_, AbstractWorkerRegisterer::Create(
                                   request.worker_config().worker_name()));
     RETURN_IF_ERROR(InternalInitializeWorker(
@@ -239,9 +249,7 @@ class WorkerService final : public proto::Server::Service {
         worker_.get(), &hook_));
     RETURN_IF_ERROR(worker_->Setup(request.worker_config().welcome_blob()));
 
-    InitializerInterWorkerCommunication(
-        request.worker_config().worker_addresses_size(),
-        request.worker_config().parallel_execution_per_worker());
+    InitializerInterWorkerCommunication(request.worker_config());
 
     return absl::OkStatus();
   }
@@ -249,7 +257,7 @@ class WorkerService final : public proto::Server::Service {
   // Blocking inter worker request.
   absl::StatusOr<Blob> BlockingInterWorkerRequest(Blob blob,
                                                   const int target_worker) {
-    RETURN_IF_ERROR(EnsureIntraWorkerStubIsReady(target_worker));
+    ASSIGN_OR_RETURN(auto stub, EnsureIntraWorkerStubIsReady(target_worker));
 
     proto::WorkerQuery query;
     *query.mutable_blob() = std::move(blob);
@@ -262,9 +270,7 @@ class WorkerService final : public proto::Server::Service {
       context.set_wait_for_ready(true);
       context.set_deadline(std::chrono::system_clock::now() +
                            std::chrono::hours(kDeadLineInHours));
-      const auto status =
-          intra_worker_communication_->other_workers[target_worker]
-              .stub->WorkerRun(&context, query, &answer);
+      const auto status = stub->WorkerRun(&context, query, &answer);
 
       if (!status.ok()) {
         LOG(WARNING) << "Intra worker GRPC call failed with error: "
@@ -277,6 +283,9 @@ class WorkerService final : public proto::Server::Service {
           num_re_emitting++;
           LOG(WARNING) << "Re-emitting request (num_re_emitting:"
                        << num_re_emitting << ")";
+
+          ASSIGN_OR_RETURN(stub, EnsureIntraWorkerStubIsReady(target_worker));
+
           continue;
         } else {
           // Something is not right.
@@ -314,23 +323,46 @@ class WorkerService final : public proto::Server::Service {
 
   // Initialize the connection and thread for the inter worker communication.
   // This method should be called before any inter worker communication.
-  void InitializerInterWorkerCommunication(const int num_workers,
-                                           const int num_threads) {
+  void InitializerInterWorkerCommunication(
+      const proto::WorkerConfig& worker_config) {
     DCHECK(!intra_worker_communication_);
     intra_worker_communication_ = absl::make_unique<InterWorkerCommunication>();
     intra_worker_communication_->threads.Start(
-        num_threads, [&]() { ProcessInterWorkerCommunication(); });
-    intra_worker_communication_->other_workers.resize(num_workers);
+        worker_config.parallel_execution_per_worker(),
+        [&]() { ProcessInterWorkerCommunication(); });
+
+    intra_worker_communication_->workers.reserve(
+        worker_config.worker_addresses_size());
+    for (int worker_idx = 0; worker_idx < worker_config.worker_addresses_size();
+         worker_idx++) {
+      auto worker = absl::make_unique<InterWorkerCommunication::Worker>();
+      utils::concurrency::MutexLock l(&worker->mutex_address);
+      worker->expected_address = worker_config.worker_addresses(worker_idx);
+      intra_worker_communication_->workers.push_back(std::move(worker));
+    }
   }
 
   // Ensures that the communication with another worker is ready.
-  absl::Status EnsureIntraWorkerStubIsReady(const int worker_idx) {
+  absl::StatusOr<proto::Server::Stub*> EnsureIntraWorkerStubIsReady(
+      const int worker_idx) {
     CHECK(intra_worker_communication_);
-    CHECK_LT(worker_idx, intra_worker_communication_->other_workers.size());
-    auto& worker = intra_worker_communication_->other_workers[worker_idx];
+    CHECK_LT(worker_idx, intra_worker_communication_->workers.size());
+    auto& worker = *intra_worker_communication_->workers[worker_idx];
+
+    utils::concurrency::MutexLock l(&worker.mutex_address);
+
+    if (worker.stub && worker.expected_address == worker.connected_address) {
+      return worker.stub.get();
+    }
 
     if (worker.stub) {
-      return absl::OkStatus();
+      LOG(WARNING) << "Update stub to worker #" << worker_idx << " from "
+                   << worker.connected_address << " to "
+                   << worker.expected_address;
+      worker.discarded_stubs_.push_back(std::move(worker.stub));
+      worker.stub.reset();
+    } else {
+      LOG(WARNING) << "Create stub to worker #" << worker_idx;
     }
 
     std::shared_ptr<grpc::ChannelCredentials> credential;
@@ -343,11 +375,11 @@ class WorkerService final : public proto::Server::Service {
     grpc::ChannelArguments channel_arguments;
     channel_arguments.SetMaxReceiveMessageSize(std::numeric_limits<int>::max());
     channel_arguments.SetMaxSendMessageSize(std::numeric_limits<int>::max());
-
-    worker.channel = grpc::CreateCustomChannel(worker_addresses_[worker_idx],
-                                               credential, channel_arguments);
-    worker.stub = proto::Server::NewStub(worker.channel);
-    return absl::OkStatus();
+    worker.connected_address = worker.expected_address;
+    auto channel = grpc::CreateCustomChannel(worker.connected_address,
+                                             credential, channel_arguments);
+    worker.stub = proto::Server::NewStub(channel);
+    return worker.stub.get();
   }
 
   // Finalize the current worker communication.
@@ -371,9 +403,6 @@ class WorkerService final : public proto::Server::Service {
   // UID of the manager. Only valid if worker_ is set.
   uint64_t manager_uid_;
 
-  // Socket address of all the workers.
-  std::vector<std::string> worker_addresses_;
-
   // Fields related to the inter worker communication.
   struct InterWorkerCommunication {
     // List of target worker index and data emitted by this worker.
@@ -385,13 +414,26 @@ class WorkerService final : public proto::Server::Service {
     // Thread emitting and receiving intra-workers requests/answers.
     ThreadVector threads;
 
-    struct OtherWorkers {
-      std::shared_ptr<grpc::Channel> channel;
-      std::unique_ptr<proto::Server::Stub> stub;
+    struct Worker {
+      std::unique_ptr<proto::Server::Stub> stub GUARDED_BY(mutex_address);
+
+      // Address currently connected by the stub.
+      std::string connected_address GUARDED_BY(mutex_address);
+
+      // Address of the worker. "expected_address" and "connected_address" might
+      // be different for a short time with a worker is re-located.
+      std::string expected_address GUARDED_BY(mutex_address);
+
+      // Disconnected worker stubs kept until releasing.
+      // TODO: Release the discarded worker stubs.
+      std::vector<std::unique_ptr<proto::Server::Stub>> discarded_stubs_
+          GUARDED_BY(mutex_address);
+
+      utils::concurrency::Mutex mutex_address;
     };
 
     // Communication channel to other workers for intra worker communication.
-    std::vector<OtherWorkers> other_workers;
+    std::vector<std::unique_ptr<Worker>> workers;
   };
 
   std::unique_ptr<InterWorkerCommunication> intra_worker_communication_;

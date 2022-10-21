@@ -19,6 +19,7 @@
 
 #include "grpcpp/create_channel.h"
 #include "grpcpp/support/channel_arguments.h"
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
@@ -39,6 +40,18 @@ absl::Status GrpcStatusToAbslStatus(const grpc::Status& src) {
   } else {
     return absl::UnknownError(src.error_message());
   }
+}
+
+// Creates a connection (called "stub" in grpc).
+std::unique_ptr<proto::Server::Stub> CreateStub(
+    const absl::string_view address,
+    std::shared_ptr<grpc::ChannelCredentials>* credential) {
+  grpc::ChannelArguments channel_arguments;
+  channel_arguments.SetMaxReceiveMessageSize(std::numeric_limits<int>::max());
+  channel_arguments.SetMaxSendMessageSize(std::numeric_limits<int>::max());
+  auto channel = grpc::CreateCustomChannel(std::string(address), *credential,
+                                           channel_arguments);
+  return proto::Server::NewStub(channel);
 }
 
 }  // namespace
@@ -76,11 +89,10 @@ absl::Status GRPCManager::InitializeWorkers(
               << " workers.";
   }
 
-  std::shared_ptr<grpc::ChannelCredentials> credential;
   if (imp_config.use_loas()) {
     return absl::InvalidArgumentError("Loas not available");
   } else {
-    credential = grpc::InsecureChannelCredentials();
+    credential_ = grpc::InsecureChannelCredentials();
   }
 
   for (int worker_idx = 0; worker_idx < worker_addresses.size(); worker_idx++) {
@@ -88,14 +100,8 @@ absl::Status GRPCManager::InitializeWorkers(
     worker->worker_idx = worker_idx;
 
     while (true) {
-      grpc::ChannelArguments channel_arguments;
-      channel_arguments.SetMaxReceiveMessageSize(
-          std::numeric_limits<int>::max());
-      channel_arguments.SetMaxSendMessageSize(std::numeric_limits<int>::max());
-
-      worker->channel = grpc::CreateCustomChannel(
-          worker_addresses[worker_idx], credential, channel_arguments);
-      worker->stub = proto::Server::NewStub(worker->channel);
+      utils::concurrency::MutexLock l(&worker->mutex_address);
+      worker->stub = CreateStub(worker_addresses[worker_idx], &credential_);
 
       grpc::ClientContext context;
       proto::Empty query;
@@ -113,7 +119,9 @@ absl::Status GRPCManager::InitializeWorkers(
       break;
     }
 
-    worker->address = worker_addresses[worker_idx];
+    utils::concurrency::MutexLock l(&worker->mutex_address);
+    worker->connected_address = worker_addresses[worker_idx];
+    worker->expected_address = worker->connected_address;
     worker->StartThreads(parallel_execution_per_worker, this);
     workers_.push_back(std::move(worker));
   }
@@ -149,6 +157,22 @@ absl::StatusOr<int> GRPCManager::NumWorkersInConfiguration(
   }
 }
 
+absl::StatusOr<proto::Server::Stub*> GRPCManager::UpdateWorkerConnection(
+    Worker* worker) {
+  utils::concurrency::MutexLock l(&worker->mutex_address);
+  if (worker->expected_address != worker->connected_address) {
+    // The worker has moved.
+    LOG(WARNING) << "Changing worker address from " << worker->connected_address
+                 << " to " << worker->expected_address;
+    worker->connected_address = worker->expected_address;
+    worker->discarded_stubs_.push_back(std::move(worker->stub));
+    worker->stub.reset();
+
+    worker->stub = CreateStub(worker->connected_address, &credential_);
+  }
+  return worker->stub.get();
+}
+
 absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
   if (verbosity_) {
     LOG(INFO) << "Change the number of parallel execution per worker";
@@ -173,6 +197,8 @@ absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
 }
 
 absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
+  ASSIGN_OR_RETURN(auto stub, UpdateWorkerConnection(worker));
+
   proto::Query query;
   *query.mutable_blob() = std::move(blob);
   query.set_manager_uid(manager_uid_);
@@ -184,7 +210,7 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
     context.set_wait_for_ready(true);
     context.set_deadline(std::chrono::system_clock::now() +
                          std::chrono::hours(kDeadLineInHours));
-    const auto status = worker->stub->Run(&context, query, &answer);
+    const auto status = stub->Run(&context, query, &answer);
     if (!status.ok()) {
       if (status.error_message() == "UNAVAILABLE: worker config required") {
         // The worker received the request, but the worker is lacking the worker
@@ -201,8 +227,8 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
                      << " failed with error: " << status.error_message();
       }
       if (IsTransiantError(status)) {
-        // The worker died during the execution (e.g. rescheduling).
-        // Let's try again.
+        // The worker is temporarly not available.
+        ASSIGN_OR_RETURN(stub, UpdateWorkerConnection(worker));
         continue;
       } else {
         // Something is not right.
@@ -261,7 +287,8 @@ absl::Status GRPCManager::InitializeConfigFile(
       parallel_execution_per_worker);
 
   for (const auto& worker : workers_) {
-    worker_config_.add_worker_addresses(worker->address);
+    utils::concurrency::MutexLock l(&worker->mutex_address);
+    worker_config_.add_worker_addresses(worker->expected_address);
   }
   return absl::OkStatus();
 }
@@ -343,6 +370,7 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
     context.set_deadline(std::chrono::system_clock::now() +
                          std::chrono::minutes(2));
     proto::Empty ignored;
+    utils::concurrency::MutexLock l(&worker->mutex_address);
     auto worker_shutdown = worker->stub->Shutdown(&context, query, &ignored);
     if (!worker_shutdown.ok()) {
       // It is not a big deal if the worker crashes during shutdown.
@@ -356,6 +384,21 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
   }
 
   return absl::OkStatus();
+}
+
+absl::Status GRPCManager::DebugShutdownWorker(int worker_idx) {
+  proto::ShutdownQuery query;
+  query.set_kill_worker_manager(true);
+
+  grpc::ClientContext context;
+  context.set_wait_for_ready(true);
+  context.set_deadline(std::chrono::system_clock::now() +
+                       std::chrono::minutes(2));
+  proto::Empty ignored;
+  auto& worker = workers_[worker_idx];
+  utils::concurrency::MutexLock l(&worker->mutex_address);
+  auto worker_shutdown = worker->stub->Shutdown(&context, query, &ignored);
+  return GrpcStatusToAbslStatus(worker_shutdown);
 }
 
 void GRPCManager::JoinWorkers() {
@@ -386,6 +429,43 @@ absl::Status GRPCManager::Initialize(const proto::Config& config,
   RETURN_IF_ERROR(InitializeConfigFile(config, worker_name,
                                        parallel_execution_per_worker,
                                        std::move(welcome_blob)));
+  return absl::OkStatus();
+}
+
+absl::Status GRPCManager::UpdateWorkerAddress(
+    const int worker_idx, const absl::string_view new_address) {
+  DCHECK_GE(worker_idx, 0);
+  DCHECK_LT(worker_idx, workers_.size());
+  auto& worker = workers_[worker_idx];
+  utils::concurrency::MutexLock l(&worker->mutex_address);
+  worker->expected_address = std::string(new_address);
+  *worker_config_.mutable_worker_addresses(worker_idx) =
+      std::string(new_address);
+
+  // Send change to all workers.
+
+  proto::UpdateWorkerAddressQuery query;
+  query.set_worker_idx(worker_idx);
+  *query.mutable_new_address() = std::string(new_address);
+
+  // TODO: Run in parallel.
+  for (auto& worker : workers_) {
+    if (worker->worker_idx == worker_idx) {
+      continue;
+    }
+    grpc::ClientContext context;
+    context.set_wait_for_ready(false);
+    context.set_deadline(std::chrono::system_clock::now() +
+                         std::chrono::minutes(2));
+    proto::Empty ignored;
+    auto worker_shutdown =
+        worker->stub->UpdateWorkerAddress(&context, query, &ignored);
+    if (!worker_shutdown.ok()) {
+      // We don't care if the worker is down. It will receive the update when it
+      // gets back online.
+    }
+  }
+
   return absl::OkStatus();
 }
 

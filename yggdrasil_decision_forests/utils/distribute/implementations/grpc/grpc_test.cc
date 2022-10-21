@@ -130,6 +130,40 @@ TEST(GRPC, TestChangeManagerNotNice) {
   all.Join();
 }
 
+TEST(GRPC, TestMessup) {
+  auto all = CreateGrpcManager();
+  TestMessup(all.manager.get(), [&]() {
+    // This method creates a new worker #0, and tell the manager to replace the
+    // old worker #0 by the new worker #0. After this change, any call to the
+    // old worker #0 will trigger a LOG(FATAL).
+
+    // Mark worker #0 as forbiden. New requests to this worker will trigger a
+    // LOG(FATAL).
+    CHECK_OK(all.manager->BlockingRequest("forbidden", 0).status());
+
+    auto* grpc_manager = dynamic_cast<GRPCManager*>(all.manager.get());
+    CHECK(grpc_manager != nullptr);
+    CHECK_OK(grpc_manager->DebugShutdownWorker(0));
+
+    // New port for worker #0.
+    const int port = test::PickUnusedPortOrDie();
+    CHECK_GT(port, 0);
+
+    // Isolate the forbiden worker thread.
+    all.discarded_worker_threads.push_back(
+        std::move(all.worker_threads.front()));
+
+    // Create worker thread.
+    all.worker_threads.front() = absl::make_unique<utils::concurrency::Thread>(
+        [port]() { CHECK_OK(GRPCWorkerMainWorkerMain(port)); });
+    absl::SleepFor(absl::Seconds(0.2));
+
+    CHECK_OK(grpc_manager->UpdateWorkerAddress(
+        /*worker_idx=*/0, absl::StrCat("localhost:", port)));
+  });
+  all.Join();
+}
+
 }  // namespace
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

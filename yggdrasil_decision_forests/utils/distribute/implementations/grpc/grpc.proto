@@ -55,6 +55,7 @@ service Server {
   rpc WorkerRun(WorkerQuery) returns (WorkerAnswer);
   rpc Shutdown(ShutdownQuery) returns (Empty);
   rpc Ping(Empty) returns (Empty);
+  rpc UpdateWorkerAddress(UpdateWorkerAddressQuery) returns (Empty);
 }
 
 message Query {
@@ -83,6 +84,11 @@ message WorkerQuery {
 message WorkerAnswer {
   optional bytes blob = 1;
   optional string error = 2;
+}
+
+message UpdateWorkerAddressQuery {
+  optional int32 worker_idx = 1;
+  optional string new_address = 2;
 }
 
 message Empty {}

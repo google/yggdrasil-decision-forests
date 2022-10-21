@@ -18,30 +18,37 @@
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
-void TestWorkerError(AbstractManager* manager) {
+void TestWorkerError(AbstractManager* manager, bool call_done) {
   EXPECT_FALSE(manager->BlockingRequest("gen_error").ok());
-  EXPECT_OK(manager->Done(true));
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
 }
 
-void TestBlockingRequest(AbstractManager* manager) {
+void TestBlockingRequest(AbstractManager* manager, bool call_done) {
   for (int i = 0; i <= 100; i++) {
     auto result =
         manager->BlockingRequest(absl::StrCat("identity:", i)).value();
     EXPECT_EQ(result, absl::StrCat(i));
   }
-  EXPECT_OK(manager->Done(true));
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
 }
 
-void TestBlockingRequestWithSpecificWorker(AbstractManager* manager) {
+void TestBlockingRequestWithSpecificWorker(AbstractManager* manager,
+                                           bool call_done) {
   for (int i = 0; i <= 100; i++) {
     const int worker_idx = i % manager->NumWorkers();
     auto result = manager->BlockingRequest("worker_idx", worker_idx).value();
     EXPECT_EQ(result, absl::StrCat(worker_idx));
   }
-  EXPECT_OK(manager->Done(true));
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
 }
 
-void TestAsynchronousRequest(AbstractManager* manager) {
+void TestAsynchronousRequest(AbstractManager* manager, bool call_done) {
   const int n = 100;
   std::vector<bool> meet(n, false);
   for (int i = 0; i < n; i++) {
@@ -55,10 +62,13 @@ void TestAsynchronousRequest(AbstractManager* manager) {
     EXPECT_FALSE(meet[int_result]);
     meet[int_result] = true;
   }
-  EXPECT_OK(manager->Done(true));
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
 }
 
-void TestAsynchronousRequestWithSpecificWorker(AbstractManager* manager) {
+void TestAsynchronousRequestWithSpecificWorker(AbstractManager* manager,
+                                               bool call_done) {
   const int n = 100;
   for (int i = 0; i < n; i++) {
     const int worker_idx = i % manager->NumWorkers();
@@ -77,10 +87,13 @@ void TestAsynchronousRequestWithSpecificWorker(AbstractManager* manager) {
     EXPECT_EQ(value.second, n / manager->NumWorkers());
   }
 
-  EXPECT_OK(manager->Done(true));
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
 }
 
-void TestAsynchronousIntraWorkerCommunication(AbstractManager* manager) {
+void TestAsynchronousIntraWorkerCommunication(AbstractManager* manager,
+                                              bool call_done) {
   for (int w = 0; w < manager->NumWorkers(); w++) {
     auto result =
         manager->BlockingRequest("worker_idx", /*worker_idx=*/w).value();
@@ -95,10 +108,13 @@ void TestAsynchronousIntraWorkerCommunication(AbstractManager* manager) {
             .value();
     EXPECT_EQ(result, absl::StrCat(sum_worker_idxs - w));
   }
-  EXPECT_OK(manager->Done(true));
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
 }
 
-void TestAsynchronousParallelWorkerExecution(AbstractManager* manager) {
+void TestAsynchronousParallelWorkerExecution(AbstractManager* manager,
+                                             bool call_done) {
   const int n = 5;
   CHECK_OK(manager->BlockingRequest("create_5_barrier", 0).status());
   for (int i = 0; i < n; i++) {
@@ -107,7 +123,9 @@ void TestAsynchronousParallelWorkerExecution(AbstractManager* manager) {
   for (int i = 0; i < n; i++) {
     EXPECT_OK(manager->NextAsynchronousAnswer().status());
   }
-  EXPECT_OK(manager->Done(true));
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
 }
 
 void TestChangeManager(ManagerCreatorAndWorkers* manager_creator, bool nice) {
@@ -146,6 +164,39 @@ void TestChangeManager(ManagerCreatorAndWorkers* manager_creator, bool nice) {
   EXPECT_OK(m2->BlockingRequest("set:2").status());
   EXPECT_EQ(m2->BlockingRequest("get").value(), "2");
   EXPECT_OK(m2->Done(true));
+}
+
+void TestMessup(AbstractManager* manager, std::function<void()> messup) {
+  TestBlockingRequest(manager, false);
+
+  LOG(INFO) << "Messup #1";
+  messup();
+
+  TestBlockingRequest(manager, false);
+
+  LOG(INFO) << "Messup #2";
+  messup();
+
+  TestBlockingRequestWithSpecificWorker(manager, false);
+
+  LOG(INFO) << "Messup #3";
+  messup();
+
+  TestAsynchronousRequest(manager, false);
+  TestAsynchronousRequestWithSpecificWorker(manager, false);
+
+  LOG(INFO) << "Messup #4";
+  messup();
+
+  TestAsynchronousIntraWorkerCommunication(manager, false);
+
+  LOG(INFO) << "Messup #5";
+  messup();
+
+  TestAsynchronousIntraWorkerCommunication(manager, false);
+
+  LOG(INFO) << "Done";
+  EXPECT_OK(manager->Done(true));
 }
 
 }  // namespace distribute
