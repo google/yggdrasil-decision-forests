@@ -1,6 +1,6 @@
 # Changelog
 
-## HEAD
+## 1.1.0 - 2022-10-21
 
 ### Features
 
@@ -9,10 +9,11 @@
     `early_stopping_initial_iteration` in `gradient_boosted_trees.proto`.
 -   Benchmark inference tool does not require for the dataset to contain the
     label column.
+-   The user can specify the location of the wasm file in the JavaScript port.
 
 ### Documentation
 
--   The new documentation is live at 
+-   The new documentation is live at
     [ydf.readthedocs.io](https://ydf.readthedocs.io).
 
 ## 1.0.0 - 2022-09-07
