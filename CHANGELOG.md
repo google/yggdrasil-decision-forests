@@ -10,6 +10,11 @@
 -   Benchmark inference tool does not require for the dataset to contain the
     label column.
 
+### Documentation
+
+-   The new documentation is live at 
+    [ydf.readthedocs.io](https://ydf.readthedocs.io).
+
 ## 1.0.0 - 2022-09-07
 
 ### Features
