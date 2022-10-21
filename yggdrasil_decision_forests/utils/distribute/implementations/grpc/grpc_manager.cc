@@ -21,6 +21,7 @@
 #include "grpcpp/support/channel_arguments.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -171,14 +172,12 @@ absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
   return absl::OkStatus();
 }
 
-void GRPCManager::WorkerRun(Blob blob, Worker* worker) {
+absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
   proto::Query query;
   *query.mutable_blob() = std::move(blob);
-  query.set_config_path(worker_config_path_);
   query.set_manager_uid(manager_uid_);
   query.set_worker_idx(worker->worker_idx);
 
-  int num_re_emitting = 0;
   proto::Answer answer;
   while (true) {
     grpc::ClientContext context;
@@ -186,39 +185,49 @@ void GRPCManager::WorkerRun(Blob blob, Worker* worker) {
     context.set_deadline(std::chrono::system_clock::now() +
                          std::chrono::hours(kDeadLineInHours));
     const auto status = worker->stub->Run(&context, query, &answer);
-
     if (!status.ok()) {
+      if (status.error_message() == "UNAVAILABLE: worker config required") {
+        // The worker received the request, but the worker is lacking the worker
+        // configuration field. The request should be re-sent with the worker
+        // configuration.
+        LOG(WARNING) << "Send worker configuration to worker #"
+                     << worker->worker_idx;
+        *query.mutable_worker_config() = worker_config_;
+        continue;
+      }
+
       if (verbosity_ >= 1) {
-        LOG(WARNING) << "GRPC call to worker #" << worker->worker_idx
+        LOG(WARNING) << "GRPC to worker #" << worker->worker_idx
                      << " failed with error: " << status.error_message();
       }
-      if (status.error_message() == "Socket closed" ||
-          status.error_message() == "Transport closed" ||
-          status.error_message() == "Connection reset by peer" ||
-          status.error_message() == "Broken pipe" ||
-          status.error_message() == "keepalive watchdog timeout") {
+      if (IsTransiantError(status)) {
         // The worker died during the execution (e.g. rescheduling).
         // Let's try again.
-        if (verbosity_ >= 1) {
-          num_re_emitting++;
-          LOG(WARNING) << "Re-emitting request (num_re_emitting:"
-                       << num_re_emitting << ")";
-        }
         continue;
       } else {
         // Something is not right.
-        answer.set_error(status.error_message());
-        async_pending_answers_.Push(std::move(answer));
-        return;
+        return GrpcStatusToAbslStatus(status);
       }
-    } else {
-      if (verbosity_ >= 1 && answer.has_error()) {
-        LOG(WARNING) << "Worker #" << worker->worker_idx
-                     << " returned an error: " << answer.error();
-      }
-      async_pending_answers_.Push(std::move(answer));
-      return;
     }
+    break;
+  }
+
+  if (answer.has_error()) {
+    if (verbosity_ >= 1) {
+      LOG(WARNING) << "Worker #" << worker->worker_idx
+                   << " returned an error: " << answer.error();
+    }
+    return absl::InvalidArgumentError(answer.error());
+  }
+  return std::move(*answer.mutable_blob());
+}
+
+void GRPCManager::WorkerRun(Blob blob, Worker* worker) {
+  auto answer_or = WorkerRunImp(std::move(blob), worker);
+  if (!answer_or.ok()) {
+    async_pending_answers_.Push(answer_or.status());
+  } else {
+    async_pending_answers_.Push(std::move(answer_or).value());
   }
 }
 
@@ -245,25 +254,15 @@ void GRPCManager::ProcessGlobalQueries(Worker* worker) {
 absl::Status GRPCManager::InitializeConfigFile(
     const proto::Config& config, const absl::string_view worker_name,
     const int parallel_execution_per_worker, Blob welcome_blob) {
-  if (config.working_directory().empty()) {
-    return absl::InvalidArgumentError("The worker directory cannot be empty.");
-  }
-  RETURN_IF_ERROR(
-      file::RecursivelyCreateDir(config.working_directory(), file::Defaults()));
-  worker_config_path_ =
-      file::JoinPath(config.working_directory(), "config.pbbin");
-  proto::WorkerConfig worker_config;
-  worker_config.set_worker_name(std::string(worker_name));
-  worker_config.set_welcome_blob(welcome_blob);
-  worker_config.set_manager_uid(manager_uid_);
-  worker_config.set_parallel_execution_per_worker(
+  worker_config_.set_worker_name(std::string(worker_name));
+  worker_config_.set_welcome_blob(welcome_blob);
+  worker_config_.set_manager_uid(manager_uid_);
+  worker_config_.set_parallel_execution_per_worker(
       parallel_execution_per_worker);
 
   for (const auto& worker : workers_) {
-    worker_config.add_worker_addresses(worker->address);
+    worker_config_.add_worker_addresses(worker->address);
   }
-  RETURN_IF_ERROR(file::SetBinaryProto(worker_config_path_, worker_config,
-                                       file::Defaults()));
   return absl::OkStatus();
 }
 
@@ -277,48 +276,7 @@ absl::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
   }
   auto* worker = workers_[worker_idx].get();
 
-  proto::Query query;
-  *query.mutable_blob() = std::move(blob);
-  query.set_config_path(worker_config_path_);
-  query.set_manager_uid(manager_uid_);
-  query.set_worker_idx(worker->worker_idx);
-
-  proto::Answer answer;
-  while (true) {
-    grpc::ClientContext context;
-    context.set_wait_for_ready(true);
-    context.set_deadline(std::chrono::system_clock::now() +
-                         std::chrono::hours(kDeadLineInHours));
-    const auto status = worker->stub->Run(&context, query, &answer);
-    if (!status.ok()) {
-      if (verbosity_ >= 1) {
-        LOG(WARNING) << "GRPC to worker #" << worker_idx
-                     << " failed with error: " << status.error_message();
-      }
-      if (status.error_message() == "Socket closed" ||
-          status.error_message() == "Transport closed" ||
-          status.error_message() == "Connection reset by peer" ||
-          status.error_message() == "Broken pipe" ||
-          status.error_message() == "keepalive watchdog timeout") {
-        // The worker died during the execution (e.g. rescheduling).
-        // Let's try again.
-        continue;
-      } else {
-        // Something is not right.
-        return GrpcStatusToAbslStatus(status);
-      }
-    }
-    break;
-  }
-
-  if (answer.has_error()) {
-    if (verbosity_ >= 1) {
-      LOG(WARNING) << "Worker #" << worker_idx
-                   << " returned an error: " << answer.error();
-    }
-    return absl::InvalidArgumentError(answer.error());
-  }
-  return std::move(*answer.mutable_blob());
+  return WorkerRunImp(std::move(blob), worker);
 }
 
 absl::Status GRPCManager::AsynchronousRequest(Blob blob, int worker_idx) {
@@ -338,10 +296,10 @@ absl::StatusOr<Blob> GRPCManager::NextAsynchronousAnswer() {
   if (!answer_or.has_value()) {
     return absl::OutOfRangeError("No more results available");
   }
-  if (answer_or.value().has_error()) {
-    return absl::InvalidArgumentError(answer_or.value().error());
+  if (!answer_or.value().ok()) {
+    return answer_or.value();
   }
-  return std::move(*answer_or.value().mutable_blob());
+  return std::move(*answer_or.value());
 }
 
 int GRPCManager::NumWorkers() { return workers_.size(); }

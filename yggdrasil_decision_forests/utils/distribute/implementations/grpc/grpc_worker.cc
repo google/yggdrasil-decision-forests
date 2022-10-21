@@ -20,9 +20,11 @@
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/channel_arguments.h"
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
 #include "yggdrasil_decision_forests/utils/distribute/utils.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -96,9 +98,8 @@ class WorkerService final : public proto::Server::Service {
                    proto::Answer* reply) override {
     {
       utils::concurrency::MutexLock l(&mutex_);
-      RETURN_IF_ERROR(AbslStatusToGrpcStatus(
-          EnsureReadyWorker(request->manager_uid(), request->config_path(),
-                            request->worker_idx(), &l)));
+      RETURN_IF_ERROR(AbslStatusToGrpcStatus(EnsureReadyWorker(
+          request->manager_uid(), *request, request->worker_idx(), &l)));
       num_active_requests_++;
     }
 
@@ -186,7 +187,7 @@ class WorkerService final : public proto::Server::Service {
   // After a call to this method, the worker is ready to processed requests.
   // This method should be called before any request.
   absl::Status EnsureReadyWorker(uint64_t manager_uid,
-                                 absl::string_view config_path,
+                                 const proto::Query& request,
                                  const int worker_idx,
                                  utils::concurrency::MutexLock* lock)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
@@ -213,31 +214,34 @@ class WorkerService final : public proto::Server::Service {
         return absl::OkStatus();
       }
     }
+
+    if (!request.has_worker_config()) {
+      LOG(INFO) << "Reject worker initialization as worker config is missing.";
+      return absl::UnavailableError("worker config required");
+    }
+
     LOG(INFO) << "Initialize worker.";
 
     manager_uid_ = manager_uid;
 
-    proto::WorkerConfig worker_config;
-    RETURN_IF_ERROR(
-        file::GetBinaryProto(config_path, &worker_config, file::Defaults()));
-    if (worker_config.manager_uid() != manager_uid_) {
+    if (request.worker_config().manager_uid() != manager_uid_) {
       return absl::InvalidArgumentError(
           "Two different managers are fighting for the same worker");
     }
 
-    worker_addresses_ = {worker_config.worker_addresses().begin(),
-                         worker_config.worker_addresses().end()};
+    worker_addresses_ = {request.worker_config().worker_addresses().begin(),
+                         request.worker_config().worker_addresses().end()};
 
-    ASSIGN_OR_RETURN(
-        worker_, AbstractWorkerRegisterer::Create(worker_config.worker_name()));
+    ASSIGN_OR_RETURN(worker_, AbstractWorkerRegisterer::Create(
+                                  request.worker_config().worker_name()));
     RETURN_IF_ERROR(InternalInitializeWorker(
-        worker_idx, worker_config.worker_addresses_size(), worker_.get(),
-        &hook_));
-    RETURN_IF_ERROR(worker_->Setup(worker_config.welcome_blob()));
+        worker_idx, request.worker_config().worker_addresses_size(),
+        worker_.get(), &hook_));
+    RETURN_IF_ERROR(worker_->Setup(request.worker_config().welcome_blob()));
 
     InitializerInterWorkerCommunication(
-        worker_config.worker_addresses_size(),
-        worker_config.parallel_execution_per_worker());
+        request.worker_config().worker_addresses_size(),
+        request.worker_config().parallel_execution_per_worker());
 
     return absl::OkStatus();
   }
@@ -267,11 +271,7 @@ class WorkerService final : public proto::Server::Service {
                      << status.error_message();
         // List of non-documented GRPC errors that can indicate a temporary
         // impossibility to reach the server.
-        if (status.error_message() == "Socket closed" ||
-            status.error_message() == "Transport closed" ||
-            status.error_message() == "Connection reset by peer" ||
-            status.error_message() == "Broken pipe" ||
-            status.error_message() == "keepalive watchdog timeout") {
+        if (IsTransiantError(status)) {
           // The worker died during the execution (e.g. rescheduling).
           // Let's try again.
           num_re_emitting++;

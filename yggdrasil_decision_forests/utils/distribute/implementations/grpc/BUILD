@@ -47,6 +47,7 @@ cc_library_ydf(
     srcs = ["grpc_manager.cc"],
     hdrs = ["grpc_manager.h"],
     deps = [
+        ":grpc_common",
         ":grpc_grpc_proto",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_absl//absl/container:node_hash_map",
@@ -66,6 +67,7 @@ cc_library_ydf(
     srcs = ["grpc_worker.cc"],
     hdrs = ["grpc_worker.h"],
     deps = [
+        ":grpc_common",
         ":grpc_grpc_proto",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_absl//absl/status",
@@ -78,6 +80,13 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils/distribute:utils",
     ],
     alwayslink = 1,
+)
+
+cc_library_ydf(
+    name = "grpc_common",
+    srcs = ["grpc_common.cc"],
+    hdrs = ["grpc_common.h"],
+    deps = ["@com_github_grpc_grpc//:grpc++"],
 )
 
 # Tests

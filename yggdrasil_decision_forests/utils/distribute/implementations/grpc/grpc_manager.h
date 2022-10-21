@@ -15,8 +15,8 @@
 
 // Distribution over a set of processed communicating through GRPC.
 
-#ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
-#define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
+#ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
+#define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
 
 #include "grpcpp/channel.h"
 #include "grpcpp/server.h"
@@ -88,13 +88,16 @@ class GRPCManager : public AbstractManager {
   void ProcessGlobalQueries(Worker* worker);
   void ProcessLocalQueries(Worker* worker);
 
-  // Process a query and export the result to the answer queue.
+  // Processes a query and exports the result to the answer queue.
   void WorkerRun(Blob blob, Worker* worker);
+
+  // Processes a query and returns the answer.
+  absl::StatusOr<Blob> WorkerRunImp(Blob blob, Worker* worker);
 
   void JoinWorkers();
 
   // Path to serialized worker configuration accessible by all workers.
-  std::string worker_config_path_;
+  proto::WorkerConfig worker_config_;
   int verbosity_;
   std::vector<std::unique_ptr<Worker>> workers_;
 
@@ -105,7 +108,7 @@ class GRPCManager : public AbstractManager {
   utils::concurrency::Channel<Blob> async_pending_queries_;
 
   // Async answers that should be returned, indexed by task.
-  utils::concurrency::Channel<proto::Answer> async_pending_answers_;
+  utils::concurrency::Channel<absl::StatusOr<Blob>> async_pending_answers_;
 
   // Idx of the next worker to receive a job if the worker idx is not specified
   // by the user.
