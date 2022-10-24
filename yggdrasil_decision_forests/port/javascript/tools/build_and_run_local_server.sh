@@ -53,7 +53,7 @@ fi
 # Copy the data to the https server.
 unzip -o bazel-genfiles/${PROJECT_DIR}/ydf.zip -d /${ROOT_DIR}/ydf/
 cp -f ${PROJECT_DIR}/example/example.html /${ROOT_DIR}/
-cp -f ${PROJECT_DIR}/example/model.zip /${ROOT_DIR}/model.zip
+cp -f ${PROJECT_DIR}/example/*.zip /${ROOT_DIR}/
 cp -f bazel-bin/third_party/javascript/node_modules/jszip/jszip.min.js ${ROOT_DIR}/jszip.js
 
 # List content of root dir

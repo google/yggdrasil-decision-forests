@@ -457,12 +457,15 @@ Module['loadModelFromZipBlob'] =
 
   zippedModel.forEach((filename, file) => {
     promiseUncompressed.push(
-        file.async('blob')
-            .then((data) => data.arrayBuffer())
-            .then(
-                (data) => Module.FS.writeFile(
-                    modelPath + '/' + filename, new Uint8Array(data),
-                    {'encoding': 'binary'})));
+        file.async('blob').then((data) => data.arrayBuffer()).then((data) => {
+          if (filename.endsWith('/')) {
+            throw Error(
+                'The model zipfile is expected to be a flat zip file, but it contains a sub-directory. If zipping the model manually with the `zip` tool, make sure to use the `-j` option.');
+          }
+          Module.FS.writeFile(
+              modelPath + '/' + filename, new Uint8Array(data),
+              {'encoding': 'binary'});
+        }));
   });
 
   await Promise.all(promiseUncompressed);

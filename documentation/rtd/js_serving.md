@@ -25,9 +25,21 @@ git clone https://github.com/google/yggdrasil-decision-forests.git
 MODEL_PATH="yggdrasil-decision-forests/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt"
 ```
 
+``` {note}
+**Warning:** The model zip file should be a *flat* zip file: The model files
+should be located at the **root** of the zip file. If using the
+[zip tool](https://linux.die.net/man/1/zip), a flat file can be created with the `-j` option.
+```
+
 **(Optional**) By default, YDF models contain meta-data used for model
 interpretation and debugging. This meta-data is not used for model inference and
 can be discarded to decrease the model size using the `edit_model` tool:
+
+``` {note}
+If you are using the TensorFlow Decision Forests API, instead of using the
+`edit_model` command demonstrated below, you can simply pass the argument
+`pure_serving_model=True` to the model constructor.
+```
 
 ```shell
 # Install the CLI API. See "CLI API / Quick Start" or " CLI API / Install" sections for more details.
