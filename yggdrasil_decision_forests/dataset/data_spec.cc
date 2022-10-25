@@ -668,6 +668,11 @@ absl::Status Tokenize(const absl::string_view text,
         unit_tokens.emplace_back(1, c);
       }
       break;
+    case proto::Tokenizer::NO_SPLITTING:
+      unit_tokens.emplace_back(cased_text);
+      break;
+    default:
+      STATUS_FATAL("Unreachable.");
   }
   // Remove empty tokens.
   unit_tokens.erase(

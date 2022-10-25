@@ -236,6 +236,9 @@ message Tokenizer {
     // Split a string into individual characters. Does not remove spaces and
     // non-printable characters.
     CHARACTER = 3;
+    // Never split a string. Useful if CATEGORICAL_SET features should be
+    // avoided.
+    NO_SPLITTING = 4;
   }
 
   message Grouping {

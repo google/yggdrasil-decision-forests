@@ -328,6 +328,12 @@ TEST(Dataset, Tokenizer) {
                                               " w", "wo", "or", "rl", "ld",
                                               "hel", "ell", "llo", "lo ", "o w",
                                               " wo", "wor", "orl", "rld"}));
+
+  CHECK_OK(Tokenize("Hello world;, test more words for splitting",
+                    PARSE_TEST_PROTO(R"pb(splitter: NO_SPLITTING)pb"),
+                    &tokens));
+  EXPECT_THAT(tokens,
+              ElementsAre("hello world;, test more words for splitting"));
 }
 
 TEST(DataSpecUtil, CategoricalIdxsToRepresentation) {

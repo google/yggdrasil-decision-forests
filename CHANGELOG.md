@@ -10,6 +10,7 @@
 -   Benchmark inference tool does not require for the dataset to contain the
     label column.
 -   The user can specify the location of the wasm file in the JavaScript port.
+-   The user can instruct the tokenizer to perform no tokenization at all.
 
 ### Documentation
 
