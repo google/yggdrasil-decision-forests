@@ -20,61 +20,86 @@
 # support. Alternatively, if TF_SUPPORT is set to 1, build and run YDF
 # with tensorflow support.
 #
+# Options:
+#  CPP_VERSIONS: C++ Versions to build, separated by semicolon. Can be 14 or 17.
+#                Defaults to 17
+#  RUN_TESTS: Run the unit tests, 0 or 1 (default).
+#  TF_SUPPORT: Whether or not to build with Tensorflow support. Can be "ON",
+#              "OFF" (default) or "BOTH" (for building both variants)
+#  COMPILERS: Compilers to build, separated by semicolon. Defaults to gcc-10
+#
 # Usage example:
 #
-#   # Compilation without TF support.
+#   # Compilation without TF support, GCC 9, 
 #   ./tools/test_bazel.sh
 #    
-#   # Compilation with TF support.
-#   TF_SUPPORT=1 ./tools/test_bazel.sh
+#   # Compilation with TF support, C++14 and C++14, Clang and gcc-9, no tests run.
+#   TF_SUPPORT="ON" COMPILERS="clang;gcc-9" CPP_VERSIONS="14;17" RUN_TESTS=0 ./tools/test_bazel.sh
 #
 set -xev
 
-if [ -z "${TF_SUPPORT}"] || [ "${TF_SUPPORT}" = 0 ]; then
+build_and_maybe_test () {
+   echo "Building YDF the following settings:"
+   echo "   C++ Version: $1"
+   echo "   Compiler : $2"
+   echo "   Tensorflow support: $3"
 
-  # TensorFlow independent build.
-  cp -f WORKSPACE_NO_TF WORKSPACE
+    BAZEL=bazel
+    ${BAZEL} version
 
-  BAZEL=bazel
-  ${BAZEL} version
+    local flags="--config=linux_cpp${1} --config=linux_avx2 --features=-fully_static_link --repo_env=CC=${2}"
+    # Not all tests can be run without TF support
+    local testable_components=""
+    local buildable_cli_components=""
+    if [ "$3" = 0 ]; then
+      # No tensorflow support
+      cp -f WORKSPACE_NO_TF WORKSPACE
+      buildable_cli_components=":all"
+      testable_components="metric/...:all"
+    else 
+      cp -f WORKSPACE_WITH_TF WORKSPACE
+      flags="${flags} --config=use_tensorflow_io"
+      buildable_cli_components="/...:all"
+      testable_components="...:all"
+    fi
 
-  FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link"
-  time ${BAZEL} build //yggdrasil_decision_forests/cli:all ${FLAGS}
+    time ${BAZEL} build //yggdrasil_decision_forests/cli${buildable_cli_components}  //examples:beginner_cc ${flags}
+    if [ "$RUN_TESTS" = 1 ]; then
+      time ${BAZEL} test //yggdrasil_decision_forests/${testable_components}  //examples:beginner_cc ${flags}
+    fi
+    echo "Building and maybe testing YDF complete."
+} 
 
-else
+main () {
 
-  # TensorFlow compatible build.
-  cp -f WORKSPACE_WITH_TF WORKSPACE
+  # Set default values
+  : "${CPP_VERSIONS:=17}"
+  : "${COMPILERS:="gcc-10"}"
+  : "${RUN_TESTS:=1}"
+  : "${TF_SUPPORT:="OFF"}"
 
-  BAZEL=bazel
-  ${BAZEL} version
+  local cpp_version_array=(${CPP_VERSIONS//;/ })
+  local compilers_array=(${COMPILERS//;/ })
 
-  echo "====================================================="
-  echo "1. With TensorFlow IO, c++14"
-  echo "====================================================="
+  local tf_supports;
+  if [ "${TF_SUPPORT}" = "ON" ]; then
+    tf_supports=(1)
+  elif [ "${TF_SUPPORT}" = "OFF" ]; then
+    tf_supports=(0)
+  elif [ "${TF_SUPPORT}" = "BOTH" ]; then
+    tf_supports=(0 1)
+  else 
+    echo "ERROR: Invalid value for TF_SUPPORT ${TF_SUPPORT}. Allowed values are \"ON\", \"OFF\", \"BOTH\""
+    exit 1;
+  fi
 
-  # With TensorFlow IO, (c++14 with gcc8)
-  FLAGS="--config=linux_cpp14 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io --repo_env=CC=gcc-8"
-  time ${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
-  time ${BAZEL} test //yggdrasil_decision_forests/{cli,dataset,learner,metric,model,serving}/...:all ${FLAGS}
+  for cpp_version in ${cpp_version_array[@]}; do
+    for compiler in ${compilers_array[@]}; do
+      for tf_support in ${tf_supports[@]}; do
+        build_and_maybe_test $cpp_version $compiler $tf_support
+      done
+    done
+  done
+}
 
-
-  echo "====================================================="
-  echo "2. Without TensorFlow IO, c++17"
-  echo "====================================================="
-
-  # Without TensorFlow IO (c++17)
-  FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link"
-  time ${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
-  time ${BAZEL} test //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc ${FLAGS}
-
-  echo "=================================================="
-  echo "3. With TensorFlow IO, c++17"
-  echo "=================================================="
-
-  # With TensorFlow IO (c++17)
-  FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io"
-  time ${BAZEL} build //yggdrasil_decision_forests/cli/...:all ${FLAGS}
-  time ${BAZEL} test //yggdrasil_decision_forests/...:all ${FLAGS}
-
-fi
+main
