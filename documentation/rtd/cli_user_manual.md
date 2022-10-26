@@ -2,11 +2,19 @@
 
 This page contains an in-depth introduction to Yggdrasil Decision Forests (YDF)
 CLI API. The content presented on this page is generally not necessary to use
-YDF, but it will help users better use it.
+YDF, but it will help users improve their understanding and use advance options.
+
+``` {note}
+New users should first check out the [Quick start](cli_quick_start).
+```
 
 Most concepts presented here apply to the other APIs, notably the C++ API.
 
 ## Dataset
+
+A **dataset** is a list of **examples**. Datasets can be stored in memory, on
+disk, or generated on the fly. Examples are **ordered** in a dataset, that is an
+example in a dataset is unambiguously identified by its **index** in a dataset.
 
 An **attribute** (also known as a *feature*, *variable*, or *column* in other
 libraries) refers to one particular piece of information in a tabular dataset.
@@ -16,7 +24,9 @@ attributes.
 Each attribute has a **semantic** (also known as *type*). The semantic
 determines how an attribute is used by a model. For example, *age* (e.g., number
 of years since birth) is generally *numerical* while *country* (e.g., ISO 3166
-country code) is categorical. Following is a list of available semantics.
+country code) is categorical.
+
+YDF supports the following semantics.
 
 -   NUMERICAL: Numerical value. Generally for quantities or counts with full
     ordering. For example, the age of a person, or the number of items in a bag.
@@ -47,7 +57,7 @@ country code) is categorical. Following is a list of available semantics.
 -   HASH: The hash of a string value. Used when only the equality between values
     is important (not the value itself). Currently, only used for groups in
     ranking problems e.g. the query in a query/document problem. The hashing is
-    computed with google's farmhash and stored as an uint64.
+    computed with [farmhash](https://github.com/google/farmhash).
 
 An **example** is a collection of **attribute** values. Following is an
 **example** with three attributes:
@@ -58,14 +68,10 @@ An **example** is a collection of **attribute** values. Following is an
 "attribute_3": [1, 2, 3] # CATEGORICAL-SET stored as integer
 ```
 
-A **dataset** is a list of **examples**. Datasets can be stored in memory, on
-disk, or generated on the fly. Examples are **ordered** in a dataset, that is an
-example in a dataset is unambiguously identified by its **index** in a dataset.
-
 A **data specification** (or **dataspec** for short) is the definition of a list
 of attributes. This definition contains the name, semantic and meta-data of each
 attribute in the dataset. A dataspec is stored as a
-[Google ProtoBuffer](https://developers.google.com/protocol-buffers) (see
+[ProtoBuffer](https://developers.google.com/protocol-buffers) (see its
 definition at `dataset/data_spec.proto`). A dataspec can be printed in a
 readable way using the `show_dataspec` CLI command.
 
@@ -225,11 +231,11 @@ Supported formats are:
     [TensorFlow Record file](https://www.tensorflow.org/tutorials/load_data/tfrecord)
     containing serialized TensorFlow Example protobuffers.
 
-A single dataset can be divided into multiple files. Such separation speed-up
-dataset reading. As a rule of thumb, individual dataset files should not exceed
-100MB. The list of files of a dataset can be specified using sharding, globbing,
-and comma separation. Following are examples of dataset paths made of multiple
-files:
+A single dataset can be divided into multiple files. Splitting up the datasets
+can speed-up dataset reading. As a rule of thumb, individual dataset files
+should not exceed 100MB. The list of files of a dataset can be specified using
+sharding, globbing, and comma separation. Following are examples of dataset
+paths made of multiple files:
 
 -   `csv:/path/to/my/dataset.csv@10`
 -   `csv:/path/to/my/dataset_*.csv`
@@ -295,7 +301,7 @@ By default, learners are configured to be trained locally using 6 threads.
 The **logging directory** of a learner is an optional directory that specifies
 where the learner exports information about the learning process. This
 information is learner specific and can be composed of plots, tables and HTML
-reports, and helps one to understand the model. The logging directory of a
+reports, and helps one understand the model. The logging directory of a
 learner does not have any defined structure as different learners can export
 different types of information.
 
@@ -468,22 +474,22 @@ than larger values.
 
 ## Automated Hyper-parameter Tuning
 
-Optimizing the hyperparameter of a learner can improve the quality of a model.
+Optimizing the hyperparameters of a learner can improve the quality of a model.
 Selecting the optimal hyper-parameters can be done manually (see
-[how to improve a model](improve_model)) or using the hyper-parameter optimizer
-(HPO). The HPO can select automatically the best hyper-parameter of a learner by
-trial and error.
+[how to improve a model](improve_model)) or using the automated hyper-parameter
+optimizer (HPO). The HPO automatically selects the best hyper-parameters through
+a sequence of trial-and-error computations.
 
 The HPO is a meta-learner with the key `HYPERPARAMETER_OPTIMIZER` configured
 with a sub-learner to optimize. It supports local and distributed training.
 
-Various aspects of the HPO can be configured. The main configuration nobs are.
+Various aspects of the HPO can be configured. The main configuration knobs are.
 
 -   **The search space**: The set of hyper-parameters to optimize.
 -   **The evaluation protocol**: How to evaluate a set of hyper-parameters,
     e.g., self-evaluation, cross-validation.
--   **The optimizer**: The Derivative-free optimization algorithm used to
-    propose new hyper-parameters to evaluate.
+-   **The optimizer**: The optimization algorithm used to navigate through the
+    search space.
 
 The following example shows the TrainingConfig configuration of the
 hyper-parameter optimizer for a Gradient boosted trees model.
@@ -806,5 +812,5 @@ Following is the list the available module path and registration keys.
 
 ## Advanced features
 
-Most of the YDF advanced documentation is written in `.h` header (for the
+Most of the YDF advanced documentation is written in the `.h` headers (for the
 library) and `.cc` headers (for CLI tools). ~~~

@@ -5,8 +5,9 @@
 
 |
 
-**Yggdrasil Decision Forests** (YDF) is a production grade collection algorithms, developed and used in Google, for the training, serving, and interpretation of Decision Forest
-models. The library is available in C++, CLI (command-line-interface), TensorFlow (under the name TensorFlow Decision Forests;TF-DF), Javascript, and Go
+**Yggdrasil Decision Forests** (YDF) is a production grade collection of algorithms, developed and used by Google, for the training, serving, and interpretation of Decision Forest
+models. YDF is open-source and is available in C++, CLI (command-line-interface),
+ TensorFlow (under the name TensorFlow Decision Forests;TF-DF), Javascript, and Go
 (inference only). See the :doc:`features` page for the list of features.
 
 |
@@ -19,7 +20,7 @@ models. The library is available in C++, CLI (command-line-interface), TensorFlo
 |
 
 **TensorFlow Decision Forests** (TF-DF) is the official port of YDF to
-TensorFlow using the `Kera API <https://keras.io/>`_. TF-DF makes it easy to train
+TensorFlow using the `Keras API <https://keras.io/>`_. TF-DF makes it easy to train
 and use decision forests in the TensorFlow ecosystem.
 
 
@@ -37,7 +38,7 @@ Content
   :caption: CLI API
 
   Quick start <cli_quick_start>
-  Install <cli_install>
+  Installation <cli_install>
   cli_commands
   User manual <cli_user_manual>
 
@@ -45,8 +46,8 @@ Content
   :maxdepth: 1
   :caption: TF-DF / Python API
 
-  Quick Star <https://www.tensorflow.org/decision_forests/tutorials/beginner_colab>
-  Install <https://www.tensorflow.org/decision_forests/installation>
+  Quick Start <https://www.tensorflow.org/decision_forests/tutorials/beginner_colab>
+  Installation <https://www.tensorflow.org/decision_forests/installation>
   Tutorials <https://www.tensorflow.org/decision_forests/tutorials>
 
 .. toctree::

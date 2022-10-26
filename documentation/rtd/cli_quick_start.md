@@ -3,7 +3,6 @@
 ``` {note}
 This page is the *Quick Start* for the *CLI API*.
 See the [list of available training APIs](apis) for other available APIs.
-For example, see the *Quick Start* for the *TensorFlow Decision Forests APIs*.
 ```
 
 On this page, we train, evaluate, analyze, generate predictions, and measure the
@@ -16,16 +15,13 @@ An end-to-end example of the CLI API is available [here](https://github.com/goog
 ## Install YDF CLI
 
 The latest CLI release of YDF is available on the
-[Github release](https://github.com/google/yggdrasil-decision-forests/releases).
+[Github release page](https://github.com/google/yggdrasil-decision-forests/releases).
 
 ```shell
 # Download and extract the last CLI release of YDF.
 wget https://github.com/google/yggdrasil-decision-forests/releases/download/1.0.0/cli_linux.zip
 unzip cli_linux.zip
 ```
-
-Alternatively, YDF can be compiled from sources following
-[the CLI Install instructions](cli_install).
 
 Each binary in the release archive executes a different task. For example, the
 `train` command trains a model. Each command is explained in the
@@ -54,7 +50,7 @@ wget -q ${DATASET_SRC}/adult_test.csv -O adult_test.csv
 head -n 4 adult_train.csv
 ```
 
-Results:
+Result:
 
 ```text
 age,workclass,fnlwgt,education,education_num,marital_status,occupation,relationship,race,sex,capital_gain,capital_loss,hours_per_week,native_country,income
@@ -146,9 +142,9 @@ most frequent of those values is `HS-grad` (32% of all values).
 ## (Optional) Create dataspec with a guide
 
 In his example, the semantics of the columns were correctly detected. However,
-when value representations representation is ambiguous, it might not be the
+when value representation is ambiguous, this might not be the
 case. For example, the semantic of *enum* values (i.e., categorical values
-represented as an integer) cannot be detected automatically in a csv file.
+represented as an integer) cannot be detected automatically in a .csv file.
 
 In such a case, we would re-run the `infer_dataspec` command with an extra flag
 to indicate the real semantic of the miss-detected column. For example, to force
@@ -217,7 +213,7 @@ A few remarks:
 -   Input features were not specified. Therefore, all the columns are used as
     input features except for the label.
 
--   DFs consume natively numerical, categorical, categorical-set features and
+-   DFs natively consume numerical, categorical, categorical-set features and
     missing values. Numerical features do not need to be normalized. Categorical
     string values do not need to be encoded in a dictionary.
 
@@ -225,7 +221,7 @@ A few remarks:
     default values of all hyper-parameters are set such that they provide
     reasonable results in most situations. We will discuss alternative default
     values (called *hyper-parameter templates*) and automated tuning
-    hyper-parameters later. The list of all hyper-parameter and their default
+    hyper-parameters later. The list of all hyper-parameters and their default
     value is available in the [hyper-parameters page)(hyper_parameters).
 
 -   No validation dataset was provided for the training. Not all learners
@@ -235,7 +231,7 @@ A few remarks:
     validation. This rate can be changed using the `validation_ratio` parameter.
     Alternatively, the validation dataset can be provided with the
     `--valid_dataset` flag. The final model contains 136 trees for a validation
-    accuracy of 0.8702.
+    accuracy of ~0.8702.
 
 ## Show model information
 
@@ -443,11 +439,11 @@ One vs other classes:
     ap: 0.830674   CI95[B][0.817513 0.843892]
 ```
 
-Some remarks:
+Interpretation:
 
--   The test dataset contains 9769.
+-   The test dataset contains 9769 examples.
 -   The test accuracy is 0.874399 with 95% confidence interval boundaries of
-    [0.86875 0.879882].
+    [0.86875; 0.879882].
 -   The test AUC is 0.929207 with 95% confidence interval boundaries of
     [0.924358 0.934056](when computed with a closed form) and [0.973397
     0.977947] when computed with bootstrapping.
@@ -493,11 +489,17 @@ model.
 
 ``` {note}
 YDF has multiple algorithms to compute the predictions of a model.
-Those inference algorithms differ in speed and coverage. When generating predictions (e.g. `predict` command, or when using the C++ API) YDF automatically uses the faster algorithm. However, the `benchmark_inference` command will still show the speed of all the algorithms.
+Those inference algorithms differ in speed and coverage. When generating
+predictions (e.g. `predict` command, or when using the C++ API) YDF
+automatically uses the fastest algorithm available.
+
+For comparison, the `benchmark_inference` shows the speed of all the available
+algorithms.
 ```
 
 ``` {note}
-Unless specified, inference algorithms are always given with single-threaded, and it is up to the user to parallelize the model inference using multi-threading.
+Unless specified, inference algorithms are single-threaded.
+It is up to the user to parallelize the model inference using multi-threading.
 ```
 
 ```shell
