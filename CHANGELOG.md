@@ -12,6 +12,10 @@
 -   The user can specify the location of the wasm file in the JavaScript port.
 -   The user can instruct the tokenizer to perform no tokenization at all.
 
+### Cleanup
+
+-   Fix GRPC dependency to version 1.50.0.
+
 ### Documentation
 
 -   The new documentation is live at
