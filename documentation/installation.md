@@ -64,11 +64,13 @@ and compile the library:
 
 ```shell
 # Compile on Linux
-./tools/test_bazel_no_tf.sh
+./tools/test_bazel.sh
 
 # Compile on Windows
 ./tools/test_bazel_no_tf.bat
 ```
+
+See `tools/test_bazel.sh` for compilation options.
 
 ## Calling Bazel directly
 
@@ -105,6 +107,16 @@ bazel build //yggdrasil_decision_forests/cli:all --config=macos
 *Note:* You can specify the compiler with `--repo_env=CC`. For example:
 
 ## OS specific instructions
+
+### Supported configurations
+
+For now, we support the following configurations
+
+1. Ubuntu Linux with GCC 9, with and without Tensorflow dataset support
+1. Ubuntu Linux with Clang 14 with Tensorflow dataset support
+
+All other configurations (e.g., other compilers, MacOS, Windows) are supported
+on a best-effort basis.
 
 ### Linux / MacOS
 

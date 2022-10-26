@@ -26,11 +26,11 @@
 #  RUN_TESTS: Run the unit tests, 0 or 1 (default).
 #  TF_SUPPORT: Whether or not to build with Tensorflow support. Can be "ON",
 #              "OFF" (default) or "BOTH" (for building both variants)
-#  COMPILERS: Compilers to build, separated by semicolon. Defaults to gcc-10
+#  COMPILERS: Compilers to build, separated by semicolon. Defaults to gcc-9
 #
 # Usage example:
 #
-#   # Compilation without TF support, GCC 9, 
+#   # Compilation without TF support, GCC 9, C++17. running tests.
 #   ./tools/test_bazel.sh
 #    
 #   # Compilation with TF support, C++14 and C++14, Clang and gcc-9, no tests run.
@@ -71,10 +71,9 @@ build_and_maybe_test () {
 } 
 
 main () {
-
   # Set default values
   : "${CPP_VERSIONS:=17}"
-  : "${COMPILERS:="gcc-10"}"
+  : "${COMPILERS:="gcc-9"}"
   : "${RUN_TESTS:=1}"
   : "${TF_SUPPORT:="OFF"}"
 
