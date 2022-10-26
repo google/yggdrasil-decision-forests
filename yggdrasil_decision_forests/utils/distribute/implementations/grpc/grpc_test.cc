@@ -124,7 +124,7 @@ TEST(GRPC, TestChangeManagerNice) {
   all.Join();
 }
 
-TEST(GRPC, TestChangeManagerNotNice) {
+  TEST(GRPC, DISABLED_TestChangeManagerNotNice) {
   auto all = CreateGrpcManagerCreator(5, 1);
   TestChangeManager(&all, /*nice=*/false);
   all.Join();
