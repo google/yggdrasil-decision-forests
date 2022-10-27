@@ -244,7 +244,7 @@ absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
 
 std::string GetBasename(absl::string_view path) {
   try {
-    return std::filesystem::path(std::string(path)).filename();
+    return std::filesystem::path(std::string(path)).filename().string();
   } catch (const std::exception& e) {
     LOG(ERROR) << "Error parsing basename of " << path << ": " << e.what();
     return "";

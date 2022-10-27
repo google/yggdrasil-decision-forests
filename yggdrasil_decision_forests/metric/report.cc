@@ -302,12 +302,14 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
                            num_bins, gt_res_plot);
 
   // Plot the histograms
-  const auto add_histogram = [&weights](
+  // Capturing `num_bins` is required for Windows compilation.
+  // NOLINTNEXTLINE(clang-diagnostic-unused-lambda-capture)
+  const auto add_histogram = [&weights, &num_bins](
                                  const std::vector<float>& values,
                                  utils::plot::Plot* plot) -> absl::Status {
     auto bars = absl::make_unique<utils::plot::Bars>();
     const auto hist = utils::histogram::Histogram<float>::MakeUniform(
-        values, num_bins, weights);
+        values, static_cast<size_t>(num_bins), weights);
     RETURN_IF_ERROR(bars->FromHistogram(hist));
     plot->items.push_back(std::move(bars));
     return absl::OkStatus();

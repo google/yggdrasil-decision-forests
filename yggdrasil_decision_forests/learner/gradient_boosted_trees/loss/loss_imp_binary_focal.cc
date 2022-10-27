@@ -118,7 +118,8 @@ FocalLossBasicData CalculateFocalLossBasic(bool is_positive, float prediction,
       label * prediction - std::log(1.0f + std::exp(prediction));
   const float mispred = 1.0f - pt;
   const float at = is_positive ? alpha : (1.0f - alpha);
-  return (FocalLossBasicData){y, label, pt, log_pt, mispred, at};
+  FocalLossBasicData result = {y, label, pt, log_pt, mispred, at};
+  return result;
 }
 
 // We have a separate function to only calculate what's necessary for gradient
@@ -133,7 +134,8 @@ FocalLossGradientData CalculateFocalLossGradient(bool is_positive,
   const float term1 = basic.at * basic.y * std::pow(basic.mispred, gamma);
   const float term2 = gamma * basic.pt * basic.log_pt - basic.mispred;
   const float gradient = -term1 * term2;
-  return (FocalLossGradientData){basic, gradient, term1, term2};
+  FocalLossGradientData result = {basic, gradient, term1, term2};
+  return result;
 }
 
 float CalculateFocalLossHessian(FocalLossGradientData gradient_data,

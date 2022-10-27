@@ -26,8 +26,8 @@
 #define STATUS_FATAL(arg) \
  return absl::InvalidArgumentError(arg)
 
-#define STATUS_FATALS(arg, args...) \
- return absl::InvalidArgumentError(absl::StrCat(arg, args))
+#define STATUS_FATALS(arg, ...) \
+ return absl::InvalidArgumentError(absl::StrCat(arg, __VA_ARGS__))
 
 #define STATUS_CHECK(expr) \
   if (!(expr)) return absl::InvalidArgumentError("Check failed " #expr)
