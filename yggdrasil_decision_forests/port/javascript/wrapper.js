@@ -117,6 +117,26 @@ function ccMatrixToJSMatrix(src) {
 }
 
 /**
+ * Converts a Blob into a promise resolving to an arrayBuffer.
+ * @param {!Blob} blob Input file.
+ * @return {!Promise<ArrayBuffer>} promise resolving to arrayBuffer contents.
+ */
+function blobToArrayBuffer(blob) {
+  if (blob.arrayBuffer) {
+    return blob.arrayBuffer();
+  } else {
+    return new Promise(resolve => {
+      const fileReader = new FileReader();
+
+      fileReader.readAsArrayBuffer(blob);
+      fileReader.onload = function(event) {
+        resolve(event.target.result);
+      }
+    });
+  }
+}
+
+/**
  * A machine learning model.
  */
 class Model {
@@ -457,7 +477,8 @@ Module['loadModelFromZipBlob'] =
 
   zippedModel.forEach((filename, file) => {
     promiseUncompressed.push(
-        file.async('blob').then((data) => data.arrayBuffer()).then((data) => {
+        file.async('blob').then((data) => blobToArrayBuffer(data))
+        .then((data) => {
           if (filename.endsWith('/')) {
             throw Error(
                 'The model zipfile is expected to be a flat zip file, but it contains a sub-directory. If zipping the model manually with the `zip` tool, make sure to use the `-j` option.');

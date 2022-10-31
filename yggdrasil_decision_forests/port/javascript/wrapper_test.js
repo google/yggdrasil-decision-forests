@@ -16,6 +16,8 @@
 describe('YDF Inference', () => {
   let ydf = null;
   let model = null;
+  const modelUrl = '/base/third_party/yggdrasil_decision_forests/port/javascript/example/model.zip'
+  const modelOptions = { createdTFDFSignature: true };
 
   beforeAll(async () => {
     // Load library
@@ -30,13 +32,43 @@ describe('YDF Inference', () => {
 
     // Load model
     await ydf
-        .loadModelFromUrl(
-            '/base/third_party/yggdrasil_decision_forests/port/javascript/example/model.zip',
-            {createdTFDFSignature: true})
+        .loadModelFromUrl(modelUrl, modelOptions)
         .then((loadedModel) => {
           model = loadedModel;
           console.log('Model loaded');
         });
+  });
+
+  it('loadModelFromUrl', () => {
+    expect(model).not.toBeNull();
+  });
+
+  it('loadModelFromZipBlob', async () => {
+    let blobModel = null;
+
+    const modelBlob = await fetch(modelUrl).then(r => r.blob());
+    await ydf.loadModelFromZipBlob(modelBlob, modelOptions).then((loadedModel) => {
+      model = loadedModel;
+    });
+
+    expect(model).not.toBeNull();
+  });
+
+  it('loadModelFromZipBlobWithoutarrayBuffer()', async () => {
+    let blobModel = null;
+    const modelBlob = await fetch(modelUrl).then(r => r.blob());
+
+    // Force model to use FileReader conversion.
+    const arrayBufferFunc = Blob.prototype.arrayBuffer;
+    Blob.prototype.arrayBuffer = undefined;
+
+    await ydf.loadModelFromZipBlob(modelBlob, modelOptions).then((loadedModel) => {
+      model = loadedModel;
+    });
+
+    Blob.prototype.arrayBuffer = arrayBufferFunc;
+
+    expect(model).not.toBeNull();
   });
 
   it('predict', async () => {
