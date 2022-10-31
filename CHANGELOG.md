@@ -1,5 +1,12 @@
 # Changelog
 
+## HEAD
+
+### Features
+
+-   YDF can load TF-DF models directly (i.e. a TF model with a YDF model in the
+    "assets" sub directory).
+
 ## 1.1.0 - 2022-10-21
 
 ### Features

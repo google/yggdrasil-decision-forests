@@ -37,6 +37,9 @@ namespace {
 constexpr char kModelHeaderFileName[] = "header.pb";
 constexpr char kModelDataSpecFileName[] = "data_spec.pb";
 
+// Name of the subdirectory containing an YDF model in a TF-DF model.
+constexpr char kTensorFlowDecisionForestsAssets[] = "assets";
+
 // Last file created in the model directory when a model is exported.
 //
 // Note: This file is only used the simpleML Estimator to delay and retry
@@ -89,21 +92,41 @@ absl::Status LoadModel(absl::string_view directory,
                        std::unique_ptr<AbstractModel>* model,
                        ModelIOOptions io_options) {
   proto::AbstractModel header;
+  std::string effective_directory{directory};
 
   if (!io_options.file_prefix) {
-    ASSIGN_OR_RETURN(io_options.file_prefix, DetectFilePrefix(directory));
+    auto prefix_or_status = DetectFilePrefix(directory);
+    if (prefix_or_status.ok()) {
+      io_options.file_prefix = prefix_or_status.value();
+    } else {
+      // Maybe this is a TensorFlow Decision Forests models and the real model
+      // is in the "assets" sub-directory.
+      auto prefix2_or_status = DetectFilePrefix(
+          file::JoinPath(directory, kTensorFlowDecisionForestsAssets));
+      if (prefix2_or_status.ok()) {
+        effective_directory =
+            file::JoinPath(directory, kTensorFlowDecisionForestsAssets);
+        io_options.file_prefix = prefix2_or_status.value();
+      } else {
+        // Return the first error.
+        return prefix_or_status.status();
+      }
+    }
   }
+
   RETURN_IF_ERROR(file::GetBinaryProto(
-      file::JoinPath(directory, absl::StrCat(io_options.file_prefix.value(),
-                                             kModelHeaderFileName)),
+      file::JoinPath(
+          effective_directory,
+          absl::StrCat(io_options.file_prefix.value(), kModelHeaderFileName)),
       &header, file::Defaults()));
   RETURN_IF_ERROR(CreateEmptyModel(header.name(), model));
   AbstractModel::ImportProto(header, model->get());
   RETURN_IF_ERROR(file::GetBinaryProto(
-      file::JoinPath(directory, absl::StrCat(io_options.file_prefix.value(),
-                                             kModelDataSpecFileName)),
+      file::JoinPath(
+          effective_directory,
+          absl::StrCat(io_options.file_prefix.value(), kModelDataSpecFileName)),
       model->get()->mutable_data_spec(), file::Defaults()));
-  RETURN_IF_ERROR(model->get()->Load(directory, io_options));
+  RETURN_IF_ERROR(model->get()->Load(effective_directory, io_options));
   return model->get()->Validate();
 }
 

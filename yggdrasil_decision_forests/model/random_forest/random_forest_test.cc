@@ -487,6 +487,19 @@ TEST(RandomForest, SaveAndLoadModelWithPrefix) {
             loaded_model_2->mutable_metadata()->uid());
 }
 
+TEST(RandomForest, TFDFModel) {
+  RandomForestModel model;
+  dataset::VerticalDataset dataset;
+  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION, &model,
+                             &dataset);
+  std::string saved_model_path =
+      file::JoinPath(test::TmpDirectory(), "tfdf_model", "assets");
+  EXPECT_OK(SaveModel(saved_model_path, &model));
+
+  std::unique_ptr<model::AbstractModel> loaded_model;
+  EXPECT_OK(LoadModel(saved_model_path, &loaded_model));
+}
+
 }  // namespace
 }  // namespace random_forest
 }  // namespace model
