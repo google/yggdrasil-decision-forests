@@ -5,9 +5,10 @@
 
 |
 
-**Yggdrasil Decision Forests** (YDF) is a production grade collection of algorithms, developed and used by Google, for the training, serving, and interpretation of Decision Forest
+**Yggdrasil Decision Forests** (YDF) is a production grade collection of algorithms,
+developed and used by Google, for the training, serving, and interpretation of Decision Forest
 models. YDF is open-source and is available in C++, CLI (command-line-interface),
- TensorFlow (under the name TensorFlow Decision Forests;TF-DF), Javascript, and Go
+TensorFlow (under the name TensorFlow Decision Forests;TF-DF), Javascript, and Go
 (inference only). See the :doc:`features` page for the list of features.
 
 |
