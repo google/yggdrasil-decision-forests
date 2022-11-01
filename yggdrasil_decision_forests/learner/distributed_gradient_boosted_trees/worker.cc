@@ -36,6 +36,8 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace distributed_gradient_boosted_trees {
 
+using ::yggdrasil_decision_forests::model::gradient_boosted_trees::LossResults;
+
 constexpr char DistributedGradientBoostedTreesWorker::kWorkerKey[];
 
 DistributedGradientBoostedTreesWorker::
@@ -979,13 +981,12 @@ absl::Status DistributedGradientBoostedTreesWorker::EndIterTrainingWorker(
   }
 
   if (request.compute_training_loss()) {
-    float loss;
-    std::vector<float> secondary_metric;
-    RETURN_IF_ERROR(
-        Loss(dataset_.get(), predictions_, &loss, &secondary_metric));
-    answer->mutable_training()->set_loss(loss);
-    *answer->mutable_training()->mutable_metrics() = {secondary_metric.begin(),
-                                                      secondary_metric.end()};
+    ASSIGN_OR_RETURN(const LossResults loss_results,
+                     Loss(dataset_.get(), predictions_));
+    answer->mutable_training()->set_loss(loss_results.loss);
+    *answer->mutable_training()->mutable_metrics() = {
+        loss_results.secondary_metrics.begin(),
+        loss_results.secondary_metrics.end()};
     answer->mutable_training()->set_num_examples(dataset_->num_examples());
   }
 
@@ -1141,19 +1142,19 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
   processor.JoinAllAndStopThreads();
 
   // Evaluate the validation predictions.
-  float loss_value;
-  std::vector<float> secondary_metric;
-  RETURN_IF_ERROR(
+  ASSIGN_OR_RETURN(
+      const LossResults loss_results,
       loss_->Loss(*validation_.dataset, welcome_.train_config_linking().label(),
                   validation_.predictions, validation_.weights,
-                  /*ranking_index=*/nullptr, &loss_value, &secondary_metric,
+                  /*ranking_index=*/nullptr,
                   /*thread_pool=*/thread_pool_.get()));
 
-  validation_.evaluation.set_loss(loss_value);
+  validation_.evaluation.set_loss(loss_results.loss);
   validation_.evaluation.set_num_examples(validation_.dataset->nrow());
   validation_.evaluation.set_sum_weights(validation_.sum_weights);
-  *validation_.evaluation.mutable_metrics() = {secondary_metric.begin(),
-                                               secondary_metric.end()};
+  *validation_.evaluation.mutable_metrics() = {
+      loss_results.secondary_metrics.begin(),
+      loss_results.secondary_metrics.end()};
 
   return absl::OkStatus();
 }
@@ -1247,25 +1248,23 @@ absl::Status DistributedGradientBoostedTreesWorker::StartTraining(
   return absl::OkStatus();
 }
 
-absl::Status DistributedGradientBoostedTreesWorker::Loss(
+absl::StatusOr<LossResults> DistributedGradientBoostedTreesWorker::Loss(
     distributed_decision_tree::dataset_cache::DatasetCacheReader* dataset,
-    const std::vector<float>& predictions, float* loss_value,
-    std::vector<float>* secondary_metric) {
+    const std::vector<float>& predictions) {
   switch (welcome_.train_config().task()) {
-    case model::proto::Task::CLASSIFICATION:
-      RETURN_IF_ERROR(loss_->Loss(dataset->categorical_labels(), predictions,
-                                  dataset->weights(), nullptr, loss_value,
-                                  secondary_metric, thread_pool_.get()));
+    case model::proto::Task::CLASSIFICATION: {
+      return loss_->Loss(dataset->categorical_labels(), predictions,
+                         dataset->weights(), nullptr, thread_pool_.get());
       break;
-    case model::proto::Task::REGRESSION:
-      RETURN_IF_ERROR(loss_->Loss(dataset->regression_labels(), predictions,
-                                  dataset->weights(), nullptr, loss_value,
-                                  secondary_metric, thread_pool_.get()));
+    }
+    case model::proto::Task::REGRESSION: {
+      return loss_->Loss(dataset->regression_labels(), predictions,
+                         dataset->weights(), nullptr, thread_pool_.get());
       break;
+    }
     default:
       return absl::InvalidArgumentError("Not supported task");
   }
-  return absl::OkStatus();
 }
 
 absl::Status UpdateClosingNodesPredictions(

@@ -29,7 +29,9 @@ namespace gradient_boosted_trees {
 namespace {
 
 using ::testing::ElementsAre;
+using ::testing::FloatNear;
 using ::testing::IsEmpty;
+using ::testing::IsNan;
 using ::testing::Not;
 using ::testing::SizeIs;
 
@@ -143,15 +145,29 @@ TEST(BinomialLogLikelihoodLossTest, ComputeLoss) {
   std::vector<float> predictions(dataset.nrow(), 0.f);
   const auto loss_imp = BinomialLogLikelihoodLoss(
       {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
-  float loss_value;
-  std::vector<float> secondary_metric;
-  ASSERT_OK(loss_imp.Loss(dataset,
-                          /* label_col_idx= */ 1, predictions, weights, nullptr,
-                          &loss_value, &secondary_metric));
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 1, predictions, weights, nullptr));
 
-  EXPECT_NEAR(loss_value, 2 * std::log(2), kTestPrecision);
-  ASSERT_THAT(secondary_metric, SizeIs(1));
-  EXPECT_NEAR(secondary_metric[0], 0.5f, kTestPrecision);
+  EXPECT_NEAR(loss_results.loss, 2 * std::log(2), kTestPrecision);
+  EXPECT_THAT(loss_results.secondary_metrics,
+              ElementsAre(FloatNear(0.5f, kTestPrecision)));
+}
+
+TEST(BinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  std::vector<float> weights(dataset.nrow(), 0.f);
+  std::vector<float> predictions(dataset.nrow(), 0.f);
+  const auto loss_imp = BinomialLogLikelihoodLoss(
+      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 1, predictions, weights, nullptr));
+
+  EXPECT_THAT(loss_results.loss, IsNan());
+  EXPECT_THAT(loss_results.secondary_metrics, ElementsAre(IsNan()));
 }
 
 TEST(BinomialLogLikelihoodLossTest, SecondaryMetricName) {

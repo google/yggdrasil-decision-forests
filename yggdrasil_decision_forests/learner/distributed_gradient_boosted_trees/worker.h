@@ -175,10 +175,9 @@ class DistributedGradientBoostedTreesWorker
       proto::WorkerResult::GetSplitValue* src_split_values);
 
   // Loss of a set of predictions.
-  absl::Status Loss(
+  absl::StatusOr<gradient_boosted_trees::LossResults> Loss(
       distributed_decision_tree::dataset_cache::DatasetCacheReader* dataset,
-      const std::vector<float>& predictions, float* loss_value,
-      std::vector<float>* secondary_metric);
+      const std::vector<float>& predictions);
 
   // Initialize the working memory of the worker. This stage requires the number
   // of weak models and cannot be done during the "setup" stage. This method is

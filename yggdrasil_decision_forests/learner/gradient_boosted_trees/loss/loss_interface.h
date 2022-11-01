@@ -44,6 +44,11 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
+struct LossResults {
+  float loss;
+  std::vector<float> secondary_metrics;
+};
+
 // One dimension of gradients values.
 // Also contains the hessian values (is hessian are materialized).
 struct GradientData {
@@ -291,40 +296,33 @@ class AbstractLoss {
   // containing as many items as the loss secondary metrics (as defined by
   // SecondaryMetricNames()). The "Loss" method populates "secondary_metric"
   // accordingly.
-  absl::Status Loss(
+  absl::StatusOr<LossResults> Loss(
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& predictions, const std::vector<float>& weights,
-      const RankingGroupsIndices* ranking_index, float* loss_value,
-      std::vector<float>* secondary_metric,
+      const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool = nullptr) const;
 
-  virtual absl::Status Loss(const std::vector<int16_t>& labels,
-                            const std::vector<float>& predictions,
-                            const std::vector<float>& weights,
-                            const RankingGroupsIndices* ranking_index,
-                            float* loss_value,
-                            std::vector<float>* secondary_metric,
-                            utils::concurrency::ThreadPool* thread_pool) const {
+  virtual absl::StatusOr<LossResults> Loss(
+      const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+      const std::vector<float>& weights,
+      const RankingGroupsIndices* ranking_index,
+      utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("Loss not implemented");
   }
 
-  virtual absl::Status Loss(const std::vector<int32_t>& labels,
-                            const std::vector<float>& predictions,
-                            const std::vector<float>& weights,
-                            const RankingGroupsIndices* ranking_index,
-                            float* loss_value,
-                            std::vector<float>* secondary_metric,
-                            utils::concurrency::ThreadPool* thread_pool) const {
+  virtual absl::StatusOr<LossResults> Loss(
+      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+      const std::vector<float>& weights,
+      const RankingGroupsIndices* ranking_index,
+      utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("Loss lot implemented");
   }
 
-  virtual absl::Status Loss(const std::vector<float>& labels,
-                            const std::vector<float>& predictions,
-                            const std::vector<float>& weights,
-                            const RankingGroupsIndices* ranking_index,
-                            float* loss_value,
-                            std::vector<float>* secondary_metric,
-                            utils::concurrency::ThreadPool* thread_pool) const {
+  virtual absl::StatusOr<LossResults> Loss(
+      const std::vector<float>& labels, const std::vector<float>& predictions,
+      const std::vector<float>& weights,
+      const RankingGroupsIndices* ranking_index,
+      utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("Loss not implemented");
   }
 

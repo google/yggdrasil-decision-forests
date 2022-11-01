@@ -100,12 +100,11 @@ class MeanSquaredErrorLoss : public AbstractLoss {
 
   std::vector<std::string> SecondaryMetricNames() const override;
 
-  absl::Status Loss(const std::vector<float>& labels,
-                    const std::vector<float>& predictions,
-                    const std::vector<float>& weights,
-                    const RankingGroupsIndices* ranking_index,
-                    float* loss_value, std::vector<float>* secondary_metric,
-                    utils::concurrency::ThreadPool* thread_pool) const override;
+  absl::StatusOr<LossResults> Loss(
+      const std::vector<float>& labels, const std::vector<float>& predictions,
+      const std::vector<float>& weights,
+      const RankingGroupsIndices* ranking_index,
+      utils::concurrency::ThreadPool* thread_pool) const override;
 };
 
 REGISTER_AbstractGradientBoostedTreeLoss(MeanSquaredErrorLoss, "SQUARED_ERROR");

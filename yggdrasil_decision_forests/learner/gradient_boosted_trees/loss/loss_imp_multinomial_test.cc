@@ -28,7 +28,9 @@ namespace gradient_boosted_trees {
 namespace {
 
 using ::testing::ElementsAre;
+using ::testing::FloatNear;
 using ::testing::IsEmpty;
+using ::testing::IsNan;
 using ::testing::Not;
 using ::testing::SizeIs;
 
@@ -156,15 +158,33 @@ TEST(MultinomialLogLikelihoodLossTest, ComputeLoss) {
       0.f);
   const MultinomialLogLikelihoodLoss loss_imp(
       {}, model::proto::Task::CLASSIFICATION, label_column);
-  float loss_value;
-  std::vector<float> secondary_metric;
-  ASSERT_OK(loss_imp.Loss(dataset,
-                          /* label_col_idx= */ 1, predictions, weights, nullptr,
-                          &loss_value, &secondary_metric));
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 1, predictions, weights, nullptr));
 
-  EXPECT_NEAR(loss_value, std::log(3), kTestPrecision);
-  ASSERT_THAT(secondary_metric, SizeIs(1));
-  EXPECT_NEAR(secondary_metric[0], 0.333333f, kTestPrecision);
+  EXPECT_NEAR(loss_results.loss, std::log(3), kTestPrecision);
+  EXPECT_THAT(loss_results.secondary_metrics,
+              ElementsAre(FloatNear(0.333333f, kTestPrecision)));
+}
+
+TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  std::vector<float> weights(dataset.nrow(), 0.f);
+  auto label_column = dataset.data_spec().columns(1);
+  std::vector<float> predictions(
+      dataset.nrow() *
+          (label_column.categorical().number_of_unique_values() - 1),
+      0.f);
+  const MultinomialLogLikelihoodLoss loss_imp(
+      {}, model::proto::Task::CLASSIFICATION, label_column);
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 1, predictions, weights, nullptr));
+
+  EXPECT_THAT(loss_results.loss, IsNan());
+  EXPECT_THAT(loss_results.secondary_metrics, ElementsAre(IsNan()));
 }
 
 TEST(MultinomialLogLikelihoodLossTest, SecondaryMetricName) {

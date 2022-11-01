@@ -229,25 +229,18 @@ std::vector<std::string> NDCGLoss::SecondaryMetricNames() const {
   return {"NDCG@5"};
 }
 
-absl::Status NDCGLoss::Loss(const std::vector<float>& labels,
-                            const std::vector<float>& predictions,
-                            const std::vector<float>& weights,
-                            const RankingGroupsIndices* ranking_index,
-                            float* loss_value,
-                            std::vector<float>* secondary_metric,
-                            utils::concurrency::ThreadPool* thread_pool) const {
+absl::StatusOr<LossResults> NDCGLoss::Loss(
+    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
+    const RankingGroupsIndices* ranking_index,
+    utils::concurrency::ThreadPool* thread_pool) const {
   if (ranking_index == nullptr) {
     return absl::InternalError("Missing ranking index");
   }
 
-  const auto ndcg = ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
-
-  // The loss is -1 * the ndcg.
-  *loss_value = -ndcg;
-
-  secondary_metric->resize(1);
-  (*secondary_metric)[0] = ndcg;
-  return absl::OkStatus();
+  const float ndcg =
+      ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
+  return LossResults{.loss = -ndcg, .secondary_metrics = {ndcg}};
 }
 
 absl::Status SetLeafNDCG(const dataset::VerticalDataset& train_dataset,

@@ -212,29 +212,26 @@ std::vector<std::string> MeanSquaredErrorLoss::SecondaryMetricNames() const {
   }
 }
 
-absl::Status MeanSquaredErrorLoss::Loss(
+absl::StatusOr<LossResults> MeanSquaredErrorLoss::Loss(
     const std::vector<float>& labels, const std::vector<float>& predictions,
     const std::vector<float>& weights,
-    const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric,
+    const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
+  float loss_value;
   // The RMSE is also the loss.
   if (weights.empty()) {
-    ASSIGN_OR_RETURN(*loss_value, metric::RMSE(labels, predictions));
+    ASSIGN_OR_RETURN(loss_value, metric::RMSE(labels, predictions));
   } else {
-    ASSIGN_OR_RETURN(*loss_value, metric::RMSE(labels, predictions, weights));
+    ASSIGN_OR_RETURN(loss_value, metric::RMSE(labels, predictions, weights));
   }
 
+  std::vector<float> secondary_metrics = {loss_value};
   if (task_ == model::proto::Task::RANKING) {
-    secondary_metric->resize(2);
-    (*secondary_metric)[0] = *loss_value;
-    (*secondary_metric)[1] =
-        ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
-  } else {
-    secondary_metric->resize(1);
-    (*secondary_metric)[0] = *loss_value;
+    secondary_metrics.push_back(
+        ranking_index->NDCG(predictions, weights, kNDCG5Truncation));
   }
-  return absl::OkStatus();
+  return LossResults{.loss = loss_value,
+                     .secondary_metrics = std::move(secondary_metrics)};
 }
 
 }  // namespace gradient_boosted_trees

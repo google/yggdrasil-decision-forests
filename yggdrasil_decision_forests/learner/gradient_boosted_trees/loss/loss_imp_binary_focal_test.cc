@@ -30,6 +30,7 @@ namespace {
 using ::testing::ElementsAre;
 using ::testing::FloatNear;
 using ::testing::IsEmpty;
+using ::testing::IsNan;
 using ::testing::Not;
 using ::testing::NotNull;
 using ::testing::SizeIs;
@@ -204,16 +205,32 @@ TEST(BinaryFocalLossTest, ComputeLoss) {
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
   const BinaryFocalLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
                                  dataset.data_spec().columns(1));
-  float loss_value;
-  std::vector<float> secondary_metric;
-  ASSERT_OK(loss_imp.Loss(dataset,
-                          /*label_col_idx=*/1, predictions, weights, nullptr,
-                          &loss_value, &secondary_metric));
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /*label_col_idx=*/1, predictions, weights, nullptr));
 
   // The loss for every example is log(2)/8, with gamma=2, alpha=.5 and all
   // predictions 0.
-  EXPECT_NEAR(loss_value, std::log(2) / 8.f, kTestPrecision);
-  EXPECT_THAT(secondary_metric, ElementsAre(FloatNear(0.5f, kTestPrecision)));
+  EXPECT_NEAR(loss_results.loss, std::log(2) / 8.f, kTestPrecision);
+  EXPECT_THAT(loss_results.secondary_metrics,
+              ElementsAre(FloatNear(0.5f, kTestPrecision)));
+}
+
+TEST(BinaryFocalLossTest, ComputeLossWithNullWeights) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  std::vector<float> weights(dataset.nrow(), 0.f);
+  std::vector<float> predictions(dataset.nrow(), 0.f);
+  const BinaryFocalLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
+                                 dataset.data_spec().columns(1));
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /*label_col_idx=*/1, predictions, weights, nullptr));
+
+  EXPECT_THAT(loss_results.loss, IsNan());
+  EXPECT_THAT(loss_results.secondary_metrics, ElementsAre(IsNan()));
 }
 
 TEST(BinaryFocalLossTest, SecondaryMetricName) {

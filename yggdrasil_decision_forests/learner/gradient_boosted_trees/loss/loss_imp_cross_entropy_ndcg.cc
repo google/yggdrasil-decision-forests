@@ -209,17 +209,17 @@ std::vector<std::string> CrossEntropyNDCGLoss::SecondaryMetricNames() const {
   return {};
 }
 
-absl::Status CrossEntropyNDCGLoss::Loss(
+absl::StatusOr<LossResults> CrossEntropyNDCGLoss::Loss(
     const std::vector<float>& labels, const std::vector<float>& predictions,
     const std::vector<float>& weights,
-    const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric,
+    const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   if (ranking_index == nullptr) {
     return absl::InternalError("Missing ranking index");
   }
-  *loss_value = -ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
-  return absl::OkStatus();
+  float loss_value =
+      -ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
+  return LossResults{.loss = loss_value, .secondary_metrics = {}};
 }
 
 }  // namespace gradient_boosted_trees

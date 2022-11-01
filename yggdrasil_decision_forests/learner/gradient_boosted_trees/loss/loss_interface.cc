@@ -25,6 +25,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
@@ -68,18 +69,17 @@ absl::Status AbstractLoss::UpdateGradients(
                        dataset.column(label_col_idx)->name(), label_col_idx));
 }
 
-absl::Status AbstractLoss::Loss(
+absl::StatusOr<LossResults> AbstractLoss::Loss(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     const std::vector<float>& predictions, const std::vector<float>& weights,
-    const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric,
+    const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   const auto* categorical_labels =
       dataset.ColumnWithCastOrNull<dataset::VerticalDataset::CategoricalColumn>(
           label_col_idx);
   if (categorical_labels) {
     return Loss(categorical_labels->values(), predictions, weights,
-                ranking_index, loss_value, secondary_metric, thread_pool);
+                ranking_index, thread_pool);
   }
 
   const auto* numerical_labels =
@@ -87,7 +87,7 @@ absl::Status AbstractLoss::Loss(
           label_col_idx);
   if (numerical_labels) {
     return Loss(numerical_labels->values(), predictions, weights, ranking_index,
-                loss_value, secondary_metric, thread_pool);
+                thread_pool);
   }
 
   return absl::InternalError("Unknown label type");

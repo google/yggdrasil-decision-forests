@@ -147,15 +147,14 @@ TEST(MeanSquareErrorLossTest, ComputeClassificationLoss) {
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
   const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::REGRESSION,
                                       dataset.data_spec().columns(0));
-  float loss_value;
-  std::vector<float> secondary_metric;
-  ASSERT_OK(loss_imp.Loss(dataset,
-                          /* label_col_idx= */ 0, predictions, weights, nullptr,
-                          &loss_value, &secondary_metric));
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 0, predictions, weights, nullptr));
 
-  EXPECT_NEAR(loss_value, std::sqrt(30. / 4.), kTestPrecision);
+  EXPECT_NEAR(loss_results.loss, std::sqrt(30. / 4.), kTestPrecision);
   // For classification, the only secondary metric is also RMSE.
-  EXPECT_THAT(secondary_metric,
+  EXPECT_THAT(loss_results.secondary_metrics,
               ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision)));
 }
 
@@ -166,18 +165,17 @@ TEST(MeanSquareErrorLossTest, ComputeRankingLoss) {
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
   const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::RANKING,
                                       dataset.data_spec().columns(0));
-  float loss_value;
-  std::vector<float> secondary_metric;
   RankingGroupsIndices index;
   index.Initialize(dataset, 0, 1);
-  ASSERT_OK(loss_imp.Loss(dataset,
-                          /* label_col_idx= */ 0, predictions, weights, &index,
-                          &loss_value, &secondary_metric));
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 0, predictions, weights, &index));
 
-  EXPECT_NEAR(loss_value, std::sqrt(30. / 4.), kTestPrecision);
+  EXPECT_NEAR(loss_results.loss, std::sqrt(30. / 4.), kTestPrecision);
   //  For ranking, first secondary metric is RMSE, second secondary metric is
   //  NDCG@5.
-  EXPECT_THAT(secondary_metric,
+  EXPECT_THAT(loss_results.secondary_metrics,
               ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision),
                           FloatNear(0.861909, kTestPrecision)));
 }

@@ -916,23 +916,24 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     // Validation & training logs
     if (((iter_idx + 1) % config.gbt_config->validation_interval_in_trees()) ==
         0) {
-      float training_loss;
-      std::vector<float> train_secondary_metrics;
       DCHECK_EQ(validation->predictions_from_num_trees, mdl->NumTrees());
-      RETURN_IF_ERROR(config.loss->Loss(
-          current_train_dataset->gradient_dataset,
-          config.train_config_link.label(), current_train_dataset->predictions,
-          current_train_dataset->weights, nullptr, &training_loss,
-          &train_secondary_metrics));
+      ASSIGN_OR_RETURN(
+          const LossResults training_loss_result,
+          config.loss->Loss(current_train_dataset->gradient_dataset,
+                            config.train_config_link.label(),
+                            current_train_dataset->predictions,
+                            current_train_dataset->weights, nullptr));
 
       auto* log_entry = mdl->training_logs_.mutable_entries()->Add();
       log_entry->set_number_of_trees(iter_idx + 1);
-      log_entry->set_training_loss(training_loss);
+      log_entry->set_training_loss(training_loss_result.loss);
       *log_entry->mutable_training_secondary_metrics() = {
-          train_secondary_metrics.begin(), train_secondary_metrics.end()};
+          training_loss_result.secondary_metrics.begin(),
+          training_loss_result.secondary_metrics.end()};
 
-      std::string snippet = absl::StrFormat("\tnum-trees:%d train-loss:%f",
-                                            iter_idx + 1, training_loss);
+      std::string snippet =
+          absl::StrFormat("\tnum-trees:%d train-loss:%f", iter_idx + 1,
+                          training_loss_result.loss);
 
       for (int secondary_metric_idx = 0;
            secondary_metric_idx <
@@ -941,21 +942,21 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         absl::StrAppendFormat(
             &snippet, " train-%s:%f",
             mdl->training_logs_.secondary_metric_names(secondary_metric_idx),
-            train_secondary_metrics[secondary_metric_idx]);
+            training_loss_result.secondary_metrics[secondary_metric_idx]);
       }
 
       if (has_validation_dataset) {
-        float validation_loss;
-        std::vector<float> validation_secondary_metrics;
-        RETURN_IF_ERROR(config.loss->Loss(
-            validation->gradient_dataset, config.train_config_link.label(),
-            validation->predictions, validation->weights, nullptr,
-            &validation_loss, &validation_secondary_metrics));
-        log_entry->set_validation_loss(validation_loss);
+        ASSIGN_OR_RETURN(const LossResults validation_loss_result,
+                         config.loss->Loss(validation->gradient_dataset,
+                                           config.train_config_link.label(),
+                                           validation->predictions,
+                                           validation->weights, nullptr));
+        log_entry->set_validation_loss(validation_loss_result.loss);
         *log_entry->mutable_validation_secondary_metrics() = {
-            validation_secondary_metrics.begin(),
-            validation_secondary_metrics.end()};
-        absl::StrAppendFormat(&snippet, " valid-loss:%f", validation_loss);
+            validation_loss_result.secondary_metrics.begin(),
+            validation_loss_result.secondary_metrics.end()};
+        absl::StrAppendFormat(&snippet, " valid-loss:%f",
+                              validation_loss_result.loss);
 
         for (int secondary_metric_idx = 0;
              secondary_metric_idx <
@@ -964,12 +965,13 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           absl::StrAppendFormat(
               &snippet, " valid-%s:%f",
               mdl->training_logs_.secondary_metric_names(secondary_metric_idx),
-              validation_secondary_metrics[secondary_metric_idx]);
+              validation_loss_result.secondary_metrics[secondary_metric_idx]);
         }
 
         // Early stopping.
         RETURN_IF_ERROR(
-            early_stopping.Update(validation_loss, validation_secondary_metrics,
+            early_stopping.Update(validation_loss_result.loss,
+                                  validation_loss_result.secondary_metrics,
                                   mdl->decision_trees().size(), iter_idx));
 
         if (config.gbt_config->early_stopping() ==
@@ -1429,23 +1431,24 @@ GradientBoostedTreesLearner::TrainWithStatus(
 
     if (((iter_idx + 1) % config.gbt_config->validation_interval_in_trees()) ==
         0) {
-      float training_loss;
-      std::vector<float> train_secondary_metrics;
-      RETURN_IF_ERROR(config.loss->Loss(
-          gradient_sub_train_dataset, config.train_config_link.label(),
-          sub_train_predictions, weights, train_ranking_index.get(),
-          &training_loss, &train_secondary_metrics));
+      ASSIGN_OR_RETURN(const LossResults training_loss_result,
+                       config.loss->Loss(gradient_sub_train_dataset,
+                                         config.train_config_link.label(),
+                                         sub_train_predictions, weights,
+                                         train_ranking_index.get()));
 
       auto* log_entry = training_logs.mutable_entries()->Add();
       log_entry->set_number_of_trees(iter_idx + 1);
-      log_entry->set_training_loss(training_loss);
+      log_entry->set_training_loss(training_loss_result.loss);
       log_entry->set_subsample_factor(subsample_factor);
       *log_entry->mutable_training_secondary_metrics() = {
-          train_secondary_metrics.begin(), train_secondary_metrics.end()};
+          training_loss_result.secondary_metrics.begin(),
+          training_loss_result.secondary_metrics.end()};
       log_entry->set_mean_abs_prediction(mean_abs_prediction);
 
-      std::string snippet = absl::StrFormat("\tnum-trees:%d train-loss:%f",
-                                            iter_idx + 1, training_loss);
+      std::string snippet =
+          absl::StrFormat("\tnum-trees:%d train-loss:%f", iter_idx + 1,
+                          training_loss_result.loss);
       if (subsample_factor < 1.f) {
         absl::StrAppendFormat(&snippet, " subsample_factor:%f",
                               subsample_factor);
@@ -1457,22 +1460,22 @@ GradientBoostedTreesLearner::TrainWithStatus(
         absl::StrAppendFormat(
             &snippet, " train-%s:%f",
             training_logs.secondary_metric_names(secondary_metric_idx),
-            train_secondary_metrics[secondary_metric_idx]);
+            training_loss_result.secondary_metrics[secondary_metric_idx]);
       }
 
       if (has_validation_dataset) {
-        float validation_loss;
-        std::vector<float> validation_secondary_metrics;
-        RETURN_IF_ERROR(config.loss->Loss(
-            gradient_validation_dataset, config.train_config_link.label(),
-            validation_predictions, validation_weights,
-            valid_ranking_index.get(), &validation_loss,
-            &validation_secondary_metrics));
-        log_entry->set_validation_loss(validation_loss);
+        ASSIGN_OR_RETURN(
+            const LossResults validation_loss_result,
+            config.loss->Loss(gradient_validation_dataset,
+                              config.train_config_link.label(),
+                              validation_predictions, validation_weights,
+                              valid_ranking_index.get()));
+        log_entry->set_validation_loss(validation_loss_result.loss);
         *log_entry->mutable_validation_secondary_metrics() = {
-            validation_secondary_metrics.begin(),
-            validation_secondary_metrics.end()};
-        absl::StrAppendFormat(&snippet, " valid-loss:%f", validation_loss);
+            validation_loss_result.secondary_metrics.begin(),
+            validation_loss_result.secondary_metrics.end()};
+        absl::StrAppendFormat(&snippet, " valid-loss:%f",
+                              validation_loss_result.loss);
 
         for (int secondary_metric_idx = 0;
              secondary_metric_idx <
@@ -1481,12 +1484,13 @@ GradientBoostedTreesLearner::TrainWithStatus(
           absl::StrAppendFormat(
               &snippet, " valid-%s:%f",
               training_logs.secondary_metric_names(secondary_metric_idx),
-              validation_secondary_metrics[secondary_metric_idx]);
+              validation_loss_result.secondary_metrics[secondary_metric_idx]);
         }
 
         // Early stopping.
         RETURN_IF_ERROR(
-            early_stopping.Update(validation_loss, validation_secondary_metrics,
+            early_stopping.Update(validation_loss_result.loss,
+                                  validation_loss_result.secondary_metrics,
                                   mdl->decision_trees().size(), iter_idx));
 
         if (config.gbt_config->early_stopping() ==

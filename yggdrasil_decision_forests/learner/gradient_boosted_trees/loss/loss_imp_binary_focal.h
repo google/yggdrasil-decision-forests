@@ -116,13 +116,11 @@ class BinaryFocalLoss : public BinomialLogLikelihoodLoss {
   std::vector<std::string> SecondaryMetricNames() const override;
 
   template <typename T>
-  absl::Status TemplatedLoss(const std::vector<T>& labels,
-                             const std::vector<float>& predictions,
-                             const std::vector<float>& weights,
-                             const RankingGroupsIndices* ranking_index,
-                             float* loss_value,
-                             std::vector<float>* secondary_metric,
-                             utils::concurrency::ThreadPool* thread_pool) const;
+  absl::StatusOr<LossResults> TemplatedLoss(
+      const std::vector<T>& labels, const std::vector<float>& predictions,
+      const std::vector<float>& weights,
+      const RankingGroupsIndices* ranking_index,
+      utils::concurrency::ThreadPool* thread_pool) const;
 
   template <bool use_weights, typename T>
   static void TemplatedLossImp(const std::vector<T>& labels,
@@ -134,19 +132,17 @@ class BinaryFocalLoss : public BinomialLogLikelihoodLoss {
                                double* __restrict count_correct_predictions,
                                double* __restrict sum_weights);
 
-  absl::Status Loss(const std::vector<int32_t>& labels,
-                    const std::vector<float>& predictions,
-                    const std::vector<float>& weights,
-                    const RankingGroupsIndices* ranking_index,
-                    float* loss_value, std::vector<float>* secondary_metric,
-                    utils::concurrency::ThreadPool* thread_pool) const override;
+  absl::StatusOr<LossResults> Loss(
+      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+      const std::vector<float>& weights,
+      const RankingGroupsIndices* ranking_index,
+      utils::concurrency::ThreadPool* thread_pool) const override;
 
-  absl::Status Loss(const std::vector<int16_t>& labels,
-                    const std::vector<float>& predictions,
-                    const std::vector<float>& weights,
-                    const RankingGroupsIndices* ranking_index,
-                    float* loss_value, std::vector<float>* secondary_metric,
-                    utils::concurrency::ThreadPool* thread_pool) const override;
+  absl::StatusOr<LossResults> Loss(
+      const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+      const std::vector<float>& weights,
+      const RankingGroupsIndices* ranking_index,
+      utils::concurrency::ThreadPool* thread_pool) const override;
 
  private:
   // Focusing parameter, when 0.0, then falls back to log loss.

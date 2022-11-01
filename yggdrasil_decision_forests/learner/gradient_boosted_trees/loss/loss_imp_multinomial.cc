@@ -244,11 +244,10 @@ std::vector<std::string> MultinomialLogLikelihoodLoss::SecondaryMetricNames()
 }
 
 template <typename T>
-absl::Status MultinomialLogLikelihoodLoss::TemplatedLoss(
+absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
     const std::vector<T>& labels, const std::vector<float>& predictions,
     const std::vector<float>& weights,
-    const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric,
+    const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
   double count_correct_predictions = 0;
@@ -315,38 +314,35 @@ absl::Status MultinomialLogLikelihoodLoss::TemplatedLoss(
     }
   }
 
-  secondary_metric->resize(1);
   if (sum_weights > 0) {
-    *loss_value = static_cast<float>(sum_loss / sum_weights);
-    DCheckIsFinite(*loss_value);
-    (*secondary_metric)[kBinomialLossSecondaryMetricClassificationIdx] =
-        static_cast<float>(count_correct_predictions / sum_weights);
+    float loss = sum_loss / sum_weights;
+    DCheckIsFinite(loss);
+    return LossResults{.loss = loss,
+                       .secondary_metrics = {static_cast<float>(
+                           count_correct_predictions / sum_weights)}};
   } else {
-    *loss_value =
-        (*secondary_metric)[kBinomialLossSecondaryMetricClassificationIdx] =
-            std::numeric_limits<float>::quiet_NaN();
+    return LossResults{
+        .loss = std::numeric_limits<float>::quiet_NaN(),
+        .secondary_metrics = {std::numeric_limits<float>::quiet_NaN()}};
   }
-  return absl::OkStatus();
 }
 
-absl::Status MultinomialLogLikelihoodLoss::Loss(
+absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::Loss(
     const std::vector<int32_t>& labels, const std::vector<float>& predictions,
     const std::vector<float>& weights,
-    const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric,
+    const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedLoss(labels, predictions, weights, ranking_index, loss_value,
-                       secondary_metric, thread_pool);
+  return TemplatedLoss(labels, predictions, weights, ranking_index,
+                       thread_pool);
 }
 
-absl::Status MultinomialLogLikelihoodLoss::Loss(
+absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::Loss(
     const std::vector<int16_t>& labels, const std::vector<float>& predictions,
     const std::vector<float>& weights,
-    const RankingGroupsIndices* ranking_index, float* loss_value,
-    std::vector<float>* secondary_metric,
+    const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedLoss(labels, predictions, weights, ranking_index, loss_value,
-                       secondary_metric, thread_pool);
+  return TemplatedLoss(labels, predictions, weights, ranking_index,
+                       thread_pool);
 }
 
 }  // namespace gradient_boosted_trees
