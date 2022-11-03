@@ -70,7 +70,7 @@ Content
   serving_apis
   C++ <cpp_serving>
   Go <go_serving>
-  JavaScript <js_serving>
+  JavaScript/Wasm <js_serving>
   TF Serving <tf_serving>
   Python <https://www.tensorflow.org/decision_forests/tutorials/predict_colab>
   Benchmark <benchmark_inference>

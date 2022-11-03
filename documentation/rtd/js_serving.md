@@ -1,7 +1,7 @@
-# Serving model in JavaScript
+# Serving models on the Web with JS/Wasm
 
-The JavaScript API makes it possible to run a YDF model in a webpage using
-WebAssembly.
+The JavaScript API makes it possible to run an Yggdrasil Decision Forests model
+or a TensorFlow Decision Forests model in a webpage.
 
 ## Usage example
 
@@ -13,16 +13,59 @@ The source code of the example is available
 
 ### Step 1: Prepare the model
 
-The JavaScript API requires a Zipped Yggdrasil model. If available in another
-format, models might need to be [converted](convert_model) first.
+The JavaScript API requires a Zipped Yggdrasil model.
 
-In this example, we will use a pre-existing YDF model trained on the Adult
-dataset.
+Optionally, the meta-data of the model can be
+[removed](https://ydf.readthedocs.io/en/latest/improve_model.html#remove-model-meta-data)
+to make the model smaller with the `edit_model` or the `pure_serving_model=True`
+argument.
+
+**Train and prepare a model for JS with the CLI API**
 
 ```shell
-# Download the model
-git clone https://github.com/google/yggdrasil-decision-forests.git
-MODEL_PATH="yggdrasil-decision-forests/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt"
+# Install the CLI API. See "CLI API / Quick Start" or " CLI API / Install" sections for more details.
+wget https://github.com/google/yggdrasil-decision-forests/releases/download/1.0.0/cli_linux.zip
+unzip cli_linux.zip
+
+# Train the model (see Quick Start)
+./train ... --output=model
+
+# Remove the meta-data from the model (makes the model smaller)
+./edit_model --input=/tmp/model --output=/tmp/model_pure --pure_serving=true
+
+# Zip the model.
+zip -j /tmp/model.zip /tmp/model_pure/*
+
+# /tmp/model.zip can be used directly in Javascript.
+```
+
+**Train and prepare a model for JS with TensorFlow Decision Forests**
+
+```python
+# Load TF-DF (see TF-DF tutorial)
+import tensorflow_decision_forests as tfdf
+
+# Load a dataset in a Pandas dataframe.
+train_df = pd.read_csv("project/train.csv")
+
+# Convert the dataset into a TensorFlow dataset.
+train_ds = tfdf.keras.pd_dataframe_to_tf_dataset(train_df, label="my_label")
+
+# Train a Random Forest model.
+model = tfdf.keras.GradientBoostedTreesModel(pure_serving_model=True)
+model.fit(train_ds)
+
+# Export the model to a SavedModel.
+model.save("/tmp/tfdf_model")
+
+# Zip the model.
+zip -j /tmp/model.zip /tmp/tfdf_model/assets/*
+
+# /tmp/model.zip can be used directly in Javascript.
+```
+
+``` {note}
+See the [convert model](convert_model) page on how to import models from other formats.
 ```
 
 ``` {note}
@@ -31,62 +74,15 @@ should be located at the **root** of the zip file. If using the
 [zip tool](https://linux.die.net/man/1/zip), a flat file can be created with the `-j` option.
 ```
 
-**(Optional**) By default, YDF models contain meta-data used for model
-interpretation and debugging. This meta-data is not used for model inference and
-can be discarded to decrease the model size using the `edit_model` tool:
-
-``` {note}
-If you are using the TensorFlow Decision Forests API, instead of using the
-`edit_model` command demonstrated below, you can simply pass the argument
-`pure_serving_model=True` to the model constructor.
-```
-
-```shell
-# Install the CLI API. See "CLI API / Quick Start" or " CLI API / Install" sections for more details.
-wget https://github.com/google/yggdrasil-decision-forests/releases/download/1.0.0/cli_linux.zip
-unzip cli_linux.zip
-
-# Remove the meta-data from the model
-./edit_model --input=${MODEL_PATH} --output=/tmp/my_model --pure_serving=true
-
-# Look at the size of the model
-du -h ${MODEL_PATH}
-du -h /tmp/my_model
-```
-
-Results:
-
-```
-528K yggdrasil-decision-forests/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt
-264K /tmp/my_model
-```
-
-We can now compress the model in a zip file:
-
-```shell
-zip -r model.zip /tmp/my_model
-du -h model.zip
-```
-
-Results:
-
-```
-96K     model.zip
-```
-
-The model size is 96KB.
-
 ### Step 2: Install the YDF Javascript library
 
-Download the YDF Javascript library on the
-[Yggdrasil release page](https://github.com/google/yggdrasil-decision-forests/releases),
-or [compile it from source](#compile-ydf-javascript-library-from-source). For
-example,
+Download the latest version of the YDF Javascript library on the
+[Yggdrasil release page](https://github.com/google/yggdrasil-decision-forests/releases).
+For example,
 [this](https://github.com/google/yggdrasil-decision-forests/releases/download/js_0.2.5_rc1/ydf.zip)
 is the YDF Javascript library for YDF 0.2.5.
 
-In the rest of this example, we assume that the content of this zip file was
-extracted in a `ydf` directory next to the webpage and the model:
+The files of your webpage can be structured as follows:
 
 -   `index.html` : The webpage running the model (see step 3).
 -   `model.zip` : The model created in step 1.
@@ -96,8 +92,7 @@ extracted in a `ydf` directory next to the webpage and the model:
 
 ### Step 3: Create the webpage
 
-In the HTML header of a webpage, download the YDF and
-[Zip](https://stuk.github.io/jszip/) libraries:
+Add the YDF Javascript wrapper to your html:
 
 ```html
 <!-- Yggdrasil Decision Forests -->
@@ -107,30 +102,23 @@ In the HTML header of a webpage, download the YDF and
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
 ```
 
-Then, load the YDF library:
+Then, also in the HTML header or in the body, load the YDF library:
 
 ```javascript
-let ydf = null;
-YggdrasilDecisionForests().then(function (m) {
-  ydf = m;
-  console.log("The library is loaded");
-});
-```
-
-As an example, the code to load the YDF library can be set in a `<script>`
-section in the HTML header:
-
-```html
 <script>
 let ydf = null;
 YggdrasilDecisionForests().then(function (m) {
   ydf = m;
-  console.log("The library is loaded");
+  console.log("The library is loaded and ready to be used!");
 });
 </script>
 ```
 
 Once the library is loaded, load the model:
+
+``` {note}
+In practice, you will likely load the model next to the `console.log("The library...` call above.
+```
 
 ```javascript
 let model = null;
@@ -140,7 +128,7 @@ ydf.loadModelFromUrl("model.zip").then((loadedModel) => {
 });
 ```
 
-Then, generate predictions with the model:
+Once, the model is loaded, you can make predictions:
 
 ```javascript
 let examples = {
@@ -150,7 +138,11 @@ let examples = {
 let predictions = model.predict(examples);
 ```
 
-Final, you are done using the model, unload the model:
+``` {note}
+The input of the `predict` function should be the same as the input features used to train the model.
+```
+
+Finally, when you are done using the model, unload the model:
 
 ```javascript
 model.unload();
