@@ -347,6 +347,8 @@ class IntegersConfusionMatrix {
 
   int32_t ncol() const { return ncol_; }
 
+  T sum() const { return sum_; }
+
   void SetZero() {
     sum_ = 0;
     std::fill(counts_.begin(), counts_.end(), 0);

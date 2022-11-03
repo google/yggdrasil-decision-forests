@@ -31,6 +31,7 @@ namespace utils {
 namespace {
 
 using test::EqualsProto;
+using ::testing::DoubleNear;
 
 TEST(Distribution, NormalDistribution) {
   NormalDistributionDouble dist;
@@ -454,6 +455,30 @@ TEST(Distribution, IntegerDistributionDoubleTopClass) {
   proto.add_counts(2);
   proto.set_sum(1 + 2 + 3);
   EXPECT_EQ(TopClass(proto), 1);
+}
+
+TEST(Distribution, IntegerConfusionMatrixInt64Sum) {
+  IntegersConfusionMatrixInt64 conf;
+  conf.SetSize(2, 2);
+
+  conf.Add(0, 0, 1);
+  conf.Add(1, 0, 2);
+  conf.Add(0, 1, 3);
+  conf.Add(1, 1, 4);
+
+  EXPECT_EQ(conf.sum(), 10);
+}
+
+TEST(Distribution, IntegerConfusionMatrixDoubleSum) {
+  IntegersConfusionMatrixDouble conf;
+  conf.SetSize(2, 2);
+
+  conf.Add(0, 0, 1.0);
+  conf.Add(1, 0, 2.1);
+  conf.Add(0, 1, 3.2);
+  conf.Add(1, 1, 4.3);
+
+  EXPECT_THAT(conf.sum(), DoubleNear(10.6, 1e-8));
 }
 
 }  // namespace
