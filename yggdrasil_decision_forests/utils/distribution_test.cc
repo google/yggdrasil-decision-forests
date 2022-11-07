@@ -481,6 +481,59 @@ TEST(Distribution, IntegerConfusionMatrixDoubleSum) {
   EXPECT_THAT(conf.sum(), DoubleNear(10.6, 1e-8));
 }
 
+TEST(Distribution, IntegerConfusionMatrixDoubleAdd) {
+  IntegersConfusionMatrixDouble conf;
+  conf.SetSize(2, 2);
+
+  conf.Add(0, 0, -1.3);
+  conf.Add(1, 0, -0.3);
+  conf.Add(0, 1, 0.3);
+  conf.Add(1, 1, 1.3);
+
+  IntegersConfusionMatrixDouble conf_2;
+  conf_2.SetSize(2, 2);
+
+  conf_2.Add(0, 0, -1.1);
+  conf_2.Add(1, 0, -0.1);
+  conf_2.Add(0, 1, 0.1);
+  conf_2.Add(1, 1, 1.1);
+
+  conf.Add(conf_2);
+
+  EXPECT_THAT(conf.at(0, 0), DoubleNear(-2.4, 1e-8));
+  EXPECT_THAT(conf.at(1, 0), DoubleNear(-0.4, 1e-8));
+  EXPECT_THAT(conf.at(0, 1), DoubleNear(0.4, 1e-8));
+  EXPECT_THAT(conf.at(1, 1), DoubleNear(2.4, 1e-8));
+
+  EXPECT_THAT(conf.sum(), DoubleNear(0, 1e-8));
+}
+
+TEST(Distribution, IntegersConfusionMatrixInt64Add) {
+  IntegersConfusionMatrixInt64 conf;
+  conf.SetSize(2, 2);
+
+  conf.Add(0, 0, 1);
+  conf.Add(1, 0, 2);
+  conf.Add(0, 1, 3);
+  conf.Add(1, 1, 4);
+
+  IntegersConfusionMatrixInt64 conf_2;
+  conf_2.SetSize(2, 2);
+
+  conf_2.Add(0, 0, 5);
+  conf_2.Add(1, 0, 6);
+  conf_2.Add(0, 1, 7);
+  conf_2.Add(1, 1, 8);
+
+  conf.Add(conf_2);
+
+  EXPECT_EQ(conf.at(0, 0), 6);
+  EXPECT_EQ(conf.at(1, 0), 8);
+  EXPECT_EQ(conf.at(0, 1), 10);
+  EXPECT_EQ(conf.at(1, 1), 12);
+
+  EXPECT_EQ(conf.sum(), 36);
+}
 }  // namespace
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

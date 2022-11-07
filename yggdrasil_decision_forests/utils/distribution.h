@@ -337,6 +337,12 @@ class IntegersConfusionMatrix {
   // Add an entry.
   void Add(int32_t row, int32_t col, const T weight);
 
+  // Add a second confusion matrix to this one.
+  //
+  // The caller must make sure that this matrix and `confusion_matrix` have the
+  // same dimension.
+  void Add(const IntegersConfusionMatrix<T>& confusion_matrix);
+
   // Set the size i.e. r \in [0, nr - 1] and c \in [0, nc - 1].
   void SetSize(int32_t nrow, int32_t ncol);
 
@@ -480,6 +486,17 @@ void IntegersConfusionMatrix<T>::Add(const int32_t row, const int32_t col,
                                      const T weight) {
   at(row, col) += weight;
   sum_ += weight;
+}
+
+template <typename T>
+void IntegersConfusionMatrix<T>::Add(
+    const IntegersConfusionMatrix<T>& confusion_matrix) {
+  DCHECK_EQ(ncol_, confusion_matrix.ncol());
+  DCHECK_EQ(nrow_, confusion_matrix.nrow());
+  for (int32_t i = 0; i < counts_.size(); i++) {
+    counts_[i] += confusion_matrix.counts_[i];
+  }
+  sum_ += confusion_matrix.sum();
 }
 
 template <typename T>
