@@ -498,11 +498,13 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
   validation_evaluation.set_loss_name(proto::Loss_Name(loss_));
 
   for (const auto& log : training_logs_.entries()) {
+    // The log entry corresponding to the final model is identified with the
+    // number of trees in the final model.
     if (log.number_of_trees() !=
         training_logs_.number_of_trees_in_final_model()) {
       continue;
     }
-    // "log" is the training log that correspond to the model.
+    // `log` is the training log that corresponds to the final model.
     for (int metrix_idx = 0;
          metrix_idx < training_logs_.secondary_metric_names_size();
          metrix_idx++) {
@@ -524,6 +526,12 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
       } else {
         LOG(WARNING) << "Unknown metric name:" << metric_name;
       }
+    }
+    if (task_ == model::proto::Task::CLASSIFICATION &&
+        log.has_validation_confusion_matrix()) {
+      *validation_evaluation.mutable_label_column() = label_col_spec();
+      *validation_evaluation.mutable_classification()->mutable_confusion() =
+          log.validation_confusion_matrix();
     }
   }
 

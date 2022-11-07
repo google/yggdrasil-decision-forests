@@ -1487,6 +1487,56 @@ TEST_F(GradientBoostedTreesOnIris, InterruptAndResumeTraining) {
             get_gbt(resumed_model)->NumTrees());
 }
 
+// Make sure that the confusion table of the training logs agrees with the
+// confusion table computed a posteriori on the validation dataset.
+TEST_F(GradientBoostedTreesOnAdult, BinomialLogLikelihoodConfusionTablesAgree) {
+  pass_training_dataset_as_path_ = false;
+  pass_validation_dataset_ = true;
+  TrainAndEvaluateModel();
+
+  ASSERT_TRUE(model_->ValidationEvaluation().has_classification());
+  ASSERT_TRUE(model_->ValidationEvaluation().classification().has_confusion());
+  auto training_logs_confusion_table =
+      model_->ValidationEvaluation().classification().confusion();
+
+  utils::RandomEngine rnd(1234);
+  const auto a_posteriori_evaulation =
+      model_->Evaluate(valid_dataset_, {}, &rnd);
+
+  ASSERT_TRUE(a_posteriori_evaulation.has_classification());
+  ASSERT_TRUE(a_posteriori_evaulation.classification().has_confusion());
+  auto evaluation_confusion_table =
+      a_posteriori_evaulation.classification().confusion();
+  EXPECT_THAT(training_logs_confusion_table,
+              EqualsProto(evaluation_confusion_table));
+}
+
+// Make sure that the confusion table of the training logs agrees with the
+// confusion table computed a posteriori on the validation dataset.
+// This test specifically tests sharded datasets.
+TEST_F(GradientBoostedTreesOnAdult,
+       BinomialLogLikelihoodConfusionTablesAgreeSharded) {
+  pass_training_dataset_as_path_ = true;
+  pass_validation_dataset_ = true;
+  TrainAndEvaluateModel();
+
+  ASSERT_TRUE(model_->ValidationEvaluation().has_classification());
+  ASSERT_TRUE(model_->ValidationEvaluation().classification().has_confusion());
+  auto training_logs_confusion_table =
+      model_->ValidationEvaluation().classification().confusion();
+
+  utils::RandomEngine rnd(1234);
+  const auto a_posteriori_evaulation =
+      model_->Evaluate(valid_dataset_, {}, &rnd);
+
+  ASSERT_TRUE(a_posteriori_evaulation.has_classification());
+  ASSERT_TRUE(a_posteriori_evaulation.classification().has_confusion());
+  auto evaluation_confusion_table =
+      a_posteriori_evaulation.classification().confusion();
+  EXPECT_THAT(training_logs_confusion_table,
+              EqualsProto(evaluation_confusion_table));
+}
+
 }  // namespace
 }  // namespace gradient_boosted_trees
 }  // namespace model

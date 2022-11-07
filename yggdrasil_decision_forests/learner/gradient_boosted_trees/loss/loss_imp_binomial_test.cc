@@ -139,9 +139,29 @@ TEST(BinomialLogLikelihoodLossTest, SetLabelDistribution) {
   EXPECT_EQ(node.node().regressor().distribution().count(), 4.);
 }
 
-TEST(BinomialLogLikelihoodLossTest, ComputeLoss) {
+TEST(BinomialLogLikelihoodLossTest, ComputeWeightedLoss) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
-  std::vector<float> weights(dataset.nrow(), 1.f);
+  std::vector<float> weights{1.f, 2.f, 3.f, 4.f};
+  std::vector<float> predictions(dataset.nrow(), 0.f);
+  const auto loss_imp = BinomialLogLikelihoodLoss(
+      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 1, predictions, weights, nullptr));
+
+  EXPECT_NEAR(loss_results.loss, 2 * std::log(2), kTestPrecision);
+  EXPECT_THAT(loss_results.secondary_metrics,
+              ElementsAre(FloatNear(0.4f, kTestPrecision)));
+  ASSERT_TRUE(loss_results.confusion_table.has_value());
+  EXPECT_EQ(loss_results.confusion_table->at(1, 1), 4);
+  EXPECT_EQ(loss_results.confusion_table->at(2, 1), 6);
+  EXPECT_EQ(loss_results.confusion_table->sum(), 10);
+}
+
+TEST(BinomialLogLikelihoodLossTest, ComputeUnweightedLoss) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  std::vector<float> weights;
   std::vector<float> predictions(dataset.nrow(), 0.f);
   const auto loss_imp = BinomialLogLikelihoodLoss(
       {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
@@ -153,6 +173,10 @@ TEST(BinomialLogLikelihoodLossTest, ComputeLoss) {
   EXPECT_NEAR(loss_results.loss, 2 * std::log(2), kTestPrecision);
   EXPECT_THAT(loss_results.secondary_metrics,
               ElementsAre(FloatNear(0.5f, kTestPrecision)));
+  ASSERT_TRUE(loss_results.confusion_table.has_value());
+  EXPECT_EQ(loss_results.confusion_table->at(1, 1), 2);
+  EXPECT_EQ(loss_results.confusion_table->at(2, 1), 2);
+  EXPECT_EQ(loss_results.confusion_table->sum(), 4);
 }
 
 TEST(BinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
@@ -168,6 +192,7 @@ TEST(BinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
 
   EXPECT_THAT(loss_results.loss, IsNan());
   EXPECT_THAT(loss_results.secondary_metrics, ElementsAre(IsNan()));
+  EXPECT_EQ(loss_results.confusion_table, absl::nullopt);
 }
 
 TEST(BinomialLogLikelihoodLossTest, SecondaryMetricName) {

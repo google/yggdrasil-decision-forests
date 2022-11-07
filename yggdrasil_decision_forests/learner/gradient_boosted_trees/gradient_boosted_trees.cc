@@ -957,6 +957,10 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
             validation_loss_result.secondary_metrics.end()};
         absl::StrAppendFormat(&snippet, " valid-loss:%f",
                               validation_loss_result.loss);
+        if (validation_loss_result.confusion_table.has_value()) {
+          validation_loss_result.confusion_table->Save(
+              log_entry->mutable_validation_confusion_matrix());
+        }
 
         for (int secondary_metric_idx = 0;
              secondary_metric_idx <
@@ -1476,6 +1480,10 @@ GradientBoostedTreesLearner::TrainWithStatus(
             validation_loss_result.secondary_metrics.end()};
         absl::StrAppendFormat(&snippet, " valid-loss:%f",
                               validation_loss_result.loss);
+        if (validation_loss_result.confusion_table.has_value()) {
+          validation_loss_result.confusion_table->Save(
+              log_entry->mutable_validation_confusion_matrix());
+        }
 
         for (int secondary_metric_idx = 0;
              secondary_metric_idx <

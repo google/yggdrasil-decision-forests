@@ -290,36 +290,29 @@ void BinomialLogLikelihoodLoss::TemplatedLossImp(
     const std::vector<T>& labels, const std::vector<float>& predictions,
     const std::vector<float>& weights, size_t begin_example_idx,
     size_t end_example_idx, double* __restrict sum_loss,
-    double* __restrict count_correct_predictions,
-    double* __restrict sum_weights) {
+    utils::IntegersConfusionMatrixDouble* confusion_matrix) {
   for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
        example_idx++) {
+    // The loss function expects a 0/1 label.
     const bool pos_label = labels[example_idx] == 2;
-    const float label = pos_label ? 1.f : 0.f;
+    const float label_for_loss = pos_label ? 1.f : 0.f;
     const float prediction = predictions[example_idx];
-    const bool pos_prediction = prediction >= 0;
+    const int predicted_label = prediction > 0.f ? 2 : 1;
     if constexpr (use_weights) {
       const float weight = weights[example_idx];
-      *sum_weights += weight;
-      if (pos_label == pos_prediction) {
-        *count_correct_predictions += weight;
-      }
-      *sum_loss -= 2 * weight *
-                   (label * prediction - std::log(1 + std::exp(prediction)));
+      confusion_matrix->Add(labels[example_idx], predicted_label, weight);
+      *sum_loss -=
+          2 * weight *
+          (label_for_loss * prediction - std::log(1.f + std::exp(prediction)));
     } else {
-      if (pos_label == pos_prediction) {
-        *count_correct_predictions += 1.;
-      }
+      confusion_matrix->Add(labels[example_idx], predicted_label, 1.f);
       // Loss:
       //   -2 * ( label * prediction - log(1+exp(prediction)))
-      *sum_loss -=
-          2 * (label * prediction - std::log(1 + std::exp(prediction)));
+      *sum_loss -= 2 * (label_for_loss * prediction -
+                        std::log(1.f + std::exp(prediction)));
       DCheckIsFinite(*sum_loss);
     }
     DCheckIsFinite(*sum_loss);
-  }
-  if constexpr (!use_weights) {
-    *sum_weights += end_example_idx - begin_example_idx;
   }
 }
 
@@ -330,61 +323,62 @@ absl::StatusOr<LossResults> BinomialLogLikelihoodLoss::TemplatedLoss(
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
-  double count_correct_predictions = 0;
-  double sum_weights = 0;
+  utils::IntegersConfusionMatrixDouble confusion_matrix;
+  int confusion_matrix_size =
+      label_column_.categorical().number_of_unique_values();
+  confusion_matrix.SetSize(confusion_matrix_size, confusion_matrix_size);
 
   if (thread_pool == nullptr) {
     if (weights.empty()) {
       TemplatedLossImp<false>(labels, predictions, weights, 0, labels.size(),
-                              &sum_loss, &count_correct_predictions,
-                              &sum_weights);
+                              &sum_loss, &confusion_matrix);
     } else {
       TemplatedLossImp<true>(labels, predictions, weights, 0, labels.size(),
-                             &sum_loss, &count_correct_predictions,
-                             &sum_weights);
+                             &sum_loss, &confusion_matrix);
     }
   } else {
     const auto num_threads = thread_pool->num_threads();
 
     struct PerThread {
       double sum_loss = 0;
-      double count_correct_predictions = 0;
-      double sum_weights = 0;
+      utils::IntegersConfusionMatrixDouble confusion_matrix;
     };
     std::vector<PerThread> per_threads(num_threads);
 
     decision_tree::ConcurrentForLoop(
         num_threads, thread_pool, labels.size(),
-        [&labels, &predictions, &per_threads, &weights](
+        [&labels, &predictions, &per_threads, &weights, &confusion_matrix_size](
             size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
           auto& block = per_threads[block_idx];
+          block.confusion_matrix.SetSize(confusion_matrix_size,
+                                         confusion_matrix_size);
 
           if (weights.empty()) {
             TemplatedLossImp<false>(labels, predictions, weights, begin_idx,
                                     end_idx, &block.sum_loss,
-                                    &block.count_correct_predictions,
-                                    &block.sum_weights);
+                                    &block.confusion_matrix);
           } else {
             TemplatedLossImp<true>(labels, predictions, weights, begin_idx,
                                    end_idx, &block.sum_loss,
-                                   &block.count_correct_predictions,
-                                   &block.sum_weights);
+                                   &block.confusion_matrix);
           }
         });
 
     for (const auto& block : per_threads) {
       sum_loss += block.sum_loss;
-      sum_weights += block.sum_weights;
-      count_correct_predictions += block.count_correct_predictions;
+      confusion_matrix.Add(block.confusion_matrix);
     }
   }
 
-  if (sum_weights > 0) {
-    float loss = sum_loss / sum_weights;
+  if (confusion_matrix.sum() > 0) {
+    double total_example_weight = confusion_matrix.sum();
+    float loss = sum_loss / total_example_weight;
+    double correct_predictions = confusion_matrix.Trace();
     DCheckIsFinite(loss);
     return LossResults{.loss = loss,
                        .secondary_metrics = {static_cast<float>(
-                           count_correct_predictions / sum_weights)}};
+                           correct_predictions / total_example_weight)},
+                       .confusion_table = std::move(confusion_matrix)};
   } else {
     return LossResults{
         .loss = std::numeric_limits<float>::quiet_NaN(),

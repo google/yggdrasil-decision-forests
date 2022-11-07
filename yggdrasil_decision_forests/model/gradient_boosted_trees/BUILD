@@ -47,6 +47,7 @@ cc_library_ydf(
 all_proto_library(
     name = "gradient_boosted_trees_proto",
     srcs = ["gradient_boosted_trees.proto"],
+    deps = ["//yggdrasil_decision_forests/utils:distribution_proto"],
 )
 
 # Test

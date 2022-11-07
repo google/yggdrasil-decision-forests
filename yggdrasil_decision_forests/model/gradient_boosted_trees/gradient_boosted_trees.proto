@@ -17,6 +17,8 @@ syntax = "proto2";
 
 package yggdrasil_decision_forests.model.gradient_boosted_trees.proto;
 
+import "yggdrasil_decision_forests/utils/distribution.proto";
+
 // Header for the gradient boosted trees model.
 message Header {
   // Next ID: 10
@@ -103,5 +105,8 @@ message TrainingLogs {
     // "subsample_factor" factor (default to 1) is reduced so the training
     // finishes in "maximum_training_duration".
     optional float subsample_factor = 7 [default = 1.];
+    // Confusion between the label and the predictions.
+    optional utils.proto.IntegersConfusionMatrixDouble
+        validation_confusion_matrix = 8;
   }
 }

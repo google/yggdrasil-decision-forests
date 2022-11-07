@@ -135,13 +135,11 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
       utils::concurrency::ThreadPool* thread_pool) const;
 
   template <bool use_weights, typename T>
-  static void TemplatedLossImp(const std::vector<T>& labels,
-                               const std::vector<float>& predictions,
-                               const std::vector<float>& weights,
-                               size_t begin_example_idx, size_t end_example_idx,
-                               double* __restrict sum_loss,
-                               double* __restrict count_correct_predictions,
-                               double* __restrict sum_weights);
+  static void TemplatedLossImp(
+      const std::vector<T>& labels, const std::vector<float>& predictions,
+      const std::vector<float>& weights, size_t begin_example_idx,
+      size_t end_example_idx, double* __restrict sum_loss,
+      utils::IntegersConfusionMatrixDouble* confusion_matrix);
 
   absl::StatusOr<LossResults> Loss(
       const std::vector<int32_t>& labels, const std::vector<float>& predictions,

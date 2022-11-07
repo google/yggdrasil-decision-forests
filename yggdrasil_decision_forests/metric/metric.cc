@@ -964,12 +964,13 @@ absl::Status FinalizeEvaluation(const proto::EvaluationOptions& option,
 
 float Accuracy(const proto::EvaluationResults& eval) {
   if (eval.classification().has_confusion()) {
-    if (eval.count_predictions() == 0) {
+    double total_prediction_weight = eval.classification().confusion().sum();
+    if (total_prediction_weight == 0) {
       return std::numeric_limits<float>::quiet_NaN();
     }
     const double diagonal =
         utils::ConfusionMatrixProtoTrace(eval.classification().confusion());
-    return diagonal / eval.count_predictions();
+    return diagonal / total_prediction_weight;
   }
   if (eval.classification().has_accuracy()) {
     return eval.classification().accuracy();
