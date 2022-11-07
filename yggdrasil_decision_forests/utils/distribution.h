@@ -360,6 +360,8 @@ class IntegersConfusionMatrix {
     std::fill(counts_.begin(), counts_.end(), 0);
   }
 
+  T Trace() const;
+
   // Index of "counts_" of a cell specified by a (row,col) coordinate.
   inline static int Index(const int row, const int col, const int num_rows) {
     return row + col * num_rows;
@@ -648,6 +650,16 @@ absl::Status IntegersConfusionMatrix<T>::AppendHtmlReport(
   content.Append(h::P("Total: ", absl::StrCat(sum_)));
   absl::StrAppend(result, std::string(content.content()));
   return absl::OkStatus();
+}
+
+template <typename T>
+T IntegersConfusionMatrix<T>::Trace() const {
+  T trace = 0;
+  int min_dimension = std::min(ncol_, nrow_);
+  for (int32_t col = 0; col < min_dimension; col++) {
+    trace += at(col, col);
+  }
+  return trace;
 }
 
 template <typename T>

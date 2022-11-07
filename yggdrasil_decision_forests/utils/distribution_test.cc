@@ -570,6 +570,34 @@ TEST(Distribution, IntegersConfusionMatrixDoubleSave) {
   EXPECT_THAT(proto_conf.counts(), ElementsAre(1.1, 2.2, 3.3, 4.4));
   EXPECT_EQ(proto_conf.sum(), 11.);
 }
+
+TEST(Distribution, IntegerConfusionMatrixDoubleTrace) {
+  IntegersConfusionMatrixDouble conf;
+  conf.SetSize(2, 3);
+
+  conf.Add(0, 0, -1.3);
+  conf.Add(1, 0, 0.3);
+  conf.Add(0, 1, -0.3);
+  conf.Add(1, 1, 1.2);
+  conf.Add(0, 2, 2.2);
+  conf.Add(1, 2, 3.2);
+
+  EXPECT_THAT(conf.Trace(), DoubleNear(-0.1, 1e-8));
+}
+
+TEST(Distribution, IntegersConfusionMatrixInt64Trace) {
+  IntegersConfusionMatrixDouble conf;
+  conf.SetSize(2, 3);
+
+  conf.Add(0, 0, -1);
+  conf.Add(1, 0, 0);
+  conf.Add(0, 1, 1);
+  conf.Add(1, 1, 2);
+  conf.Add(0, 2, 3);
+  conf.Add(1, 2, 4);
+
+  EXPECT_EQ(conf.Trace(), 1);
+}
 }  // namespace
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
