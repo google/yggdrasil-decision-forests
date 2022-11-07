@@ -386,6 +386,11 @@ class IntegersConfusionMatrix {
   template <typename P>
   void Load(const P& proto);
 
+  // Save the confusion matrix to the given non-null proto.
+  //
+  // This function clears any existing values from `proto`.
+  void Save(proto::IntegersConfusionMatrixDouble* proto) const;
+
   // Create a text table representing the confusion matrix.
   absl::Status AppendTextReport(const dataset::proto::Column& column_spec,
                                 std::string* result) const;
@@ -652,6 +657,19 @@ void IntegersConfusionMatrix<T>::Load(const P& proto) {
   nrow_ = proto.nrow();
   ncol_ = proto.ncol();
   counts_.assign(proto.counts().begin(), proto.counts().end());
+}
+
+template <typename T>
+void IntegersConfusionMatrix<T>::Save(
+    proto::IntegersConfusionMatrixDouble* proto) const {
+  proto->set_sum(sum_);
+  proto->set_nrow(nrow_);
+  proto->set_ncol(ncol_);
+  proto->clear_counts();
+  proto->mutable_counts()->Reserve(counts_.size());
+  for (int i = 0; i < counts_.size(); i++) {
+    proto->add_counts(counts_[i]);
+  }
 }
 
 template <typename T>

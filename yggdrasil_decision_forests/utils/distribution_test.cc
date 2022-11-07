@@ -32,6 +32,7 @@ namespace {
 
 using test::EqualsProto;
 using ::testing::DoubleNear;
+using ::testing::ElementsAre;
 
 TEST(Distribution, NormalDistribution) {
   NormalDistributionDouble dist;
@@ -533,6 +534,41 @@ TEST(Distribution, IntegersConfusionMatrixInt64Add) {
   EXPECT_EQ(conf.at(1, 1), 12);
 
   EXPECT_EQ(conf.sum(), 36);
+}
+TEST(Distribution, IntegersConfusionMatrixInt64Save) {
+  IntegersConfusionMatrixInt64 conf;
+  conf.SetSize(2, 2);
+
+  conf.Add(0, 0, 1);
+  conf.Add(1, 0, 2);
+  conf.Add(0, 1, 3);
+  conf.Add(1, 1, 4);
+
+  proto::IntegersConfusionMatrixDouble proto_conf;
+  conf.Save(&proto_conf);
+
+  EXPECT_EQ(proto_conf.nrow(), 2);
+  EXPECT_EQ(proto_conf.ncol(), 2);
+  EXPECT_THAT(proto_conf.counts(), ElementsAre(1, 2, 3, 4));
+  EXPECT_EQ(proto_conf.sum(), 10);
+}
+
+TEST(Distribution, IntegersConfusionMatrixDoubleSave) {
+  IntegersConfusionMatrixDouble conf;
+  conf.SetSize(2, 2);
+
+  conf.Add(0, 0, 1.1);
+  conf.Add(1, 0, 2.2);
+  conf.Add(0, 1, 3.3);
+  conf.Add(1, 1, 4.4);
+
+  proto::IntegersConfusionMatrixDouble proto_conf;
+  conf.Save(&proto_conf);
+
+  EXPECT_EQ(proto_conf.nrow(), 2);
+  EXPECT_EQ(proto_conf.ncol(), 2);
+  EXPECT_THAT(proto_conf.counts(), ElementsAre(1.1, 2.2, 3.3, 4.4));
+  EXPECT_EQ(proto_conf.sum(), 11.);
 }
 }  // namespace
 }  // namespace utils
