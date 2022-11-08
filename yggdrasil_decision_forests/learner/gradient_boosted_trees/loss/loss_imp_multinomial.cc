@@ -250,8 +250,10 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
-  double count_correct_predictions = 0;
-  double sum_weights = 0;
+  utils::IntegersConfusionMatrixDouble confusion_matrix;
+  int confusion_matrix_size =
+      label_column_.categorical().number_of_unique_values();
+  confusion_matrix.SetSize(confusion_matrix_size, confusion_matrix_size);
 
   if (weights.empty()) {
     for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
@@ -270,23 +272,19 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
           predicted_class = grad_idx + 1;
         }
       }
-      if (label == predicted_class) {
-        count_correct_predictions += 1;
-      }
+      confusion_matrix.Add(label, predicted_class, 1);
       // Loss:
       //   - log(predict_proba[true_label])
       const float tree_label_exp_value =
           std::exp(predictions[(label - 1) + example_idx * dimension_]);
       sum_loss -= std::log(tree_label_exp_value / sum_exp);
       DCheckIsFinite(sum_loss);
-      DCheckIsFinite(sum_weights);
+      DCheckIsFinite(confusion_matrix.sum());
     }
-    sum_weights += labels.size();
   } else {
     for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
       const int label = labels[example_idx];
       const float weight = weights[example_idx];
-      sum_weights += weight;
 
       int predicted_class = -1;
       float predicted_class_exp_value = 0;
@@ -301,25 +299,25 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
           predicted_class = grad_idx + 1;
         }
       }
-      if (label == predicted_class) {
-        count_correct_predictions += weight;
-      }
+      confusion_matrix.Add(label, predicted_class, weight);
       // Loss:
       //   - log(predict_proba[true_label])
       const float tree_label_exp_value =
           std::exp(predictions[(label - 1) + example_idx * dimension_]);
       sum_loss -= weight * std::log(tree_label_exp_value / sum_exp);
       DCheckIsFinite(sum_loss);
-      DCheckIsFinite(sum_weights);
+      DCheckIsFinite(confusion_matrix.sum());
     }
   }
 
-  if (sum_weights > 0) {
-    float loss = sum_loss / sum_weights;
+  if (confusion_matrix.sum() > 0) {
+    const float loss = sum_loss / confusion_matrix.sum();
+    const float secondary_metric =
+        static_cast<float>(confusion_matrix.Trace() / confusion_matrix.sum());
     DCheckIsFinite(loss);
     return LossResults{.loss = loss,
-                       .secondary_metrics = {static_cast<float>(
-                           count_correct_predictions / sum_weights)}};
+                       .secondary_metrics = {secondary_metric},
+                       .confusion_table = std::move(confusion_matrix)};
   } else {
     return LossResults{
         .loss = std::numeric_limits<float>::quiet_NaN(),

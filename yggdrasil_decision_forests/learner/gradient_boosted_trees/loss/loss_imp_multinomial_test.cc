@@ -150,7 +150,7 @@ TEST(MultinomialLogLikelihoodLossTest, SetLabelDistribution) {
 
 TEST(MultinomialLogLikelihoodLossTest, ComputeLoss) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
-  std::vector<float> weights(dataset.nrow(), 1.f);
+  std::vector<float> weights;
   auto label_column = dataset.data_spec().columns(1);
   std::vector<float> predictions(
       dataset.nrow() *
@@ -166,6 +166,36 @@ TEST(MultinomialLogLikelihoodLossTest, ComputeLoss) {
   EXPECT_NEAR(loss_results.loss, std::log(3), kTestPrecision);
   EXPECT_THAT(loss_results.secondary_metrics,
               ElementsAre(FloatNear(0.333333f, kTestPrecision)));
+  ASSERT_TRUE(loss_results.confusion_table.has_value());
+  EXPECT_EQ(loss_results.confusion_table->at(1, 1), 2);
+  EXPECT_EQ(loss_results.confusion_table->at(2, 1), 2);
+  EXPECT_EQ(loss_results.confusion_table->at(3, 1), 2);
+  EXPECT_EQ(loss_results.confusion_table->sum(), 6);
+}
+
+TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithWeights) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  std::vector<float> weights = {1.f, 2.f, 3.f, 4.f, 5.f, 6.f};
+  auto label_column = dataset.data_spec().columns(1);
+  std::vector<float> predictions(
+      dataset.nrow() *
+          (label_column.categorical().number_of_unique_values() - 1),
+      0.f);
+  const MultinomialLogLikelihoodLoss loss_imp(
+      {}, model::proto::Task::CLASSIFICATION, label_column);
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 1, predictions, weights, nullptr));
+
+  EXPECT_NEAR(loss_results.loss, std::log(3), kTestPrecision);
+  EXPECT_THAT(loss_results.secondary_metrics,
+              ElementsAre(FloatNear(5. / 21., kTestPrecision)));
+  ASSERT_TRUE(loss_results.confusion_table.has_value());
+  EXPECT_EQ(loss_results.confusion_table->at(1, 1), 5.);
+  EXPECT_EQ(loss_results.confusion_table->at(2, 1), 7.);
+  EXPECT_EQ(loss_results.confusion_table->at(3, 1), 9.);
+  EXPECT_EQ(loss_results.confusion_table->sum(), 21.);
 }
 
 TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
@@ -185,6 +215,7 @@ TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
 
   EXPECT_THAT(loss_results.loss, IsNan());
   EXPECT_THAT(loss_results.secondary_metrics, ElementsAre(IsNan()));
+  EXPECT_EQ(loss_results.confusion_table, absl::nullopt);
 }
 
 TEST(MultinomialLogLikelihoodLossTest, SecondaryMetricName) {
