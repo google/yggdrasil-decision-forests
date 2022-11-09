@@ -110,6 +110,9 @@ void TrainAndTestTester::TrainAndEvaluateModel(
     absl::optional<absl::string_view> numerical_weight_attribute,
     const bool emulate_weight_with_duplication,
     std::function<void(void)> callback_training_about_to_start) {
+  model::ModelIOOptions model_io;
+  model_io.file_prefix = "";
+
   // Path to dataset(s).
   std::string dataset_path;
   std::string test_dataset_path;
@@ -222,7 +225,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   // Export the model to drive.
   const std::string model_path =
       file::JoinPath(test::TmpDirectory(), test_dir_, "model");
-  EXPECT_OK(SaveModel(model_path, model_.get()));
+  EXPECT_OK(SaveModel(model_path, model_.get(), model_io));
 
   LOG(INFO) << "Description:\n"
             << model_->DescriptionAndStatistics(show_full_model_structure_);
@@ -258,7 +261,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   // Evaluate the exported model.
   LOG(INFO) << "Evaluate the exported model";
   std::unique_ptr<model::AbstractModel> loaded_model;
-  EXPECT_OK(LoadModel(model_path, &loaded_model));
+  EXPECT_OK(LoadModel(model_path, &loaded_model, model_io));
   rnd.seed(1234);
   const auto evaluation_loaded_model =
       loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
