@@ -14,6 +14,7 @@ interfaces.
     *   [Compile command-line-interface from source](#compile-command-line-interface-from-source)
     *   [Calling Bazel directly](#calling-bazel-directly)
     *   [OS specific instructions](#os-specific-instructions)
+        *   [Supported configurations](#supported-configurations)
         *   [Linux / MacOS](#linux--macos)
         *   [Windows](#windows)
     *   [Running a minimal example](#running-a-minimal-example)

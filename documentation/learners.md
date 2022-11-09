@@ -127,6 +127,14 @@ reasonable time.
 
 -   Early stopping detects the overfitting of the model and halts it training using the validation dataset controlled by `validation_ratio`.<br>- `NONE`: No early stopping. The model is trained entirely.<br>- `MIN_LOSS_FINAL`: No early stopping. However, the model is then truncated to maximize the validation loss.<br>- `LOSS_INCREASE`: Stop the training when the validation does not decrease for `early_stopping_num_trees_look_ahead` trees.
 
+#### [early_stopping_initial_iteration](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:early_stopping_initial_iteration)
+
+-   **Type:** Integer **Default:** 10 **Possible values:** min:0
+
+-   0-based index of the first iteration considered for early stopping
+    computation. Increasing this value prevents too early stopping due to noisy
+    initial iterations of the learner.
+
 #### [early_stopping_num_trees_look_ahead](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:early_stopping_num_trees_look_ahead)
 
 -   **Type:** Integer **Default:** 30 **Possible values:** min:1
