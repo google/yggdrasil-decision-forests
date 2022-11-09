@@ -172,8 +172,6 @@ message GradientBoostedTreesTrainingConfig {
   // to early stopping while the model still has poor quality. This parameter
   // specifies the index of the first iteration during which a validation loss
   // is computed, i.e. the first iteration considered for early stopping
-  // TODO Add this parameter to the list of generic
-  // hyperparameters (learner/gradient_boosted_trees/gradient_boosted_trees.h)
   optional int32 early_stopping_initial_iteration = 37 [default = 10];
 
   oneof loss_options {

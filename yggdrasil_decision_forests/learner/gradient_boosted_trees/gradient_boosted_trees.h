@@ -117,6 +117,8 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamEarlyStoppingLossIncrease[] = "LOSS_INCREASE";
   static constexpr char kHParamEarlyStoppingNumTreesLookAhead[] =
       "early_stopping_num_trees_look_ahead";
+  static constexpr char kHParamEarlyStoppingInitialIteration[] =
+      "early_stopping_initial_iteration";
   static constexpr char kHParamApplyLinkFunction[] = "apply_link_function";
   static constexpr char kHParamComputePermutationVariableImportance[] =
       "compute_permutation_variable_importance";

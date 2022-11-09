@@ -108,6 +108,8 @@ constexpr char
 constexpr char GradientBoostedTreesLearner::kHParamEarlyStoppingLossIncrease[];
 constexpr char
     GradientBoostedTreesLearner::kHParamEarlyStoppingNumTreesLookAhead[];
+constexpr char
+    GradientBoostedTreesLearner::kHParamEarlyStoppingInitialIteration[];
 constexpr char GradientBoostedTreesLearner::kHParamApplyLinkFunction[];
 constexpr char
     GradientBoostedTreesLearner::kHParamComputePermutationVariableImportance[];
@@ -1815,6 +1817,15 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
 
   {
     const auto hparam =
+        generic_hyper_params->Get(kHParamEarlyStoppingInitialIteration);
+    if (hparam.has_value()) {
+      gbt_config->set_early_stopping_initial_iteration(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam =
         generic_hyper_params->Get(kHParamValidationIntervalInTrees);
     if (hparam.has_value()) {
       gbt_config->set_validation_interval_in_trees(
@@ -2282,6 +2293,17 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
         R"(Rolling number of trees used to detect validation loss increase and trigger early stopping.)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamEarlyStoppingInitialIteration);
+    param.mutable_integer()->set_minimum(0);
+    param.mutable_integer()->set_default_value(
+        gbt_config.early_stopping_initial_iteration());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(0-based index of the first iteration considered for early stopping computation. Increasing this value prevents too early stopping due to noisy initial iterations of the learner.)");
   }
 
   {
