@@ -465,7 +465,7 @@ void RandomForestModel::AppendDescriptionAndStatistics(
   absl::StrAppend(description, "\n");
 
   if (task() == model::proto::Task::CLASSIFICATION) {
-    absl::SubstituteAndAppend(description, "Winner take all: $0\n",
+    absl::SubstituteAndAppend(description, "Winner takes all: $0\n",
                               winner_take_all_inference_);
   }
 
@@ -604,9 +604,10 @@ RandomForestModel::GetVariableImportance(absl::string_view key) const {
 metric::proto::EvaluationResults RandomForestModel::ValidationEvaluation()
     const {
   if (out_of_bag_evaluations_.empty()) {
-    LOG(WARNING) << "Cannot call ValidationEvaluation on a Random Forest model "
-                    "without OOB evaluation. The model should be trained with "
-                    "compute_oob_performances:true.";
+    LOG(WARNING) << "ValidationEvaluation requires OOB evaluation enabled."
+                    "Random Forest models should be trained with "
+                    "compute_oob_performances:true. CART models do not support "
+                    "OOB evaluation.";
     return {};
   }
   return out_of_bag_evaluations_.back().evaluation();
