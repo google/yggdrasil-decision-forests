@@ -45,6 +45,12 @@ Content
 
 .. toctree::
   :maxdepth: 1
+  :caption: C++ API
+
+  Example <https://github.com/google/yggdrasil-decision-forests/tree/main/examples/standalone>
+
+.. toctree::
+  :maxdepth: 1
   :caption: TF-DF / Python API
 
   Quick Start <https://www.tensorflow.org/decision_forests/tutorials/beginner_colab>
