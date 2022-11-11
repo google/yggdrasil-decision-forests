@@ -21,6 +21,7 @@
 #include "yggdrasil_decision_forests/learner/multitasker/multitasker.pb.h"
 #include "yggdrasil_decision_forests/model/multitasker/multitasker.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
@@ -47,6 +48,8 @@ MultitaskerLearner::TrainWithStatus(
 
   auto model = absl::make_unique<MultitaskerModel>();
   model->set_data_spec(train_dataset.data_spec());
+  STATUS_CHECK_LE(model->models_.size(), mt_config.subtasks_size());
+  model->models_.resize(mt_config.subtasks_size());
 
   ASSIGN_OR_RETURN(const auto first_subtraining_config,
                    BuildSubTrainingConfig(0));
@@ -61,11 +64,13 @@ MultitaskerLearner::TrainWithStatus(
   absl::Status status;
 
   const auto train_subtask = [&](const int subtask_idx) {
+    STATUS_CHECK_GE(subtask_idx, 0);
     ASSIGN_OR_RETURN(const auto sublearner, BuildSubLearner(subtask_idx));
     ASSIGN_OR_RETURN(auto submodel,
                      sublearner->TrainWithStatus(train_dataset, valid_dataset));
     utils::concurrency::MutexLock lock(&mutex);
-    model->models_.push_back(std::move(submodel));
+    STATUS_CHECK_LT(subtask_idx, model->models_.size());
+    model->models_[subtask_idx] = std::move(submodel);
     return absl::OkStatus();
   };
 

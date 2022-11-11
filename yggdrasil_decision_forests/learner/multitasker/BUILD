@@ -24,6 +24,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/multitasker",
         "//yggdrasil_decision_forests/utils:concurrency",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "//yggdrasil_decision_forests/utils:usage",
     ],
