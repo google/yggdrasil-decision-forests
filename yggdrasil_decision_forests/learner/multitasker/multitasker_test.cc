@@ -90,7 +90,7 @@ TEST_F(MultitaskerOnAdult, Base) {
     metric::proto::EvaluationOptions eval_options;
     eval_options.set_task(model::proto::Task::REGRESSION);
     auto eval = submodel->Evaluate(test_dataset_, eval_options, &rnd);
-    YDF_EXPECT_METRIC_NEAR(metric::RMSE(eval), 9.957, 0.01);
+    YDF_EXPECT_METRIC_NEAR(metric::RMSE(eval), 9.957, 0.03);
   }
 
   {
