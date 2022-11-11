@@ -301,9 +301,9 @@ By default, learners are configured to be trained locally using 6 threads.
 The **logging directory** of a learner is an optional directory that specifies
 where the learner exports information about the learning process. This
 information is learner specific and can be composed of plots, tables and HTML
-reports, and helps one understand the model. The logging directory of a
-learner does not have any defined structure as different learners can export
-different types of information.
+reports, and helps one understand the model. The logging directory of a learner
+does not have any defined structure as different learners can export different
+types of information.
 
 The following two examples show the training of a model using the CLI and C++
 API (see above how to create the *dataspec* in the `dataspec.pbtxt` file):
@@ -479,6 +479,10 @@ Selecting the optimal hyper-parameters can be done manually (see
 [how to improve a model](improve_model)) or using the automated hyper-parameter
 optimizer (HPO). The HPO automatically selects the best hyper-parameters through
 a sequence of trial-and-error computations.
+
+``` {note}
+Check the [example directory](https://github.com/google/yggdrasil-decision-forests/tree/main/examples) for examples of hyper-parameter tuning.
+```
 
 The HPO is a meta-learner with the key `HYPERPARAMETER_OPTIMIZER` configured
 with a sub-learner to optimize. It supports local and distributed training.

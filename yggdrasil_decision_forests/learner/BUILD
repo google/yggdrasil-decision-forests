@@ -38,6 +38,7 @@ cc_library_ydf(
     name = "all_learners",
     deps = [
         ":all_learners_except_hparam_optimizer",
+        "//yggdrasil_decision_forests/learner/hyperparameters_optimizer",
     ],
 )
 
