@@ -24,8 +24,7 @@
 # Decision Forests binaries.
 #
 
-set -x
-set -e
+set -vex
 
 # Find Yggdrasil Decision Forests
 if command -v ./infer_dataspec &> /dev/null; then

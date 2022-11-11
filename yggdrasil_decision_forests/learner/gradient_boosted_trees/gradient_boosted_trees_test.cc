@@ -503,6 +503,7 @@ TEST_F(GradientBoostedTreesOnAdult, VariableImportance) {
   gbt_config->set_compute_permutation_variable_importance(true);
 
   TrainAndEvaluateModel();
+
   EXPECT_THAT(
       model_->AvailableVariableImportances(),
       ElementsAre("MEAN_DECREASE_IN_ACCURACY",
@@ -510,6 +511,21 @@ TEST_F(GradientBoostedTreesOnAdult, VariableImportance) {
                   "MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS",
                   "MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS", "MEAN_MIN_DEPTH",
                   "NUM_AS_ROOT", "NUM_NODES", "SUM_SCORE"));
+
+  const auto mean_decrease_accuracy =
+      model_->GetVariableImportance("MEAN_DECREASE_IN_ACCURACY").value();
+
+  // Top 3 variables.
+  const int rank_capital_gain = utils::GetVariableImportanceRank(
+      "capital_gain", model_->data_spec(), mean_decrease_accuracy);
+  const int rank_relationship = utils::GetVariableImportanceRank(
+      "relationship", model_->data_spec(), mean_decrease_accuracy);
+  const int rank_occupation = utils::GetVariableImportanceRank(
+      "occupation", model_->data_spec(), mean_decrease_accuracy);
+
+  EXPECT_LE(rank_capital_gain, 3);
+  EXPECT_LE(rank_relationship, 3);
+  EXPECT_LE(rank_occupation, 3);
 }
 
 class PerShardSamplingOnAdult : public ::testing::Test {

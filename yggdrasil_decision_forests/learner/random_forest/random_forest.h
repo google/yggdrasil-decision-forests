@@ -167,7 +167,8 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
     const std::vector<internal::PredictionAccumulator>& oob_predictions,
     const std::vector<std::vector<internal::PredictionAccumulator>>&
         oob_predictions_per_input_features,
-    const dataset::VerticalDataset& dataset, RandomForestModel* model);
+    const dataset::VerticalDataset& dataset, const int num_threads,
+    RandomForestModel* model);
 
 // Selects the examples to train one tree. Selects "num_samples" integers in [0,
 // num_examples[ with replacement.

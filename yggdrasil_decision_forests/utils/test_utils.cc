@@ -839,5 +839,19 @@ void InternalExportMetricCondition(const absl::string_view test,
   }
 }
 
+int GetVariableImportanceRank(
+    const absl::string_view attribute,
+    const dataset::proto::DataSpecification& data_spec,
+    const std::vector<model::proto::VariableImportance>& variable_importance) {
+  const int attribute_idx = dataset::GetColumnIdxFromName(attribute, data_spec);
+  const auto found_iterator = std::find_if(
+      variable_importance.begin(), variable_importance.end(),
+      [attribute_idx](const model::proto::VariableImportance& var) {
+        return var.attribute_idx() == attribute_idx;
+      });
+  CHECK(found_iterator != variable_importance.end());
+  return std::distance(variable_importance.begin(), found_iterator);
+}
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

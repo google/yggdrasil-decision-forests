@@ -882,7 +882,7 @@ RandomForestLearner::TrainWithStatus(
   if (compute_oob_variable_importances) {
     RETURN_IF_ERROR(ComputeVariableImportancesFromAccumulatedPredictions(
         oob_predictions, oob_predictions_per_input_features, train_dataset,
-        mdl.get()));
+        deployment().num_threads(), mdl.get()));
   }
 
   utils::usage::OnTrainingEnd(train_dataset.data_spec(), config_with_default,
@@ -1106,7 +1106,8 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
     const std::vector<internal::PredictionAccumulator>& oob_predictions,
     const std::vector<std::vector<internal::PredictionAccumulator>>&
         oob_predictions_per_input_features,
-    const dataset::VerticalDataset& dataset, RandomForestModel* model) {
+    const dataset::VerticalDataset& dataset, const int num_threads,
+    RandomForestModel* model) {
   // Note: "for_permutation_importance=true" allows to compute AUC, PR-AUC and
   // other expensive evaluation metrics.
   ASSIGN_OR_RETURN(
@@ -1131,7 +1132,8 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
   };
 
   return utils::ComputePermutationFeatureImportance(
-      base_evaluation, permutation_evaluation, model);
+      base_evaluation, permutation_evaluation, model,
+      utils::ComputeFeatureImportanceOptions{/*num_threads =*/num_threads});
 }
 
 void InitializeModelWithTrainingConfig(

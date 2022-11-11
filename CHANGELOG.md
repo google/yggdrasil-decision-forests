@@ -7,6 +7,8 @@
 -   YDF can load TF-DF models directly (i.e. a TF model with a YDF model in the
     "assets" sub directory).
 -   Expose confusion tables in a GBT model's analysis.
+-   Add the "compute_variable_importances" tool to compute variable importances
+    on an already trained model.
 
 ## 1.1.0 - 2022-10-21
 

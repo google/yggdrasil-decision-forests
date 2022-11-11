@@ -227,7 +227,7 @@ std::vector<std::string> SampleTrainingShards(
 absl::Status FinalizeModelWithValidationDataset(
     const internal::AllTrainingConfiguration& config,
     const EarlyStopping& early_stopping,
-    const dataset::VerticalDataset& validation_dataset,
+    const dataset::VerticalDataset& validation_dataset, const int num_threads,
     GradientBoostedTreesModel* mdl) {
   std::vector<float> final_secondary_metrics;
   if (config.gbt_config->early_stopping() ==
@@ -310,8 +310,9 @@ absl::Status FinalizeModelWithValidationDataset(
 
   if (config.gbt_config->compute_permutation_variable_importance()) {
     LOG(INFO) << "Compute permutation variable importances";
-    RETURN_IF_ERROR(
-        utils::ComputePermutationFeatureImportance(validation_dataset, mdl));
+    RETURN_IF_ERROR(utils::ComputePermutationFeatureImportance(
+        validation_dataset, mdl,
+        utils::ComputeFeatureImportanceOptions{num_threads}));
   }
 
   return absl::OkStatus();
@@ -1025,7 +1026,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 
   if (has_validation_dataset) {
     RETURN_IF_ERROR(FinalizeModelWithValidationDataset(
-        config, early_stopping, validation->dataset, mdl.get()));
+        config, early_stopping, validation->dataset, deployment().num_threads(),
+        mdl.get()));
   }
 
   RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
@@ -1583,7 +1585,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
 
   if (has_validation_dataset) {
     RETURN_IF_ERROR(FinalizeModelWithValidationDataset(
-        config, early_stopping, validation_dataset, mdl.get()));
+        config, early_stopping, validation_dataset, deployment().num_threads(),
+        mdl.get()));
   }
 
   if (dart_extraction) {

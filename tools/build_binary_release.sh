@@ -87,6 +87,7 @@ if [[ ! -z ${PACK+z} ]]; then
     benchmark_inference \
     edit_model \
     utils/synthetic_dataset \
+    compute_variable_importances \
     ../utils/distribute/implementations/grpc/grpc_worker_main
   popd
 

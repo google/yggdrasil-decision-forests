@@ -181,21 +181,6 @@ void ExtremelyRandomizeTreesFigure10Dataset(const int num_examples,
   }
 }
 
-// Returns the rank of importance of an attribute.
-int GetVariableImportanceRank(
-    const absl::string_view attribute,
-    const dataset::proto::DataSpecification& data_spec,
-    const std::vector<model::proto::VariableImportance>& variable_importance) {
-  const int attribute_idx = dataset::GetColumnIdxFromName(attribute, data_spec);
-  const auto found_iterator = std::find_if(
-      variable_importance.begin(), variable_importance.end(),
-      [attribute_idx](const model::proto::VariableImportance& var) {
-        return var.attribute_idx() == attribute_idx;
-      });
-  CHECK(found_iterator != variable_importance.end());
-  return std::distance(variable_importance.begin(), found_iterator);
-}
-
 // Helper for the training and testing on two non-overlapping samples from the
 // adult dataset.
 class RandomForestOnAdult : public utils::TrainAndTestTester {
@@ -243,11 +228,11 @@ TEST_F(RandomForestOnAdult, Base) {
   // close.
 
   // Top 3 variables.
-  const int rank_capital_gain = GetVariableImportanceRank(
+  const int rank_capital_gain = utils::GetVariableImportanceRank(
       "capital_gain", model_->data_spec(), mean_decrease_accuracy);
-  const int rank_relationship = GetVariableImportanceRank(
+  const int rank_relationship = utils::GetVariableImportanceRank(
       "relationship", model_->data_spec(), mean_decrease_accuracy);
-  const int rank_occupation = GetVariableImportanceRank(
+  const int rank_occupation = utils::GetVariableImportanceRank(
       "occupation", model_->data_spec(), mean_decrease_accuracy);
 
   EXPECT_LE(rank_capital_gain, 5);
@@ -255,9 +240,9 @@ TEST_F(RandomForestOnAdult, Base) {
   EXPECT_LE(rank_occupation, 5);
 
   // Worst 2 variables.
-  const int rank_fnlwgt = GetVariableImportanceRank(
+  const int rank_fnlwgt = utils::GetVariableImportanceRank(
       "fnlwgt", model_->data_spec(), mean_decrease_accuracy);
-  const int rank_education = GetVariableImportanceRank(
+  const int rank_education = utils::GetVariableImportanceRank(
       "education", model_->data_spec(), mean_decrease_accuracy);
 
   EXPECT_GE(rank_fnlwgt, 7);
@@ -799,7 +784,8 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
 
   // Compute importance.
   CHECK_OK(internal::ComputeVariableImportancesFromAccumulatedPredictions(
-      oob_predictions, oob_predictions_per_input_features, dataset, &model));
+      oob_predictions, oob_predictions_per_input_features, dataset,
+      /*num_threads=*/6, &model));
 
   // Ground truth: 1, 1
   // Baseline prediction: 1, 0

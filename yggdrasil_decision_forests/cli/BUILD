@@ -172,6 +172,22 @@ cc_binary_ydf(
     ],
 )
 
+cc_binary_ydf(
+    name = "compute_variable_importances",
+    srcs = ["compute_variable_importances.cc"],
+    deps = [
+        ":all_file_systems",
+        "@com_google_absl//absl/flags:flag",
+        "//yggdrasil_decision_forests/dataset:all_dataset_formats",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
+        "//yggdrasil_decision_forests/model:all_models",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/utils:feature_importance",
+        "//yggdrasil_decision_forests/utils:logging",
+    ],
+)
+
 # Tests
 # =====
 
@@ -181,6 +197,7 @@ sh_test(
     srcs = ["cli_test.sh"],
     data = [
         ":benchmark_inference",
+        ":compute_variable_importances",
         ":convert_dataset",
         ":evaluate",
         ":infer_dataspec",

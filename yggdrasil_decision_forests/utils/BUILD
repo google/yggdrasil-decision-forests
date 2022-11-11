@@ -510,6 +510,7 @@ cc_library_ydf(
         "feature_importance.h",
     ],
     deps = [
+        ":concurrency",
         ":random",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",

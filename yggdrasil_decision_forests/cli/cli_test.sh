@@ -68,6 +68,10 @@ $CLI/train \
 MODEL_INFO="$TEST_TMPDIR/model/description.txt"
 $CLI/show_model --model=$MODEL --engines --alsologtostderr | tee $MODEL_INFO
 
+# Compute some extra variable importances.
+$CLI/compute_variable_importances --input_model=$MODEL --output_model=$MODEL \
+  --dataset=$TEST_DS --variable_importance_prefix=new_va --alsologtostderr
+
 # Evaluate the model on the test dataset.
 EVALUATION="$TEST_TMPDIR/evaluation.txt"
 $CLI/evaluate --dataset=$TEST_DS --model=$MODEL --alsologtostderr | tee $EVALUATION

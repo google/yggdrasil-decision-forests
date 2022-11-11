@@ -355,6 +355,12 @@ std::string InternalGetTestName(T* t) {
   return type_id_name;
 }
 
+// Returns the rank of importance of an attribute.
+int GetVariableImportanceRank(
+    const absl::string_view attribute,
+    const dataset::proto::DataSpecification& data_spec,
+    const std::vector<model::proto::VariableImportance>& variable_importance);
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
 
