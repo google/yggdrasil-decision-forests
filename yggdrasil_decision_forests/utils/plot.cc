@@ -30,6 +30,27 @@
 namespace yggdrasil_decision_forests {
 namespace utils {
 namespace plot {
+namespace {
+
+// Converts a vector into a stringified Javascript array.
+std::string VectorToJsVector(const std::vector<double>& values) {
+  std::string js = "[";
+  for (int i = 0; i < values.size(); i++) {
+    if (i != 0) {
+      absl::StrAppend(&js, ",");
+    }
+    const auto value = values[i];
+    if (std::isnan(value)) {
+      absl::StrAppend(&js, "NaN");
+    } else {
+      absl::StrAppend(&js, value);
+    }
+  }
+  absl::StrAppend(&js, "]");
+  return js;
+}
+
+}  // namespace
 
 absl::Status Curve::Check() const {
   STATUS_CHECK(xs.empty() || xs.size() == ys.size());
@@ -53,14 +74,14 @@ absl::Status MultiPlot::Check() const {
   STATUS_CHECK_GE(num_rows, 0);
 
   for (const auto& item : items) {
-    STATUS_CHECK_GE(item.col, 0);
-    STATUS_CHECK_GE(item.row, 0);
-    STATUS_CHECK_GE(item.num_cols, 1);
-    STATUS_CHECK_GE(item.num_rows, 1);
-    STATUS_CHECK_LE(item.col + item.num_cols, num_cols);
-    STATUS_CHECK_LE(item.row + item.num_rows, num_rows);
+    STATUS_CHECK_GE(item->col, 0);
+    STATUS_CHECK_GE(item->row, 0);
+    STATUS_CHECK_GE(item->num_cols, 1);
+    STATUS_CHECK_GE(item->num_rows, 1);
+    STATUS_CHECK_LE(item->col + item->num_cols, num_cols);
+    STATUS_CHECK_LE(item->row + item->num_rows, num_rows);
 
-    RETURN_IF_ERROR(item.plot.Check());
+    RETURN_IF_ERROR(item->plot.Check());
   }
 
   return absl::OkStatus();
@@ -114,13 +135,15 @@ absl::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
     }
 
     // Generates the html of the sub plot.
-    ASSIGN_OR_RETURN(const auto sub_html, ExportToHtml(item.plot, sub_options));
+    ASSIGN_OR_RETURN(const auto sub_html,
+                     ExportToHtml(item->plot, sub_options));
 
     // Write the sub-plot into a grid cell.
-    absl::SubstituteAndAppend(
-        &html, "<div style='grid-row:$0 / $1; grid-column:$2 / $3;'>$4</div>",
-        item.row + 1, item.row + item.num_rows + 1,
-        item.col + item.num_cols + 1, item.col + 1, sub_html);
+    absl::SubstituteAndAppend(&html,
+                              "<div style='grid-row:$0 / span $1; "
+                              "grid-column:$2 / span $3;'>$4</div>",
+                              item->row + 1, item->num_rows, item->col + 1,
+                              item->num_cols, sub_html);
   }
 
   absl::StrAppend(&html, "</div>");
@@ -146,6 +169,9 @@ PlotPlacer::PlotPlacer(const int num_plots, const int num_cols,
                        const int num_rows, MultiPlot* multiplot)
     : num_plots_(num_plots), multiplot_(multiplot) {
   multiplot_->items.resize(num_plots);
+  for (auto& item : multiplot_->items) {
+    item = std::make_unique<MultiPlotItem>();
+  }
   multiplot_->num_cols = num_cols;
   multiplot_->num_rows = num_rows;
 }
@@ -155,10 +181,10 @@ absl::StatusOr<Plot*> PlotPlacer::NewPlot() {
   STATUS_CHECK_LT(num_new_plots_, num_plots_);
   STATUS_CHECK(!finalize_called_);
   auto& item = multiplot_->items[num_new_plots_];
-  item.col = num_new_plots_ % multiplot_->num_cols;
-  item.row = num_new_plots_ / multiplot_->num_cols;
+  item->col = num_new_plots_ % multiplot_->num_cols;
+  item->row = num_new_plots_ / multiplot_->num_cols;
   num_new_plots_++;
-  return &item.plot;
+  return &item->plot;
 }
 
 absl::Status PlotPlacer::Finalize() {
@@ -187,8 +213,8 @@ absl::Status ExportCurveToHtml(const Curve& curve, const int item_idx,
 
   // Xs.
   if (!curve.xs.empty()) {
-    absl::SubstituteAndAppend(&export_acc->data, "x: [$0],\n",
-                              absl::StrJoin(curve.xs, ","));
+    absl::SubstituteAndAppend(&export_acc->data, "x: $0,\n",
+                              VectorToJsVector(curve.xs));
   }
 
   std::string line_style;
@@ -201,7 +227,7 @@ absl::Status ExportCurveToHtml(const Curve& curve, const int item_idx,
       break;
   }
 
-  absl::SubstituteAndAppend(&export_acc->data, R"(y: [$0],
+  absl::SubstituteAndAppend(&export_acc->data, R"(y: $0,
 type: 'scatter',
 mode: 'lines',
 line: {
@@ -209,8 +235,8 @@ line: {
   width: 1
 },
 )",
-                            absl::StrJoin(curve.ys, ","),  // $0
-                            line_style                     // $1
+                            VectorToJsVector(curve.ys),  // $0
+                            line_style                   // $1
   );
 
   // Label.
@@ -227,13 +253,13 @@ absl::Status ExportBarsToHtml(const Bars& bars, const int item_idx,
                               ExportAccumulator* export_acc) {
   absl::StrAppend(&export_acc->data, "{\n");
 
-  absl::SubstituteAndAppend(&export_acc->data, "x: [$0],\n",
-                            absl::StrJoin(bars.centers, ","));
+  absl::SubstituteAndAppend(&export_acc->data, "x: $0,\n",
+                            VectorToJsVector(bars.centers));
 
-  absl::SubstituteAndAppend(&export_acc->data, R"(y: [$0],
+  absl::SubstituteAndAppend(&export_acc->data, R"(y: $0,
 type: 'bar',
 )",
-                            absl::StrJoin(bars.heights, ","));
+                            VectorToJsVector(bars.heights));
 
   if (!bars.label.empty()) {
     absl::SubstituteAndAppend(&export_acc->data, "name: '$0',\n", bars.label);
@@ -261,6 +287,43 @@ absl::Status ExportPlotItemToHtml(const PlotItem* item, const int item_idx,
 
   return absl::UnimplementedError(
       "Support for this plot item not implemented in plotly");
+}
+
+// Extra axis configuration.
+absl::StatusOr<std::string> AxisExtra(const Axis& axis) {
+  std::string extra;
+
+  switch (axis.scale) {
+    case AxisScale::UNIFORM:
+      // Nothing to do.
+      break;
+    case AxisScale::LOG:
+      absl::StrAppend(&extra, " type: 'log',");
+      break;
+  }
+
+  if (axis.manual_tick_values.has_value()) {
+    absl::StrAppend(&extra, "tickvals: ",
+                    VectorToJsVector(axis.manual_tick_values.value()), ",");
+  }
+
+  if (axis.manual_tick_texts.has_value()) {
+    if (!axis.manual_tick_values.has_value()) {
+      return absl::InvalidArgumentError("manual_tick_values is not set");
+    }
+    if (axis.manual_tick_values.value().size() !=
+        axis.manual_tick_texts.value().size()) {
+      return absl::InvalidArgumentError(
+          "manual_tick_values and manual_tick_texts don't have the same "
+          "number of items.");
+    }
+    absl::StrAppend(&extra, "ticktext: [");
+    for (const auto& item : axis.manual_tick_texts.value()) {
+      absl::StrAppend(&extra, "\"", html::Escape(item), "\",");
+    }
+    absl::StrAppend(&extra, "],");
+  }
+  return extra;
 }
 
 // Specialization of ExportToHtml for c3js.
@@ -291,6 +354,9 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
         ExportPlotItemToHtml(item.get(), item_idx, options, &export_acc));
   }
 
+  ASSIGN_OR_RETURN(const auto x_axis_extra, AxisExtra(plot.x_axis));
+  ASSIGN_OR_RETURN(const auto y_axis_extra, AxisExtra(plot.y_axis));
+
   // Export the html
   absl::SubstituteAndAppend(&html,
                             R"(
@@ -309,7 +375,7 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: '$3',
+        title: '$3',$8
         },
       font: {
         size: 10,
@@ -319,7 +385,7 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: '$4',
+        title: '$4',$9
         },
       margin: {
         l: 50,
@@ -335,14 +401,16 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
   );
 </script>
 )",
-                            chart_id,                            // $0
-                            export_acc.data,                     // $1
-                            html::Escape(plot.title),            // $2
-                            html::Escape(plot.x_axis.label),     // $3
-                            html::Escape(plot.y_axis.label),     // $4
-                            options.width,                       // $5
-                            options.height,                      // $6
-                            plot.show_legend ? "true" : "false"  // $7
+                            chart_id,                             // $0
+                            export_acc.data,                      // $1
+                            html::Escape(plot.title),             // $2
+                            html::Escape(plot.x_axis.label),      // $3
+                            html::Escape(plot.y_axis.label),      // $4
+                            options.width,                        // $5
+                            options.height,                       // $6
+                            plot.show_legend ? "true" : "false",  // $7
+                            x_axis_extra,                         // $8
+                            y_axis_extra                          // $9
   );
   return html;
 }

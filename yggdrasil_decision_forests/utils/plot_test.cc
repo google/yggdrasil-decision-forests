@@ -38,25 +38,25 @@ TEST(MultiPlot, Check) {
   multiplot.num_cols = 2;
   EXPECT_OK(multiplot.Check());
 
-  multiplot.items.push_back({Plot()});
-  multiplot.items.back().plot.items.push_back(absl::make_unique<Curve>());
+  multiplot.items.push_back(absl::make_unique<plot::MultiPlotItem>());
+  multiplot.items.back()->plot.items.push_back(absl::make_unique<Curve>());
   auto* curve =
-      dynamic_cast<Curve*>(multiplot.items.back().plot.items.back().get());
+      dynamic_cast<Curve*>(multiplot.items.back()->plot.items.back().get());
   EXPECT_OK(multiplot.Check());
 
-  multiplot.items.back().col = 1;
+  multiplot.items.back()->col = 1;
   EXPECT_OK(multiplot.Check());
 
-  multiplot.items.back().col = 2;
+  multiplot.items.back()->col = 2;
   EXPECT_THAT(multiplot.Check(),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
 
-  multiplot.items.back().col = 1;
-  multiplot.items.back().num_cols = 2;
+  multiplot.items.back()->col = 1;
+  multiplot.items.back()->num_cols = 2;
   EXPECT_THAT(multiplot.Check(),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
 
-  multiplot.items.back().num_cols = 1;
+  multiplot.items.back()->num_cols = 1;
   curve->ys.push_back(1);
   curve->ys.push_back(2);
   EXPECT_OK(multiplot.Check());
@@ -80,6 +80,14 @@ TEST(Plot, Base) {
   curve->xs = {1, 2, 3};
   curve->ys = {2, 0.5, 4};
   plot.items.push_back(std::move(curve));
+  plot.x_axis.label = "x label";
+  plot.x_axis.scale = plot::AxisScale::LOG;
+  plot.x_axis.manual_tick_values = std::vector<double>();
+  plot.x_axis.manual_tick_values->push_back(1);
+  plot.x_axis.manual_tick_values->push_back(2);
+  plot.x_axis.manual_tick_texts = std::vector<std::string>();
+  plot.x_axis.manual_tick_texts->push_back("v1");
+  plot.x_axis.manual_tick_texts->push_back("v2");
 
   const auto html_plot = ExportToHtml(plot).value();
   const auto path = file::JoinPath(test::TmpDirectory(), "plot.html");
@@ -116,7 +124,7 @@ name: 'curve 1',
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: '',
+        title: 'x label', type: 'log',tickvals: [1,2],ticktext: ["v1","v2",],
         },
       font: {
         size: 10,
@@ -163,7 +171,8 @@ TEST(MultiPlot, Base) {
     curve->ys = {2, 0.5, 4};
     plot.items.push_back(std::move(curve));
 
-    multiplot.items.push_back({std::move(plot), 0, 0});
+    multiplot.items.push_back(
+        absl::make_unique<plot::MultiPlotItem>(std::move(plot), 0, 0));
   }
 
   {
@@ -177,7 +186,8 @@ TEST(MultiPlot, Base) {
     curve->ys = {7, 9, 2};
     plot.items.push_back(std::move(curve));
 
-    multiplot.items.push_back({std::move(plot), 1, 0});
+    multiplot.items.push_back(
+        absl::make_unique<plot::MultiPlotItem>(std::move(plot), 1, 0));
   }
 
   {
@@ -191,7 +201,8 @@ TEST(MultiPlot, Base) {
     bars->heights = {7, 9, 2};
     plot.items.push_back(std::move(bars));
 
-    multiplot.items.push_back({std::move(plot), 0, 1, 2, 1});
+    multiplot.items.push_back(
+        absl::make_unique<plot::MultiPlotItem>(std::move(plot), 0, 1, 2, 1));
   }
 
   const auto html_plot = ExportToHtml(multiplot).value();
@@ -202,7 +213,7 @@ TEST(MultiPlot, Base) {
   // The plot has been checked by hand.
   EXPECT_EQ(
       html_plot,
-      R"(<div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / 2; grid-column:2 / 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+      R"(<div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
 <div id="chard_1" style="display: inline-block;" ></div>
 <script>
   Plotly.newPlot(
@@ -254,7 +265,7 @@ name: 'curve 1',
     }
   );
 </script>
-</div><div style='grid-row:1 / 2; grid-column:3 / 2;'>
+</div><div style='grid-row:1 / span 1; grid-column:2 / span 1;'>
 <div id="chard_2" style="display: inline-block;" ></div>
 <script>
   Plotly.newPlot(
@@ -306,7 +317,7 @@ name: 'curve 2',
     }
   );
 </script>
-</div><div style='grid-row:2 / 3; grid-column:3 / 1;'>
+</div><div style='grid-row:2 / span 1; grid-column:1 / span 2;'>
 <div id="chard_3" style="display: inline-block;" ></div>
 <script>
   Plotly.newPlot(
@@ -385,17 +396,17 @@ TEST(Bars, PlotPlacer) {
   EXPECT_EQ(multiplot.num_rows, 2);
   EXPECT_EQ(multiplot.items.size(), 3);
 
-  EXPECT_EQ(plot_1, &multiplot.items[0].plot);
-  EXPECT_EQ(multiplot.items[0].col, 0);
-  EXPECT_EQ(multiplot.items[0].row, 0);
+  EXPECT_EQ(plot_1, &multiplot.items[0]->plot);
+  EXPECT_EQ(multiplot.items[0]->col, 0);
+  EXPECT_EQ(multiplot.items[0]->row, 0);
 
-  EXPECT_EQ(plot_2, &multiplot.items[1].plot);
-  EXPECT_EQ(multiplot.items[1].col, 1);
-  EXPECT_EQ(multiplot.items[1].row, 0);
+  EXPECT_EQ(plot_2, &multiplot.items[1]->plot);
+  EXPECT_EQ(multiplot.items[1]->col, 1);
+  EXPECT_EQ(multiplot.items[1]->row, 0);
 
-  EXPECT_EQ(plot_3, &multiplot.items[2].plot);
-  EXPECT_EQ(multiplot.items[2].col, 0);
-  EXPECT_EQ(multiplot.items[2].row, 1);
+  EXPECT_EQ(plot_3, &multiplot.items[2]->plot);
+  EXPECT_EQ(multiplot.items[2]->col, 0);
+  EXPECT_EQ(multiplot.items[2]->row, 1);
 }
 
 }  // namespace

@@ -1133,6 +1133,7 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
 
   return utils::ComputePermutationFeatureImportance(
       base_evaluation, permutation_evaluation, model,
+      model->mutable_precomputed_variable_importances(),
       utils::ComputeFeatureImportanceOptions{/*num_threads =*/num_threads});
 }
 

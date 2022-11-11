@@ -231,6 +231,16 @@ Html Button(Args... args) {
   return internal::Tag("button", args...);
 }
 
+template <typename... Args>
+Html A(Args... args) {
+  return internal::Tag("a", args...);
+}
+
+template <typename... Args>
+Html B(Args... args) {
+  return internal::Tag("b", args...);
+}
+
 inline Html Br() {
   Html content;
   content.AppendRaw("<br>");
@@ -280,6 +290,10 @@ inline internal::Attr Checked(absl::string_view value) {
 
 inline internal::Attr Style(Style value) {
   return internal::Attr("style", value.content());
+}
+
+inline internal::Attr HRef(absl::string_view value) {
+  return internal::Attr("href", value);
 }
 
 }  // namespace html

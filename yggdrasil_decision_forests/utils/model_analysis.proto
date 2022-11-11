@@ -1,0 +1,64 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.utils.model_analysis.proto;
+
+import "yggdrasil_decision_forests/model/abstract_model.proto";
+import "yggdrasil_decision_forests/utils/partial_dependence_plot.proto";
+
+// Configuration for the model analysis
+message Options {
+  // Number of threads used for the computation.
+  optional int32 num_threads = 1 [default = 6];
+
+  // Enable the computation of Partial Dependence Plots.
+  optional PlotConfig pdp = 2;
+
+  // Enable the computation of Conditional Expectation Plot.
+  optional PlotConfig cep = 3;
+
+  // Configuration of the computation of the PDP and CEP.
+  message PlotConfig {
+    // Enable the computation.
+    optional bool enabled = 1 [default = true];
+    optional float example_sampling = 2 [default = 1.];
+    optional int32 num_numerical_bins = 3 [default = 50];
+  }
+
+  // Measure the importance of each input feature using permutation variable
+  // importance:
+  // https://christophm.github.io/interpretable-ml-book/feature-importance.html.
+  optional PermutedVariableImportance permuted_variable_importance = 7;
+
+  message PermutedVariableImportance {
+    optional bool enabled = 1 [default = true];
+  }
+
+  // Size, in pixel, of a figure (possibly composed of multiple plots).
+  optional int32 figure_width = 8 [default = 1600];
+
+  // Size in pixel of an individual plot.
+  optional int32 plot_width = 9 [default = 530];
+  optional int32 plot_height = 10 [default = 450];
+}
+
+// Results of a model analysis.
+message AnalysisResult {
+  optional utils.proto.PartialDependencePlotSet pdp_set = 1;
+  optional utils.proto.PartialDependencePlotSet cep_set = 2;
+  map<string, model.proto.VariableImportanceSet> variable_importances = 3;
+}

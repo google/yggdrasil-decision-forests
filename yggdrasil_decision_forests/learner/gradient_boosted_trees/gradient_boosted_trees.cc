@@ -311,7 +311,7 @@ absl::Status FinalizeModelWithValidationDataset(
   if (config.gbt_config->compute_permutation_variable_importance()) {
     LOG(INFO) << "Compute permutation variable importances";
     RETURN_IF_ERROR(utils::ComputePermutationFeatureImportance(
-        validation_dataset, mdl,
+        validation_dataset, mdl,mdl->mutable_precomputed_variable_importances(),
         utils::ComputeFeatureImportanceOptions{num_threads}));
   }
 

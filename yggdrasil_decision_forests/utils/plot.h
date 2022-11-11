@@ -126,10 +126,27 @@ struct Bars : PlotItem {
   std::vector<double> centers;
 };
 
+// The scale of a numerical axis.
+enum class AxisScale {
+  UNIFORM,
+  LOG,
+};
+
 // An axis of the plot.
 struct Axis {
   // Label of the axis. Leave empty for no label.
   std::string label;
+
+  // Scale of the axis.
+  AxisScale scale = AxisScale::UNIFORM;
+
+  // List of tick values. If not set, ticks are set automatically.
+  absl::optional<std::vector<double>> manual_tick_values;
+
+  // List of tick texts. If not set, "manual_tick_values" should also be set and
+  // both "manual_tick_values" and "manual_tick_texts" should have the same
+  // number of examples.
+  absl::optional<std::vector<std::string>> manual_tick_texts;
 };
 
 // A set of geometrical object in a 2d space.
@@ -155,6 +172,15 @@ struct Plot {
 };
 
 struct MultiPlotItem {
+  MultiPlotItem() = default;
+  MultiPlotItem(Plot&& _plot, int _col = 0, int _row = 0, int _num_cols = 1,
+                int _num_rows = 1)
+      : plot(std::move(_plot)),
+        col(_col),
+        row(_row),
+        num_cols(_num_cols),
+        num_rows(_num_rows) {}
+
   Plot plot;
 
   // The following field are the coordinate of the plot inside of the
@@ -175,7 +201,7 @@ struct MultiPlotItem {
 struct MultiPlot {
   absl::Status Check() const;
 
-  std::vector<MultiPlotItem> items;
+  std::vector<std::unique_ptr<MultiPlotItem>> items;
 
   // Size of the multi-plot.
   int num_cols = 1;

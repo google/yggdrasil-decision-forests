@@ -27,6 +27,14 @@
 namespace yggdrasil_decision_forests {
 namespace utils {
 
+typedef ::google::protobuf::Map<
+    std::string,
+    ::yggdrasil_decision_forests::model::proto::VariableImportanceSet>
+    ResultFeatureImportanceProto;
+
+typedef absl::flat_hash_map<std::string, model::proto::VariableImportanceSet>
+    ResultFeatureImportance;
+
 struct ComputeFeatureImportanceOptions {
   // Number of threads used for the computation. Should be >=1.
   int num_threads = 6;
@@ -43,12 +51,27 @@ absl::Status ComputePermutationFeatureImportance(
         absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
             const int feature_idx)>
         get_permutation_evaluation,
-    model::AbstractModel* model,
+    const model::AbstractModel* model, ResultFeatureImportance* output,
+    const ComputeFeatureImportanceOptions& options = {});
+
+absl::Status ComputePermutationFeatureImportance(
+    const metric::proto::EvaluationResults& base_evaluation,
+    const std::function<
+        absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
+            const int feature_idx)>
+        get_permutation_evaluation,
+    const model::AbstractModel* model, ResultFeatureImportanceProto* output,
     const ComputeFeatureImportanceOptions& options = {});
 
 // Computes and adds to the model permutation feature importances.
 absl::Status ComputePermutationFeatureImportance(
-    const dataset::VerticalDataset& dataset, model::AbstractModel* model,
+    const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
+    ResultFeatureImportance* output,
+    const ComputeFeatureImportanceOptions& options = {});
+
+absl::Status ComputePermutationFeatureImportance(
+    const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
+    ResultFeatureImportanceProto* output,
     const ComputeFeatureImportanceOptions& options = {});
 
 // Builds a copy of the dataset with the values of the columns in

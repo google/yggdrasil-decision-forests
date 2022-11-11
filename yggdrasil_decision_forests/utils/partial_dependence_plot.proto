@@ -1,0 +1,99 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.utils.proto;
+
+import "yggdrasil_decision_forests/dataset/example.proto";
+import "yggdrasil_decision_forests/utils/distribution.proto";
+
+// Message for the metrics required to compute a partial dependence plot for
+// multiple features or sets of features.
+//
+// This message is also used to store Conditional Expectancy Plots.
+message PartialDependencePlotSet {
+  // Message for metrics required to compute a partial dependence plot for ONE
+  // feature or ONE set of features.
+  message PartialDependencePlot {
+    // Represents the "sum" of a set of labels, either predicted by the model,
+    // or the ground truth.
+    message LabelAccumulator {
+      oneof prediction_value {
+        IntegerDistributionFloat classification_class_distribution = 1;
+
+        // sum_of_regression_predictions should be normalized with
+        // num_observations to obtain the mean prediction.
+        double sum_of_regression_predictions = 2 [default = 0];
+
+        // sum_of_regression_predictions should be normalized with
+        // num_observations to obtain the mean prediction.
+        double sum_of_ranking_predictions = 3 [default = 0];
+      }
+    }
+    // Represent the accumulation of evaluation metrics.
+    message EvaluationAccumulator {
+      oneof prediction_value {
+        double sum_squared_error = 1 [default = 0];  // For regression.
+        double num_correct_predictions = 2
+            [default = 0];  // For classification.
+      }
+    }
+    // Represents the metrics for a feature OR set of features at a particular
+    // value (Represented by attribute_values).
+    message Bin {
+      optional LabelAccumulator prediction = 1;
+      optional LabelAccumulator ground_truth = 2;
+      optional EvaluationAccumulator evaluation = 4;
+
+      // The values used to represent the center of this bin.
+      // In case of a categorical feature, this stores the exact categorical
+      // value. In case of a numerical feature, this stores a value:
+      // (max_value - min_value)*(bin_number + 0.5)/num_bins + min_value.
+      repeated yggdrasil_decision_forests.dataset.proto.Example.Attribute
+          center_input_feature_values = 3;
+    }
+
+    optional double num_observations = 1;
+    repeated Bin pdp_bins = 3;
+
+    message AttributeInfo {
+      // If this PartialDependencePlot represents a set of 3 features,
+      // attribute_info.num_bins represents the number of bins in each of these
+      // feature spaces. Further, \product_i
+      // attribute_info[i].num_bins_per_input_feature = pdp_bins.size().
+      optional int32 num_bins_per_input_feature = 1;
+      optional int32 attribute_idx = 2;
+
+      // Distribution of the attribute for each of the bins.
+      repeated double num_observations_per_bins = 3;
+
+      // Boundaries of the bins for numerical attributes.
+      repeated float numerical_boundaries = 4;
+
+      // How to scale the axis when plotting this attribute. Only used for
+      // numerical attributes.
+      optional Scale scale = 5 [default = UNIFORM];
+      enum Scale {
+        UNIFORM = 0;
+        LOG = 1;
+      }
+    }
+
+    repeated AttributeInfo attribute_info = 4;
+  }
+
+  repeated PartialDependencePlot pdps = 1;
+}

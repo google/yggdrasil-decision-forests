@@ -503,12 +503,8 @@ cc_library_ydf(
 
 cc_library_ydf(
     name = "feature_importance",
-    srcs = [
-        "feature_importance.cc",
-    ],
-    hdrs = [
-        "feature_importance.h",
-    ],
+    srcs = ["feature_importance.cc"],
+    hdrs = ["feature_importance.h"],
     deps = [
         ":concurrency",
         ":random",
@@ -726,6 +722,55 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "model_analysis",
+    srcs = ["model_analysis.cc"],
+    hdrs = ["model_analysis.h"],
+    deps = [
+        ":distribution",
+        ":feature_importance",
+        ":filesystem",
+        ":histogram",
+        ":html",
+        ":model_analysis_cc_proto",
+        ":partial_dependence_plot",
+        ":partial_dependence_plot_cc_proto",
+        ":plot",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:model_engine_wrapper",
+    ],
+)
+
+cc_library_ydf(
+    name = "partial_dependence_plot",
+    srcs = ["partial_dependence_plot.cc"],
+    hdrs = ["partial_dependence_plot.h"],
+    deps = [
+        ":distribution",
+        ":distribution_cc_proto",
+        ":logging",
+        ":partial_dependence_plot_cc_proto",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "//yggdrasil_decision_forests/dataset:data_spec",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset:example_reader",
+        "//yggdrasil_decision_forests/dataset:example_reader_interface",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:weight",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model:prediction_cc_proto",
+    ],
+)
+
 # Bzl Libraries
 # =============
 
@@ -750,6 +795,24 @@ all_proto_library(
 all_proto_library(
     name = "bitmap_proto",
     srcs = ["bitmap.proto"],
+)
+
+all_proto_library(
+    name = "model_analysis_proto",
+    srcs = ["model_analysis.proto"],
+    deps = [
+        "//yggdrasil_decision_forests/model:abstract_model_proto",
+        "//yggdrasil_decision_forests/utils:partial_dependence_plot_proto",
+    ],
+)
+
+all_proto_library(
+    name = "partial_dependence_plot_proto",
+    srcs = ["partial_dependence_plot.proto"],
+    deps = [
+        "//yggdrasil_decision_forests/dataset:example_proto",
+        "//yggdrasil_decision_forests/utils:distribution_proto",
+    ],
 )
 
 # Tests
@@ -1062,5 +1125,44 @@ cc_test(
         ":test",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/memory",
+    ],
+)
+
+cc_test(
+    name = "model_analysis_test",
+    srcs = ["model_analysis_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
+    deps = [
+        ":filesystem",
+        ":model_analysis",
+        ":plot",
+        ":test",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/memory",
+        "//yggdrasil_decision_forests/dataset:csv_example_reader",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/model:model_testing",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+    ],
+)
+
+cc_test(
+    name = "partial_dependence_plot_test",
+    srcs = ["partial_dependence_plot_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
+    deps = [
+        ":partial_dependence_plot",
+        ":test",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/memory",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model/decision_tree",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
+        "//yggdrasil_decision_forests/model/random_forest",
     ],
 )

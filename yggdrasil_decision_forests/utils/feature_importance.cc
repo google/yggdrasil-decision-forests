@@ -55,7 +55,7 @@ std::vector<std::string> BuildPermutationVariableImportanceName(
 
 // Sort the variable importances by importance.
 void SortVariableImportance(const std::vector<std::string>& importance_names,
-                            model::AbstractModel* model) {
+                            ResultFeatureImportance* output) {
   // Sort the importance by decreasing order.
   const auto var_importance_comparer =
       [](const model::proto::VariableImportance& a,
@@ -64,8 +64,7 @@ void SortVariableImportance(const std::vector<std::string>& importance_names,
       };
 
   for (const auto& importance_name : importance_names) {
-    auto& feature_importance =
-        (*model->mutable_precomputed_variable_importances())[importance_name];
+    auto& feature_importance = (*output)[importance_name];
     std::sort(feature_importance.mutable_variable_importances()->begin(),
               feature_importance.mutable_variable_importances()->end(),
               var_importance_comparer);
@@ -108,7 +107,7 @@ absl::Status ComputePermutationFeatureImportance(
         absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
             const int feature_idx)>
         get_permutation_evaluation,
-    model::AbstractModel* model,
+    const model::AbstractModel* model, ResultFeatureImportance* output,
     const ComputeFeatureImportanceOptions& options) {
   const auto metrics =
       metric::DefaultMetrics(model->task(), model->label_col_spec());
@@ -212,9 +211,7 @@ absl::Status ComputePermutationFeatureImportance(
       const auto sum = sum_permutation_metrics[metric_idx][feature_idx];
       const auto permuted_metric_value = sum / count;
 
-      auto& feature_importance =
-          (*model->mutable_precomputed_variable_importances())
-              [importance_names[metric_idx]];
+      auto& feature_importance = (*output)[importance_names[metric_idx]];
       auto& feature = *feature_importance.mutable_variable_importances()->Add();
       feature.set_importance(
           (baseline_metric_values[metric_idx] - permuted_metric_value) *
@@ -223,12 +220,13 @@ absl::Status ComputePermutationFeatureImportance(
     }
   }
 
-  SortVariableImportance(importance_names, model);
+  SortVariableImportance(importance_names, output);
   return absl::OkStatus();
 }
 
 absl::Status ComputePermutationFeatureImportance(
-    const dataset::VerticalDataset& dataset, model::AbstractModel* model,
+    const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
+    ResultFeatureImportance* output,
     const ComputeFeatureImportanceOptions& options) {
   // Setup the evaluation configuration.
   metric::proto::EvaluationOptions eval_options;
@@ -259,7 +257,38 @@ absl::Status ComputePermutationFeatureImportance(
   };
 
   return utils::ComputePermutationFeatureImportance(
-      base_evaluation, permutation_evaluation, model, options);
+      base_evaluation, permutation_evaluation, model, output, options);
+}
+
+absl::Status ComputePermutationFeatureImportance(
+    const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
+    ResultFeatureImportanceProto* output,
+    const ComputeFeatureImportanceOptions& options) {
+  ResultFeatureImportance raw_output;
+  RETURN_IF_ERROR(ComputePermutationFeatureImportance(dataset, model,
+                                                      &raw_output, options));
+  for (const auto& item : raw_output) {
+    (*output)[item.first] = std::move(item.second);
+  }
+  return absl::OkStatus();
+}
+
+absl::Status ComputePermutationFeatureImportance(
+    const metric::proto::EvaluationResults& base_evaluation,
+    const std::function<
+        absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
+            const int feature_idx)>
+        get_permutation_evaluation,
+    const model::AbstractModel* model, ResultFeatureImportanceProto* output,
+    const ComputeFeatureImportanceOptions& options) {
+  ResultFeatureImportance raw_output;
+  RETURN_IF_ERROR(ComputePermutationFeatureImportance(
+      base_evaluation, get_permutation_evaluation, model, &raw_output,
+      options));
+  for (const auto& item : raw_output) {
+    (*output)[item.first] = std::move(item.second);
+  }
+  return absl::OkStatus();
 }
 
 }  // namespace utils

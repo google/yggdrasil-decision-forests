@@ -188,6 +188,23 @@ cc_binary_ydf(
     ],
 )
 
+cc_binary_ydf(
+    name = "experimental_analyze_model_and_dataset",
+    srcs = ["analyze_model_and_dataset.cc"],
+    deps = [
+        ":all_file_systems",
+        "@com_google_absl//absl/flags:flag",
+        "//yggdrasil_decision_forests/dataset:all_dataset_formats",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
+        "//yggdrasil_decision_forests/model:all_models",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:model_analysis",
+        "//yggdrasil_decision_forests/utils:protobuf",
+    ],
+)
+
 # Tests
 # =====
 

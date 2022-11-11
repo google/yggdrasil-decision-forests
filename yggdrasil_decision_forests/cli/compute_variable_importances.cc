@@ -82,8 +82,9 @@ void PermutationVI() {
   utils::ComputeFeatureImportanceOptions options;
   options.num_threads = absl::GetFlag(FLAGS_num_compute_threads);
   options.num_rounds = absl::GetFlag(FLAGS_num_repetitions);
-  QCHECK_OK(utils::ComputePermutationFeatureImportance(dataset, model.get(),
-                                                       options));
+  QCHECK_OK(utils::ComputePermutationFeatureImportance(
+      dataset, model.get(), model->mutable_precomputed_variable_importances(),
+      options));
 
   LOG(INFO) << "Save model";
   QCHECK_OK(model::SaveModel(absl::GetFlag(FLAGS_output_model), model.get()));
