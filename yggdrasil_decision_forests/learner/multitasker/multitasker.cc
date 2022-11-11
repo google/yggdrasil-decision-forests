@@ -28,6 +28,8 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace multitasker {
 
+constexpr char MultitaskerLearner::kRegisteredName[];
+
 MultitaskerLearner::MultitaskerLearner(
     const model::proto::TrainingConfig& training_config)
     : AbstractLearner(training_config) {}
