@@ -44,6 +44,12 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
                               absl::string_view output_directory,
                               const proto::Options& options = {});
 
+// Same as "CreateHtmlReport" above. Return the HTML as a string.
+absl::StatusOr<std::string> CreateHtmlReport(
+    const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
+    absl::string_view model_path, absl::string_view dataset_path,
+    const proto::AnalysisResult& analysis, const proto::Options& options = {});
+
 // Combines the model analysis and html creation i.e. Analyse +
 // CreateHtmlReport.
 absl::Status AnalyseAndCreateHtmlReport(const model::AbstractModel& model,

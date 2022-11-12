@@ -698,6 +698,8 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
                          options.cep().example_sampling()));
   }
 
+  LOG(INFO) << "@@@ VI";
+
   if (options.permuted_variable_importance().enabled()) {
     RETURN_IF_ERROR(ComputePermutationFeatureImportance(
         dataset, &model, analysis.mutable_variable_importances(),
@@ -714,15 +716,29 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
                               const proto::AnalysisResult& analysis,
                               absl::string_view output_directory,
                               const proto::Options& options) {
-  namespace h = utils::html;
-
   RETURN_IF_ERROR(
       file::RecursivelyCreateDir(output_directory, file::Defaults()));
+
+  ASSIGN_OR_RETURN(const auto html_content,
+                   CreateHtmlReport(model, dataset, model_path, dataset_path,
+                                    analysis, options));
+
+  RETURN_IF_ERROR(
+      file::SetContent(file::JoinPath(output_directory, kIndex), html_content));
+  LOG(INFO) << "Report written to " << output_directory;
+  return absl::OkStatus();
+}
+
+absl::StatusOr<std::string> CreateHtmlReport(
+    const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
+    absl::string_view model_path, absl::string_view dataset_path,
+    const proto::AnalysisResult& analysis, const proto::Options& options) {
+  namespace h = utils::html;
 
   h::Html html;
 
   // Report header.
-  {
+  if (options.report_header().enabled()) {
     h::Html report_header;
     report_header.Append(h::H1("Model and Dataset Analysis Report"));
     report_header.Append(h::P(
@@ -733,7 +749,7 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
   }
 
   // Table of content.
-  {
+  if (options.table_of_content().enabled()) {
     h::Html report_toc;
     report_toc.Append(h::H2("Table of Content"));
     report_toc.Append(
@@ -750,7 +766,7 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
   }
 
   // Report Setup.
-  {
+  if (options.report_setup().enabled()) {
     h::Html report_setup;
     report_setup.Append(h::H2(h::Id("report_setup"), "Report Setup"));
     report_setup.Append(h::P(h::B("Analyse dataset: "), dataset_path, h::Br(),
@@ -759,7 +775,7 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
   }
 
   // Dataset Specification.
-  {
+  if (options.dataspec().enabled()) {
     h::Html report_data_spec;
     report_data_spec.Append(h::H2(h::Id("data_spec"), "Dataset Specification"));
     report_data_spec.Append(
@@ -768,10 +784,11 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
   }
 
   // Partial Dependence Plot
-  {
+  if (options.pdp().enabled()) {
     html.Append(
         h::H2(h::Id("partial_dependence_plot"), "Partial Dependence Plot"));
     utils::plot::ExportOptions plot_options;
+    plot_options.show_interactive_menu = options.plot().show_interactive_menu();
     ASSIGN_OR_RETURN(const auto plot,
                      internal::PlotPartialDependencePlotSet(
                          model.data_spec(), analysis.pdp_set(), model.task(),
@@ -783,10 +800,11 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
   }
 
   // Conditional Expectation Plot
-  {
+  if (options.cep().enabled()) {
     html.Append(h::H2(h::Id("conditional_expectation_plot"),
                       "Conditional Expectation Plot"));
     utils::plot::ExportOptions plot_options;
+    plot_options.show_interactive_menu = options.plot().show_interactive_menu();
     ASSIGN_OR_RETURN(const auto plot,
                      internal::PlotConditionalExpectationPlotSet(
                          model.data_spec(), analysis.cep_set(), model.task(),
@@ -798,7 +816,7 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
   }
 
   // Permutation Variable Importance.
-  {
+  if (options.permuted_variable_importance().enabled()) {
     h::Html report_data_spec;
     report_data_spec.Append(
         h::H2(h::Id("var_importance"),
@@ -828,7 +846,7 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
   }
 
   // Model Description.
-  {
+  if (options.model_description().enabled()) {
     h::Html report_model_description;
     report_model_description.Append(
         h::H2(h::Id("model_description"), "Model Description"));
@@ -838,11 +856,7 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
 
     html.Append(report_model_description);
   }
-
-  RETURN_IF_ERROR(file::SetContent(file::JoinPath(output_directory, kIndex),
-                                   std::string(html.content())));
-  LOG(INFO) << "Report written to " << output_directory;
-  return absl::OkStatus();
+  return std::string(html.content());
 }
 
 }  // namespace model_analysis

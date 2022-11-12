@@ -54,6 +54,36 @@ message Options {
   // Size in pixel of an individual plot.
   optional int32 plot_width = 9 [default = 530];
   optional int32 plot_height = 10 [default = 450];
+
+  optional ReportHeader report_header = 11;
+  message ReportHeader {
+    optional bool enabled = 1 [default = true];
+  }
+
+  optional TableOfContent table_of_content = 12;
+  message TableOfContent {
+    optional bool enabled = 1 [default = true];
+  }
+
+  optional ReportSetup report_setup = 13;
+  message ReportSetup {
+    optional bool enabled = 1 [default = true];
+  }
+
+  optional Dataspec dataspec = 14;
+  message Dataspec {
+    optional bool enabled = 1 [default = true];
+  }
+
+  optional ModelDescription model_description = 15;
+  message ModelDescription {
+    optional bool enabled = 1 [default = true];
+  }
+
+  optional Plot plot = 16;
+  message Plot {
+    optional bool show_interactive_menu = 1 [default = false];
+  }
 }
 
 // Results of a model analysis.

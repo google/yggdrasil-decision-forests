@@ -502,6 +502,7 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
     }
     LOG_INFO_EVERY_N_SEC(30, _ << example_idx + 1 << " examples scanned.");
     dataset.ExtractExample(example_idx, &example);
+
     RETURN_IF_ERROR(UpdatePartialDependencePlotSet(model, example, &pdp_set));
   }
 

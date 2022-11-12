@@ -354,6 +354,22 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
         ExportPlotItemToHtml(item.get(), item_idx, options, &export_acc));
   }
 
+  std::string config_extra;
+  if (!options.show_interactive_menu) {
+    config_extra = "displayModeBar: false,";
+  }
+
+  const auto layout_base = absl::Substitute(
+      R"(      width: $0,
+      height: $1,
+      title: '$2',
+      showlegend: $3,)",
+      options.width,                       // $0
+      options.height,                      // $1
+      html::Escape(plot.title),            // $2
+      plot.show_legend ? "true" : "false"  // $3
+  );
+
   ASSIGN_OR_RETURN(const auto x_axis_extra, AxisExtra(plot.x_axis));
   ASSIGN_OR_RETURN(const auto y_axis_extra, AxisExtra(plot.y_axis));
 
@@ -366,16 +382,13 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
     '$0',
     [$1],
     {
-      width: $5,
-      height: $6,
-      title: '$2',
-      showlegend: $7,
+$2
       xaxis: {
         ticks: 'outside',
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: '$3',$8
+        title: '$3',$5
         },
       font: {
         size: 10,
@@ -385,7 +398,7 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: '$4',$9
+        title: '$4',$6
         },
       margin: {
         l: 50,
@@ -396,21 +409,19 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
     },
     {
       modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,
+      displaylogo: false,$7
     }
   );
 </script>
 )",
-                            chart_id,                             // $0
-                            export_acc.data,                      // $1
-                            html::Escape(plot.title),             // $2
-                            html::Escape(plot.x_axis.label),      // $3
-                            html::Escape(plot.y_axis.label),      // $4
-                            options.width,                        // $5
-                            options.height,                       // $6
-                            plot.show_legend ? "true" : "false",  // $7
-                            x_axis_extra,                         // $8
-                            y_axis_extra                          // $9
+                            chart_id,                         // $0
+                            export_acc.data,                  // $1
+                            layout_base,                      // $2
+                            html::Escape(plot.x_axis.label),  // $3
+                            html::Escape(plot.y_axis.label),  // $4
+                            x_axis_extra,                     // $5
+                            y_axis_extra,                     // $6
+                            config_extra                      // $7
   );
   return html;
 }

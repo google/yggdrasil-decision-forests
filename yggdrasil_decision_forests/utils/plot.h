@@ -83,6 +83,9 @@ struct ExportOptions {
   // Dimension of the plot in px.
   int width = 600;
   int height = 400;
+
+  // Show a menu in the plot. Disable it when creating small plots.
+  bool show_interactive_menu = false;
 };
 
 // A plot item is the base class for plot content.

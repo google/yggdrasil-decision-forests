@@ -145,7 +145,7 @@ name: 'curve 1',
     },
     {
       modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,
+      displaylogo: false,displayModeBar: false,
     }
   );
 </script>
@@ -261,7 +261,7 @@ name: 'curve 1',
     },
     {
       modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,
+      displaylogo: false,displayModeBar: false,
     }
   );
 </script>
@@ -313,7 +313,7 @@ name: 'curve 2',
     },
     {
       modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,
+      displaylogo: false,displayModeBar: false,
     }
   );
 </script>
@@ -360,7 +360,7 @@ name: 'bars 3',
     },
     {
       modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,
+      displaylogo: false,displayModeBar: false,
     }
   );
 </script>
