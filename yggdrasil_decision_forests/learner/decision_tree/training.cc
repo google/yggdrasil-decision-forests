@@ -3614,15 +3614,22 @@ absl::Status SetRegressionLabelDistribution(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
-  DCHECK(!weights.empty());
   ASSIGN_OR_RETURN(
       const auto* const labels,
       dataset
           .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               config_link.label()));
   utils::NormalDistributionDouble label_distribution;
-  for (const UnsignedExampleIdx example_idx : selected_examples) {
-    label_distribution.Add(labels->values()[example_idx], weights[example_idx]);
+  if (weights.empty()) {
+    for (const UnsignedExampleIdx example_idx : selected_examples) {
+      label_distribution.Add(labels->values()[example_idx], 1.f);
+    }
+  } else {
+    STATUS_CHECK(weights.size() == dataset.nrow());
+    for (const UnsignedExampleIdx example_idx : selected_examples) {
+      label_distribution.Add(labels->values()[example_idx],
+                             weights[example_idx]);
+    }
   }
   label_distribution.Save(node->mutable_regressor()->mutable_distribution());
   node->mutable_regressor()->set_top_value(label_distribution.Mean());

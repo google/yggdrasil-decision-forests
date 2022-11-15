@@ -71,12 +71,20 @@ BinomialLogLikelihoodLoss::InitialPredictions(
       dataset.ColumnWithCastWithStatus<
           dataset::VerticalDataset::CategoricalColumn>(label_col_idx));
   const UnsignedExampleIdx n = dataset.nrow();
-  for (UnsignedExampleIdx example_idx = 0; example_idx < n; example_idx++) {
-    sum_weights += weights[example_idx];
-    weighted_sum_positive +=
-        weights[example_idx] * (labels->values()[example_idx] == 2);
+  if (weights.empty()) {
+    sum_weights = static_cast<double>(n);
+    weighted_sum_positive = static_cast<double>(
+        std::count(labels->values().begin(), labels->values().end(), 2));
+  } else {
+    for (UnsignedExampleIdx example_idx = 0; example_idx < n; example_idx++) {
+      sum_weights += weights[example_idx];
+      weighted_sum_positive +=
+          weights[example_idx] * (labels->values()[example_idx] == 2);
+    }
   }
-  const auto ratio_positive = weighted_sum_positive / sum_weights;
+  STATUS_CHECK_GT(sum_weights, 0);
+
+  const double ratio_positive = weighted_sum_positive / sum_weights;
   if (ratio_positive == 0.0) {
     return std::vector<float>{-std::numeric_limits<float>::max()};
   } else if (ratio_positive == 1.0) {
@@ -197,75 +205,16 @@ BinomialLogLikelihoodLoss::SetLeafFunctor(
              const model::proto::TrainingConfig& config,
              const model::proto::TrainingConfigLinking& config_link,
              decision_tree::NodeWithChildren* node) {
-    return SetLeaf(train_dataset, selected_examples, weights, config,
-                   config_link, predictions, label_col_idx, node);
+    if (weights.empty()) {
+      return SetLeaf</*weighted=*/false>(train_dataset, selected_examples,
+                                         weights, config, config_link,
+                                         predictions, label_col_idx, node);
+    } else {
+      return SetLeaf</*weighted=*/true>(train_dataset, selected_examples,
+                                        weights, config, config_link,
+                                        predictions, label_col_idx, node);
+    }
   };
-}
-
-absl::Status BinomialLogLikelihoodLoss::SetLeaf(
-    const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const std::vector<float>& predictions, const int label_col_idx,
-    decision_tree::NodeWithChildren* node) const {
-  if (!gbt_config_.use_hessian_gain()) {
-    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
-        train_dataset, selected_examples, weights, config_link,
-        node->mutable_node()));
-    // Even if "use_hessian_gain" is not enabled for the splits. We use a
-    // Newton step in the leaves i.e. if "use_hessian_gain" is false, we need
-    // all the information.
-  }
-
-  // Set the value of the leaf to:
-  //   (\sum_i weight[i] * (label[i] - p[i]) ) / (\sum_i weight[i] * p[i] *
-  //   (1-p[i]))
-  // with: p[i] = 1/(1+exp(-prediction)
-  // TODO: Update.
-  const auto* labels =
-      train_dataset
-          .ColumnWithCastWithStatus<
-              dataset::VerticalDataset::CategoricalColumn>(label_col_idx)
-          .value();
-  double numerator = 0;
-  double denominator = 0;
-  double sum_weights = 0;
-  static const float bool_to_float[] = {0.f, 1.f};
-  for (const auto example_idx : selected_examples) {
-    const float weight = weights[example_idx];
-    const float label = bool_to_float[labels->values()[example_idx] == 2];
-    const float prediction = predictions[example_idx];
-    const float p = 1.f / (1.f + std::exp(-prediction));
-    numerator += weight * (label - p);
-    denominator += weight * p * (1.f - p);
-    sum_weights += weight;
-    DCheckIsFinite(numerator);
-    DCheckIsFinite(denominator);
-  }
-
-  if (denominator <= kMinHessianForNewtonStep) {
-    denominator = kMinHessianForNewtonStep;
-  }
-
-  if (gbt_config_.use_hessian_gain()) {
-    auto* reg = node->mutable_node()->mutable_regressor();
-    reg->set_sum_gradients(numerator);
-    reg->set_sum_hessians(denominator);
-    reg->set_sum_weights(sum_weights);
-  }
-
-  const auto leaf_value =
-      gbt_config_.shrinkage() *
-      static_cast<float>(decision_tree::l1_threshold(
-                             numerator, gbt_config_.l1_regularization()) /
-                         (denominator + gbt_config_.l2_regularization()));
-
-  node->mutable_node()->mutable_regressor()->set_top_value(
-      utils::clamp(leaf_value, -gbt_config_.clamp_leaf_logit(),
-                   gbt_config_.clamp_leaf_logit()));
-  return absl::OkStatus();
 }
 
 absl::Status BinomialLogLikelihoodLoss::UpdatePredictions(

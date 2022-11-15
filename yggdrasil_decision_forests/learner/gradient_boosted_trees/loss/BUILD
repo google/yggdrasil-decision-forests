@@ -137,6 +137,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:distribution_cc_proto",
         "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:status_macros",
     ],
     alwayslink = 1,
 )
@@ -283,6 +284,7 @@ cc_test(
     deps = [
         ":loss_imp_binomial",
         "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",

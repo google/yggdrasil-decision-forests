@@ -330,8 +330,11 @@ absl::Status SetLabelDistribution(
     const model::proto::TrainingConfigLinking& config_link,
     NodeWithChildren* node);
 
+// Set the label value for a regression label on a vertical dataset.
+//
 // Default policy to set the label value of a leaf in a regression tree i.e. set
 // the value to the mean of the labels.
+// `weights` may be empty, corresponding to unit weights.
 absl::Status SetRegressionLabelDistribution(
     const dataset::VerticalDataset& dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
