@@ -123,8 +123,8 @@ absl::StatusOr<int> GetPerAttributeBinIdx(
       const auto it =
           std::upper_bound(boundaries.begin(), boundaries.end(), value);
       const int idx = std::distance(boundaries.begin(), it);
-      return std::clamp(idx, 0,
-                        attribute_info.num_bins_per_input_feature() - 1);
+      return utils::clamp(idx, 0,
+                          attribute_info.num_bins_per_input_feature() - 1);
     }
     case dataset::proto::ColumnType::CATEGORICAL:
       return example.attributes(attribute_idx).categorical();
