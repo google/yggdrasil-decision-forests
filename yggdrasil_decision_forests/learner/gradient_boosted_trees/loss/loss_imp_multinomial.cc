@@ -243,6 +243,64 @@ std::vector<std::string> MultinomialLogLikelihoodLoss::SecondaryMetricNames()
   return {"accuracy"};
 }
 
+template <bool use_weights, typename T>
+void MultinomialLogLikelihoodLoss::TemplatedLossImp(
+    const std::vector<T>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights, size_t begin_example_idx,
+    size_t end_example_idx, double* __restrict sum_loss,
+    utils::IntegersConfusionMatrixDouble* confusion_matrix) {
+  const int dimension = confusion_matrix->ncol() - 1;
+  double loss = 0;
+
+  for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
+       example_idx++) {
+    const int label = labels[example_idx];
+    int predicted_class = -1;
+    float predicted_class_exp_value = 0;
+    float sum_exp = 0;
+    if constexpr (use_weights) {
+      const float weight = weights[example_idx];
+      for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
+        const float exp_val =
+            std::exp(predictions[grad_idx + example_idx * dimension]);
+        sum_exp += exp_val;
+        DCheckIsFinite(sum_exp);
+        if (exp_val > predicted_class_exp_value) {
+          predicted_class_exp_value = exp_val;
+          predicted_class = grad_idx + 1;
+        }
+      }
+      confusion_matrix->Add(label, predicted_class, weight);
+      // Loss:
+      //   - log(predict_proba[true_label])
+      const float tree_label_exp_value =
+          std::exp(predictions[(label - 1) + example_idx * dimension]);
+      loss -= weight * std::log(tree_label_exp_value / sum_exp);
+    } else {
+      for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
+        const float exp_val =
+            std::exp(predictions[grad_idx + example_idx * dimension]);
+        sum_exp += exp_val;
+        DCheckIsFinite(sum_exp);
+        if (exp_val > predicted_class_exp_value) {
+          predicted_class_exp_value = exp_val;
+          predicted_class = grad_idx + 1;
+        }
+      }
+      confusion_matrix->Add(label, predicted_class, 1);
+      // Loss:
+      //   - log(predict_proba[true_label])
+      const float tree_label_exp_value =
+          std::exp(predictions[(label - 1) + example_idx * dimension]);
+      loss -= std::log(tree_label_exp_value / sum_exp);
+    }
+    DCheckIsFinite(loss);
+    DCheckIsFinite(confusion_matrix->sum());
+  }
+  DCheckIsFinite(loss);
+  *sum_loss = loss;
+}
+
 template <typename T>
 absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
     const std::vector<T>& labels, const std::vector<float>& predictions,
@@ -251,62 +309,48 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
     utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
   utils::IntegersConfusionMatrixDouble confusion_matrix;
-  int confusion_matrix_size =
-      label_column_.categorical().number_of_unique_values();
+  int confusion_matrix_size = dimension_ + 1;
   confusion_matrix.SetSize(confusion_matrix_size, confusion_matrix_size);
 
-  if (weights.empty()) {
-    for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
-      const int label = labels[example_idx];
-
-      int predicted_class = -1;
-      float predicted_class_exp_value = 0;
-      float sum_exp = 0;
-      for (int grad_idx = 0; grad_idx < dimension_; grad_idx++) {
-        const float exp_val =
-            std::exp(predictions[grad_idx + example_idx * dimension_]);
-        sum_exp += exp_val;
-        DCheckIsFinite(sum_exp);
-        if (exp_val > predicted_class_exp_value) {
-          predicted_class_exp_value = exp_val;
-          predicted_class = grad_idx + 1;
-        }
-      }
-      confusion_matrix.Add(label, predicted_class, 1);
-      // Loss:
-      //   - log(predict_proba[true_label])
-      const float tree_label_exp_value =
-          std::exp(predictions[(label - 1) + example_idx * dimension_]);
-      sum_loss -= std::log(tree_label_exp_value / sum_exp);
-      DCheckIsFinite(sum_loss);
-      DCheckIsFinite(confusion_matrix.sum());
+  if (thread_pool == nullptr) {
+    if (weights.empty()) {
+      TemplatedLossImp<false>(labels, predictions, weights, 0, labels.size(),
+                              &sum_loss, &confusion_matrix);
+    } else {
+      TemplatedLossImp<true>(labels, predictions, weights, 0, labels.size(),
+                             &sum_loss, &confusion_matrix);
     }
   } else {
-    for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
-      const int label = labels[example_idx];
-      const float weight = weights[example_idx];
+    const auto num_threads = thread_pool->num_threads();
 
-      int predicted_class = -1;
-      float predicted_class_exp_value = 0;
-      float sum_exp = 0;
-      for (int grad_idx = 0; grad_idx < dimension_; grad_idx++) {
-        const float exp_val =
-            std::exp(predictions[grad_idx + example_idx * dimension_]);
-        sum_exp += exp_val;
-        DCheckIsFinite(sum_exp);
-        if (exp_val > predicted_class_exp_value) {
-          predicted_class_exp_value = exp_val;
-          predicted_class = grad_idx + 1;
-        }
-      }
-      confusion_matrix.Add(label, predicted_class, weight);
-      // Loss:
-      //   - log(predict_proba[true_label])
-      const float tree_label_exp_value =
-          std::exp(predictions[(label - 1) + example_idx * dimension_]);
-      sum_loss -= weight * std::log(tree_label_exp_value / sum_exp);
-      DCheckIsFinite(sum_loss);
-      DCheckIsFinite(confusion_matrix.sum());
+    struct PerThread {
+      double sum_loss = 0;
+      utils::IntegersConfusionMatrixDouble confusion_matrix;
+    };
+    std::vector<PerThread> per_threads(num_threads);
+
+    decision_tree::ConcurrentForLoop(
+        num_threads, thread_pool, labels.size(),
+        [&labels, &predictions, &per_threads, &weights, &confusion_matrix_size](
+            size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
+          auto& block = per_threads[block_idx];
+          block.confusion_matrix.SetSize(confusion_matrix_size,
+                                         confusion_matrix_size);
+
+          if (weights.empty()) {
+            TemplatedLossImp<false>(labels, predictions, weights, begin_idx,
+                                    end_idx, &block.sum_loss,
+                                    &block.confusion_matrix);
+          } else {
+            TemplatedLossImp<true>(labels, predictions, weights, begin_idx,
+                                   end_idx, &block.sum_loss,
+                                   &block.confusion_matrix);
+          }
+        });
+
+    for (const auto& block : per_threads) {
+      sum_loss += block.sum_loss;
+      confusion_matrix.Add(block.confusion_matrix);
     }
   }
 

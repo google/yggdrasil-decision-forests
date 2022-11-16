@@ -19,6 +19,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
@@ -148,7 +149,17 @@ TEST(MultinomialLogLikelihoodLossTest, SetLabelDistribution) {
   EXPECT_EQ(node.node().regressor().distribution().count(), 6.);
 }
 
-TEST(MultinomialLogLikelihoodLossTest, ComputeLoss) {
+TEST(MultinomialLogLikelihoodLossTest, SecondaryMetricName) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  const MultinomialLogLikelihoodLoss loss_imp(
+      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+  EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("accuracy"));
+}
+
+using ThreadedMultinomialLogLikelihoodLossTest = ::testing::TestWithParam<bool>;
+
+TEST_P(ThreadedMultinomialLogLikelihoodLossTest, ComputeLoss) {
+  const bool threaded = GetParam();
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   std::vector<float> weights;
   auto label_column = dataset.data_spec().columns(1);
@@ -158,10 +169,20 @@ TEST(MultinomialLogLikelihoodLossTest, ComputeLoss) {
       0.f);
   const MultinomialLogLikelihoodLoss loss_imp(
       {}, model::proto::Task::CLASSIFICATION, label_column);
-  ASSERT_OK_AND_ASSIGN(
-      LossResults loss_results,
-      loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 1, predictions, weights, nullptr));
+  LossResults loss_results;
+  if (threaded) {
+    utils::concurrency::ThreadPool thread_pool("", 4);
+    thread_pool.StartWorkers();
+    ASSERT_OK_AND_ASSIGN(
+        loss_results,
+        loss_imp.Loss(dataset,
+                      /* label_col_idx= */ 1, predictions, weights, nullptr));
+  } else {
+    ASSERT_OK_AND_ASSIGN(
+        loss_results,
+        loss_imp.Loss(dataset,
+                      /* label_col_idx= */ 1, predictions, weights, nullptr));
+  }
 
   EXPECT_NEAR(loss_results.loss, std::log(3), kTestPrecision);
   EXPECT_THAT(loss_results.secondary_metrics,
@@ -173,7 +194,8 @@ TEST(MultinomialLogLikelihoodLossTest, ComputeLoss) {
   EXPECT_EQ(loss_results.confusion_table->sum(), 6);
 }
 
-TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithWeights) {
+TEST_P(ThreadedMultinomialLogLikelihoodLossTest, ComputeLossWithWeights) {
+  const bool threaded = GetParam();
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   std::vector<float> weights = {1.f, 2.f, 3.f, 4.f, 5.f, 6.f};
   auto label_column = dataset.data_spec().columns(1);
@@ -183,10 +205,20 @@ TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithWeights) {
       0.f);
   const MultinomialLogLikelihoodLoss loss_imp(
       {}, model::proto::Task::CLASSIFICATION, label_column);
-  ASSERT_OK_AND_ASSIGN(
-      LossResults loss_results,
-      loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 1, predictions, weights, nullptr));
+  LossResults loss_results;
+  if (threaded) {
+    utils::concurrency::ThreadPool thread_pool("", 4);
+    thread_pool.StartWorkers();
+    ASSERT_OK_AND_ASSIGN(
+        loss_results,
+        loss_imp.Loss(dataset,
+                      /* label_col_idx= */ 1, predictions, weights, nullptr));
+  } else {
+    ASSERT_OK_AND_ASSIGN(
+        loss_results,
+        loss_imp.Loss(dataset,
+                      /* label_col_idx= */ 1, predictions, weights, nullptr));
+  }
 
   EXPECT_NEAR(loss_results.loss, std::log(3), kTestPrecision);
   EXPECT_THAT(loss_results.secondary_metrics,
@@ -198,7 +230,8 @@ TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithWeights) {
   EXPECT_EQ(loss_results.confusion_table->sum(), 21.);
 }
 
-TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
+TEST_P(ThreadedMultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
+  const bool threaded = GetParam();
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   std::vector<float> weights(dataset.nrow(), 0.f);
   auto label_column = dataset.data_spec().columns(1);
@@ -208,22 +241,29 @@ TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
       0.f);
   const MultinomialLogLikelihoodLoss loss_imp(
       {}, model::proto::Task::CLASSIFICATION, label_column);
-  ASSERT_OK_AND_ASSIGN(
-      LossResults loss_results,
-      loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 1, predictions, weights, nullptr));
+  LossResults loss_results;
+  if (threaded) {
+    utils::concurrency::ThreadPool thread_pool("", 4);
+    thread_pool.StartWorkers();
+    ASSERT_OK_AND_ASSIGN(
+        loss_results,
+        loss_imp.Loss(dataset,
+                      /* label_col_idx= */ 1, predictions, weights, nullptr));
+  } else {
+    ASSERT_OK_AND_ASSIGN(
+        loss_results,
+        loss_imp.Loss(dataset,
+                      /* label_col_idx= */ 1, predictions, weights, nullptr));
+  }
 
   EXPECT_THAT(loss_results.loss, IsNan());
   EXPECT_THAT(loss_results.secondary_metrics, ElementsAre(IsNan()));
   EXPECT_EQ(loss_results.confusion_table, absl::nullopt);
 }
 
-TEST(MultinomialLogLikelihoodLossTest, SecondaryMetricName) {
-  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
-  const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
-  EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("accuracy"));
-}
+INSTANTIATE_TEST_SUITE_P(ThreadedMultinomialLogLikelihoodLossTests,
+                         ThreadedMultinomialLogLikelihoodLossTest,
+                         testing::ValuesIn<bool>({true, false}));
 
 }  // namespace
 }  // namespace gradient_boosted_trees
