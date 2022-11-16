@@ -146,84 +146,23 @@ decision_tree::CreateSetLeafValueFunctor
 MultinomialLogLikelihoodLoss::SetLeafFunctor(
     const std::vector<float>& predictions,
     const std::vector<GradientData>& gradients, const int label_col_idx) const {
-  return
-      [this, &predictions, label_col_idx](
-          const dataset::VerticalDataset& train_dataset,
-          const std::vector<UnsignedExampleIdx>& selected_examples,
-          const std::vector<float>& weights,
-          const model::proto::TrainingConfig& config,
-          const model::proto::TrainingConfigLinking& config_link,
-          decision_tree::NodeWithChildren* node) {
-        return SetLeaf(train_dataset, selected_examples, weights, config,
-                       config_link, predictions, label_col_idx, node);
-      };
-}
-
-absl::Status MultinomialLogLikelihoodLoss::SetLeaf(
-    const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const std::vector<float>& predictions, const int label_col_idx,
-    decision_tree::NodeWithChildren* node) const {
-  // Initialize the distribution (as the "top_value" is overridden right
-  // after.
-  if (!gbt_config_.use_hessian_gain()) {
-    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
-        train_dataset, selected_examples, weights, config_link,
-        node->mutable_node()));
-  }
-
-  // Set the value of the leaf to:
-  //  (dim-1) / dim * ( \sum_i weight[i] grad[i] ) / (\sum_i |grad[i]| *
-  //  (1-|grad[i]|))
-  //
-  // Note: The leaf value does not depend on the label value (directly).
-  ASSIGN_OR_RETURN(
-      const auto& column,
-      train_dataset
-          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
-              config_link.label()));
-  const auto& grad = column->values();
-
-  double numerator = 0;
-  double denominator = 0;
-  double sum_weights = 0;
-  for (const auto example_idx : selected_examples) {
-    const float weight = weights[example_idx];
-    numerator += weight * grad[example_idx];
-    const float abs_grad = std::abs(grad[example_idx]);
-    denominator += weight * abs_grad * (1 - abs_grad);
-    sum_weights += weight;
-    DCheckIsFinite(numerator);
-    DCheckIsFinite(denominator);
-  }
-
-  if (denominator <= kMinHessianForNewtonStep) {
-    denominator = kMinHessianForNewtonStep;
-  }
-
-  if (gbt_config_.use_hessian_gain()) {
-    auto* reg = node->mutable_node()->mutable_regressor();
-    reg->set_sum_gradients(numerator);
-    reg->set_sum_hessians(denominator);
-    reg->set_sum_weights(sum_weights);
-  }
-
-  numerator *= dimension_ - 1;
-  denominator *= dimension_;
-  const auto leaf_value =
-      gbt_config_.shrinkage() *
-      static_cast<float>(decision_tree::l1_threshold(
-                             numerator, gbt_config_.l1_regularization()) /
-                         (denominator + gbt_config_.l2_regularization()));
-  DCheckIsFinite(leaf_value);
-
-  node->mutable_node()->mutable_regressor()->set_top_value(
-      utils::clamp(leaf_value, -gbt_config_.clamp_leaf_logit(),
-                   gbt_config_.clamp_leaf_logit()));
-  return absl::OkStatus();
+  return [this, &predictions, label_col_idx](
+             const dataset::VerticalDataset& train_dataset,
+             const std::vector<UnsignedExampleIdx>& selected_examples,
+             const std::vector<float>& weights,
+             const model::proto::TrainingConfig& config,
+             const model::proto::TrainingConfigLinking& config_link,
+             decision_tree::NodeWithChildren* node) {
+    if (weights.empty()) {
+      return SetLeaf</*weighted=*/false>(train_dataset, selected_examples,
+                                         weights, config, config_link,
+                                         predictions, label_col_idx, node);
+    } else {
+      return SetLeaf</*weighted=*/true>(train_dataset, selected_examples,
+                                        weights, config, config_link,
+                                        predictions, label_col_idx, node);
+    }
+  };
 }
 
 absl::Status MultinomialLogLikelihoodLoss::UpdatePredictions(
@@ -243,7 +182,7 @@ std::vector<std::string> MultinomialLogLikelihoodLoss::SecondaryMetricNames()
   return {"accuracy"};
 }
 
-template <bool use_weights, typename T>
+template <bool weighted, typename T>
 void MultinomialLogLikelihoodLoss::TemplatedLossImp(
     const std::vector<T>& labels, const std::vector<float>& predictions,
     const std::vector<float>& weights, size_t begin_example_idx,
@@ -258,7 +197,7 @@ void MultinomialLogLikelihoodLoss::TemplatedLossImp(
     int predicted_class = -1;
     float predicted_class_exp_value = 0;
     float sum_exp = 0;
-    if constexpr (use_weights) {
+    if constexpr (weighted) {
       const float weight = weights[example_idx];
       for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
         const float exp_val =
