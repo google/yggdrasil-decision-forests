@@ -55,22 +55,39 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   return dataset;
 }
 
-TEST(MeanSquareErrorLossTest, InitialPredictions) {
+class MeanSquareErrorLossTest : public testing::TestWithParam<bool> {};
+
+TEST_P(MeanSquareErrorLossTest, InitialPredictions) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  std::vector<float> weights = {1.f, 1.f, 1.f, 1.f};
+  const bool weighted = GetParam();
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f};
+  }
+
   const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::REGRESSION,
                                       dataset.data_spec().columns(0));
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
       loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 0, weights));
-  EXPECT_THAT(init_pred, ElementsAre((1.f + 2.f + 3.f + 4.f) / 4.f));  // Mean.
+  if (weighted) {
+    EXPECT_THAT(init_pred,
+                ElementsAre((2.f + 8.f + 18.f + 32.f) / 20.f));  // Mean.
+  } else {
+    EXPECT_THAT(init_pred,
+                ElementsAre((1.f + 2.f + 3.f + 4.f) / 4.f));  // Mean.
+  }
 }
 
-TEST(MeanSquareErrorLossTest, UpdateGradients) {
+TEST_P(MeanSquareErrorLossTest, UpdateGradients) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  std::vector<float> weights = {1.f, 1.f, 1.f, 1.f};
+  const bool weighted = GetParam();
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f};
+  }
 
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
@@ -97,14 +114,23 @@ TEST(MeanSquareErrorLossTest, UpdateGradients) {
                                      &random));
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
+  if (weighted) {
+  EXPECT_THAT(gradients.front().gradient,
+              ElementsAre(1.f - 3.f, 2.f - 3.f, 3.f - 3.f, 4.f - 3.f));
+  } else {
   EXPECT_THAT(gradients.front().gradient,
               ElementsAre(1.f - 2.5f, 2.f - 2.5f, 3.f - 2.5f, 4.f - 2.5f));
+  }
 }
 
-TEST(MeanSquareErrorLossTest, SetLabelDistribution) {
+TEST_P(MeanSquareErrorLossTest, SetLabelDistribution) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  std::vector<float> weights = {1.f, 1.f, 1.f, 1.f};
+  const bool weighted = GetParam();
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f};
+  }
 
   proto::GradientBoostedTreesTrainingConfig gbt_config;
   gbt_config.set_shrinkage(1.f);
@@ -128,22 +154,42 @@ TEST(MeanSquareErrorLossTest, SetLabelDistribution) {
   config_link.set_label(2);  // Gradient column.
 
   decision_tree::NodeWithChildren node;
-  ASSERT_OK(loss_imp.SetLeaf(gradient_dataset, selected_examples, weights,
-                             config, config_link, predictions,
-                             /* label_col_idx= */ 0, &node));
-
-  EXPECT_EQ(node.node().regressor().top_value(), 2.5f);  // Mean of the labels.
-  // Distribution of the gradients:
-  EXPECT_EQ(node.node().regressor().distribution().sum(), 0);
-  EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
-  // Same as the number of examples in the dataset.
-  EXPECT_EQ(node.node().regressor().distribution().count(), 4.);
+  if (weighted) {
+    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/true>(
+        gradient_dataset, selected_examples, weights, config, config_link,
+        predictions,
+        /* label_col_idx= */ 0, &node));
+    // Top_value is the weighted mean of the labels
+    EXPECT_EQ(node.node().regressor().top_value(), 3.f);
+    // Distribution of the gradients:
+    EXPECT_EQ(node.node().regressor().distribution().sum(), 0);
+    EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
+    // Total weight in the dataset.
+    EXPECT_EQ(node.node().regressor().distribution().count(), 20.);
+  } else {
+    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/false>(
+        gradient_dataset, selected_examples, weights, config, config_link,
+        predictions,
+        /* label_col_idx= */ 0, &node));
+    // Top value is the mean of the labels.
+    EXPECT_EQ(node.node().regressor().top_value(), 2.5f);
+    // Distribution of the gradients:
+    EXPECT_EQ(node.node().regressor().distribution().sum(), 0);
+    EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
+    // Same as the number of examples in the dataset.
+    EXPECT_EQ(node.node().regressor().distribution().count(), 4.);
+  }
 }
 
-TEST(MeanSquareErrorLossTest, ComputeClassificationLoss) {
+TEST_P(MeanSquareErrorLossTest, ComputeClassificationLoss) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  std::vector<float> weights = {1.f, 1.f, 1.f, 1.f};
+  const bool weighted = GetParam();
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f};
+  }
+
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
   const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::REGRESSION,
                                       dataset.data_spec().columns(0));
@@ -151,17 +197,28 @@ TEST(MeanSquareErrorLossTest, ComputeClassificationLoss) {
       LossResults loss_results,
       loss_imp.Loss(dataset,
                     /* label_col_idx= */ 0, predictions, weights, nullptr));
-
-  EXPECT_NEAR(loss_results.loss, std::sqrt(30. / 4.), kTestPrecision);
-  // For classification, the only secondary metric is also RMSE.
-  EXPECT_THAT(loss_results.secondary_metrics,
-              ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision)));
+  if (weighted) {
+    EXPECT_NEAR(loss_results.loss, std::sqrt(200. / 20.), kTestPrecision);
+    // For classification, the only secondary metric is also RMSE.
+    EXPECT_THAT(loss_results.secondary_metrics,
+                ElementsAre(FloatNear(std::sqrt(200. / 20.), kTestPrecision)));
+  } else {
+    EXPECT_NEAR(loss_results.loss, std::sqrt(30. / 4.), kTestPrecision);
+    // For classification, the only secondary metric is also RMSE.
+    EXPECT_THAT(loss_results.secondary_metrics,
+                ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision)));
+  }
 }
 
-TEST(MeanSquareErrorLossTest, ComputeRankingLoss) {
+TEST_P(MeanSquareErrorLossTest, ComputeRankingLoss) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  std::vector<float> weights = {1.f, 1.f, 1.f, 1.f};
+  const bool weighted = GetParam();
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f};
+  }
+
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
   const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::RANKING,
                                       dataset.data_spec().columns(0));
@@ -171,13 +228,21 @@ TEST(MeanSquareErrorLossTest, ComputeRankingLoss) {
       LossResults loss_results,
       loss_imp.Loss(dataset,
                     /* label_col_idx= */ 0, predictions, weights, &index));
-
-  EXPECT_NEAR(loss_results.loss, std::sqrt(30. / 4.), kTestPrecision);
-  //  For ranking, first secondary metric is RMSE, second secondary metric is
-  //  NDCG@5.
-  EXPECT_THAT(loss_results.secondary_metrics,
-              ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision),
-                          FloatNear(0.861909, kTestPrecision)));
+  if (weighted) {
+    EXPECT_NEAR(loss_results.loss, std::sqrt(200. / 20.), kTestPrecision);
+    //  For ranking, first secondary metric is RMSE, second secondary metric is
+    //  NDCG@5.
+    EXPECT_THAT(loss_results.secondary_metrics,
+                ElementsAre(FloatNear(std::sqrt(200. / 20.), kTestPrecision),
+                            FloatNear(0.86291, kTestPrecision)));
+  } else {
+    EXPECT_NEAR(loss_results.loss, std::sqrt(30. / 4.), kTestPrecision);
+    //  For ranking, first secondary metric is RMSE, second secondary metric is
+    //  NDCG@5.
+    EXPECT_THAT(loss_results.secondary_metrics,
+                ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision),
+                            FloatNear(0.861909, kTestPrecision)));
+  }
 }
 
 TEST(MeanSquareErrorLossTest, SecondaryMetricNamesClassification) {
@@ -197,6 +262,9 @@ TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRanking) {
   EXPECT_THAT(loss_imp_ranking.SecondaryMetricNames(),
               ElementsAre("rmse", "NDCG@5"));
 }
+
+INSTANTIATE_TEST_SUITE_P(MeanSquareErrorLossTestWithWeights,
+                         MeanSquareErrorLossTest, testing::Bool());
 
 }  // namespace
 }  // namespace gradient_boosted_trees

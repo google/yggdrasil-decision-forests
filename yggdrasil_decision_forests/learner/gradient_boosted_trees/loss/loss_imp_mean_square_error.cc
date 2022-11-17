@@ -68,10 +68,17 @@ absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
       dataset
           .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               label_col_idx));
-  for (UnsignedExampleIdx example_idx = 0; example_idx < dataset.nrow();
-       example_idx++) {
-    sum_weights += weights[example_idx];
-    weighted_sum_values += weights[example_idx] * labels->values()[example_idx];
+  if (weights.empty()) {
+    sum_weights = dataset.nrow();
+    weighted_sum_values =
+        std::accumulate(labels->values().begin(), labels->values().end(), 0.);
+  } else {
+    for (UnsignedExampleIdx example_idx = 0; example_idx < dataset.nrow();
+         example_idx++) {
+      sum_weights += weights[example_idx];
+      weighted_sum_values +=
+          weights[example_idx] * labels->values()[example_idx];
+    }
   }
   // Note: Null and negative weights are detected by the dataspec
   // computation.
@@ -127,57 +134,23 @@ absl::Status MeanSquaredErrorLoss::UpdatePredictions(
 decision_tree::CreateSetLeafValueFunctor MeanSquaredErrorLoss::SetLeafFunctor(
     const std::vector<float>& predictions,
     const std::vector<GradientData>& gradients, const int label_col_idx) const {
-  return
-      [this, &predictions, label_col_idx](
-          const dataset::VerticalDataset& train_dataset,
-          const std::vector<UnsignedExampleIdx>& selected_examples,
-          const std::vector<float>& weights,
-          const model::proto::TrainingConfig& config,
-          const model::proto::TrainingConfigLinking& config_link,
-          decision_tree::NodeWithChildren* node) {
-        return SetLeaf(train_dataset, selected_examples, weights, config,
-                       config_link, predictions, label_col_idx, node);
-      };
-}
-
-absl::Status MeanSquaredErrorLoss::SetLeaf(
-    const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const std::vector<float>& predictions, const int label_col_idx,
-    decision_tree::NodeWithChildren* node) const {
-  RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
-      train_dataset, selected_examples, weights, config_link,
-      node->mutable_node()));
-
-  // Set the value of the leaf to be the residual:
-  //   label[i] - prediction
-  ASSIGN_OR_RETURN(
-      const auto* labels,
-      train_dataset
-          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
-              label_col_idx));
-  double sum_weighted_values = 0;
-  double sum_weights = 0;
-  for (const auto example_idx : selected_examples) {
-    const float label = labels->values()[example_idx];
-    const float prediction = predictions[example_idx];
-    sum_weighted_values += weights[example_idx] * (label - prediction);
-    sum_weights += weights[example_idx];
-  }
-  if (sum_weights <= 0) {
-    LOG(WARNING) << "Zero or negative weights in node";
-    sum_weights = 1.0;
-  }
-  // Note: The "sum_weights" terms carries an implicit 2x factor that is
-  // integrated in the shrinkage. We don't integrate this factor here not to
-  // change the behavior of existing training configurations.
-  node->mutable_node()->mutable_regressor()->set_top_value(
-      gbt_config_.shrinkage() * sum_weighted_values /
-      (sum_weights + gbt_config_.l2_regularization() / 2));
-  return absl::OkStatus();
+  return [this, &predictions, label_col_idx](
+             const dataset::VerticalDataset& train_dataset,
+             const std::vector<UnsignedExampleIdx>& selected_examples,
+             const std::vector<float>& weights,
+             const model::proto::TrainingConfig& config,
+             const model::proto::TrainingConfigLinking& config_link,
+             decision_tree::NodeWithChildren* node) {
+    if (weights.empty()) {
+      return SetLeaf</*weighted=*/false>(train_dataset, selected_examples,
+                                         weights, config, config_link,
+                                         predictions, label_col_idx, node);
+    } else {
+      return SetLeaf</*weighted=*/true>(train_dataset, selected_examples,
+                                        weights, config, config_link,
+                                        predictions, label_col_idx, node);
+    }
+  };
 }
 
 absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>

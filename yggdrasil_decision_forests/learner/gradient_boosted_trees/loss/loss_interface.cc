@@ -170,7 +170,7 @@ double RankingGroupsIndices::NDCG(const std::vector<float>& predictions,
                                   const std::vector<float>& weights,
                                   const int truncation) const {
   DCHECK_EQ(predictions.size(), num_items_);
-  DCHECK_EQ(weights.size(), num_items_);
+  DCHECK(weights.empty() || weights.size() == num_items_);
 
   metric::NDCGCalculator ndcg_calculator(truncation);
   std::vector<metric::RankingLabelAndPrediction> pred_and_label_relevance;

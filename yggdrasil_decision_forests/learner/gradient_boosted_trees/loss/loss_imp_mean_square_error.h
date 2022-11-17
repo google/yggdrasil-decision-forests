@@ -82,13 +82,59 @@ class MeanSquaredErrorLoss : public AbstractLoss {
       const std::vector<GradientData>& gradients,
       int label_col_idx) const override;
 
+  template <bool weighted>
   absl::Status SetLeaf(const dataset::VerticalDataset& train_dataset,
                        const std::vector<UnsignedExampleIdx>& selected_examples,
                        const std::vector<float>& weights,
                        const model::proto::TrainingConfig& config,
                        const model::proto::TrainingConfigLinking& config_link,
-                       const std::vector<float>& predictions, int label_col_idx,
-                       decision_tree::NodeWithChildren* node) const;
+                       const std::vector<float>& predictions,
+                       const int label_col_idx,
+                       decision_tree::NodeWithChildren* node) const {
+    if constexpr (weighted) {
+      STATUS_CHECK(weights.size() == train_dataset.nrow());
+    } else {
+      STATUS_CHECK(weights.empty());
+    }
+    // Initialize the distribution (as the "top_value" is overridden right
+    // after.
+    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
+        train_dataset, selected_examples, weights, config_link,
+        node->mutable_node()));
+
+    // Set the value of the leaf to be the residual:
+    //   label[i] - prediction
+    ASSIGN_OR_RETURN(
+        const auto* labels,
+        train_dataset.ColumnWithCastWithStatus<
+            dataset::VerticalDataset::NumericalColumn>(label_col_idx));
+    double sum_weighted_values = 0;
+    double sum_weights = 0;
+    if constexpr (!weighted) {
+      sum_weights = selected_examples.size();
+    }
+    for (const auto example_idx : selected_examples) {
+      const float label = labels->values()[example_idx];
+      const float prediction = predictions[example_idx];
+      if constexpr (weighted) {
+        sum_weighted_values += weights[example_idx] * (label - prediction);
+        sum_weights += weights[example_idx];
+      } else {
+        sum_weighted_values += label - prediction;
+      }
+    }
+    if (sum_weights <= 0) {
+      LOG(WARNING) << "Zero or negative weights in node";
+      sum_weights = 1.0;
+    }
+    // Note: The "sum_weights" terms carries an implicit 2x factor that is
+    // integrated in the shrinkage. We don't integrate this factor here not to
+    // change the behavior of existing training configurations.
+    node->mutable_node()->mutable_regressor()->set_top_value(
+        gbt_config_.shrinkage() * sum_weighted_values /
+        (sum_weights + gbt_config_.l2_regularization() / 2));
+    return absl::OkStatus();
+  }
 
   absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
   SetLeafFunctorFromLabelStatistics() const override;
