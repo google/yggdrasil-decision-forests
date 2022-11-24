@@ -47,11 +47,14 @@
         let examples = JSON.parse(document.getElementById("examples").value);
         console.log("Examples:", examples);
 
+        const startTimeMs = performance.now();
         let predictions = model.predict(examples);
+        const endTimeMs = performance.now();
 
-        console.log("Predictions:", predictions);
-        writeToTerminal("Predictions:");
-        writeToTerminal(predictions);
+        writeToTerminal(`Predictions: ${predictions}`);
+        writeToTerminal(
+          `Predictions computed in ${endTimeMs - startTimeMs} milliseconds`
+        );
       }
 
       function unloadModel() {
