@@ -738,6 +738,9 @@ class VerticalDataset {
   // Generates a human readable summary of the memory.
   std::string MemorySummary() const;
 
+  // Number of bytes used in memory.
+  uint64_t MemoryUsage() const;
+
   // Release the reserved but not used memory.
   //
   // Can be called on a dataset that won't receive new elements.

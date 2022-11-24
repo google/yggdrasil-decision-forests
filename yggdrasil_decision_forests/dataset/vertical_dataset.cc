@@ -969,6 +969,15 @@ void VerticalDataset::Reserve(
   }
 }
 
+uint64_t VerticalDataset::MemoryUsage() const {
+  uint64_t reserved = 0;
+  for (int col_idx = 0; col_idx < ncol(); col_idx++) {
+    const auto col_mem = column(col_idx)->memory_usage();
+    reserved += col_mem.second;
+  }
+  return reserved;
+}
+
 std::string VerticalDataset::MemorySummary() const {
   uint64_t usage = 0;
   uint64_t reserved = 0;

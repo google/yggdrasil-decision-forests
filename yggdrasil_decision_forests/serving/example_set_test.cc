@@ -482,6 +482,14 @@ TEST(ExampleSet, FromProtoExample) {
               EqualsProto(example_1));
 }
 
+TEST(ExampleSet, MemoryUsage) {
+  ToyModel model;
+  ToyModel::ExampleSet example_set(5, model);
+  SetToyValues(model, &example_set);
+  const auto usage = example_set.MemoryUsage();
+  EXPECT_LE(usage, 2000);
+}
+
 }  // namespace
 }  // namespace serving
 }  // namespace yggdrasil_decision_forests

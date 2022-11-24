@@ -514,6 +514,9 @@ class AbstractExampleSet {
       const int example_idx, const FeaturesDefinition& features) const = 0;
 
   virtual void Clear() = 0;
+
+  // Returns an approximation of the set's memory usage.
+  virtual uint64_t MemoryUsage() const = 0;
 };
 
 // ExampleSet implementation where attribute (feature) values are stored either
@@ -974,6 +977,14 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
 
   const std::vector<int32_t>& InternalCategoricalItemBuffer() const {
     return categorical_item_buffer_;
+  }
+
+  uint64_t MemoryUsage() const override {
+    return sizeof(ExampleSetNumericalOrCategoricalFlat) +
+           fixed_length_features_.capacity() *
+               sizeof(NumericalOrCategoricalValue) +
+           categorical_set_begins_and_ends_.capacity() * sizeof(Rangei32) +
+           categorical_item_buffer_.capacity() * sizeof(int32_t);
   }
 
  private:

@@ -493,6 +493,8 @@ TEST(VerticalDataset, Set) {
   EXPECT_EQ(dataset.ValueToString(1, 0), "nan");
   EXPECT_EQ(dataset.ValueToString(0, 1), "CCC");
   EXPECT_EQ(dataset.ValueToString(1, 1), "BBB");
+
+  EXPECT_LT(dataset.MemoryUsage(), 200);
 }
 
 }  // namespace
