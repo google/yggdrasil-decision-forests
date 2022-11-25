@@ -1277,11 +1277,83 @@ TEST(GradientBoostedTrees, SetHyperParameters) {
   // Set
   EXPECT_EQ(gbdt_config.num_trees(), 10);
   EXPECT_NEAR(learner.training_config().maximum_training_duration_seconds(),
-              10., 0.001);
+              10., epsilon);
   EXPECT_NEAR(gbdt_config.validation_set_ratio(), 0.2, epsilon);
   EXPECT_EQ(gbdt_config.early_stopping_num_trees_look_ahead(), 10);
   EXPECT_EQ(gbdt_config.early_stopping(),
             proto::GradientBoostedTreesTrainingConfig::NONE);
+  EXPECT_TRUE(gbdt_config.has_stochastic_gradient_boosting());
+  EXPECT_NEAR(gbdt_config.stochastic_gradient_boosting().ratio(), 1.0, epsilon);
+  EXPECT_FALSE(gbdt_config.has_subsample());
+
+  // Extra test for the sampling.
+
+  // Old / simple way to specify Random sampling.
+  EXPECT_OK(learner.SetHyperParameters(PARSE_TEST_PROTO(R"pb(
+    fields {
+      name: "subsample"
+      value { real: 0.2 }
+    }
+  )pb")));
+  EXPECT_FALSE(gbdt_config.has_subsample());
+  EXPECT_TRUE(gbdt_config.has_stochastic_gradient_boosting());
+  EXPECT_NEAR(gbdt_config.stochastic_gradient_boosting().ratio(), 0.2, epsilon);
+
+  // Goss
+  EXPECT_OK(learner.SetHyperParameters(PARSE_TEST_PROTO(R"pb(
+    fields {
+      name: "sampling_method"
+      value { categorical: "GOSS" }
+    }
+    fields {
+      name: "goss_alpha"
+      value { real: 0.4 }
+    }
+    fields {
+      name: "goss_beta"
+      value { real: 0.5 }
+    }
+  )pb")));
+  EXPECT_TRUE(gbdt_config.has_gradient_one_side_sampling());
+  EXPECT_NEAR(gbdt_config.gradient_one_side_sampling().alpha(), 0.4, epsilon);
+  EXPECT_NEAR(gbdt_config.gradient_one_side_sampling().beta(), 0.5, epsilon);
+
+  // Random sampling
+  EXPECT_OK(learner.SetHyperParameters(PARSE_TEST_PROTO(R"pb(
+    fields {
+      name: "sampling_method"
+      value { categorical: "RANDOM" }
+    }
+    fields {
+      name: "subsample"
+      value { real: 0.3 }
+    }
+  )pb")));
+  EXPECT_TRUE(gbdt_config.has_stochastic_gradient_boosting());
+  EXPECT_NEAR(gbdt_config.stochastic_gradient_boosting().ratio(), 0.3, epsilon);
+
+  // No sampling.
+  EXPECT_OK(learner.SetHyperParameters(PARSE_TEST_PROTO(R"pb(
+    fields {
+      name: "sampling_method"
+      value { categorical: "NONE" }
+    }
+  )pb")));
+  EXPECT_FALSE(gbdt_config.has_stochastic_gradient_boosting());
+
+  // Ransom sampling with compatibility mode
+  EXPECT_OK(learner.SetHyperParameters(PARSE_TEST_PROTO(R"pb(
+    fields {
+      name: "sampling_method"
+      value { categorical: "NONE" }
+    }
+    fields {
+      name: "subsample"
+      value { real: 0.4 }
+    }
+  )pb")));
+  EXPECT_TRUE(gbdt_config.has_stochastic_gradient_boosting());
+  EXPECT_NEAR(gbdt_config.stochastic_gradient_boosting().ratio(), 0.4, epsilon);
 }
 
 TEST(DartPredictionAccumulator, Base) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## HEAD
+
+### Features
+
+-   Setting the generic hyper-parameter "subsample" is enough enable random
+    subsampling (to need to also set "sampling_method=RANDOM").
+
 ## 1.2.0 - 2022-11-18
 
 ### Features
@@ -7,9 +14,10 @@
 -   YDF can load TF-DF models directly (i.e. a TF model with a YDF model in the
     "assets" sub directory).
 -   Expose confusion tables in a GBT model's analysis.
--   Add the "compute_variable_importances" tool to compute variable importances on
-    an already trained model.
--   Add the "experimental_analyze_model_and_dataset" tool to understand/analyze models.
+-   Add the "compute_variable_importances" tool to compute variable importances
+    on an already trained model.
+-   Add the "experimental_analyze_model_and_dataset" tool to understand/analyze
+    models.
 
 ## 1.1.0 - 2022-10-21
 

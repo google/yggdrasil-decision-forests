@@ -311,7 +311,8 @@ absl::Status FinalizeModelWithValidationDataset(
   if (config.gbt_config->compute_permutation_variable_importance()) {
     LOG(INFO) << "Compute permutation variable importances";
     RETURN_IF_ERROR(utils::ComputePermutationFeatureImportance(
-        validation_dataset, mdl,mdl->mutable_precomputed_variable_importances(),
+        validation_dataset, mdl,
+        mdl->mutable_precomputed_variable_importances(),
         utils::ComputeFeatureImportanceOptions{num_threads}));
   }
 
@@ -1735,6 +1736,10 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
       gbt_config->mutable_gradient_one_side_sampling();
     } else if (sampling_method == kSamplingMethodSelGB) {
       gbt_config->mutable_selective_gradient_boosting();
+    } else if (sampling_method == kSamplingMethodNone) {
+      gbt_config->clear_stochastic_gradient_boosting();
+      gbt_config->clear_selective_gradient_boosting();
+      gbt_config->clear_gradient_one_side_sampling();
     }
   } else {
 
@@ -1758,12 +1763,19 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   {
     const auto subsample = generic_hyper_params->Get(kHParamSubsample);
     if (subsample.has_value()) {
-      if (gbt_config->has_stochastic_gradient_boosting()) {
+      if (gbt_config->sampling_methods_case() ==
+              proto::GradientBoostedTreesTrainingConfig::
+                  SAMPLING_METHODS_NOT_SET ||
+          gbt_config->sampling_methods_case() ==
+              proto::GradientBoostedTreesTrainingConfig::
+                  kStochasticGradientBoosting) {
+        // Note: Force stocastic gb if the sampling method is "NONE" and the
+        // "subsampling" parameter is set.
         gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(
             subsample.value().value().real());
       } else {
-        LOG(WARNING) << "Subsample hyperparameter given but sampling method "
-                        "does not match.";
+        LOG(WARNING) << "\"subsample\" hyperparameter set, but "
+                        "\"sampling_method\" is not \"RANDOM\" or \"NONE\".";
       }
     }
   }
@@ -1775,7 +1787,8 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
         gbt_config->mutable_gradient_one_side_sampling()->set_alpha(
             alpha.value().value().real());
       } else {
-        LOG(WARNING) << "GOSS alpha hyperparameter given but GOSS is disabled.";
+        LOG(WARNING) << "\"goss_alpha\" set but \"sampling_method\" not equal "
+                        "to \"GOSS\".";
       }
     }
     const auto beta = generic_hyper_params->Get(kHParamGossBeta);
@@ -1784,7 +1797,9 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
         gbt_config->mutable_gradient_one_side_sampling()->set_beta(
             beta.value().value().real());
       } else {
-        LOG(WARNING) << "GOSS beta hyperparameter given but GOSS is disabled.";
+        LOG(WARNING)
+            << "\"goss_beta\" set but \"sampling_method\" not equal to "
+               "\"GOSS\".";
       }
     }
   }
@@ -1796,8 +1811,9 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
         gbt_config->mutable_selective_gradient_boosting()->set_ratio(
             selgb.value().value().real());
       } else {
-        LOG(WARNING)
-            << "SelGB ratio hyperparameter given but SelGB is disabled.";
+        LOG(WARNING) << "\"selective_gradient_boosting_ratio\" set but "
+                        "\"sampling_method\" not equal to "
+                        "\"SELGB\".";
       }
     }
   }
@@ -2217,7 +2233,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
   {
     auto& param =
         hparam_def.mutable_fields()->operator[](kHParamSamplingMethod);
-    param.mutable_categorical()->set_default_value(kSamplingMethodNone);
+    param.mutable_categorical()->set_default_value(kSamplingMethodRandom);
     param.mutable_categorical()->add_possible_values(kSamplingMethodNone);
     param.mutable_categorical()->add_possible_values(kSamplingMethodRandom);
     param.mutable_categorical()->add_possible_values(kSamplingMethodGOSS);
@@ -2227,10 +2243,10 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
         R"(Control the sampling of the datasets used to train individual trees.
-- NONE: No sampling is applied.
-- RANDOM: Uniform random sampling. Automatically selected if "subsample" is set.
+- NONE: No sampling is applied. This is equivalent to RANDOM sampling with \"subsample=1\".
+- RANDOM (default): Uniform random sampling. Automatically selected if "subsample" is set.
 - GOSS: Gradient-based One-Side Sampling. Automatically selected if "goss_alpha" or "goss_beta" is set.
-- SELGB: Selective Gradient Boosting. Automatically selected if "selective_gradient_boosting_ratio" is set.
+- SELGB: Selective Gradient Boosting. Automatically selected if "selective_gradient_boosting_ratio" is set. Only valid for ranking.
 )");
   }
 
@@ -2241,7 +2257,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_real()->set_default_value(gbt_config.subsample());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Ratio of the dataset (sampling without replacement) used to train individual trees for the random sampling method.)");
+        R"(Ratio of the dataset (sampling without replacement) used to train individual trees for the random sampling method. If \"subsample\" is set and if \"sampling_method\" is NOT set or set to \"NONE\", then \"sampling_method\" is implicitely set to \"RANDOM\". In other words, to enable random subsampling, you only need to set "\"subsample\".)");
   }
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamGossAlpha);

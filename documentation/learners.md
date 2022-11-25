@@ -360,10 +360,10 @@ reasonable time.
 
 #### [sampling_method](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:sampling_method)
 
--   **Type:** Categorical **Default:** NONE **Possible values:** NONE, RANDOM,
+-   **Type:** Categorical **Default:** RANDOM **Possible values:** NONE, RANDOM,
     GOSS
 
--   Control the sampling of the datasets used to train individual trees.<br>- NONE: No sampling is applied.<br>- RANDOM: Uniform random sampling. Automatically selected if "subsample" is set.<br>- GOSS: Gradient-based One-Side Sampling. Automatically selected if "goss_alpha" or "goss_beta" is set.<br>- SELGB: Selective Gradient Boosting. Automatically selected if "selective_gradient_boosting_ratio" is set.<br>
+-   Control the sampling of the datasets used to train individual trees.<br>- NONE: No sampling is applied. This is equivalent to RANDOM sampling with \"subsample=1\".<br>- RANDOM (default): Uniform random sampling. Automatically selected if "subsample" is set.<br>- GOSS: Gradient-based One-Side Sampling. Automatically selected if "goss_alpha" or "goss_beta" is set.<br>- SELGB: Selective Gradient Boosting. Automatically selected if "selective_gradient_boosting_ratio" is set. Only valid for ranking.<br>
 
 #### [selective_gradient_boosting_ratio](../yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto?q=symbol:ratio)
 
@@ -432,7 +432,10 @@ reasonable time.
 -   **Type:** Real **Default:** 1 **Possible values:** min:0 max:1
 
 -   Ratio of the dataset (sampling without replacement) used to train individual
-    trees for the random sampling method.
+    trees for the random sampling method. If \"subsample\" is set and if
+    \"sampling_method\" is NOT set or set to \"NONE\", then \"sampling_method\"
+    is implicitely set to \"RANDOM\". In other words, to enable random
+    subsampling, you only need to set "\"subsample\".
 
 #### [uplift_min_examples_in_treatment](../yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto?q=symbol:uplift_min_examples_in_treatment)
 
