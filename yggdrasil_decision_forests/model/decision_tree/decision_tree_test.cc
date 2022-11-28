@@ -363,9 +363,8 @@ TEST_F(EvalConditions, EvalConditionOblique) {
       }
       )",
       1, false);
-  EXPECT_EQ(
-      description,
-      R"(Condition:: "Num_1"x1+"Num_2"x-0.5>=3.5 score:0.000000 training_examples:0 positive_training_examples:0 missing_value_evaluation:0)");
+  EXPECT_EQ(description,
+            R"("Num_1"x1+"Num_2"x-0.5>=3.5 [s:0 n:0 np:0 miss:0])");
 
   CheckCondition(
       R"(

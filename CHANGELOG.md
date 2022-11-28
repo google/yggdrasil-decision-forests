@@ -6,6 +6,7 @@
 
 -   Setting the generic hyper-parameter "subsample" is enough enable random
     subsampling (to need to also set "sampling_method=RANDOM").
+-   Improve the display of decision tree structures.
 
 ## 1.2.0 - 2022-11-18
 

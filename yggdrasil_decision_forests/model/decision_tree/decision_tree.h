@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -135,7 +136,9 @@ class NodeWithChildren {
 
   // Append a human readable semi-graphical description of the model structure.
   void AppendModelStructure(const dataset::proto::DataSpecification& data_spec,
-                            const int label_col_idx, int depth,
+                            int label_col_idx, int depth,
+                            absl::optional<bool> is_pos,
+                            const std::string& prefix,
                             std::string* description) const;
 
   // Convert a node that was previously "FinalizeAsNonLeaf" into a leaf.
@@ -295,7 +298,13 @@ bool IsMissingValueConditionResultFollowGlobalImputation(
 // Append a human readable semi-graphical description of the model structure.
 void AppendModelStructure(const DecisionForest& trees,
                           const dataset::proto::DataSpecification& data_spec,
-                          const int label_col_idx, std::string* description);
+                          int label_col_idx, std::string* description);
+
+// Append the header of AppendModelStructure.
+void AppendModelStructureHeader(
+    const DecisionForest& trees,
+    const dataset::proto::DataSpecification& data_spec, int label_col_idx,
+    std::string* description);
 
 // Gets the number of time each feature is used as root in a set of trees.
 std::vector<model::proto::VariableImportance> StructureNumberOfTimesAsRoot(

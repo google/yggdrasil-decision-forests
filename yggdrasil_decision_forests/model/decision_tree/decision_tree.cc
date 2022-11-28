@@ -34,6 +34,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -54,6 +55,19 @@ using row_t = dataset::VerticalDataset::row_t;
 
 namespace {
 
+// Prefix added in front of a node when printing it with AppendModelStructure.
+std::string PrettyLocalPrefix(const absl::optional<bool>& is_pos) {
+  if (!is_pos.has_value()) {
+    return "";
+  }
+
+  if (is_pos.value()) {
+    return "    ├─(pos)─ ";
+  } else {
+    return "    └─(neg)─ ";
+  }
+}
+
 // Append "num_tabs x tab_width" spaces to the string.
 void AppendMargin(const int num_tabs, std::string* dst,
                   const int tab_width = 2) {
@@ -64,7 +78,6 @@ void AppendMargin(const int num_tabs, std::string* dst,
 void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
                             const int label_col_idx, const proto::Node& node,
                             std::string* description) {
-  absl::StrAppend(description, "Value:: ");
   switch (node.output_case()) {
     case proto::Node::OUTPUT_NOT_SET:
       LOG(FATAL) << "Not supported";
@@ -77,30 +90,28 @@ void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
       const bool use_quotes = !col_spec.categorical().is_already_integerized();
       const std::string optional_quote = use_quotes ? "\"" : "";
 
-      absl::StrAppend(description, "top:", optional_quote,
+      absl::StrAppend(description, "val:", optional_quote,
                       dataset::CategoricalIdxToRepresentation(
                           col_spec, node.classifier().top_value()),
                       optional_quote);
 
       if (node.classifier().has_distribution()) {
-        absl::StrAppend(description, " proba:[");
+        absl::StrAppend(description, " prob:[");
         const auto& distrib = node.classifier().distribution();
-        for (int count_idx = 0; count_idx < distrib.counts_size();
+        for (int count_idx = 1; count_idx < distrib.counts_size();
              count_idx++) {
-          if (count_idx > 0) {
+          if (count_idx > 1) {
             absl::StrAppend(description, ", ");
           }
           absl::StrAppend(description,
                           distrib.counts(count_idx) / distrib.sum());
         }
         absl::StrAppend(description, "]");
-        absl::StrAppend(description, " sum:", distrib.sum());
       }
     } break;
 
     case proto::Node::OutputCase::kRegressor:
-      absl::StrAppend(description, "mean:", node.regressor().top_value(),
-                      " sum:", node.regressor().sum_weights());
+      absl::StrAppend(description, "pred:", node.regressor().top_value());
       break;
 
     case proto::Node::OutputCase::kUplift: {
@@ -225,8 +236,6 @@ std::vector<int32_t> ExactElementsFromContainsCondition(
 void AppendConditionDescription(
     const dataset::proto::DataSpecification& data_spec,
     const proto::NodeCondition& node, std::string* description) {
-  absl::StrAppend(description, "Condition:: ");
-
   if (node.condition().type_case() !=
       proto::Condition::TypeCase::kObliqueCondition) {
     // Oblique conditions print the attribute name themself.
@@ -294,10 +303,8 @@ void AppendConditionDescription(
       break;
   }
   absl::StrAppendFormat(
-      description,
-      " score:%f training_examples:%i positive_training_examples:%i "
-      "missing_value_evaluation:%i",
-      node.split_score(), node.num_training_examples_without_weight(),
+      description, " [s:%g n:%i np:%i miss:%i]", node.split_score(),
+      node.num_training_examples_without_weight(),
       node.num_pos_training_examples_without_weight(), node.na_value());
 }
 
@@ -1042,34 +1049,46 @@ void DecisionTree::AppendModelStructure(
     absl::StrAppend(description, "*empty tree*");
     return;
   }
-  root_->AppendModelStructure(data_spec, label_col_idx, 0, description);
+  root_->AppendModelStructure(data_spec, label_col_idx, 0, {}, "    ",
+                              description);
 }
 
 void NodeWithChildren::AppendModelStructure(
     const dataset::proto::DataSpecification& data_spec, const int label_col_idx,
-    const int depth, std::string* description) const {
-  // The node value.
-  if (node().output_case() != proto::Node::OUTPUT_NOT_SET) {
-    AppendMargin(depth, description);
-    AppendValueDescription(data_spec, label_col_idx, node(), description);
-    absl::StrAppend(description, "\n");
+    const int depth, const absl::optional<bool> is_pos,
+    const std::string& prefix, std::string* description) const {
+  auto children_prefix = prefix;
+  if (is_pos.has_value()) {
+    if (is_pos.value()) {
+      absl::StrAppend(&children_prefix, "    |    ");
+    } else {
+      absl::StrAppend(&children_prefix, "         ");
+    }
   }
 
-  if (!IsLeaf()) {
-    // The condition.
-    AppendMargin(depth, description);
-    AppendConditionDescription(data_spec, node().condition(), description);
-    absl::StrAppend(description, "\n");
+  absl::StrAppend(description, prefix, PrettyLocalPrefix(is_pos));
 
-    // The children.
-    AppendMargin(depth, description);
-    absl::StrAppend(description, "Positive child\n");
-    pos_child()->AppendModelStructure(data_spec, label_col_idx, depth + 1,
-                                      description);
-    AppendMargin(depth, description);
-    absl::StrAppend(description, "Negative child\n");
+  // The condition.
+  if (!IsLeaf()) {
+    AppendConditionDescription(data_spec, node().condition(), description);
+  }
+
+  // The node value.
+  if (node().output_case() != proto::Node::OUTPUT_NOT_SET) {
+    if (!IsLeaf()) {
+      absl::StrAppend(description, " ; ");
+    }
+    AppendValueDescription(data_spec, label_col_idx, node(), description);
+  }
+
+  absl::StrAppend(description, "\n");
+
+  // The children.
+  if (!IsLeaf()) {
+    pos_child()->AppendModelStructure(data_spec, label_col_idx, depth + 1, true,
+                                      children_prefix, description);
     neg_child()->AppendModelStructure(data_spec, label_col_idx, depth + 1,
-                                      description);
+                                      false, children_prefix, description);
   }
 }
 
@@ -1112,13 +1131,49 @@ void AppendModelStructure(
     const std::vector<std::unique_ptr<DecisionTree>>& trees,
     const dataset::proto::DataSpecification& data_spec, const int label_col_idx,
     std::string* description) {
-  absl::StrAppend(description, "Number of trees:", trees.size(), "\n");
+  AppendModelStructureHeader(trees, data_spec, label_col_idx, description);
+  absl::StrAppend(description, "\n");
   for (int tree_idx = 0; tree_idx < trees.size(); tree_idx++) {
-    absl::StrAppend(description, "Tree #", tree_idx, "\n");
+    absl::StrAppend(description, "Tree #", tree_idx, ":\n");
     trees[tree_idx]->AppendModelStructure(data_spec, label_col_idx,
                                           description);
     absl::StrAppend(description, "\n");
   }
+}
+
+void AppendModelStructureHeader(
+    const DecisionForest& trees,
+    const dataset::proto::DataSpecification& data_spec, const int label_col_idx,
+    std::string* description) {
+  const auto& label_col_spec = data_spec.columns(label_col_idx);
+
+  // Print the label values.
+  if (label_col_spec.type() == dataset::proto::CATEGORICAL &&
+      !label_col_spec.categorical().is_already_integerized()) {
+    absl::StrAppend(description, "Label values:\n");
+    for (int value = 1;
+         value < label_col_spec.categorical().number_of_unique_values();
+         value++) {
+      absl::StrAppend(
+          description, "\t",
+          dataset::CategoricalIdxToRepresentation(label_col_spec, value, true),
+          "\n");
+    }
+  }
+
+  absl::StrAppend(description, "Legend:\n");
+  absl::StrAppend(description, "    s: Split score\n");
+  absl::StrAppend(description, "    n: Number of training examples\n");
+  absl::StrAppend(description,
+                  "    np: Number of positive training examples\n");
+  absl::StrAppend(description, "    miss: Number of missing values\n");
+  absl::StrAppend(description,
+                  "    val: Prediction of the leaf/non-leaf node\n");
+  absl::StrAppend(description,
+                  "    prob: Predicted probability for the label "
+                  "values listed above (only used for classification)\n");
+
+  absl::StrAppend(description, "Number of trees:", trees.size(), "\n");
 }
 
 int DecisionTree::MaximumDepth() const {

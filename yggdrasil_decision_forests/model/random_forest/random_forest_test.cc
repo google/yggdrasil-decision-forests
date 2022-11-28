@@ -296,20 +296,26 @@ TEST(DecisionTree, AppendModelStructure) {
                              &dataset);
   std::string description;
   model.AppendModelStructure(&description);
-  EXPECT_EQ(description, R"(Number of trees:2
-Tree #0
-Condition:: "a">=1 score:0.000000 training_examples:0 positive_training_examples:0 missing_value_evaluation:0
-Positive child
-  Value:: top:0 proba:[inf, inf, inf] sum:0
-Negative child
-  Value:: top:1 proba:[inf, inf, inf] sum:0
 
-Tree #1
-Condition:: "a">=3 score:0.000000 training_examples:0 positive_training_examples:0 missing_value_evaluation:0
-Positive child
-  Value:: top:2 proba:[inf, inf, inf] sum:0
-Negative child
-  Value:: top:1 proba:[inf, inf, inf] sum:0
+  LOG(INFO) << description;
+  EXPECT_EQ(description, R"(Legend:
+    s: Split score
+    n: Number of training examples
+    np: Number of positive training examples
+    miss: Number of missing values
+    val: Prediction of the leaf/non-leaf node
+    prob: Predicted probability for the label values listed above (only used for classification)
+Number of trees:2
+
+Tree #0:
+    "a">=1 [s:0 n:0 np:0 miss:0]
+        ├─(pos)─ val:0 prob:[inf, inf]
+        └─(neg)─ val:1 prob:[inf, inf]
+
+Tree #1:
+    "a">=3 [s:0 n:0 np:0 miss:0]
+        ├─(pos)─ val:2 prob:[inf, inf]
+        └─(neg)─ val:1 prob:[inf, inf]
 
 )");
 }
