@@ -39,6 +39,13 @@ using ConditionType = model::decision_tree::proto::Condition::TypeCase;
 
 namespace {
 
+// Tests if a model is compatible with binary classification engines.
+bool IsBinaryClassification(const GradientBoostedTreesModel& model) {
+  return (model.loss() == Loss::BINOMIAL_LOG_LIKELIHOOD ||
+          model.loss() == Loss::BINARY_FOCAL_LOSS) &&
+         model.initial_predictions().size() == 1;
+}
+
 // Set the value of a non-leaf node only supporting numerical conditions.
 template <typename GenericModel, typename SpecializedModel>
 absl::Status SetNonLeafNode(const GenericModel& src_model,
@@ -770,8 +777,7 @@ absl::Status GenericToSpecializedModel(
 absl::Status GenericToSpecializedModel(
     const GradientBoostedTreesModel& src,
     GradientBoostedTreesBinaryClassificationNumericalOnly* dst) {
-  if (src.loss() != Loss::BINOMIAL_LOG_LIKELIHOOD ||
-      src.initial_predictions().size() != 1) {
+  if (!IsBinaryClassification(src)) {
     return absl::InvalidArgumentError(
         "The GBT is not trained for binary classification.");
   }
@@ -791,8 +797,7 @@ absl::Status GenericToSpecializedModel(
 absl::Status GenericToSpecializedModel(
     const GradientBoostedTreesModel& src,
     GradientBoostedTreesBinaryClassificationNumericalAndCategorical* dst) {
-  if (src.loss() != Loss::BINOMIAL_LOG_LIKELIHOOD ||
-      src.initial_predictions().size() != 1) {
+  if (!IsBinaryClassification(src)) {
     return absl::InvalidArgumentError(
         "The GBT is not trained for binary classification.");
   }
@@ -992,8 +997,7 @@ template <>
 absl::Status GenericToSpecializedModel(
     const GradientBoostedTreesModel& src,
     GradientBoostedTreesBinaryClassification* dst) {
-  if (src.loss() != Loss::BINOMIAL_LOG_LIKELIHOOD ||
-      src.initial_predictions().size() != 1) {
+  if (!IsBinaryClassification(src)) {
     return absl::InvalidArgumentError(
         "The Gradient Boosted Tree is not trained for binary classification.");
   }
@@ -1008,8 +1012,7 @@ template <>
 absl::Status GenericToSpecializedModel(
     const GradientBoostedTreesModel& src,
     GenericGradientBoostedTreesBinaryClassification<uint32_t>* dst) {
-  if (src.loss() != Loss::BINOMIAL_LOG_LIKELIHOOD ||
-      src.initial_predictions().size() != 1) {
+  if (!IsBinaryClassification(src)) {
     return absl::InvalidArgumentError(
         "The Gradient Boosted Tree is not trained for binary classification.");
   }
