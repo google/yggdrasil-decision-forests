@@ -378,7 +378,7 @@ absl::Status AppendTextReportWithStatus(const proto::EvaluationResults& eval,
       RETURN_IF_ERROR(AppendTextReportUplift(eval, report));
       break;
     default:
-      STATUS_FATAL("Not implemented");
+      STATUS_FATAL("This model does not support evaluation reports.");
   }
   return absl::OkStatus();
 }
