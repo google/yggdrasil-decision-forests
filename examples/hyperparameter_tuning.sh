@@ -117,61 +117,73 @@ label: "income"
   }
 
   # Hyper-parameter space to optimize.
-  # Check the following links for details:
+  #
+  # The space of hyper-paramter to optimize can be defined automatically or
+  # manually.
+
+  # Automatically set the hyper-parameters to optimize.
+  predefined_search_space {}
+
+  # Alternatively, manually set the hyper-parameters to optimize.
+  #
+  # Check the following links for explanations and advices on how to configure
+  # hyper-parameters for automated tuning:
   # https://ydf.readthedocs.io/en/latest/hyper_parameters.html
   # https://ydf.readthedocs.io/en/latest/improve_model.html
-  search_space {
-    fields {
-      name: "num_candidate_attributes_ratio"
-      discrete_candidates {
-        possible_values { real: 1.0 }
-        possible_values { real: 0.8 }
-        possible_values { real: 0.6 }
-      }
-    }
-
-    fields {
-      name: "use_hessian_gain"
-      discrete_candidates {
-        possible_values { categorical: "true" }
-        possible_values { categorical: "false" }
-      }
-    }
-
-    fields {
-      name: "growing_strategy"
-      discrete_candidates {
-        possible_values { categorical: "LOCAL" }
-        possible_values { categorical: "BEST_FIRST_GLOBAL" }
-      }
-
-      children {
-        parent_discrete_values {
-          possible_values { categorical: "LOCAL" }
-        }
-        name: "max_depth"
-        discrete_candidates {
-          possible_values { integer: 4 }
-          possible_values { integer: 5 }
-          possible_values { integer: 6 }
-          possible_values { integer: 7 }
-        }
-      }
-
-      children {
-        parent_discrete_values {
-          possible_values { categorical: "BEST_FIRST_GLOBAL" }
-        }
-        name: "max_num_nodes"
-        discrete_candidates {
-          possible_values { integer: 16 }
-          possible_values { integer: 32 }
-          possible_values { integer: 64 }
-          possible_values { integer: 128 }
-        }
-      }
-    }
-  }
+  #
+  # search_space {
+  #   fields {
+  #     name: "num_candidate_attributes_ratio"
+  #     discrete_candidates {
+  #       possible_values { real: 1.0 }
+  #       possible_values { real: 0.8 }
+  #       possible_values { real: 0.6 }
+  #     }
+  #   }
+  #
+  #   fields {
+  #     name: "use_hessian_gain"
+  #     discrete_candidates {
+  #       possible_values { categorical: "true" }
+  #       possible_values { categorical: "false" }
+  #     }
+  #   }
+  #
+  #   fields {
+  #     name: "growing_strategy"
+  #     discrete_candidates {
+  #       possible_values { categorical: "LOCAL" }
+  #       possible_values { categorical: "BEST_FIRST_GLOBAL" }
+  #     }
+  #
+  #     children {
+  #       parent_discrete_values {
+  #         possible_values { categorical: "LOCAL" }
+  #       }
+  #       name: "max_depth"
+  #       discrete_candidates {
+  #         possible_values { integer: 4 }
+  #         possible_values { integer: 5 }
+  #         possible_values { integer: 6 }
+  #         possible_values { integer: 7 }
+  #       }
+  #     }
+  #
+  #     children {
+  #       parent_discrete_values {
+  #         possible_values { categorical: "BEST_FIRST_GLOBAL" }
+  #       }
+  #       name: "max_num_nodes"
+  #       discrete_candidates {
+  #         possible_values { integer: 16 }
+  #         possible_values { integer: 32 }
+  #         possible_values { integer: 64 }
+  #         possible_values { integer: 128 }
+  #       }
+  #     }
+  #   }
+  # }
+  
 }
 EOF
 

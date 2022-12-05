@@ -237,10 +237,11 @@ void TrainAndTestTester::TrainAndEvaluateModel(
           case model::proto::Task::CLASSIFICATION:
             // Note: On small dataset, the accuracy can change if the prediction
             // value for one example is near the decision boundary.
-            // The prediction values as tested in "TestGenericEngine" with a
-            // margin of 0.0002.
+            //
+            // Note: In the next test (see "TestGenericEngine"), we ensure that
+            // predictions are equal with a margin of 0.0002.
             EXPECT_NEAR(metric::Accuracy(e1), metric::Accuracy(e2), 0.002);
-            EXPECT_NEAR(metric::LogLoss(e1), metric::LogLoss(e2), 0.007);
+            EXPECT_NEAR(metric::LogLoss(e1), metric::LogLoss(e2), 0.05);
             break;
           case model::proto::Task::REGRESSION:
             EXPECT_NEAR(metric::RMSE(e1), metric::RMSE(e2), 0.001);

@@ -125,6 +125,10 @@ absl::Status SetHyperParameters(
 void PredefinedHyperParameterAxisSplitSpace(
     model::proto::HyperParameterSpace* space);
 
+// Default predefined hyper-parameter space for categorical splits.
+void PredefinedHyperParameterCategoricalSpace(
+    model::proto::HyperParameterSpace* space);
+
 }  // namespace decision_tree
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

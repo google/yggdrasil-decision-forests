@@ -44,6 +44,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -1168,6 +1169,56 @@ TEST_F(RandomForestOnRegressiveSimPTE, Base) {
   // labels of this dataset were to be replaced with {0,1}, the scores would be
   // equal (tested).
   EXPECT_NEAR(metric::Qini(evaluation_), 0.095192, 0.008);
+}
+
+class AutotunedRandomForestOnAdult : public utils::TrainAndTestTester {
+  void SetUp() override {
+    train_config_ = PARSE_TEST_PROTO(R"pb(
+      task: CLASSIFICATION
+      learner: "HYPERPARAMETER_OPTIMIZER"
+      label: "income"
+
+      [yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto
+           .hyperparameters_optimizer_config] {
+
+        optimizer {
+          optimizer_key: "RANDOM"
+          [yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto
+               .random] { num_trials: 10 }
+        }
+
+        base_learner {
+          learner: "RANDOM_FOREST"
+          [yggdrasil_decision_forests.model.random_forest.proto
+               .random_forest_config] { num_trees: 50 }
+        }
+
+        base_learner_deployment {
+          # The multi-threading is done at the optimizer level.
+          num_threads: 1
+        }
+
+        predefined_search_space {}
+      }
+    )pb");
+
+    train_config_.set_learner(
+        hyperparameters_optimizer_v2::HyperParameterOptimizerLearner::
+            kRegisteredName);
+    train_config_.set_task(model::proto::Task::CLASSIFICATION);
+    train_config_.set_label("income");
+    train_config_.add_features(".*");
+    dataset_filename_ = "adult.csv";
+
+    deployment_config_.set_cache_path(
+        file::JoinPath(test::TmpDirectory(), "working_directory"));
+  }
+};
+
+TEST_F(AutotunedRandomForestOnAdult, RandomTuner_MemoryDataset_LocalTraining) {
+  TrainAndEvaluateModel();
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.86);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 10);
 }
 
 }  // namespace

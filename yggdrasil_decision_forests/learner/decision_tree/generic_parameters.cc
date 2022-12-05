@@ -745,18 +745,59 @@ void PredefinedHyperParameterAxisSplitSpace(
   cands->add_possible_values()->set_categorical(
       decision_tree::kHParamSplitAxisSparseOblique);
 
-  auto* child = field->add_children();
-  child->set_name(
-      decision_tree::kHParamSplitAxisSparseObliqueProjectionDensityFactor);
-  auto* parent_values = child->mutable_parent_discrete_values();
-  parent_values->add_possible_values()->set_categorical(
-      decision_tree::kHParamSplitAxisSparseOblique);
-  auto* child_cands = child->mutable_discrete_candidates();
-  child_cands->add_possible_values()->set_real(1);
-  child_cands->add_possible_values()->set_real(2);
-  child_cands->add_possible_values()->set_real(3);
-  child_cands->add_possible_values()->set_real(4);
-  child_cands->add_possible_values()->set_real(5);
+  {
+    auto* child = field->add_children();
+    child->set_name(
+        decision_tree::kHParamSplitAxisSparseObliqueProjectionDensityFactor);
+    auto* parent_values = child->mutable_parent_discrete_values();
+    parent_values->add_possible_values()->set_categorical(
+        decision_tree::kHParamSplitAxisSparseOblique);
+    auto* child_cands = child->mutable_discrete_candidates();
+    child_cands->add_possible_values()->set_real(1);
+    child_cands->add_possible_values()->set_real(2);
+    child_cands->add_possible_values()->set_real(3);
+    child_cands->add_possible_values()->set_real(4);
+    child_cands->add_possible_values()->set_real(5);
+  }
+
+  {
+    auto* child = field->add_children();
+    child->set_name(decision_tree::kHParamSplitAxisSparseObliqueNormalization);
+    auto* parent_values = child->mutable_parent_discrete_values();
+    parent_values->add_possible_values()->set_categorical(
+        decision_tree::kHParamSplitAxisSparseOblique);
+    auto* child_cands = child->mutable_discrete_candidates();
+    child_cands->add_possible_values()->set_categorical(
+        kHParamSplitAxisSparseObliqueNormalizationNone);
+    child_cands->add_possible_values()->set_categorical(
+        kHParamSplitAxisSparseObliqueNormalizationStandardDeviation);
+    child_cands->add_possible_values()->set_categorical(
+        kHParamSplitAxisSparseObliqueNormalizationMinMax);
+  }
+
+  {
+    auto* child = field->add_children();
+    child->set_name(decision_tree::kHParamSplitAxisSparseObliqueWeights);
+    auto* parent_values = child->mutable_parent_discrete_values();
+    parent_values->add_possible_values()->set_categorical(
+        decision_tree::kHParamSplitAxisSparseOblique);
+    auto* child_cands = child->mutable_discrete_candidates();
+    child_cands->add_possible_values()->set_categorical(
+        kHParamSplitAxisSparseObliqueWeightsBinary);
+    child_cands->add_possible_values()->set_categorical(
+        kHParamSplitAxisSparseObliqueWeightsContinuous);
+  }
+}
+
+void PredefinedHyperParameterCategoricalSpace(
+    model::proto::HyperParameterSpace* space) {
+  auto* field = space->add_fields();
+  field->set_name(decision_tree::kHParamCategoricalAlgorithm);
+  auto* cands = field->mutable_discrete_candidates();
+  cands->add_possible_values()->set_categorical(
+      decision_tree::kCategoricalAlgorithmCART);
+  cands->add_possible_values()->set_categorical(
+      decision_tree::kCategoricalAlgorithmRandom);
 }
 
 }  // namespace decision_tree

@@ -7,6 +7,9 @@
 -   Setting the generic hyper-parameter "subsample" is enough enable random
     subsampling (to need to also set "sampling_method=RANDOM").
 -   Improve the display of decision tree structures.
+-   The Hyper-parameter optimizer field "predefined_search_space" automatically
+    configures the set of hyper-parameters to explore during automatic
+    hyper-parameter tuning.
 
 ## 1.2.0 - 2022-11-18
 

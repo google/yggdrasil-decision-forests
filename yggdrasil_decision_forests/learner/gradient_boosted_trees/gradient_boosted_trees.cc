@@ -1912,20 +1912,10 @@ GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
   model::proto::HyperParameterSpace space;
 
   decision_tree::PredefinedHyperParameterAxisSplitSpace(&space);
+  decision_tree::PredefinedHyperParameterCategoricalSpace(&space);
 
   // Note: We don't optimize the number of tree as it is always beneficial
   // metric wise, and we don't optimize the inference time or model size (yet).
-
-  {
-    auto* field = space.add_fields();
-    field->set_name(decision_tree::kHParamMaxDepth);
-    auto* cands = field->mutable_discrete_candidates();
-    cands->add_possible_values()->set_integer(-1);
-    cands->add_possible_values()->set_integer(3);
-    cands->add_possible_values()->set_integer(4);
-    cands->add_possible_values()->set_integer(6);
-    cands->add_possible_values()->set_integer(8);
-  }
 
   {
     auto* field = space.add_fields();
@@ -1936,28 +1926,40 @@ GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
     cands->add_possible_values()->set_categorical(
         decision_tree::kGrowingStrategyBestFirstGlobal);
 
-    auto* child = field->add_children();
-    child->set_name(decision_tree::kHParamMaxNumNodes);
-    auto* parent_values = child->mutable_parent_discrete_values();
-    parent_values->add_possible_values()->set_categorical(
-        decision_tree::kGrowingStrategyBestFirstGlobal);
-    auto* child_cands = child->mutable_discrete_candidates();
-    child_cands->add_possible_values()->set_integer(8);
-    child_cands->add_possible_values()->set_integer(16);
-    child_cands->add_possible_values()->set_integer(31);
-    child_cands->add_possible_values()->set_integer(63);
-    child_cands->add_possible_values()->set_integer(127);
-    child_cands->add_possible_values()->set_integer(255);
-    child_cands->add_possible_values()->set_integer(512);
+    {
+      auto* child = field->add_children();
+      child->set_name(decision_tree::kHParamMaxNumNodes);
+      auto* parent_values = child->mutable_parent_discrete_values();
+      parent_values->add_possible_values()->set_categorical(
+          decision_tree::kGrowingStrategyBestFirstGlobal);
+      auto* child_cands = child->mutable_discrete_candidates();
+      child_cands->add_possible_values()->set_integer(16);
+      child_cands->add_possible_values()->set_integer(32);
+      child_cands->add_possible_values()->set_integer(64);
+      child_cands->add_possible_values()->set_integer(128);
+      child_cands->add_possible_values()->set_integer(256);
+      child_cands->add_possible_values()->set_integer(512);
+    }
+
+    {
+      auto* child = field->add_children();
+      child->set_name(decision_tree::kHParamMaxDepth);
+      auto* parent_values = child->mutable_parent_discrete_values();
+      parent_values->add_possible_values()->set_categorical(
+          decision_tree::kGrowingStrategyLocal);
+      auto* child_cands = child->mutable_discrete_candidates();
+      child_cands->add_possible_values()->set_integer(3);
+      child_cands->add_possible_values()->set_integer(4);
+      child_cands->add_possible_values()->set_integer(6);
+      child_cands->add_possible_values()->set_integer(8);
+    }
   }
 
   {
     auto* field = space.add_fields();
     field->set_name(kHParamSamplingMethod);
     auto* cands = field->mutable_discrete_candidates();
-    cands->add_possible_values()->set_categorical(kSamplingMethodNone);
     cands->add_possible_values()->set_categorical(kSamplingMethodRandom);
-    cands->add_possible_values()->set_categorical(kSamplingMethodGOSS);
 
     // Random sampling method (aka, subsample).
     auto* random = field->add_children();
@@ -1971,29 +1973,8 @@ GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
     random_cands->add_possible_values()->set_real(0.9);
     random_cands->add_possible_values()->set_real(1.0);
 
-    // GOSS sampling method.
-    auto* goss_alpha = field->add_children();
-    goss_alpha->set_name(kHParamGossAlpha);
-    auto* goss_alpha_parent_values =
-        goss_alpha->mutable_parent_discrete_values();
-    goss_alpha_parent_values->add_possible_values()->set_categorical(
-        kSamplingMethodGOSS);
-    auto* goss_alpha_cands = goss_alpha->mutable_discrete_candidates();
-    goss_alpha_cands->add_possible_values()->set_real(0.05);
-    goss_alpha_cands->add_possible_values()->set_real(0.1);
-    goss_alpha_cands->add_possible_values()->set_real(0.15);
-    goss_alpha_cands->add_possible_values()->set_real(0.2);
-
-    auto* goss_beta = field->add_children();
-    goss_beta->set_name(kHParamGossBeta);
-    auto* goss_beta_parent_values = goss_beta->mutable_parent_discrete_values();
-    goss_beta_parent_values->add_possible_values()->set_categorical(
-        kSamplingMethodGOSS);
-    auto* goss_beta_cands = goss_beta->mutable_discrete_candidates();
-    goss_beta_cands->add_possible_values()->set_real(0.05);
-    goss_beta_cands->add_possible_values()->set_real(0.1);
-    goss_beta_cands->add_possible_values()->set_real(0.15);
-    goss_beta_cands->add_possible_values()->set_real(0.2);
+    // Note: GOSS is not part the HP sampling domain as this paramter is only
+    // expected to speed-up training (and not impact the model in a good way).
 
     // Selective Gradient Boosting sampling method.
     if (training_config_.task() == model::proto::Task::RANKING) {
@@ -2020,7 +2001,6 @@ GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
     cands->add_possible_values()->set_real(0.02);
     cands->add_possible_values()->set_real(0.05);
     cands->add_possible_values()->set_real(0.10);
-    cands->add_possible_values()->set_real(0.15);
   }
 
   {
@@ -2028,8 +2008,9 @@ GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
     field->set_name(decision_tree::kHParamMinExamples);
     auto* cands = field->mutable_discrete_candidates();
     cands->add_possible_values()->set_integer(5);
+    cands->add_possible_values()->set_integer(7);
     cands->add_possible_values()->set_integer(10);
-    cands->add_possible_values()->set_integer(50);
+    cands->add_possible_values()->set_integer(20);
   }
 
   if (training_config_.task() != model::proto::Task::REGRESSION) {
@@ -2040,34 +2021,14 @@ GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
     cands->add_possible_values()->set_categorical("false");
   }
 
-  const std::vector<float> l2_loss_regularization = {0.f, 0.1f, 1.0f, 10.f,
-                                                     100.f};
-  const std::vector<float> l1_loss_regularization = {0.f, 0.1f, 1.0f, 10.f};
   {
     auto* field = space.add_fields();
-    field->set_name(kHParamL2Regularization);
-    auto* candidates = field->mutable_discrete_candidates();
-    for (const auto& value : l2_loss_regularization) {
-      candidates->add_possible_values()->set_real(value);
-    }
-  }
-
-  {
-    auto* field = space.add_fields();
-    field->set_name(kHParamL2CategoricalRegularization);
-    auto* candidates = field->mutable_discrete_candidates();
-    for (const auto& value : l2_loss_regularization) {
-      candidates->add_possible_values()->set_real(value);
-    }
-  }
-
-  {
-    auto* field = space.add_fields();
-    field->set_name(kHParamL1Regularization);
-    auto* candidates = field->mutable_discrete_candidates();
-    for (const auto& value : l1_loss_regularization) {
-      candidates->add_possible_values()->set_real(value);
-    }
+    field->set_name(decision_tree::kHParamNumCandidateAttributesRatio);
+    auto* cands = field->mutable_discrete_candidates();
+    cands->add_possible_values()->set_real(0.2);
+    cands->add_possible_values()->set_real(0.5);
+    cands->add_possible_values()->set_real(0.9);
+    cands->add_possible_values()->set_real(1.0);
   }
 
   return space;

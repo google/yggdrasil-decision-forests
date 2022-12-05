@@ -184,6 +184,14 @@ RandomForestLearner::PredefinedHyperParameterSpace() const {
   model::proto::HyperParameterSpace space;
 
   decision_tree::PredefinedHyperParameterAxisSplitSpace(&space);
+  decision_tree::PredefinedHyperParameterCategoricalSpace(&space);
+
+  {
+    auto* field = space.add_fields();
+    field->set_name(kHParamWinnerTakeAll);
+    auto* cands = field->mutable_discrete_candidates();
+    cands->add_possible_values()->set_categorical("true");
+  }
 
   {
     auto* field = space.add_fields();

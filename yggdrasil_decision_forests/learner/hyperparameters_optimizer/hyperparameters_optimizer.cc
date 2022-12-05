@@ -420,7 +420,11 @@ absl::StatusOr<model::proto::HyperParameterSpace>
 HyperParameterOptimizerLearner::BuildSearchSpace(
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
     const AbstractLearner& base_learner) const {
-  model::proto::HyperParameterSpace space = spe_config.search_space();
+  model::proto::HyperParameterSpace space;
+  if (spe_config.has_predefined_search_space()) {
+    ASSIGN_OR_RETURN(space, base_learner.PredefinedHyperParameterSpace());
+  }
+  space.MergeFrom(spe_config.search_space());
   return space;
 }
 

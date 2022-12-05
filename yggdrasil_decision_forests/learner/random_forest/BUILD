@@ -110,6 +110,7 @@ cc_test(
         "//yggdrasil_decision_forests/learner:learner_library",
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
+        "//yggdrasil_decision_forests/learner/hyperparameters_optimizer",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",

@@ -34,9 +34,13 @@ message HyperParametersOptimizerLearnerTrainingConfig {
 
   // Manually define the space of hyper-parameters. Fields defined in
   // "hyper_parameter_space" override the pre-defined space specified in
-  // "predefined_hyper_parameter_space" (if "predefined_hyper_parameter_space"
+  // "predefined_search_space" (if "predefined_hyper_parameter_space"
   // is set).
   optional model.proto.HyperParameterSpace search_space = 4;
+
+  // If set, configure automatically "search_space" with the pre-defined
+  // hyper-parameters of the learner (in "PredefinedHyperParameterSpace").
+  optional PredefinedHyperParameterSpace predefined_search_space = 8;
 
   // Deployment configuration (i.e. computing resources) for the base learner.
   optional model.proto.DeploymentConfig base_learner_deployment = 5;
@@ -56,6 +60,11 @@ message HyperParametersOptimizerLearnerTrainingConfig {
   //
   // This option has not impact if the training is deterministic.
   optional bool retrain_final_model = 7 [default = false];
+}
+
+// Empty message
+message PredefinedHyperParameterSpace {
+  // TODO: Make it possible to tune only a subset of paramters.
 }
 
 message Evaluation {

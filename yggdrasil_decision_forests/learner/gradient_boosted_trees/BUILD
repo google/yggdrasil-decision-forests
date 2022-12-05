@@ -121,6 +121,7 @@ cc_test(
         "//yggdrasil_decision_forests/learner/decision_tree:training",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
+        "//yggdrasil_decision_forests/learner/hyperparameters_optimizer",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:report",
         "//yggdrasil_decision_forests/model:abstract_model",
