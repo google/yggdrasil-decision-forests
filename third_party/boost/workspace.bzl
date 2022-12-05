@@ -43,7 +43,7 @@ cc_library(
     #    "new_local_repository" rule below.
 
     # native.new_local_repository(
-    #   name = "org_boost",
-    #   path = "../boost",
-    #   build_file_content = build_file_content,
-    #  )
+    #     name = "org_boost",
+    #     path = "../boost",
+    #     build_file_content = build_file_content,
+    # )
