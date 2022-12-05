@@ -427,6 +427,19 @@ TEST(Evaluate, FromDisk) {
   EXPECT_NEAR(metric::Accuracy(evaluation), 0.8723513, 0.000001);
 }
 
+TEST(Evaluate, FailsWithNoRowsFails) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &model));
+
+  dataset::VerticalDataset dataset;
+
+  utils::RandomEngine rnd;
+  const auto evaluation = model->EvaluateWithStatus(dataset, {}, &rnd);
+  EXPECT_FALSE(evaluation.ok());
+}
+
 TEST(Model, AbstractAttributesSizeInBytes) {
   FakeModelWithEngine model;
   // The model size is compiler+arch dependent.

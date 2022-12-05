@@ -325,6 +325,7 @@ absl::Status AbstractModel::AppendEvaluationWithEngine(
   const int64_t batch_size =
       std::min(static_cast<int64_t>(100), total_num_examples);
 
+  DCHECK_GT(total_num_examples, 0);
   auto batch_of_examples = engine.AllocateExamples(batch_size);
   const int64_t num_batches =
       (total_num_examples + batch_size - 1) / batch_size;
@@ -372,6 +373,10 @@ absl::Status AbstractModel::AppendEvaluation(
   if (option.has_weights()) {
     RETURN_IF_ERROR(dataset::GetLinkedWeightDefinition(
         option.weights(), data_spec_, &weight_links));
+  }
+  if (dataset.nrow() == 0) {
+    return absl::InvalidArgumentError(
+        "The dataset is empty. Cannot evaluate model.");
   }
 
   auto engine_or_status = BuildFastEngine();

@@ -41,7 +41,7 @@ std::string ModelDir() {
       "yggdrasil_decision_forests/test_data/model");
 }
 
-TEST(ModelAnalaysis, Basic) {
+TEST(ModelAnalysis, Basic) {
   const std::string dataset_path =
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult_test.csv"));
   const std::string model_path =
@@ -63,7 +63,23 @@ TEST(ModelAnalaysis, Basic) {
                                       dataset_path, report_path, options));
 }
 
-TEST(ModelAnalaysis, PDPPlot) {
+TEST(ModelAnalysis, FailsWithEmptyDataset) {
+  const std::string dataset_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult_test.csv"));
+  const std::string model_path =
+      file::JoinPath(ModelDir(), "adult_binary_class_gbdt");
+  std::unique_ptr<model::AbstractModel> model;
+  CHECK_OK(model::LoadModel(model_path, &model));
+  dataset::VerticalDataset dataset;
+
+  proto::Options options;
+  const auto report_path = file::JoinPath(test::TmpDirectory(), "analysis");
+  EXPECT_FALSE(AnalyseAndCreateHtmlReport(*model.get(), dataset, model_path,
+                                          dataset_path, report_path, options)
+                   .ok());
+}
+
+TEST(ModelAnalysis, PDPPlot) {
   dataset::proto::DataSpecification data_spec = PARSE_TEST_PROTO(
       R"pb(
         columns {

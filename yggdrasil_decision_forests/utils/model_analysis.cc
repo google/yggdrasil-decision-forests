@@ -651,6 +651,10 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
     const proto::Options& options) {
   proto::AnalysisResult analysis;
 
+  if (dataset.nrow() == 0) {
+    return absl::InvalidArgumentError("The dataset is empty.");
+  }
+
   // Try to create a fast engine.
   const model::AbstractModel* effective_model = &model;
   auto engine_or = model.BuildFastEngine();
