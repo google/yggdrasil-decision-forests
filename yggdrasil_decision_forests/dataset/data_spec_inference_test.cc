@@ -784,6 +784,57 @@ TEST(Dataset, UnknownType) {
   EXPECT_THAT(data_spec, EqualsProto(target));
 }
 
+TEST(Dataset, OverrideMostFrequentItem) {
+  proto::DataSpecificationGuide guide;
+  auto* col_guide = guide.add_column_guides();
+  col_guide->set_column_name_pattern("^Cat_1$");
+  col_guide->set_type(proto::CATEGORICAL);
+  col_guide->mutable_categorial()
+      ->mutable_override_most_frequent_item()
+      ->set_str_value("B");
+  col_guide->mutable_categorial()->set_min_vocab_frequency(1);
+
+  proto::DataSpecification data_spec;
+  CHECK_OK(CreateDataSpecWithStatus(ToyDatasetTypedPathCsv(), false, guide,
+                                    &data_spec));
+  LOG(INFO) << PrintHumanReadable(data_spec, false);
+  auto& col = data_spec.columns(GetColumnIdxFromName("Cat_1", data_spec));
+  EXPECT_EQ(col.categorical().most_frequent_value(),
+            CategoricalStringToValue("B", col));
+}
+
+TEST(Dataset, OverrideMostFrequentItemFail1) {
+  proto::DataSpecificationGuide guide;
+  auto* col_guide = guide.add_column_guides();
+  col_guide->set_column_name_pattern("^Cat_2$");
+  col_guide->set_type(proto::CATEGORICAL);
+  col_guide->mutable_categorial()
+      ->mutable_override_most_frequent_item()
+      ->set_str_value("B");
+  col_guide->mutable_categorial()->set_min_vocab_frequency(1);
+
+  proto::DataSpecification data_spec;
+  EXPECT_FALSE(CreateDataSpecWithStatus(ToyDatasetTypedPathCsv(), false, guide,
+                                        &data_spec)
+                   .ok());
+}
+
+TEST(Dataset, OverrideMostFrequentItemFail2) {
+  proto::DataSpecificationGuide guide;
+  auto* col_guide = guide.add_column_guides();
+  col_guide->set_column_name_pattern("^Cat_1$");
+  col_guide->set_type(proto::CATEGORICAL);
+  col_guide->mutable_categorial()
+      ->mutable_override_most_frequent_item()
+      ->set_str_value("non-existing-item");
+  col_guide->mutable_categorial()->set_min_vocab_frequency(1);
+
+  proto::DataSpecification data_spec;
+  EXPECT_FALSE(CreateDataSpecWithStatus(ToyDatasetTypedPathCsv(), false, guide,
+                                        &data_spec)
+                   .ok());
+}
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

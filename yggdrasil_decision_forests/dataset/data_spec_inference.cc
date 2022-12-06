@@ -259,13 +259,13 @@ void SortedDictionaryVectorToDictionaryMap(
 
 // Finalize the information about a categorical column i.e. finalize the
 // token dictionary.
-void FinalizeComputeSpecColumnCategorical(
+absl::Status FinalizeComputeSpecColumnCategorical(
     const uint64_t count_valid_records,
     const proto::DataSpecificationAccumulator::Column& col_acc,
-    proto::Column* col) {
+    const proto::DataSpecificationGuide& guide, proto::Column* col) {
   if (col->categorical().is_already_integerized()) {
     // Nothing to finalize for already integerized categorical columns.
-    return;
+    return absl::OkStatus();
   }
   // Compute the dictionary item indices so the item frequency decrease with
   // the index value.
@@ -330,8 +330,38 @@ void FinalizeComputeSpecColumnCategorical(
     col->mutable_categorical()->set_most_frequent_value(1);
   }
 
+  // Override most frequent item.
+  proto::ColumnGuide col_guide;
+  if (BuildColumnGuide(col->name(), guide, &col_guide) &&
+      col_guide.categorial().has_override_most_frequent_item()) {
+    // Check the column does not have missing values.
+    if (col->count_nas() > 0) {
+      return absl::InvalidArgumentError(
+          "The most frequent item / global imputation item cannot be overriden "
+          "if the column contains missing values.");
+    }
+
+    // Get the index of the overriden item.
+    const auto& item = col_guide.categorial().override_most_frequent_item();
+    if (item.has_str_value()) {
+      auto item_it = col->categorical().items().find(item.str_value());
+      if (item_it == col->categorical().items().end()) {
+        return absl::InvalidArgumentError(
+            "The overrident frequent item / global imputation item does not "
+            "exist in the dataset");
+      } else {
+        col->mutable_categorical()->set_most_frequent_value(
+            item_it->second.index());
+      }
+    } else {
+      return absl::InvalidArgumentError(
+          "override_most_frequent_item's value not set");
+    }
+  }
+
   // Number of unique item.
   col->mutable_categorical()->set_number_of_unique_values(items->size());
+  return absl::OkStatus();
 }
 
 void InitializeDataspecAccumulator(
@@ -501,7 +531,8 @@ absl::Status FinalizeComputeSpec(
     }
     // Categorical type.
     if (IsCategorical(col->type())) {
-      FinalizeComputeSpecColumnCategorical(count_valid_records, col_acc, col);
+      RETURN_IF_ERROR(FinalizeComputeSpecColumnCategorical(
+          count_valid_records, col_acc, guide, col));
     }
     if (col->type() == ColumnType::DISCRETIZED_NUMERICAL) {
       RETURN_IF_ERROR(FinalizeComputeSpecDiscretizedNumerical(col_acc, col));

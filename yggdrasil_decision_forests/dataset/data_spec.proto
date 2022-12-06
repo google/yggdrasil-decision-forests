@@ -372,6 +372,18 @@ message CategoricalGuide {
   // with a value > number_of_already_integerized_values, the example value will
   // be used instead of "number_of_already_integerized_values".
   optional int64 number_of_already_integerized_values = 4;
+
+  // If set, replaces the most_frequent_item item. The most frequent item is
+  // used by the global imputation algorithm to handle missing values. That is,
+  // missing values will be treated as the most frequent item. Overriding the
+  // most frequent item is only allowed on columns not containing any missing
+  // values.
+  optional OverrideMostFrequentItem override_most_frequent_item = 5;
+
+  message OverrideMostFrequentItem {
+    // Overriding is only possible for non-integerized columns.
+    optional string str_value = 5;
+  }
 }
 
 message NumericalGuide {}
