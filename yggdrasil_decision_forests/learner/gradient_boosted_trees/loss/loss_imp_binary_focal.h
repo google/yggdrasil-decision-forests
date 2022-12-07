@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 
+// Implementation of binary focal loss following
+// https://arxiv.org/pdf/1708.02002.pdf.
+
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_BINARY_FOCAL_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_BINARY_FOCAL_H_
 
@@ -42,6 +45,32 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
+
+// Local helper functions for calculating the (slightly more involved)
+// focal loss gradients and hessians at a common place to avoid code duplication
+struct FocalLossBasicData {
+  float y;      // Label as from {-1, 1} set to follow paper's notation.
+  float label;  // Label as from {0, 1} set.
+  float pt;     // Probability of "being right".
+  // Log of prob of being right. Calculated directly from log odds.
+  float log_pt;
+  float mispred;  // Probability of miss-prediction.
+  float at;       // Sample weight (alpha_t, depends on ground truth label)
+};
+
+struct FocalLossGradientData {
+  FocalLossBasicData basic;
+  float gradient;
+  float term1;  // The first derivative term of the first derivative
+  float term2;  // The second derivative term of the first derivative
+};
+
+FocalLossGradientData CalculateFocalLossGradient(bool is_positive,
+                                                 float prediction, float gamma,
+                                                 float alpha);
+
+float CalculateFocalLossHessian(FocalLossGradientData gradient_data,
+                                float gamma, float alpha);
 
 // Focal loss.
 // Suited for binary classification, implementation based on log loss
@@ -92,13 +121,94 @@ class BinaryFocalLoss : public BinomialLogLikelihoodLoss {
       const std::vector<GradientData>& gradients,
       int label_col_idx) const override;
 
+  template <bool weighted>
   absl::Status SetLeaf(const dataset::VerticalDataset& train_dataset,
-               const std::vector<UnsignedExampleIdx>& selected_examples,
-      const std::vector<float>& weights,
-      const model::proto::TrainingConfig& config,
-      const model::proto::TrainingConfigLinking& config_link,
-      const std::vector<float>& predictions, int label_col_idx,
-      decision_tree::NodeWithChildren* node) const;
+                       const std::vector<UnsignedExampleIdx>& selected_examples,
+                       const std::vector<float>& weights,
+                       const model::proto::TrainingConfig& config,
+                       const model::proto::TrainingConfigLinking& config_link,
+                       const std::vector<float>& predictions,
+                       const int label_col_idx,
+                       decision_tree::NodeWithChildren* node) const {
+    if constexpr (weighted) {
+      DCHECK_EQ(train_dataset.nrow(), weights.size());
+    } else {
+      DCHECK(weights.empty());
+    }
+    if (!gbt_config_.use_hessian_gain()) {
+      if (weights.empty()) {
+        RETURN_IF_ERROR(
+            decision_tree::SetRegressionLabelDistribution(
+                train_dataset, selected_examples, weights, config_link,
+                node->mutable_node()));
+      } else {
+        RETURN_IF_ERROR(
+            decision_tree::SetRegressionLabelDistribution(
+                train_dataset, selected_examples, weights, config_link,
+                node->mutable_node()));
+      }
+      // Even if "use_hessian_gain" is not enabled for the splits. We use a
+      // Newton step in the leaves i.e. if "use_hessian_gain" is false, we need
+      // all the information.
+    }
+
+    // `labels` is not owning.
+    ASSIGN_OR_RETURN(
+        const dataset::VerticalDataset::CategoricalColumn* labels,
+        train_dataset.ColumnWithCastWithStatus<
+            dataset::VerticalDataset::CategoricalColumn>(label_col_idx));
+
+    double numerator = 0;
+    double denominator = 0;
+    double sum_weights = 0;
+    if constexpr (!weighted) {
+      sum_weights = selected_examples.size();
+    }
+    for (const auto example_idx : selected_examples) {
+      const bool is_positive = labels->values()[example_idx] == 2;
+      const float prediction = predictions[example_idx];
+      const FocalLossGradientData gradient_data =
+          CalculateFocalLossGradient(is_positive, prediction, gamma_, alpha_);
+      DCheckIsFinite(gradient_data.gradient);
+
+      const double hessian =
+          CalculateFocalLossHessian(gradient_data, gamma_, alpha_);
+      DCheckIsFinite(hessian);
+      if constexpr (weighted) {
+        const float weight = weights[example_idx];
+        numerator += weight * gradient_data.gradient;
+        denominator += weight * hessian;
+        sum_weights += weight;
+      } else {
+        numerator += gradient_data.gradient;
+        denominator += hessian;
+      }
+      DCheckIsFinite(numerator);
+      DCheckIsFinite(denominator);
+    }
+
+    if (denominator <= kMinHessianForNewtonStep) {
+      denominator = kMinHessianForNewtonStep;
+    }
+
+    if (gbt_config_.use_hessian_gain()) {
+      auto* reg = node->mutable_node()->mutable_regressor();
+      reg->set_sum_gradients(numerator);
+      reg->set_sum_hessians(denominator);
+      reg->set_sum_weights(sum_weights);
+    }
+
+    const auto leaf_value =
+        gbt_config_.shrinkage() *
+        static_cast<float>(decision_tree::l1_threshold(
+                               numerator, gbt_config_.l1_regularization()) /
+                           (denominator + gbt_config_.l2_regularization()));
+
+    node->mutable_node()->mutable_regressor()->set_top_value(
+        utils::clamp(leaf_value, -gbt_config_.clamp_leaf_logit(),
+                     gbt_config_.clamp_leaf_logit()));
+    return absl::OkStatus();
+  }
 
   absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
   SetLeafFunctorFromLabelStatistics() const override {
