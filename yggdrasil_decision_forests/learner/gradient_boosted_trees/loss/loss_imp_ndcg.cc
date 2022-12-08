@@ -201,16 +201,22 @@ decision_tree::CreateSetLeafValueFunctor NDCGLoss::SetLeafFunctor(
     const std::vector<float>& predictions,
     const std::vector<GradientData>& gradients, const int label_col_idx) const {
   return [this, &predictions, &gradients, label_col_idx](
-          const dataset::VerticalDataset& train_dataset,
+             const dataset::VerticalDataset& train_dataset,
              const std::vector<UnsignedExampleIdx>& selected_examples,
-          const std::vector<float>& weights,
-          const model::proto::TrainingConfig& config,
-          const model::proto::TrainingConfigLinking& config_link,
-          decision_tree::NodeWithChildren* node) {
-        return SetLeafNDCG(train_dataset, selected_examples, weights, config,
-                           config_link, predictions, gbt_config_, gradients,
-                           label_col_idx, node);
-      };
+             const std::vector<float>& weights,
+             const model::proto::TrainingConfig& config,
+             const model::proto::TrainingConfigLinking& config_link,
+             decision_tree::NodeWithChildren* node) {
+    if (weights.empty()) {
+      return SetLeafNDCG</*weighted=*/false>(
+          train_dataset, selected_examples, weights, config, config_link,
+          predictions, gbt_config_, gradients, label_col_idx, node);
+    } else {
+      return SetLeafNDCG</*weighted=*/true>(
+          train_dataset, selected_examples, weights, config, config_link,
+          predictions, gbt_config_, gradients, label_col_idx, node);
+    }
+  };
 }
 
 absl::Status NDCGLoss::UpdatePredictions(
@@ -241,57 +247,6 @@ absl::StatusOr<LossResults> NDCGLoss::Loss(
   const float ndcg =
       ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
   return LossResults{.loss = -ndcg, .secondary_metrics = {ndcg}};
-}
-
-absl::Status SetLeafNDCG(const dataset::VerticalDataset& train_dataset,
-                 const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const std::vector<float>& predictions,
-    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-                 const std::vector<GradientData>& gradients,
-                 const int label_col_idx,
-    decision_tree::NodeWithChildren* node) {
-  if (!gbt_config.use_hessian_gain()) {
-    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
-        train_dataset, selected_examples, weights, config_link,
-        node->mutable_node()));
-  }
-
-  const auto& gradient_data = gradients.front().gradient;
-  const auto& second_order_derivative_data = *(gradients.front().hessian);
-
-  double sum_weighted_gradient = 0;
-  double sum_weighted_second_order_derivative = 0;
-  double sum_weights = 0;
-  for (const auto example_idx : selected_examples) {
-    const float weight = weights[example_idx];
-    sum_weighted_gradient += weight * gradient_data[example_idx];
-    sum_weighted_second_order_derivative +=
-        weight * second_order_derivative_data[example_idx];
-    sum_weights += weight;
-  }
-  DCheckIsFinite(sum_weighted_gradient);
-  DCheckIsFinite(sum_weighted_second_order_derivative);
-
-  if (sum_weighted_second_order_derivative <= kMinHessianForNewtonStep) {
-    sum_weighted_second_order_derivative = kMinHessianForNewtonStep;
-  }
-
-  if (gbt_config.use_hessian_gain()) {
-    auto* reg = node->mutable_node()->mutable_regressor();
-    reg->set_sum_gradients(sum_weighted_gradient);
-    reg->set_sum_hessians(sum_weighted_second_order_derivative);
-    reg->set_sum_weights(sum_weights);
-  }
-
-  node->mutable_node()->mutable_regressor()->set_top_value(
-      gbt_config.shrinkage() *
-      decision_tree::l1_threshold(sum_weighted_gradient,
-                                  gbt_config.l1_regularization()) /
-      (sum_weighted_second_order_derivative + gbt_config.l2_regularization()));
-  return absl::OkStatus();
 }
 
 }  // namespace gradient_boosted_trees

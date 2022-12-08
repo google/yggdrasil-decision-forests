@@ -179,18 +179,23 @@ absl::Status CrossEntropyNDCGLoss::UpdateGradients(
 decision_tree::CreateSetLeafValueFunctor CrossEntropyNDCGLoss::SetLeafFunctor(
     const std::vector<float>& predictions,
     const std::vector<GradientData>& gradients, const int label_col_idx) const {
-  return
-      [this, &predictions, &gradients, label_col_idx](
-          const dataset::VerticalDataset& train_dataset,
-          const std::vector<UnsignedExampleIdx>& selected_examples,
-          const std::vector<float>& weights,
-          const model::proto::TrainingConfig& config,
-          const model::proto::TrainingConfigLinking& config_link,
-          decision_tree::NodeWithChildren* node) {
-        return SetLeafNDCG(train_dataset, selected_examples, weights, config,
-                           config_link, predictions, gbt_config_, gradients,
-                           label_col_idx, node);
-      };
+  return [this, &predictions, &gradients, label_col_idx](
+             const dataset::VerticalDataset& train_dataset,
+             const std::vector<UnsignedExampleIdx>& selected_examples,
+             const std::vector<float>& weights,
+             const model::proto::TrainingConfig& config,
+             const model::proto::TrainingConfigLinking& config_link,
+             decision_tree::NodeWithChildren* node) {
+    if (weights.empty()) {
+      return SetLeafNDCG</*weighted=*/false>(
+          train_dataset, selected_examples, weights, config, config_link,
+          predictions, gbt_config_, gradients, label_col_idx, node);
+    } else {
+      return SetLeafNDCG</*weighted=*/true>(
+          train_dataset, selected_examples, weights, config, config_link,
+          predictions, gbt_config_, gradients, label_col_idx, node);
+    }
+  };
 }
 
 absl::Status CrossEntropyNDCGLoss::UpdatePredictions(
