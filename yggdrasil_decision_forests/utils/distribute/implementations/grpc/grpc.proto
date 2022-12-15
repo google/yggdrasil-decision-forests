@@ -25,9 +25,27 @@ message GRPCImp {
   oneof worker_address {
     SocketAddresses socket_addresses = 1;
     Bns bns = 2;
+    GrpcAddresses grpc_addresses = 5;
   }
 
   optional bool use_loas = 3 [default = false];
+
+  // Optional global identifier of the distribute session (shared among the
+  // manager and the workers). Useful to differentiate between multiple
+  // distribute sessions running in the same process.
+  //
+  // At a given time, only one manager can be instantiated with the same key in
+  // a given process. Note that many managers can be instantiated without a key.
+  optional int32 key = 4;
+}
+
+message GrpcAddresses {
+  // Address of the workers.
+  //
+  // Example: "127.0.0.1:2345".
+  // See https://grpc.github.io/grpc/cpp/md_doc_naming.html for the supported
+  // formats.
+  repeated string addresses = 1;
 }
 
 extend Config {

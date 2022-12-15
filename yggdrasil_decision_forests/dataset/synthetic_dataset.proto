@@ -121,4 +121,9 @@ message SyntheticDatasetOptions {
     // 0.
     optional int32 group_size = 2 [default = 10];
   }
+
+  // Number of examples to inject in each shards. Requires for the dataset paths
+  // to be sharded (i.e. ends with @<number of shards>). Set to -1 to disable
+  // dataset sharding.
+  optional int64 num_examples_per_shards = 22 [default = -1];
 }

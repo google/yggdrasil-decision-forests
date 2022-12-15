@@ -654,6 +654,11 @@ absl::Status ConvertPartialToFinalRawDataCategoricalString(
   std::vector<int32_t> mapping(meta_data.categorical().items_size());
   for (const auto& src_item : meta_data.categorical().items()) {
     const auto it_src = transformation.items().find(src_item.first);
+
+    if (src_item.second.index() >= mapping.size()) {
+      return absl::InternalError("Wrong raw categorical string mapping");
+    }
+
     if (it_src == transformation.items().end()) {
       // This item is unknown in the final dictionary. It is transformed to
       // Out-of-vocabulary.
@@ -686,6 +691,7 @@ absl::Status ConvertPartialToFinalRawDataCategoricalString(
                      if (value < 0) {
                        return transformation.nan_value_replacement();
                      }
+                     DCHECK_LT(value, mapping.size());
                      return mapping[value];
                    });
 

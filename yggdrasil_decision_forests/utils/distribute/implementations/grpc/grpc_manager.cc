@@ -15,10 +15,12 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_manager.h"
 
+#include <memory>
 #include <random>
 
 #include "grpcpp/create_channel.h"
 #include "grpcpp/support/channel_arguments.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
@@ -33,6 +35,45 @@ namespace distribute {
 namespace {
 
 constexpr int kDeadLineInHours = 24 * 40;
+
+// In addition to control available though the "GRPCManager" class (e.g. the
+// GRPCManager::UpdateWorkerAddress function), GRPC manager can be referenced
+// and configured using the session key (optional "key" field in the manager
+// configuration). This is called a "global change".
+//
+// For example, calling "UpdateWorkerAddress(grpc_key, address)" is equivalent
+// to calling  "manager->UpdateWorkerAddress(address)" if "manager" is
+// configured with the "grpc_key" key.
+//
+// "GetGlobalChanges" returns a control structure for manager configuration
+// through keys.
+
+// Redefinition of the address of a worker.
+struct UpdateAddress {
+  int worker_idx;
+  std::string new_address;
+};
+
+// Changes for a given key.
+struct KeyChanges {
+  // List of changes made after the manager creation.
+  // Currently, "UpdateAddress" is the only type of changes.
+  std::vector<UpdateAddress> pending_changes;
+
+  // List of already applied changes.
+  absl::flat_hash_map<int, std::string> past_changes;
+};
+
+struct GlobalChanges {
+  absl::flat_hash_map<int, KeyChanges> per_key GUARDED_BY(mutex);
+  utils::concurrency::Mutex mutex;
+  utils::concurrency::CondVar cond_var;  // When a change is made.
+};
+
+GlobalChanges& GetGlobalChanges() {
+  static GlobalChanges all_changes;
+  return all_changes;
+}
 
 absl::Status GrpcStatusToAbslStatus(const grpc::Status& src) {
   if (src.ok()) {
@@ -77,6 +118,11 @@ absl::Status GRPCManager::InitializeWorkers(
             absl::StrCat(imp_config.bns().prefix(), "/", worker_idx));
       }
       break;
+    case proto::GRPCImp::kGrpcAddresses:
+      for (const auto& addresse : imp_config.grpc_addresses().addresses()) {
+        worker_addresses.push_back(addresse);
+      }
+      break;
     default:
       return absl::UnimplementedError("Unknown worker address type");
   }
@@ -84,6 +130,17 @@ absl::Status GRPCManager::InitializeWorkers(
   if (worker_addresses.empty()) {
     return absl::InvalidArgumentError("There should be at least one worker");
   }
+
+  // Override the worker address with global changes.
+  if (imp_config.has_key()) {
+    auto& all_events = GetGlobalChanges();
+    utils::concurrency::MutexLock l(&all_events.mutex);
+    auto& per_key = all_events.per_key[imp_config.key()];
+    for (const auto& change : per_key.past_changes) {
+      worker_addresses[change.first] = change.second;
+    }
+  }
+
   if (verbosity_ >= 1) {
     LOG(INFO) << "Start manager with " << worker_addresses.size()
               << " workers.";
@@ -98,32 +155,39 @@ absl::Status GRPCManager::InitializeWorkers(
   for (int worker_idx = 0; worker_idx < worker_addresses.size(); worker_idx++) {
     auto worker = absl::make_unique<Worker>();
     worker->worker_idx = worker_idx;
-
-    while (true) {
+    {
       utils::concurrency::MutexLock l(&worker->mutex_address);
-      worker->stub = CreateStub(worker_addresses[worker_idx], &credential_);
+      worker->expected_address = worker_addresses[worker_idx];
+      worker->StartThreads(parallel_execution_per_worker, this);
+      workers_.push_back(std::move(worker));
+    }
+  }
 
+  for (auto& worker : workers_) {
+    RETURN_IF_ERROR(UpdateWorkerConnection(worker.get()).status());
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status GRPCManager::WaitForAllWorkersToBeReady() {
+  for (auto& worker : workers_) {
+    while (true) {
+      ASSIGN_OR_RETURN(auto stub, UpdateWorkerConnection(worker.get()));
       grpc::ClientContext context;
       proto::Empty query;
       proto::Empty answer;
-      const auto ping_status = worker->stub->Ping(&context, query, &answer);
+      const auto ping_status = stub->Ping(&context, query, &answer);
       if (!ping_status.ok()) {
         if (verbosity_ >= 1) {
-          LOG(INFO) << "Worker #" << worker_idx
+          LOG(INFO) << "Worker #" << worker->worker_idx
                     << " is not yet available. Waiting 10s";
         }
         absl::SleepFor(absl::Seconds(10));
         continue;
       }
-
       break;
     }
-
-    utils::concurrency::MutexLock l(&worker->mutex_address);
-    worker->connected_address = worker_addresses[worker_idx];
-    worker->expected_address = worker->connected_address;
-    worker->StartThreads(parallel_execution_per_worker, this);
-    workers_.push_back(std::move(worker));
   }
 
   if (verbosity_ >= 1) {
@@ -142,6 +206,9 @@ void GRPCManager::Worker::StartThreads(int parallel_execution_per_worker,
   process_global_queries.Start(
       parallel_execution_per_worker,
       [this, manager]() { manager->ProcessGlobalQueries(this); });
+
+  peer_worker_update_thread_ = absl::make_unique<utils::concurrency::Thread>(
+      [this, manager]() { manager->ProcessPeerWorkerAddressUpdate(this); });
 }
 
 absl::StatusOr<int> GRPCManager::NumWorkersInConfiguration(
@@ -150,6 +217,8 @@ absl::StatusOr<int> GRPCManager::NumWorkersInConfiguration(
   switch (imp_config.worker_address_case()) {
     case proto::GRPCImp::kSocketAddresses:
       return imp_config.socket_addresses().addresses_size();
+    case proto::GRPCImp::kGrpcAddresses:
+      return imp_config.grpc_addresses().addresses_size();
     case proto::GRPCImp::kBns:
       return imp_config.bns().num_workers();
     default:
@@ -162,14 +231,18 @@ absl::StatusOr<proto::Server::Stub*> GRPCManager::UpdateWorkerConnection(
   utils::concurrency::MutexLock l(&worker->mutex_address);
   if (worker->expected_address != worker->connected_address) {
     // The worker has moved.
-    LOG(WARNING) << "Changing worker address from " << worker->connected_address
-                 << " to " << worker->expected_address;
     worker->connected_address = worker->expected_address;
-    worker->discarded_stubs_.push_back(std::move(worker->stub));
-    worker->stub.reset();
 
+    if (worker->stub) {
+      worker->discarded_stubs_.push_back(std::move(worker->stub));
+      worker->stub.reset();
+    }
+
+    DCHECK(credential_);
     worker->stub = CreateStub(worker->connected_address, &credential_);
   }
+
+  DCHECK(worker->stub);
   return worker->stub.get();
 }
 
@@ -182,6 +255,7 @@ absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
   async_pending_queries_.Close();
   for (auto& worker : workers_) {
     worker->async_pending_queries_.Close();
+    worker->peer_worker_update_workers_.Close();
   }
 
   // Wait for the threads to join
@@ -191,6 +265,7 @@ absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
   async_pending_queries_.Reopen();
   for (auto& worker : workers_) {
     worker->async_pending_queries_.Reopen();
+    worker->peer_worker_update_workers_.Reopen();
     worker->StartThreads(num, this);
   }
   return absl::OkStatus();
@@ -218,6 +293,7 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
         // configuration.
         LOG(WARNING) << "Send worker configuration to worker #"
                      << worker->worker_idx;
+        utils::concurrency::MutexLock l(&mutex_worker_config_);
         *query.mutable_worker_config() = worker_config_;
         continue;
       }
@@ -280,6 +356,7 @@ void GRPCManager::ProcessGlobalQueries(Worker* worker) {
 absl::Status GRPCManager::InitializeConfigFile(
     const proto::Config& config, const absl::string_view worker_name,
     const int parallel_execution_per_worker, Blob welcome_blob) {
+  utils::concurrency::MutexLock l(&mutex_worker_config_);
   worker_config_.set_worker_name(std::string(worker_name));
   worker_config_.set_welcome_blob(welcome_blob);
   worker_config_.set_manager_uid(manager_uid_);
@@ -349,6 +426,9 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
   for (auto& worker : workers_) {
     worker->async_pending_queries_.Close();
     worker->async_pending_queries_.Clear();
+
+    worker->peer_worker_update_workers_.Close();
+    worker->peer_worker_update_workers_.Clear();
   }
 
   JoinWorkers();
@@ -365,18 +445,22 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
 
   // TODO: Run in parallel.
   for (auto& worker : workers_) {
+    ASSIGN_OR_RETURN(auto stub, UpdateWorkerConnection(worker.get()));
+
     grpc::ClientContext context;
-    context.set_wait_for_ready(false);
     context.set_deadline(std::chrono::system_clock::now() +
                          std::chrono::minutes(2));
     proto::Empty ignored;
-    utils::concurrency::MutexLock l(&worker->mutex_address);
-    auto worker_shutdown = worker->stub->Shutdown(&context, query, &ignored);
+    auto worker_shutdown = stub->Shutdown(&context, query, &ignored);
     if (!worker_shutdown.ok()) {
       // It is not a big deal if the worker crashes during shutdown.
       LOG(WARNING) << "Error when shutting down the connection:"
                    << worker_shutdown.error_message();
     }
+  }
+
+  if (key_.has_value()) {
+    StopEventCheckingThread();
   }
 
   if (verbosity_ >= 1) {
@@ -405,6 +489,7 @@ void GRPCManager::JoinWorkers() {
   for (auto& worker : workers_) {
     worker->process_local_queries.JoinAndClear();
     worker->process_global_queries.JoinAndClear();
+    worker->peer_worker_update_thread_->Join();
   }
 }
 
@@ -429,6 +514,12 @@ absl::Status GRPCManager::Initialize(const proto::Config& config,
   RETURN_IF_ERROR(InitializeConfigFile(config, worker_name,
                                        parallel_execution_per_worker,
                                        std::move(welcome_blob)));
+  const auto& imp_config = config.GetExtension(proto::grpc);
+  if (imp_config.has_key()) {
+    key_ = imp_config.key();
+    StartEventCheckingThread();
+  }
+  RETURN_IF_ERROR(WaitForAllWorkersToBeReady());
   return absl::OkStatus();
 }
 
@@ -437,36 +528,120 @@ absl::Status GRPCManager::UpdateWorkerAddress(
   DCHECK_GE(worker_idx, 0);
   DCHECK_LT(worker_idx, workers_.size());
   auto& worker = workers_[worker_idx];
-  utils::concurrency::MutexLock l(&worker->mutex_address);
-  worker->expected_address = std::string(new_address);
-  *worker_config_.mutable_worker_addresses(worker_idx) =
-      std::string(new_address);
-
-  // Send change to all workers.
-
-  proto::UpdateWorkerAddressQuery query;
-  query.set_worker_idx(worker_idx);
-  *query.mutable_new_address() = std::string(new_address);
-
-  // TODO: Run in parallel.
-  for (auto& worker : workers_) {
-    if (worker->worker_idx == worker_idx) {
+  {
+    utils::concurrency::MutexLock l(&worker->mutex_address);
+    worker->expected_address = std::string(new_address);
+  }
+  {
+    utils::concurrency::MutexLock l(&mutex_worker_config_);
+    *worker_config_.mutable_worker_addresses(worker_idx) =
+        std::string(new_address);
+  }
+  for (auto& update_worker : workers_) {
+    if (update_worker->worker_idx == worker_idx) {
       continue;
     }
-    grpc::ClientContext context;
-    context.set_wait_for_ready(false);
-    context.set_deadline(std::chrono::system_clock::now() +
-                         std::chrono::minutes(2));
-    proto::Empty ignored;
-    auto worker_shutdown =
-        worker->stub->UpdateWorkerAddress(&context, query, &ignored);
-    if (!worker_shutdown.ok()) {
-      // We don't care if the worker is down. It will receive the update when it
-      // gets back online.
+    update_worker->peer_worker_update_workers_.Push(worker_idx);
+  }
+  return absl::OkStatus();
+}
+
+void GRPCManager::ProcessPeerWorkerAddressUpdate(Worker* worker) {
+  while (true) {
+    auto worker_idx_or = worker->peer_worker_update_workers_.Pop();
+    if (!worker_idx_or.has_value()) {
+      break;
+    }
+
+    proto::UpdateWorkerAddressQuery query;
+    query.set_worker_idx(worker_idx_or.value());
+
+    // Get the new address of those workers.
+    {
+      auto& target_worker = workers_[query.worker_idx()];
+      utils::concurrency::MutexLock l(&target_worker->mutex_address);
+      query.set_new_address(target_worker->expected_address);
+    }
+
+    // Send update.
+    while (!done_was_called_) {
+      auto stub_or = UpdateWorkerConnection(worker);
+      if (!stub_or.ok()) {
+        LOG(WARNING) << "Cannot create stub";
+        continue;
+      }
+
+      grpc::ClientContext context;
+      context.set_deadline(std::chrono::system_clock::now() +
+                           std::chrono::minutes(2));
+      proto::Empty ignored;
+      auto worker_shutdown =
+          stub_or.value()->UpdateWorkerAddress(&context, query, &ignored);
+
+      if (worker_shutdown.ok()) {
+        break;
+      }
     }
   }
+}
 
-  return absl::OkStatus();
+void UpdateWorkerAddress(int key, int worker_idx,
+                         absl::string_view new_address) {
+  auto& all_changes = GetGlobalChanges();
+  utils::concurrency::MutexLock l(&all_changes.mutex);
+  auto& per_key = all_changes.per_key[key];
+
+  per_key.pending_changes.push_back(
+      UpdateAddress{/*worker_idx=*/worker_idx,
+                    /*new_address=*/std::string(new_address)});
+  per_key.past_changes[worker_idx] = std::string(new_address);
+  all_changes.cond_var.SignalAll();
+}
+
+void GRPCManager::StartEventCheckingThread() {
+  DCHECK(!event_checking_thread_);
+  event_checking_thread_ = absl::make_unique<utils::concurrency::Thread>(
+      [this]() { MainEventCheckingThread(); });
+}
+
+void GRPCManager::StopEventCheckingThread() {
+  if (event_checking_thread_) {
+    DCHECK(done_was_called_);
+    event_checking_thread_->Join();
+  }
+}
+
+void GRPCManager::MainEventCheckingThread() {
+  auto& all_changes = GetGlobalChanges();
+  while (!done_was_called_) {
+    std::vector<UpdateAddress> pending_changes;
+    {
+      utils::concurrency::MutexLock lock(&all_changes.mutex);
+
+      // Wait for changes.
+      absl::flat_hash_map<int, KeyChanges>::iterator it_per_key;
+      while (!done_was_called_) {
+        it_per_key = all_changes.per_key.find(key_.value());
+        if (it_per_key == all_changes.per_key.end() ||
+            it_per_key->second.pending_changes.empty()) {
+          all_changes.cond_var.WaitWithTimeout(&all_changes.mutex, &lock, 10);
+          continue;
+        }
+        break;
+      }
+
+      pending_changes = std::move(it_per_key->second.pending_changes);
+      it_per_key->second.pending_changes.clear();
+    }
+
+    // Execute events.
+    for (const auto& change : pending_changes) {
+      auto status = UpdateWorkerAddress(change.worker_idx, change.new_address);
+      if (!status.ok()) {
+        LOG(WARNING) << "Cannot update worker address: " << status.message();
+      }
+    }
+  }
 }
 
 }  // namespace distribute

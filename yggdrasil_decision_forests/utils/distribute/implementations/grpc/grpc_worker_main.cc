@@ -24,19 +24,21 @@ ABSL_FLAG(bool, use_loas, false, "Use LOAS.");
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
+namespace grpc_worker {
 
 void GRPCWorker() {
   const auto port = absl::GetFlag(FLAGS_port);
   LOG(INFO) << "Start GRPC worker on port " << port;
-  QCHECK_OK(GRPCWorkerMainWorkerMain(port, absl::GetFlag(FLAGS_use_loas)));
+  QCHECK_OK(WorkerMain(port, absl::GetFlag(FLAGS_use_loas)));
   LOG(INFO) << "Stop GRPC worker";
 }
 
+}  // namespace grpc_worker
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests
 
 int main(int argc, char** argv) {
   InitLogging(argv[0], &argc, &argv, true);
-  yggdrasil_decision_forests::distribute::GRPCWorker();
+  yggdrasil_decision_forests::distribute::grpc_worker::GRPCWorker();
   return 0;
 }

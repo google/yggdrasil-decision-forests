@@ -146,7 +146,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
 
   // Creates an initialized distribute manager with "GENERIC_WORKER" workers.
   absl::StatusOr<std::unique_ptr<distribute::AbstractManager>>
-  CreateDistributeManager() const;
+  CreateDistributeManager(int num_threads_in_base_learner_deployment) const;
 
   // Trains a model remotely.
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainRemoteModel(

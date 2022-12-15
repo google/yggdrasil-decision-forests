@@ -545,8 +545,10 @@ absl::Status CreateLabels(const proto::SyntheticDatasetOptions& options,
 
 // Writes the list of examples to a tensorflow.Example container.
 absl::Status WriteTFEExamples(const std::vector<Example>& examples,
-                              absl::string_view typed_path) {
-  ASSIGN_OR_RETURN(auto writer, CreateTFExampleWriter(typed_path, -1));
+                              absl::string_view typed_path,
+                              const int num_examples_per_shards) {
+  ASSIGN_OR_RETURN(auto writer,
+                   CreateTFExampleWriter(typed_path, num_examples_per_shards));
   for (const auto& example : examples) {
     RETURN_IF_ERROR(writer->Write(example.tf_example));
   }
@@ -623,7 +625,8 @@ absl::Status WriteCsvExamples(const std::vector<Example>& examples,
 }
 
 absl::Status WriteExamples(const std::vector<Example>& examples,
-                           absl::string_view typed_path) {
+                           absl::string_view typed_path,
+                           const int num_examples_per_shards) {
   // Note: We don't use the generic example writer (CreateExampleWriter) because
   // we don't have (and do not want to create) a dataspec.
   std::string sharded_path;
@@ -633,7 +636,7 @@ absl::Status WriteExamples(const std::vector<Example>& examples,
     return WriteCsvExamples(examples, typed_path);
   } else {
     // Will fail if the format is not based on tensorflow.Example protos.
-    return WriteTFEExamples(examples, typed_path);
+    return WriteTFEExamples(examples, typed_path, num_examples_per_shards);
   }
 }
 
@@ -685,7 +688,7 @@ absl::Status GenerateSyntheticDataset(
   ASSIGN_OR_RETURN(auto state, CreateState(options, &rnd));
   ASSIGN_OR_RETURN(auto examples, CreateFeatures(options, state, &rnd));
   RETURN_IF_ERROR(CreateLabels(options, state, &examples, &rnd));
-  return WriteExamples(examples, typed_path);
+  return WriteExamples(examples, typed_path, options.num_examples_per_shards());
 }
 
 absl::Status GenerateSyntheticDatasetTrainValidTest(
@@ -746,12 +749,15 @@ absl::Status GenerateSyntheticDatasetTrainValidTest(
     }
   }
 
-  RETURN_IF_ERROR(WriteExamples(example_train, typed_path_train));
+  RETURN_IF_ERROR(WriteExamples(example_train, typed_path_train,
+                                options.num_examples_per_shards()));
   if (!typed_path_valid.empty()) {
-    RETURN_IF_ERROR(WriteExamples(example_valid, typed_path_valid));
+    RETURN_IF_ERROR(WriteExamples(example_valid, typed_path_valid,
+                                  options.num_examples_per_shards()));
   }
   if (!typed_path_test.empty()) {
-    RETURN_IF_ERROR(WriteExamples(example_test, typed_path_test));
+    RETURN_IF_ERROR(WriteExamples(example_test, typed_path_test,
+                                  options.num_examples_per_shards()));
   }
   return absl::OkStatus();
 }

@@ -28,6 +28,7 @@
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
+#include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
@@ -278,9 +279,6 @@ HyperParameterOptimizerLearner::TrainWithStatus(
 
   const auto begin_training = absl::Now();
 
-  // Initialize the remote workers.
-  ASSIGN_OR_RETURN(auto manager, CreateDistributeManager());
-
   // The effective configuration is the user configuration + the default value +
   // the automatic configuration (if enabled) + the copy of the non-specified
   // training configuration field from the learner to the sub-learner (e.g. copy
@@ -291,6 +289,11 @@ HyperParameterOptimizerLearner::TrainWithStatus(
       GetEffectiveConfiguration(data_spec, &effective_config, &config_link));
   const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config =
       effective_config.GetExtension(proto::hyperparameters_optimizer_config);
+
+  // Initialize the remote workers.
+  ASSIGN_OR_RETURN(auto manager,
+                   CreateDistributeManager(
+                       spe_config.base_learner_deployment().num_threads()));
 
   utils::usage::OnTrainingStart(data_spec, effective_config, config_link, -1);
 
@@ -380,7 +383,8 @@ HyperParameterOptimizerLearner::TrainRemoteModel(
 }
 
 absl::StatusOr<std::unique_ptr<distribute::AbstractManager>>
-HyperParameterOptimizerLearner::CreateDistributeManager() const {
+HyperParameterOptimizerLearner::CreateDistributeManager(
+    const int num_threads_in_base_learner_deployment) const {
   // Configure the working directory.
   if (deployment().cache_path().empty()) {
     return absl::InvalidArgumentError(
@@ -401,8 +405,17 @@ HyperParameterOptimizerLearner::CreateDistributeManager() const {
   generic_worker::proto::Welcome welcome;
   welcome.set_temporary_directory(
       file::JoinPath(deployment_.cache_path(), "workers"));
+
+  // Number of model training request executed in parallel on each worker.
+  ASSIGN_OR_RETURN(const int num_workers,
+                   distribute::NumWorkers(distribute_config));
+  const int parallel_execution_per_worker =
+      (num_workers + num_threads_in_base_learner_deployment - 1) /
+      num_threads_in_base_learner_deployment;
+
   return distribute::CreateManager(distribute_config, "GENERIC_WORKER",
-                                   welcome.SerializeAsString());
+                                   welcome.SerializeAsString(),
+                                   parallel_execution_per_worker);
 }
 
 absl::StatusOr<std::unique_ptr<AbstractLearner>>

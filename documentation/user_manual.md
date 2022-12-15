@@ -6,37 +6,37 @@ It is complementary to the beginner example available in `examples/`.
 ## Table of Contents
 
 <!--ts-->
-* [User Manual](#user-manual)
-   * [Table of Contents](#table-of-contents)
-   * [Interfaces](#interfaces)
-   * [Dataset](#dataset)
-   * [Dataset path and format](#dataset-path-and-format)
-   * [Learners and Models](#learners-and-models)
-   * [Distributed Training](#distributed-training)
-   * [Meta-Learner](#meta-learner)
-   * [Model/Learner Evaluation](#modellearner-evaluation)
-   * [Experiment](#experiment)
-   * [Model Analysis](#model-analysis)
-      * [Variable Importances](#variable-importances)
-         * [Model agnostic](#model-agnostic)
-         * [Decision Forests specific](#decision-forests-specific)
-   * [Manual Tuning of Hyper-parameters](#manual-tuning-of-hyper-parameters)
-      * [Best first global growing strategy for GBT](#best-first-global-growing-strategy-for-gbt)
-      * [Oblique splits for GBT and RF](#oblique-splits-for-gbt-and-rf)
-      * [Random Categorical splits for GBT and RF](#random-categorical-splits-for-gbt-and-rf)
-      * [Hessian splits for GBT](#hessian-splits-for-gbt)
-      * [Number of trees for RF and GBT](#number-of-trees-for-rf-and-gbt)
-      * [Disabling the validation dataset for GBT](#disabling-the-validation-dataset-for-gbt)
-      * [Disabling winner take all for RF](#disabling-winner-take-all-for-rf)
-      * [Super learners](#super-learners)
-   * [Automated Tuning of Hyper-parameters](#automated-tuning-of-hyper-parameters)
-   * [Feature Engineering](#feature-engineering)
-   * [Model Inference](#model-inference)
-      * [Fast engine](#fast-engine)
-      * [Serving TensorFlow Decision Forests model](#serving-tensorflow-decision-forests-model)
-   * [Registered classes](#registered-classes)
-   * [Advanced features](#advanced-features)
 
+*   [User Manual](#user-manual)
+    *   [Table of Contents](#table-of-contents)
+    *   [Interfaces](#interfaces)
+    *   [Dataset](#dataset)
+    *   [Dataset path and format](#dataset-path-and-format)
+    *   [Learners and Models](#learners-and-models)
+    *   [Distributed Training](#distributed-training)
+    *   [Meta-Learner](#meta-learner)
+    *   [Model/Learner Evaluation](#modellearner-evaluation)
+    *   [Experiment](#experiment)
+    *   [Model Analysis](#model-analysis)
+        *   [Variable Importances](#variable-importances)
+            *   [Model agnostic](#model-agnostic)
+            *   [Decision Forests specific](#decision-forests-specific)
+    *   [Manual Tuning of Hyper-parameters](#manual-tuning-of-hyper-parameters)
+        *   [Best first global growing strategy for GBT](#best-first-global-growing-strategy-for-gbt)
+        *   [Oblique splits for GBT and RF](#oblique-splits-for-gbt-and-rf)
+        *   [Random Categorical splits for GBT and RF](#random-categorical-splits-for-gbt-and-rf)
+        *   [Hessian splits for GBT](#hessian-splits-for-gbt)
+        *   [Number of trees for RF and GBT](#number-of-trees-for-rf-and-gbt)
+        *   [Disabling the validation dataset for GBT](#disabling-the-validation-dataset-for-gbt)
+        *   [Disabling winner take all for RF](#disabling-winner-take-all-for-rf)
+        *   [Super learners](#super-learners)
+    *   [Automated Tuning of Hyper-parameters](#automated-tuning-of-hyper-parameters)
+    *   [Feature Engineering](#feature-engineering)
+    *   [Model Inference](#model-inference)
+        *   [Fast engine](#fast-engine)
+        *   [Serving TensorFlow Decision Forests model](#serving-tensorflow-decision-forests-model)
+    *   [Registered classes](#registered-classes)
+    *   [Advanced features](#advanced-features)
 
 <!--te-->
 
@@ -365,7 +365,7 @@ and the `cache_path` field in the
 . Different `distribute` execution engines are available. They don't impact the
 effective trained model.
 
-### `GRPC` distribute implementation (recommended)
+### `GRPC` distribute execution engine (recommended)
 
 Each worker is a process running the
 `yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_worker_main`
@@ -394,24 +394,6 @@ distribute {
     }
   }
 ```
-
-See
-[yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.proto](../yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.proto)
-for more details.
-
-### `TF_DIST` distribute implementation
-
-Each worker is a generic TensorFlow parameter server with TF-DF custom ops. One
-such rule is pre-configured:
-`tensorflow_decision_forests/tensorflow/distribute:tensorflow_std_server`. This
-implementation is best suited for TensorFlow Decision Forest users. The workers
-can be configured either by socket addresses or with the
-[TF_CONFIG](https://www.tensorflow.org/guide/distributed_training#setting_up_the_tf_config_environment_variable)
-variable
-
-See
-[tensorflow_decision_forests/tensorflow/distribute/tf_distribution.proto](http://google3/third_party/tensorflow_decision_forests/tensorflow/distribute/tf_distribution.proto)
-for more details.
 
 ## Meta-Learner
 

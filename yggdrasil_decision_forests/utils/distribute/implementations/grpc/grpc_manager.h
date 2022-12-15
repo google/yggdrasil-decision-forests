@@ -25,6 +25,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
+#include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
 #include "yggdrasil_decision_forests/utils/distribute/utils.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
@@ -60,7 +61,7 @@ class GRPCManager : public AbstractManager {
 
   // Changes the address of a worker. The next requests emited by the manager or
   // the other workers to worke "worker_idx" will use this new address.
-  absl::Status UpdateWorkerAddress(int worker_idx,
+  absl::Status UpdateWorkerAddress(WorkerIdx worker_idx,
                                    absl::string_view new_address);
 
   // Shuts down a worker without updating the manager or any of the other
@@ -70,7 +71,10 @@ class GRPCManager : public AbstractManager {
 
  private:
   struct Worker {
-    int worker_idx;
+    // Starts all the communication threads with the worker.
+    void StartThreads(int parallel_execution_per_worker, GRPCManager* manager);
+
+    WorkerIdx worker_idx;
 
     // Connection to the worker.
     std::unique_ptr<proto::Server::Stub> stub GUARDED_BY(mutex_address);
@@ -92,10 +96,19 @@ class GRPCManager : public AbstractManager {
     // Async query to execute specific to this worker.
     utils::concurrency::Channel<Blob> async_pending_queries_;
 
+    // Threads sending tasks requests to the workers.
     ThreadVector process_local_queries;
     ThreadVector process_global_queries;
 
-    void StartThreads(int parallel_execution_per_worker, GRPCManager* manager);
+    // List of workers for which this worker (i.e., the worker "worker_idx")
+    // need to receive an update of the address.
+    utils::concurrency::Channel<WorkerIdx> peer_worker_update_workers_;
+
+    // Thread sending "peer_worker_update_items_" to the worker. This thread
+    // runs "PeerWorkerAddressUpdate".
+    std::unique_ptr<utils::concurrency::Thread> peer_worker_update_thread_;
+
+    utils::concurrency::Mutex mutex_peer_worker_update_;
   };
 
   absl::Status Initialize(const proto::Config& config,
@@ -104,6 +117,9 @@ class GRPCManager : public AbstractManager {
 
   absl::Status InitializeWorkers(const proto::Config& config,
                                  int parallel_execution_per_worker);
+
+  // Blocks until all the workers are responding.
+  absl::Status WaitForAllWorkersToBeReady();
 
   absl::Status InitializeConfigFile(const proto::Config& config,
                                     absl::string_view worker_name,
@@ -117,6 +133,10 @@ class GRPCManager : public AbstractManager {
   // Processes a query and exports the result to the answer queue.
   void WorkerRun(Blob blob, Worker* worker);
 
+  // Thread loop to update the address of workers on other workers. Stop when no
+  // more update are pending.
+  void ProcessPeerWorkerAddressUpdate(Worker* worker);
+
   // Processes a query and returns the answer.
   absl::StatusOr<Blob> WorkerRunImp(Blob blob, Worker* worker);
 
@@ -125,8 +145,19 @@ class GRPCManager : public AbstractManager {
   // Checks and possibly update the effectively targeted worker.
   absl::StatusOr<proto::Server::Stub*> UpdateWorkerConnection(Worker* worker);
 
+  // Starts a thread that checks an execute events registered with
+  // "GetAllEvents".
+  void StartEventCheckingThread();
+
+  // Stop the thread started by "StartEventCheckingThread".
+  void StopEventCheckingThread();
+
+  // Running logic of the event checking thread.
+  void MainEventCheckingThread();
+
   // Path to serialized worker configuration accessible by all workers.
-  proto::WorkerConfig worker_config_;
+  proto::WorkerConfig worker_config_ GUARDED_BY(mutex_worker_config_);
+  utils::concurrency::Mutex mutex_worker_config_;
   int verbosity_;
   std::vector<std::unique_ptr<Worker>> workers_;
 
@@ -148,9 +179,23 @@ class GRPCManager : public AbstractManager {
   bool done_was_called_ = false;
 
   std::shared_ptr<grpc::ChannelCredentials> credential_;
+
+  // Thread running the "MainEventCheckingThread" function.
+  std::unique_ptr<utils::concurrency::Thread> event_checking_thread_;
+
+  // Identifier of the session.
+  absl::optional<int> key_;
 };
 
 REGISTER_Distribution_Manager(GRPCManager, GRPCManager::kKey);
+
+// Updates the address of a worker if an active GRPC manager created with "key".
+//
+// Thread-safe: The grpc manager execution and the caller to the
+// "UpdateWorkerAddress" function can be executed concurrently without mutex
+// protection.
+void UpdateWorkerAddress(int key, int worker_idx,
+                         absl::string_view new_address);
 
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

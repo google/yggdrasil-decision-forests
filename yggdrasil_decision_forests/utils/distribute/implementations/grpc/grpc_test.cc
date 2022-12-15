@@ -27,6 +27,7 @@
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
+namespace grpc_worker {
 namespace {
 
 // Create a GRPC manager and its workers.
@@ -53,7 +54,7 @@ ManagerCreatorAndWorkers CreateGrpcManagerCreator(
     // Create worker thread.
     manager_and_workers.worker_threads.push_back(
         absl::make_unique<utils::concurrency::Thread>(
-            [port]() { CHECK_OK(GRPCWorkerMainWorkerMain(port)); }));
+            [port]() { CHECK_OK(WorkerMain(port)); }));
     absl::SleepFor(absl::Seconds(0.2));
   }
 
@@ -155,7 +156,7 @@ TEST(GRPC, TestMessup) {
 
     // Create worker thread.
     all.worker_threads.front() = absl::make_unique<utils::concurrency::Thread>(
-        [port]() { CHECK_OK(GRPCWorkerMainWorkerMain(port)); });
+        [port]() { CHECK_OK(WorkerMain(port)); });
     absl::SleepFor(absl::Seconds(0.2));
 
     CHECK_OK(grpc_manager->UpdateWorkerAddress(
@@ -165,5 +166,6 @@ TEST(GRPC, TestMessup) {
 }
 
 }  // namespace
+}  // namespace grpc_worker
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

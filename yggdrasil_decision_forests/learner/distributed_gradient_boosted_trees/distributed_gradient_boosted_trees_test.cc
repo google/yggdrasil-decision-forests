@@ -175,7 +175,7 @@ TEST_F(DatasetAdult, ManualValidation) {
   SetNumWorkers(10);
   pass_validation_dataset_ = true;
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.01);
+  EXPECT_GT(metric::Accuracy(evaluation_), 0.863);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
 
   auto* gbt_model =

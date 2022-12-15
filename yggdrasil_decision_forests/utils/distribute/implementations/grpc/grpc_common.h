@@ -25,6 +25,9 @@ namespace distribute {
 // temporarily not available) or a definitive error.
 bool IsTransiantError(const grpc::Status& status);
 
+// Index of a worker.
+typedef int WorkerIdx;
+
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests
 
