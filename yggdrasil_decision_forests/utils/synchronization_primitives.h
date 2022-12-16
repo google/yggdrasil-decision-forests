@@ -98,7 +98,7 @@ class CondVar {
   void SignalAll() { cv_.notify_all(); }
   void Wait(Mutex* mutex, MutexLock* lock) { cv_.wait(lock->std()); }
   void WaitWithTimeout(Mutex* mutex, MutexLock* lock, double timeout_seconds) {
-    cv_.wait_for(lock->std(), std::chrono::seconds(timeout_seconds));
+    cv_.wait_for(lock->std(), std::chrono::duration<double>(timeout_seconds));
   }
 
  private:
