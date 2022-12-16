@@ -666,6 +666,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
 //
 // This functions works similarly as
 // "FindSplitLabelClassificationFeatureNumericalCart" for categorical labels.
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,

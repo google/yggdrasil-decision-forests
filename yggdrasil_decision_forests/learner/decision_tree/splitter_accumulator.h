@@ -85,6 +85,15 @@ struct IntegerValueOnly {
   int value;
 };
 
+struct FloatValueAndWeight {
+  float value;
+  float weight;
+};
+
+struct FloatValueOnly {
+  float value;
+};
+
 struct SumTruesAndWeights {
   double sum_trues;
   double sum_weights;
@@ -768,8 +777,12 @@ struct LabelHessianNumericalScoreAccumulator {
 // Label Buckets
 // ===============
 //
-// LabelBucket accumulate statistics about labels in a bucket. They should
-// implement the following methods:
+// LabelBucket accumulate statistics about labels in a bucket.
+//
+// LabelBuckets may be templated to improve performance for special cases such
+// as unweighted datasets.
+//
+// LabelBuckets should implement the following methods:
 //
 // Add a bucket to an accumulator.
 // void AddToScoreAcc(ScoreAccumulator* acc) const;
@@ -803,17 +816,28 @@ struct LabelHessianNumericalScoreAccumulator {
 // double NormalizeScore(const double score) const;
 //
 
+template <bool weighted>
 struct LabelNumericalOneValueBucket {
-  float value;
-  float weight;
+  typedef typename std::conditional_t<weighted, internal::FloatValueAndWeight,
+                                      internal::FloatValueOnly>
+      ValueAndMaybeWeight;
+  ValueAndMaybeWeight content;
   static constexpr int count = 1;  // NOLINT
 
   void AddToScoreAcc(LabelNumericalScoreAccumulator* acc) const {
-    acc->label.Add(value, weight);
+    if constexpr (weighted) {
+      acc->label.Add(content.value, content.weight);
+    } else {
+      acc->label.Add(content.value);
+    }
   }
 
   void SubToScoreAcc(LabelNumericalScoreAccumulator* acc) const {
-    acc->label.Sub(value, weight);
+    if constexpr (weighted) {
+      acc->label.Sub(content.value, content.weight);
+    } else {
+      acc->label.Sub(content.value);
+    }
   }
 
   class Initializer {
@@ -853,7 +877,11 @@ struct LabelNumericalOneValueBucket {
    public:
     Filler(const std::vector<float>& label, const std::vector<float>& weights)
         : label_(label), weights_(weights) {
-      DCHECK_EQ(weights.size(), label.size());
+      if constexpr (weighted) {
+        DCHECK_EQ(weights.size(), label.size());
+      } else {
+        DCHECK(weights.empty());
+      }
     }
 
     void InitializeAndZero(LabelNumericalOneValueBucket* acc) const {}
@@ -862,42 +890,60 @@ struct LabelNumericalOneValueBucket {
 
     void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelNumericalOneValueBucket* acc) const {
-      acc->value = label_[example_idx];
-      acc->weight = weights_[example_idx];
+      acc->content.value = label_[example_idx];
+      if constexpr (weighted) {
+        acc->content.weight = weights_[example_idx];
+      }
     }
 
     template <typename ExampleIdx>
     void AddDirectToScoreAcc(const ExampleIdx example_idx,
                              LabelNumericalScoreAccumulator* acc) const {
-      acc->label.Add(label_[example_idx], weights_[example_idx]);
+      if constexpr (weighted) {
+        acc->label.Add(label_[example_idx], weights_[example_idx]);
+      } else {
+        acc->label.Add(label_[example_idx]);
+      }
     }
 
     template <typename ExampleIdx>
     void SubDirectToScoreAcc(const ExampleIdx example_idx,
                              LabelNumericalScoreAccumulator* acc) const {
-      acc->label.Sub(label_[example_idx], weights_[example_idx]);
+      if constexpr (weighted) {
+        acc->label.Sub(label_[example_idx], weights_[example_idx]);
+      } else {
+        acc->label.Sub(label_[example_idx]);
+      }
     }
 
     template <typename ExampleIdx>
     void AddDirectToScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
         LabelNumericalScoreAccumulator* acc) const {
-      acc->label.Add(label_[example_idx],
-                     weights_[example_idx] * num_duplicates);
+      if constexpr (weighted) {
+        acc->label.Add(label_[example_idx],
+                       weights_[example_idx] * num_duplicates);
+      } else {
+        acc->label.Add(label_[example_idx], static_cast<float>(num_duplicates));
+      }
     }
 
     template <typename ExampleIdx>
     void SubDirectToScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
         LabelNumericalScoreAccumulator* acc) const {
-      acc->label.Sub(label_[example_idx],
-                     weights_[example_idx] * num_duplicates);
+      if constexpr (weighted) {
+        acc->label.Sub(label_[example_idx],
+                       weights_[example_idx] * num_duplicates);
+      } else {
+        acc->label.Sub(label_[example_idx], static_cast<float>(num_duplicates));
+      }
     }
 
     template <typename ExampleIdx>
     void Prefetch(const ExampleIdx example_idx) const {
       PREFETCH(&label_[example_idx]);
-      PREFETCH(&weights_[example_idx]);
+      if constexpr (weighted) PREFETCH(&weights_[example_idx]);
     }
 
    private:
@@ -905,14 +951,21 @@ struct LabelNumericalOneValueBucket {
     const std::vector<float>& weights_;
   };
 
-  friend std::ostream& operator<<(std::ostream& os,
-                                  const LabelNumericalOneValueBucket& data);
+  friend std::ostream& operator<<(
+      std::ostream& os, const LabelNumericalOneValueBucket<weighted>& data);
 };
 
-inline std::ostream& operator<<(std::ostream& os,
-                                const LabelNumericalOneValueBucket& data) {
-  os << "value:" << data.value << " weight:" << data.weight
+inline std::ostream& operator<<(
+    std::ostream& os,
+    const LabelNumericalOneValueBucket</*weighted=*/true>& data) {
+  os << "value:" << data.content.value << " weight:" << data.content.weight
      << " count:" << data.count;
+  return os;
+}
+inline std::ostream& operator<<(
+    std::ostream& os,
+    const LabelNumericalOneValueBucket</*weighted=*/false>& data) {
+  os << "value:" << data.content.value << " count:" << data.count;
   return os;
 }
 

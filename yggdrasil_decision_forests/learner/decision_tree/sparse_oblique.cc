@@ -312,11 +312,23 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
           current_projection.front().attribute_idx, internal_config,
           best_condition, cache);
     } else if constexpr (is_same<LabelStats, RegressionLabelStats>::value) {
-      result = FindSplitLabelRegressionFeatureNumericalCart(
-          dense_example_idxs, selected_weights, projection_values,
-          selected_labels, na_replacement, min_num_obs, dt_config,
-          label_stats.label_distribution,
-          current_projection.front().attribute_idx, {}, best_condition, cache);
+      if (weights.empty()) {
+        result =
+            FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/false>(
+                dense_example_idxs, selected_weights, projection_values,
+                selected_labels, na_replacement, min_num_obs, dt_config,
+                label_stats.label_distribution,
+                current_projection.front().attribute_idx, {}, best_condition,
+                cache);
+      } else {
+        result =
+            FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/true>(
+                dense_example_idxs, selected_weights, projection_values,
+                selected_labels, na_replacement, min_num_obs, dt_config,
+                label_stats.label_distribution,
+                current_projection.front().attribute_idx, {}, best_condition,
+                cache);
+      }
     } else {
       static_assert(!is_same<LabelStats, LabelStats>::value,
                     "Not implemented.");

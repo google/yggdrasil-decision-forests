@@ -111,9 +111,11 @@ struct ExampleBucketSet {
 // Used bucket sets.
 
 // Label: Numerical.
-
-using FeatureNumericalLabelNumericalOneValue = ExampleBucketSet<
-    ExampleBucket<FeatureNumericalBucket, LabelNumericalOneValueBucket>>;
+// TODO Add unweighted versions for other LabelNumericalBuckets.
+template <bool weighted>
+using FeatureNumericalLabelNumericalOneValue =
+    ExampleBucketSet<ExampleBucket<FeatureNumericalBucket,
+                                   LabelNumericalOneValueBucket<weighted>>>;
 
 using FeatureDiscretizedNumericalLabelNumerical = ExampleBucketSet<
     ExampleBucket<FeatureDiscretizedNumericalBucket, LabelNumericalBucket>>;
@@ -273,11 +275,15 @@ struct PerThreadCacheV2 {
   // The postfix digit is only used to differentiate between the objects. There
   // is not special semantic to it.
 
-  FeatureNumericalLabelNumericalOneValue example_bucket_set_num_1;
+  FeatureNumericalLabelNumericalOneValue</*weighted=*/true>
+      example_bucket_set_num_1;
   FeatureDiscretizedNumericalLabelNumerical example_bucket_set_num_5;
   FeatureCategoricalLabelNumerical example_bucket_set_num_2;
   FeatureIsMissingLabelNumerical example_bucket_set_num_3;
   FeatureBooleanLabelNumerical example_bucket_set_num_4;
+
+  FeatureNumericalLabelNumericalOneValue</*weighted=*/false>
+      example_bucket_set_unum_1;
 
   FeatureNumericalLabelCategoricalOneValue example_bucket_set_cat_1;
   FeatureDiscretizedNumericalLabelCategorical example_bucket_set_cat_5;
@@ -352,7 +358,8 @@ auto* GetCachedExampleBucketSet(PerThreadCacheV2* cache) {
   using utils::is_same_v;
   // Numerical.
   if constexpr (is_same_v<ExampleBucketSet,
-                          FeatureNumericalLabelNumericalOneValue>) {
+                          FeatureNumericalLabelNumericalOneValue<
+                              /*weighted=*/true>>) {
     return &cache->example_bucket_set_num_1;
   } else if constexpr (is_same_v<ExampleBucketSet,
                                  FeatureDiscretizedNumericalLabelNumerical>) {
@@ -366,6 +373,10 @@ auto* GetCachedExampleBucketSet(PerThreadCacheV2* cache) {
   } else if constexpr (is_same_v<ExampleBucketSet,
                                  FeatureBooleanLabelNumerical>) {
     return &cache->example_bucket_set_num_4;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureNumericalLabelNumericalOneValue<
+                                     /*weighted=*/false>>) {
+    return &cache->example_bucket_set_unum_1;
   } else if constexpr (is_same_v<
                            ExampleBucketSet,
                            FeatureNumericalLabelHessianNumericalOneValue>) {
@@ -1284,8 +1295,9 @@ void AddLabelBucket(const ExampleBucketSet& src, ExampleBucketSet* dst) {
 
 // Label: Regression.
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelRegressionFeatureNumerical =
-    FindBestSplit<FeatureNumericalLabelNumericalOneValue,
+    FindBestSplit<FeatureNumericalLabelNumericalOneValue<weighted>,
                   LabelNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
 

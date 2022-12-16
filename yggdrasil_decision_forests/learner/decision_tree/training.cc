@@ -84,11 +84,17 @@ NumTrialsForRandomCategoricalSplit(const proto::Categorical::Random& config) {
 }
 
 // Set the label value for a classification label on a vertical dataset.
+template <bool weighted>
 absl::Status SetClassificationLabelDistribution(
     const dataset::VerticalDataset& dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
+  if constexpr (weighted) {
+    DCHECK_LE(selected_examples.size(), weights.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   ASSIGN_OR_RETURN(
       const auto* const labels,
       dataset.ColumnWithCastWithStatus<
@@ -100,11 +106,11 @@ absl::Status SetClassificationLabelDistribution(
                                   .number_of_unique_values();
   label_distribution.SetNumClasses(num_classes);
   for (const UnsignedExampleIdx example_idx : selected_examples) {
-    if (weights.empty()) {
-      label_distribution.Add(labels->values()[example_idx]);
-    } else {
+    if constexpr (weighted) {
       label_distribution.Add(labels->values()[example_idx],
                              weights[example_idx]);
+    } else {
+      label_distribution.Add(labels->values()[example_idx]);
     }
   }
   label_distribution.Save(node->mutable_classifier()->mutable_distribution());
@@ -456,11 +462,16 @@ absl::Status SetLabelDistribution(
     NodeWithChildren* node) {
   switch (config.task()) {
     case model::proto::Task::CLASSIFICATION:
-      RETURN_IF_ERROR(SetClassificationLabelDistribution(
-          train_dataset, selected_examples, weights, config_link,
-          node->mutable_node()));
+      if (weights.empty()) {
+        RETURN_IF_ERROR(SetClassificationLabelDistribution</*weighted=*/false>(
+            train_dataset, selected_examples, weights, config_link,
+            node->mutable_node()));
+      } else {
+        RETURN_IF_ERROR(SetClassificationLabelDistribution</*weighted=*/true>(
+            train_dataset, selected_examples, weights, config_link,
+            node->mutable_node()));
+      }
       break;
-
     case model::proto::Task::REGRESSION:
       RETURN_IF_ERROR(SetRegressionLabelDistribution(
           train_dataset, selected_examples, weights, config_link,
@@ -796,11 +807,21 @@ SplitSearchResult FindBestCondition(
               ->values();
       const auto na_replacement = attribute_column_spec.numerical().mean();
       if (dt_config.numerical_split().type() == proto::NumericalSplit::EXACT) {
-        result = FindSplitLabelRegressionFeatureNumericalCart(
-            selected_examples, weights, attribute_data, label_stats.label_data,
-            na_replacement, min_num_obs, dt_config,
-            label_stats.label_distribution, attribute_idx, internal_config,
-            best_condition, cache);
+        if (weights.empty()) {
+          result =
+              FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/false>(
+                  selected_examples, weights, attribute_data,
+                  label_stats.label_data, na_replacement, min_num_obs,
+                  dt_config, label_stats.label_distribution, attribute_idx,
+                  internal_config, best_condition, cache);
+        } else {
+          result =
+              FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/true>(
+                  selected_examples, weights, attribute_data,
+                  label_stats.label_data, na_replacement, min_num_obs,
+                  dt_config, label_stats.label_distribution, attribute_idx,
+                  internal_config, best_condition, cache);
+        }
       } else {
         result = FindSplitLabelRegressionFeatureNumericalHistogram(
             selected_examples, weights, attribute_data, label_stats.label_data,
@@ -2330,6 +2351,7 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
       attribute_idx, condition, &cache->cache_v2);
 }
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
@@ -2348,9 +2370,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
   FeatureNumericalBucket::Filler feature_filler(selected_examples.size(),
                                                 na_replacement, attributes);
 
-  LabelNumericalOneValueBucket::Filler label_filler(labels, weights);
+  typename LabelNumericalOneValueBucket<weighted>::Filler label_filler(labels,
+                                                                       weights);
 
-  LabelNumericalOneValueBucket::Initializer initializer(label_distribution);
+  typename LabelNumericalOneValueBucket<weighted>::Initializer initializer(
+      label_distribution);
   const auto sorting_strategy = dt_config.internal().sorting_strategy();
   if (sorting_strategy ==
           proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -2369,8 +2393,9 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
       const auto& sorted_attributes =
           internal_config.preprocessing
               ->presorted_numerical_features()[attribute_idx];
-      return ScanSplitsPresortedSparse<FeatureNumericalLabelNumericalOneValue,
-                                       LabelNumericalScoreAccumulator>(
+      return ScanSplitsPresortedSparse<
+          FeatureNumericalLabelNumericalOneValue<weighted>,
+          LabelNumericalScoreAccumulator>(
           internal_config.preprocessing->num_examples(), selected_examples,
           sorted_attributes.items, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx,
@@ -2379,7 +2404,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
     }
   }
 
-  return FindBestSplit_LabelRegressionFeatureNumerical(
+  return FindBestSplit_LabelRegressionFeatureNumerical<weighted>(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
