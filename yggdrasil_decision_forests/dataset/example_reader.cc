@@ -42,7 +42,8 @@ absl::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     const absl::optional<std::vector<int>> required_columns) {
   std::string sharded_path;
   proto::DatasetFormat format;
-  std::tie(sharded_path, format) = GetDatasetPathAndType(typed_path);
+  ASSIGN_OR_RETURN(std::tie(sharded_path, format),
+                   GetDatasetPathAndTypeOrStatus(typed_path));
 
   const std::string& format_name = proto::DatasetFormat_Name(format);
   ASSIGN_OR_RETURN(auto reader,

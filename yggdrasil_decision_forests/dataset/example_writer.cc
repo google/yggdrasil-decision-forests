@@ -42,7 +42,8 @@ absl::StatusOr<std::unique_ptr<ExampleWriterInterface>> CreateExampleWriter(
     const int64_t num_records_by_shard) {
   std::string sharded_path;
   proto::DatasetFormat format;
-  std::tie(sharded_path, format) = GetDatasetPathAndType(typed_path);
+  ASSIGN_OR_RETURN(std::tie(sharded_path, format),
+                   GetDatasetPathAndTypeOrStatus(typed_path));
 
   const std::string& format_name = proto::DatasetFormat_Name(format);
   ASSIGN_OR_RETURN(

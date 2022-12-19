@@ -396,7 +396,8 @@ absl::Status CreateDataSpecWithStatus(
   // Format of the dataset.
   std::string sharded_path;
   proto::DatasetFormat format;
-  std::tie(sharded_path, format) = GetDatasetPathAndType(typed_path);
+  ASSIGN_OR_RETURN(std::tie(sharded_path, format),
+                   GetDatasetPathAndTypeOrStatus(typed_path));
 
   // Files in the dataset.
   std::vector<std::string> paths;
@@ -611,7 +612,8 @@ absl::Status UpdateCategoricalIntColumnSpec(
 absl::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path) {
   std::string sharded_path;
   proto::DatasetFormat format;
-  std::tie(sharded_path, format) = GetDatasetPathAndType(typed_path);
+  ASSIGN_OR_RETURN(std::tie(sharded_path, format),
+                   GetDatasetPathAndTypeOrStatus(typed_path));
   std::vector<std::string> paths;
   RETURN_IF_ERROR(utils::ExpandInputShards(sharded_path, &paths));
   LOG(INFO) << "Counting the number of examples on " << paths.size()
