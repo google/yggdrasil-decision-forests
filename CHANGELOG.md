@@ -10,6 +10,7 @@
 -   The Hyper-parameter optimizer field "predefined_search_space" automatically
     configures the set of hyper-parameters to explore during automatic
     hyper-parameter tuning.
+-   Replaces the MEAN_MIN_DEPTH variable importance with INV_MEAN_MIN_DEPTH.
 
 ## 1.2.0 - 2022-11-18
 

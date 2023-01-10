@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -484,6 +485,56 @@ TEST(DecisionTree, DoSortedRangesIntersect) {
   a = {1, 2, 3};
   b = {};
   EXPECT_FALSE(intersect());
+}
+
+TEST(DecisionTree, StructureMeanMinDepth) {
+  std::vector<std::unique_ptr<decision_tree::DecisionTree>> trees;
+  trees.push_back(std::make_unique<DecisionTree>());
+  {
+    auto& tree = *trees.back();
+    tree.CreateRoot();
+
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+
+    tree.mutable_root()->mutable_pos_child()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_attribute(1);
+  }
+
+  trees.push_back(std::make_unique<DecisionTree>());
+  {
+    auto& tree = *trees.back();
+    tree.CreateRoot();
+
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+
+    tree.mutable_root()->mutable_pos_child()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_attribute(3);
+  }
+
+  const float kMargin = 0.00001f;
+  auto vi = StructureMeanMinDepth(trees, /*num_features=*/4);
+  EXPECT_EQ(vi.size(), 3);
+
+  EXPECT_EQ(vi[0].attribute_idx(), 0);
+  EXPECT_NEAR(vi[0].importance(), 1, kMargin);
+
+  EXPECT_EQ(vi[1].attribute_idx(), 1);
+  EXPECT_NEAR(vi[1].importance(),
+              1. / (1. + (1. + 1. + 1. + 2. + 2. + 1.) / 6.), kMargin);
+
+  EXPECT_EQ(vi[2].attribute_idx(), 3);
+  EXPECT_NEAR(vi[2].importance(),
+              1. / (1. + (1. + 1. + 1. + 2. + 2. + 1.) / 6.), kMargin);
 }
 
 }  // namespace

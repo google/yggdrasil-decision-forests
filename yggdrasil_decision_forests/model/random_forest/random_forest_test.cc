@@ -281,12 +281,10 @@ TEST(DecisionTree, StructuralVariableImportance) {
   EXPECT_NEAR(imp_sum_score[0].importance(), 0.0, 0.0001);
 
   const auto imp_mean_min_depth =
-      model.GetVariableImportance("MEAN_MIN_DEPTH").value();
-  EXPECT_EQ(imp_mean_min_depth.size(), 2);
-  EXPECT_EQ(imp_mean_min_depth[0].attribute_idx(), 1);
+      model.GetVariableImportance("INV_MEAN_MIN_DEPTH").value();
+  EXPECT_EQ(imp_mean_min_depth.size(), 1);
+  EXPECT_EQ(imp_mean_min_depth[0].attribute_idx(), 0);
   EXPECT_NEAR(imp_mean_min_depth[0].importance(), 1.0, 0.0001);
-  EXPECT_EQ(imp_mean_min_depth[1].attribute_idx(), 0);
-  EXPECT_NEAR(imp_mean_min_depth[1].importance(), 0.0, 0.0001);
 }
 
 TEST(DecisionTree, AppendModelStructure) {

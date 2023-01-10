@@ -635,7 +635,7 @@ GradientBoostedTreesModel::AvailableStructuralVariableImportances() const {
       decision_tree::kVariableImportanceNumberOfTimesAsRoot);
   variable_importances.push_back(decision_tree::kVariableImportanceSumScore);
   variable_importances.push_back(
-      decision_tree::kVariableImportanceMeanMinDepth);
+      decision_tree::kVariableImportanceInvMeanMinDepth);
   return variable_importances;
 }
 
@@ -652,7 +652,7 @@ GradientBoostedTreesModel::GetVariableImportance(absl::string_view key) const {
       return decision_tree::StructureNumberOfTimesAsRoot(decision_trees());
     } else if (key == decision_tree::kVariableImportanceSumScore) {
       return decision_tree::StructureSumScore(decision_trees());
-    } else if (key == decision_tree::kVariableImportanceMeanMinDepth) {
+    } else if (key == decision_tree::kVariableImportanceInvMeanMinDepth) {
       return decision_tree::StructureMeanMinDepth(decision_trees(),
                                                   data_spec().columns_size());
     }

@@ -264,6 +264,14 @@ TEST_F(RandomForestOnAdult, Base) {
   EXPECT_TRUE(absl::StartsWith(oob_predictions, "<=50K,>50K\n"));
   EXPECT_EQ(std::count(oob_predictions.begin(), oob_predictions.end(), '\n'),
             train_dataset_.nrow() + 1 /*the header*/);
+
+  // Check that the label is not in any feature importance table.
+  for (const auto& vi_key : model_->AvailableVariableImportances()) {
+    const auto vis = model_->GetVariableImportance(vi_key).value();
+    for (const auto& vi : vis) {
+      EXPECT_NE(vi.attribute_idx(), model_->label_col_idx());
+    }
+  }
 }
 
 TEST_F(RandomForestOnAdult, PureServingModel) {

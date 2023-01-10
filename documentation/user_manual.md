@@ -463,8 +463,8 @@ most important.
 `NUM_NODES`: Number of nodes using a specific feature. The larger, the most
 important.
 
-`MEAN_MIN_DEPTH`: Average minimum depth of the first occurence of a feature
-across all the tree paths. The smaller, the most important.
+`INV_MEAN_MIN_DEPTH`: 1/(1+x) where x is the average minimum depth of the first
+occurrence of a feature across all the tree paths.
 
 ## Manual Tuning of Hyper-parameters
 

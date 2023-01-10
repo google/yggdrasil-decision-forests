@@ -464,13 +464,9 @@ The available variable importances are:
 -   `NUM_NODES`: Number of nodes using a specific feature. The larger, the most
     important.
 
--   `MEAN_MIN_DEPTH`: Average minimum depth of the first occurrence of a feature
-    across all the tree paths. **The smaller, the most important.**
-
-``` {warning}
-For the `MEAN_MIN_DEPTH` variable importance, smaller values are more important
-than larger values.
-```
+-   `INV_MEAN_MIN_DEPTH`: Inverse (i.e. 1/(1+x)) of the average minimum depth of
+    the first occurrence of a feature across all the tree paths. **Note:**
+    `MEAN_MIN_DEPTH` was removed.
 
 ## Automated Hyper-parameter Tuning
 

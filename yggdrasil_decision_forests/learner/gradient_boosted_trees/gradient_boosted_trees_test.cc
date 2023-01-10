@@ -74,6 +74,7 @@ namespace {
 using test::EqualsProto;
 using ::testing::ElementsAre;
 using ::testing::Not;
+using ::testing::UnorderedElementsAre;
 
 std::string DatasetDir() {
   return file::JoinPath(
@@ -505,13 +506,13 @@ TEST_F(GradientBoostedTreesOnAdult, VariableImportance) {
 
   TrainAndEvaluateModel();
 
-  EXPECT_THAT(
-      model_->AvailableVariableImportances(),
-      ElementsAre("MEAN_DECREASE_IN_ACCURACY",
-                  "MEAN_DECREASE_IN_AP_>50K_VS_OTHERS",
-                  "MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS",
-                  "MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS", "MEAN_MIN_DEPTH",
-                  "NUM_AS_ROOT", "NUM_NODES", "SUM_SCORE"));
+  EXPECT_THAT(model_->AvailableVariableImportances(),
+              UnorderedElementsAre("MEAN_DECREASE_IN_ACCURACY",
+                                   "MEAN_DECREASE_IN_AP_>50K_VS_OTHERS",
+                                   "MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS",
+                                   "MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS",
+                                   "INV_MEAN_MIN_DEPTH", "NUM_AS_ROOT",
+                                   "NUM_NODES", "SUM_SCORE"));
 
   const auto mean_decrease_accuracy =
       model_->GetVariableImportance("MEAN_DECREASE_IN_ACCURACY").value();

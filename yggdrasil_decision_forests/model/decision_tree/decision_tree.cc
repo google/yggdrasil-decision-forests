@@ -186,9 +186,13 @@ VariableImportanceMapToSortedVector(
 //
 // "min_depth_per_feature" should be already initialized (its size should be
 // set).
-void AddMininumDepthPerPath(const NodeWithChildren& node, const int depth,
+//
+// If a feature is effectively seen in the tree, set feature_used[feature_idx]
+// to be true.
+void AddMinimumDepthPerPath(const NodeWithChildren& node, const int depth,
                             std::vector<int>* stack,
-                            std::vector<int>* min_depth_per_feature) {
+                            std::vector<int>* min_depth_per_feature,
+                            std::vector<bool>* feature_used) {
   if (node.IsLeaf()) {
     for (int feature_idx = 0; feature_idx < min_depth_per_feature->size();
          feature_idx++) {
@@ -196,14 +200,18 @@ void AddMininumDepthPerPath(const NodeWithChildren& node, const int depth,
       while (min_depth < stack->size() && (*stack)[min_depth] != feature_idx) {
         min_depth++;
       }
+
+      if (min_depth < stack->size()) {
+        (*feature_used)[feature_idx] = true;
+      }
       (*min_depth_per_feature)[feature_idx] += min_depth;
     }
   } else {
     stack->push_back(node.node().condition().attribute());
-    AddMininumDepthPerPath(*node.pos_child(), depth + 1, stack,
-                           min_depth_per_feature);
-    AddMininumDepthPerPath(*node.neg_child(), depth + 1, stack,
-                           min_depth_per_feature);
+    AddMinimumDepthPerPath(*node.pos_child(), depth + 1, stack,
+                           min_depth_per_feature, feature_used);
+    AddMinimumDepthPerPath(*node.neg_child(), depth + 1, stack,
+                           min_depth_per_feature, feature_used);
     stack->pop_back();
   }
 }
@@ -1241,19 +1249,47 @@ std::vector<model::proto::VariableImportance> StructureMeanMinDepth(
     const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
         decision_trees,
     const int num_features) {
-  absl::flat_hash_map<int, double> importance;
+  struct Importance {
+    double mean_min_depth = 0;
+    bool used = false;
+  };
+  std::vector<Importance> importance_per_feature(num_features);
+
   for (auto& tree : decision_trees) {
     const auto num_nodes = tree->NumLeafs();
     std::vector<int> stack;
     std::vector<int> min_depth_per_feature(num_features, 0);
-    AddMininumDepthPerPath(tree->root(), 0, &stack, &min_depth_per_feature);
+    std::vector<bool> feature_used(num_features, false);
+
+    AddMinimumDepthPerPath(tree->root(), 0, &stack, &min_depth_per_feature,
+                           &feature_used);
+
     for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
-      importance[feature_idx] +=
+      importance_per_feature[feature_idx].mean_min_depth +=
           static_cast<double>(min_depth_per_feature[feature_idx]) /
           (num_nodes * decision_trees.size());
+      if (feature_used[feature_idx]) {
+        importance_per_feature[feature_idx].used = true;
+      }
     }
   }
-  return VariableImportanceMapToSortedVector(importance);
+
+  // Do the three following operations:
+  //   - Copy the importance from the vector to the map.
+  //   - Compute the **inverse** mean min depth.
+  //   - Skip non used features.
+  absl::flat_hash_map<int, double> importance_map;
+  for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
+    const auto& importance = importance_per_feature[feature_idx];
+
+    if (!importance.used) {
+      continue;
+    }
+    const auto inv_mean_min_depth = 1. / (1. + importance.mean_min_depth);
+    importance_map[feature_idx] = inv_mean_min_depth;
+  }
+
+  return VariableImportanceMapToSortedVector(importance_map);
 }
 
 std::vector<model::proto::VariableImportance> StructureSumScore(

@@ -55,7 +55,10 @@ constexpr int32_t kConditionPoolGrowthFactor = 2;
 static constexpr char kVariableImportanceNumberOfNodes[] = "NUM_NODES";
 static constexpr char kVariableImportanceNumberOfTimesAsRoot[] = "NUM_AS_ROOT";
 static constexpr char kVariableImportanceSumScore[] = "SUM_SCORE";
-static constexpr char kVariableImportanceMeanMinDepth[] = "MEAN_MIN_DEPTH";
+// "INV_MEAN_MIN_DEPTH" is 1/(1+d) where "d" is the average depth of the feature
+// in the forest.
+static constexpr char kVariableImportanceInvMeanMinDepth[] =
+    "INV_MEAN_MIN_DEPTH";
 
 // Return an identifier of a type of condition.
 std::string ConditionTypeToString(proto::Condition::TypeCase type);
