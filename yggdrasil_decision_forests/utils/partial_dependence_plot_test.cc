@@ -254,7 +254,6 @@ class PartialDependencePlotTest : public testing::Test {
 
     std::string description;
     model->AppendModelStructure(&description);
-    LOG(INFO) << "@@@ Model\n" << description;
     return model;
   }
 

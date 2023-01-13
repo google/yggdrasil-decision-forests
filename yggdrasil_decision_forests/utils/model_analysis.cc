@@ -702,8 +702,6 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
                          options.cep().example_sampling()));
   }
 
-  LOG(INFO) << "@@@ VI";
-
   if (options.permuted_variable_importance().enabled()) {
     RETURN_IF_ERROR(ComputePermutationFeatureImportance(
         dataset, &model, analysis.mutable_variable_importances(),

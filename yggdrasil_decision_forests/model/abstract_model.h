@@ -456,7 +456,7 @@ class AbstractModel {
   // have the same weight.
   absl::optional<dataset::proto::LinkedWeightDefinition> weights_;
 
-  // Input features of the model.
+  // Input features of the model sorted by index.
   std::vector<int> input_features_;
 
   absl::flat_hash_map<std::string, proto::VariableImportanceSet>

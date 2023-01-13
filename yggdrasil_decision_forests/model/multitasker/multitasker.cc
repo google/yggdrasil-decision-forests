@@ -18,6 +18,7 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
@@ -104,6 +105,17 @@ void MultitaskerModel::Predict(const dataset::VerticalDataset& dataset,
 void MultitaskerModel::Predict(const dataset::proto::Example& example,
                                model::proto::Prediction* prediction) const {
   models_.front()->Predict(example, prediction);
+}
+
+void MultitaskerModel::AppendDescriptionAndStatistics(
+    bool full_definition, std::string* description) const {
+  AbstractModel::AppendDescriptionAndStatistics(full_definition, description);
+  for (int model_idx = 0; model_idx < models_.size(); model_idx++) {
+    const auto& model = models_[model_idx];
+    absl::SubstituteAndAppend(description, "model #$0:\n", model_idx);
+    model->AppendDescriptionAndStatistics(full_definition, description);
+    absl::StrAppend(description, "\n");
+  }
 }
 
 }  // namespace multitasker

@@ -66,6 +66,9 @@ class MultitaskerModel : public AbstractModel {
   void Predict(const dataset::proto::Example& example,
                model::proto::Prediction* prediction) const override;
 
+  void AppendDescriptionAndStatistics(bool full_definition,
+                                      std::string* description) const override;
+
   const AbstractModel* model(int index) const { return models_[index].get(); }
 
   const std::vector<std::unique_ptr<AbstractModel>>& models() {

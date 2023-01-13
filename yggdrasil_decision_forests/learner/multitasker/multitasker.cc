@@ -89,6 +89,8 @@ MultitaskerLearner::TrainWithStatus(
   };
 
   {
+    LOG(INFO) << "Train multitasker with " << mt_config.subtasks_size()
+              << " model(s)";
     utils::concurrency::ThreadPool pool("multitasker",
                                         deployment().num_threads());
     pool.StartWorkers();
@@ -101,6 +103,16 @@ MultitaskerLearner::TrainWithStatus(
   }
 
   RETURN_IF_ERROR(status);
+
+  std::set<int> all_input_features;
+  for (const auto& model : model->models()) {
+    all_input_features.insert(model->input_features().begin(),
+                              model->input_features().end());
+  }
+  *model->mutable_input_features() = {all_input_features.begin(),
+                                      all_input_features.end()};
+  std::sort(model->mutable_input_features()->begin(),
+            model->mutable_input_features()->end());
 
   return model;
 }
@@ -117,6 +129,11 @@ MultitaskerLearner::BuildSubTrainingConfig(const int learner_idx) const {
       training_config().GetExtension(proto::multitasker_config);
 
   model::proto::TrainingConfig sub_learner_config = mt_config.base_learner();
+  RETURN_IF_ERROR(CopyProblemDefinition(training_config_, &sub_learner_config));
+
+  if (learner_idx >= mt_config.subtasks_size()) {
+    return absl::InvalidArgumentError("Invalid learner idx");
+  }
   sub_learner_config.MergeFrom(mt_config.subtasks(learner_idx).train_config());
 
   if (training_config().has_maximum_training_duration_seconds() &&
@@ -130,6 +147,7 @@ MultitaskerLearner::BuildSubTrainingConfig(const int learner_idx) const {
     sub_learner_config.set_maximum_model_size_in_memory_in_bytes(
         training_config().maximum_model_size_in_memory_in_bytes());
   }
+
   return sub_learner_config;
 }
 
@@ -151,6 +169,14 @@ MultitaskerLearner::BuildSubLearner(const int learner_idx) const {
 
 absl::StatusOr<model::proto::GenericHyperParameterSpecification>
 MultitaskerLearner::GetGenericHyperParameterSpecification() const {
+  const auto& mt_config =
+      training_config().GetExtension(proto::multitasker_config);
+  if (mt_config.subtasks_size() == 0) {
+    LOG(WARNING) << "Sub-learner not set. This is only expected during the "
+                    "automatic documentation generation.";
+    return AbstractLearner::GetGenericHyperParameterSpecification();
+  }
+
   ASSIGN_OR_RETURN(auto sub_learner, BuildSubLearner(0));
   return sub_learner->GetGenericHyperParameterSpecification();
 }
