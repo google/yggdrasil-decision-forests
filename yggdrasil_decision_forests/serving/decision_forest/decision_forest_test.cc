@@ -23,8 +23,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/flags/flag.h"
+#include "absl/memory/memory.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -39,6 +41,7 @@
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended.h"
+#include "yggdrasil_decision_forests/serving/decision_forest/register_engines.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -97,12 +100,23 @@ std::unique_ptr<model::AbstractModel> LoadModel(
   return model;
 }
 
-// Load a set of pre-computed numerical predictions.
-std::vector<float> LoadNumericalPredictions(
-    const absl::string_view prediction_filename) {
-  const std::string expected_prediction_path =
-      file::JoinPath(TestDataDir(), "prediction", prediction_filename);
-  return LoadCsvToVectorOfFloat(expected_prediction_path);
+// Ensures that the model is compatible with the following set of engines.
+void CheckCompatibleEngine(
+    const model::AbstractModel& model,
+    const std::unordered_set<std::string>& expected_engines) {
+  std::unordered_set<std::string> compatible_engines;
+  auto engine_factories = model.ListCompatibleFastEngines();
+  for (auto& factory : engine_factories) {
+    EXPECT_OK(factory->CreateEngine(&model).status());
+    compatible_engines.insert(factory->name());
+  }
+
+  if (expected_engines != compatible_engines) {
+    LOG(INFO) << "expected_engines:" << absl::StrJoin(expected_engines, " ");
+    LOG(INFO) << "compatible_engines:"
+              << absl::StrJoin(compatible_engines, " ");
+    ADD_FAILURE();
+  }
 }
 
 TEST(SpecializedRandomForestTest,
@@ -205,6 +219,7 @@ TEST(SpecializedRandomForestTest,
 struct AllCompatibleEnginesTestParams {
   const std::string model;
   const std::string dataset;
+  const std::unordered_set<std::string> expected_engines;
   const std::string dataset_format = "csv";
 };
 
@@ -222,26 +237,111 @@ TEST_P(AllCompatibleEnginesTest, Automtac) {
     const auto engine = factory->CreateEngine(model.get()).value();
     utils::ExpectEqualPredictions(dataset, *model, *engine);
   }
+
+  CheckCompatibleEngine(*model, GetParam().expected_engines);
+}
+
+TEST_P(AllCompatibleEnginesTest, AutomtacForceCheckFail) {
+  const auto model = LoadModel(GetParam().model);
+
+  // Make it look like the model is not compatible with global imputation
+  // optimization.
+  if (dynamic_cast<GradientBoostedTreesModel*>(model.get())) {
+    dynamic_cast<GradientBoostedTreesModel*>(model.get())
+        ->Testing()
+        ->force_fail_check_structure_global_imputation_is_higher = true;
+  } else if (dynamic_cast<RandomForestModel*>(model.get())) {
+    dynamic_cast<RandomForestModel*>(model.get())
+        ->Testing()
+        ->force_fail_check_structure_global_imputation_is_higher = true;
+  } else {
+    // Nothing to test.
+    return;
+  }
+
+  // None of the Opt engines are compatible.
+  auto expected_engines = GetParam().expected_engines;
+  expected_engines.erase(gradient_boosted_trees::kOptPred);
+  expected_engines.erase(random_forest::kOptPred);
+
+  const auto dataset = LoadDataset(model->data_spec(), GetParam().dataset,
+                                   GetParam().dataset_format);
+  const auto factories = model->ListCompatibleFastEngines();
+  CHECK_GE(factories.size(), 1);
+  for (const auto& factory : factories) {
+    const auto engine = factory->CreateEngine(model.get()).value();
+    utils::ExpectEqualPredictions(dataset, *model, *engine);
+  }
+
+  CheckCompatibleEngine(*model, expected_engines);
+}
+
+std::unordered_set<std::string> AllGBTEngines() {
+  return {
+      gradient_boosted_trees::kQuickScorerExtended,
+      gradient_boosted_trees::kOptPred,
+      gradient_boosted_trees::kGeneric,
+  };
+}
+
+std::unordered_set<std::string> GBTQSAndGenericEngines() {
+  return {
+      gradient_boosted_trees::kQuickScorerExtended,
+      gradient_boosted_trees::kGeneric,
+  };
+}
+
+std::unordered_set<std::string> AllRFEngines() {
+  return {
+      random_forest::kOptPred,
+      random_forest::kGeneric,
+  };
 }
 
 INSTANTIATE_TEST_SUITE_P(
     AllCompatibleEnginesTests, AllCompatibleEnginesTest,
     testing::ValuesIn<AllCompatibleEnginesTestParams>({
-        {"abalone_regression_gbdt", "abalone.csv"},
-        {"abalone_regression_rf", "abalone.csv"},
-        {"adult_binary_class_gbdt", "adult_test.csv"},
-        {"adult_binary_class_gbdt_32cat", "adult_test.csv"},
-        {"adult_binary_class_gbdt_only_num", "adult_test.csv"},
-        {"adult_binary_class_oblique_rf", "adult_test.csv"},
-        {"adult_binary_class_rf", "adult_test.csv"},
-        {"adult_binary_class_rf_32cat", "adult_test.csv"},
-        {"adult_binary_class_rf_discret_numerical", "adult_test.csv"},
-        {"adult_binary_class_rf_only_num", "adult_test.csv"},
-        {"iris_multi_class_gbdt", "iris.csv"},
-        {"iris_multi_class_rf", "iris.csv"},
-        {"sst_binary_class_gbdt", "sst_binary_test.csv"},
-        {"sst_binary_class_rf", "sst_binary_test.csv"},
-        {"synthetic_ranking_gbdt", "synthetic_ranking_test.csv"},
+        {"abalone_regression_gbdt", "abalone.csv", AllGBTEngines()},
+        {"abalone_regression_rf", "abalone.csv", AllRFEngines()},
+        {"adult_binary_class_gbdt", "adult_test.csv", GBTQSAndGenericEngines()},
+        {"adult_binary_class_gbdt_32cat", "adult_test.csv", AllGBTEngines()},
+        {"adult_binary_class_gbdt_only_num", "adult_test.csv", AllGBTEngines()},
+        {
+            "adult_binary_class_oblique_rf",
+            "adult_test.csv",
+            {random_forest::kGeneric},
+        },
+        {
+            "adult_binary_class_rf",
+            "adult_test.csv",
+            {random_forest::kGeneric},
+        },
+        {"adult_binary_class_rf_32cat", "adult_test.csv", AllRFEngines()},
+        {
+            "adult_binary_class_rf_discret_numerical",
+            "adult_test.csv",
+            {random_forest::kGeneric},
+        },
+        {"adult_binary_class_rf_only_num", "adult_test.csv", AllRFEngines()},
+        {
+            "iris_multi_class_gbdt",
+            "iris.csv",
+            {gradient_boosted_trees::kGeneric},
+        },
+        {
+            "iris_multi_class_rf",
+            "iris.csv",
+            {random_forest::kGeneric},
+        },
+        {"sst_binary_class_gbdt", "sst_binary_test.csv",
+         GBTQSAndGenericEngines()},
+        {
+            "sst_binary_class_rf",
+            "sst_binary_test.csv",
+            {random_forest::kGeneric},
+        },
+        {"synthetic_ranking_gbdt", "synthetic_ranking_test.csv",
+         AllGBTEngines()},
     }),
     [](const testing::TestParamInfo<AllCompatibleEnginesTest::ParamType>&
            info) {
@@ -391,6 +491,140 @@ TEST(SpecializedGradientBoostedTreesTest, MoreThan65kNodesPerTrees) {
   label->mutable_categorical()->set_number_of_unique_values(3);
 
   EXPECT_OK(model.BuildFastEngine());
+}
+
+std::unique_ptr<GradientBoostedTreesModel> BuildNonGlobalImputationGBT() {
+  auto model = absl::make_unique<GradientBoostedTreesModel>();
+
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "a" }
+    columns { type: NUMERICAL name: "b" }
+    columns { type: NUMERICAL name: "c" }
+  )pb");
+
+  model->set_task(model::proto::Task::REGRESSION);
+  model->set_label_col_idx(0);
+  model->set_data_spec(dataspec);
+  model->set_loss(model::gradient_boosted_trees::proto::Loss::SQUARED_ERROR);
+  model->mutable_initial_predictions()->push_back(0);
+  model->mutable_input_features()->push_back(1);
+  model->mutable_input_features()->push_back(2);
+
+  struct NodeHelper {
+    model::decision_tree::NodeWithChildren* pos;
+    model::decision_tree::NodeWithChildren* neg;
+  };
+
+  const auto split = [](model::decision_tree::NodeWithChildren* node,
+                        const int attribute, const float threshold,
+                        const bool na_value) -> NodeHelper {
+    node->CreateChildren();
+    node->mutable_node()->mutable_condition()->set_attribute(attribute);
+    node->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_higher_condition()
+        ->set_threshold(threshold);
+    node->mutable_node()->mutable_condition()->set_na_value(na_value);
+
+    return {
+        /*.pos =*/node->mutable_pos_child(),
+        /*.neg =*/node->mutable_neg_child(),
+    };
+  };
+
+  // "b">=1 [s:0 n:0 np:0 miss:0]
+  //     ├─(pos)─ "c">=2 [s:0 n:0 np:0 miss:1]
+  //     |        ├─(pos)─ pred:4
+  //     |        └─(neg)─ pred:3
+  //     └─(neg)─ "c">=1 [s:0 n:0 np:0 miss:0]
+  //              ├─(pos)─ pred:2
+  //              └─(neg)─ pred:1
+
+  auto tree = absl::make_unique<model::decision_tree::DecisionTree>();
+  tree->CreateRoot();
+  auto n1 = split(tree->mutable_root(), 1, 1.0, false);
+  auto n2 = split(n1.neg, 2, 1.0, false);
+  auto n3 = split(n1.pos, 2, 2.0, true);
+  n2.neg->mutable_node()->mutable_regressor()->set_top_value(1.f);
+  n2.pos->mutable_node()->mutable_regressor()->set_top_value(2.f);
+  n3.neg->mutable_node()->mutable_regressor()->set_top_value(3.f);
+  n3.pos->mutable_node()->mutable_regressor()->set_top_value(4.f);
+  model->mutable_decision_trees()->push_back(std::move(tree));
+
+  return model;
+}
+
+template <typename Engine>
+std::unique_ptr<typename Engine::ExampleSet> BuildNonGlobalImputationExamples(
+    const Engine& engine) {
+  auto examples = absl::make_unique<typename Engine::ExampleSet>(6, engine);
+
+  const auto& fs = engine.features();
+  auto feature_b = engine.features().GetNumericalFeatureId("b").value();
+  auto feature_c = engine.features().GetNumericalFeatureId("c").value();
+
+  examples->SetNumerical(/*example_idx=*/5, feature_b, /*value=*/0.0f, fs);
+  examples->SetNumerical(/*example_idx=*/1, feature_b, /*value=*/0.0f, fs);
+  examples->SetNumerical(/*example_idx=*/2, feature_b, /*value=*/0.0f, fs);
+  examples->SetNumerical(/*example_idx=*/3, feature_b, /*value=*/2.0f, fs);
+  examples->SetNumerical(/*example_idx=*/4, feature_b, /*value=*/2.0f, fs);
+  examples->SetNumerical(/*example_idx=*/0, feature_b, /*value=*/2.0f, fs);
+
+  examples->SetNumerical(/*example_idx=*/5, feature_c, /*value=*/0.0f, fs);
+  examples->SetNumerical(/*example_idx=*/1, feature_c, /*value=*/3.0f, fs);
+  examples->SetMissingNumerical(/*example_idx=*/2, feature_c, fs);
+  examples->SetNumerical(/*example_idx=*/3, feature_c, /*value=*/0.0f, fs);
+  examples->SetNumerical(/*example_idx=*/4, feature_c, /*value=*/3.0f, fs);
+  examples->SetMissingNumerical(/*example_idx=*/0, feature_c, fs);
+  return examples;
+}
+
+void CheckNonGlobalImputationPredictions(
+    const std::vector<float>& predictions) {
+  EXPECT_EQ(predictions.size(), 6);
+  EXPECT_NEAR(predictions[5], 1, 0.0001);
+  EXPECT_NEAR(predictions[1], 2, 0.0001);
+  EXPECT_NEAR(predictions[2], 1, 0.0001);
+  EXPECT_NEAR(predictions[3], 3, 0.0001);
+  EXPECT_NEAR(predictions[4], 4, 0.0001);
+  EXPECT_NEAR(predictions[0], 4, 0.0001);
+}
+
+TEST(DecisionForest, NonGlobalImputationGeneric) {
+  auto model = BuildNonGlobalImputationGBT();
+
+  GradientBoostedTreesRegression engine;
+  CHECK_OK(GenericToSpecializedModel(*model.get(), &engine));
+
+  const auto examples = BuildNonGlobalImputationExamples(engine);
+  std::vector<float> predictions;
+  Predict(engine, *examples, examples->NumberOfExamples(), &predictions);
+
+  CheckNonGlobalImputationPredictions(predictions);
+}
+
+TEST(DecisionForest, NonGlobalImputationQuickScorer) {
+  auto model = BuildNonGlobalImputationGBT();
+
+  GradientBoostedTreesRegressionQuickScorerExtended engine;
+  CHECK_OK(GenericToSpecializedModel(*model.get(), &engine));
+  LOG(INFO) << "Engine:\n" << DescribeQuickScorer(engine);
+
+  const auto examples = BuildNonGlobalImputationExamples(engine);
+  std::vector<float> predictions;
+  Predict(engine, *examples, examples->NumberOfExamples(), &predictions);
+
+  CheckNonGlobalImputationPredictions(predictions);
+}
+
+TEST(DecisionForest, NonGlobalImputationEngines) {
+  auto model = BuildNonGlobalImputationGBT();
+  CheckCompatibleEngine(*model,
+                        {
+                            gradient_boosted_trees::kQuickScorerExtended,
+                            gradient_boosted_trees::kGeneric,
+                        });
 }
 
 }  // namespace

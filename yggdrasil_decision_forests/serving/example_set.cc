@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/serving/example_set.h"
 
+#include <limits>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -27,9 +29,13 @@ using dataset::proto::ColumnType;
 // Creates the default value for a numerical only model.
 template <>
 absl::StatusOr<float> GetDefaultValue<float>(
-    const dataset::proto::Column& col_spec) {
+    const dataset::proto::Column& col_spec,
+    const bool missing_numerical_is_na) {
   if (col_spec.type() == ColumnType::NUMERICAL ||
       col_spec.type() == ColumnType::DISCRETIZED_NUMERICAL) {
+    if (missing_numerical_is_na) {
+      return std::numeric_limits<float>::quiet_NaN();
+    }
     return col_spec.numerical().mean();
   } else if (col_spec.type() == ColumnType::BOOLEAN) {
     // Note: Boolean can only be compared with 0.5f.
@@ -49,10 +55,15 @@ absl::StatusOr<float> GetDefaultValue<float>(
 template <>
 absl::StatusOr<NumericalOrCategoricalValue>
 GetDefaultValue<NumericalOrCategoricalValue>(
-    const dataset::proto::Column& col_spec) {
+    const dataset::proto::Column& col_spec,
+    const bool missing_numerical_is_na) {
   switch (col_spec.type()) {
     case ColumnType::NUMERICAL:
     case ColumnType::DISCRETIZED_NUMERICAL:
+      if (missing_numerical_is_na) {
+        return NumericalOrCategoricalValue::Numerical(
+            std::numeric_limits<float>::quiet_NaN());
+      }
       return NumericalOrCategoricalValue::Numerical(
           col_spec.numerical().mean());
     case ColumnType::BOOLEAN:
@@ -120,9 +131,12 @@ bool FeaturesDefinitionNumericalOrCategoricalFlat::HasInputFeature(
 }
 
 absl::Status FeaturesDefinitionNumericalOrCategoricalFlat::Initialize(
-    const std::vector<int>& input_features, const DataSpecification& dataspec) {
-  RETURN_IF_ERROR(InitializeNormalFeatures(input_features, dataspec));
-  RETURN_IF_ERROR(InitializeUnstackedFeatures(input_features, dataspec));
+    const std::vector<int>& input_features, const DataSpecification& dataspec,
+    const bool missing_numerical_is_na) {
+  RETURN_IF_ERROR(InitializeNormalFeatures(input_features, dataspec,
+                                           missing_numerical_is_na));
+  RETURN_IF_ERROR(InitializeUnstackedFeatures(input_features, dataspec,
+                                              missing_numerical_is_na));
 
   // At this point, feature definitions (e.g. fixed_length_features) should not
   // be modified anymore.
@@ -140,7 +154,8 @@ absl::Status FeaturesDefinitionNumericalOrCategoricalFlat::Initialize(
 
 absl::Status
 FeaturesDefinitionNumericalOrCategoricalFlat::InitializeNormalFeatures(
-    const std::vector<int>& input_features, const DataSpecification& dataspec) {
+    const std::vector<int>& input_features, const DataSpecification& dataspec,
+    const bool missing_numerical_is_na) {
   data_spec_ = dataspec;
 
   // Index the input features.
@@ -161,9 +176,9 @@ FeaturesDefinitionNumericalOrCategoricalFlat::InitializeNormalFeatures(
                                           /*.type =*/col_spec.type(),
                                           /*.spec_idx =*/spec_feature_idx,
                                           /*.internal_idx =*/internal_idx});
-        ASSIGN_OR_RETURN(
-            auto default_value,
-            GetDefaultValue<NumericalOrCategoricalValue>(col_spec));
+        ASSIGN_OR_RETURN(auto default_value,
+                         GetDefaultValue<NumericalOrCategoricalValue>(
+                             col_spec, missing_numerical_is_na));
         fixed_length_feature_missing_values_.push_back(default_value);
       } break;
       case ColumnType::CATEGORICAL_SET: {
@@ -185,7 +200,8 @@ FeaturesDefinitionNumericalOrCategoricalFlat::InitializeNormalFeatures(
 
 absl::Status
 FeaturesDefinitionNumericalOrCategoricalFlat::InitializeUnstackedFeatures(
-    const std::vector<int>& input_features, const DataSpecification& dataspec) {
+    const std::vector<int>& input_features, const DataSpecification& dataspec,
+    const bool missing_numerical_is_na) {
   // List the sub-set of input features which are unstacked.
   std::vector<int> unstacked_input_features;
   for (const int spec_feature_idx : input_features) {
@@ -233,7 +249,8 @@ FeaturesDefinitionNumericalOrCategoricalFlat::InitializeUnstackedFeatures(
            /*.spec_idx =*/spec_feature_idx,
            /*.internal_idx =*/begin_internal_idx + dim_idx});
       ASSIGN_OR_RETURN(auto default_value,
-                       GetDefaultValue<NumericalOrCategoricalValue>(col_spec));
+                       GetDefaultValue<NumericalOrCategoricalValue>(
+                           col_spec, missing_numerical_is_na));
       fixed_length_feature_missing_values_.push_back(default_value);
     }
   }

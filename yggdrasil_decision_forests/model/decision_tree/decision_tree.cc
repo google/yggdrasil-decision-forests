@@ -341,7 +341,8 @@ int64_t NodeWithChildren::NumNodes() const {
   }
 }
 
-bool NodeWithChildren::IsMissingValueConditionResultFollowGlobalImputation(
+bool NodeWithChildren::CheckStructure(
+    const CheckStructureOptions& options,
     const dataset::proto::DataSpecification& data_spec) const {
   if (IsLeaf()) {
     return true;
@@ -351,6 +352,11 @@ bool NodeWithChildren::IsMissingValueConditionResultFollowGlobalImputation(
   const auto& attribute_spec = data_spec.columns(condition.attribute());
   switch (condition.condition().type_case()) {
     case proto::Condition::kHigherCondition:
+
+      if (!options.global_imputation_is_higher) {
+        break;
+      }
+
       if ((static_cast<float>(attribute_spec.numerical().mean()) >=
            condition.condition().higher_condition().threshold()) !=
           condition.na_value()) {
@@ -363,20 +369,31 @@ bool NodeWithChildren::IsMissingValueConditionResultFollowGlobalImputation(
       // follow global imputation.
       return true;
 
-    case proto::Condition::kDiscretizedHigherCondition: {
-      const auto discretized_threshold =
-          condition.condition().discretized_higher_condition().threshold();
-      const float is_higher_threshold =
-          attribute_spec.discretized_numerical().boundaries(
-              discretized_threshold - 1);
-      if ((attribute_spec.numerical().mean() >= is_higher_threshold) !=
-          condition.na_value()) {
-        return false;
+    case proto::Condition::kDiscretizedHigherCondition:
+
+      if (!options.global_imputation_is_higher) {
+        break;
+      }
+
+      {
+        const auto discretized_threshold =
+            condition.condition().discretized_higher_condition().threshold();
+        const float is_higher_threshold =
+            attribute_spec.discretized_numerical().boundaries(
+                discretized_threshold - 1);
+        if ((attribute_spec.numerical().mean() >= is_higher_threshold) !=
+            condition.na_value()) {
+          return false;
+        }
       }
       break;
-    }
 
     case proto::Condition::kTrueValueCondition:
+
+      if (!options.global_imputation_others) {
+        break;
+      }
+
       if ((attribute_spec.boolean().count_true() >=
            attribute_spec.boolean().count_false()) != condition.na_value()) {
         return false;
@@ -384,6 +401,11 @@ bool NodeWithChildren::IsMissingValueConditionResultFollowGlobalImputation(
       break;
 
     case proto::Condition::kContainsCondition:
+
+      if (!options.global_imputation_others) {
+        break;
+      }
+
       if (attribute_spec.type() == dataset::proto::CATEGORICAL) {
         const auto& elements =
             condition.condition().contains_condition().elements();
@@ -397,6 +419,11 @@ bool NodeWithChildren::IsMissingValueConditionResultFollowGlobalImputation(
       break;
 
     case proto::Condition::kContainsBitmapCondition:
+
+      if (!options.global_imputation_others) {
+        break;
+      }
+
       if (attribute_spec.type() == dataset::proto::CATEGORICAL) {
         if (!utils::bitmap::GetValueBit(
                 condition.condition()
@@ -406,7 +433,6 @@ bool NodeWithChildren::IsMissingValueConditionResultFollowGlobalImputation(
             condition.na_value()) {
           return false;
         }
-        break;
       }
       break;
 
@@ -415,10 +441,8 @@ bool NodeWithChildren::IsMissingValueConditionResultFollowGlobalImputation(
       break;
   }
 
-  return pos_child()->IsMissingValueConditionResultFollowGlobalImputation(
-             data_spec) &&
-         neg_child()->IsMissingValueConditionResultFollowGlobalImputation(
-             data_spec);
+  return pos_child()->CheckStructure(options, data_spec) &&
+         neg_child()->CheckStructure(options, data_spec);
 }
 
 int64_t DecisionTree::NumNodes() const {
@@ -861,10 +885,9 @@ const proto::Node& DecisionTree::GetLeaf(
   return current_node->node();
 }
 
-const void DecisionTree::GetPath(
-    const dataset::VerticalDataset& dataset,
-    dataset::VerticalDataset::row_t row_idx,
-    std::vector<const NodeWithChildren*>* path) const {
+void DecisionTree::GetPath(const dataset::VerticalDataset& dataset,
+                           dataset::VerticalDataset::row_t row_idx,
+                           std::vector<const NodeWithChildren*>* path) const {
   DCHECK(root_ != nullptr);
   path->clear();
   const NodeWithChildren* current_node = root_.get();
@@ -1124,11 +1147,11 @@ int64_t NumberOfNodes(const std::vector<std::unique_ptr<DecisionTree>>& trees) {
   return num_nodes;
 }
 
-bool IsMissingValueConditionResultFollowGlobalImputation(
-    const dataset::proto::DataSpecification& data_spec,
-    const std::vector<std::unique_ptr<DecisionTree>>& trees) {
+bool CheckStructure(const CheckStructureOptions& options,
+                    const dataset::proto::DataSpecification& data_spec,
+                    const std::vector<std::unique_ptr<DecisionTree>>& trees) {
   for (const auto& tree : trees) {
-    if (!tree->IsMissingValueConditionResultFollowGlobalImputation(data_spec)) {
+    if (!tree->CheckStructure(options, data_spec)) {
       return false;
     }
   }
@@ -1203,9 +1226,10 @@ void DecisionTree::SetLeafIndices() {
       /*neg_before_pos_child=*/true);
 }
 
-bool DecisionTree::IsMissingValueConditionResultFollowGlobalImputation(
+bool DecisionTree::CheckStructure(
+    const CheckStructureOptions& options,
     const dataset::proto::DataSpecification& data_spec) const {
-  return root().IsMissingValueConditionResultFollowGlobalImputation(data_spec);
+  return root().CheckStructure(options, data_spec);
 }
 
 void DecisionTree::ScaleRegressorOutput(const float scale) {

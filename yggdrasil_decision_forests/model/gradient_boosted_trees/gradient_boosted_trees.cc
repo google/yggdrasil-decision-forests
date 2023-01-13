@@ -191,10 +191,13 @@ int64_t GradientBoostedTreesModel::NumNodes() const {
   return decision_tree::NumberOfNodes(decision_trees_);
 }
 
-bool GradientBoostedTreesModel::
-    IsMissingValueConditionResultFollowGlobalImputation() const {
-  return decision_tree::IsMissingValueConditionResultFollowGlobalImputation(
-      data_spec(), decision_trees_);
+bool GradientBoostedTreesModel::CheckStructure(
+    const decision_tree::CheckStructureOptions& options) const {
+  if (options.global_imputation_is_higher &&
+      testing_.force_fail_check_structure_global_imputation_is_higher) {
+    return false;
+  }
+  return decision_tree::CheckStructure(options, data_spec(), decision_trees_);
 }
 
 // Add a new tree to the model.

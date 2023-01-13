@@ -121,17 +121,22 @@ struct NumericalOrCategoricalValue {
   }
 };
 
-// Get the default value for column i.e. the value to use when the feature is
-// missing / non-available at inference time.
+// Gets the value that represent a "missing value" for an example set / an
+// inference engine.
 //
-// Note: The default value of a column is model specific. However, all the
-// currently supported model in "serving/" are using the default value
-// implemented as follow:
+// For categorical* features, values are replaced by the most frequent value.
+// This behavior is compatible with models trained with global imputation.
 //
-//   Numerical feature: Mean value.
-//   Categotical feature: Most frequent value.
+// For numerical features, if missing_numerical_is_na=False, values are replaced
+// by the value mean as defined in the dataspec. This behavior is compatible
+// with models trained with global imputation.
+//
+// For numerical features, if missing_numerical_is_na=True, values are replaced
+// by NaN.
+//
 template <typename Value>
-absl::StatusOr<Value> GetDefaultValue(const dataset::proto::Column& col_spec);
+absl::StatusOr<Value> GetDefaultValue(const dataset::proto::Column& col_spec,
+                                      bool missing_numerical_is_na);
 
 // How is a batch of examples stored in memory.
 enum class ExampleFormat {
@@ -382,17 +387,19 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
 
   // Initialize the object.
   absl::Status Initialize(const std::vector<int>& input_features,
-                          const DataSpecification& dataspec);
+                          const DataSpecification& dataspec,
+                          bool missing_numerical_is_na = false);
 
  private:
   // Specialization of "Initialize" for "normal" features.
   absl::Status InitializeNormalFeatures(const std::vector<int>& input_features,
-                                        const DataSpecification& dataspec);
+                                        const DataSpecification& dataspec,
+                                        bool missing_numerical_is_na);
 
   // Specialization of "Initialize" for "unstacked" features.
   absl::Status InitializeUnstackedFeatures(
-      const std::vector<int>& input_features,
-      const DataSpecification& dataspec);
+      const std::vector<int>& input_features, const DataSpecification& dataspec,
+      const bool missing_numerical_is_na);
 
   // The name and order of the fixed length input features expected by the
   // model.

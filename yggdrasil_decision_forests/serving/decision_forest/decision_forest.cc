@@ -284,16 +284,30 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
   dst_node->feature_idx = static_cast<FeatureIdx>(feature.internal_idx);
 
   const auto& src_condition = src_node.node().condition().condition();
+  const bool na_value = src_node.node().condition().na_value();
 
   const auto& attribute_spec =
       src_model.data_spec().columns(src_node.node().condition().attribute());
+
+  auto NumericalIsHigher = [dst_model, na_value]() ->
+      typename GenericNode::Type {
+        if (dst_model->global_imputation_optimization) {
+          return GenericNode::Type::kNumericalIsHigherMissingIsFalse;
+        }
+
+        if (na_value) {
+          return GenericNode::Type::kNumericalIsHigherMissingIsTrue;
+        } else {
+          return GenericNode::Type::kNumericalIsHigherMissingIsFalse;
+        }
+      };
 
   switch (src_condition.type_case()) {
     case ConditionType::kHigherCondition:
       if (attribute_spec.type() != dataset::proto::NUMERICAL) {
         return absl::InvalidArgumentError("Non supported condition.");
       }
-      dst_node->type = GenericNode::Type::kNumericalIsHigher;
+      dst_node->type = NumericalIsHigher();
       dst_node->numerical_is_higher_threshold =
           src_condition.higher_condition().threshold();
       break;
@@ -302,7 +316,7 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
       if (attribute_spec.type() != dataset::proto::BOOLEAN) {
         return absl::InvalidArgumentError("Non supported condition.");
       }
-      dst_node->type = GenericNode::Type::kNumericalIsHigher;
+      dst_node->type = NumericalIsHigher();
       dst_node->numerical_is_higher_threshold = 0.5f;
       break;
 
@@ -310,7 +324,7 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
       if (attribute_spec.type() != dataset::proto::DISCRETIZED_NUMERICAL) {
         return absl::InvalidArgumentError("Non supported condition.");
       }
-      dst_node->type = GenericNode::Type::kNumericalIsHigher;
+      dst_node->type = NumericalIsHigher();
       const auto discretized_threshold =
           src_condition.discretized_higher_condition().threshold();
       dst_node->numerical_is_higher_threshold =
@@ -696,24 +710,32 @@ template <typename GenericModel, typename SpecializedModel>
 absl::Status GenericToSpecializedModelHelper(
     const GenericModel& src_model,
     SetLeafFunctor<GenericModel, SpecializedModel> set_node,
-    SpecializedModel* dst_model) {
+    SpecializedModel* dst_model,
+    const bool global_imputation_optimization = true) {
   if (src_model.task() != SpecializedModel::kTask) {
     return absl::InvalidArgumentError("Wrong model class.");
   }
   src_model.metadata().Export(&dst_model->metadata);
 
-  RETURN_IF_ERROR(InitializeFlatNodeModel(src_model, dst_model));
+  RETURN_IF_ERROR(InitializeFlatNodeModel(
+      src_model, dst_model,
+      /*missing_numerical_is_na=*/!global_imputation_optimization));
 
   return CreateFlatModelNodes(src_model, set_node, dst_model);
 }
 
-// A more automatized version of "GenericToSpecializedModelHelper".
+// A version of "GenericToSpecializedModelHelper" to handle generic engines,
+// that is, the most engines with the greatest coverage.
 template <typename SetLeaf, typename GenericModel, typename SpecializedModel>
-absl::Status GenericToSpecializedModelHelper2(SetLeaf set_leaf,
-                                              const GenericModel& src,
-                                              SpecializedModel* dst) {
+absl::Status GenericToSpecializedGenericModelHelper(
+    SetLeaf set_leaf, const GenericModel& src, SpecializedModel* dst,
+    absl::optional<bool> global_imputation_optimization = {}) {
+  dst->global_imputation_optimization =
+      src.CheckStructure({.global_imputation_is_higher = true});
+
   return GenericToSpecializedModelHelper(
-      src, SetLeafFunctor<GenericModel, SpecializedModel>(set_leaf), dst);
+      src, SetLeafFunctor<GenericModel, SpecializedModel>(set_leaf), dst,
+      dst->global_imputation_optimization);
 }
 
 // Checks that a model is a binary classifier.
@@ -900,7 +922,7 @@ absl::Status GenericToSpecializedModel(const RandomForestModel& src,
                                        RandomForestBinaryClassification* dst) {
   RETURN_IF_ERROR(CheckBinaryClassification(src));
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestBinaryClassification<DstType>, src, dst);
 }
 
@@ -911,7 +933,7 @@ absl::Status GenericToSpecializedModel(
       src.label_col_spec().categorical().number_of_unique_values() - 1;
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestMulticlassClassification<DstType>, src, dst);
 }
 
@@ -919,7 +941,7 @@ template <>
 absl::Status GenericToSpecializedModel(const RandomForestModel& src,
                                        RandomForestRegression* dst) {
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestRegression<DstType>, src, dst);
 }
 
@@ -929,7 +951,7 @@ absl::Status GenericToSpecializedModel(const RandomForestModel& src,
   dst->num_classes =
       src.label_col_spec().categorical().number_of_unique_values() - 2;
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestCategoricalUplift<DstType>, src, dst);
 }
 
@@ -937,7 +959,7 @@ template <>
 absl::Status GenericToSpecializedModel(const RandomForestModel& src,
                                        RandomForestNumericalUplift* dst) {
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestNumericalUplift<DstType>, src, dst);
 }
 
@@ -948,7 +970,7 @@ absl::Status GenericToSpecializedModel(
   RETURN_IF_ERROR(CheckBinaryClassification(src));
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestBinaryClassification<DstType>, src, dst);
 }
 
@@ -960,7 +982,7 @@ absl::Status GenericToSpecializedModel(
       src.label_col_spec().categorical().number_of_unique_values() - 1;
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestMulticlassClassification<DstType>, src, dst);
 }
 
@@ -969,7 +991,7 @@ absl::Status GenericToSpecializedModel(
     const RandomForestModel& src,
     GenericRandomForestRegression<uint32_t>* dst) {
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestRegression<DstType>, src, dst);
 }
 
@@ -980,7 +1002,7 @@ absl::Status GenericToSpecializedModel(
   dst->num_classes =
       src.label_col_spec().categorical().number_of_unique_values() - 2;
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestCategoricalUplift<DstType>, src, dst);
 }
 
@@ -989,7 +1011,7 @@ absl::Status GenericToSpecializedModel(
     const RandomForestModel& src,
     GenericRandomForestNumericalUplift<uint32_t>* dst) {
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestNumericalUplift<DstType>, src, dst);
 }
 
@@ -1004,7 +1026,7 @@ absl::Status GenericToSpecializedModel(
   dst->initial_predictions = src.initial_predictions()[0];
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafGradientBoostedTreesClassification<DstType>, src, dst);
 }
 
@@ -1020,7 +1042,7 @@ absl::Status GenericToSpecializedModel(
   dst->output_logits = src.output_logits();
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafGradientBoostedTreesClassification<DstType>, src, dst);
 }
 
@@ -1039,7 +1061,7 @@ absl::Status GenericToSpecializedModel(
   dst->output_logits = src.output_logits();
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafGradientBoostedTreesClassification<DstType>, src, dst);
 }
 
@@ -1055,7 +1077,7 @@ absl::Status GenericToSpecializedModel(const GradientBoostedTreesModel& src,
   dst->initial_predictions = src.initial_predictions()[0];
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafGradientBoostedTreesRegression<DstType>, src, dst);
 }
 
@@ -1071,7 +1093,7 @@ absl::Status GenericToSpecializedModel(const GradientBoostedTreesModel& src,
   dst->initial_predictions = src.initial_predictions()[0];
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
-  return GenericToSpecializedModelHelper2(
+  return GenericToSpecializedGenericModelHelper(
       SetLeafGradientBoostedTreesRegression<DstType>, src, dst);
 }
 
@@ -1288,10 +1310,18 @@ inline bool EvalCondition(const typename Model::NodeType* node,
                           const int example_idx, const Model& model) {
   using GenericNode = typename Model::NodeType;
   switch (node->type) {
-    case GenericNode::Type::kNumericalIsHigher: {
+    case GenericNode::Type::kNumericalIsHigherMissingIsFalse:
+    case GenericNode::Type::kNumericalIsHigherMissingIsTrue: {
       const auto attribute_value =
           examples.GetNumerical(example_idx, {node->feature_idx}, model);
-      return attribute_value >= node->numerical_is_higher_threshold;
+
+      // Note: It is faster to have this second check, than having a different
+      // case.
+      if (node->type == GenericNode::Type::kNumericalIsHigherMissingIsFalse) {
+        return attribute_value >= node->numerical_is_higher_threshold;
+      } else {
+        return !(attribute_value < node->numerical_is_higher_threshold);
+      }
     }
 
     case GenericNode::Type::kCategoricalContainsMask: {

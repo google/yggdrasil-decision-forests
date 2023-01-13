@@ -78,9 +78,8 @@ class GradientBoostedTreesModel : public AbstractModel,
   // Number of nodes in the model.
   int64_t NumNodes() const;
 
-  // See "IsMissingValueConditionResultFollowGlobalImputation" in
-  // "NodeWithChildren".
-  bool IsMissingValueConditionResultFollowGlobalImputation() const;
+  bool CheckStructure(
+      const decision_tree::CheckStructureOptions& options) const override;
 
   // Number of trees in the model. Note that this value can be different from
   // the "num_trees" parameter used during training for two reasons: (1) Early
@@ -160,6 +159,14 @@ class GradientBoostedTreesModel : public AbstractModel,
 
   absl::Status MakePureServing() override;
 
+  // Fields related to unit testing.
+  struct Testing {
+    // If true, the "CheckStructure" method will fail if
+    // "global_imputation_is_higher"=True.
+    bool force_fail_check_structure_global_imputation_is_higher = false;
+  };
+  Testing* Testing() { return &testing_; }
+
  private:
   void PredictClassification(const dataset::VerticalDataset& dataset,
                              dataset::VerticalDataset::row_t row_idx,
@@ -232,6 +239,8 @@ class GradientBoostedTreesModel : public AbstractModel,
   // used. When loading a model from disk, this field is populated with the
   // format.
   absl::optional<std::string> node_format_;
+
+  struct Testing testing_;
 
   friend GradientBoostedTreesLearner;
 };

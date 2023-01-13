@@ -97,6 +97,7 @@ cc_library_ydf(
     name = "decision_forest_interface",
     hdrs = ["decision_forest_interface.h"],
     deps = [
+        ":decision_tree",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:span",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",

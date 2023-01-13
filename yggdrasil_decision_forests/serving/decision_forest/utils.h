@@ -30,7 +30,8 @@ namespace decision_forest {
 // "FlatNodeModel".
 template <typename GenericModel, typename SpecializedModel>
 absl::Status InitializeFlatNodeModel(const GenericModel& src_model,
-                                     SpecializedModel* dst_model);
+                                     SpecializedModel* dst_model,
+                                     bool missing_numerical_is_na = false);
 
 // Get the list of input features used by the model.
 absl::Status GetInputFeatures(
@@ -55,13 +56,14 @@ absl::flat_hash_map<std::string, int> GetFeatureIndexMap(
 
 template <typename GenericModel, typename SpecializedModel>
 absl::Status InitializeFlatNodeModel(const GenericModel& src_model,
-                                     SpecializedModel* dst_model) {
+                                     SpecializedModel* dst_model,
+                                     const bool missing_numerical_is_na) {
   // List the model input features.
   std::vector<int> all_input_features;
   RETURN_IF_ERROR(GetInputFeatures(src_model, &all_input_features, nullptr));
 
   RETURN_IF_ERROR(dst_model->mutable_features()->Initialize(
-      all_input_features, src_model.data_spec()));
+      all_input_features, src_model.data_spec(), missing_numerical_is_na));
 
   return absl::OkStatus();
 }

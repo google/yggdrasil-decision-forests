@@ -76,6 +76,31 @@ bool EvalConditionFromColumn(
 bool EvalCondition(const proto::NodeCondition& condition,
                    const dataset::proto::Example& example);
 
+// Argument to the "CheckStructure" method that test some aspect of the model
+// structure. By default, "CheckStructureOptions" is empty, that is, it does not
+// check anything.
+struct CheckStructureOptions {
+  // "global_imputation_*" test if the model structure looks as if it was
+  // trained with global imputation. That is, the "na_value" values of the
+  // conditions (i.e. the value of the condition when a value is missing) are
+  // equal to the condition applied with global imputation feature replacement
+  // (i.e. replacing the value by the global mean or median; see
+  // GLOBAL_IMPUTATION strategy for more details).
+
+  // For the "is higher" conditions.
+  bool global_imputation_is_higher = true;
+
+  // For all the other conditions.
+  bool global_imputation_others = true;
+
+  static CheckStructureOptions GlobalImuptation() {
+    return {
+        /*.global_imputation_is_higher =*/true,
+        /*.global_imputation_others =*/true,
+    };
+  }
+};
+
 // A node and its two children (if any).
 class NodeWithChildren {
  public:
@@ -156,15 +181,10 @@ class NodeWithChildren {
   void FinalizeAsNonLeaf(bool keep_non_leaf_label_distribution,
                          bool store_detailed_label_distribution);
 
-  // If true, all the "na_value" values of the conditions (i.e. the value of the
-  // condition when a value is missing) is equal to the condition applied with
-  // global imputation (i.e. replacing the value by the global mean or median;
-  // see GLOBAL_IMPUTATION strategy for more details).
-  //
-  // Such models are faster to serve as the inference engine does not need to
-  // check for the absence of value.
-  bool IsMissingValueConditionResultFollowGlobalImputation(
-      const dataset::proto::DataSpecification& data_spec) const;
+  // Tests if the model satisfy the condition defined in
+  // "CheckStructureOptions".
+  bool CheckStructure(const CheckStructureOptions& options,
+                      const dataset::proto::DataSpecification& data_spec) const;
 
   int32_t leaf_idx() const { return leaf_idx_; }
   void set_leaf_idx(const int32_t v) { leaf_idx_ = v; }
@@ -231,9 +251,9 @@ class DecisionTree {
       dataset::VerticalDataset::row_t row_idx) const;
 
   // Apply the decision tree on an example and returns the path.
-  const void GetPath(const dataset::VerticalDataset& dataset,
-                     dataset::VerticalDataset::row_t row_idx,
-                     std::vector<const NodeWithChildren*>* path) const;
+  void GetPath(const dataset::VerticalDataset& dataset,
+               dataset::VerticalDataset::row_t row_idx,
+               std::vector<const NodeWithChildren*>* path) const;
 
   // Apply the decision tree similarly to "GetLeaf". However, during inference,
   // simulate the replacement of the value of the attribute
@@ -268,9 +288,10 @@ class DecisionTree {
   // error is raised.
   void ScaleRegressorOutput(float scale);
 
-  // See the same method in "NodeWithChildren".
-  bool IsMissingValueConditionResultFollowGlobalImputation(
-      const dataset::proto::DataSpecification& data_spec) const;
+  // Tests if the model satisfy the condition defined in
+  // "CheckStructureOptions".
+  bool CheckStructure(const CheckStructureOptions& options,
+                      const dataset::proto::DataSpecification& data_spec) const;
 
   // Set the "leaf_idx" field for all the leaves. The index of a leaf is
   // assigned in the depth first iteration over all the nods (negative before
@@ -294,9 +315,11 @@ size_t EstimateSizeInByte(const DecisionForest& trees);
 // Number of nodes in a list of decision trees.
 int64_t NumberOfNodes(const DecisionForest& trees);
 
-bool IsMissingValueConditionResultFollowGlobalImputation(
-    const dataset::proto::DataSpecification& data_spec,
-    const DecisionForest& trees);
+// Tests if the model satisfy the condition defined in
+// "CheckStructureOptions".
+bool CheckStructure(const CheckStructureOptions& options,
+                    const dataset::proto::DataSpecification& data_spec,
+                    const DecisionForest& trees);
 
 // Append a human readable semi-graphical description of the model structure.
 void AppendModelStructure(const DecisionForest& trees,

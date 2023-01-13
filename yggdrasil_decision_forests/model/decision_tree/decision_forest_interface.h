@@ -21,6 +21,7 @@
 #include "absl/status/status.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -41,6 +42,11 @@ class DecisionForestInterface {
   virtual absl::Status PredictGetLeaves(const dataset::VerticalDataset& dataset,
                                         dataset::VerticalDataset::row_t row_idx,
                                         absl::Span<int32_t> leaves) const = 0;
+
+  // Tests if the model satisfy the condition defined in
+  // "CheckStructureOptions".
+  virtual bool CheckStructure(
+      const decision_tree::CheckStructureOptions& options) const = 0;
 };
 
 }  // namespace model

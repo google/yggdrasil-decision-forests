@@ -143,11 +143,12 @@ struct GenericNode {
     kLeaf,
     // The following symbol follow the convention:
     // {attribute type}{condition}{implementation; optional}
-    kNumericalIsHigher,
+    kNumericalIsHigherMissingIsFalse,
+    kNumericalIsHigherMissingIsTrue,
     kCategoricalContainsMask,
     kCategoricalContainsBufferOffset,
     kCategoricalSetContainsBufferOffset,
-    kNumericalObliqueProjectionIsHigher
+    kNumericalObliqueProjectionIsHigher,
   };
   // Type of the node (leaf or condition type).
   Type type;
@@ -359,6 +360,10 @@ struct ExampleSetModel
   using ExampleSet =
       ExampleSetNumericalOrCategoricalFlat<ExampleSetModel<NodeOffsetRep>,
                                            ExampleFormat::FORMAT_EXAMPLE_MAJOR>;
+
+  // If true, the engine inference runs with the global imputation optimization.
+  // That is, missing values are replaced with global imputation.
+  bool global_imputation_optimization;
 };
 
 struct ExampleSetModelManyNodes : ExampleSetModel<uint32_t> {};

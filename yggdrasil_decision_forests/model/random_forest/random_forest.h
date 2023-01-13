@@ -116,9 +116,8 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   // Number of nodes in the model.
   int64_t NumNodes() const;
 
-  // See "IsMissingValueConditionResultFollowGlobalImputation" in
-  // "NodeWithChildren".
-  bool IsMissingValueConditionResultFollowGlobalImputation() const;
+  bool CheckStructure(
+      const decision_tree::CheckStructureOptions& options) const override;
 
   // Number of trees in the model.
   size_t NumTrees() const { return decision_trees_.size(); }
@@ -210,6 +209,14 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
 
   absl::Status MakePureServing() override;
 
+  // Fields related to unit testing.
+  struct Testing {
+    // If true, the "CheckStructure" method will fail if
+    // "global_imputation_is_higher"=True.
+    bool force_fail_check_structure_global_imputation_is_higher = false;
+  };
+  Testing* Testing() { return &testing_; }
+
  private:
   // The decision trees.
   std::vector<std::unique_ptr<decision_tree::DecisionTree>> decision_trees_;
@@ -234,6 +241,9 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   // Number of nodes trained and then pruned during the training.
   // The classical random forest learning algorithm does not prune nodes.
   absl::optional<int64_t> num_pruned_nodes_;
+
+  // Fields related to unit testing.
+  struct Testing testing_;
 };
 
 namespace internal {

@@ -390,6 +390,44 @@ TEST(QuickScorer, ExceedStackBuffer) {
                   (1 + 1 + 10 + 300 + 2000 + 20000) * duplicate_factor));
 }
 
+TEST(QuickScorer, FinalizeConditionItems) {
+  std::vector<internal::QuickScorerExtendedModel::ConditionItem> items{
+      {.tree_idx = 2, .leaf_mask = 0b0111},
+      {.tree_idx = 1, .leaf_mask = 0b1011},
+      {.tree_idx = 2, .leaf_mask = 0b1101},
+      {.tree_idx = 1, .leaf_mask = 0b1110},
+  };
+  internal::FinalizeConditionItems(&items);
+  EXPECT_EQ(items.size(), 2);
+  EXPECT_EQ(items[0].tree_idx, 1);
+  EXPECT_EQ(items[1].tree_idx, 2);
+  EXPECT_EQ(items[0].leaf_mask, 0b1010);
+  EXPECT_EQ(items[1].leaf_mask, 0b0101);
+}
+
+TEST(QuickScorer, FinalizeIsHigherConditionItems) {
+  std::vector<internal::QuickScorerExtendedModel::IsHigherConditionItem> items{
+      {.threshold = 1.f, .tree_idx = 2, .leaf_mask = 0b0111},
+      {.threshold = 3.f, .tree_idx = 1, .leaf_mask = 0b1011},
+      {.threshold = 1.f, .tree_idx = 2, .leaf_mask = 0b1101},
+      {.threshold = 2.f, .tree_idx = 1, .leaf_mask = 0b1110},
+  };
+  internal::FinalizeIsHigherConditionItems(&items);
+  EXPECT_EQ(items.size(), 3);
+
+  EXPECT_EQ(items[0].tree_idx, 2);
+  EXPECT_EQ(items[0].leaf_mask, 0b0101);
+  EXPECT_EQ(items[0].threshold, 1);
+
+  EXPECT_EQ(items[1].tree_idx, 1);
+  EXPECT_EQ(items[1].leaf_mask, 0b1110);
+  EXPECT_EQ(items[1].threshold, 2);
+
+  EXPECT_EQ(items[2].tree_idx, 1);
+  EXPECT_EQ(items[2].leaf_mask, 0b1011);
+  EXPECT_EQ(items[2].threshold, 3);
+}
+
 }  // namespace
 }  // namespace decision_forest
 }  // namespace serving

@@ -367,7 +367,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
-  EXPECT_TRUE(gbt_model->IsMissingValueConditionResultFollowGlobalImputation());
+  EXPECT_TRUE(gbt_model->CheckStructure(
+      decision_tree::CheckStructureOptions::GlobalImuptation()));
 }
 
 // Train and test a model on the adult dataset.
@@ -388,7 +389,8 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
-  EXPECT_TRUE(gbt_model->IsMissingValueConditionResultFollowGlobalImputation());
+  EXPECT_TRUE(gbt_model->CheckStructure(
+      decision_tree::CheckStructureOptions::GlobalImuptation()));
 }
 
 // Train and test a model on the adult dataset with focal loss, but with gamma
@@ -659,7 +661,8 @@ TEST_F(GradientBoostedTreesOnAdult, RandomCategorical) {
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
-  EXPECT_TRUE(gbt_model->IsMissingValueConditionResultFollowGlobalImputation());
+  EXPECT_TRUE(gbt_model->CheckStructure(
+      decision_tree::CheckStructureOptions::GlobalImuptation()));
 }
 
 // Train and test a model on the adult dataset with too much nodes for the
@@ -681,7 +684,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseNoQuickScorer) {
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
-  EXPECT_TRUE(gbt_model->IsMissingValueConditionResultFollowGlobalImputation());
+  EXPECT_TRUE(gbt_model->CheckStructure(
+      decision_tree::CheckStructureOptions::GlobalImuptation()));
 }
 
 // Train and test a model on the adult dataset.

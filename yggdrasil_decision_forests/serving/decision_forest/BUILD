@@ -117,6 +117,7 @@ cc_test(
         ":register_engines",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",

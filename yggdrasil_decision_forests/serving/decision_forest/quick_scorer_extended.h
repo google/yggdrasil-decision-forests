@@ -140,6 +140,10 @@ struct QuickScorerExtendedModel {
   static constexpr size_t kMaxTrees = std::numeric_limits<TreeIdx>::max();
   static constexpr size_t kMaxLeafs = sizeof(LeafMask) * 8;
 
+  // If true, the engine inference runs with the global imputation optimization.
+  // That is, missing values are replaced with global imputation.
+  bool global_imputation_optimization;
+
   // Maximum number of leafs in each tree.
   int max_num_leafs_per_tree;
 
@@ -163,11 +167,39 @@ struct QuickScorerExtendedModel {
   bool cpu_supports_avx2 = true;
 #endif
 
+  struct ConditionItem {
+    TreeIdx tree_idx;
+    LeafMask leaf_mask;
+
+    bool operator<(const ConditionItem& e) const {
+      return tree_idx < e.tree_idx;
+    }
+
+    // Indicates that two items can be merged without impact on the inference
+    // logic.
+    bool CanMerge(const ConditionItem& e) const {
+      return tree_idx == e.tree_idx;
+    }
+  };
+
   // Data for "IsHigher" conditions i.e. condition of the form "feature >= t".
   struct IsHigherConditionItem {
     float threshold;
     TreeIdx tree_idx;
     LeafMask leaf_mask;
+
+    bool operator<(const IsHigherConditionItem& e) const {
+      if (threshold != e.threshold) {
+        return threshold < e.threshold;
+      }
+      return tree_idx < e.tree_idx;
+    }
+
+    // Indicates that two items can be merged without impact on the inference
+    // logic.
+    bool CanMerge(const IsHigherConditionItem& e) const {
+      return tree_idx == e.tree_idx && threshold == e.threshold;
+    }
   };
 
   struct IsHigherConditions {
@@ -177,6 +209,9 @@ struct QuickScorerExtendedModel {
 
     // Thresholds ordered in ascending order.
     std::vector<IsHigherConditionItem> items;
+
+    // Items to consider in the case of a missing value.
+    std::vector<ConditionItem> missing_value_items;
   };
 
   // Data for "Contains" conditions i.e. condition of the form "feature \in
@@ -244,6 +279,14 @@ void AndMaskMap(const typename Map::key_type& key,
     insertion.first->second &= mask;
   }
 }
+
+// Finalize a set of condition from the "BuildingAccumulator" into the final
+// model.
+void FinalizeConditionItems(
+    std::vector<QuickScorerExtendedModel::ConditionItem>* items);
+
+void FinalizeIsHigherConditionItems(
+    std::vector<QuickScorerExtendedModel::IsHigherConditionItem>* items);
 
 }  // namespace internal
 

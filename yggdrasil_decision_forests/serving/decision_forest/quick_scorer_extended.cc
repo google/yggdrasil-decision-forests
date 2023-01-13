@@ -148,10 +148,8 @@ absl::Status FinalizeModel(
   for (const auto& it_is_higher_condition : accumulator.is_higher_conditions) {
     dst->is_higher_conditions.push_back(it_is_higher_condition.second);
     auto& condition = dst->is_higher_conditions.back();
-    // Sort in increasing threshold value.
-    std::sort(
-        condition.items.begin(), condition.items.end(),
-        [](const auto& a, const auto& b) { return a.threshold < b.threshold; });
+    FinalizeIsHigherConditionItems(&condition.items);
+    FinalizeConditionItems(&condition.missing_value_items);
   }
   // Sort the condition by increasing feature index (for better locality when
   // querying the examples).
@@ -260,6 +258,13 @@ absl::Status FillQuickScorerNode(
       accumulator->is_higher_conditions[spec_feature_idx].items.push_back(
           {/*.threshold =*/threshold, /*.tree_idx =*/tree_idx,
            /*.leaf_mask =*/mask});
+
+      if (src_node.node().condition().na_value()) {
+        // The condition evaluates to true when the attribute is missing.
+        accumulator->is_higher_conditions[spec_feature_idx]
+            .missing_value_items.push_back({/*.tree_idx =*/tree_idx,
+                                            /*.leaf_mask =*/mask});
+      }
     };
 
     auto set_boolean_is_true = [&]() {
@@ -470,11 +475,18 @@ void PredictQuickScorerSequential(
                                       example_idx)]
               .numerical_value;
 
-      for (const auto& item : is_higher_condition.items) {
-        if (item.threshold > feature_value) {
-          break;
+      if (model.global_imputation_optimization || !std::isnan(feature_value)) {
+        for (const auto& item : is_higher_condition.items) {
+          if (item.threshold > feature_value) {
+            break;
+          }
+          active_leaf_buffer[item.tree_idx] &= item.leaf_mask;
         }
-        active_leaf_buffer[item.tree_idx] &= item.leaf_mask;
+
+      } else {
+        for (const auto& item : is_higher_condition.missing_value_items) {
+          active_leaf_buffer[item.tree_idx] &= item.leaf_mask;
+        }
       }
     }
 
@@ -623,6 +635,43 @@ void PredictQuickScorerMajorFeatureOffset(
             is_higher_condition.internal_feature_idx * major_feature_offset;
 
         const auto feature_values = _mm_loadu_ps(begin_example);
+
+        if (!model.global_imputation_optimization) {
+          // If any feature value is Nan
+          //   Create NaN mask
+          //   Iterate over examples and apply leaf mask * nan mask
+          //   Replace value as - infinity in next loop
+
+          // Test for the existence of at least one missing value.
+          // mask_no_nan_128 is a bitmask of the non-missing values.
+          __m128i mask_no_nan_128 =
+              _mm_castps_si128(_mm_cmpeq_ps(feature_values, feature_values));
+          int has_nan = !_mm_test_all_ones(mask_no_nan_128);
+          if (has_nan) {
+            // At least one of the feature contains a missing value.
+
+            // Nan mask in 256 bits
+            __m256i mask_no_nan_256 = _mm256_cvtepi32_epi64(mask_no_nan_128);
+
+            // Apply all the masks
+            for (const auto& item : is_higher_condition.missing_value_items) {
+              // Update the active node
+              auto* active_si256 = reinterpret_cast<__m256i*>(
+                  &active_leaf_buffer[item.tree_idx * kNumParallelExamples]);
+
+              const auto active = _mm256_load_si256(active_si256);
+              // new_active = active & ( mask_split | mask_no_nan )
+              const auto new_active = _mm256_and_si256(
+                  active, _mm256_or_si256(_mm256_set1_epi64x(item.leaf_mask),
+                                          mask_no_nan_256));
+              _mm256_store_si256(active_si256, new_active);
+            }
+
+            // Missing values are represented as Nan. They will fail at the
+            // first comparison "value >= threshold" in the next loop.
+          }
+        }
+
         for (const auto& item : is_higher_condition.items) {
           const auto threshold = _mm_set1_ps(item.threshold);
 
@@ -837,8 +886,12 @@ absl::Status BaseGenericToSpecializedModel(const AbstractModel& src,
   std::vector<int> all_input_features;
   RETURN_IF_ERROR(GetInputFeatures(src, &all_input_features, nullptr));
 
-  RETURN_IF_ERROR(
-      dst->mutable_features()->Initialize(all_input_features, src.data_spec()));
+  dst->global_imputation_optimization =
+      src.CheckStructure({.global_imputation_is_higher = true});
+
+  RETURN_IF_ERROR(dst->mutable_features()->Initialize(
+      all_input_features, src.data_spec(),
+      /*missing_numerical_is_na=*/!dst->global_imputation_optimization));
 
   // Compile the model.
   RETURN_IF_ERROR(FillQuickScorer(src, dst, &accumulator));
@@ -1047,6 +1100,17 @@ std::string DescribeQuickScorer(const Model& model, const bool detailed) {
                                   sub_item.leaf_mask, bitmap_representation,
                                   sub_item.threshold, sub_item.tree_idx);
       }
+
+      for (const auto& sub_item : item.missing_value_items) {
+        const auto bitmap_representation = ToStringBit(
+            std::string(
+                reinterpret_cast<const char* const>(&sub_item.leaf_mask),
+                sizeof(LeafMask)),
+            internal::QuickScorerExtendedModel::kMaxLeafs);
+        absl::SubstituteAndAppend(
+            &structure, "\t\tmask:$0 = $1 thre:MISSING tree:$2\n",
+            sub_item.leaf_mask, bitmap_representation, sub_item.tree_idx);
+      }
     }
   }
   absl::StrAppend(&structure, "\n");
@@ -1063,6 +1127,50 @@ template std::string DescribeQuickScorer<
     GradientBoostedTreesBinaryClassificationQuickScorerExtended>(
     const GradientBoostedTreesBinaryClassificationQuickScorerExtended& model,
     bool detailed);
+
+namespace internal {
+
+template <typename Item>
+void MergeAdjacent(const std::vector<Item>& src, std::vector<Item>* dst) {
+  const size_t n = src.size();
+  dst->clear();
+  dst->reserve(n);
+
+  auto it_begin = src.begin();
+  while (it_begin != src.end()) {
+    // Iterate and merge the elements equivalent to "it_begin".
+    auto merged_item = *it_begin;
+    auto it_end = it_begin + 1;
+    while (it_end != src.end() && it_begin->CanMerge(*it_end)) {
+      merged_item.leaf_mask &= it_end->leaf_mask;
+      it_end++;
+    }
+
+    // Add the merged items [it_begin, it_end) to "dst".
+    dst->push_back(merged_item);
+
+    // Continue
+    it_begin = it_end;
+  }
+
+  dst->shrink_to_fit();
+}
+
+void FinalizeConditionItems(
+    std::vector<QuickScorerExtendedModel::ConditionItem>* items) {
+  std::sort(items->begin(), items->end());
+  const auto save = std::move(*items);
+  MergeAdjacent(save, items);
+}
+
+void FinalizeIsHigherConditionItems(
+    std::vector<QuickScorerExtendedModel::IsHigherConditionItem>* items) {
+  std::sort(items->begin(), items->end());
+  const auto save = std::move(*items);
+  MergeAdjacent(save, items);
+}
+
+}  // namespace internal
 
 }  // namespace decision_forest
 }  // namespace serving
