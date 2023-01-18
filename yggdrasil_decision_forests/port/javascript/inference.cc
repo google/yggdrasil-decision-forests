@@ -211,6 +211,17 @@ class Model {
                                  engine_->features());
   }
 
+  // Sets the value of a categorical set feature.
+  void SetCategoricalSetInt(int example_idx, int feature_id,
+                            std::vector<int> value) {
+    if (example_idx >= num_examples_) {
+      LOG(WARNING) << "example_idx should be less than the number of examples";
+      return;
+    }
+    examples_->SetCategoricalSet(example_idx, {feature_id}, value,
+                                 engine_->features());
+  }
+
   // Runs the model on the previously set features.
   std::vector<float> Predict() {
     if (num_examples_ == -1) {
@@ -311,6 +322,18 @@ std::shared_ptr<Model> LoadModel(std::string path,
                                  created_tfdf_signature);
 }
 
+std::vector<std::string> CreateVectorString(size_t reserved) {
+  std::vector<std::string> v;
+  v.reserve(reserved);
+  return v;
+}
+
+std::vector<int> CreateVectorInt(size_t reserved) {
+  std::vector<int> v;
+  v.reserve(reserved);
+  return v;
+}
+
 // Expose some of the class/functions to JS.
 //
 // Keep this list in sync with the corresponding @typedef in wrapper.js.
@@ -325,6 +348,7 @@ EMSCRIPTEN_BINDINGS(my_module) {
       .function("setCategoricalInt", &Model::SetCategoricalInt)
       .function("setCategoricalString", &Model::SetCategoricalString)
       .function("setCategoricalSetString", &Model::SetCategoricalSetString)
+      .function("setCategoricalSetInt", &Model::SetCategoricalSetInt)
       .function("getInputFeatures", &Model::GetInputFeatures)
       .function("getProtoInputFeatures", &Model::GetProtoInputFeatures);
 
@@ -343,6 +367,10 @@ EMSCRIPTEN_BINDINGS(my_module) {
 
   emscripten::register_vector<InputFeature>("vector<InputFeature>");
   emscripten::register_vector<float>("vector<float>");
+  emscripten::register_vector<int>("vector<int>");
   emscripten::register_vector<std::vector<float>>("vector<vector<float>>");
   emscripten::register_vector<std::string>("vector<string>");
+
+  emscripten::function("CreateVectorString", &CreateVectorString);
+  emscripten::function("CreateVectorInt", &CreateVectorInt);
 }

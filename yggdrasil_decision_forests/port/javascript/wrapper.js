@@ -107,6 +107,32 @@ function ccVectorToJSVector(src) {
 }
 
 /**
+ * Converts a JS array into a std::vector<std::string> (C++).
+ * @param {!Array} src JS Vector.
+ * @return {!CCVector} CC Vector.
+ */
+function jsStrVectorToCCStrVector(src) {
+  const vector = Module.CreateVectorString(src.length);
+  for (const value of src) {
+    vector.push_back(value);
+  }
+  return vector;
+}
+
+/**
+ * Converts a JS array into a std::vector<int> (C++).
+ * @param {!Array} src JS Vector.
+ * @return {!CCVector} CC Vector.
+ */
+function jsStrVectorToCCIntVector(src) {
+  const vector = Module.CreateVectorInt(src.length);
+  for (const value of src) {
+    vector.push_back(value);
+  }
+  return vector;
+}
+
+/**
  * Converts a std::vector<std::vector<T>> (C++) into a JS array or array.
  * @param {!CCVectorVector} src CC Matrix.
  * @return {!Array<!Array>} JS Matrix.
@@ -178,6 +204,12 @@ class Model {
      */
     this.categoricalIntFeaturesIndex = null;
 
+    /**
+     * Index of the categorical-set input features for the TF-DF signature.
+     * @private @type {?Array<number>}
+     */
+    this.categoricalSetIntFeaturesIndex = null;
+
     if (this.createdTFDFSignature) {
       this.createdTFDFSignature_();
     }
@@ -198,6 +230,8 @@ class Model {
         indexTFDFFeatures(protoInputFeatures, this.inputFeatures, ['BOOLEAN']);
     this.categoricalIntFeaturesIndex = indexTFDFFeatures(
         protoInputFeatures, this.inputFeatures, ['CATEGORICAL']);
+    this.categoricalSetIntFeaturesIndex = indexTFDFFeatures(
+        protoInputFeatures, this.inputFeatures, ['CATEGORICAL_SET']);
   }
 
 
@@ -235,7 +269,7 @@ class Model {
    */
   predict(examples) {
     if (typeof examples !== 'object') {
-      throw Error('argument should be an array or an object');
+      throw new Error('argument should be an array or an object');
     }
 
     // Detect the number of examples and ensure that all the fields (i.e.
@@ -243,17 +277,17 @@ class Model {
     let numExamples = undefined;
     for (const values of Object.values(examples)) {
       if (!Array.isArray(values)) {
-        throw Error('features should be arrays');
+        throw new Error('features should be arrays');
       }
       if (numExamples === undefined) {
         numExamples = values.length;
       } else if (numExamples !== values.length) {
-        throw Error('features have a different number of values');
+        throw new Error('features have a different number of values');
       }
     }
     if (numExamples === undefined) {
       // The example does not contain any features.
-      throw Error('not features');
+      throw new Error('not features');
     }
 
     // Fill the examples
@@ -281,10 +315,11 @@ class Model {
         for (const [exampleIdx, value] of values.entries()) {
           if (value === null) continue;
           this.internalModel.setCategoricalSetString(
-              exampleIdx, featureDef.internalIdx, value);
+              exampleIdx, featureDef.internalIdx,
+              jsStrVectorToCCStrVector(value));
         }
       } else {
-        throw Error(`Non supported feature type ${featureDef}`);
+        throw new Error(`Non supported feature type ${featureDef}`);
       }
     }
 
@@ -309,52 +344,60 @@ class Model {
    * @return {!TFDFOutputPrediction} Predictions of the model.
    */
   predictTFDFSignature(inputs) {
-    // TODO: Add support for categorical-set features.
-
     if (!this.createdTFDFSignature) {
-      throw Error('Model not loaded with options.createdTFDFSignature=true');
-    }
-
-    if (inputs.categoricalSetIntFeaturesRowSplitsDim1.length != 1 ||
-        inputs.categoricalSetIntFeaturesRowSplitsDim1[0] != 0) {
-      throw Error(
-          'Categorical-set features are currently not supported with this ' +
-          'interface (predictTensorFlowDecisionForestSignature). Use ' +
-          '"predict" instead.');
+      throw new Error(
+          'Model not loaded with options.createdTFDFSignature=true');
     }
 
     // Detect the number of examples.
+    //
+    // For each type of given feature, extract the number of examples. Ensure
+    // that the feature shapes are consistant.
     let numExamples = 0;
     if (inputs.numericalFeatures.length != 0) {
       if (numExamples != 0 && numExamples != inputs.numericalFeatures.length) {
-        throw Error('features have a different number of values');
+        throw new Error('features have a different number of values');
       }
       if (this.numericalFeaturesIndex.length !=
           inputs.numericalFeatures[0].length) {
-        throw Error('Unexpected numerical input feature shape');
+        throw new Error('Unexpected numerical input feature shape');
       }
       numExamples = inputs.numericalFeatures.length;
     }
     if (inputs.booleanFeatures.length != 0) {
       if (numExamples != 0 && numExamples != inputs.booleanFeatures.length) {
-        throw Error('features have a different number of values');
+        throw new Error('features have a different number of values');
       }
       if (this.booleanFeaturesIndex.length !=
           inputs.booleanFeatures[0].length) {
-        throw Error('Unexpected boolean input feature shape');
+        throw new Error('Unexpected boolean input feature shape');
       }
       numExamples = inputs.booleanFeatures.length;
     }
     if (inputs.categoricalIntFeatures.length != 0) {
       if (numExamples != 0 &&
           numExamples != inputs.categoricalIntFeatures.length) {
-        throw Error('features have a different number of values');
+        throw new Error('features have a different number of values');
       }
       if (this.categoricalIntFeaturesIndex.length !=
           inputs.categoricalIntFeatures[0].length) {
-        throw Error('Unexpected categorical int input feature shape');
+        throw new Error('Unexpected categorical int input feature shape');
       }
       numExamples = inputs.categoricalIntFeatures.length;
+    }
+    if (inputs.categoricalSetIntFeaturesRowSplitsDim2.length > 1) {
+      if (this.categoricalSetIntFeaturesIndex.length == null ||
+          this.categoricalSetIntFeaturesIndex.length <= 0) {
+        throw new Error('Invalid categoricalSetIntFeaturesIndex');
+      }
+      const detectedNumExamples =
+          (inputs.categoricalSetIntFeaturesRowSplitsDim2
+               [inputs.categoricalSetIntFeaturesRowSplitsDim2.length - 1] /
+           this.categoricalSetIntFeaturesIndex.length);
+      if (numExamples != 0 && numExamples != detectedNumExamples) {
+        throw new Error('Invalid categorical-set feature shape');
+      }
+      numExamples = detectedNumExamples;
     }
 
     // Allocate the examples
@@ -408,6 +451,35 @@ class Model {
         this.internalModel.setCategoricalInt(exampleIdx, internIdx, value);
       }
     }
+
+    for (let localIdx = 0;
+         localIdx < this.categoricalSetIntFeaturesIndex.length; localIdx++) {
+      const internIdx = this.categoricalSetIntFeaturesIndex[localIdx];
+      if (internIdx == -1) {
+        continue;
+      }
+      for (let exampleIdx = 0; exampleIdx < numExamples; exampleIdx++) {
+        const d1Cell =
+            exampleIdx * this.categoricalSetIntFeaturesIndex.length + localIdx;
+        const beginIdx = inputs.categoricalSetIntFeaturesRowSplitsDim1[d1Cell];
+        const endIdx =
+            inputs.categoricalSetIntFeaturesRowSplitsDim1[d1Cell + 1];
+        const ccValues = Module.CreateVectorInt(endIdx - beginIdx);
+
+        if (endIdx > beginIdx &&
+            inputs.categoricalSetIntFeaturesValues[beginIdx] == -1) {
+          // This is a missing value.
+          continue;
+        }
+
+        for (let itemIdx = beginIdx; itemIdx < endIdx; itemIdx++) {
+          ccValues.push_back(inputs.categoricalSetIntFeaturesValues[itemIdx]);
+        }
+        this.internalModel.setCategoricalSetInt(
+            exampleIdx, internIdx, ccValues);
+      }
+    }
+
 
     // Generate predictions.
     const rawPredictions =
@@ -477,10 +549,9 @@ Module['loadModelFromZipBlob'] =
 
   zippedModel.forEach((filename, file) => {
     promiseUncompressed.push(
-        file.async('blob').then((data) => blobToArrayBuffer(data))
-        .then((data) => {
+        file.async('blob').then((data) => blobToArrayBuffer(data)).then((data) => {
           if (filename.endsWith('/')) {
-            throw Error(
+            throw new Error(
                 'The model zipfile is expected to be a flat zip file, but it contains a sub-directory. If zipping the model manually with the `zip` tool, make sure to use the `-j` option.');
           }
           Module.FS.writeFile(
@@ -504,7 +575,7 @@ Module['loadModelFromZipBlob'] =
   Module.FS.rmdir(modelPath);
 
   if (modelWasm == null) {
-    throw Error('Cannot parse model');
+    throw new Error('Cannot parse model');
   }
 
   return new Model(modelWasm, createdTFDFSignature);

@@ -24,6 +24,7 @@
  * @typedef {{
  *   size: function(): number,
  *   get: function(number) : (string|boolean|number|!Object),
+ *   push_back: function(?),
  * }}
  */
 let CCVector;
@@ -56,6 +57,7 @@ let InputFeature;
  * @typedef {{
  *   size: function(): number,
  *   get: function(number) : !InputFeature,
+ *   push_back: function(!InputFeature),
  * }}
  */
 let InternalInputFeatures;
@@ -66,6 +68,7 @@ let InternalInputFeatures;
  * @typedef {{
  *   size: function(): number,
  *   get: function(number) : number,
+ *   push_back: function(number),
  * }}
  */
 let InternalPredictions;
@@ -106,9 +109,9 @@ let TFDFOutputPrediction;
  *   numericalFeatures: !Array<!Array<number>>,
  *   booleanFeatures: !Array<!Array<number>>,
  *   categoricalIntFeatures: !Array<!Array<number>>,
- *   categoricalSetIntFeaturesValues: !Array<!Array<number>>,
- *   categoricalSetIntFeaturesRowSplitsDim1: !Array<!Array<number>>,
- *   categoricalSetIntFeaturesRowSplitsDim2: !Array<!Array<number>>,
+ *   categoricalSetIntFeaturesValues: !Array<number>,
+ *   categoricalSetIntFeaturesRowSplitsDim1: !Array<number>,
+ *   categoricalSetIntFeaturesRowSplitsDim2: !Array<number>,
  *   denseOutputDim: number,
  * }}
  */
@@ -125,7 +128,8 @@ let TFDFInput;
  *   setBoolean: function(number,number,number),
  *   setCategoricalInt: function(number,number,number),
  *   setCategoricalString: function(number,number,string),
- *   setCategoricalSetString: function(number,number,!Array<string>),
+ *   setCategoricalSetString: function(number,number,!CCVector),
+ *   setCategoricalSetInt: function(number,number,!CCVector),
  *   getInputFeatures: function(): !InternalInputFeatures,
  *   getProtoInputFeatures: function(): !InternalInputFeatures,
  *   delete: function(),

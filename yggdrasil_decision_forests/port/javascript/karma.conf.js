@@ -42,6 +42,20 @@ module.exports = function(config) {
     included: false,
   });
   config.files.push({
+    pattern: basePath + 'test_data/model_2.zip',
+    watched: false,
+    served: true,
+    nocache: false,
+    included: false,
+  });
+  config.files.push({
+    pattern: basePath + 'test_data/model_small_sst.zip',
+    watched: false,
+    served: true,
+    nocache: false,
+    included: false,
+  });
+  config.files.push({
     pattern: 'third_party/javascript/node_modules/jszip/jszip.min.js',
     watched: false,
     served: true,
