@@ -58,6 +58,15 @@ absl::Status AnalyseAndCreateHtmlReport(const model::AbstractModel& model,
                                         absl::string_view dataset_path,
                                         absl::string_view output_directory,
                                         const proto::Options& options = {});
+
+// Similar to "AnalyseAndCreateHtmlReport" above, but takes a dataset path
+// instead of a vertical dataset.
+absl::Status AnalyseAndCreateHtmlReport(const model::AbstractModel& model,
+                                        absl::string_view model_path,
+                                        absl::string_view dataset_path,
+                                        absl::string_view output_directory,
+                                        const proto::Options& options = {});
+
 namespace internal {
 
 absl::StatusOr<utils::plot::MultiPlot> PlotConditionalExpectationPlotSet(

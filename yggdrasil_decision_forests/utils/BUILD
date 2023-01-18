@@ -740,6 +740,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:model_engine_wrapper",
     ],

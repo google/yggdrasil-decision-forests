@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_engine_wrapper.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
@@ -644,6 +645,21 @@ absl::Status AnalyseAndCreateHtmlReport(const model::AbstractModel& model,
   ASSIGN_OR_RETURN(const auto analysis, Analyse(model, dataset, options));
   return CreateHtmlReport(model, dataset, model_path, dataset_path, analysis,
                           output_directory, options);
+}
+
+absl::Status AnalyseAndCreateHtmlReport(const model::AbstractModel& model,
+                                        absl::string_view model_path,
+                                        absl::string_view dataset_path,
+                                        absl::string_view output_directory,
+                                        const proto::Options& options) {
+  LOG(INFO) << "Load dataset";
+  dataset::VerticalDataset dataset;
+  RETURN_IF_ERROR(dataset::LoadVerticalDataset(
+      dataset_path, model.data_spec(), &dataset,
+      /*ensure_non_missing=*/model.input_features()));
+
+  return AnalyseAndCreateHtmlReport(model, dataset, model_path, dataset_path,
+                                    output_directory, options);
 }
 
 absl::StatusOr<proto::AnalysisResult> Analyse(

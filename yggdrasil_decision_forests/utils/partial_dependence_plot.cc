@@ -483,6 +483,7 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs,
     const int num_numerical_bins, const float example_sampling) {
+  LOG(INFO) << "Initiate PDP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializePartialDependencePlotSet(
                        model.data_spec(), attribute_idxs, model.task(),
@@ -497,10 +498,12 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
   // TODO: Multi-thread.
   dataset::proto::Example example;
   for (size_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
-    if (example_sampling < dist_unif_unit(random)) {
+    if (example_sampling < 1.f && example_sampling < dist_unif_unit(random)) {
       continue;
     }
-    LOG_INFO_EVERY_N_SEC(30, _ << example_idx + 1 << " examples scanned.");
+    if ((example_idx % 100) == 0) {
+      LOG_INFO_EVERY_N_SEC(30, _ << example_idx + 1 << " examples scanned.");
+    }
     dataset.ExtractExample(example_idx, &example);
 
     RETURN_IF_ERROR(UpdatePartialDependencePlotSet(model, example, &pdp_set));
@@ -514,6 +517,7 @@ ComputeConditionalExpectationPlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs, int num_numerical_bins,
     float example_sampling) {
+  LOG(INFO) << "Initiate CEP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializeConditionalExpectationPlotSet(
                        model.data_spec(), attribute_idxs, model.task(),
@@ -528,10 +532,12 @@ ComputeConditionalExpectationPlotSet(
   // TODO: Multi-thread.
   dataset::proto::Example example;
   for (size_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
-    if (example_sampling < dist_unif_01(random)) {
+    if (example_sampling < 1.f && example_sampling < dist_unif_01(random)) {
       continue;
     }
-    LOG_INFO_EVERY_N_SEC(30, _ << example_idx + 1 << " examples scanned.");
+    if ((example_idx % 100) == 0) {
+      LOG_INFO_EVERY_N_SEC(30, _ << example_idx + 1 << " examples scanned.");
+    }
     dataset.ExtractExample(example_idx, &example);
     RETURN_IF_ERROR(
         UpdateConditionalExpectationPlotSet(model, example, &pdp_set));
@@ -543,6 +549,7 @@ ComputeConditionalExpectationPlotSet(
 absl::StatusOr<std::vector<std::vector<int>>> GenerateAttributesCombinations(
     const model::AbstractModel& model, const bool flag_1d, const bool flag_2d,
     const bool flag_2d_categorical_numerical) {
+  LOG(INFO) << "List plotting attribute combinations";
   std::vector<std::vector<int>> attribute_idxs;
   if (flag_1d) {
     RETURN_IF_ERROR(
