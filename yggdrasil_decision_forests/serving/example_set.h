@@ -66,6 +66,7 @@
 #include <ostream>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -219,7 +220,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   // is not used by the model as input.
   absl::StatusOr<const FeatureDef*> FindFeatureDefByName(
       const absl::string_view name) const {
-    auto cached_feature_it = feature_def_cache_.find(name);
+    auto cached_feature_it = feature_def_cache_.find(std::string(name));
     if (cached_feature_it != feature_def_cache_.end()) {
       // The feature was found.
       return cached_feature_it->second;
@@ -255,7 +256,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   // Gets the unstacked feature definition from its name.
   absl::StatusOr<const UnstackedFeature*> FindUnstackedFeatureDefByName(
       const absl::string_view name) const {
-    auto it_index = indexed_unstacked_features_.find(name);
+    auto it_index = indexed_unstacked_features_.find(std::string(name));
     if (it_index == indexed_unstacked_features_.end()) {
       return absl::InvalidArgumentError(
           absl::Substitute("Unknown unstacked feature $0", name));
@@ -339,7 +340,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   absl::StatusOr<MultiDimNumericalFeatureId> GetMultiDimNumericalFeatureId(
       const absl::string_view name) const {
     // Get the unstacked feature information.
-    const auto it_index = indexed_unstacked_features_.find(name);
+    const auto it_index = indexed_unstacked_features_.find(std::string(name));
     if (it_index == indexed_unstacked_features_.end()) {
       return absl::InvalidArgumentError(
           absl::StrFormat("Unknown feature %s", name));
@@ -419,13 +420,13 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
 
   // Index to the "fixed_length_features_" and "categorical_set_features_" by
   // "name".
-  absl::flat_hash_map<std::string, const FeatureDef*> feature_def_cache_;
+  std::unordered_map<std::string, const FeatureDef*> feature_def_cache_;
 
   // List of "unstacked" features (similar to "unstackeds" in the dataspec).
   std::vector<UnstackedFeature> unstacked_features_;
 
   // Index  "original name" to its index in "unstacked_features_".
-  absl::flat_hash_map<std::string, int> indexed_unstacked_features_;
+  std::unordered_map<std::string, int> indexed_unstacked_features_;
 };
 
 using FeaturesDefinition = FeaturesDefinitionNumericalOrCategoricalFlat;

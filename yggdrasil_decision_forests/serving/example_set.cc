@@ -125,8 +125,9 @@ FeaturesDefinitionNumericalOrCategoricalFlat::unstacked_features() const {
 
 bool FeaturesDefinitionNumericalOrCategoricalFlat::HasInputFeature(
     const absl::string_view name) const {
-  return feature_def_cache_.find(name) != feature_def_cache_.end() ||
-         indexed_unstacked_features_.find(name) !=
+  return feature_def_cache_.find(std::string(name)) !=
+             feature_def_cache_.end() ||
+         indexed_unstacked_features_.find(std::string(name)) !=
              indexed_unstacked_features_.end();
 }
 
