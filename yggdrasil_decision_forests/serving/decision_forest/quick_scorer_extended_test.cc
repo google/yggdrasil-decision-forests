@@ -392,10 +392,10 @@ TEST(QuickScorer, ExceedStackBuffer) {
 
 TEST(QuickScorer, FinalizeConditionItems) {
   std::vector<internal::QuickScorerExtendedModel::ConditionItem> items{
-      {.tree_idx = 2, .leaf_mask = 0b0111},
-      {.tree_idx = 1, .leaf_mask = 0b1011},
-      {.tree_idx = 2, .leaf_mask = 0b1101},
-      {.tree_idx = 1, .leaf_mask = 0b1110},
+      {/*.tree_idx =*/ 2, /*.leaf_mask =*/ 0b0111},
+      {/*.tree_idx =*/ 1, /*.leaf_mask =*/ 0b1011},
+      {/*.tree_idx =*/ 2, /*.leaf_mask =*/ 0b1101},
+      {/*.tree_idx =*/ 1, /*.leaf_mask =*/ 0b1110},
   };
   internal::FinalizeConditionItems(&items);
   EXPECT_EQ(items.size(), 2);
@@ -407,10 +407,10 @@ TEST(QuickScorer, FinalizeConditionItems) {
 
 TEST(QuickScorer, FinalizeIsHigherConditionItems) {
   std::vector<internal::QuickScorerExtendedModel::IsHigherConditionItem> items{
-      {.threshold = 1.f, .tree_idx = 2, .leaf_mask = 0b0111},
-      {.threshold = 3.f, .tree_idx = 1, .leaf_mask = 0b1011},
-      {.threshold = 1.f, .tree_idx = 2, .leaf_mask = 0b1101},
-      {.threshold = 2.f, .tree_idx = 1, .leaf_mask = 0b1110},
+      {/*.threshold =*/ 1.f, /*.tree_idx =*/ 2, /*.leaf_mask =*/ 0b0111},
+      {/*.threshold =*/ 3.f, /*.tree_idx =*/ 1, /*.leaf_mask =*/ 0b1011},
+      {/*.threshold =*/ 1.f, /*.tree_idx =*/ 2, /*.leaf_mask =*/ 0b1101},
+      {/*.threshold =*/ 2.f, /*.tree_idx =*/ 1, /*.leaf_mask =*/ 0b1110},
   };
   internal::FinalizeIsHigherConditionItems(&items);
   EXPECT_EQ(items.size(), 3);

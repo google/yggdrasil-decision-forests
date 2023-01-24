@@ -20,6 +20,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner/hyperparameters_optimizer:optimizer_interface",
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "//yggdrasil_decision_forests/utils:compatibility",
     ],
     alwayslink = 1,
 )

@@ -19,6 +19,7 @@
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers/random.pb.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -214,7 +215,7 @@ absl::StatusOr<double> UpdateWeights(
 
 absl::StatusOr<size_t> Sample(std::vector<float>& weights,
                               utils::RandomEngine* random) {
-  const double sum = std::accumulate(weights.begin(), weights.end(), 0.0);
+  const double sum = utils::accumulate(weights.begin(), weights.end(), 0.0);
   if (sum <= 0) {
     return absl::InvalidArgumentError("Zero weight sum");
   }

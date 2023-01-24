@@ -163,7 +163,7 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
     if (gbt_model == nullptr) {
       return false;
     }
-    return gbt_model->CheckStructure({.global_imputation_is_higher = false});
+    return gbt_model->CheckStructure({/*.global_imputation_is_higher =*/ false});
   }
 
   std::vector<std::string> IsBetterThan() const override { return {}; }
@@ -175,7 +175,7 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
       return absl::InvalidArgumentError("The model is not a GBDT.");
     }
 
-    if (!gbt_model->CheckStructure({.global_imputation_is_higher = false})) {
+    if (!gbt_model->CheckStructure({/*.global_imputation_is_higher =*/ false})) {
       return NoGlobalImputationError(
           "GradientBoostedTreesGenericFastEngineFactory");
     }
@@ -258,7 +258,7 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
       return false;
     }
 
-    if (!gbt_model->CheckStructure({.global_imputation_is_higher = false})) {
+    if (!gbt_model->CheckStructure({/*.global_imputation_is_higher =*/ false})) {
       return false;
     }
 
@@ -304,7 +304,7 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
       return absl::InvalidArgumentError("The model is not a GBDT.");
     }
 
-    if (!gbt_model->CheckStructure({.global_imputation_is_higher = false})) {
+    if (!gbt_model->CheckStructure({/*.global_imputation_is_higher =*/ false})) {
       return NoGlobalImputationError(
           "GradientBoostedTreesQuickScorerFastEngineFactory");
     }
@@ -471,7 +471,7 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
     if (rf_model == nullptr) {
       return false;
     }
-    return rf_model->CheckStructure({.global_imputation_is_higher = false});
+    return rf_model->CheckStructure({/*.global_imputation_is_higher =*/ false});
   }
 
   std::vector<std::string> IsBetterThan() const override { return {}; }
@@ -483,7 +483,7 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
       return absl::InvalidArgumentError("The model is not a RF.");
     }
 
-    if (!rf_model->CheckStructure({.global_imputation_is_higher = false})) {
+    if (!rf_model->CheckStructure({/*.global_imputation_is_higher =*/ false})) {
       return NoGlobalImputationError("RandomForestGenericFastEngineFactory");
     }
 

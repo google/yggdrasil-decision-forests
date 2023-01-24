@@ -177,6 +177,7 @@ cc_library_ydf(
     srcs = ["loss_imp_mean_square_error.cc"],
     hdrs = ["loss_imp_mean_square_error.h"],
     deps = [
+        "//yggdrasil_decision_forests/utils:compatibility",
         ":loss_interface",
         ":loss_utils",
         "@com_google_absl//absl/container:inlined_vector",

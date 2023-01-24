@@ -887,7 +887,7 @@ absl::Status BaseGenericToSpecializedModel(const AbstractModel& src,
   RETURN_IF_ERROR(GetInputFeatures(src, &all_input_features, nullptr));
 
   dst->global_imputation_optimization =
-      src.CheckStructure({.global_imputation_is_higher = true});
+      src.CheckStructure({/*.global_imputation_is_higher =*/ true});
 
   RETURN_IF_ERROR(dst->mutable_features()->Initialize(
       all_input_features, src.data_spec(),

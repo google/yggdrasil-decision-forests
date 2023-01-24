@@ -357,13 +357,13 @@ absl::StatusOr<LossResults> BinaryFocalLoss::TemplatedLoss(
   if (sum_weights > 0) {
     float loss = sum_loss / sum_weights;
     DCheckIsFinite(loss);
-    return LossResults{.loss = loss,
-                       .secondary_metrics = {static_cast<float>(
+    return LossResults{/*.loss =*/ loss,
+                       /*.secondary_metrics =*/ {static_cast<float>(
                            count_correct_predictions / sum_weights)}};
   } else {
     return LossResults{
-        .loss = std::numeric_limits<float>::quiet_NaN(),
-        .secondary_metrics = {std::numeric_limits<float>::quiet_NaN()}};
+        /*.loss =*/ std::numeric_limits<float>::quiet_NaN(),
+        /*.secondary_metrics =*/ {std::numeric_limits<float>::quiet_NaN()}};
   }
   return absl::OkStatus();
 }

@@ -55,6 +55,16 @@ constexpr const T& clamp(const T& v, const T& lo, const T& hi) {
 template <class T, class U>
 constexpr bool is_same_v = ::std::is_same<T, U>::value;
 
+// Similar as std::accumulate introduced in c++20.
+template<class Iter, class Result>
+Result accumulate(Iter first, Iter last, Result acc)
+{
+    for (; first != last; ++first){
+        acc = std::move(acc) + *first;
+    }
+    return acc;
+}
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
 

@@ -50,6 +50,7 @@ cc_library_ydf(
     srcs = ["worker.cc"],
     hdrs = ["worker.h"],
     deps = [
+        "//yggdrasil_decision_forests/utils:compatibility",
         ":common",
         ":distributed_gradient_boosted_trees_cc_proto",
         ":worker_cc_proto",

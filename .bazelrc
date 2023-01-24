@@ -34,6 +34,9 @@
 # Common flags.
 common --experimental_repo_remote_exec
 
+# Avoid long path issues<
+startup --output_user_root=C:/tmpbld
+
 # Flags to compile with or without recent version of Bazel.
 
 # Required for bazel <=4, fails with bazel >= 5.

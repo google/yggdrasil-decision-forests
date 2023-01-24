@@ -431,7 +431,7 @@ TEST(RandomForest, SaveAndLoadModelWithAutodetectedPrefix) {
   std::string model_path =
       file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
   EXPECT_OK(
-      SaveModel(model_path, &original_model, {.file_prefix = "prefix_1_"}));
+      SaveModel(model_path, &original_model, {/*.file_prefix =*/ "prefix_1_"}));
 
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_OK(LoadModel(model_path, &loaded_model, {}));
@@ -449,9 +449,9 @@ TEST(RandomForest, FailingPrefixDetectionForMultipleModelsPerDirectory) {
   std::string model_path =
       file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
   ASSERT_OK(
-      SaveModel(model_path, &original_model, {.file_prefix = "prefix_1_"}));
+      SaveModel(model_path, &original_model, {/*.file_prefix =*/ "prefix_1_"}));
   ASSERT_OK(
-      SaveModel(model_path, &original_model, {.file_prefix = "prefix_2_"}));
+      SaveModel(model_path, &original_model, {/*.file_prefix =*/ "prefix_2_"}));
 
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_THAT(LoadModel(model_path, &loaded_model, {}),

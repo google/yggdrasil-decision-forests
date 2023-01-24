@@ -246,7 +246,7 @@ absl::StatusOr<LossResults> NDCGLoss::Loss(
 
   const float ndcg =
       ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
-  return LossResults{.loss = -ndcg, .secondary_metrics = {ndcg}};
+  return LossResults{/*.loss =*/ -ndcg, /*.secondary_metrics =*/ {ndcg}};
 }
 
 }  // namespace gradient_boosted_trees
