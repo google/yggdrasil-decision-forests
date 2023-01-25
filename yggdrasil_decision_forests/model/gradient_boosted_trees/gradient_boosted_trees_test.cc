@@ -90,7 +90,7 @@ TEST(GradientBoostedTrees, SaveAndLoadModelWithAutodetectedPrefix) {
   std::string model_path =
       file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
   EXPECT_OK(SaveModel(model_path, original_model.get(),
-                      {.file_prefix = "prefix_1_"}));
+                      {/*.file_prefix =*/"prefix_1_"}));
 
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_OK(LoadModel(model_path, &loaded_model, {}));
@@ -107,9 +107,9 @@ TEST(GradientBoostedTrees,
   std::string model_path =
       file::JoinPath(test::TmpDirectory(), "saved_model_with_auto_prefix");
   ASSERT_OK(SaveModel(model_path, original_model.get(),
-                      {.file_prefix = "prefix_1_"}));
+                      {/*.file_prefix =*/"prefix_1_"}));
   ASSERT_OK(SaveModel(model_path, original_model.get(),
-                      {.file_prefix = "prefix_2_"}));
+                      {/*.file_prefix =*/"prefix_2_"}));
 
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_THAT(LoadModel(model_path, &loaded_model, {}),

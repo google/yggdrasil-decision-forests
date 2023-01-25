@@ -28,6 +28,7 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
@@ -128,8 +129,8 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
           *validation_.dataset,
           welcome_.train_config_linking().weight_definition(),
           &validation_.weights));
-      validation_.sum_weights = std::accumulate(validation_.weights.begin(),
-                                                validation_.weights.end(), 0.0);
+      validation_.sum_weights = utils::accumulate(
+          validation_.weights.begin(), validation_.weights.end(), 0.0);
     } else {
       validation_.weights.assign(validation_.dataset->nrow(), 1.f);
       validation_.sum_weights = validation_.dataset->nrow();

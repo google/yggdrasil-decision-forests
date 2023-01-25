@@ -224,7 +224,7 @@ absl::StatusOr<LossResults> CrossEntropyNDCGLoss::Loss(
   }
   float loss_value =
       -ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
-  return LossResults{.loss = loss_value, .secondary_metrics = {}};
+  return LossResults{/*.loss =*/loss_value, /*.secondary_metrics =*/{}};
 }
 
 }  // namespace gradient_boosted_trees

@@ -298,13 +298,13 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
     const float secondary_metric =
         static_cast<float>(confusion_matrix.Trace() / confusion_matrix.sum());
     DCheckIsFinite(loss);
-    return LossResults{.loss = loss,
-                       .secondary_metrics = {secondary_metric},
-                       .confusion_table = std::move(confusion_matrix)};
+    return LossResults{/*.loss =*/loss,
+                       /*.secondary_metrics =*/{secondary_metric},
+                       /*.confusion_table =*/std::move(confusion_matrix)};
   } else {
     return LossResults{
-        .loss = std::numeric_limits<float>::quiet_NaN(),
-        .secondary_metrics = {std::numeric_limits<float>::quiet_NaN()}};
+        /*.loss =*/std::numeric_limits<float>::quiet_NaN(),
+        /*.secondary_metrics =*/{std::numeric_limits<float>::quiet_NaN()}};
   }
 }
 

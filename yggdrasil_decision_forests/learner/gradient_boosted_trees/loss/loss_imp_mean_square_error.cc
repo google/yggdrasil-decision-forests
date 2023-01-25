@@ -39,6 +39,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -71,7 +72,7 @@ absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
   if (weights.empty()) {
     sum_weights = dataset.nrow();
     weighted_sum_values =
-        std::accumulate(labels->values().begin(), labels->values().end(), 0.);
+        utils::accumulate(labels->values().begin(), labels->values().end(), 0.);
   } else {
     for (UnsignedExampleIdx example_idx = 0; example_idx < dataset.nrow();
          example_idx++) {
@@ -203,8 +204,8 @@ absl::StatusOr<LossResults> MeanSquaredErrorLoss::Loss(
     secondary_metrics.push_back(
         ranking_index->NDCG(predictions, weights, kNDCG5Truncation));
   }
-  return LossResults{.loss = loss_value,
-                     .secondary_metrics = std::move(secondary_metrics)};
+  return LossResults{/*.loss =*/loss_value,
+                     /*.secondary_metrics =*/std::move(secondary_metrics)};
 }
 
 }  // namespace gradient_boosted_trees

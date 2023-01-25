@@ -324,14 +324,15 @@ absl::StatusOr<LossResults> BinomialLogLikelihoodLoss::TemplatedLoss(
     float loss = sum_loss / total_example_weight;
     double correct_predictions = confusion_matrix.Trace();
     DCheckIsFinite(loss);
-    return LossResults{.loss = loss,
-                       .secondary_metrics = {static_cast<float>(
-                           correct_predictions / total_example_weight)},
-                       .confusion_table = std::move(confusion_matrix)};
+    return LossResults{
+        /*.loss =*/loss,
+        /*.secondary_metrics =*/
+        {static_cast<float>(correct_predictions / total_example_weight)},
+        /*.confusion_table =*/std::move(confusion_matrix)};
   } else {
     return LossResults{
-        .loss = std::numeric_limits<float>::quiet_NaN(),
-        .secondary_metrics = {std::numeric_limits<float>::quiet_NaN()}};
+        /*.loss =*/std::numeric_limits<float>::quiet_NaN(),
+        /*.secondary_metrics =*/{std::numeric_limits<float>::quiet_NaN()}};
   }
 }
 

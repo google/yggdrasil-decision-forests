@@ -731,7 +731,7 @@ absl::Status GenericToSpecializedGenericModelHelper(
     SetLeaf set_leaf, const GenericModel& src, SpecializedModel* dst,
     absl::optional<bool> global_imputation_optimization = {}) {
   dst->global_imputation_optimization =
-      src.CheckStructure({.global_imputation_is_higher = true});
+      src.CheckStructure({/*.global_imputation_is_higher =*/true});
 
   return GenericToSpecializedModelHelper(
       src, SetLeafFunctor<GenericModel, SpecializedModel>(set_leaf), dst,

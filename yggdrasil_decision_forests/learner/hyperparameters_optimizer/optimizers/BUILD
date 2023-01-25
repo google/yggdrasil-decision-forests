@@ -18,6 +18,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/learner/hyperparameters_optimizer:optimizer_interface",
+        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
     ],
