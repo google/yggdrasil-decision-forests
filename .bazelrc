@@ -13,6 +13,8 @@
 #
 # Windows
 #
+#  On Windows, uncomment the output_user_root option to avoid long path issues.
+#
 #   windows_cpp14: Windows build. Uses C++14. Does not work with tensorflow.
 #   windows_cpp17: Windows build. Uses C++17.
 #
@@ -34,8 +36,8 @@
 # Common flags.
 common --experimental_repo_remote_exec
 
-# Avoid long path issues<
-startup --output_user_root=C:/tmpbld
+# Avoid long path issues on Windows
+# startup --output_user_root=C:/tmpbld
 
 # Flags to compile with or without recent version of Bazel.
 
