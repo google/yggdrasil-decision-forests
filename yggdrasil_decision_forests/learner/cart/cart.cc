@@ -174,8 +174,9 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
   mdl->AddTree(absl::make_unique<decision_tree::DecisionTree>());
   auto* decision_tree = mdl->mutable_decision_trees()->front().get();
 
-  LOG(INFO) << "Training CART on " << train_dataset.nrow() << " example(s) and "
-            << config_link.features().size() << " feature(s).";
+  YDF_LOG(INFO) << "Training CART on " << train_dataset.nrow()
+                << " example(s) and " << config_link.features().size()
+                << " feature(s).";
   utils::usage::OnTrainingStart(train_dataset.data_spec(), config, config_link,
                                 train_dataset.nrow());
 
@@ -516,8 +517,8 @@ absl::Status PruneTree(const dataset::VerticalDataset& dataset,
   }
 
   const auto num_nodes_post_pruning = tree->NumNodes();
-  LOG(INFO) << num_nodes_pre_pruning << " nodes before pruning. "
-            << num_nodes_post_pruning << " nodes after pruning.";
+  YDF_LOG(INFO) << num_nodes_pre_pruning << " nodes before pruning. "
+                << num_nodes_post_pruning << " nodes after pruning.";
   return absl::OkStatus();
 }
 

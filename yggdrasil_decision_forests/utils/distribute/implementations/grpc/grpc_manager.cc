@@ -142,8 +142,8 @@ absl::Status GRPCManager::InitializeWorkers(
   }
 
   if (verbosity_ >= 1) {
-    LOG(INFO) << "Start manager with " << worker_addresses.size()
-              << " workers.";
+    YDF_LOG(INFO) << "Start manager with " << worker_addresses.size()
+                  << " workers.";
   }
 
   if (imp_config.use_loas()) {
@@ -180,8 +180,8 @@ absl::Status GRPCManager::WaitForAllWorkersToBeReady() {
       const auto ping_status = stub->Ping(&context, query, &answer);
       if (!ping_status.ok()) {
         if (verbosity_ >= 1) {
-          LOG(INFO) << "Worker #" << worker->worker_idx
-                    << " is not yet available. Waiting 10s";
+          YDF_LOG(INFO) << "Worker #" << worker->worker_idx
+                        << " is not yet available. Waiting 10s";
         }
         absl::SleepFor(absl::Seconds(10));
         continue;
@@ -191,7 +191,7 @@ absl::Status GRPCManager::WaitForAllWorkersToBeReady() {
   }
 
   if (verbosity_ >= 1) {
-    LOG(INFO) << "All the workers are available";
+    YDF_LOG(INFO) << "All the workers are available";
   }
 
   return absl::OkStatus();
@@ -248,7 +248,7 @@ absl::StatusOr<proto::Server::Stub*> GRPCManager::UpdateWorkerConnection(
 
 absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
   if (verbosity_) {
-    LOG(INFO) << "Change the number of parallel execution per worker";
+    YDF_LOG(INFO) << "Change the number of parallel execution per worker";
   }
 
   // Close the query channels.
@@ -291,16 +291,16 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
         // The worker received the request, but the worker is lacking the worker
         // configuration field. The request should be re-sent with the worker
         // configuration.
-        LOG(WARNING) << "Send worker configuration to worker #"
-                     << worker->worker_idx;
+        YDF_LOG(WARNING) << "Send worker configuration to worker #"
+                         << worker->worker_idx;
         utils::concurrency::MutexLock l(&mutex_worker_config_);
         *query.mutable_worker_config() = worker_config_;
         continue;
       }
 
       if (verbosity_ >= 1) {
-        LOG(WARNING) << "GRPC to worker #" << worker->worker_idx
-                     << " failed with error: " << status.error_message();
+        YDF_LOG(WARNING) << "GRPC to worker #" << worker->worker_idx
+                         << " failed with error: " << status.error_message();
       }
       if (IsTransiantError(status)) {
         // The worker is temporarly not available.
@@ -316,8 +316,8 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
 
   if (answer.has_error()) {
     if (verbosity_ >= 1) {
-      LOG(WARNING) << "Worker #" << worker->worker_idx
-                   << " returned an error: " << answer.error();
+      YDF_LOG(WARNING) << "Worker #" << worker->worker_idx
+                       << " returned an error: " << answer.error();
     }
     return absl::InvalidArgumentError(answer.error());
   }
@@ -372,7 +372,7 @@ absl::Status GRPCManager::InitializeConfigFile(
 
 absl::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
   if (verbosity_ >= 2) {
-    LOG(INFO) << "Emitting blocking request of " << blob.size() << " bytes";
+    YDF_LOG(INFO) << "Emitting blocking request of " << blob.size() << " bytes";
   }
 
   if (worker_idx < 0) {
@@ -385,7 +385,8 @@ absl::StatusOr<Blob> GRPCManager::BlockingRequest(Blob blob, int worker_idx) {
 
 absl::Status GRPCManager::AsynchronousRequest(Blob blob, int worker_idx) {
   if (verbosity_ >= 2) {
-    LOG(INFO) << "Emitting asynchronous request of " << blob.size() << " bytes";
+    YDF_LOG(INFO) << "Emitting asynchronous request of " << blob.size()
+                  << " bytes";
   }
   if (worker_idx < 0) {
     async_pending_queries_.Push(std::move(blob));
@@ -410,10 +411,10 @@ int GRPCManager::NumWorkers() { return workers_.size(); }
 
 absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
   if (verbosity_ >= 1) {
-    LOG(INFO) << "Shutdown manager";
+    YDF_LOG(INFO) << "Shutdown manager";
   }
   if (done_was_called_) {
-    LOG(WARNING) << "Calling done twice";
+    YDF_LOG(WARNING) << "Calling done twice";
     return absl::OkStatus();
   }
   done_was_called_ = true;
@@ -433,7 +434,7 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
 
   JoinWorkers();
   if (verbosity_ >= 1) {
-    LOG(INFO) << "Workers joined";
+    YDF_LOG(INFO) << "Workers joined";
   }
 
   proto::ShutdownQuery query;
@@ -454,8 +455,8 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
     auto worker_shutdown = stub->Shutdown(&context, query, &ignored);
     if (!worker_shutdown.ok()) {
       // It is not a big deal if the worker crashes during shutdown.
-      LOG(WARNING) << "Error when shutting down the connection:"
-                   << worker_shutdown.error_message();
+      YDF_LOG(WARNING) << "Error when shutting down the connection:"
+                       << worker_shutdown.error_message();
     }
   }
 
@@ -464,7 +465,7 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
   }
 
   if (verbosity_ >= 1) {
-    LOG(INFO) << "Manager has been shutdown";
+    YDF_LOG(INFO) << "Manager has been shutdown";
   }
 
   return absl::OkStatus();
@@ -507,8 +508,8 @@ absl::Status GRPCManager::Initialize(const proto::Config& config,
       std::numeric_limits<uint64_t>::max())(rnd);
 
   if (verbosity_ >= 1) {
-    LOG(INFO) << "Initialize manager with " << welcome_blob.size()
-              << " bytes welcome blob, uid:" << manager_uid_;
+    YDF_LOG(INFO) << "Initialize manager with " << welcome_blob.size()
+                  << " bytes welcome blob, uid:" << manager_uid_;
   }
   RETURN_IF_ERROR(InitializeWorkers(config, parallel_execution_per_worker));
   RETURN_IF_ERROR(InitializeConfigFile(config, worker_name,
@@ -567,7 +568,7 @@ void GRPCManager::ProcessPeerWorkerAddressUpdate(Worker* worker) {
     while (!done_was_called_) {
       auto stub_or = UpdateWorkerConnection(worker);
       if (!stub_or.ok()) {
-        LOG(WARNING) << "Cannot create stub";
+        YDF_LOG(WARNING) << "Cannot create stub";
         continue;
       }
 
@@ -638,7 +639,8 @@ void GRPCManager::MainEventCheckingThread() {
     for (const auto& change : pending_changes) {
       auto status = UpdateWorkerAddress(change.worker_idx, change.new_address);
       if (!status.ok()) {
-        LOG(WARNING) << "Cannot update worker address: " << status.message();
+        YDF_LOG(WARNING) << "Cannot update worker address: "
+                         << status.message();
       }
     }
   }

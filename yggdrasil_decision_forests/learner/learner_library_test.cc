@@ -36,7 +36,7 @@ using test::EqualsProto;
 
 TEST(ModelLibrary, CreateAllLearners) {
   for (const auto& learner_name : AllRegisteredLearners()) {
-    LOG(INFO) << learner_name;
+    YDF_LOG(INFO) << learner_name;
     std::unique_ptr<AbstractLearner> learner;
     proto::TrainingConfig train_config;
     train_config.set_label("my_label");

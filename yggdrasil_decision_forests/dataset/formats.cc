@@ -79,7 +79,7 @@ GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path) {
 std::string FormatToRecommendedExtension(proto::DatasetFormat format) {
   switch (format) {
     case proto::INVALID:
-      LOG(FATAL) << "Invalid format";
+      YDF_LOG(FATAL) << "Invalid format";
       break;
     case proto::FORMAT_CSV:
       return "csv";
@@ -93,7 +93,7 @@ std::string FormatToRecommendedExtension(proto::DatasetFormat format) {
 std::string DatasetFormatToPrefix(proto::DatasetFormat format) {
   switch (format) {
     case proto::INVALID:
-      LOG(FATAL) << "Invalid format";
+      YDF_LOG(FATAL) << "Invalid format";
       break;
     case proto::FORMAT_CSV:
       return FORMAT_CSV;

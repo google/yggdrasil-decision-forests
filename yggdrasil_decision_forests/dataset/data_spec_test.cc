@@ -116,7 +116,7 @@ TEST(Dataset, DiscretizeAdult) {
   dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
 
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << readable_representation;
+  YDF_LOG(INFO) << readable_representation;
   std::string expected_result = R"(Number of records: 32561
 Number of columns: 2
 
@@ -152,7 +152,7 @@ TEST(Dataset, AdultAllDiscretized) {
       )pb");
   dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << readable_representation;
+  YDF_LOG(INFO) << readable_representation;
   std::string expected_result = R"(Number of records: 32561
 Number of columns: 15
 

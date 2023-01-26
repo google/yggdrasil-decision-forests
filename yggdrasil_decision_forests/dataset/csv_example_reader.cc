@@ -107,7 +107,8 @@ absl::Status UpdateDataSpecWithCsvExample(
   for (int col_idx = 0; col_idx < data_spec->columns_size(); col_idx++) {
     proto::Column* col = data_spec->mutable_columns(col_idx);
     if (col->is_unstacked()) {
-      LOG(FATAL) << "Unstacked numerical features not supported for csv files";
+      YDF_LOG(FATAL)
+          << "Unstacked numerical features not supported for csv files";
     }
     auto* col_acc = accumulator->mutable_columns(col_idx);
     // Skip NAs
@@ -208,7 +209,7 @@ absl::Status CsvDataSpecCreator::InferColumnsAndTypes(
       // Check if we have seen enought records to determine all the types.
       if (guide.max_num_scanned_rows_to_guess_type() > 0 &&
           nrow > guide.max_num_scanned_rows_to_guess_type()) {
-        LOG(INFO)
+        YDF_LOG(INFO)
             << "Stop scanning the csv file to infer the type. Some records "
                "were not considered.";
         break;

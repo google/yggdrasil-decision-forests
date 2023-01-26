@@ -164,7 +164,7 @@ MeanSquaredErrorLoss::SetLeafFunctorFromLabelStatistics() const {
 
     double denominator = label_stats.regression().labels().count();
     if (denominator <= 0) {
-      LOG(WARNING) << "Zero or negative weights in node";
+      YDF_LOG(WARNING) << "Zero or negative weights in node";
       denominator = 1.0;
     }
 

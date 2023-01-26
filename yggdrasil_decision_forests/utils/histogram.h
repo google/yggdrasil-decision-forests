@@ -18,7 +18,7 @@
 // Usage example:
 //   std::vector<int> values = ...;
 //   const auto histogram = Histogram::MakeUniform(values);
-//   LOG(INFO) << "\n" << histogram.ToString();
+//   YDF_LOG(INFO) << "\n" << histogram.ToString();
 //
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_HISTOGRAM_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_HISTOGRAM_H_

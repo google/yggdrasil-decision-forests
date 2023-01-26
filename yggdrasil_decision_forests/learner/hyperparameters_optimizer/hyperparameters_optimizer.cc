@@ -74,8 +74,8 @@ absl::Status HyperParameterOptimizerLearner::SetHyperParametersImpl(
   if (!spe_config.has_base_learner()) {
     // The base learner is not set. This is possible during the automated
     // documentation generation.
-    LOG(WARNING) << "Sub-learner not set. This is only expected during the "
-                    "automatic documentation generation.";
+    YDF_LOG(WARNING) << "Sub-learner not set. This is only expected during the "
+                        "automatic documentation generation.";
     return AbstractLearner::SetHyperParametersImpl(generic_hyper_params);
   }
 
@@ -110,8 +110,8 @@ HyperParameterOptimizerLearner::GetGenericHyperParameterSpecification() const {
       training_config_.GetExtension(proto::hyperparameters_optimizer_config);
 
   if (!spe_config.has_base_learner()) {
-    LOG(WARNING) << "Sub-learner not set. This is only expected during the "
-                    "automatic documentation generation.";
+    YDF_LOG(WARNING) << "Sub-learner not set. This is only expected during the "
+                        "automatic documentation generation.";
     return AbstractLearner::GetGenericHyperParameterSpecification();
   }
 
@@ -130,9 +130,10 @@ HyperParameterOptimizerLearner::TrainFromFileOnMemoryDataset(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
-  LOG(INFO) << "Serialize memory dataset to disk. To skip this stage and a "
-               "more efficient training, provide the dataset as a path instead "
-               "of as a VerticalDataset";
+  YDF_LOG(INFO)
+      << "Serialize memory dataset to disk. To skip this stage and a "
+         "more efficient training, provide the dataset as a path instead "
+         "of as a VerticalDataset";
   const auto& serialized_dataset_format =
       training_config_.GetExtension(proto::hyperparameters_optimizer_config)
           .serialized_dataset_format();
@@ -205,7 +206,8 @@ HyperParameterOptimizerLearner::TrainWithStatus(
   // Build the effective space to optimize.
   ASSIGN_OR_RETURN(const auto search_space,
                    BuildSearchSpace(spe_config, *base_learner));
-  LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
+  YDF_LOG(INFO) << "Hyperparameter search space:\n"
+                << search_space.DebugString();
 
   // Select the best hyperparameters.
   model::proto::HyperparametersOptimizerLogs logs;
@@ -214,13 +216,13 @@ HyperParameterOptimizerLearner::TrainWithStatus(
                    SearchBestHyperparameterInProcess(
                        spe_config, config_link, search_space_spec, search_space,
                        train_dataset, valid_dataset, &best_model, &logs));
-  LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
+  YDF_LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
 
   // TODO: Record the logs.
 
   if (spe_config.retrain_final_model()) {
     // Train a model on the entire train dataset using the best hyperparameters.
-    LOG(INFO) << "Training a model on the best hyper parameters.";
+    YDF_LOG(INFO) << "Training a model on the best hyper parameters.";
     RETURN_IF_ERROR(base_learner->SetHyperParameters(best_params));
     ASSIGN_OR_RETURN(
         auto mdl, base_learner->TrainWithStatus(train_dataset, valid_dataset));
@@ -308,7 +310,8 @@ HyperParameterOptimizerLearner::TrainWithStatus(
   // Build the effective space to optimize.
   ASSIGN_OR_RETURN(const auto search_space,
                    BuildSearchSpace(spe_config, *base_learner));
-  LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
+  YDF_LOG(INFO) << "Hyperparameter search space:\n"
+                << search_space.DebugString();
 
   // Select the best hyperparameters.
   model::proto::HyperparametersOptimizerLogs logs;
@@ -318,13 +321,13 @@ HyperParameterOptimizerLearner::TrainWithStatus(
       SearchBestHyperparameterDistributed(
           spe_config, config_link, search_space_spec, search_space, typed_path,
           data_spec, typed_valid_path, &best_model, manager.get(), &logs));
-  LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
+  YDF_LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
 
   // TODO: Record the logs.
 
   if (spe_config.retrain_final_model()) {
     // Train a model on the entire train dataset using the best hyperparameters.
-    LOG(INFO) << "Training a model on the best hyper parameters.";
+    YDF_LOG(INFO) << "Training a model on the best hyper parameters.";
     ASSIGN_OR_RETURN(auto model,
                      TrainRemoteModel(spe_config.base_learner(), config_link,
                                       spe_config.base_learner_deployment(),
@@ -494,8 +497,8 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
             return Output{score, candidate, std::move(model)};
           });
 
-  LOG(INFO) << "Start local tuner with " << deployment().num_threads()
-            << " thread(s)";
+  YDF_LOG(INFO) << "Start local tuner with " << deployment().num_threads()
+                << " thread(s)";
   async_evaluator.StartWorkers();
 
   // Number of candidate being evaluated.
@@ -511,7 +514,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
 
   while (true) {
     if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
-      LOG(INFO) << "Training interrupted per the user";
+      YDF_LOG(INFO) << "Training interrupted per the user";
       break;
     }
 
@@ -576,15 +579,16 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
       logging_best_score = output.score;
       *best_model = std::move(output.model);
     }
-    LOG(INFO) << "[" << round_idx + 1 << "/" << optimizer->NumExpectedRounds()
-              << "] Score: " << output.score << " / " << logging_best_score
-              << " HParams: " << output.candidate.ShortDebugString();
+    YDF_LOG(INFO) << "[" << round_idx + 1 << "/"
+                  << optimizer->NumExpectedRounds()
+                  << "] Score: " << output.score << " / " << logging_best_score
+                  << " HParams: " << output.candidate.ShortDebugString();
 
     if (training_config().has_maximum_training_duration_seconds() &&
         (absl::Now() - begin_optimization) >
             absl::Seconds(
                 training_config().maximum_training_duration_seconds())) {
-      LOG(INFO)
+      YDF_LOG(INFO)
           << "Stop optimization because of the maximum training duration.";
       break;
     }
@@ -647,7 +651,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
 
   while (true) {
     if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
-      LOG(INFO) << "Training interrupted per the user";
+      YDF_LOG(INFO) << "Training interrupted per the user";
       break;
     }
 
@@ -737,15 +741,16 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
       logging_best_score = score;
       best_model_path = evaluator_result.train_model().model_path();
     }
-    LOG(INFO) << "[" << round_idx + 1 << "/" << optimizer->NumExpectedRounds()
-              << "] Score: " << score << " / " << logging_best_score
-              << " HParams: " << candidate.ShortDebugString();
+    YDF_LOG(INFO) << "[" << round_idx + 1 << "/"
+                  << optimizer->NumExpectedRounds() << "] Score: " << score
+                  << " / " << logging_best_score
+                  << " HParams: " << candidate.ShortDebugString();
 
     if (training_config().has_maximum_training_duration_seconds() &&
         (absl::Now() - begin_optimization) >
             absl::Seconds(
                 training_config().maximum_training_duration_seconds())) {
-      LOG(INFO)
+      YDF_LOG(INFO)
           << "Stop optimization because of the maximum training duration.";
       break;
     }

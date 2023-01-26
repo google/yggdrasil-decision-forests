@@ -47,13 +47,14 @@ absl::Status Worker::RunCommand(const absl::string_view command,
     std::array<char, 2048> buffer;
     FILE* pipe = popen(absl::StrCat(command, " 2>&1").c_str(), "r");
     if (!pipe) {
-      LOG(WARNING) << "popen() failed";
+      YDF_LOG(WARNING) << "popen() failed";
       return absl::InvalidArgumentError("popen() failed");
     }
     while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
       const auto write_log_status = log_closer.stream()->Write(buffer.data());
       if (!write_log_status.ok()) {
-        LOG(WARNING) << "Failure to write logs: " << write_log_status.message();
+        YDF_LOG(WARNING) << "Failure to write logs: "
+                         << write_log_status.message();
         pclose(pipe);
         return write_log_status;
       }
@@ -72,7 +73,7 @@ absl::Status Worker::RunCommand(const absl::string_view command,
   }
 
   if (welcome_.display_output()) {
-    LOG(INFO) << "The command failed";
+    YDF_LOG(INFO) << "The command failed";
   }
 
   std::string end_of_logs;
@@ -127,8 +128,8 @@ absl::Status Worker::Command(const proto::Request::Command& request,
   ASSIGN_OR_RETURN(const auto done_already_exist, file::FileExists(done_path));
   if (done_already_exist) {
     if (welcome_.display_output()) {
-      LOG(INFO) << "The command " << request.internal_command_id()
-                << " was already run";
+      YDF_LOG(INFO) << "The command " << request.internal_command_id()
+                    << " was already run";
     }
     return absl::OkStatus();
   }
@@ -139,8 +140,9 @@ absl::Status Worker::Command(const proto::Request::Command& request,
 
   // Effectively run the command.
   if (welcome_.display_output()) {
-    LOG(INFO) << "Running command " << request.internal_command_id() << ":\n"
-              << request.command() << "\nwith logs in: " << log_path;
+    YDF_LOG(INFO) << "Running command " << request.internal_command_id()
+                  << ":\n"
+                  << request.command() << "\nwith logs in: " << log_path;
   }
   const auto begin_time = absl::Now();
 
@@ -149,9 +151,9 @@ absl::Status Worker::Command(const proto::Request::Command& request,
 
   if (!status.ok()) {
     if (welcome_.display_output()) {
-      LOG(INFO) << "The command " << request.internal_command_id()
-                << " failed.\nThe full command was:\n\n"
-                << request.command() << "\n\nwith logs in: " << log_path;
+      YDF_LOG(INFO) << "The command " << request.internal_command_id()
+                    << " failed.\nThe full command was:\n\n"
+                    << request.command() << "\n\nwith logs in: " << log_path;
     }
     file::RecursivelyDelete(fail_path, file::Defaults()).IgnoreError();
     RETURN_IF_ERROR(file::SetContent(fail_path, "fail"));
@@ -159,8 +161,8 @@ absl::Status Worker::Command(const proto::Request::Command& request,
   }
 
   if (welcome_.display_output()) {
-    LOG(INFO) << "The command " << request.internal_command_id()
-              << " completed in " << (absl::Now() - begin_time);
+    YDF_LOG(INFO) << "The command " << request.internal_command_id()
+                  << " completed in " << (absl::Now() - begin_time);
   }
   file::RecursivelyDelete(done_path, file::Defaults()).IgnoreError();
   RETURN_IF_ERROR(file::SetContent(done_path, "done"));

@@ -102,14 +102,14 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
     const distribute::proto::Config& distribute_config,
     const bool delete_source_file) {
   const auto begin = absl::Now();
-  LOG(INFO) << "Create dataset cache " << final_cache_directory
-            << " from partial dataset cache " << partial_cache_directory;
+  YDF_LOG(INFO) << "Create dataset cache " << final_cache_directory
+                << " from partial dataset cache " << partial_cache_directory;
 
   // Check if the cache is already there.
   const auto done_path = file::JoinPath(final_cache_directory, kFilenameDone);
   ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(done_path));
   if (already_exist) {
-    LOG(INFO) << "The dataset cache already exist.";
+    YDF_LOG(INFO) << "The dataset cache already exist.";
     return absl::OkStatus();
   }
 
@@ -173,10 +173,10 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
   RETURN_IF_ERROR(distribute_manager->Done());
   RETURN_IF_ERROR(file::SetContent(done_path, "done"));
 
-  LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
-  LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
+  YDF_LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
+  YDF_LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
 
-  LOG(INFO) << "Raw meta-data:\n" << metadata.DebugString();
+  YDF_LOG(INFO) << "Raw meta-data:\n" << metadata.DebugString();
 
   return absl::OkStatus();
 }
@@ -188,14 +188,14 @@ absl::Status CreateDatasetCacheFromShardedFiles(
     const proto::CreateDatasetCacheConfig& config,
     const distribute::proto::Config& distribute_config) {
   const auto begin = absl::Now();
-  LOG(INFO) << "Create dataset cache in " << cache_directory << " for dataset "
-            << typed_path;
+  YDF_LOG(INFO) << "Create dataset cache in " << cache_directory
+                << " for dataset " << typed_path;
 
   // Check if the cache is already there.
   const auto done_path = file::JoinPath(cache_directory, kFilenameDone);
   ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(done_path));
   if (already_exist) {
-    LOG(INFO) << "The dataset cache already exist.";
+    YDF_LOG(INFO) << "The dataset cache already exist.";
     return absl::OkStatus();
   }
 
@@ -224,7 +224,7 @@ absl::Status CreateDatasetCacheFromShardedFiles(
   // List the columns in the dataset.
   ASSIGN_OR_RETURN(const auto effective_columns,
                    GetColumnsOrAll(data_spec, columns, config));
-  LOG(INFO) << "Found " << effective_columns.size() << " column(s)";
+  YDF_LOG(INFO) << "Found " << effective_columns.size() << " column(s)";
 
   proto::CacheMetadata metadata;
   RETURN_IF_ERROR(internal::InitializeMetadata(data_spec, effective_columns,
@@ -234,7 +234,7 @@ absl::Status CreateDatasetCacheFromShardedFiles(
   std::vector<std::string> dataset_shards;
   std::string dataset_type;
   RETURN_IF_ERROR(ListShards(typed_path, &dataset_shards, &dataset_type));
-  LOG(INFO) << "Found " << dataset_shards.size() << " shard(s)";
+  YDF_LOG(INFO) << "Found " << dataset_shards.size() << " shard(s)";
 
   // Separate the columns of individual shards.
   RETURN_IF_ERROR(internal::SeparateDatasetColumns(
@@ -254,8 +254,8 @@ absl::Status CreateDatasetCacheFromShardedFiles(
   RETURN_IF_ERROR(distribute_manager->Done());
   RETURN_IF_ERROR(file::SetContent(done_path, "done"));
 
-  LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
-  LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
+  YDF_LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
+  YDF_LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
   return absl::OkStatus();
 }
 
@@ -374,7 +374,7 @@ absl::Status SeparateDatasetColumns(
     const proto::CreateDatasetCacheConfig& config,
     distribute::AbstractManager* distribute_manager,
     proto::CacheMetadata* cache_metadata) {
-  LOG(INFO) << "Start separating dataset by columns";
+  YDF_LOG(INFO) << "Start separating dataset by columns";
 
   cache_metadata->set_num_examples(0);
 
@@ -403,11 +403,12 @@ absl::Status SeparateDatasetColumns(
 
   RETURN_IF_ERROR(distribute_manager->SetParallelExecutionPerWorker(1));
 
-  LOG(INFO) << "Create " << num_output_shards
-            << " shards in the dataset cache from the " << dataset_shards.size()
-            << " shards of the original dataset i.e. ~" << shards_per_requests
-            << " shards to prepare for each of the "
-            << distribute_manager->NumWorkers() << " workers";
+  YDF_LOG(INFO) << "Create " << num_output_shards
+                << " shards in the dataset cache from the "
+                << dataset_shards.size()
+                << " shards of the original dataset i.e. ~"
+                << shards_per_requests << " shards to prepare for each of the "
+                << distribute_manager->NumWorkers() << " workers";
 
   cache_metadata->set_num_shards_in_feature_cache(num_output_shards);
   int pending_requests = 0;
@@ -418,8 +419,8 @@ absl::Status SeparateDatasetColumns(
         ShardMetadataPath(cache_directory, output_shard_idx, num_output_shards);
     ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(metadata_path));
     if (already_exist) {
-      LOG(INFO) << "The result of job #" << output_shard_idx
-                << " is already there.";
+      YDF_LOG(INFO) << "The result of job #" << output_shard_idx
+                    << " is already there.";
 
       proto::ShardMetadata metadata;
       RETURN_IF_ERROR(
@@ -470,8 +471,8 @@ absl::Status SeparateDatasetColumns(
   RETURN_IF_ERROR(distribute_manager->SetParallelExecutionPerWorker(
       kNumParallelQueriesPerWorker));
 
-  LOG(INFO) << "Column separation done. " << cache_metadata->num_examples()
-            << " example(s) found";
+  YDF_LOG(INFO) << "Column separation done. " << cache_metadata->num_examples()
+                << " example(s) found";
   return absl::OkStatus();
 }
 
@@ -484,7 +485,7 @@ absl::Status ConvertPartialToFinalRawData(
     const bool delete_source_file,
     distribute::AbstractManager* distribute_manager,
     proto::CacheMetadata* cache_metadata) {
-  LOG(INFO) << "Convert partial to final raw data";
+  YDF_LOG(INFO) << "Convert partial to final raw data";
 
   // Common part of the requests.
   proto::WorkerRequest generic_request;
@@ -553,7 +554,7 @@ absl::Status SortNumericalColumns(
     const proto::CreateDatasetCacheConfig& config,
     distribute::AbstractManager* distribute_manager,
     proto::CacheMetadata* cache_metadata) {
-  LOG(INFO) << "Start sorting numerical columns";
+  YDF_LOG(INFO) << "Start sorting numerical columns";
 
   // Common part of the requests.
   proto::WorkerRequest generic_request;
@@ -596,8 +597,8 @@ absl::Status SortNumericalColumns(
       auto* column_metadata =
           cache_metadata->mutable_columns(column_idx)->mutable_numerical();
       column_metadata->MergeFrom(metadata.metadata());
-      LOG(INFO) << "The result of job for column #" << column_idx
-                << " is already there.";
+      YDF_LOG(INFO) << "The result of job for column #" << column_idx
+                    << " is already there.";
       continue;
     }
 
@@ -630,8 +631,8 @@ absl::Status SortNumericalColumns(
     ASSIGN_OR_RETURN(const bool already_exist,
                      file::FileExists(final_directory));
     if (already_exist) {
-      LOG(WARNING) << "The directory result of job on column #"
-                   << result.column_idx() << " already exist.";
+      YDF_LOG(WARNING) << "The directory result of job on column #"
+                       << result.column_idx() << " already exist.";
     } else {
       RETURN_IF_ERROR(file::Rename(result.output_directory(), final_directory,
                                    file::Defaults()));

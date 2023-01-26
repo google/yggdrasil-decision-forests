@@ -483,14 +483,15 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs,
     const int num_numerical_bins, const float example_sampling) {
-  LOG(INFO) << "Initiate PDP accumulator";
+  YDF_LOG(INFO) << "Initiate PDP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializePartialDependencePlotSet(
                        model.data_spec(), attribute_idxs, model.task(),
                        model.label_col_idx(), num_numerical_bins, dataset));
-  LOG(INFO) << "Compute partial dependence plot for " << attribute_idxs.size()
-            << " set of features and " << NumModelCallPerExample(pdp_set)
-            << " model call(s) per example.";
+  YDF_LOG(INFO) << "Compute partial dependence plot for "
+                << attribute_idxs.size() << " set of features and "
+                << NumModelCallPerExample(pdp_set)
+                << " model call(s) per example.";
 
   std::default_random_engine random;
   std::uniform_real_distribution<float> dist_unif_unit;
@@ -517,14 +518,15 @@ ComputeConditionalExpectationPlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs, int num_numerical_bins,
     float example_sampling) {
-  LOG(INFO) << "Initiate CEP accumulator";
+  YDF_LOG(INFO) << "Initiate CEP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializeConditionalExpectationPlotSet(
                        model.data_spec(), attribute_idxs, model.task(),
                        model.label_col_idx(), num_numerical_bins, dataset));
-  LOG(INFO) << "Compute conditional expectation plot for "
-            << attribute_idxs.size() << " set of features and "
-            << NumModelCallPerExample(pdp_set) << " model call(s) per example.";
+  YDF_LOG(INFO) << "Compute conditional expectation plot for "
+                << attribute_idxs.size() << " set of features and "
+                << NumModelCallPerExample(pdp_set)
+                << " model call(s) per example.";
 
   std::default_random_engine random;
   std::uniform_real_distribution<float> dist_unif_01;
@@ -549,7 +551,7 @@ ComputeConditionalExpectationPlotSet(
 absl::StatusOr<std::vector<std::vector<int>>> GenerateAttributesCombinations(
     const model::AbstractModel& model, const bool flag_1d, const bool flag_2d,
     const bool flag_2d_categorical_numerical) {
-  LOG(INFO) << "List plotting attribute combinations";
+  YDF_LOG(INFO) << "List plotting attribute combinations";
   std::vector<std::vector<int>> attribute_idxs;
   if (flag_1d) {
     RETURN_IF_ERROR(

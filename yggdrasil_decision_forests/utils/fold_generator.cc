@@ -275,7 +275,7 @@ int NumberOfFolds(const proto::FoldGenerator& generator,
     case proto::FoldGenerator::GeneratorCase::kPrecomputedCrossValidation:
       return folds.size();
     default:
-      LOG(FATAL) << "Unknown fold generator.";
+      YDF_LOG(FATAL) << "Unknown fold generator.";
   }
   return -1;
 }
@@ -307,7 +307,7 @@ absl::Status GenerateFolds(const proto::FoldGenerator& generator,
       return GenerateFoldsPrecomputedCrossValidation(generator, *dataset,
                                                      folds);
     default:
-      LOG(FATAL) << "Not supported fold generator.";
+      YDF_LOG(FATAL) << "Not supported fold generator.";
   }
 }
 
@@ -326,7 +326,7 @@ absl::Status GenerateFoldsConstDataset(const proto::FoldGenerator& generator,
     case proto::FoldGenerator::GeneratorCase::kPrecomputedCrossValidation:
       return GenerateFoldsPrecomputedCrossValidation(generator, dataset, folds);
     default:
-      LOG(FATAL) << "Not supported fold generator.";
+      YDF_LOG(FATAL) << "Not supported fold generator.";
   }
 }
 

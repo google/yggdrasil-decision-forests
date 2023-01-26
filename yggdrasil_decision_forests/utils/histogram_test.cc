@@ -137,7 +137,7 @@ TEST(Histogram, UniformIntRnd) {
   for (int i = 0; i < 10000; i++) {
     values.push_back(dist(rnd));
   }
-  LOG(INFO) << Histogram<int>::MakeUniform(values).ToString();
+  YDF_LOG(INFO) << Histogram<int>::MakeUniform(values).ToString();
 }
 
 TEST(Histogram, UniformFloatRnd) {
@@ -147,7 +147,7 @@ TEST(Histogram, UniformFloatRnd) {
   for (int i = 0; i < 10000; i++) {
     values.push_back(dist(rnd));
   }
-  LOG(INFO) << Histogram<float>::MakeUniform(values).ToString();
+  YDF_LOG(INFO) << Histogram<float>::MakeUniform(values).ToString();
 }
 
 TEST(Histogram, UniformFloatWithWeightsRnd) {
@@ -159,7 +159,8 @@ TEST(Histogram, UniformFloatWithWeightsRnd) {
     values.push_back(dist(rnd));
     weights.push_back(dist2(rnd));
   }
-  LOG(INFO) << Histogram<float>::MakeUniform(values, 10, weights).ToString();
+  YDF_LOG(INFO)
+      << Histogram<float>::MakeUniform(values, 10, weights).ToString();
 }
 
 TEST(Metric, BucketizedContainer) {

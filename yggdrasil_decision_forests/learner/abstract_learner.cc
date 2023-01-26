@@ -117,8 +117,9 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   // List the model input features.
   std::vector<int32_t> feature_idxs;
   if (training_config.features().empty()) {
-    LOG(INFO) << "No input feature specified. Using all the available input "
-                 "features as input signal.";
+    YDF_LOG(INFO)
+        << "No input feature specified. Using all the available input "
+           "features as input signal.";
     feature_idxs.assign(data_spec.columns_size(), 0);
     std::iota(feature_idxs.begin(), feature_idxs.end(), 0);
   } else {
@@ -131,8 +132,8 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   auto it_label_result =
       std::find(feature_idxs.begin(), feature_idxs.end(), label);
   if (it_label_result != feature_idxs.end()) {
-    LOG(INFO) << "The label \"" << training_config.label()
-              << "\" was removed from the input feature set.";
+    YDF_LOG(INFO) << "The label \"" << training_config.label()
+                  << "\" was removed from the input feature set.";
     feature_idxs.erase(it_label_result);
   }
 
@@ -141,8 +142,8 @@ absl::Status AbstractLearner::LinkTrainingConfig(
     auto it_ranking_group_result =
         std::find(feature_idxs.begin(), feature_idxs.end(), ranking_group);
     if (it_ranking_group_result != feature_idxs.end()) {
-      LOG(INFO) << "The ranking_group \"" << training_config.ranking_group()
-                << "\" was removed from the input feature set.";
+      YDF_LOG(INFO) << "The ranking_group \"" << training_config.ranking_group()
+                    << "\" was removed from the input feature set.";
       feature_idxs.erase(it_ranking_group_result);
     }
   }
@@ -152,9 +153,9 @@ absl::Status AbstractLearner::LinkTrainingConfig(
     auto it_uplift_treatment_result =
         std::find(feature_idxs.begin(), feature_idxs.end(), uplift_treatment);
     if (it_uplift_treatment_result != feature_idxs.end()) {
-      LOG(INFO) << "The uplift_treatment \""
-                << training_config.uplift_treatment()
-                << "\" was removed from the input feature set.";
+      YDF_LOG(INFO) << "The uplift_treatment \""
+                    << training_config.uplift_treatment()
+                    << "\" was removed from the input feature set.";
       feature_idxs.erase(it_uplift_treatment_result);
     }
   }
@@ -164,8 +165,8 @@ absl::Status AbstractLearner::LinkTrainingConfig(
     auto it_cv_group_result =
         std::find(feature_idxs.begin(), feature_idxs.end(), cv_group);
     if (it_cv_group_result != feature_idxs.end()) {
-      LOG(INFO) << "The cv_group \"" << training_config.cv_group()
-                << "\" was removed from the input feature set.";
+      YDF_LOG(INFO) << "The cv_group \"" << training_config.cv_group()
+                    << "\" was removed from the input feature set.";
       feature_idxs.erase(it_cv_group_result);
     }
   }
@@ -176,9 +177,9 @@ absl::Status AbstractLearner::LinkTrainingConfig(
         std::find(feature_idxs.begin(), feature_idxs.end(),
                   config_link->weight_definition().attribute_idx());
     if (it_weight_result != feature_idxs.end()) {
-      LOG(INFO) << "The weight column \""
-                << training_config.weight_definition().attribute()
-                << "\" was removed from the input feature set.";
+      YDF_LOG(INFO) << "The weight column \""
+                    << training_config.weight_definition().attribute()
+                    << "\" was removed from the input feature set.";
       feature_idxs.erase(it_weight_result);
     }
   }
@@ -195,8 +196,8 @@ absl::Status AbstractLearner::LinkTrainingConfig(
                         std::isnan(feature_col.numerical().mean());
 
     if (is_fully_missing) {
-      LOG(WARNING) << "Remove feature \"" << feature_col.name()
-                   << "\" because it only contains missing values.";
+      YDF_LOG(WARNING) << "Remove feature \"" << feature_col.name()
+                       << "\" because it only contains missing values.";
       return true;
     }
     return false;
@@ -389,9 +390,9 @@ absl::Status AbstractLearner::CheckConfiguration(
       }
       if (ranking_group_col_spec.type() ==
           dataset::proto::ColumnType::CATEGORICAL) {
-        LOG(WARNING) << "The grouping column \"" << config.ranking_group()
-                     << "\" is of CATEGORICAL type. The STRING type is "
-                        "generally a better choice.";
+        YDF_LOG(WARNING) << "The grouping column \"" << config.ranking_group()
+                         << "\" is of CATEGORICAL type. The STRING type is "
+                            "generally a better choice.";
         if (ranking_group_col_spec.categorical().min_value_count() != 1) {
           return absl::InvalidArgumentError(
               "The \"ranking_group\" column must have a \"min_value_count\" "

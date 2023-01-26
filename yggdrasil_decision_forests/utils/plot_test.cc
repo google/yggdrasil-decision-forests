@@ -91,7 +91,7 @@ TEST(Plot, Base) {
 
   const auto html_plot = ExportToHtml(plot).value();
   const auto path = file::JoinPath(test::TmpDirectory(), "plot.html");
-  LOG(INFO) << "path: " << path;
+  YDF_LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_plot));
 
   // The plot has been checked by hand.
@@ -207,7 +207,7 @@ TEST(MultiPlot, Base) {
 
   const auto html_plot = ExportToHtml(multiplot).value();
   const auto path = file::JoinPath(test::TmpDirectory(), "multiplot.html");
-  LOG(INFO) << "path: " << path;
+  YDF_LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_plot));
 
   // The plot has been checked by hand.

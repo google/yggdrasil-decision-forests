@@ -92,7 +92,7 @@
   auto tmpvar = (rexpr);                                        \
   if (ABSL_PREDICT_FALSE(!tmpvar.ok())) {                       \
     std::string _;                                              \
-    LOG(WARNING) << message;                                    \
+    YDF_LOG(WARNING) << message;                                \
     return tmpvar.status();                                     \
   }                                                             \
   lhs = std::move(tmpvar).value()

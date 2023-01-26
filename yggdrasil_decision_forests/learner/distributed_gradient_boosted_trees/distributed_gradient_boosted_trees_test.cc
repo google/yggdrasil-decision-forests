@@ -209,7 +209,7 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
       decision_tree { max_depth: 3 }
     }
   )pb");
-  LOG(INFO) << "Training classical algorithm";
+  YDF_LOG(INFO) << "Training classical algorithm";
   TrainAndEvaluateModel();
   // Note: The description includes a details of the tree structure.
   auto* gbt_model =
@@ -246,7 +246,7 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
       }
     }
   )pb");
-  LOG(INFO) << "Training distributed algorithm";
+  YDF_LOG(INFO) << "Training distributed algorithm";
   TrainAndEvaluateModel();
   // Note: The description includes a details of the tree structure.
   auto* distributed_gbt_model =

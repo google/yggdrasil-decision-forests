@@ -253,7 +253,7 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
                             proto::Prediction* dst_prediction) {
   switch (task) {
     case proto::UNDEFINED:
-      LOG(WARNING) << "Undefined task";
+      YDF_LOG(WARNING) << "Undefined task";
       break;
     case proto::CLASSIFICATION: {
       auto* classification = dst_prediction->mutable_classification();
@@ -488,7 +488,7 @@ absl::Status AbstractModel::AppendEvaluation(
 
   } else {
     // Evaluate using the (slow) generic inference.
-    LOG(WARNING)
+    YDF_LOG(WARNING)
         << "Evaluation with the slow generic engine without distribution";
     dataset::VerticalDataset dataset;
     RETURN_IF_ERROR(
@@ -846,8 +846,8 @@ void AbstractModel::AppendDescriptionAndStatistics(
   const auto self_evaluation_description =
       metric::TextReport(ValidationEvaluation());
   if (self_evaluation_description.ok()) {
-    LOG(INFO) << "Model self evaluation:\n"
-              << self_evaluation_description.value();
+    YDF_LOG(INFO) << "Model self evaluation:\n"
+                  << self_evaluation_description.value();
   } else {
     absl::StrAppend(description, "Cannot compute model self evaluation:",
                     self_evaluation_description.status().message(), "\n");
@@ -1055,7 +1055,7 @@ void AppendVariableImportanceDescription(
 }
 
 metric::proto::EvaluationResults AbstractModel::ValidationEvaluation() const {
-  LOG(WARNING) << "Validation evaluation not supported for " << name();
+  YDF_LOG(WARNING) << "Validation evaluation not supported for " << name();
   return {};
 }
 
@@ -1290,12 +1290,12 @@ AbstractModel::BuildFastEngine() const {
   std::unique_ptr<FastEngineFactory> best_engine;
   if (best_engines.empty()) {
     // No engine is better than all the other engines.
-    LOG(WARNING) << "Circular is_better relation between engines.";
+    YDF_LOG(WARNING) << "Circular is_better relation between engines.";
     best_engine = std::move(compatible_engines.front());
   } else {
     if (best_engines.size() > 1) {
       // Multiple engines are "the best".
-      LOG(WARNING)
+      YDF_LOG(WARNING)
           << "Non complete relation between engines. Cannot select the "
              "best one. One engine selected randomly.";
     }
@@ -1304,9 +1304,9 @@ AbstractModel::BuildFastEngine() const {
 
   auto engine_or = best_engine->CreateEngine(this);
   if (!engine_or.ok()) {
-    LOG(WARNING) << "The engine \"" << best_engine->name()
-                 << "\" is compatible but could not be created: "
-                 << engine_or.status().message();
+    YDF_LOG(WARNING) << "The engine \"" << best_engine->name()
+                     << "\" is compatible but could not be created: "
+                     << engine_or.status().message();
   } else {
     LOG_INFO_EVERY_N_SEC(10,
                          _ << "Engine \"" << best_engine->name() << "\" built");

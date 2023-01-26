@@ -70,8 +70,9 @@ absl::Status GetInputFeatures(
   }
 
   if (input_features_idxs->empty()) {
-    LOG(WARNING) << "The model does not have any input features i.e. the model "
-                    "is constant and will always return the same prediction.";
+    YDF_LOG(WARNING)
+        << "The model does not have any input features i.e. the model "
+           "is constant and will always return the same prediction.";
   }
 
   return absl::OkStatus();

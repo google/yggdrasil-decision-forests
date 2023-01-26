@@ -44,11 +44,11 @@ std::string DatasetDir() {
 TEST(VerticalDatasetIOTest, Load) {
   for (const auto& dataset_path :
        {absl::StrCat("csv:", file::JoinPath(DatasetDir(), "toy.csv"))}) {
-    LOG(INFO) << "Create dataspec for " << dataset_path;
+    YDF_LOG(INFO) << "Create dataspec for " << dataset_path;
     proto::DataSpecificationGuide guide;
     proto::DataSpecification data_spec;
     CreateDataSpec(dataset_path, false, guide, &data_spec);
-    LOG(INFO) << "Load " << dataset_path;
+    YDF_LOG(INFO) << "Load " << dataset_path;
     VerticalDataset ds;
     EXPECT_OK(LoadVerticalDataset(dataset_path, data_spec, &ds));
     EXPECT_EQ(ds.nrow(), 4);

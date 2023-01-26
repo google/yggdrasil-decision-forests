@@ -52,16 +52,16 @@ bool IsPortAvailable(int port) {
   int actual_port;
 
   if (fd < 0) {
-    LOG(ERROR) << "socket() failed: " << strerror(errno);
+    YDF_LOG(ERROR) << "socket() failed: " << strerror(errno);
     return false;
   }
 
   // SO_REUSEADDR lets us start up a server immediately after it exists.
   int one = 1;
   if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0) {
-    LOG(ERROR) << "setsockopt() failed: " << strerror(errno);
+    YDF_LOG(ERROR) << "setsockopt() failed: " << strerror(errno);
     if (close(fd) < 0) {
-      LOG(ERROR) << "close() failed: " << strerror(errno);
+      YDF_LOG(ERROR) << "close() failed: " << strerror(errno);
     };
     return false;
   }
@@ -72,9 +72,9 @@ bool IsPortAvailable(int port) {
   addr.sin_port = htons(static_cast<uint16_t>(port));
   if (bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0)
   {
-    LOG(WARNING) << "bind(port=" << port << ") failed: " << strerror(errno);
-    if (close(fd) < 0) {
-      LOG(ERROR) << "close() failed: " << strerror(errno);
+    YDF_LOG(WARNING) << "bind(port=" << port << ") failed: " <<
+    strerror(errno); if (close(fd) < 0) {
+      YDF_LOG(ERROR) << "close() failed: " << strerror(errno);
     };
     return false;
   }
@@ -82,9 +82,9 @@ bool IsPortAvailable(int port) {
   // Get the bound port number.
   if (getsockname(fd, reinterpret_cast<struct sockaddr*>(&addr), &addr_len) <
       0) {
-    LOG(WARNING) << "getsockname() failed: " << strerror(errno);
+    YDF_LOG(WARNING) << "getsockname() failed: " << strerror(errno);
     if (close(fd) < 0) {
-      LOG(ERROR) << "close() failed: " << strerror(errno);
+      YDF_LOG(ERROR) << "close() failed: " << strerror(errno);
     };
     return false;
   }
@@ -94,7 +94,7 @@ bool IsPortAvailable(int port) {
 
   CHECK_EQ(port, actual_port);
   if (close(fd) < 0) {
-    LOG(ERROR) << "close() failed: " << strerror(errno);
+    YDF_LOG(ERROR) << "close() failed: " << strerror(errno);
   }
 
   return true;
@@ -111,7 +111,7 @@ int PickUnusedPortOrDie() {
       return port;
     }
   }
-  LOG(WARNING) << "Failed to pick an unused port";
+  YDF_LOG(WARNING) << "Failed to pick an unused port";
   return 0;
 }
 

@@ -90,9 +90,10 @@ TEST(TrainAndEvaluateModel, Base) {
   auto evaluate_result =
       manager->BlockingProtoRequest<proto::Result>(evaluate_request).value();
 
-  LOG(INFO) << "Evaluation:"
-            << metric::TextReport(evaluate_result.evaluate_model().evaluation())
-                   .value();
+  YDF_LOG(INFO) << "Evaluation:"
+                << metric::TextReport(
+                       evaluate_result.evaluate_model().evaluation())
+                       .value();
 
   EXPECT_GE(metric::Accuracy(evaluate_result.evaluate_model().evaluation()),
             0.86);

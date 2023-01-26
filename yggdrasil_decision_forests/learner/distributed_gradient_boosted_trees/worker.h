@@ -304,7 +304,7 @@ class DistributedGradientBoostedTreesWorker
   absl::Duration dataset_feature_duration_;
   int dataset_num_features_loaded_ = 0;
 
-  // Prints details about the computation with LOG(INFO).
+  // Prints details about the computation with YDF_LOG(INFO).
   bool worker_logs_ = true;
 };
 

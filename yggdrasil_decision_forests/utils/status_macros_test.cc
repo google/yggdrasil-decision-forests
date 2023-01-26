@@ -56,7 +56,7 @@ TEST(StatusMacros, ASSIGN_OR_RETURN_2ARGS) {
 
   const auto g = [&](const int a) -> absl::Status {
     ASSIGN_OR_RETURN(const int b, f(a));
-    LOG(INFO) << "b:" << b;
+    YDF_LOG(INFO) << "b:" << b;
     return absl::OkStatus();
   };
 
@@ -74,7 +74,7 @@ TEST(StatusMacros, ASSIGN_OR_RETURN_3ARGS) {
 
   const auto g = [&](const int a) -> absl::Status {
     ASSIGN_OR_RETURN(const int b, f(a), _ << "a:" << a);
-    LOG(INFO) << "b:" << b;
+    YDF_LOG(INFO) << "b:" << b;
     return absl::OkStatus();
   };
 

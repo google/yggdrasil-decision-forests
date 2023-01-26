@@ -58,7 +58,7 @@ class Channel {
   // Push an item in the channel.
   void Push(Input item) {
     if (close_channel_) {
-      LOG(ERROR) << "Ignoring value added to closed channel.";
+      YDF_LOG(ERROR) << "Ignoring value added to closed channel.";
       return;
     }
     MutexLock results_lock(&mutex_);

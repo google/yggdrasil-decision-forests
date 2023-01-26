@@ -146,7 +146,7 @@ class Model {
   // example values.
   void NewBatchOfExamples(int num_examples) {
     if (num_examples < 0) {
-      LOG(WARNING) << "num_examples should be positive";
+      YDF_LOG(WARNING) << "num_examples should be positive";
       return;
     }
     if (!examples_ || num_examples != num_examples_) {
@@ -160,7 +160,8 @@ class Model {
   // Sets the value of a numerical feature.
   void SetNumerical(int example_idx, int feature_id, float value) {
     if (example_idx >= num_examples_) {
-      LOG(WARNING) << "example_idx should be less than the number of examples";
+      YDF_LOG(WARNING)
+          << "example_idx should be less than the number of examples";
       return;
     }
 
@@ -171,7 +172,8 @@ class Model {
   // Sets the value of a boolean feature.
   void SetBoolean(int example_idx, int feature_id, bool value) {
     if (example_idx >= num_examples_) {
-      LOG(WARNING) << "example_idx should be less than the number of examples";
+      YDF_LOG(WARNING)
+          << "example_idx should be less than the number of examples";
       return;
     };
     examples_->SetBoolean(example_idx, {feature_id}, value,
@@ -181,7 +183,8 @@ class Model {
   // Sets the value of a categorical feature.
   void SetCategoricalInt(int example_idx, int feature_id, int value) {
     if (example_idx >= num_examples_) {
-      LOG(WARNING) << "example_idx should be less than the number of examples";
+      YDF_LOG(WARNING)
+          << "example_idx should be less than the number of examples";
       return;
     }
 
@@ -193,7 +196,8 @@ class Model {
   void SetCategoricalString(int example_idx, int feature_id,
                             std::string value) {
     if (example_idx >= num_examples_) {
-      LOG(WARNING) << "example_idx should be less than the number of examples";
+      YDF_LOG(WARNING)
+          << "example_idx should be less than the number of examples";
       return;
     }
     examples_->SetCategorical(example_idx, {feature_id}, value,
@@ -204,7 +208,8 @@ class Model {
   void SetCategoricalSetString(int example_idx, int feature_id,
                                std::vector<std::string> value) {
     if (example_idx >= num_examples_) {
-      LOG(WARNING) << "example_idx should be less than the number of examples";
+      YDF_LOG(WARNING)
+          << "example_idx should be less than the number of examples";
       return;
     }
     examples_->SetCategoricalSet(example_idx, {feature_id}, value,
@@ -215,7 +220,8 @@ class Model {
   void SetCategoricalSetInt(int example_idx, int feature_id,
                             std::vector<int> value) {
     if (example_idx >= num_examples_) {
-      LOG(WARNING) << "example_idx should be less than the number of examples";
+      YDF_LOG(WARNING)
+          << "example_idx should be less than the number of examples";
       return;
     }
     examples_->SetCategoricalSet(example_idx, {feature_id}, value,
@@ -225,7 +231,7 @@ class Model {
   // Runs the model on the previously set features.
   std::vector<float> Predict() {
     if (num_examples_ == -1) {
-      LOG(WARNING) << "predict called before setting any examples";
+      YDF_LOG(WARNING) << "predict called before setting any examples";
       return {};
     }
     std::vector<float> predictions;
@@ -239,7 +245,7 @@ class Model {
     output.dense_col_representation = dense_col_representation_;
 
     if (num_examples_ == -1) {
-      LOG(WARNING) << "predict called before setting any examples";
+      YDF_LOG(WARNING) << "predict called before setting any examples";
       return output;
     }
 
@@ -255,7 +261,7 @@ class Model {
     // Export the predictions.
     if (decompact_probability_) {
       if (engine_output_dim != 1) {
-        LOG(FATAL) << "Wrong NumPredictionDimension";
+        YDF_LOG(FATAL) << "Wrong NumPredictionDimension";
       }
       for (int example_idx = 0; example_idx < num_examples_; example_idx++) {
         const float proba =
@@ -307,14 +313,14 @@ std::shared_ptr<Model> LoadModel(std::string path,
   std::unique_ptr<ydf::model::AbstractModel> ydf_model;
   auto status = ydf::model::LoadModel(path, &ydf_model);
   if (!status.ok()) {
-    LOG(WARNING) << status.message();
+    YDF_LOG(WARNING) << status.message();
     return {};
   }
 
   // Compile model.
   auto engine_or = ydf_model->BuildFastEngine();
   if (!engine_or.ok()) {
-    LOG(WARNING) << engine_or.status().message();
+    YDF_LOG(WARNING) << engine_or.status().message();
     return {};
   }
 

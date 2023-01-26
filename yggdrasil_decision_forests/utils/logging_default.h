@@ -36,16 +36,16 @@ enum Severity { INFO, WARNING, FATAL };
 // Logging.
 //
 // Usage example:
-//   LOG(INFO) << "Hello world";
+//   YDF_LOG(INFO) << "Hello world";
 //
-#define LOG(sev) LOG_##sev
+#define YDF_LOG(sev) YDF_LOG_##sev
 
-#define LOG_INFO ::internal::LogMessage(INFO, __FILE__, __LINE__)
-#define LOG_WARNING ::internal::LogMessage(WARNING, __FILE__, __LINE__)
-#define LOG_FATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
-#define LOG_ERROR ::internal::LogMessage(WARNING, __FILE__, __LINE__)
-#define LOG_QFATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
-#define LOG_DFATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
+#define YDF_LOG_INFO ::internal::LogMessage(INFO, __FILE__, __LINE__)
+#define YDF_LOG_WARNING ::internal::LogMessage(WARNING, __FILE__, __LINE__)
+#define YDF_LOG_FATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
+#define YDF_LOG_ERROR ::internal::LogMessage(WARNING, __FILE__, __LINE__)
+#define YDF_LOG_QFATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
+#define YDF_LOG_DFATAL ::internal::FatalLogMessage(__FILE__, __LINE__)
 
 namespace yggdrasil_decision_forests {
 namespace logging {
@@ -92,7 +92,7 @@ inline bool IsLoggingEnabled(Severity severity) {
 #ifndef CHECK_OK
 #define CHECK_OK(expr)                                            \
   if (const auto status = expr; ABSL_PREDICT_FALSE(!status.ok())) \
-  LOG(FATAL) << status
+  YDF_LOG(FATAL) << status
 #endif
 
 #else
@@ -107,7 +107,7 @@ inline bool IsLoggingEnabled(Severity severity) {
   {                                                                    \
     const auto COMBINE_TERMS(status_for, __LINE__) = expr;             \
     if (ABSL_PREDICT_FALSE(!COMBINE_TERMS(status_for, __LINE__).ok())) \
-      LOG(FATAL) << COMBINE_TERMS(status_for, __LINE__);               \
+      YDF_LOG(FATAL) << COMBINE_TERMS(status_for, __LINE__);           \
   }                                                                    \
   nullptr
 #endif
@@ -126,7 +126,7 @@ inline bool IsLoggingEnabled(Severity severity) {
 #ifndef CHECK
 // NOLINTBEGIN
 #define CHECK(expr) \
-  if (!(expr)) LOG(FATAL) << "Check failed " #expr
+  if (!(expr)) YDF_LOG(FATAL) << "Check failed " #expr
 // NOLINTEND
 #endif
 
@@ -142,7 +142,7 @@ inline bool IsLoggingEnabled(Severity severity) {
 #ifndef NDEBUG
 // NOLINTBEGIN
 #define DCHECK(expr) \
-  if (!(expr)) LOG(FATAL) << "Check failed " #expr
+  if (!(expr)) YDF_LOG(FATAL) << "Check failed " #expr
 // NOLINTEND
 #else
 #define DCHECK(expr) ::internal::NullSink()

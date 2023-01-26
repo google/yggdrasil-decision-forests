@@ -652,7 +652,7 @@ absl::Status AnalyseAndCreateHtmlReport(const model::AbstractModel& model,
                                         absl::string_view dataset_path,
                                         absl::string_view output_directory,
                                         const proto::Options& options) {
-  LOG(INFO) << "Load dataset";
+  YDF_LOG(INFO) << "Load dataset";
   dataset::VerticalDataset dataset;
   RETURN_IF_ERROR(dataset::LoadVerticalDataset(
       dataset_path, model.data_spec(), &dataset,
@@ -676,12 +676,12 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
   auto engine_or = model.BuildFastEngine();
   std::unique_ptr<model::EngineWrapperModel> engine_wrapper;
   if (engine_or.ok()) {
-    LOG(INFO) << "Run the model with the fast engine wrapper";
+    YDF_LOG(INFO) << "Run the model with the fast engine wrapper";
     engine_wrapper = std::make_unique<model::EngineWrapperModel>(
         &model, std::move(engine_or.value()));
     effective_model = engine_wrapper.get();
   } else {
-    LOG(INFO)
+    YDF_LOG(INFO)
         << "Run the model with the slow engine. No fast engine could be found: "
         << engine_or.status().message();
   }
@@ -743,7 +743,7 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
 
   RETURN_IF_ERROR(
       file::SetContent(file::JoinPath(output_directory, kIndex), html_content));
-  LOG(INFO) << "Report written to " << output_directory;
+  YDF_LOG(INFO) << "Report written to " << output_directory;
   return absl::OkStatus();
 }
 

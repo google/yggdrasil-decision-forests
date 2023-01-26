@@ -122,7 +122,7 @@ void RankingGroupsIndices::Initialize(const dataset::VerticalDataset& dataset,
     } else if (group_hash_values) {
       group_value = group_hash_values->values()[example_idx];
     } else {
-      LOG(FATAL) << "Invalid group type";
+      YDF_LOG(FATAL) << "Invalid group type";
     }
 
     tmp_groups[group_value].push_back(
@@ -143,12 +143,12 @@ void RankingGroupsIndices::Initialize(const dataset::VerticalDataset& dataset,
               });
 
     if (group.second.size() > kMaximumItemsInRankingGroup) {
-      LOG(FATAL) << "The number of items in the group \"" << group.first
-                 << "\" is " << group.second.size()
-                 << " and is greater than kMaximumItemsInRankingGroup="
-                 << kMaximumItemsInRankingGroup
-                 << ". This is likely a mistake in the generation of the "
-                    "configuration of the group column.";
+      YDF_LOG(FATAL) << "The number of items in the group \"" << group.first
+                     << "\" is " << group.second.size()
+                     << " and is greater than kMaximumItemsInRankingGroup="
+                     << kMaximumItemsInRankingGroup
+                     << ". This is likely a mistake in the generation of the "
+                        "configuration of the group column.";
     }
 
     groups_.push_back(
@@ -162,8 +162,8 @@ void RankingGroupsIndices::Initialize(const dataset::VerticalDataset& dataset,
     }
     return a.items.front().example_idx < b.items.front().example_idx;
   });
-  LOG(INFO) << "Found " << groups_.size() << " groups in " << dataset.nrow()
-            << " examples.";
+  YDF_LOG(INFO) << "Found " << groups_.size() << " groups in " << dataset.nrow()
+                << " examples.";
 }
 
 double RankingGroupsIndices::NDCG(const std::vector<float>& predictions,

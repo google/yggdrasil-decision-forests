@@ -45,11 +45,11 @@ TEST(ExampleReader, CreateExampleReader) {
        {absl::StrCat("tfrecord+tfe:",
                      file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
         absl::StrCat("csv:", file::JoinPath(DatasetDir(), "toy.csv"))}) {
-    LOG(INFO) << "Create dataspec for " << dataset_path;
+    YDF_LOG(INFO) << "Create dataspec for " << dataset_path;
     proto::DataSpecificationGuide guide;
     proto::DataSpecification data_spec;
     CreateDataSpec(dataset_path, false, guide, &data_spec);
-    LOG(INFO) << "Scan " << dataset_path;
+    YDF_LOG(INFO) << "Scan " << dataset_path;
     auto reader = CreateExampleReader(dataset_path, data_spec).value();
     proto::Example example;
     int num_rows = 0;

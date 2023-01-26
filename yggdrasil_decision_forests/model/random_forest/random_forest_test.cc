@@ -243,7 +243,7 @@ TEST(DecisionTree, AppendDescriptionAndStatisticsToy) {
                              &dataset);
   std::string description;
   model.AppendDescriptionAndStatistics(false, &description);
-  LOG(INFO) << "description:\n" << description;
+  YDF_LOG(INFO) << "description:\n" << description;
 
   CHECK_NE(description.find("Type: \"RANDOM_FOREST\""), -1);
   CHECK_NE(description.find("Task: CLASSIFICATION"), -1);
@@ -263,7 +263,7 @@ TEST(DecisionTree, StructuralVariableImportance) {
                              &dataset);
   std::string description;
   model.AppendDescriptionAndStatistics(false, &description);
-  LOG(INFO) << "description:\n" << description;
+  YDF_LOG(INFO) << "description:\n" << description;
 
   const auto imp_num_nodes = model.GetVariableImportance("NUM_NODES").value();
   EXPECT_EQ(imp_num_nodes.size(), 1);
@@ -295,7 +295,7 @@ TEST(DecisionTree, AppendModelStructure) {
   std::string description;
   model.AppendModelStructure(&description);
 
-  LOG(INFO) << description;
+  YDF_LOG(INFO) << description;
   EXPECT_EQ(description, R"(Legend:
     s: Split score
     n: Number of training examples
@@ -389,7 +389,7 @@ TEST(RandomForest, GetLeaves) {
 
   auto* df_model = dynamic_cast<model::DecisionForestInterface*>(model.get());
   if (df_model == nullptr) {
-    LOG(FATAL) << "The model is not a Random Forest.";
+    YDF_LOG(FATAL) << "The model is not a Random Forest.";
   }
 
   EXPECT_EQ(df_model->num_trees(), 100);

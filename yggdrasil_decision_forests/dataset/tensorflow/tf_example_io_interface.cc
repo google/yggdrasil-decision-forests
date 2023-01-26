@@ -291,8 +291,9 @@ absl::Status TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
     // Check if we have seen enough records to determine all the types.
     if (guide.max_num_scanned_rows_to_guess_type() > 0 &&
         nrow > guide.max_num_scanned_rows_to_guess_type()) {
-      LOG(INFO) << "Stop scanning the dataset to infer the type. Some records "
-                   "were not considered.";
+      YDF_LOG(INFO)
+          << "Stop scanning the dataset to infer the type. Some records "
+             "were not considered.";
       break;
     }
 

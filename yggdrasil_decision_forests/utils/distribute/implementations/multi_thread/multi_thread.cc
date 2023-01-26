@@ -29,7 +29,7 @@ constexpr char MultiThreadManager::kKey[];
 absl::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
                                                          int worker_idx) {
   if (verbosity_ >= 2) {
-    LOG(INFO) << "Emitting blocking request of " << blob.size() << " bytes";
+    YDF_LOG(INFO) << "Emitting blocking request of " << blob.size() << " bytes";
   }
 
   if (worker_idx < 0) {
@@ -41,8 +41,8 @@ absl::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
                    _ << "Error emitted by worker #" << worker_idx);
 
   if (verbosity_ >= 2) {
-    LOG(INFO) << "Completed blocking request with " << answer.size()
-              << " bytes";
+    YDF_LOG(INFO) << "Completed blocking request with " << answer.size()
+                  << " bytes";
   }
   return answer;
 }
@@ -50,7 +50,8 @@ absl::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
 absl::Status MultiThreadManager::AsynchronousRequest(Blob blob,
                                                      int worker_idx) {
   if (verbosity_ >= 2) {
-    LOG(INFO) << "Emitting asynchronous request of " << blob.size() << " bytes";
+    YDF_LOG(INFO) << "Emitting asynchronous request of " << blob.size()
+                  << " bytes";
   }
   if (worker_idx < 0) {
     pending_queries_.Push(std::move(blob));
@@ -62,19 +63,19 @@ absl::Status MultiThreadManager::AsynchronousRequest(Blob blob,
 
 absl::StatusOr<Blob> MultiThreadManager::NextAsynchronousAnswer() {
   if (verbosity_ >= 2) {
-    LOG(INFO) << "Wait for next result";
+    YDF_LOG(INFO) << "Wait for next result";
   }
   auto answer = pending_answers_.Pop();
   if (!answer.has_value()) {
     return absl::OutOfRangeError("No more results available");
   }
   if (verbosity_ >= 1 && !answer.value().ok()) {
-    LOG(INFO) << "Return asynchronous result failure: "
-              << answer.value().status();
+    YDF_LOG(INFO) << "Return asynchronous result failure: "
+                  << answer.value().status();
   }
   if (verbosity_ >= 2 && answer.value().ok()) {
-    LOG(INFO) << "Return asynchronous result with "
-              << answer.value().value().size() << " bytes";
+    YDF_LOG(INFO) << "Return asynchronous result with "
+                  << answer.value().value().size() << " bytes";
   }
   return std::move(answer.value());
 }
@@ -121,10 +122,10 @@ int MultiThreadManager::NumWorkers() { return workers_.size(); }
 absl::Status MultiThreadManager::Done(
     absl::optional<bool> kill_worker_manager) {
   if (verbosity_ >= 1) {
-    LOG(INFO) << "Release workers";
+    YDF_LOG(INFO) << "Release workers";
   }
   if (done_was_called_) {
-    LOG(WARNING) << "Calling done twice";
+    YDF_LOG(WARNING) << "Calling done twice";
     return absl::OkStatus();
   }
   done_was_called_ = true;
@@ -145,7 +146,7 @@ absl::Status MultiThreadManager::Done(
 
 absl::Status MultiThreadManager::SetParallelExecutionPerWorker(int num) {
   if (verbosity_) {
-    LOG(INFO) << "Change the number of parallel execution per worker";
+    YDF_LOG(INFO) << "Change the number of parallel execution per worker";
   }
 
   // Close the query channels.
@@ -180,8 +181,8 @@ absl::Status MultiThreadManager::Initialize(const proto::Config& config,
   const auto num_workers = imp_config.num_workers();
   verbosity_ = config.verbosity();
   if (verbosity_ >= 1) {
-    LOG(INFO) << "Initialize manager with " << welcome_blob.size()
-              << " bytes welcome blob and " << num_workers << " workers";
+    YDF_LOG(INFO) << "Initialize manager with " << welcome_blob.size()
+                  << " bytes welcome blob and " << num_workers << " workers";
   }
   if (num_workers <= 0) {
     return absl::InvalidArgumentError(

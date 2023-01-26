@@ -66,9 +66,9 @@ absl::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
     const std::vector<std::string>& ordering) {
   std::string content;
 
-  LOG(INFO) << "Export learners:";
+  YDF_LOG(INFO) << "Export learners:";
   for (const auto& x : learners) {
-    LOG(INFO) << "\t" << x;
+    YDF_LOG(INFO) << "\t" << x;
   }
 
   // Index of "v" in "ordering". Returns "ordering.size()" is "v" is not in

@@ -42,7 +42,7 @@ std::string url(absl::string_view path, absl::string_view keyword) {
         "yggdrasil_decision_forests/",
         path);
   } else {
-    LOG(FATAL) << "Unknown --url_type value";
+    YDF_LOG(FATAL) << "Unknown --url_type value";
   }
 }
 

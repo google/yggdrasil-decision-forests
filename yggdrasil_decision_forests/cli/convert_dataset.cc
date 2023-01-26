@@ -110,7 +110,7 @@ void ConvertDataset() {
     nrow++;
   }
 
-  LOG(INFO) << "Converting done. " << nrow << " example(s) converted.";
+  YDF_LOG(INFO) << "Converting done. " << nrow << " example(s) converted.";
 }
 
 }  // namespace cli

@@ -210,7 +210,7 @@ TEST(QuickScorer, Compilation) {
   CHECK_OK(GenericToSpecializedModel(model, &quick_scorer_model));
 
   const auto model_description = DescribeQuickScorer(quick_scorer_model);
-  LOG(INFO) << "Model:\n" << model_description;
+  YDF_LOG(INFO) << "Model:\n" << model_description;
 
   EXPECT_EQ(quick_scorer_model.features().input_features().size(), 3);
 
@@ -254,7 +254,7 @@ TEST(QuickScorer, ExampleSet) {
   CHECK_OK(GenericToSpecializedModel(model, &quick_scorer_model));
 
   const auto model_description = DescribeQuickScorer(quick_scorer_model);
-  LOG(INFO) << "Model:\n" << model_description;
+  YDF_LOG(INFO) << "Model:\n" << model_description;
 
   GradientBoostedTreesRegressionQuickScorerExtended::ExampleSet examples(
       5, quick_scorer_model);
@@ -327,7 +327,7 @@ TEST(QuickScorer, ExceedStackBuffer) {
   CHECK_OK(GenericToSpecializedModel(model, &quick_scorer_model));
 
   const auto model_description = DescribeQuickScorer(quick_scorer_model);
-  LOG(INFO) << "Model:\n" << model_description;
+  YDF_LOG(INFO) << "Model:\n" << model_description;
 
   GradientBoostedTreesRegressionQuickScorerExtended::ExampleSet examples(
       5, quick_scorer_model);

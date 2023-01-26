@@ -22,7 +22,7 @@ namespace yggdrasil_decision_forests {
 namespace utils {
 namespace {
 
-TEST(Logging, LogInfo) { LOG(INFO) << "Hello world"; }
+TEST(Logging, LogInfo) { YDF_LOG(INFO) << "Hello world"; }
 
 }  // namespace
 }  // namespace utils

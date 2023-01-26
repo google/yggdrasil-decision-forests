@@ -239,15 +239,16 @@ absl::Status FinalizeModelWithValidationDataset(
         config.gbt_config->early_stopping_initial_iteration();
     if (mdl->NumTrees() <
         (early_stopping_initial_iteration + 1) * mdl->num_trees_per_iter()) {
-      LOG(INFO) << "Insufficient number of trees to apply early stopping. "
-                   "Using last loss for metrics.";
+      YDF_LOG(INFO) << "Insufficient number of trees to apply early stopping. "
+                       "Using last loss for metrics.";
       mdl->set_validation_loss(early_stopping.last_loss());
       final_secondary_metrics = early_stopping.last_metrics();
     } else {
-      LOG(INFO) << "Truncates the model to " << early_stopping.best_num_trees()
-                << " tree(s) i.e. "
-                << early_stopping.best_num_trees() / mdl->num_trees_per_iter()
-                << "  iteration(s).";
+      YDF_LOG(INFO) << "Truncates the model to "
+                    << early_stopping.best_num_trees() << " tree(s) i.e. "
+                    << early_stopping.best_num_trees() /
+                           mdl->num_trees_per_iter()
+                    << "  iteration(s).";
       if (early_stopping.best_num_trees() < 0) {
         return absl::InvalidArgumentError(
             "The model should be evaluated once on the validation dataset.");
@@ -264,7 +265,7 @@ absl::Status FinalizeModelWithValidationDataset(
 
       if (mdl->NumTrees() ==
           (early_stopping_initial_iteration + 1) * mdl->num_trees_per_iter()) {
-        LOG(WARNING)
+        YDF_LOG(WARNING)
             << "The best validation loss was obtained during iteration "
             << early_stopping_initial_iteration
             << ". This is the first step during which a validation loss was "
@@ -306,10 +307,10 @@ absl::Status FinalizeModelWithValidationDataset(
           final_secondary_metrics[secondary_metric_idx]);
     }
   }
-  LOG(INFO) << snippet;
+  YDF_LOG(INFO) << snippet;
 
   if (config.gbt_config->compute_permutation_variable_importance()) {
-    LOG(INFO) << "Compute permutation variable importances";
+    YDF_LOG(INFO) << "Compute permutation variable importances";
     RETURN_IF_ERROR(utils::ComputePermutationFeatureImportance(
         validation_dataset, mdl,
         mdl->mutable_precomputed_variable_importances(),
@@ -398,7 +399,7 @@ absl::Status GradientBoostedTreesLearner::CheckConfiguration(
   if ((gbt_config.has_subsample() && gbt_config.subsample() < 1) &&
       gbt_config.sampling_methods_case() !=
           gbt_config.SAMPLING_METHODS_NOT_SET) {
-    LOG(WARNING) << "More than one sampling strategy is present.";
+    YDF_LOG(WARNING) << "More than one sampling strategy is present.";
   }
 
   if (gbt_config.has_sample_with_shards()) {
@@ -449,8 +450,8 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
             all_config->train_config.task(),
             data_spec.columns(all_config->train_config_link.label())));
     mutable_gbt_config->set_loss(default_loss);
-    LOG(INFO) << "Default loss set to "
-              << proto::Loss_Name(mutable_gbt_config->loss());
+    YDF_LOG(INFO) << "Default loss set to "
+                  << proto::Loss_Name(mutable_gbt_config->loss());
   }
 
   ASSIGN_OR_RETURN(
@@ -481,7 +482,7 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
   int specified_initial_iteration =
       all_config->gbt_config->early_stopping_initial_iteration();
   if (specified_initial_iteration * trees_per_iteration > specified_num_trees) {
-    LOG(WARNING)
+    YDF_LOG(WARNING)
         << "The model configuration specifies " << specified_num_trees
         << " trees but computation of the validation loss will only start "
            "at iteration "
@@ -569,9 +570,9 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   std::vector<std::string> all_shards;
   RETURN_IF_ERROR(utils::ExpandInputShards(dataset_path, &all_shards));
 
-  LOG(INFO) << "Training gradient boosted tree on " << all_shards.size()
-            << " shard(s) and " << config.train_config_link.features().size()
-            << " feature(s).";
+  YDF_LOG(INFO) << "Training gradient boosted tree on " << all_shards.size()
+                << " shard(s) and "
+                << config.train_config_link.features().size() << " feature(s).";
   if (all_shards.size() < 10) {
     return absl::InvalidArgumentError(absl::Substitute(
         "The number of shards in $0 is too small $1<10. For best "
@@ -611,15 +612,15 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   std::unique_ptr<internal::CompleteTrainingDatasetForWeakLearner> validation;
   if (has_validation_dataset) {
     const auto begin_load_validation = absl::Now();
-    LOG(INFO) << "Loading validation dataset from " << validation_shards.size()
-              << " shards";
+    YDF_LOG(INFO) << "Loading validation dataset from "
+                  << validation_shards.size() << " shards";
     ASSIGN_OR_RETURN(validation,
                      internal::LoadCompleteDatasetForWeakLearner(
                          validation_shards, dataset_prefix, data_spec, config,
                          /*allocate_gradient=*/false, mdl.get()));
-    LOG(INFO) << validation->dataset.nrow()
-              << " examples loaded in the validation dataset in "
-              << (absl::Now() - begin_load_validation);
+    YDF_LOG(INFO) << validation->dataset.nrow()
+                  << " examples loaded in the validation dataset in "
+                  << (absl::Now() - begin_load_validation);
   }
 
   EarlyStopping early_stopping(
@@ -635,8 +636,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   }
   std::unique_ptr<internal::CompleteTrainingDatasetForWeakLearner>
       current_train_dataset, next_train_dataset;
-  LOG(INFO) << "Loading first training sample dataset from "
-            << num_sample_train_shards << " shards";
+  YDF_LOG(INFO) << "Loading first training sample dataset from "
+                << num_sample_train_shards << " shards";
   const auto begin_load_first_sample = absl::Now();
   ASSIGN_OR_RETURN(current_train_dataset,
                    internal::LoadCompleteDatasetForWeakLearner(
@@ -645,9 +646,9 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
                        dataset_prefix, data_spec, config,
                        /*allocate_gradient=*/true, mdl.get()));
   RETURN_IF_ERROR(CheckNumExamples(current_train_dataset->dataset.nrow()));
-  LOG(INFO) << current_train_dataset->dataset.nrow()
-            << " examples loaded in the first training sample in "
-            << (absl::Now() - begin_load_first_sample);
+  YDF_LOG(INFO) << current_train_dataset->dataset.nrow()
+                << " examples loaded in the first training sample in "
+                << (absl::Now() - begin_load_first_sample);
 
   // Timer accumulators.
   struct {
@@ -996,7 +997,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           std::lround(100 * get_ratio_prepare_in_shard_preparation()));
 
       if (iter_idx == 0 || iter_idx == config.gbt_config->num_trees() - 1) {
-        LOG(INFO) << snippet;
+        YDF_LOG(INFO) << snippet;
       } else {
         LOG_INFO_EVERY_N_SEC(30, _ << snippet);
       }
@@ -1005,7 +1006,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           (absl::Now() - begin_training) >
               absl::Seconds(
                   training_config().maximum_training_duration_seconds())) {
-        LOG(INFO) << "Stop training because of the maximum training duration.";
+        YDF_LOG(INFO)
+            << "Stop training because of the maximum training duration.";
         break;
       }
     }  // End of training loss.
@@ -1074,9 +1076,9 @@ GradientBoostedTreesLearner::TrainWithStatus(
   RETURN_IF_ERROR(
       BuildAllTrainingConfiguration(train_dataset.data_spec(), &config));
 
-  LOG(INFO) << "Training gradient boosted tree on " << train_dataset.nrow()
-            << " example(s) and " << config.train_config_link.features().size()
-            << " feature(s).";
+  YDF_LOG(INFO) << "Training gradient boosted tree on " << train_dataset.nrow()
+                << " example(s) and "
+                << config.train_config_link.features().size() << " feature(s).";
 
   utils::usage::OnTrainingStart(train_dataset.data_spec(), config.train_config,
                                 config.train_config_link, train_dataset.nrow());
@@ -1111,14 +1113,15 @@ GradientBoostedTreesLearner::TrainWithStatus(
     has_validation_dataset = validation_dataset.nrow() > 0;
     if (config.gbt_config->validation_set_ratio() > 0 &&
         !has_validation_dataset) {
-      LOG(WARNING)
+      YDF_LOG(WARNING)
           << "The validation dataset is empty. Either increase the number "
              "of training examples, or increase the validation set ratio.";
     }
   }
 
-  LOG(INFO) << sub_train_dataset.nrow() << " examples used for training and "
-            << validation_dataset.nrow() << " examples used for validation";
+  YDF_LOG(INFO) << sub_train_dataset.nrow()
+                << " examples used for training and "
+                << validation_dataset.nrow() << " examples used for validation";
 
   // Compute the example weights.
   std::vector<float> weights, validation_weights;
@@ -1262,8 +1265,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
     const auto snapshot_idx_or = utils::GetGreatestSnapshot(snapshot_directory);
     if (snapshot_idx_or.ok()) {
       // Load the snapshot.
-      LOG(INFO) << "Resume the GBT training from iteration #"
-                << snapshot_idx_or.value();
+      YDF_LOG(INFO) << "Resume the GBT training from iteration #"
+                    << snapshot_idx_or.value();
       const auto model_path =
           file::JoinPath(deployment_.cache_path(),
                          absl::StrCat("model_", snapshot_idx_or.value()));
@@ -1295,9 +1298,9 @@ GradientBoostedTreesLearner::TrainWithStatus(
             mdl.get(), engine.get(), {}, config, gradient_validation_dataset,
             &validation_predictions));
       }
-      LOG(INFO) << "Re-compute the prediction accumulators in "
-                << absl::FormatDuration(absl::Now() -
-                                        time_begin_recompute_accumulators);
+      YDF_LOG(INFO) << "Re-compute the prediction accumulators in "
+                    << absl::FormatDuration(absl::Now() -
+                                            time_begin_recompute_accumulators);
     }
   }
 
@@ -1314,7 +1317,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
   for (; iter_idx < config.gbt_config->num_trees(); iter_idx++) {
     // The user interrupted the training.
     if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
-      LOG(INFO) << "Training interrupted per request.";
+      YDF_LOG(INFO) << "Training interrupted per request.";
       break;
     }
 
@@ -1515,7 +1518,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
       }  // End of validation loss.
 
       if (iter_idx == 0 || iter_idx == config.gbt_config->num_trees() - 1) {
-        LOG(INFO) << snippet;
+        YDF_LOG(INFO) << snippet;
       } else {
         LOG_INFO_EVERY_N_SEC(30, _ << snippet);
       }
@@ -1524,7 +1527,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
           (absl::Now() - begin_training) >
               absl::Seconds(
                   training_config().maximum_training_duration_seconds())) {
-        LOG(INFO) << "Stop training because of the maximum training duration.";
+        YDF_LOG(INFO)
+            << "Stop training because of the maximum training duration.";
         break;
       }
     }  // End of training loss.
@@ -1538,7 +1542,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
 
     // Export a snapshot
     if (deployment_.try_resume_training() && next_snapshot < absl::Now()) {
-      LOG(INFO) << "Create a snapshot of the model at iteration " << iter_idx;
+      YDF_LOG(INFO) << "Create a snapshot of the model at iteration "
+                    << iter_idx;
       const auto model_path = file::JoinPath(deployment_.cache_path(),
                                              absl::StrCat("model_", iter_idx));
 
@@ -1565,8 +1570,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
   if (deployment_.try_resume_training()) {
     const auto last_snapshot = utils::GetGreatestSnapshot(snapshot_directory);
     if (!last_snapshot.ok() || last_snapshot.value() < iter_idx) {
-      LOG(INFO) << "Create final snapshot of the model at iteration "
-                << iter_idx;
+      YDF_LOG(INFO) << "Create final snapshot of the model at iteration "
+                    << iter_idx;
       const auto model_path = file::JoinPath(deployment_.cache_path(),
                                              absl::StrCat("model_", iter_idx));
 
@@ -1694,8 +1699,9 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
                  kHParamForestExtractionDart) {
         gbt_config->mutable_dart();
       } else {
-        LOG(WARNING) << "Unknown value " << hparam.value().value().categorical()
-                     << " for " << kHParamForestExtraction << ".";
+        YDF_LOG(WARNING) << "Unknown value "
+                         << hparam.value().value().categorical() << " for "
+                         << kHParamForestExtraction << ".";
       }
     }
   }
@@ -1750,7 +1756,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
       gbt_config->mutable_stochastic_gradient_boosting();
     } else {
       if (gbt_config->has_subsample()) {
-        LOG(WARNING)
+        YDF_LOG(WARNING)
             << "Too many sampling methods are set in the config. "
                "Only one may be configured at any given time. Ignoring "
                "'subsample'.";
@@ -1774,8 +1780,9 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
         gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(
             subsample.value().value().real());
       } else {
-        LOG(WARNING) << "\"subsample\" hyperparameter set, but "
-                        "\"sampling_method\" is not \"RANDOM\" or \"NONE\".";
+        YDF_LOG(WARNING)
+            << "\"subsample\" hyperparameter set, but "
+               "\"sampling_method\" is not \"RANDOM\" or \"NONE\".";
       }
     }
   }
@@ -1787,8 +1794,9 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
         gbt_config->mutable_gradient_one_side_sampling()->set_alpha(
             alpha.value().value().real());
       } else {
-        LOG(WARNING) << "\"goss_alpha\" set but \"sampling_method\" not equal "
-                        "to \"GOSS\".";
+        YDF_LOG(WARNING)
+            << "\"goss_alpha\" set but \"sampling_method\" not equal "
+               "to \"GOSS\".";
       }
     }
     const auto beta = generic_hyper_params->Get(kHParamGossBeta);
@@ -1797,7 +1805,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
         gbt_config->mutable_gradient_one_side_sampling()->set_beta(
             beta.value().value().real());
       } else {
-        LOG(WARNING)
+        YDF_LOG(WARNING)
             << "\"goss_beta\" set but \"sampling_method\" not equal to "
                "\"GOSS\".";
       }
@@ -1811,9 +1819,9 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
         gbt_config->mutable_selective_gradient_boosting()->set_ratio(
             selgb.value().value().real());
       } else {
-        LOG(WARNING) << "\"selective_gradient_boosting_ratio\" set but "
-                        "\"sampling_method\" not equal to "
-                        "\"SELGB\".";
+        YDF_LOG(WARNING) << "\"selective_gradient_boosting_ratio\" set but "
+                            "\"sampling_method\" not equal to "
+                            "\"SELGB\".";
       }
     }
   }
@@ -2517,12 +2525,13 @@ absl::Status ExtractValidationDataset(const VerticalDataset& dataset,
                         : validation_rows;
         dst.insert(dst.end(), group.begin(), group.end());
       }
-      LOG(INFO) << "Split training/validation dataset by \""
-                << dataset.data_spec().columns(group_column_idx).name()
-                << "\". " << rows_per_groups.size() << " groups found in "
-                << dataset.nrow() << " examples i.e. "
-                << static_cast<float>(dataset.nrow()) / rows_per_groups.size()
-                << " examples/groups.";
+      YDF_LOG(INFO) << "Split training/validation dataset by \""
+                    << dataset.data_spec().columns(group_column_idx).name()
+                    << "\". " << rows_per_groups.size() << " groups found in "
+                    << dataset.nrow() << " examples i.e. "
+                    << static_cast<float>(dataset.nrow()) /
+                           rows_per_groups.size()
+                    << " examples/groups.";
     }
 
     *train = dataset.Extract(training_rows).value();
@@ -2985,15 +2994,16 @@ absl::Status SetDefaultHyperParameters(
   }
   if (gbt_config->has_use_goss()) {
     if (gbt_config->has_gradient_one_side_sampling()) {
-      LOG(WARNING) << "Ignoring deprecated use_goss, goss_alpha, and goss_beta "
-                      "values because `gradient_one_side_sampling` is already "
-                      "present in "
-                      "the train config.";
+      YDF_LOG(WARNING)
+          << "Ignoring deprecated use_goss, goss_alpha, and goss_beta "
+             "values because `gradient_one_side_sampling` is already "
+             "present in "
+             "the train config.";
     } else if ((gbt_config->has_subsample() && gbt_config->subsample() < 1) ||
                gbt_config->sampling_methods_case() !=
                    proto::GradientBoostedTreesTrainingConfig::
                        SAMPLING_METHODS_NOT_SET) {
-      LOG(WARNING)
+      YDF_LOG(WARNING)
           << "Ignoring deprecated use_goss, goss_alpha, and goss_beta "
              "values because another sampling method is already present in the "
              "train config.";
@@ -3012,14 +3022,15 @@ absl::Status SetDefaultHyperParameters(
   }
   if (gbt_config->has_subsample()) {
     if (gbt_config->has_stochastic_gradient_boosting()) {
-      LOG(WARNING)
+      YDF_LOG(WARNING)
           << "Ignoring deprecated subsample value because "
              "`stochastic_gradient_boosting` is already present in the config.";
     } else if (gbt_config->sampling_methods_case() !=
                proto::GradientBoostedTreesTrainingConfig::
                    SAMPLING_METHODS_NOT_SET) {
-      LOG(WARNING) << "Ignoring deprecated subsample value because another "
-                      "sampling method is already present in the train config.";
+      YDF_LOG(WARNING)
+          << "Ignoring deprecated subsample value because another "
+             "sampling method is already present in the train config.";
     } else {
       gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(
           gbt_config->subsample());
@@ -3032,7 +3043,7 @@ absl::Status SetDefaultHyperParameters(
   if (gbt_config->early_stopping() !=
           proto::GradientBoostedTreesTrainingConfig::NONE &&
       gbt_config->validation_set_ratio() == 0) {
-    LOG(WARNING)
+    YDF_LOG(WARNING)
         << "early_stopping != \"NONE\" requires validation_set_ratio>0. "
            "Setting early_stopping=\"NONE\" (was \""
         << proto::GradientBoostedTreesTrainingConfig::EarlyStopping_Name(

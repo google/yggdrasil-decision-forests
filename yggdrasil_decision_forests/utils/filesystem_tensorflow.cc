@@ -23,6 +23,7 @@
 #include "absl/strings/str_replace.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/path.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/tensorflow.h"
 
@@ -65,7 +66,7 @@ bool GenerateShardedFilenames(absl::string_view spec,
 
   int int_count;
   if (count == "*") {
-    LOG(WARNING) << "Non defined shard count not supported in " << spec;
+    YDF_LOG(WARNING) << "Non defined shard count not supported in " << spec;
     return false;
   } else if (absl::SimpleAtoi(count, &int_count)) {
   } else {

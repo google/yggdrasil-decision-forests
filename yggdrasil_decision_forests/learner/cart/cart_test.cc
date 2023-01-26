@@ -50,7 +50,7 @@ TEST_F(CartOnAdult, Base) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  LOG(INFO) << description;
+  YDF_LOG(INFO) << description;
 }
 
 // Similar as "CartOnAdult", but use the pre-splitted train and test dataset (

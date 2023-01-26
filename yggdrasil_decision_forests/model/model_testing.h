@@ -43,13 +43,13 @@ class FakeModel : public AbstractModel {
 
   void Predict(const dataset::proto::Example& example,
                proto::Prediction* prediction) const override {
-    LOG(FATAL) << "Unimplemented: Predict Example";
+    YDF_LOG(FATAL) << "Unimplemented: Predict Example";
   }
 
   void Predict(const dataset::VerticalDataset& dataset,
                dataset::VerticalDataset::row_t row_idx,
                proto::Prediction* prediction) const override {
-    LOG(FATAL) << "Unimplemented: Predict Dataset";
+    YDF_LOG(FATAL) << "Unimplemented: Predict Dataset";
   }
 };
 

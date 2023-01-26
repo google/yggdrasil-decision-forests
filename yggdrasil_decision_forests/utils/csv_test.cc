@@ -206,7 +206,7 @@ TEST(Csv, WriterWindows) {
   std::vector<absl::string_view>* row;
   int row_idx = 0;
   while (reader.NextRow(&row).value()) {
-    LOG(INFO) << "row_idx:" << row_idx;
+    YDF_LOG(INFO) << "row_idx:" << row_idx;
     EXPECT_EQ(*row, content[row_idx]);
     row_idx++;
   }
@@ -248,7 +248,7 @@ TEST(Csv, WriterUnix) {
   std::vector<absl::string_view>* row;
   int row_idx = 0;
   while (reader.NextRow(&row).value()) {
-    LOG(INFO) << "row_idx:" << row_idx;
+    YDF_LOG(INFO) << "row_idx:" << row_idx;
     EXPECT_EQ(*row, content[row_idx]);
     row_idx++;
   }

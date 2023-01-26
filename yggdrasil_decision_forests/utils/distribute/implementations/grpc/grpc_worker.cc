@@ -101,7 +101,7 @@ grpc::Status WorkerService::Run(grpc::ServerContext* context,
     utils::concurrency::MutexLock l(&mutex_);
     num_active_requests_--;
     if (stopping_worker_) {
-      LOG(INFO) << "Still " << num_active_requests_ << " active requests";
+      YDF_LOG(INFO) << "Still " << num_active_requests_ << " active requests";
       if (num_active_requests_ == 0) {
         request_done_cv_.Signal();
       }
@@ -121,8 +121,8 @@ grpc::Status WorkerService::WorkerRun(grpc::ServerContext* context,
                                       const proto::WorkerQuery* request,
                                       proto::WorkerAnswer* reply) {
   if (!worker_) {
-    LOG(WARNING) << "Worker received an inter worker request before being "
-                    "initialized by the manager";
+    YDF_LOG(WARNING) << "Worker received an inter worker request before being "
+                        "initialized by the manager";
     reply->set_error(
         "Worker received an inter worker request before being initialized by "
         "the manager");
@@ -155,7 +155,7 @@ grpc::Status WorkerService::UpdateWorkerAddress(
 grpc::Status WorkerService::Shutdown(grpc::ServerContext* context,
                                      const proto::ShutdownQuery* request,
                                      proto::Empty* reply) {
-  LOG(INFO) << "Shutdown worker";
+  YDF_LOG(INFO) << "Shutdown worker";
   utils::concurrency::MutexLock l(&mutex_);
   if (worker_) {
     RETURN_IF_ERROR(AbslStatusToGrpcStatus(BlockingDoneOnWorker(&l)));
@@ -170,7 +170,7 @@ grpc::Status WorkerService::Shutdown(grpc::ServerContext* context,
 grpc::Status WorkerService::Ping(grpc::ServerContext* context,
                                  const proto::Empty* request,
                                  proto::Empty* reply) {
-  LOG(INFO) << "Reply to ping";
+  YDF_LOG(INFO) << "Reply to ping";
   return grpc::Status::OK;
 }
 
@@ -178,8 +178,8 @@ absl::Status WorkerService::BlockingDoneOnWorker(
     utils::concurrency::MutexLock* lock) EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
   stopping_worker_ = true;
   RETURN_IF_ERROR(worker_->Done());
-  LOG(INFO) << "Waiting for the " << num_active_requests_
-            << " active request(s) to complete";
+  YDF_LOG(INFO) << "Waiting for the " << num_active_requests_
+                << " active request(s) to complete";
   while (num_active_requests_ > 0) {
     request_done_cv_.Wait(&mutex_, lock);
   }
@@ -194,7 +194,7 @@ absl::Status WorkerService::EnsureReadyWorker(
   if (worker_) {
     if (manager_uid_ != manager_uid) {
       // The manager has changed e.g. the managed was killed and rescheduled.
-      LOG(INFO) << "The manager has changed.";
+      YDF_LOG(INFO) << "The manager has changed.";
       if (stopping_worker_) {
         // Another call is changing the worker.
         while (stopping_worker_) {
@@ -216,11 +216,12 @@ absl::Status WorkerService::EnsureReadyWorker(
   }
 
   if (!request.has_worker_config()) {
-    LOG(INFO) << "Reject worker initialization as worker config is missing.";
+    YDF_LOG(INFO)
+        << "Reject worker initialization as worker config is missing.";
     return absl::UnavailableError("worker config required");
   }
 
-  LOG(INFO) << "Initialize worker.";
+  YDF_LOG(INFO) << "Initialize worker.";
 
   manager_uid_ = manager_uid;
 
@@ -259,16 +260,16 @@ absl::StatusOr<Blob> WorkerService::BlockingInterWorkerRequest(
     const auto status = stub->WorkerRun(&context, query, &answer);
 
     if (!status.ok()) {
-      LOG(WARNING) << "Intra worker GRPC call failed with error: "
-                   << status.error_message();
+      YDF_LOG(WARNING) << "Intra worker GRPC call failed with error: "
+                       << status.error_message();
       // List of non-documented GRPC errors that can indicate a temporary
       // impossibility to reach the server.
       if (IsTransiantError(status)) {
         // The worker died during the execution (e.g. rescheduling).
         // Let's try again.
         num_re_emitting++;
-        LOG(WARNING) << "Re-emitting request (num_re_emitting:"
-                     << num_re_emitting << ")";
+        YDF_LOG(WARNING) << "Re-emitting request (num_re_emitting:"
+                         << num_re_emitting << ")";
 
         ASSIGN_OR_RETURN(stub, EnsureIntraWorkerStubIsReady(target_worker));
 
@@ -279,7 +280,7 @@ absl::StatusOr<Blob> WorkerService::BlockingInterWorkerRequest(
       }
     } else {
       if (answer.has_error()) {
-        LOG(WARNING)
+        YDF_LOG(WARNING)
             << "Worker called with intra worker GRPC call returned an error: "
             << answer.error();
         return absl::UnknownError(answer.error());
@@ -338,13 +339,13 @@ WorkerService::EnsureIntraWorkerStubIsReady(const int worker_idx) {
   }
 
   if (worker.stub) {
-    LOG(WARNING) << "Update stub to worker #" << worker_idx << " from "
-                 << worker.connected_address << " to "
-                 << worker.expected_address;
+    YDF_LOG(WARNING) << "Update stub to worker #" << worker_idx << " from "
+                     << worker.connected_address << " to "
+                     << worker.expected_address;
     worker.discarded_stubs_.push_back(std::move(worker.stub));
     worker.stub.reset();
   } else {
-    LOG(WARNING) << "Create stub to worker #" << worker_idx;
+    YDF_LOG(WARNING) << "Create stub to worker #" << worker_idx;
   }
 
   std::shared_ptr<grpc::ChannelCredentials> credential;
@@ -391,7 +392,7 @@ absl::StatusOr<std::unique_ptr<GRPCWorkerServer>> StartGRPCWorker(
 
   grpc::ServerBuilder builder;
   std::string server_address = absl::StrCat("[::]:", port);
-  LOG(INFO) << "Start worker server at address " << server_address;
+  YDF_LOG(INFO) << "Start worker server at address " << server_address;
   builder.AddListeningPort(server_address, credential, &server->port);
 
   builder.RegisterService(server->service.get());

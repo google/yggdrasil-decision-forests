@@ -66,8 +66,8 @@ FeatureStatistics::FeatureStatistics(
         feature.mutable_categorical();
         break;
       default:
-        LOG(WARNING) << "Type of feature \"" << col_spec.name()
-                     << " is supported.";
+        YDF_LOG(WARNING) << "Type of feature \"" << col_spec.name()
+                         << " is supported.";
     }
   }
 }

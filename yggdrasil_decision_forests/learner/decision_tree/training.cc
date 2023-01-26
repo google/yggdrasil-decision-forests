@@ -620,10 +620,11 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      LOG(FATAL) << dataset::proto::ColumnType_Name(
-                        train_dataset.column(attribute_idx)->type())
-                 << " attribute " << train_dataset.column(attribute_idx)->name()
-                 << " is not supported.";
+      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
+                            train_dataset.column(attribute_idx)->type())
+                     << " attribute "
+                     << train_dataset.column(attribute_idx)->name()
+                     << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
@@ -680,7 +681,7 @@ SplitSearchResult FindBestCondition(
             label_stats.sum_hessian, label_stats.sum_weights, attribute_idx,
             internal_config, best_condition, cache);
       } else {
-        LOG(FATAL) << "Only split exact implemented for hessian gains.";
+        YDF_LOG(FATAL) << "Only split exact implemented for hessian gains.";
       }
     } break;
 
@@ -752,10 +753,11 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      LOG(FATAL) << dataset::proto::ColumnType_Name(
-                        train_dataset.column(attribute_idx)->type())
-                 << " attribute " << train_dataset.column(attribute_idx)->name()
-                 << " is not supported.";
+      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
+                            train_dataset.column(attribute_idx)->type())
+                     << " attribute "
+                     << train_dataset.column(attribute_idx)->name()
+                     << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
@@ -908,10 +910,11 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      LOG(FATAL) << dataset::proto::ColumnType_Name(
-                        train_dataset.column(attribute_idx)->type())
-                 << " attribute " << train_dataset.column(attribute_idx)->name()
-                 << " is not supported.";
+      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
+                            train_dataset.column(attribute_idx)->type())
+                     << " attribute "
+                     << train_dataset.column(attribute_idx)->name()
+                     << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
@@ -980,15 +983,16 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      LOG(FATAL) << dataset::proto::ColumnType_Name(
-                        train_dataset.column(attribute_idx)->type())
-                 << " attribute " << train_dataset.column(attribute_idx)->name()
-                 << " is not supported.";
+      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
+                            train_dataset.column(attribute_idx)->type())
+                     << " attribute "
+                     << train_dataset.column(attribute_idx)->name()
+                     << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
   if (dt_config.allow_na_conditions()) {
-    LOG(FATAL) << "allow_na_conditions not supported";
+    YDF_LOG(FATAL) << "allow_na_conditions not supported";
   }
 
   return result;
@@ -1046,15 +1050,16 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      LOG(FATAL) << dataset::proto::ColumnType_Name(
-                        train_dataset.column(attribute_idx)->type())
-                 << " attribute " << train_dataset.column(attribute_idx)->name()
-                 << " is not supported.";
+      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
+                            train_dataset.column(attribute_idx)->type())
+                     << " attribute "
+                     << train_dataset.column(attribute_idx)->name()
+                     << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
   if (dt_config.allow_na_conditions()) {
-    LOG(FATAL) << "allow_na_conditions not supported";
+    YDF_LOG(FATAL) << "allow_na_conditions not supported";
   }
 
   return result;
@@ -1936,8 +1941,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
           sorting_strategy ==
               proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
         if (!internal_config.preprocessing) {
-          LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                        "strategy";
+          YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                            "strategy";
         }
         if (sorting_strategy ==
                 proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
@@ -1972,8 +1977,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
           sorting_strategy ==
               proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
         if (!internal_config.preprocessing) {
-          LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                        "strategy";
+          YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                            "strategy";
         }
         if (sorting_strategy ==
                 proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
@@ -2011,8 +2016,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
           sorting_strategy ==
               proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
         if (!internal_config.preprocessing) {
-          LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                        "strategy";
+          YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                            "strategy";
         }
         if (sorting_strategy ==
                 proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
@@ -2047,8 +2052,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
           sorting_strategy ==
               proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
         if (!internal_config.preprocessing) {
-          LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                        "strategy";
+          YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                            "strategy";
         }
         if (sorting_strategy ==
                 proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
@@ -2294,8 +2299,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
       dt_config.internal().sorting_strategy() ==
           proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
     if (!internal_config.preprocessing) {
-      LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                    "strategy";
+      YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                        "strategy";
     }
     if (dt_config.internal().sorting_strategy() ==
             proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
@@ -2381,8 +2386,8 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
       sorting_strategy ==
           proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
     if (!internal_config.preprocessing) {
-      LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                    "strategy";
+      YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
+                        "strategy";
     }
 
     if (sorting_strategy ==
@@ -2707,7 +2712,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      LOG(FATAL) << "Non supported";
+      YDF_LOG(FATAL) << "Non supported";
   }
 }
 
@@ -2753,7 +2758,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      LOG(FATAL) << "Non supported";
+      YDF_LOG(FATAL) << "Non supported";
   }
 }
 
@@ -3172,9 +3177,9 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
       }
 
 #ifdef SIMPLE_ML_DEBUG_DECISION_TREE_SPLITTER
-      LOG(INFO) << "Scan CatCat one vs others for positive_label_value:"
-                << positive_label_value
-                << " Item size :" << sizeof(example_set_accumulator.items[0]);
+      YDF_LOG(INFO) << "Scan CatCat one vs others for positive_label_value:"
+                    << positive_label_value << " Item size :"
+                    << sizeof(example_set_accumulator.items[0]);
 #endif
 
       // Order value of the buckets.
@@ -3474,7 +3479,7 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      LOG(FATAL) << "Non supported";
+      YDF_LOG(FATAL) << "Non supported";
   }
 }
 
@@ -3527,7 +3532,7 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      LOG(FATAL) << "Non supported";
+      YDF_LOG(FATAL) << "Non supported";
   }
 }
 
@@ -3547,9 +3552,9 @@ void GetCandidateAttributes(
       dt_config.num_candidate_attributes_ratio() >= 0) {
     if (dt_config.has_num_candidate_attributes() &&
         dt_config.num_candidate_attributes() > 0) {
-      LOG(WARNING) << "Both \"num_candidate_attributes\" and "
-                      "\"num_candidate_attributes_ratio\" are specified. "
-                      "Ignoring \"num_candidate_attributes\".";
+      YDF_LOG(WARNING) << "Both \"num_candidate_attributes\" and "
+                          "\"num_candidate_attributes_ratio\" are specified. "
+                          "Ignoring \"num_candidate_attributes\".";
     }
     *num_attributes_to_test =
         static_cast<int>(std::ceil(dt_config.num_candidate_attributes_ratio() *
@@ -4103,7 +4108,8 @@ absl::StatusOr<Preprocessing> PreprocessTrainingDataset(
 
   const auto duration = absl::Now() - time_begin;
   if (duration > absl::Seconds(10)) {
-    LOG(INFO) << "Feature index computed in " << absl::FormatDuration(duration);
+    YDF_LOG(INFO) << "Feature index computed in "
+                  << absl::FormatDuration(duration);
   }
   return preprocessing;
 }
@@ -4245,7 +4251,7 @@ std::vector<float> GenHistogramBins(const proto::NumericalSplit::Type type,
       }
     } break;
     default:
-      LOG(FATAL) << "Numerical histogram not implemented";
+      YDF_LOG(FATAL) << "Numerical histogram not implemented";
   }
   std::sort(candidate_splits.begin(), candidate_splits.end());
   return candidate_splits;
@@ -4322,7 +4328,7 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
     if (error_on_wrong_splitter_statistics) {
       return absl::InternalError(message);
     } else {
-      LOG(WARNING) << message;
+      YDF_LOG(WARNING) << message;
     }
   }
   return absl::OkStatus();

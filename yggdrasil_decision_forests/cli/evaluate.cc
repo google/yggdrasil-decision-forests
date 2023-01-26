@@ -95,8 +95,8 @@ void Evaluate() {
     CHECK_OK(metric::AppendHtmlReport(evaluation, &report));
     std::cout << report;
   } else {
-    LOG(FATAL) << "Unknown output format: " << format
-               << ". Possible values are: text, html.";
+    YDF_LOG(FATAL) << "Unknown output format: " << format
+                   << ". Possible values are: text, html.";
   }
 }
 

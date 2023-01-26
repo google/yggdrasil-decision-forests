@@ -22,17 +22,17 @@
 // class MyWorker : public AbstractWorker {
 //  public:
 //   absl::Status Setup(Blob welcome_blob) override {
-//     LOG(INFO) << "Initialization of the worker #" << WorkerIdx();
+//     YDF_LOG(INFO) << "Initialization of the worker #" << WorkerIdx();
 //     return absl::OkStatus();
 //   }
 //
 //   absl::Status Done() override {
-//     LOG(INFO) << "Termination of the worker #" << WorkerIdx();
+//     YDF_LOG(INFO) << "Termination of the worker #" << WorkerIdx();
 //     return absl::OkStatus();
 //   }
 //
 //   absl::StatusOr<Blob> RunRequest(Blob blob) override {
-//     LOG(INFo) << "Processing " << blob;
+//     YDF_LOG(INFo) << "Processing " << blob;
 //     return "MyAnswer";
 //   }
 // };

@@ -44,7 +44,7 @@ constexpr char DistributedGradientBoostedTreesWorker::kWorkerKey[];
 DistributedGradientBoostedTreesWorker::
     ~DistributedGradientBoostedTreesWorker() {
   if (worker_logs_) {
-    LOG(INFO) << "Destroying DistributedGradientBoostedTreesWorker";
+    YDF_LOG(INFO) << "Destroying DistributedGradientBoostedTreesWorker";
   }
 }
 
@@ -86,7 +86,7 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
   worker_logs_ = spe_config.worker_logs();
 
   if (worker_logs_) {
-    LOG(INFO) << "Initializing DistributedGradientBoostedTreesWorker";
+    YDF_LOG(INFO) << "Initializing DistributedGradientBoostedTreesWorker";
   }
 
   if (GetWorkerType() == WorkerType::kTRAINER) {
@@ -107,7 +107,7 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
   if (GetWorkerType() == WorkerType::kEVALUATOR) {
     // Load evaluation worker datasets.
     if (worker_logs_) {
-      LOG(INFO) << "Loading validation dataset";
+      YDF_LOG(INFO) << "Loading validation dataset";
     }
 
     // Load the dataset in memory.
@@ -147,8 +147,8 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
 
   // Threadpool.
   if (worker_logs_) {
-    LOG(INFO) << "Create thread pool with "
-              << welcome_.deployment_config().num_threads() << " threads";
+    YDF_LOG(INFO) << "Create thread pool with "
+                  << welcome_.deployment_config().num_threads() << " threads";
   }
   thread_pool_ = absl::make_unique<utils::concurrency::ThreadPool>(
       "generic", welcome_.deployment_config().num_threads());
@@ -172,15 +172,16 @@ DistributedGradientBoostedTreesWorker::RunRequest(
     num_running_requests_--;
     if (stop_) {
       if (num_running_requests_ == 0) {
-        LOG(INFO) << "Clear the worker memory";
+        YDF_LOG(INFO) << "Clear the worker memory";
         dataset_.reset();
         loss_.reset();
         predictions_.clear();
         weak_models_.clear();
         thread_pool_.reset();
       } else {
-        LOG(INFO) << "Will clear the worker memory when all requests are done ("
-                  << num_running_requests_ << " requeres remaining)";
+        YDF_LOG(INFO)
+            << "Will clear the worker memory when all requests are done ("
+            << num_running_requests_ << " requeres remaining)";
       }
     }
   }
@@ -198,8 +199,8 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
   const auto& spe_config = welcome_.train_config().GetExtension(
       proto::distributed_gradient_boosted_trees_config);
   if (worker_logs_) {
-    LOG(INFO) << "Worker #" << WorkerIdx() << " received request "
-              << request.type_case();
+    YDF_LOG(INFO) << "Worker #" << WorkerIdx() << " received request "
+                  << request.type_case();
   }
   proto::WorkerResult result;
   result.set_request_id(request.request_id());
@@ -233,9 +234,9 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
     if (missing_data) {
       // The worker was restarted during the training of this tree. Tell the
       // manager to restart the training of this tree.
-      LOG(WARNING) << "Incomplete information to run a request #"
-                   << request.type_case() << " on worker #" << WorkerIdx()
-                   << ". Ask manager to restart";
+      YDF_LOG(WARNING) << "Incomplete information to run a request #"
+                       << request.type_case() << " on worker #" << WorkerIdx()
+                       << ". Ask manager to restart";
       result.set_request_restart_iter(true);
       return result.SerializeAsString();
     }
@@ -344,8 +345,8 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
 
   const auto runtime = absl::Now() - begin;
   if (worker_logs_) {
-    LOG(INFO) << "Worker #" << WorkerIdx() << " answered request "
-              << request.type_case() << " in " << runtime;
+    YDF_LOG(INFO) << "Worker #" << WorkerIdx() << " answered request "
+                  << request.type_case() << " in " << runtime;
   }
   result.set_runtime_seconds(absl::ToDoubleSeconds(runtime));
 
@@ -376,9 +377,9 @@ void DistributedGradientBoostedTreesWorker::MaybeSimulateFailure(
     if (debug_forced_failure_.find(request_type) ==
         debug_forced_failure_.end()) {
       debug_forced_failure_.insert(request_type);
-      LOG(WARNING) << "[!!!!!] Simulate the failure and restart of worker #"
-                   << WorkerIdx() << " on message " << request_type
-                   << " and iteration " << iter_idx_;
+      YDF_LOG(WARNING) << "[!!!!!] Simulate the failure and restart of worker #"
+                       << WorkerIdx() << " on message " << request_type
+                       << " and iteration " << iter_idx_;
 
       // Reset the worker to its initial state.
       received_initial_predictions_ = false;
@@ -388,8 +389,8 @@ void DistributedGradientBoostedTreesWorker::MaybeSimulateFailure(
 }
 
 absl::Status DistributedGradientBoostedTreesWorker::Done() {
-  LOG(INFO) << "Done called on the worker (" << num_running_requests_
-            << " running requests)";
+  YDF_LOG(INFO) << "Done called on the worker (" << num_running_requests_
+                << " running requests)";
   stop_ = true;
   return absl::OkStatus();
 }
@@ -436,7 +437,7 @@ DistributedGradientBoostedTreesWorker::InitializeTrainingWorkerMemory(
       proto::distributed_gradient_boosted_trees_config);
 
   if (worker_logs_) {
-    LOG(INFO) << "Initialize worker memory";
+    YDF_LOG(INFO) << "Initialize worker memory";
   }
 
   // Allocate the memory for the gradient and hessian (if needed). Create a
@@ -489,7 +490,7 @@ absl::Status DistributedGradientBoostedTreesWorker::SetInitialPredictions(
                    loss_->InitialPredictions(request.label_statistics()));
 
   if (worker_logs_) {
-    LOG(INFO) << "Initialize initial predictions";
+    YDF_LOG(INFO) << "Initialize initial predictions";
   }
 
   if (GetWorkerType() == WorkerType::kTRAINER) {
@@ -723,7 +724,7 @@ absl::Status DistributedGradientBoostedTreesWorker::UpdateOwnedFeatures(
   }
   if (worker_logs_) {
     if (!features_to_load.empty()) {
-      LOG(INFO)
+      YDF_LOG(INFO)
           << "Blocking loading of " << features_to_load.size()
           << " features. This is less efficient that non-blocking feature "
              "loading and should open append when the manager or the "
@@ -762,21 +763,23 @@ DistributedGradientBoostedTreesWorker::PreloadFutureOwnedFeatures(
     if (preloading_running) {
       // Still running.
       if (!requested_equals_running) {
-        LOG(INFO) << "Requested future owned features are different from the "
-                     "ones currently being loaded";
+        YDF_LOG(INFO)
+            << "Requested future owned features are different from the "
+               "ones currently being loaded";
       }
       return true;
     } else {
       // Just done running.
 
-      LOG(INFO) << "Feature pre-loading done on worker " << WorkerIdx();
+      YDF_LOG(INFO) << "Feature pre-loading done on worker " << WorkerIdx();
       if (!requested_equals_running) {
         // Quickly start the pre-loading of the request (because it was
         // different from the execution).
-        LOG(INFO) << "Immediate restart of non-blocking loading ("
-                  << load_features.size() << ") and unloading ("
-                  << unload_features.size()
-                  << ") of features for future work on worker " << WorkerIdx();
+        YDF_LOG(INFO) << "Immediate restart of non-blocking loading ("
+                      << load_features.size() << ") and unloading ("
+                      << unload_features.size()
+                      << ") of features for future work on worker "
+                      << WorkerIdx();
 
         RETURN_IF_ERROR(dataset_->NonBlockingLoadingAndUnloadingFeatures(
             load_features, unload_features, /*num_threads=*/5));
@@ -789,9 +792,10 @@ DistributedGradientBoostedTreesWorker::PreloadFutureOwnedFeatures(
     return true;
   } else {
     if (!requested_equals_running) {
-      LOG(INFO) << "Non-blocking loading (" << load_features.size()
-                << ") and unloading (" << unload_features.size()
-                << ") of features for future work on worker " << WorkerIdx();
+      YDF_LOG(INFO) << "Non-blocking loading (" << load_features.size()
+                    << ") and unloading (" << unload_features.size()
+                    << ") of features for future work on worker "
+                    << WorkerIdx();
 
       RETURN_IF_ERROR(dataset_->NonBlockingLoadingAndUnloadingFeatures(
           load_features, unload_features));
@@ -852,9 +856,9 @@ absl::Status DistributedGradientBoostedTreesWorker::ShareSplits(
     auto reply_status =
         NextAsynchronousProtoAnswerFromOtherWorker<proto::WorkerResult>();
     if (!reply_status.ok()) {
-      LOG(WARNING) << "Other replied with error: "
-                   << reply_status.status().message()
-                   << ". Answering the manager with missing data error";
+      YDF_LOG(WARNING) << "Other replied with error: "
+                       << reply_status.status().message()
+                       << ". Answering the manager with missing data error";
       RETURN_IF_ERROR(
           SkipAsyncWorkerToWorkerAnswers(num_requests - reply_idx - 1));
       generic_answer->set_request_restart_iter(true);
@@ -864,8 +868,9 @@ absl::Status DistributedGradientBoostedTreesWorker::ShareSplits(
 
     if (generic_other_result.request_restart_iter()) {
       // The target worker does not have the required data.
-      LOG(WARNING) << "Other worker responded to GetSplitValue request with "
-                      "missing data error";
+      YDF_LOG(WARNING)
+          << "Other worker responded to GetSplitValue request with "
+             "missing data error";
       RETURN_IF_ERROR(
           SkipAsyncWorkerToWorkerAnswers(num_requests - reply_idx - 1));
       generic_answer->set_request_restart_iter(true);
@@ -1163,8 +1168,8 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
 absl::Status DistributedGradientBoostedTreesWorker::RestoreCheckpoint(
     const proto::WorkerRequest::RestoreCheckpoint& request,
     proto::WorkerResult::RestoreCheckpoint* answer) {
-  LOG(INFO) << "Restore checkpoint to iter " << request.iter_idx() << " (was "
-            << iter_idx_ << " before)";
+  YDF_LOG(INFO) << "Restore checkpoint to iter " << request.iter_idx()
+                << " (was " << iter_idx_ << " before)";
 
   if (GetWorkerType() == WorkerType::kTRAINER) {
     iter_idx_ = request.iter_idx();

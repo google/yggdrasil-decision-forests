@@ -89,8 +89,8 @@ MultitaskerLearner::TrainWithStatus(
   };
 
   {
-    LOG(INFO) << "Train multitasker with " << mt_config.subtasks_size()
-              << " model(s)";
+    YDF_LOG(INFO) << "Train multitasker with " << mt_config.subtasks_size()
+                  << " model(s)";
     utils::concurrency::ThreadPool pool("multitasker",
                                         deployment().num_threads());
     pool.StartWorkers();
@@ -172,8 +172,8 @@ MultitaskerLearner::GetGenericHyperParameterSpecification() const {
   const auto& mt_config =
       training_config().GetExtension(proto::multitasker_config);
   if (mt_config.subtasks_size() == 0) {
-    LOG(WARNING) << "Sub-learner not set. This is only expected during the "
-                    "automatic documentation generation.";
+    YDF_LOG(WARNING) << "Sub-learner not set. This is only expected during the "
+                        "automatic documentation generation.";
     return AbstractLearner::GetGenericHyperParameterSpecification();
   }
 

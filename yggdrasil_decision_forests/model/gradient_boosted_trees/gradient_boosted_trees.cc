@@ -336,7 +336,7 @@ void GradientBoostedTreesModel::Predict(
       } else if (task() == model::proto::REGRESSION) {
         prediction->mutable_regression()->set_value(accumulator);
       } else {
-        LOG(FATAL) << "Non supported task";
+        YDF_LOG(FATAL) << "Non supported task";
       }
     } break;
     case proto::Loss::LAMBDA_MART_NDCG5:
@@ -349,7 +349,7 @@ void GradientBoostedTreesModel::Predict(
       prediction->mutable_ranking()->set_relevance(accumulator);
     } break;
     default:
-      LOG(FATAL) << "Not implemented";
+      YDF_LOG(FATAL) << "Not implemented";
   }
 }
 
@@ -442,7 +442,7 @@ void GradientBoostedTreesModel::Predict(
       prediction->mutable_ranking()->set_relevance(accumulator);
     } break;
     default:
-      LOG(FATAL) << "Not implemented";
+      YDF_LOG(FATAL) << "Not implemented";
   }
 }
 
@@ -490,9 +490,10 @@ void GradientBoostedTreesModel::AppendModelStructure(
 metric::proto::EvaluationResults
 GradientBoostedTreesModel::ValidationEvaluation() const {
   if (std::isnan(validation_loss_)) {
-    LOG(WARNING) << "Validation evaluation not available for the Gradient "
-                    "Boosted Tree model as no validation dataset was provided "
-                    "for training (i.e. validation_set_ratio == 0).";
+    YDF_LOG(WARNING)
+        << "Validation evaluation not available for the Gradient "
+           "Boosted Tree model as no validation dataset was provided "
+           "for training (i.e. validation_set_ratio == 0).";
     return {};
   }
   metric::proto::EvaluationResults validation_evaluation;
@@ -527,7 +528,7 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
             metric_value);
         validation_evaluation.mutable_ranking()->set_ndcg_truncation(5);
       } else {
-        LOG(WARNING) << "Unknown metric name:" << metric_name;
+        YDF_LOG(WARNING) << "Unknown metric name:" << metric_name;
       }
     }
     if (task_ == model::proto::Task::CLASSIFICATION &&

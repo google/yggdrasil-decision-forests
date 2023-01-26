@@ -125,6 +125,7 @@ cc_library_ydf(
     features = ["-use_header_modules"],  # Incompatible with -fexceptions.
     visibility = ["//visibility:private"],
     deps = [
+        ":logging",
         ":compatibility",
         ":bytestream",
         ":status_macros",

@@ -51,7 +51,7 @@ TEST(SyntheticDataset, BinaryClassification) {
 
   const auto data_spec = GetDataSpec(dst_path);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << "SPEC:\n" << readable_representation;
+  YDF_LOG(INFO) << "SPEC:\n" << readable_representation;
 }
 
 TEST(SyntheticDataset, MultiClassClassification) {
@@ -63,7 +63,7 @@ TEST(SyntheticDataset, MultiClassClassification) {
 
   const auto data_spec = GetDataSpec(dst_path);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << "SPEC:\n" << readable_representation;
+  YDF_LOG(INFO) << "SPEC:\n" << readable_representation;
 }
 
 TEST(SyntheticDataset, Regression) {
@@ -75,7 +75,7 @@ TEST(SyntheticDataset, Regression) {
 
   const auto data_spec = GetDataSpec(dst_path);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << "SPEC:\n" << readable_representation;
+  YDF_LOG(INFO) << "SPEC:\n" << readable_representation;
 }
 
 TEST(SyntheticDataset, MultidimensionalNumerical) {
@@ -96,7 +96,7 @@ TEST(SyntheticDataset, MultidimensionalNumerical) {
   guide.set_unstack_numerical_set_as_numericals(true);
   const auto data_spec = GetDataSpec(dst_path, guide);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << "SPEC:\n" << readable_representation;
+  YDF_LOG(INFO) << "SPEC:\n" << readable_representation;
 }
 
 TEST(SyntheticDataset, MultidimensionalNumericalInt) {
@@ -118,7 +118,7 @@ TEST(SyntheticDataset, MultidimensionalNumericalInt) {
   guide.set_unstack_numerical_set_as_numericals(true);
   const auto data_spec = GetDataSpec(dst_path, guide);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << "SPEC:\n" << readable_representation;
+  YDF_LOG(INFO) << "SPEC:\n" << readable_representation;
 }
 
 TEST(SyntheticDataset, MultidimensionalNumericalDiscretized) {
@@ -140,7 +140,7 @@ TEST(SyntheticDataset, MultidimensionalNumericalDiscretized) {
   guide.set_detect_numerical_as_discretized_numerical(true);
   const auto data_spec = GetDataSpec(dst_path, guide);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << "SPEC:\n" << readable_representation;
+  YDF_LOG(INFO) << "SPEC:\n" << readable_representation;
 }
 
 TEST(SyntheticDataset, WriteToCsv) {
@@ -157,7 +157,7 @@ TEST(SyntheticDataset, WriteToCsv) {
 
   const auto data_spec = GetDataSpec(dst_path);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << "SPEC:\n" << readable_representation;
+  YDF_LOG(INFO) << "SPEC:\n" << readable_representation;
 }
 
 TEST(SyntheticDataset, Ranking) {
@@ -169,7 +169,7 @@ TEST(SyntheticDataset, Ranking) {
 
   const auto data_spec = GetDataSpec(dst_path);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  LOG(INFO) << "SPEC:\n" << readable_representation;
+  YDF_LOG(INFO) << "SPEC:\n" << readable_representation;
 }
 
 }  // namespace

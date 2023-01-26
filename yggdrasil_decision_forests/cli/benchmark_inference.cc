@@ -142,7 +142,7 @@ absl::Status BenchmarkGenericSlowEngine(const RunOptions& options,
           predictions[example_idx] = prediction.ranking().relevance();
           break;
         default:
-          LOG(INFO) << "Non supported task";
+          YDF_LOG(INFO) << "Non supported task";
       }
     }
   };
@@ -242,12 +242,12 @@ absl::Status Benchmark() {
       /*.warmup_runs =*/absl::GetFlag(FLAGS_warmup_runs),
   };
 
-  LOG(INFO) << "Loading model";
+  YDF_LOG(INFO) << "Loading model";
   std::unique_ptr<model::AbstractModel> model;
   RETURN_IF_ERROR(model::LoadModel(model_path, &model));
-  LOG(INFO) << "The model is of type: " << model->name();
+  YDF_LOG(INFO) << "The model is of type: " << model->name();
 
-  LOG(INFO) << "Loading dataset";
+  YDF_LOG(INFO) << "Loading dataset";
   dataset::VerticalDataset dataset;
   RETURN_IF_ERROR(
       LoadVerticalDataset(dataset_path, model->data_spec(), &dataset,
@@ -257,16 +257,16 @@ absl::Status Benchmark() {
 
   // Run engines.
   const auto engine_factories = model->ListCompatibleFastEngines();
-  LOG(INFO) << "Found " << engine_factories.size()
-            << " compatible fast engines.";
+  YDF_LOG(INFO) << "Found " << engine_factories.size()
+                << " compatible fast engines.";
   for (const auto& engine_factory : engine_factories) {
-    LOG(INFO) << "Running " << engine_factory->name();
+    YDF_LOG(INFO) << "Running " << engine_factory->name();
     RETURN_IF_ERROR(BenchmarkFastEngineWithVirtualInterface(
         options, *engine_factory, *model.get(), dataset, &results));
   }
 
   if (absl::GetFlag(FLAGS_generic)) {
-    LOG(INFO) << "Running the slow generic engine";
+    YDF_LOG(INFO) << "Running the slow generic engine";
     RETURN_IF_ERROR(
         BenchmarkGenericSlowEngine(options, *model, dataset, &results));
   }
@@ -282,7 +282,8 @@ int main(int argc, char** argv) {
   InitLogging(kUsageMessage, &argc, &argv, true);
   const auto status = yggdrasil_decision_forests::Benchmark();
   if (!status.ok()) {
-    LOG(INFO) << "The benchmark failed with the following error: " << status;
+    YDF_LOG(INFO) << "The benchmark failed with the following error: "
+                  << status;
     return 1;
   }
   return 0;

@@ -124,7 +124,7 @@ class MeanSquaredErrorLoss : public AbstractLoss {
       }
     }
     if (sum_weights <= 0) {
-      LOG(WARNING) << "Zero or negative weights in node";
+      YDF_LOG(WARNING) << "Zero or negative weights in node";
       sum_weights = 1.0;
     }
     // Note: The "sum_weights" terms carries an implicit 2x factor that is

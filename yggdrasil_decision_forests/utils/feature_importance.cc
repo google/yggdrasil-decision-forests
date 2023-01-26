@@ -189,9 +189,9 @@ absl::Status ComputePermutationFeatureImportance(
     utils::concurrency::ThreadPool pool("variable_importance",
                                         options.num_threads);
     pool.StartWorkers();
-    LOG(INFO) << "Running " << model->data_spec().columns_size()
-              << " features on " << options.num_threads << " threads with "
-              << options.num_rounds << " rounds";
+    YDF_LOG(INFO) << "Running " << model->data_spec().columns_size()
+                  << " features on " << options.num_threads << " threads with "
+                  << options.num_rounds << " rounds";
     for (int feature_idx = 0; feature_idx < model->data_spec().columns_size();
          feature_idx++) {
       for (int round_idx = 0; round_idx < options.num_rounds; round_idx++) {

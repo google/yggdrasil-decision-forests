@@ -46,7 +46,7 @@ namespace serving {
 //  stats.Update(examples, num_examples, ExampleFormat::FORMAT_EXAMPLE_MAJOR);
 //
 //  // Final display.
-//  LOG(INFO) << "Statistics:\n", << stats.BuildReport();
+//  YDF_LOG(INFO) << "Statistics:\n", << stats.BuildReport();
 //
 // FutureWork(gbm): Create a method exporting results as a CSV file.
 class FeatureStatistics {

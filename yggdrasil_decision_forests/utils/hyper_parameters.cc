@@ -35,8 +35,8 @@ GenericHyperParameterConsumer::GenericHyperParameterConsumer(
   for (const auto& field : generic_hyper_parameters.fields()) {
     if (generic_hyper_parameters_.find(field.name()) !=
         generic_hyper_parameters_.end()) {
-      LOG(FATAL) << "The field \"" << field.name()
-                 << "\" is defined several times.";
+      YDF_LOG(FATAL) << "The field \"" << field.name()
+                     << "\" is defined several times.";
     }
     generic_hyper_parameters_[field.name()] = field;
   }
@@ -45,8 +45,8 @@ GenericHyperParameterConsumer::GenericHyperParameterConsumer(
 absl::optional<model::proto::GenericHyperParameters::Field>
 GenericHyperParameterConsumer::Get(const absl::string_view key) {
   if (consumed_values_.find(key) != consumed_values_.end()) {
-    LOG(FATAL) << absl::StrCat("Already consumed hyper-parameter \"", key,
-                               "\".");
+    YDF_LOG(FATAL) << absl::StrCat("Already consumed hyper-parameter \"", key,
+                                   "\".");
   }
   consumed_values_.insert(std::string(key));
   const auto value_it = generic_hyper_parameters_.find(key);

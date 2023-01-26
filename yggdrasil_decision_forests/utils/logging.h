@@ -33,7 +33,7 @@
       next_log_time_atomic.store(now_time + INTERVAL * 1e9,   \
                                  std::memory_order_relaxed);  \
       std::string _;                                          \
-      LOG(INFO) << MESSAGE;                                   \
+      YDF_LOG(INFO) << MESSAGE;                               \
     }                                                         \
   }
 

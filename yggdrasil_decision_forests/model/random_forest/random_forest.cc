@@ -314,7 +314,7 @@ void RandomForestModel::Predict(const dataset::VerticalDataset& dataset,
       PredictUplift(dataset, row_idx, prediction);
       break;
     default:
-      LOG(FATAL) << "Non supported task.";
+      YDF_LOG(FATAL) << "Non supported task.";
       break;
   }
 }
@@ -334,7 +334,7 @@ void RandomForestModel::Predict(const dataset::proto::Example& example,
       PredictUplift(example, prediction);
       break;
     default:
-      LOG(FATAL) << "Non supported task.";
+      YDF_LOG(FATAL) << "Non supported task.";
       break;
   }
 }
@@ -549,8 +549,9 @@ std::vector<std::string> RandomForestModel::AvailableVariableImportances()
       // TODO: Add uplift variable importances.
       break;
     default:
-      LOG(FATAL) << "RandomForest for task " << model::proto::Task_Name(task())
-                 << " does not implement VariableImportances.";
+      YDF_LOG(FATAL) << "RandomForest for task "
+                     << model::proto::Task_Name(task())
+                     << " does not implement VariableImportances.";
   }
   const auto structual = AvailableStructuralVariableImportances();
   variable_importances.insert(variable_importances.end(), structual.begin(),
@@ -607,10 +608,11 @@ RandomForestModel::GetVariableImportance(absl::string_view key) const {
 metric::proto::EvaluationResults RandomForestModel::ValidationEvaluation()
     const {
   if (out_of_bag_evaluations_.empty()) {
-    LOG(WARNING) << "ValidationEvaluation requires OOB evaluation enabled."
-                    "Random Forest models should be trained with "
-                    "compute_oob_performances:true. CART models do not support "
-                    "OOB evaluation.";
+    YDF_LOG(WARNING)
+        << "ValidationEvaluation requires OOB evaluation enabled."
+           "Random Forest models should be trained with "
+           "compute_oob_performances:true. CART models do not support "
+           "OOB evaluation.";
     return {};
   }
   return out_of_bag_evaluations_.back().evaluation();
@@ -670,7 +672,7 @@ std::string EvaluationSnippet(
       return absl::Substitute("qini:$0 auuc:$1", metric::Qini(evaluation),
                               metric::AUUC(evaluation));
     default:
-      LOG(FATAL) << "Not implemented";
+      YDF_LOG(FATAL) << "Not implemented";
   }
 }
 

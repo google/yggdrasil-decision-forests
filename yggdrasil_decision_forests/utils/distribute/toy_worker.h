@@ -42,21 +42,21 @@ class ToyWorker final : public AbstractWorker {
   virtual ~ToyWorker() { num_existing_toy_workers_--; }
 
   absl::Status Setup(Blob welcome_blob) override {
-    LOG(INFO) << "Setup worker " << WorkerIdx();
+    YDF_LOG(INFO) << "Setup worker " << WorkerIdx();
     CHECK_EQ(welcome_blob, "hello");
     return absl::OkStatus();
   }
 
   absl::Status Done() override {
-    LOG(INFO) << "Done worker " << WorkerIdx();
+    YDF_LOG(INFO) << "Done worker " << WorkerIdx();
     return absl::OkStatus();
   }
 
   absl::StatusOr<Blob> RunRequest(Blob blob) override {
-    LOG(INFO) << "RunRequest " << blob << " on worker " << WorkerIdx();
+    YDF_LOG(INFO) << "RunRequest " << blob << " on worker " << WorkerIdx();
 
     if (forbidden) {
-      LOG(FATAL) << "A forbidden worker was called!";
+      YDF_LOG(FATAL) << "A forbidden worker was called!";
     }
 
     if (absl::StartsWith(blob, "identity")) {
@@ -88,13 +88,13 @@ class ToyWorker final : public AbstractWorker {
     } else if (blob == "wait_barrier") {
       // Wait and block for 5 calls to this request.
       CHECK(barrier_);
-      LOG(INFO) << "Worker " << WorkerIdx()
-                << " is waiting for 5 other calls at barrier";
+      YDF_LOG(INFO) << "Worker " << WorkerIdx()
+                    << " is waiting for 5 other calls at barrier";
       if (barrier_->Block()) {
         delete barrier_;
         barrier_ = nullptr;
       }
-      LOG(INFO) << "Worker #" << WorkerIdx() << " passed the barrier";
+      YDF_LOG(INFO) << "Worker #" << WorkerIdx() << " passed the barrier";
       return "";
     } else if (blob == "get") {
       return value_;
@@ -110,7 +110,7 @@ class ToyWorker final : public AbstractWorker {
     } else if (absl::StartsWith(blob, "max_num_existing_toy_workers")) {
       return absl::StrCat(max_num_existing_toy_workers_.load());
     } else if (blob == "forbidden") {
-      LOG(INFO) << "Set the worker as forbidden";
+      YDF_LOG(INFO) << "Set the worker as forbidden";
       forbidden = true;
       return "";
     }

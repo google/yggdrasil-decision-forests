@@ -37,11 +37,11 @@ struct ManagerAndWorkers {
     if (worker_threads.empty()) {
       return;
     }
-    LOG(INFO) << "Waiting for workers to stop";
+    YDF_LOG(INFO) << "Waiting for workers to stop";
     for (auto& worker : worker_threads) {
       worker->Join();
     }
-    LOG(INFO) << "Waiting for discarded workers to stop";
+    YDF_LOG(INFO) << "Waiting for discarded workers to stop";
     for (auto& worker : discarded_worker_threads) {
       worker->Join();
     }
@@ -59,7 +59,7 @@ struct ManagerCreatorAndWorkers {
     if (worker_threads.empty()) {
       return;
     }
-    LOG(INFO) << "Waiting for workers to stop";
+    YDF_LOG(INFO) << "Waiting for workers to stop";
     for (auto& worker : worker_threads) {
       worker->Join();
     }

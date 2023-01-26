@@ -112,7 +112,7 @@ TEST(Metric, EvaluationOfClassification) {
   // Create reports.
   std::string report;
   CHECK_OK(AppendTextReportWithStatus(eval, &report));
-  LOG(INFO) << "Report :\n " << report;
+  YDF_LOG(INFO) << "Report :\n " << report;
 }
 
 TEST(Metric, EvaluationOfClassificationWithNumericalWeights) {
@@ -248,7 +248,7 @@ TEST(Metric, EvaluationOfRegression) {
   // Create reports.
   std::string report;
   CHECK_OK(AppendTextReportWithStatus(eval, &report));
-  LOG(INFO) << "Report :\n " << report;
+  YDF_LOG(INFO) << "Report :\n " << report;
 }
 
 TEST(Metric, ComputeRoc) {
@@ -982,7 +982,7 @@ TEST(Metric, BinaryClassificationEvaluationHelper) {
   // String readable report.
   std::string report;
   CHECK_OK(AppendTextReportWithStatus(eval, &report));
-  LOG(INFO) << "Report :\n " << report;
+  YDF_LOG(INFO) << "Report :\n " << report;
 }
 
 TEST(Metric, EvaluationOfRanking) {
@@ -1072,7 +1072,7 @@ TEST(Metric, EvaluationOfRanking) {
   // Create reports.
   std::string report;
   CHECK_OK(AppendTextReportWithStatus(eval, &report));
-  LOG(INFO) << "Report :\n " << report;
+  YDF_LOG(INFO) << "Report :\n " << report;
 }
 
 TEST(Metric, EvaluationOfRankingMRR) {
@@ -1379,7 +1379,7 @@ TEST(Metric, EvaluationOfRankingCI) {
   // Create reports.
   std::string report;
   CHECK_OK(AppendTextReportWithStatus(eval, &report));
-  LOG(INFO) << "Report :\n " << report;
+  YDF_LOG(INFO) << "Report :\n " << report;
 }
 
 TEST(Metric, RMSE) {

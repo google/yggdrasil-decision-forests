@@ -90,7 +90,7 @@ TEST(Report, HtmlReportClassification) {
 
   const auto path =
       file::JoinPath(test::TmpDirectory(), "report_classification.html");
-  LOG(INFO) << "path: " << path;
+  YDF_LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_report));
 }
 
@@ -136,7 +136,7 @@ TEST(Report, HtmlReportRegression) {
 
   const auto path =
       file::JoinPath(test::TmpDirectory(), "report_regression.html");
-  LOG(INFO) << "path: " << path;
+  YDF_LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_report));
 }
 

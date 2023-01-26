@@ -67,7 +67,7 @@ absl::Status DistributeCLIManager::Initialize() {
   }
   RETURN_IF_ERROR(file::RecursivelyCreateDir(log_dir_, file::Defaults()));
   if (config_.distribute_config().verbosity() >= 1) {
-    LOG(INFO) << "Distribute CLI log directory: " << log_dir_;
+    YDF_LOG(INFO) << "Distribute CLI log directory: " << log_dir_;
   }
 
   // Start the distribute manager.
@@ -89,7 +89,7 @@ absl::Status DistributeCLIManager::Initialize() {
 absl::Status DistributeCLIManager::Schedule(
     const absl::string_view command, const absl::optional<std::string>& uid) {
   if (config_.distribute_config().verbosity() >= 2) {
-    LOG(INFO) << "Schedule command: " << command;
+    YDF_LOG(INFO) << "Schedule command: " << command;
   }
   if (config_.shuffle_commands()) {
     waiting_commands_.push_back(
@@ -150,8 +150,8 @@ absl::Status DistributeCLIManager::WaitCompletion() {
   }
 
   if (config_.distribute_config().verbosity() >= 1) {
-    LOG(INFO) << "Running " << pending_commands_ << " commands";
-    LOG(INFO) << "\tlegend: w=worker t=time l=log";
+    YDF_LOG(INFO) << "Running " << pending_commands_ << " commands";
+    YDF_LOG(INFO) << "\tlegend: w=worker t=time l=log";
   }
 
   absl::Time next_log = absl::Now();
@@ -167,25 +167,25 @@ absl::Status DistributeCLIManager::WaitCompletion() {
     if (config_.distribute_config().verbosity() >= 1 &&
         absl::Now() >= next_log) {
       next_log = absl::Now() + absl::Seconds(30);
-      LOG(INFO) << (num_commands - pending_commands_) << " / " << num_commands
-                << " [+" << finished_commands_since_last_log
-                << "] Last: w:" << generic_result.worker()
-                << " t:" << absl::Seconds(std::round(generic_result.duration()))
-                << " l:"
-                << LogPathFromInternalUid(
-                       generic_result.command().internal_command_id());
+      YDF_LOG(INFO) << (num_commands - pending_commands_) << " / "
+                    << num_commands << " [+" << finished_commands_since_last_log
+                    << "] Last: w:" << generic_result.worker() << " t:"
+                    << absl::Seconds(std::round(generic_result.duration()))
+                    << " l:"
+                    << LogPathFromInternalUid(
+                           generic_result.command().internal_command_id());
       finished_commands_since_last_log = 0;
     }
   }
   if (config_.distribute_config().verbosity() >= 1) {
-    LOG(INFO) << "All commands completed";
+    YDF_LOG(INFO) << "All commands completed";
   }
   return absl::OkStatus();
 }
 
 absl::Status DistributeCLIManager::Shutdown() {
   if (config_.distribute_config().verbosity() >= 2) {
-    LOG(INFO) << "Shutting down Distribute CLI manager";
+    YDF_LOG(INFO) << "Shutting down Distribute CLI manager";
   }
   RETURN_IF_ERROR(distribute_manager_->Done());
   distribute_manager_.reset();

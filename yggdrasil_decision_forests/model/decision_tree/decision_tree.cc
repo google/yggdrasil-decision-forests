@@ -80,7 +80,7 @@ void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
                             std::string* description) {
   switch (node.output_case()) {
     case proto::Node::OUTPUT_NOT_SET:
-      LOG(FATAL) << "Not supported";
+      YDF_LOG(FATAL) << "Not supported";
       break;
 
     case proto::Node::OutputCase::kClassifier: {
@@ -237,7 +237,7 @@ std::vector<int32_t> ExactElementsFromContainsCondition(
       return elements;
     }
     default:
-      LOG(FATAL) << "Not a \"contains\" type condition";
+      YDF_LOG(FATAL) << "Not a \"contains\" type condition";
   }
 }
 
@@ -626,8 +626,8 @@ bool EvalConditionFromColumn(
                 categorical_column->values()[example_idx].second);
 
       } else {
-        LOG(FATAL) << "Cannot evaluate condition on column "
-                   << condition.attribute();
+        YDF_LOG(FATAL) << "Cannot evaluate condition on column "
+                       << condition.attribute();
       }
     }
 
@@ -658,8 +658,8 @@ bool EvalConditionFromColumn(
         }
         return false;
       } else {
-        LOG(FATAL) << "Cannot evaluate condition on column "
-                   << condition.attribute();
+        YDF_LOG(FATAL) << "Cannot evaluate condition on column "
+                       << condition.attribute();
       }
     }
 
@@ -682,7 +682,7 @@ bool EvalConditionFromColumn(
     }
 
     default:
-      LOG(FATAL) << "Non implemented";
+      YDF_LOG(FATAL) << "Non implemented";
   }
   return false;
 }
@@ -760,8 +760,8 @@ bool EvalCondition(const proto::NodeCondition& condition,
             attribute.categorical_set().values().end());
 
       } else {
-        LOG(FATAL) << "Cannot evaluate condition on column "
-                   << condition.attribute();
+        YDF_LOG(FATAL) << "Cannot evaluate condition on column "
+                       << condition.attribute();
       }
     }
 
@@ -781,8 +781,8 @@ bool EvalCondition(const proto::NodeCondition& condition,
         }
         return false;
       } else {
-        LOG(FATAL) << "Cannot evaluate condition on column "
-                   << condition.attribute();
+        YDF_LOG(FATAL) << "Cannot evaluate condition on column "
+                       << condition.attribute();
       }
     }
 
@@ -802,7 +802,7 @@ bool EvalCondition(const proto::NodeCondition& condition,
     }
 
     default:
-      LOG(FATAL) << "Non implemented";
+      YDF_LOG(FATAL) << "Non implemented";
   }
   return false;
 }

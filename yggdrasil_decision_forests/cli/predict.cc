@@ -103,7 +103,7 @@ void Predict() {
           std::find(required_columns.begin(), required_columns.end(),
                     key_col_idx) != required_columns.end();
       if (key_is_input_feature) {
-        LOG(FATAL) << "The --key cannot be an input feature of the model.";
+        YDF_LOG(FATAL) << "The --key cannot be an input feature of the model.";
       }
       // Turn the column into a raw string to make sure no processing is applied
       // during reading.
@@ -130,7 +130,7 @@ void Predict() {
 
   auto engine_or = model->BuildFastEngine();
   if (engine_or.ok()) {
-    LOG(INFO) << "Run predictions with semi-fast engine";
+    YDF_LOG(INFO) << "Run predictions with semi-fast engine";
 
     // Convert dataset to efficient format.
     auto engine = std::move(engine_or.value());
@@ -159,7 +159,7 @@ void Predict() {
       }
     }
   } else {
-    LOG(INFO) << "Run predictions with slow engine";
+    YDF_LOG(INFO) << "Run predictions with slow engine";
     for (dataset::VerticalDataset::row_t example_idx = 0;
          example_idx < dataset.nrow(); example_idx++) {
       LOG_INFO_EVERY_N_SEC(30, _ << example_idx << "/" << dataset.nrow()

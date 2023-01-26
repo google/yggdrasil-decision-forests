@@ -66,11 +66,11 @@ void PermutationVI() {
   QCHECK(!absl::GetFlag(FLAGS_output_model).empty());
   QCHECK(!absl::GetFlag(FLAGS_dataset).empty());
 
-  LOG(INFO) << "Load model";
+  YDF_LOG(INFO) << "Load model";
   std::unique_ptr<model::AbstractModel> model;
   QCHECK_OK(model::LoadModel(absl::GetFlag(FLAGS_input_model), &model));
 
-  LOG(INFO) << "Load dataset";
+  YDF_LOG(INFO) << "Load dataset";
   dataset::LoadConfig read_dataset_options;
   read_dataset_options.num_threads = absl::GetFlag(FLAGS_num_io_threads);
   dataset::VerticalDataset dataset;
@@ -78,7 +78,7 @@ void PermutationVI() {
       absl::GetFlag(FLAGS_dataset), model->data_spec(), &dataset,
       /*ensure_non_missing=*/model->input_features(), read_dataset_options));
 
-  LOG(INFO) << "Compute the permutation variable importances";
+  YDF_LOG(INFO) << "Compute the permutation variable importances";
   utils::ComputeFeatureImportanceOptions options;
   options.num_threads = absl::GetFlag(FLAGS_num_compute_threads);
   options.num_rounds = absl::GetFlag(FLAGS_num_repetitions);
@@ -86,7 +86,7 @@ void PermutationVI() {
       dataset, model.get(), model->mutable_precomputed_variable_importances(),
       options));
 
-  LOG(INFO) << "Save model";
+  YDF_LOG(INFO) << "Save model";
   QCHECK_OK(model::SaveModel(absl::GetFlag(FLAGS_output_model), model.get()));
 }
 

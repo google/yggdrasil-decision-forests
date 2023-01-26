@@ -74,19 +74,19 @@ void EditModel() {
   const auto output = absl::GetFlag(FLAGS_output);
 
   if (input == kStringNoSet) {
-    LOG(FATAL) << "--input required";
+    YDF_LOG(FATAL) << "--input required";
   }
   if (output == kStringNoSet) {
-    LOG(FATAL) << "--output required";
+    YDF_LOG(FATAL) << "--output required";
   }
 
-  LOG(INFO) << "Loading model";
+  YDF_LOG(INFO) << "Loading model";
   std::unique_ptr<model::AbstractModel> model;
   QCHECK_OK(model::LoadModel(input, &model));
   auto* label_column =
       model->mutable_data_spec()->mutable_columns(model->label_col_idx());
 
-  LOG(INFO) << "Apply action";
+  YDF_LOG(INFO) << "Apply action";
 
   // Change the name of the label.
   if (absl::GetFlag(FLAGS_new_label_name) != kStringNoSet) {
@@ -97,8 +97,9 @@ void EditModel() {
   if (absl::GetFlag(FLAGS_new_weights_name) != kStringNoSet) {
     auto weights = model->weights();
     if (!weights.has_value()) {
-      LOG(FATAL) << "Cannot apply --new_weights_name because the model is not "
-                    "weighted.";
+      YDF_LOG(FATAL)
+          << "Cannot apply --new_weights_name because the model is not "
+             "weighted.";
     }
     auto* weight_column = model->mutable_data_spec()->mutable_columns(
         weights.value().attribute_idx());
@@ -115,7 +116,7 @@ void EditModel() {
   if (absl::GetFlag(FLAGS_new_file_prefix) != kStringNoSet) {
     output_options.file_prefix = absl::GetFlag(FLAGS_new_file_prefix);
   }
-  LOG(INFO) << "Saving model";
+  YDF_LOG(INFO) << "Saving model";
   QCHECK_OK(model::SaveModel(output, model.get(), output_options));
 }
 

@@ -97,7 +97,7 @@ TEST(ExportDoc, Base) {
       file::JoinPath(test::TmpDirectory(), "content.csv");
   EXPECT_OK(file::SetContent(content_path, content));
 
-  LOG(INFO) << "Exporting content to: " << content_path;
+  YDF_LOG(INFO) << "Exporting content to: " << content_path;
 
   EXPECT_EQ(content, R"(## FakeLearner2
 

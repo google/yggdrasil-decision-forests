@@ -658,10 +658,10 @@ absl::Status CreateFlatModelNodes(
     RETURN_IF_ERROR(ConvertGenericNodeToFlatNode(
         src_model, tree->root(), set_node, dst_model, &dst_model->nodes));
   }
-  LOG(INFO) << "Model loaded with " << dst_model->root_offsets.size()
-            << " root(s), " << dst_model->nodes.size() << " node(s), and "
-            << dst_model->features().input_features().size()
-            << " input feature(s).";
+  YDF_LOG(INFO) << "Model loaded with " << dst_model->root_offsets.size()
+                << " root(s), " << dst_model->nodes.size() << " node(s), and "
+                << dst_model->features().input_features().size()
+                << " input feature(s).";
 
   return absl::OkStatus();
 }

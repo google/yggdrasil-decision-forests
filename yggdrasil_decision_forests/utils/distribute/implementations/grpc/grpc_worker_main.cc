@@ -28,9 +28,9 @@ namespace grpc_worker {
 
 void GRPCWorker() {
   const auto port = absl::GetFlag(FLAGS_port);
-  LOG(INFO) << "Start GRPC worker on port " << port;
+  YDF_LOG(INFO) << "Start GRPC worker on port " << port;
   QCHECK_OK(WorkerMain(port, absl::GetFlag(FLAGS_use_loas)));
-  LOG(INFO) << "Stop GRPC worker";
+  YDF_LOG(INFO) << "Stop GRPC worker";
 }
 
 }  // namespace grpc_worker

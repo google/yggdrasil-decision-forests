@@ -47,11 +47,11 @@ TEST(ModelAnalysis, Basic) {
   const std::string model_path =
       file::JoinPath(ModelDir(), "adult_binary_class_gbdt");
 
-  LOG(INFO) << "Load model";
+  YDF_LOG(INFO) << "Load model";
   std::unique_ptr<model::AbstractModel> model;
   CHECK_OK(model::LoadModel(model_path, &model));
 
-  LOG(INFO) << "Load dataset";
+  YDF_LOG(INFO) << "Load dataset";
   dataset::VerticalDataset dataset;
   CHECK_OK(dataset::LoadVerticalDataset(
       dataset_path, model->data_spec(), &dataset,
