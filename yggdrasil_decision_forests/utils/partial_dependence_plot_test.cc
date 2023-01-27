@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/utils/partial_dependence_plot.h"
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -888,6 +889,18 @@ TEST(GetBinsForOneAttribute, NumericalLog) {
   EXPECT_NEAR(bins.numerical_boundaries[1], 248.329, error);
   EXPECT_NEAR(bins.numerical_boundaries[2], 3935.760, error);
   EXPECT_NEAR(bins.numerical_boundaries[3], 62377.601, error);
+}
+
+TEST(SortedUniqueCounts, Basic) {
+  EXPECT_EQ((std::vector<std::pair<float, int>>{}),
+            internal::SortedUniqueCounts({}));
+  EXPECT_EQ((std::vector<std::pair<float, int>>{{1, 1}}),
+            internal::SortedUniqueCounts({1}));
+  EXPECT_EQ((std::vector<std::pair<float, int>>{{1, 3}, {2, 2}, {5, 1}}),
+            internal::SortedUniqueCounts({1, 2, 5, 1, 1, 2}));
+  const auto nan = std::numeric_limits<float>::quiet_NaN();
+  EXPECT_EQ((std::vector<std::pair<float, int>>{{1, 2}, {2, 1}, {5, 1}}),
+            internal::SortedUniqueCounts({1, nan, 5, nan, 1, 2}));
 }
 
 }  // namespace

@@ -571,10 +571,57 @@ absl::StatusOr<std::vector<std::vector<int>>> GenerateAttributesCombinations(
   attribute_idxs.erase(
       std::unique(attribute_idxs.begin(), attribute_idxs.end()),
       attribute_idxs.end());
+
+  YDF_LOG(INFO) << "Found " << attribute_idxs.size() << " combination(s)";
   return attribute_idxs;
 }
 
 namespace internal {
+
+std::vector<std::pair<float, int>> SortedUniqueCounts(
+    std::vector<float> values) {
+  if (values.empty()) {
+    return {};
+  }
+  std::sort(values.begin(), values.end(), [](const float a, const float b) {
+    const bool nan_a = !(a == a);
+    const bool nan_b = !(b == b);
+
+    if (nan_b) {
+      // Sort the nans at the top of the list.
+      return !nan_a;
+    }
+
+    if (nan_a) {
+      // Ensure there is no operations on nans.
+      return false;
+    }
+
+    return a < b;
+  });
+  std::vector<std::pair<float, int>> result;
+
+  float cur_value = 0;
+  int cur_num = 0;
+
+  for (const auto value : values) {
+    if (std::isnan(value)) {
+      continue;
+    }
+    if (value != cur_value) {
+      if (cur_num > 0) {
+        result.push_back({cur_value, cur_num});
+      }
+      cur_value = value;
+      cur_num = 0;
+    }
+    cur_num++;
+  }
+  if (cur_num > 0) {
+    result.push_back({cur_value, cur_num});
+  }
+  return result;
+}
 
 absl::StatusOr<int> ExampleToBinIndex(
     const dataset::proto::Example& example,
@@ -600,25 +647,13 @@ absl::StatusOr<BinsDefinition> GetBinsForOneAttribute(
   if (column.type() == ColumnType::NUMERICAL) {
     STATUS_CHECK(column.has_numerical());
 
-    const auto& values =
-        dataset
-            .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                attribute_idx)
-            ->values();
+    ASSIGN_OR_RETURN(
+        const auto column_data,
+        dataset.ColumnWithCastWithStatus<
+            dataset::VerticalDataset::NumericalColumn>(attribute_idx));
 
-    // Compute the number values.
-    absl::flat_hash_map<float, int> unique_values_and_counts;
-    for (const auto value : values) {
-      unique_values_and_counts[value]++;
-    }
-    std::vector<std::pair<float, int>> unique_values_and_counts_vector;
-    unique_values_and_counts.reserve(unique_values_and_counts.size());
-    for (const auto& item : unique_values_and_counts) {
-      unique_values_and_counts_vector.push_back({item.first, item.second});
-    }
-    std::sort(unique_values_and_counts_vector.begin(),
-              unique_values_and_counts_vector.end());
-    unique_values_and_counts.clear();
+    const auto unique_values_and_counts_vector =
+        SortedUniqueCounts(column_data->values());
 
     ASSIGN_OR_RETURN(auto bounds,
                      dataset::GenDiscretizedBoundaries(

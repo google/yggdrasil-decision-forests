@@ -49,8 +49,7 @@ absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
         absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
-            const int feature_idx)>
-        get_permutation_evaluation,
+            const int feature_idx)>& get_permutation_evaluation,
     const model::AbstractModel* model, ResultFeatureImportance* output,
     const ComputeFeatureImportanceOptions& options = {});
 
@@ -58,8 +57,7 @@ absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
         absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
-            const int feature_idx)>
-        get_permutation_evaluation,
+            const int feature_idx)>& get_permutation_evaluation,
     const model::AbstractModel* model, ResultFeatureImportanceProto* output,
     const ComputeFeatureImportanceOptions& options = {});
 

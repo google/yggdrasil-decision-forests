@@ -130,6 +130,11 @@ absl::StatusOr<BinsDefinition> GetBinsForOneAttribute(
     const dataset::proto::DataSpecification& data_spec, int attribute_idx,
     int num_numerical_bins, const dataset::VerticalDataset& dataset);
 
+// Computes a sorted list of unique values (and counts) in "values". NaN values
+// in "values" are ignored.
+std::vector<std::pair<float, int>> SortedUniqueCounts(
+    std::vector<float> values);
+
 }  // namespace internal
 
 }  // namespace utils

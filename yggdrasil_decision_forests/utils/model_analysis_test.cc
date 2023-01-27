@@ -58,6 +58,8 @@ TEST(ModelAnalysis, Basic) {
       /*ensure_non_missing=*/model->input_features()));
 
   proto::Options options;
+  options.mutable_pdp()->set_example_sampling(0.01f);
+  options.mutable_cep()->set_example_sampling(0.1f);
   const auto report_path = file::JoinPath(test::TmpDirectory(), "analysis");
   CHECK_OK(AnalyseAndCreateHtmlReport(*model.get(), dataset, model_path,
                                       dataset_path, report_path, options));
@@ -103,11 +105,14 @@ TEST(ModelAnalysis, PDPPlot) {
   *dataset.mutable_data_spec() = data_spec;
   CHECK_OK(dataset.CreateColumnsFromDataspec());
   for (int i = 0; i < 1000; i++) {
-    CHECK_OK(dataset.AppendExampleWithStatus({
-        {"f", absl::StrCat(i)},
+    std::unordered_map<std::string, std::string> example{
         {"l", absl::StrCat(i)},
-        {"f2", absl::StrCat(i)},
-    }));
+        {"f2", absl::StrCat(i / 2)},
+    };
+    if ((i % 2) == 0) {
+      example["f"] = absl::StrCat(i);
+    }
+    CHECK_OK(dataset.AppendExampleWithStatus(example));
   }
 
   class FakeModel : public model::FakeModel {

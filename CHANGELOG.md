@@ -1,5 +1,11 @@
 # Changelog
 
+## HEAD
+
+### Features
+
+-   Speed-up the computation of PDP and CEP in the model analysis tool.
+
 ## 1.3.0 - 2023-01-24
 
 ### Features

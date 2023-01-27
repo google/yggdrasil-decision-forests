@@ -105,8 +105,7 @@ absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
         absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
-            const int feature_idx)>
-        get_permutation_evaluation,
+            const int feature_idx)>& get_permutation_evaluation,
     const model::AbstractModel* model, ResultFeatureImportance* output,
     const ComputeFeatureImportanceOptions& options) {
   const auto metrics =
@@ -238,7 +237,8 @@ absl::Status ComputePermutationFeatureImportance(
 
   const auto base_evaluation = model->Evaluate(dataset, eval_options, &rng);
 
-  const auto permutation_evaluation = [&](const int feature_idx)
+  const auto permutation_evaluation = [&dataset, &eval_options, &rng,
+                                       &rng_mutex, model](const int feature_idx)
       -> absl::optional<metric::proto::EvaluationResults> {
     const auto it_input_feature =
         std::find(model->input_features().begin(),
@@ -277,8 +277,7 @@ absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
         absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
-            const int feature_idx)>
-        get_permutation_evaluation,
+            const int feature_idx)>& get_permutation_evaluation,
     const model::AbstractModel* model, ResultFeatureImportanceProto* output,
     const ComputeFeatureImportanceOptions& options) {
   ResultFeatureImportance raw_output;
