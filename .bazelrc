@@ -120,6 +120,7 @@ build:wasm --copt="-Wno-deprecated-non-prototype"
 build:wasm --copt="-Wno-unused-value"
 build:wasm --copt="-Wno-unused-function"
 build:wasm --copt="-Wno-deprecated-declarations"
+build:wasm --copt="-Wno-unused-lambda-capture"
 build:wasm --spawn_strategy=local
 build:wasm --cxxopt=-std=c++17
 build:wasm --host_cxxopt="-fno-exceptions"

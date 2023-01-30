@@ -149,6 +149,13 @@ model.unload();
 model = null;
 ```
 
+## Testing the inference
+
+You case use Yggdrasil pre-configured https server to test your code before
+deployment. Look at
+[build_and_run_local_server.sh](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/port/javascript/tools/build_and_run_local_server.sh)
+for an example.
+
 ## Compile YDF Javascript library from source
 
 To compile, the YDF Javascript library from the source, install the dependencies
@@ -176,3 +183,30 @@ disable the Emscripten frozen cache. This is done by setting
 located in the Bazel cache
 `~/.cache/bazel/.../external/emsdk/emscripten_toolchain`. See here
 [here](https://github.com/emscripten-core/emsdk/issues/971) for more details.
+
+You can also compile YDF from within a Docker as follow:
+
+```shell
+docker run -it -v ${PWD}/..:/working_dir -w /working_dir/yggdrasil-decision-forests ubuntu:18.04
+
+apt-get update
+apt-get -y --no-install-recommends install \
+  ca-certificates \
+  build-essential \
+  g++-10 \
+  clang-10 \
+  git \
+  python3 \
+  python3-pip \
+  zip \
+  wget \
+  unzip
+
+python3 -m pip install numpy
+
+wget -O bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.14.0/bazelisk-linux-amd64
+chmod +x bazelisk
+ln -s ${PWD}/bazelisk /usr/bin/bazel
+
+yggdrasil_decision_forests/port/javascript/tools/build_zipped_library.sh
+```

@@ -15,8 +15,14 @@
 
 
 
-# Note: Removing "--config=lto" will speed-up the compilation.
+# If your env supports it, adds the following:
+# --config=lto
+# --config=size
 
 set -vex
-bazel build -c opt --config=lto --config=size --config=wasm \
+bazel build -c opt --config=wasm \
   //yggdrasil_decision_forests/port/javascript:create_release
+
+mkdir -p dist
+cp -f bazel-bin/yggdrasil_decision_forests/port/javascript/ydf.zip dist/ydf.zip
+cp -f bazel-bin/yggdrasil_decision_forests/port/javascript/ydf.zip dist/javascript_wasm.zip
