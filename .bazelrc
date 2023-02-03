@@ -84,6 +84,10 @@ build:windows_cpp17 --cxxopt=/std:c++17
 build:windows_cpp17 --host_cxxopt=/std:c++17
 build:windows_cpp17 --config=windows
 
+build:windows_cpp20 --cxxopt=/std:c++20
+build:windows_cpp20 --host_cxxopt=/std:c++20
+build:windows_cpp20 --config=windows
+
 # Instruction set optimizations
 build:linux_avx2 --copt=-mavx2
 build:windows_avx2 --copt=/arch:AVX2
