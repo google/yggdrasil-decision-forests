@@ -156,6 +156,20 @@ struct Axis {
 struct Plot {
   absl::Status Check() const;
 
+  Curve* AddCurve() {
+    auto curve = absl::make_unique<Curve>();
+    auto* raw_curve = curve.get();
+    items.push_back(std::move(curve));
+    return raw_curve;
+  }
+
+  Bars* AddBars() {
+    auto bars = absl::make_unique<Bars>();
+    auto* raw_bars = bars.get();
+    items.push_back(std::move(bars));
+    return raw_bars;
+  }
+
   // Title of the plot. Leave empty for no title.
   std::string title;
 
@@ -203,6 +217,11 @@ struct MultiPlotItem {
 // A set of plots.
 struct MultiPlot {
   absl::Status Check() const;
+
+  MultiPlotItem* AddItem() {
+    items.push_back(absl::make_unique<MultiPlotItem>());
+    return items.back().get();
+  }
 
   std::vector<std::unique_ptr<MultiPlotItem>> items;
 
