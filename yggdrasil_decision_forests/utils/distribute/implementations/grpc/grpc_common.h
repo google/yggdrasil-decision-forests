@@ -17,6 +17,7 @@
 #define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_GRPC_COMMON_H_
 
 #include "grpcpp/channel.h"
+#include "grpcpp/client_context.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -27,6 +28,9 @@ bool IsTransiantError(const grpc::Status& status);
 
 // Index of a worker.
 typedef int WorkerIdx;
+
+// Creates a client context;
+void ConfigureClientContext(grpc::ClientContext* context);
 
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

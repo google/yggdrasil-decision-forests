@@ -254,9 +254,8 @@ absl::StatusOr<Blob> WorkerService::BlockingInterWorkerRequest(
   proto::WorkerAnswer answer;
   while (true) {
     grpc::ClientContext context;
-    context.set_wait_for_ready(true);
-    context.set_deadline(std::chrono::system_clock::now() +
-                         std::chrono::hours(kDeadLineInHours));
+    ConfigureClientContext(&context);
+
     const auto status = stub->WorkerRun(&context, query, &answer);
 
     if (!status.ok()) {
@@ -339,7 +338,7 @@ WorkerService::EnsureIntraWorkerStubIsReady(const int worker_idx) {
   }
 
   if (worker.stub) {
-    YDF_LOG(WARNING) << "Update stub to worker #" << worker_idx << " from "
+    YDF_LOG(WARNING) << "Update address of worker #" << worker_idx << " from "
                      << worker.connected_address << " to "
                      << worker.expected_address;
     worker.discarded_stubs_.push_back(std::move(worker.stub));

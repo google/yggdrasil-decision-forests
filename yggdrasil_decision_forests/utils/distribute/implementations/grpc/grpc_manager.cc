@@ -143,7 +143,8 @@ absl::Status GRPCManager::InitializeWorkers(
 
   if (verbosity_ >= 1) {
     YDF_LOG(INFO) << "Start manager with " << worker_addresses.size()
-                  << " workers.";
+                  << " workers and key="
+                  << (key_.has_value() ? key_.value() : -1);
   }
 
   if (imp_config.use_loas()) {
@@ -175,6 +176,7 @@ absl::Status GRPCManager::WaitForAllWorkersToBeReady() {
     while (true) {
       ASSIGN_OR_RETURN(auto stub, UpdateWorkerConnection(worker.get()));
       grpc::ClientContext context;
+      ConfigureClientContext(&context);
       proto::Empty query;
       proto::Empty answer;
       const auto ping_status = stub->Ping(&context, query, &answer);
@@ -231,6 +233,11 @@ absl::StatusOr<proto::Server::Stub*> GRPCManager::UpdateWorkerConnection(
   utils::concurrency::MutexLock l(&worker->mutex_address);
   if (worker->expected_address != worker->connected_address) {
     // The worker has moved.
+
+    YDF_LOG(INFO) << "Update address of worker #" << worker->worker_idx
+                  << " from" << worker->connected_address << " to "
+                  << worker->expected_address;
+
     worker->connected_address = worker->expected_address;
 
     if (worker->stub) {
@@ -282,9 +289,7 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
   proto::Answer answer;
   while (true) {
     grpc::ClientContext context;
-    context.set_wait_for_ready(true);
-    context.set_deadline(std::chrono::system_clock::now() +
-                         std::chrono::hours(kDeadLineInHours));
+    ConfigureClientContext(&context);
     const auto status = stub->Run(&context, query, &answer);
     if (!status.ok()) {
       if (status.error_message() == "UNAVAILABLE: worker config required") {
@@ -411,7 +416,8 @@ int GRPCManager::NumWorkers() { return workers_.size(); }
 
 absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
   if (verbosity_ >= 1) {
-    YDF_LOG(INFO) << "Shutdown manager";
+    YDF_LOG(INFO) << "Shutdown manager with key="
+                  << (key_.has_value() ? key_.value() : -1);
   }
   if (done_was_called_) {
     YDF_LOG(WARNING) << "Calling done twice";
@@ -449,8 +455,8 @@ absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
     ASSIGN_OR_RETURN(auto stub, UpdateWorkerConnection(worker.get()));
 
     grpc::ClientContext context;
-    context.set_deadline(std::chrono::system_clock::now() +
-                         std::chrono::minutes(2));
+    ConfigureClientContext(&context);
+
     proto::Empty ignored;
     auto worker_shutdown = stub->Shutdown(&context, query, &ignored);
     if (!worker_shutdown.ok()) {
@@ -476,9 +482,7 @@ absl::Status GRPCManager::DebugShutdownWorker(int worker_idx) {
   query.set_kill_worker_manager(true);
 
   grpc::ClientContext context;
-  context.set_wait_for_ready(true);
-  context.set_deadline(std::chrono::system_clock::now() +
-                       std::chrono::minutes(2));
+  ConfigureClientContext(&context);
   proto::Empty ignored;
   auto& worker = workers_[worker_idx];
   utils::concurrency::MutexLock l(&worker->mutex_address);
@@ -573,8 +577,7 @@ void GRPCManager::ProcessPeerWorkerAddressUpdate(Worker* worker) {
       }
 
       grpc::ClientContext context;
-      context.set_deadline(std::chrono::system_clock::now() +
-                           std::chrono::minutes(2));
+      ConfigureClientContext(&context);
       proto::Empty ignored;
       auto worker_shutdown =
           stub_or.value()->UpdateWorkerAddress(&context, query, &ignored);
@@ -588,6 +591,8 @@ void GRPCManager::ProcessPeerWorkerAddressUpdate(Worker* worker) {
 
 void UpdateWorkerAddress(int key, int worker_idx,
                          absl::string_view new_address) {
+  YDF_LOG(INFO) << "Receive update of worker #" << worker_idx << " address to "
+                << new_address;
   auto& all_changes = GetGlobalChanges();
   utils::concurrency::MutexLock l(&all_changes.mutex);
   auto& per_key = all_changes.per_key[key];

@@ -26,5 +26,12 @@ bool IsTransiantError(const grpc::Status& status) {
           status.error_message() == "keepalive watchdog timeout");
 }
 
+void ConfigureClientContext(grpc::ClientContext* context) {
+  // Use default context creation.
+  //
+  // Do not set wait_for_ready=true or long deadline as fast connection failure
+  // is necessary for on-the-fly change of worker address.
+}
+
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests
