@@ -203,8 +203,9 @@ class LogMessage {
         std::clog << "UNDEF";
         break;
     }
-    std::clog << " " << absl::Now() << " " << ExtractFilename(file) << ":"
-              << line << "] ";
+    std::clog << absl::FormatTime(" %y-%m-%d %H:%M:%E4S %Z ", absl::Now(),
+                                  absl::LocalTimeZone())
+              << ExtractFilename(file) << ":" << line << "] ";
   }
 
   virtual ~LogMessage() {
