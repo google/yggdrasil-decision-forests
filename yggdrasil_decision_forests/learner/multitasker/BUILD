@@ -14,9 +14,6 @@ cc_library_ydf(
     hdrs = ["multitasker.h"],
     deps = [
         ":multitasker_cc_proto",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner:abstract_learner",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
@@ -27,6 +24,9 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "//yggdrasil_decision_forests/utils:usage",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
     alwayslink = 1,
 )
@@ -54,10 +54,6 @@ cc_test(
     deps = [
         ":multitasker",
         ":multitasker_cc_proto",
-        "@com_google_googletest//:gtest_main",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
         "//yggdrasil_decision_forests/learner/random_forest",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/model:model_library",
@@ -66,5 +62,9 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_googletest//:gtest_main",
     ],
 )
