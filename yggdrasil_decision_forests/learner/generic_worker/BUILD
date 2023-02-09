@@ -63,7 +63,6 @@ cc_test(
     deps = [
         ":generic_worker",
         ":generic_worker_cc_proto",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",
         "//yggdrasil_decision_forests/learner/random_forest",
         "//yggdrasil_decision_forests/metric",
@@ -74,5 +73,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils/distribute",
         "//yggdrasil_decision_forests/utils/distribute:distribute_without_implementations",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_cc_proto",
+        "@com_google_googletest//:gtest_main",
     ],
 )

@@ -23,7 +23,6 @@ cc_binary(
     # See TensorFlow Decision Forests for an example (TF-DF imports YDF):
     #   https://github.com/tensorflow/decision-forests
     deps = [
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
@@ -36,5 +35,6 @@ cc_binary(
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
     ],
 )

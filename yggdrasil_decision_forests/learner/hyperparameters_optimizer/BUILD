@@ -23,10 +23,6 @@ cc_library_ydf(
         ":all_optimizers",
         ":hyperparameters_optimizer_cc_proto",
         ":optimizer_interface",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner:abstract_learner",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
@@ -41,6 +37,10 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:hyper_parameters",
         "//yggdrasil_decision_forests/utils:usage",
         "//yggdrasil_decision_forests/utils/distribute:distribute_without_implementations",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/time",
     ],
     alwayslink = 1,
 )
@@ -79,7 +79,6 @@ cc_test(
     shard_count = 8,
     deps = [
         ":hyperparameters_optimizer",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/learner/generic_worker",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/metric",
@@ -89,5 +88,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",
+        "@com_google_googletest//:gtest_main",
     ],
 )

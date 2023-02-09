@@ -14,11 +14,6 @@ cc_library_ydf(
     hdrs = ["cart.h"],
     deps = [
         ":cart_cc_proto",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:weight",
         "//yggdrasil_decision_forests/learner:abstract_learner",
@@ -40,6 +35,11 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:usage",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/time",
     ],
     alwayslink = 1,
 )
@@ -65,12 +65,12 @@ cc_test(
     data = ["//yggdrasil_decision_forests/test_data"],
     deps = [
         ":cart",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
+        "@com_google_googletest//:gtest_main",
     ],
 )

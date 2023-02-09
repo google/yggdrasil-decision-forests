@@ -32,8 +32,6 @@ cc_library_ydf(
     ],
     deps = [
         ":training_cc_proto",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
@@ -45,6 +43,8 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:bitmap",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 
@@ -59,7 +59,6 @@ cc_test(
     ],
     deps = [
         ":training",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:csv_example_writer",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",
@@ -78,5 +77,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_cc_proto",
+        "@com_google_googletest//:gtest_main",
     ],
 )

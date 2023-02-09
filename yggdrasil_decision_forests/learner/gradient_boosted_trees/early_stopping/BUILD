@@ -14,8 +14,8 @@ cc_library_ydf(
     hdrs = ["early_stopping.h"],
     deps = [
         ":early_stopping_snapshot_cc_proto",
-        "@com_google_absl//absl/status",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/status",
     ],
     alwayslink = 1,
 )
@@ -37,7 +37,7 @@ cc_test(
     deps = [
         ":early_stopping",
         ":early_stopping_snapshot_cc_proto",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/utils:test",
+        "@com_google_googletest//:gtest_main",
     ],
 )

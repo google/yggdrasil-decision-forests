@@ -16,9 +16,6 @@ cc_library_ydf(
         ":common",
         ":distributed_gradient_boosted_trees_cc_proto",
         ":worker_cc_proto",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/dataset:formats",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner:abstract_learner",
@@ -41,6 +38,9 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:uid",
         "//yggdrasil_decision_forests/utils:usage",
         "//yggdrasil_decision_forests/utils/distribute:core",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
     alwayslink = 1,
 )
@@ -53,7 +53,6 @@ cc_library_ydf(
         ":common",
         ":distributed_gradient_boosted_trees_cc_proto",
         ":worker_cc_proto",
-        "@com_google_absl//absl/status",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/dataset:weight",
@@ -72,6 +71,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:uid",
         "//yggdrasil_decision_forests/utils/distribute:core",
+        "@com_google_absl//absl/status",
     ],
     alwayslink = 1,
 )
@@ -82,12 +82,12 @@ cc_library_ydf(
     hdrs = ["common.h"],
     deps = [
         ":worker_cc_proto",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:column_cache",
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:protobuf",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -129,11 +129,11 @@ cc_test(
     srcs = ["distributed_gradient_boosted_trees_test.cc"],
     data = ["//yggdrasil_decision_forests/test_data"],
     shard_count = 10,
+    tags = ["manual"],
     deps = [
         ":common",
         ":distributed_gradient_boosted_trees",
         ":worker",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_worker",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/utils:filesystem",
@@ -141,6 +141,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",
+        "@com_google_googletest//:gtest_main",
     ],
-    tags = ["manual"],
 )

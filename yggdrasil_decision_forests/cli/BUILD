@@ -22,7 +22,6 @@ cc_binary_ydf(
     srcs = ["benchmark_inference.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
@@ -30,6 +29,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/model:all_models",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -38,13 +38,13 @@ cc_binary_ydf(
     srcs = ["infer_dataspec.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -53,11 +53,11 @@ cc_binary_ydf(
     srcs = ["show_dataspec.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -66,7 +66,6 @@ cc_binary_ydf(
     srcs = ["train.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/learner:all_learners",
@@ -75,6 +74,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils/distribute/implementations/grpc",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -83,12 +83,12 @@ cc_binary_ydf(
     srcs = ["show_model.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:all_models",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -97,8 +97,6 @@ cc_binary_ydf(
     srcs = ["convert_dataset.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_reader",
@@ -107,6 +105,8 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -115,7 +115,6 @@ cc_binary_ydf(
     srcs = ["predict.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
@@ -128,6 +127,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/serving/decision_forest:register_engines",
         "//yggdrasil_decision_forests/utils:evaluation",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -136,7 +136,6 @@ cc_binary_ydf(
     srcs = ["evaluate.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
@@ -153,6 +152,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:random",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -161,14 +161,14 @@ cc_binary_ydf(
     srcs = ["edit_model.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:all_models",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -177,7 +177,6 @@ cc_binary_ydf(
     srcs = ["compute_variable_importances.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
@@ -185,6 +184,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:feature_importance",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -193,7 +193,6 @@ cc_binary_ydf(
     srcs = ["analyze_model_and_dataset.cc"],
     deps = [
         ":all_file_systems",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
@@ -202,6 +201,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:model_analysis",
         "//yggdrasil_decision_forests/utils:protobuf",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 

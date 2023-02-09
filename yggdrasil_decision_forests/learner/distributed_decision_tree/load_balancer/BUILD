@@ -24,15 +24,15 @@ cc_library_ydf(
     hdrs = ["load_balancer.h"],
     deps = [
         ":load_balancer_cc_proto",
+        "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_cc_proto",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
-        "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_cc_proto",
-        "//yggdrasil_decision_forests/utils:logging",
-        "//yggdrasil_decision_forests/utils:random",
-        "//yggdrasil_decision_forests/utils:status_macros",
     ],
 )
 
@@ -44,8 +44,8 @@ cc_test(
     srcs = ["load_balancer_test.cc"],
     deps = [
         ":load_balancer",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
+        "@com_google_googletest//:gtest_main",
     ],
 )
