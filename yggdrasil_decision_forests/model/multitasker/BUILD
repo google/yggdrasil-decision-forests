@@ -14,10 +14,6 @@ cc_library_ydf(
     hdrs = ["multitasker.h"],
     deps = [
         ":multitasker_cc_proto",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",
@@ -26,6 +22,10 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/model:prediction_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
     ],
     alwayslink = 1,
 )
