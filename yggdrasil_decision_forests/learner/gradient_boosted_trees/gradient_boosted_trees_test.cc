@@ -307,7 +307,7 @@ TEST(GradientBoostedTrees, SampleTrainingExamplesWithSelGB) {
   CHECK_OK(dataset.AppendExampleWithStatus({{"a", "0"}, {"b", "2"}}));
 
   RankingGroupsIndices index;
-  index.Initialize(dataset, 0, 1);
+  EXPECT_OK(index.Initialize(dataset, 0, 1));
   EXPECT_EQ(index.groups().size(), 2);
 
   std::vector<float> predictions = {0.8, -0.1, -4.0, 2.0, 1.2, -3.2, -0.3};

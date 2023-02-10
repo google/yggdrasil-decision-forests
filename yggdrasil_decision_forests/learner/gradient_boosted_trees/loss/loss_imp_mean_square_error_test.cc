@@ -223,7 +223,7 @@ TEST_P(MeanSquareErrorLossTest, ComputeRankingLoss) {
   const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::RANKING,
                                       dataset.data_spec().columns(0));
   RankingGroupsIndices index;
-  index.Initialize(dataset, 0, 1);
+  EXPECT_OK(index.Initialize(dataset, 0, 1));
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,

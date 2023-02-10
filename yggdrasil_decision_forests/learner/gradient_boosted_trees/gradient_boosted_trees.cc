@@ -1212,14 +1212,14 @@ GradientBoostedTreesLearner::TrainWithStatus(
   std::unique_ptr<RankingGroupsIndices> valid_ranking_index;
   if (mdl->task() == model::proto::Task::RANKING) {
     train_ranking_index = absl::make_unique<RankingGroupsIndices>();
-    train_ranking_index->Initialize(sub_train_dataset,
-                                    config.train_config_link.label(),
-                                    config.train_config_link.ranking_group());
+    RETURN_IF_ERROR(train_ranking_index->Initialize(
+        sub_train_dataset, config.train_config_link.label(),
+        config.train_config_link.ranking_group()));
     if (has_validation_dataset) {
       valid_ranking_index = absl::make_unique<RankingGroupsIndices>();
-      valid_ranking_index->Initialize(validation_dataset,
-                                      config.train_config_link.label(),
-                                      config.train_config_link.ranking_group());
+      RETURN_IF_ERROR(valid_ranking_index->Initialize(
+          validation_dataset, config.train_config_link.label(),
+          config.train_config_link.ranking_group()));
     }
   }
 

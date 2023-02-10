@@ -130,8 +130,8 @@ class RankingGroupsIndices {
 
   // Constructs the index. No other function should be called before
   // "Initialize".
-  void Initialize(const dataset::VerticalDataset& dataset, int label_col_idx,
-                  int group_col_idx);
+  absl::Status Initialize(const dataset::VerticalDataset& dataset,
+                          int label_col_idx, int group_col_idx);
 
   double NDCG(const std::vector<float>& predictions,
               const std::vector<float>& weights, int truncation) const;

@@ -34,11 +34,13 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-// Maximum number of items in a ranking group (e.g. maximum number of queries
-// for a document). While possible, it is very unlikely that a user would exceed
-// this value. A most likely scenario would be a
-// configuration/dataset-preparation error.
-constexpr int64_t kMaximumItemsInRankingGroup = 2000;
+// Maximum number of items in a ranking group (e.g. maximum number of documents
+// for a query). While possible, it is very unlikely that a user would exceed
+// this value. The most likely scenario would be a
+// configuration/dataset-preparation error. Since the running time is quadratic
+// with the number of documents in a group, increasing this value further might
+// allow very slow configuations.
+constexpr int64_t kMaximumItemsInRankingGroup = 4096;
 
 constexpr int kNDCG5Truncation = 5;
 

@@ -65,7 +65,7 @@ TEST(NDCGLossTest, RankingIndexInitialization) {
                        CreateToyDataset());
 
   RankingGroupsIndices index;
-  index.Initialize(dataset, 0, 1);
+  EXPECT_OK(index.Initialize(dataset, 0, 1));
   ASSERT_THAT(index.groups(), SizeIs(2));
   ASSERT_THAT(index.groups()[0].items, SizeIs(2));
   ASSERT_THAT(index.groups()[1].items, SizeIs(2));
@@ -102,7 +102,7 @@ TEST(NDCGLossTest, UpdateGradients) {
   std::vector<float> weights;
 
   RankingGroupsIndices index;
-  index.Initialize(dataset, 0, 1);
+  EXPECT_OK(index.Initialize(dataset, 0, 1));
   EXPECT_THAT(index.groups(), SizeIs(2));
 
   dataset::VerticalDataset gradient_dataset;
@@ -143,7 +143,7 @@ TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
   std::vector<float> weights;
 
   RankingGroupsIndices index;
-  index.Initialize(dataset, 0, 1);
+  EXPECT_OK(index.Initialize(dataset, 0, 1));
   EXPECT_THAT(index.groups(), SizeIs(2));
 
   dataset::VerticalDataset gradient_dataset;
@@ -193,7 +193,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictions) {
   const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
                           dataset.data_spec().columns(0));
   RankingGroupsIndices index;
-  index.Initialize(dataset, 0, 1);
+  EXPECT_OK(index.Initialize(dataset, 0, 1));
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
@@ -229,7 +229,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectPredictions) {
   const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
                           dataset.data_spec().columns(0));
   RankingGroupsIndices index;
-  index.Initialize(dataset, 0, 1);
+  EXPECT_OK(index.Initialize(dataset, 0, 1));
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
@@ -253,7 +253,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectGroupedPredictions) {
   const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
                           dataset.data_spec().columns(0));
   RankingGroupsIndices index;
-  index.Initialize(dataset, 0, 1);
+  EXPECT_OK(index.Initialize(dataset, 0, 1));
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
