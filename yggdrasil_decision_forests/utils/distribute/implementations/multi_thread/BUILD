@@ -23,13 +23,13 @@ cc_library_ydf(
     hdrs = ["multi_thread.h"],
     deps = [
         ":multi_thread_cc_proto",
-        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
         "//yggdrasil_decision_forests/utils/distribute:utils",
+        "@com_google_absl//absl/status:statusor",
     ],
     alwayslink = 1,
 )

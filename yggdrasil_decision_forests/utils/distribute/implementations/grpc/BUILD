@@ -28,9 +28,9 @@ cc_library_ydf(
     srcs = ["grpc_worker_main.cc"],
     deps = [
         ":grpc_worker",
-        "@com_google_absl//absl/flags:flag",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils/distribute:all_workers",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -49,10 +49,6 @@ cc_library_ydf(
     deps = [
         ":grpc_common",
         ":grpc_grpc_proto",
-        "@com_github_grpc_grpc//:grpc++",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/status",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
@@ -60,6 +56,10 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "//yggdrasil_decision_forests/utils/distribute:utils",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/status",
     ],
     alwayslink = 1,
 )
@@ -72,10 +72,6 @@ cc_library_ydf(
         ":grpc_cc_proto",
         ":grpc_common",
         ":grpc_grpc_proto",
-        "@com_github_grpc_grpc//:grpc++",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
@@ -83,6 +79,10 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "//yggdrasil_decision_forests/utils/distribute:utils",
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
     alwayslink = 1,
 )
@@ -104,7 +104,6 @@ cc_test(
         ":grpc_cc_proto",
         ":grpc_manager",
         ":grpc_worker",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
@@ -112,5 +111,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils/distribute:distribute_without_implementations",
         "//yggdrasil_decision_forests/utils/distribute:test_utils",
         "//yggdrasil_decision_forests/utils/distribute:toy_worker",
+        "@com_google_googletest//:gtest_main",
     ],
 )
