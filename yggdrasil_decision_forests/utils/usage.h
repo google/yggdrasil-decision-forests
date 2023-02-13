@@ -58,6 +58,9 @@ void OnTrainingEnd(const dataset::proto::DataSpecification& data_spec,
 void OnInference(int64_t num_examples, const model::proto::Metadata& metadata);
 void OnInference(int64_t num_examples, const model::MetaData& metadata);
 
+// Enables / disable usage tracking.
+void EnableUsage(bool usage);
+
 }  // namespace usage
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

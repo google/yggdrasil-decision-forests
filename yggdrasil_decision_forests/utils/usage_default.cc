@@ -44,6 +44,8 @@ void OnInference(int64_t num_examples, const model::MetaData& metadata) {
   // Add usage tracking here.
 }
 
+void EnableUsage(bool usage) {}
+
 }  // namespace usage
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
