@@ -41,8 +41,8 @@ py_binary(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
-        "//third_party/py/absl:app",
-        "//third_party/py/absl/flags",
-        "//third_party/py/pandas",
+        # absl:app dep,
+        # absl/flags dep,
+        # pandas dep,
     ],
 )
