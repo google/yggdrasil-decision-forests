@@ -24,7 +24,7 @@ namespace distribute {
 
 // Tests if a failing status is a transiant error (i.e., the recipient is
 // temporarily not available) or a definitive error.
-bool IsTransiantError(const grpc::Status& status);
+bool IsTransientError(const grpc::Status& status);
 
 // Index of a worker.
 typedef int WorkerIdx;

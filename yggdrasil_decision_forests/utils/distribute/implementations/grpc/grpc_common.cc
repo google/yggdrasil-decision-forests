@@ -15,15 +15,19 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
 
+#include "absl/strings/match.h"
+
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
-bool IsTransiantError(const grpc::Status& status) {
+bool IsTransientError(const grpc::Status& status) {
   return (status.error_message() == "Socket closed" ||
           status.error_message() == "Transport closed" ||
           status.error_message() == "Connection reset by peer" ||
           status.error_message() == "Broken pipe" ||
-          status.error_message() == "keepalive watchdog timeout");
+          status.error_message() == "keepalive watchdog timeout" ||
+          absl::StartsWith(status.error_message(),
+                           "failed to connect to all addresses"));
 }
 
 void ConfigureClientContext(grpc::ClientContext* context) {

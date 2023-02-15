@@ -307,12 +307,15 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
         YDF_LOG(WARNING) << "GRPC to worker #" << worker->worker_idx
                          << " failed with error: " << status.error_message();
       }
-      if (IsTransiantError(status)) {
+      if (IsTransientError(status)) {
         // The worker is temporarly not available.
         ASSIGN_OR_RETURN(stub, UpdateWorkerConnection(worker));
         continue;
       } else {
         // Something is not right.
+        YDF_LOG(INFO)
+            << "Fatal error in GRPC communication. If this is in fact a "
+               "transiant error, update \"IsTransiantError\" accordingly.";
         return GrpcStatusToAbslStatus(status);
       }
     }

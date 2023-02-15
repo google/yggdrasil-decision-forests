@@ -91,7 +91,10 @@ cc_library_ydf(
     name = "grpc_common",
     srcs = ["grpc_common.cc"],
     hdrs = ["grpc_common.h"],
-    deps = ["@com_github_grpc_grpc//:grpc++"],
+    deps = [
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_google_absl//absl/strings",
+    ],
 )
 
 # Tests
