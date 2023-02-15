@@ -31,6 +31,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
@@ -73,7 +74,7 @@ void FillContentNumericalFeature(
   }
 }
 
-void InitializeDataSpecFromColumnNames(
+absl::Status InitializeDataSpecFromColumnNames(
     const proto::DataSpecificationGuide& guide,
     const std::vector<std::string>& header, proto::DataSpecification* data_spec,
     std::vector<std::pair<int, proto::ColumnGuide>>*
@@ -83,8 +84,8 @@ void InitializeDataSpecFromColumnNames(
   for (int head_col_idx = 0; head_col_idx < header.size(); head_col_idx++) {
     const auto& col_name = header[head_col_idx];
     proto::ColumnGuide col_guide;
-    const bool has_user_col_guide =
-        BuildColumnGuide(col_name, guide, &col_guide);
+    ASSIGN_OR_RETURN(bool has_user_col_guide,
+                     BuildColumnGuide(col_name, guide, &col_guide));
     if (!has_user_col_guide && guide.ignore_columns_without_guides()) {
       continue;
     }
@@ -102,6 +103,7 @@ void InitializeDataSpecFromColumnNames(
       column->set_is_manual_type(false);
     }
   }
+  return absl::OkStatus();
 }
 
 absl::StatusOr<bool> LooksMultiDimensional(const absl::string_view value,
@@ -332,7 +334,9 @@ absl::Status FinalizeComputeSpecColumnCategorical(
 
   // Override most frequent item.
   proto::ColumnGuide col_guide;
-  if (BuildColumnGuide(col->name(), guide, &col_guide) &&
+  ASSIGN_OR_RETURN(bool has_user_col_guide,
+                   BuildColumnGuide(col->name(), guide, &col_guide));
+  if (has_user_col_guide &&
       col_guide.categorial().has_override_most_frequent_item()) {
     // Check the column does not have missing values.
     if (col->count_nas() > 0) {
@@ -639,9 +643,9 @@ absl::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path) {
   return number_of_examples;
 }
 
-bool BuildColumnGuide(const absl::string_view col_name,
-                      const proto::DataSpecificationGuide& guide,
-                      proto::ColumnGuide* col_guide) {
+absl::StatusOr<bool> BuildColumnGuide(
+    const absl::string_view col_name,
+    const proto::DataSpecificationGuide& guide, proto::ColumnGuide* col_guide) {
   bool found_user_guide = false;
   std::string matched_column_guide_pattern;
 
@@ -657,14 +661,14 @@ bool BuildColumnGuide(const absl::string_view col_name,
     // The spec guide contains a column guide matching this column name.
 
     if (found_user_guide && !candidate_guide.allow_multi_match()) {
-      YDF_LOG(FATAL)
-          << "At least two different column guides are matching the same "
-             "column \""
-          << col_name << "\".\nColumn guide 1: " << matched_column_guide_pattern
-          << "\nColumn guide 2: " << candidate_guide.column_name_pattern()
-          << "\n. If this is expected, set allow_multi_match=true in"
-             " the column guide. Alterntively, ensure that each column is "
-             "matched by only one column guide.";
+      return absl::InvalidArgumentError(absl::Substitute(
+          "At least two different column guides are matching the same "
+          "column \"$0\".\nColumn guide 1: $1\nColumn guide 2: $2"
+          "\n. If this is expected, set allow_multi_match=true in"
+          " the column guide. Alterntively, ensure that each column is "
+          "matched by only one column guide.",
+          col_name, matched_column_guide_pattern,
+          candidate_guide.column_name_pattern()));
     }
     MergeColumnGuide(candidate_guide, col_guide);
     found_user_guide = true;

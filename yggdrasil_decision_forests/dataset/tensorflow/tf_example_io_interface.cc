@@ -308,8 +308,9 @@ absl::Status TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
       // Create a new feature column in the data spec.
       if (col_type_info.col_idx == -1) {
         // Check for a user defined guide.
-        const bool has_specific_guide =
-            BuildColumnGuide(col_name, guide, &col_type_info.col_guide);
+        ASSIGN_OR_RETURN(
+            bool has_specific_guide,
+            BuildColumnGuide(col_name, guide, &col_type_info.col_guide));
         if (!has_specific_guide && guide.ignore_columns_without_guides()) {
           // Set this feature to be ignored.
           col_type_info.ignore_feature = true;

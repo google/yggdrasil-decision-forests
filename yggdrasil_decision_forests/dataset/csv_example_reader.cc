@@ -194,8 +194,8 @@ absl::Status CsvDataSpecCreator::InferColumnsAndTypes(
     if (csv_header.empty()) {
       // Create the dataspec columns.
       csv_header = {row->begin(), row->end()};
-      InitializeDataSpecFromColumnNames(guide, csv_header, data_spec,
-                                        &spec_col_idx_2_csv_col_idx);
+      RETURN_IF_ERROR(InitializeDataSpecFromColumnNames(
+          guide, csv_header, data_spec, &spec_col_idx_2_csv_col_idx));
     } else {
       if (!std::equal(csv_header.begin(), csv_header.end(), row->begin(),
                       row->end())) {

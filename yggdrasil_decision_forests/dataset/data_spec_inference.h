@@ -124,9 +124,9 @@ absl::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path);
 // guide and the specific [matched using a regex on the column name]
 // column guides (if any)). Returns true if a column name specific definition
 // was found. Returns false otherwise.
-bool BuildColumnGuide(absl::string_view col_name,
-                      const proto::DataSpecificationGuide& guide,
-                      proto::ColumnGuide* col_guide);
+absl::StatusOr<bool> BuildColumnGuide(
+    absl::string_view col_name, const proto::DataSpecificationGuide& guide,
+    proto::ColumnGuide* col_guide);
 
 // Update the a column in a data spec (with the newly decided and definitive
 // column type) with the appropriate guide information.
@@ -135,7 +135,7 @@ absl::Status UpdateSingleColSpecWithGuideInfo(
 
 // Initialize the column of a dataspec from a vector of column names (vector of
 // strings). Also returns the guides of each newly created dataspec columns.
-void InitializeDataSpecFromColumnNames(
+absl::Status InitializeDataSpecFromColumnNames(
     const proto::DataSpecificationGuide& guide,
     const std::vector<std::string>& header, proto::DataSpecification* data_spec,
     std::vector<std::pair<int, proto::ColumnGuide>>*
