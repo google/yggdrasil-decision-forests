@@ -71,11 +71,11 @@ cc_library_ydf(
     hdrs = ["core.h"],
     deps = [
         ":distribute_cc_proto",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:registration",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -107,9 +107,9 @@ cc_library_ydf(
     hdrs = ["toy_worker.h"],
     deps = [
         ":core",
-        "@com_google_absl//absl/synchronization",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
+        "@com_google_absl//absl/synchronization",
     ],
     alwayslink = 1,
 )
@@ -122,9 +122,9 @@ cc_test(
         ":distribute",
         ":distribute_without_implementations",
         ":toy_worker",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_cc_proto",
+        "@com_google_googletest//:gtest_main",
     ],
 )
