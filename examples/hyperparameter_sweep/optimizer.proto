@@ -1,0 +1,50 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package example.proto;
+
+import "yggdrasil_decision_forests/dataset/data_spec.proto";
+import "yggdrasil_decision_forests/learner/abstract_learner.proto";
+
+message Initialization {
+  optional string train_path = 1;
+  optional string test_path = 2;
+  optional string param_json = 3;
+}
+
+message Request {
+  optional yggdrasil_decision_forests.model.proto.TrainingConfig train_config =
+      2;
+  optional yggdrasil_decision_forests.dataset.proto.DataSpecificationGuide
+      guide = 3;
+  optional string param_json = 4;
+  optional int32 num_repetitions = 5 [default = 1];
+  optional int32 run_idx = 6;
+}
+
+message ResultItem {
+  optional int32 repetition_idx = 1;
+  optional double accuracy = 2;
+  repeated double aucs = 3 [packed = true];
+  optional string param_json = 4;
+  optional double time_per_predictions_s = 5;
+  optional int32 run_idx = 6;
+}
+
+message Result {
+  repeated ResultItem items = 1;
+}
