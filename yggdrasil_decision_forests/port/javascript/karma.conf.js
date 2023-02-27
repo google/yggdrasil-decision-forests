@@ -49,6 +49,13 @@ module.exports = function(config) {
     included: false,
   });
   config.files.push({
+    pattern: basePath + 'test_data/model_3.zip',
+    watched: false,
+    served: true,
+    nocache: false,
+    included: false,
+  });
+  config.files.push({
     pattern: basePath + 'test_data/model_small_sst.zip',
     watched: false,
     served: true,

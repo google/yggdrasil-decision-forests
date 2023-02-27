@@ -87,7 +87,8 @@ let InternalTFDFPredictions;
  * Option for loading a model.
  *
  * @typedef {{
- *   createdTFDFSignature: boolean,
+ *   createdTFDFSignature: (boolean | undefined),
+ *   file_prefix: (string | undefined),
  * }}
  */
 let LoadModelOptions;

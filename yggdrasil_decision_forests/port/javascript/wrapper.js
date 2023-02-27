@@ -528,13 +528,21 @@ class Model {
  * @return {!Promise<!Model>} The loaded model.
  */
 Module['loadModelFromZipBlob'] =
-    async function loadModelFromZipBlob(serializedModel, options = undefined) {
+    async function loadModelFromZipBlob(serializedModel, options) {
   // Read options.
-  if (options === undefined) {
-    options = {createdTFDFSignature: false};
-  }
-  const createdTFDFSignature = options.hasOwnProperty('createdTFDFSignature') &&
+
+
+  options = (options !== undefined) ?
+      /** @type {!LoadModelOptions} */ ({...options}) :
+      /** @type {!LoadModelOptions} */ ({});
+
+  options.createdTFDFSignature = (options.createdTFDFSignature === undefined) ?
+      false :
       options.createdTFDFSignature;
+  // Same as "kNoPrefix" in "inference.cc".
+  options.file_prefix = (options.file_prefix === undefined) ?
+      '__NO_PREFIX__' :
+      options.file_prefix;
 
 
   // Create model directory in RAM.
@@ -563,7 +571,8 @@ Module['loadModelFromZipBlob'] =
   await Promise.all(promiseUncompressed);
 
   // Load model in Yggdrasil.
-  const modelWasm = Module.InternalLoadModel(modelPath, createdTFDFSignature);
+  const modelWasm = Module.InternalLoadModel(
+      modelPath, options.createdTFDFSignature, options.file_prefix);
 
   // Delete the model on disk.
   for (const filename of Module.FS.readdir(modelPath)) {
@@ -578,7 +587,7 @@ Module['loadModelFromZipBlob'] =
     throw new Error('Cannot parse model');
   }
 
-  return new Model(modelWasm, createdTFDFSignature);
+  return new Model(modelWasm, options.createdTFDFSignature);
 };
 
 /**

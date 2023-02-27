@@ -28,6 +28,11 @@
 
 namespace ydf = yggdrasil_decision_forests;
 
+// Special prefix value that indicates that the prefix is not specified. Loading
+// a model without specifying the prefix enables the automatic prefix seach
+// logic.
+constexpr char kNoPrefix[] = "__NO_PREFIX__";
+
 // Definition of an input feature.
 // This struct is the JS visible version of the ydf::serving::FeatureDef class.
 struct InputFeature {
@@ -308,10 +313,15 @@ class Model {
 
 // Loads a model from a path.
 std::shared_ptr<Model> LoadModel(std::string path,
-                                 const bool created_tfdf_signature) {
+                                 const bool created_tfdf_signature,
+                                 const std::string file_prefix) {
   // Load model.
+  ydf::model::ModelIOOptions options;
+  if (file_prefix != kNoPrefix) {
+    options.file_prefix = file_prefix;
+  }
   std::unique_ptr<ydf::model::AbstractModel> ydf_model;
-  auto status = ydf::model::LoadModel(path, &ydf_model);
+  auto status = ydf::model::LoadModel(path, &ydf_model, options);
   if (!status.ok()) {
     YDF_LOG(WARNING) << status.message();
     return {};

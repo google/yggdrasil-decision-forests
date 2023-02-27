@@ -24,6 +24,9 @@ describe('YDF Inference', () => {
   const modelUrl2 =
       '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_2.zip';
 
+  const modelUrl3 =
+      '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_3.zip';
+
   let modelSmallSST = null;
   const modelSmallSSTUrl =
       '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_small_sst.zip';
@@ -83,12 +86,61 @@ describe('YDF Inference', () => {
 
   it('loadModelFromZipBlob', async () => {
     const modelBlob = await fetch(modelUrl).then(r => r.blob());
+    let my_model = null;
     await ydf.loadModelFromZipBlob(modelBlob, modelOptions)
         .then((loadedModel) => {
-          model = loadedModel;
+          my_model = loadedModel;
         });
 
-    expect(model).not.toBeNull();
+    expect(my_model).not.toBeNull();
+  });
+
+  it('loadModelFromZipBlobWithPrefixEmpty', async () => {
+    const modelBlob = await fetch(modelUrl).then(r => r.blob());
+    let my_model = null;
+    await ydf
+        .loadModelFromZipBlob(
+            modelBlob, {createdTFDFSignature: true, file_prefix: ''})
+        .then((loadedModel) => {
+          my_model = loadedModel;
+        });
+
+    expect(my_model).not.toBeNull();
+  });
+
+  it('loadModelFromZipBlobWithPrefixManual', async () => {
+    const modelBlob = await fetch(modelUrl3).then(r => r.blob());
+    let model_1 = null;
+    let model_2 = null;
+    let model_3 = null;
+
+    console.log('Load model3 with prefix \'\'');
+    await ydf
+        .loadModelFromZipBlob(
+            modelBlob, {createdTFDFSignature: true, file_prefix: ''})
+        .then((loadedModel) => {
+          model_1 = loadedModel;
+        });
+
+    console.log('Load model3 with prefix \'p1_\'');
+    await ydf
+        .loadModelFromZipBlob(
+            modelBlob, {createdTFDFSignature: true, file_prefix: 'p1_'})
+        .then((loadedModel) => {
+          model_2 = loadedModel;
+        });
+
+    console.log('Load model3 with prefix \'p2_\'');
+    await ydf
+        .loadModelFromZipBlob(
+            modelBlob, {createdTFDFSignature: true, file_prefix: 'p2_'})
+        .then((loadedModel) => {
+          model_3 = loadedModel;
+        });
+
+    expect(model_1).not.toBeNull();
+    expect(model_2).not.toBeNull();
+    expect(model_3).not.toBeNull();
   });
 
   it('loadModelFromZipBlobWithoutarrayBuffer()', async () => {
@@ -98,14 +150,15 @@ describe('YDF Inference', () => {
     const arrayBufferFunc = Blob.prototype.arrayBuffer;
     Blob.prototype.arrayBuffer = undefined;
 
+    let my_model = null;
     await ydf.loadModelFromZipBlob(modelBlob, modelOptions)
         .then((loadedModel) => {
-          model = loadedModel;
+          my_model = loadedModel;
         });
 
     Blob.prototype.arrayBuffer = arrayBufferFunc;
 
-    expect(model).not.toBeNull();
+    expect(my_model).not.toBeNull();
   });
 
   it('predict', async () => {
