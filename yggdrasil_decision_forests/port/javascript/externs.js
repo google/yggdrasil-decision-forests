@@ -25,6 +25,7 @@
  *   size: function(): number,
  *   get: function(number) : (string|boolean|number|!Object),
  *   push_back: function(?),
+ *   delete: function(),
  * }}
  */
 let CCVector;
@@ -35,6 +36,7 @@ let CCVector;
  * @typedef {{
  *   size: function(): number,
  *   get: function(number) : !CCVector,
+ *   delete: function(),
  * }}
  */
 let CCVectorVector;
@@ -58,6 +60,7 @@ let InputFeature;
  *   size: function(): number,
  *   get: function(number) : !InputFeature,
  *   push_back: function(!InputFeature),
+ *   delete: function(),
  * }}
  */
 let InternalInputFeatures;
@@ -69,6 +72,7 @@ let InternalInputFeatures;
  *   size: function(): number,
  *   get: function(number) : number,
  *   push_back: function(number),
+ *   delete: function(),
  * }}
  */
 let InternalPredictions;
@@ -79,6 +83,7 @@ let InternalPredictions;
  * @typedef {{
  *   densePredictions: !CCVectorVector,
  *   denseColRepresentation: !CCVector,
+ *   delete: function(),
  * }}
  */
 let InternalTFDFPredictions;

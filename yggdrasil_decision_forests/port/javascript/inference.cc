@@ -180,7 +180,7 @@ class Model {
       YDF_LOG(WARNING)
           << "example_idx should be less than the number of examples";
       return;
-    };
+    }
     examples_->SetBoolean(example_idx, {feature_id}, value,
                           engine_->features());
   }

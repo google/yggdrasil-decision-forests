@@ -222,6 +222,7 @@ class Model {
     // Index the input features for the TensorFlow Decision Forests signature.
     const rawProtoInputFeatures = this.internalModel.getProtoInputFeatures();
     const protoInputFeatures = ccVectorToJSVector(rawProtoInputFeatures);
+    rawProtoInputFeatures.delete();
 
     this.numericalFeaturesIndex = indexTFDFFeatures(
         protoInputFeatures, this.inputFeatures,
@@ -314,9 +315,10 @@ class Model {
       } else if (featureDef.type === ColumnType.CATEGORICAL_SET) {
         for (const [exampleIdx, value] of values.entries()) {
           if (value === null) continue;
+          const cc_values = jsStrVectorToCCStrVector(value);
           this.internalModel.setCategoricalSetString(
-              exampleIdx, featureDef.internalIdx,
-              jsStrVectorToCCStrVector(value));
+              exampleIdx, featureDef.internalIdx, cc_values);
+          cc_values.delete();
         }
       } else {
         throw new Error(`Non supported feature type ${featureDef}`);
@@ -325,7 +327,9 @@ class Model {
 
     // Extract predictions
     const internalPredictions = this.internalModel.predict();
-    return ccVectorToJSVector(internalPredictions);
+    const jsPredictions = ccVectorToJSVector(internalPredictions);
+    internalPredictions.delete();
+    return jsPredictions;
   }
 
   /**
@@ -477,6 +481,7 @@ class Model {
         }
         this.internalModel.setCategoricalSetInt(
             exampleIdx, internIdx, ccValues);
+        ccValues.delete();
       }
     }
 
@@ -485,11 +490,18 @@ class Model {
     const rawPredictions =
         this.internalModel.predictTFDFSignature(inputs.denseOutputDim);
 
+    // Note: It is unclear why, but "rawPredictions" and its components (e.g.
+    // rawPredictions.denseColRepresentation) should not be deleted.
+
     // Convert predictions to js format.
+    const denseColRepresentation =
+        ccVectorToJSVector(rawPredictions.denseColRepresentation);
+    const densePredictions =
+        ccMatrixToJSMatrix(rawPredictions.densePredictions);
+
     return {
-      densePredictions: ccMatrixToJSMatrix(rawPredictions.densePredictions),
-      denseColRepresentation:
-          ccVectorToJSVector(rawPredictions.denseColRepresentation),
+      densePredictions: densePredictions,
+      denseColRepresentation: denseColRepresentation,
     };
   }
 

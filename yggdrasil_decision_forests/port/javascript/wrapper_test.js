@@ -82,6 +82,7 @@ describe('YDF Inference', () => {
   it('loadModelFromUrl', () => {
     expect(model).not.toBeNull();
     expect(model2).not.toBeNull();
+    expect(modelSmallSST).not.toBeNull();
   });
 
   it('loadModelFromZipBlob', async () => {
@@ -93,6 +94,7 @@ describe('YDF Inference', () => {
         });
 
     expect(my_model).not.toBeNull();
+    my_model.unload();
   });
 
   it('loadModelFromZipBlobWithPrefixEmpty', async () => {
@@ -106,6 +108,7 @@ describe('YDF Inference', () => {
         });
 
     expect(my_model).not.toBeNull();
+    my_model.unload();
   });
 
   it('loadModelFromZipBlobWithPrefixManual', async () => {
@@ -141,6 +144,9 @@ describe('YDF Inference', () => {
     expect(model_1).not.toBeNull();
     expect(model_2).not.toBeNull();
     expect(model_3).not.toBeNull();
+    model_1.unload();
+    model_2.unload();
+    model_3.unload();
   });
 
   it('loadModelFromZipBlobWithoutarrayBuffer()', async () => {
@@ -159,6 +165,7 @@ describe('YDF Inference', () => {
     Blob.prototype.arrayBuffer = arrayBufferFunc;
 
     expect(my_model).not.toBeNull();
+    my_model.unload();
   });
 
   it('predict', async () => {
@@ -397,5 +404,11 @@ describe('YDF Inference', () => {
     ]);
 
     expect(predictions.denseColRepresentation).toEqual(['1', '2']);
+  });
+
+  afterAll(async () => {
+    model.unload();
+    model2.unload();
+    modelSmallSST.unload();
   });
 });
