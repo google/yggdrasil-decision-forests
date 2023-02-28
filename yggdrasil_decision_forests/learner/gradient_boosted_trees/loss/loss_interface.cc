@@ -144,11 +144,13 @@ absl::Status RankingGroupsIndices::Initialize(
               });
 
     if (group.second.size() > kMaximumItemsInRankingGroup) {
-      return absl::InvalidArgumentError(absl::Substitute(
-          "The number of items in the group \"$0\" is $1 which is greater than "
-          "$2. This is likely a mistake in the generation of the configuration "
-          "of the group column.",
-          group.first, group.second.size(), kMaximumItemsInRankingGroup));
+      YDF_LOG(WARNING)
+          << "The number of items in the group \"" << group.first << "\" is "
+          << group.second.size() << " which is greater than "
+          << kMaximumItemsInRankingGroup
+          << ".  This is likely a mistake in the generation of "
+             "the configuration of the group column. Note that large groups "
+             "might lead to training performance degradation.";
     }
 
     groups_.push_back(
