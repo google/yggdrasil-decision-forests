@@ -34,7 +34,8 @@ inline absl::Status ToUtilStatus(const ::tensorflow::Status& s) {
 inline ::tensorflow::Status FromUtilStatus(const absl::Status& s) {
   return s.ok()
              ? ::tensorflow::Status()
-             : ::tensorflow::Status(tensorflow::error::Code::UNKNOWN,
+             : ::tensorflow::Status(static_cast<tensorflow::errors::Code>(
+                                        absl::StatusCode::kUnknown),
                                     absl::StrCat("TensorFlow: ", s.ToString()));
 }
 
