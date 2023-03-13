@@ -239,7 +239,10 @@ message EvaluationResults {
   // The number of folds is 1 for train-and-test, and equals to the
   // cross-validation number of folds in case of cross-validation.
   optional int32 num_folds = 13;
-  // Next ID: 15
+
+  // User can use this field to store value for any customized metrics.
+  map<string, double> user_metrics = 15;
+  // Next ID: 16
 }
 
 // Reference a metric."MetricAccessor" is used as a parameter of the function
