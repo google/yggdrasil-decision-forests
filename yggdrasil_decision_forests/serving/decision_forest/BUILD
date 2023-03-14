@@ -9,6 +9,27 @@ package(
 # =========
 
 cc_library_ydf(
+    name = "model_compiler",
+    srcs = [
+        "model_compiler.cc",
+    ],
+    hdrs = [
+        "model_compiler.h",
+    ],
+    deps = [
+        ":decision_forest",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library_ydf(
     name = "register_engines",
     srcs = [
         "register_engines.cc",

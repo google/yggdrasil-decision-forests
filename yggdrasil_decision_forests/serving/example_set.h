@@ -380,6 +380,11 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   // Specification of the features.
   const DataSpecification& data_spec() const { return data_spec_; }
 
+  // Specification of the features.
+  const std::vector<int>& column_input_features() const {
+    return column_input_features_;
+  }
+
   // Representation of missing values for fixed length features.
   const std::vector<NumericalOrCategoricalValue>&
   fixed_length_na_replacement_values() const {
@@ -427,6 +432,9 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
 
   // Index  "original name" to its index in "unstacked_features_".
   std::unordered_map<std::string, int> indexed_unstacked_features_;
+
+  // Index of the columns in the dataspec used as input feature to the model.
+  std::vector<int> column_input_features_;
 };
 
 using FeaturesDefinition = FeaturesDefinitionNumericalOrCategoricalFlat;

@@ -134,6 +134,7 @@ bool FeaturesDefinitionNumericalOrCategoricalFlat::HasInputFeature(
 absl::Status FeaturesDefinitionNumericalOrCategoricalFlat::Initialize(
     const std::vector<int>& input_features, const DataSpecification& dataspec,
     const bool missing_numerical_is_na) {
+  column_input_features_ = input_features;
   RETURN_IF_ERROR(InitializeNormalFeatures(input_features, dataspec,
                                            missing_numerical_is_na));
   RETURN_IF_ERROR(InitializeUnstackedFeatures(input_features, dataspec,

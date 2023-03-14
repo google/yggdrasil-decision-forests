@@ -1,0 +1,152 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: RANKING
+Label: "LABEL"
+Rank group: "GROUP"
+
+Input Features (4):
+        num_0
+        num_1
+        num_2
+        num_3
+
+No weights
+
+Variable Importance: INV_MEAN_MIN_DEPTH:
+    1. "num_0"  0.549552 ################
+    2. "num_2"  0.433009 ##########
+    3. "num_1"  0.219873 
+    4. "num_3"  0.208864 
+
+Variable Importance: NUM_AS_ROOT:
+    1. "num_0" 35.000000 ################
+    2. "num_2" 12.000000 #####
+    3. "num_3"  1.000000 
+
+Variable Importance: NUM_NODES:
+    1. "num_2" 355.000000 ################
+    2. "num_0" 326.000000 #############
+    3. "num_1" 248.000000 #####
+    4. "num_3" 193.000000 
+
+Variable Importance: SUM_SCORE:
+    1. "num_0" 331.524629 ################
+    2. "num_2" 297.705952 ##############
+    3. "num_1" 103.861762 ##
+    4. "num_3" 52.431933 
+
+
+
+Loss: LAMBDA_MART_NDCG5
+Validation loss value: -0.688763
+Number of trees per iteration: 1
+Node format: BLOB_SEQUENCE
+Number of trees: 48
+Total number of nodes: 2292
+
+Number of nodes by tree:
+Count: 48 Average: 47.75 StdDev: 10.3572
+Min: 17 Max: 61 Ignored: 0
+----------------------------------------------
+[ 17, 19)  1   2.08%   2.08% #
+[ 19, 21)  0   0.00%   2.08%
+[ 21, 23)  0   0.00%   2.08%
+[ 23, 26)  0   0.00%   2.08%
+[ 26, 28)  1   2.08%   4.17% #
+[ 28, 30)  1   2.08%   6.25% #
+[ 30, 32)  2   4.17%  10.42% ##
+[ 32, 35)  1   2.08%  12.50% #
+[ 35, 37)  2   4.17%  16.67% ##
+[ 37, 39)  1   2.08%  18.75% #
+[ 39, 41)  2   4.17%  22.92% ##
+[ 41, 44)  4   8.33%  31.25% ####
+[ 44, 46)  2   4.17%  35.42% ##
+[ 46, 48)  4   8.33%  43.75% ####
+[ 48, 50)  3   6.25%  50.00% ###
+[ 50, 53)  5  10.42%  60.42% #####
+[ 53, 55)  3   6.25%  66.67% ###
+[ 55, 57)  3   6.25%  72.92% ###
+[ 57, 59)  3   6.25%  79.17% ###
+[ 59, 61] 10  20.83% 100.00% ##########
+
+Depth by leafs:
+Count: 1170 Average: 4.77009 StdDev: 0.563227
+Min: 1 Max: 5 Ignored: 0
+----------------------------------------------
+[ 1, 2)   1   0.09%   0.09%
+[ 2, 3)  10   0.85%   0.94%
+[ 3, 4)  46   3.93%   4.87%
+[ 4, 5) 143  12.22%  17.09% #
+[ 5, 5] 970  82.91% 100.00% ##########
+
+Number of training obs by leaf:
+Count: 1170 Average: 148.513 StdDev: 368.335
+Min: 5 Max: 3448 Ignored: 0
+----------------------------------------------
+[    5,  177) 965  82.48%  82.48% ##########
+[  177,  349)  75   6.41%  88.89% #
+[  349,  521)  41   3.50%  92.39%
+[  521,  693)  21   1.79%  94.19%
+[  693,  866)  11   0.94%  95.13%
+[  866, 1038)  12   1.03%  96.15%
+[ 1038, 1210)  12   1.03%  97.18%
+[ 1210, 1382)   6   0.51%  97.69%
+[ 1382, 1554)   3   0.26%  97.95%
+[ 1554, 1727)   7   0.60%  98.55%
+[ 1727, 1899)   2   0.17%  98.72%
+[ 1899, 2071)   2   0.17%  98.89%
+[ 2071, 2243)   4   0.34%  99.23%
+[ 2243, 2415)   4   0.34%  99.57%
+[ 2415, 2588)   2   0.17%  99.74%
+[ 2588, 2760)   1   0.09%  99.83%
+[ 2760, 2932)   0   0.00%  99.83%
+[ 2932, 3104)   1   0.09%  99.91%
+[ 3104, 3276)   0   0.00%  99.91%
+[ 3276, 3448]   1   0.09% 100.00%
+
+Attribute in nodes:
+        355 : num_2 [NUMERICAL]
+        326 : num_0 [NUMERICAL]
+        248 : num_1 [NUMERICAL]
+        193 : num_3 [NUMERICAL]
+
+Attribute in nodes with depth <= 0:
+        35 : num_0 [NUMERICAL]
+        12 : num_2 [NUMERICAL]
+        1 : num_3 [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+        66 : num_2 [NUMERICAL]
+        62 : num_0 [NUMERICAL]
+        8 : num_3 [NUMERICAL]
+        7 : num_1 [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+        126 : num_0 [NUMERICAL]
+        113 : num_2 [NUMERICAL]
+        49 : num_1 [NUMERICAL]
+        35 : num_3 [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+        217 : num_2 [NUMERICAL]
+        205 : num_0 [NUMERICAL]
+        123 : num_1 [NUMERICAL]
+        92 : num_3 [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+        355 : num_2 [NUMERICAL]
+        326 : num_0 [NUMERICAL]
+        248 : num_1 [NUMERICAL]
+        193 : num_3 [NUMERICAL]
+
+Condition type in nodes:
+        1122 : HigherCondition
+Condition type in nodes with depth <= 0:
+        48 : HigherCondition
+Condition type in nodes with depth <= 1:
+        143 : HigherCondition
+Condition type in nodes with depth <= 2:
+        323 : HigherCondition
+Condition type in nodes with depth <= 3:
+        637 : HigherCondition
+Condition type in nodes with depth <= 5:
+        1122 : HigherCondition

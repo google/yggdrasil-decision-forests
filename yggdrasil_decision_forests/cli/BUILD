@@ -205,6 +205,18 @@ cc_binary_ydf(
     ],
 )
 
+cc_binary_ydf(
+    name = "compile_model",
+    srcs = ["compile_model.cc"],
+    deps = [
+        "//yggdrasil_decision_forests/serving/decision_forest:model_compiler",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
 # Tests
 # =====
 
@@ -223,5 +235,54 @@ sh_test(
         ":show_model",
         ":train",
         "//yggdrasil_decision_forests/test_data",
+    ],
+)
+
+genrule(
+    name = "compile_model_for_test",
+    testonly = 1,
+    srcs = [
+        ":compile_model.cc",
+        "//yggdrasil_decision_forests/test_data",
+    ],
+    outs = ["generated_model.h"],
+    cmd = """
+    TESTDATA_BASEDIR=$$(dirname $$(echo $(locations //yggdrasil_decision_forests/test_data) | cut -d ' ' -f1))/model/synthetic_ranking_gbdt_numerical/
+    $(location :compile_model) --model $$TESTDATA_BASEDIR --namespace test_model > $@
+    """,
+    exec_tools = [":compile_model"],
+)
+
+cc_library_ydf(
+    name = "compiled_model_for_test",
+    testonly = 1,
+    hdrs = ["generated_model.h"],
+    deps = [
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/serving/decision_forest:decision_forest_serving",
+        "//yggdrasil_decision_forests/utils:protobuf",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "compile_model_test",
+    srcs = ["compile_model_test.cc"],
+    data = [
+        "//yggdrasil_decision_forests/test_data",
+    ],
+    deps = [
+        ":compiled_model_for_test",
+        "//yggdrasil_decision_forests/dataset:all_dataset_formats",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/serving/decision_forest",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_googletest//:gtest_main",
     ],
 )
