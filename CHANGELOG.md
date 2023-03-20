@@ -1,10 +1,18 @@
 # Changelog
 
-## HEAD
+## 1.4.0 - 2023-03-20
 
 ### Features
 
 -   Speed-up the computation of PDP and CEP in the model analysis tool.
+-   Add compilation of model into .h file.
+-   [JS port] Add "prefix" argument to model loading method.
+-   Rename logging function from LOG to YDF_LOG to limit risk of collision with
+    TF or Absl.
+
+### Fix
+
+-   [JS port] Fix memory leak. Release emscripten objects.
 
 ## 1.3.0 - 2023-01-24
 
