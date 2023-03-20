@@ -543,9 +543,10 @@ Module['loadModelFromZipBlob'] =
     async function loadModelFromZipBlob(serializedModel, options) {
   // Read options.
 
-
+  // Note: Emscripten has issues with ES6 spead operator.
+  // https://github.com/emscripten-core/emscripten/pull/18461
   options = (options !== undefined) ?
-      /** @type {!LoadModelOptions} */ ({...options}) :
+      /** @type {!LoadModelOptions} */ (Object.assign({}, options)) :
       /** @type {!LoadModelOptions} */ ({});
 
   options.createdTFDFSignature = (options.createdTFDFSignature === undefined) ?
