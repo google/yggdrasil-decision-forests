@@ -124,9 +124,9 @@ cc_library_ydf(
     features = ["-use_header_modules"],  # Incompatible with -fexceptions.
     visibility = ["//visibility:private"],
     deps = [
-        ":logging",
-        ":compatibility",
         ":bytestream",
+        ":compatibility",
+        ":logging",
         ":status_macros",
         ":tensorflow",
         "@com_google_protobuf//:protobuf",
@@ -140,9 +140,9 @@ cc_library_ydf(
             "@tensorflow_pypi//:tf_header_lib",
         ],
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core/platform:path",
             "@org_tensorflow//tensorflow/core:framework",
             "@org_tensorflow//tensorflow/core:lib",
+            "@org_tensorflow//tensorflow/core/platform:path",
         ],
     }),
 )
