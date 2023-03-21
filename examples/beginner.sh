@@ -97,7 +97,7 @@ MODEL_INFO="$PROJECT/model/description.txt"
 $CLI/show_model --model=$MODEL --engines --alsologtostderr | tee $MODEL_INFO
 
 # Analyse the model
-$CLI/experimental_analyze_model_and_dataset --dataset=$TEST_DS --model=$MODEL --alsologtostderr --output="$PROJECT/analyse_report"
+$CLI/analyze_model_and_dataset --dataset=$TEST_DS --model=$MODEL --alsologtostderr --output="$PROJECT/analyse_report"
 
 # Evaluate the model on the test dataset.
 EVALUATION="$PROJECT/evaluation.txt"

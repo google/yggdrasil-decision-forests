@@ -88,7 +88,7 @@ if [[ ! -z ${PACK+z} ]]; then
     edit_model \
     utils/synthetic_dataset \
     compute_variable_importances \
-    experimental_analyze_model_and_dataset \
+    analyze_model_and_dataset \
     ../utils/distribute/implementations/grpc/grpc_worker_main
   popd
 

@@ -189,7 +189,7 @@ cc_binary_ydf(
 )
 
 cc_binary_ydf(
-    name = "experimental_analyze_model_and_dataset",
+    name = "analyze_model_and_dataset",
     srcs = ["analyze_model_and_dataset.cc"],
     deps = [
         ":all_file_systems",

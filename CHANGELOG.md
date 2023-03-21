@@ -1,5 +1,11 @@
 # Changelog
 
+## HEAD
+
+### Feature
+
+- Rename experimental_analyze_model_and_dataset to analyze_model_and_dataset
+
 ## 1.4.0 - 2023-03-20
 
 ### Features
