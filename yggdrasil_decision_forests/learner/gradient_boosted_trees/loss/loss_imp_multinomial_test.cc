@@ -230,10 +230,10 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLoss) {
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool("", 4);
     thread_pool.StartWorkers();
-    ASSERT_OK_AND_ASSIGN(
-        loss_results,
-        loss_imp.Loss(dataset,
-                      /* label_col_idx= */ 1, predictions, weights, nullptr));
+    ASSERT_OK_AND_ASSIGN(loss_results,
+                         loss_imp.Loss(dataset,
+                                       /* label_col_idx= */ 1, predictions,
+                                       weights, nullptr, &thread_pool));
   } else {
     ASSERT_OK_AND_ASSIGN(
         loss_results,
