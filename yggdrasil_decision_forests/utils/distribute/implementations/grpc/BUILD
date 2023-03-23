@@ -60,6 +60,7 @@ cc_library_ydf(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/time",
     ],
     alwayslink = 1,
 )
@@ -69,7 +70,6 @@ cc_library_ydf(
     srcs = ["grpc_worker.cc"],
     hdrs = ["grpc_worker.h"],
     deps = [
-        ":grpc_cc_proto",
         ":grpc_common",
         ":grpc_grpc_proto",
         "//yggdrasil_decision_forests/utils:concurrency",

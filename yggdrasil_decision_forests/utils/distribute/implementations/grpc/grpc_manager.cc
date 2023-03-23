@@ -22,6 +22,7 @@
 #include "grpcpp/support/channel_arguments.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
@@ -309,6 +310,7 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
       }
       if (IsTransientError(status)) {
         // The worker is temporarly not available.
+        absl::SleepFor(absl::Seconds(5));
         ASSIGN_OR_RETURN(stub, UpdateWorkerConnection(worker));
         continue;
       } else {

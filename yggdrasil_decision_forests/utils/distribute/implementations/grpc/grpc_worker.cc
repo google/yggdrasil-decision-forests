@@ -264,6 +264,7 @@ absl::StatusOr<Blob> WorkerService::BlockingInterWorkerRequest(
       // List of non-documented GRPC errors that can indicate a temporary
       // impossibility to reach the server.
       if (IsTransientError(status)) {
+        absl::SleepFor(absl::Seconds(5));
         // The worker died during the execution (e.g. rescheduling).
         // Let's try again.
         num_re_emitting++;
