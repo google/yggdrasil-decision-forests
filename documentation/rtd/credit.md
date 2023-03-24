@@ -17,14 +17,13 @@ the following paper:
 **Bibtex**
 
 ```
-@misc{GBBSP22,
-  doi = {10.48550/ARXIV.2212.02934},
-  url = {https://arxiv.org/abs/2212.02934},
-  author = {Guillame-Bert, Mathieu and Bruch, Sebastian and Stotz, Richard and Pfeifer, Jan},
-  title = {Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library},
-  publisher = {arXiv},
-  year = {2022},
-  copyright = {Creative Commons Attribution 4.0 International}
+@misc{guillamebert2022yggdrasil,
+      title={Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library},
+      author={Mathieu Guillame-Bert and Sebastian Bruch and Richard Stotz and Jan Pfeifer},
+      year={2022},
+      eprint={2212.02934},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
 }
 ```
 
