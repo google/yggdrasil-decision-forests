@@ -94,11 +94,30 @@ The following resources are available:
 -   [TensorFlow Decision Forest](https://github.com/tensorflow/decision-forests)
 -   [Long time support](https://ydf.readthedocs.io/en/latest/lts.html)
 
-## Contributing
+## Citation
 
-Contributions to TensorFlow Decision Forests and Yggdrasil Decision Forests are
-welcome. If you want to contribute, check the
-[contribution guidelines](CONTRIBUTING.md).
+If you us Yggdrasil Decision Forests in a scientific publication, please cite
+the following paper:
+[Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://arxiv.org/abs/2212.02934).
+
+**Bibtex**
+
+```
+@misc{GBBSP22,
+  doi = {10.48550/ARXIV.2212.02934},
+  url = {https://arxiv.org/abs/2212.02934},
+  author = {Guillame-Bert, Mathieu and Bruch, Sebastian and Stotz, Richard and Pfeifer, Jan},
+  title = {Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+```
+
+**Raw**
+
+Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library,
+Guillame-Bert et al., arXiv, 2022. doi:10.48550/ARXIV.2212.02934
 
 ## Credits
 
@@ -109,6 +128,12 @@ Yggdrasil Decision Forests and TensorFlow Decision Forests are developed by:
 -   Sebastian Bruch (sebastian AT bruch DOT io)
 -   Richard Stotz (richardstotz AT google DOT com)
 -   Arvind Srinivasan (arvnd AT google DOT com)
+
+## Contributing
+
+Contributions to TensorFlow Decision Forests and Yggdrasil Decision Forests are
+welcome. If you want to contribute, check the
+[contribution guidelines](CONTRIBUTING.md).
 
 ## License
 

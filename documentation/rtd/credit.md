@@ -11,7 +11,8 @@ YDF was developed by:
 ## Citing Yggdrasil Decision Forests
 
 If you us Yggdrasil Decision Forests in a scientific publication, please cite
-the: following paper:
+the following paper:
+[Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://arxiv.org/abs/2212.02934).
 
 **Bibtex**
 
