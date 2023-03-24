@@ -290,8 +290,14 @@ void AppendConditionDescription(
     }
     case proto::Condition::kDiscretizedHigherCondition:
       absl::StrAppend(
-          description, " index >=",
-          node.condition().discretized_higher_condition().threshold());
+          description, ".index >= ",
+          node.condition().discretized_higher_condition().threshold(),
+          " i.e. \"", data_spec.columns(node.attribute()).name(), "\" >= ",
+          data_spec.columns(node.attribute())
+              .discretized_numerical()
+              .boundaries(
+                  node.condition().discretized_higher_condition().threshold() -
+                  1));
       break;
     case proto::Condition::kObliqueCondition: {
       const auto& oblique = node.condition().oblique_condition();

@@ -733,8 +733,11 @@ class VerticalDataset {
   // Reserves the memory for "num_rows" examples on each existing columns.
   // It is not required to reserve the memory, but it can speed-up the code
   // (similarly to std::vector:reserve).m
-  void Reserve(const row_t num_rows,
+  void Reserve(row_t num_rows,
                const absl::optional<std::vector<int>>& load_columns = {});
+
+  // Resize the dataset.
+  void Resize(row_t num_rows);
 
   // Generates a human readable summary of the memory.
   std::string MemorySummary() const;

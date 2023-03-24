@@ -38,3 +38,26 @@ cc_binary(
         "@com_google_absl//absl/flags:flag",
     ],
 )
+
+cc_binary(
+    name = "fast_8bits_numerical",
+    srcs = ["fast_8bits_numerical.cc"],
+    deps = [
+        "//yggdrasil_decision_forests/dataset:all_dataset_formats",
+        "//yggdrasil_decision_forests/dataset:data_spec",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:data_spec_inference",
+        "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
+        "//yggdrasil_decision_forests/learner:learner_library",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/metric",
+        "//yggdrasil_decision_forests/metric:report",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/serving/decision_forest:8bits_numerical_features",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
+    ],
+)

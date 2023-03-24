@@ -497,6 +497,21 @@ TEST(VerticalDataset, Set) {
   EXPECT_LT(dataset.MemoryUsage(), 200);
 }
 
+TEST(VerticalDataset, Reset) {
+  VerticalDataset dataset;
+  AddColumn("a", proto::ColumnType::NUMERICAL, dataset.mutable_data_spec());
+  AddColumn("b", proto::ColumnType::STRING, dataset.mutable_data_spec());
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+  EXPECT_OK(dataset.AppendExampleWithStatus({{"a", "0.1"}, {"b", "AAA"}}));
+  EXPECT_OK(dataset.AppendExampleWithStatus({{"a", "0.2"}, {"b", "BBB"}}));
+  EXPECT_OK(dataset.AppendExampleWithStatus({{"a", "0.3"}, {"b", "CCC"}}));
+  dataset.Resize(2);
+
+  EXPECT_EQ(dataset.nrow(), 2);
+  EXPECT_EQ(dataset.ValueToString(0, 0), "0.1");
+  EXPECT_EQ(dataset.ValueToString(0, 1), "AAA");
+}
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

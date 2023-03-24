@@ -969,6 +969,13 @@ void VerticalDataset::Reserve(
   }
 }
 
+void VerticalDataset::Resize(const row_t num_rows) {
+  nrow_ = num_rows;
+  for (int col_idx = 0; col_idx < columns_.size(); col_idx++) {
+    mutable_column(col_idx)->Resize(num_rows);
+  }
+}
+
 uint64_t VerticalDataset::MemoryUsage() const {
   uint64_t reserved = 0;
   for (int col_idx = 0; col_idx < ncol(); col_idx++) {

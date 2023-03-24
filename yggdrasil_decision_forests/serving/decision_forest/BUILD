@@ -1,8 +1,31 @@
-load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_binary_ydf", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
+)
+
+# Binaries
+# ========
+
+cc_binary_ydf(
+    name = "benchmark_8bits_numerical_features",
+    srcs = ["benchmark_8bits_numerical_features.cc"],
+    deps = [
+        ":8bits_numerical_features",
+        "//yggdrasil_decision_forests/cli:all_file_systems",
+        "//yggdrasil_decision_forests/dataset:all_dataset_formats",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:all_models",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/model/decision_tree",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/flags:flag",
+    ],
 )
 
 # Libraries
@@ -132,6 +155,22 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "8bits_numerical_features",
+    srcs = ["8bits_numerical_features.cc"],
+    hdrs = ["8bits_numerical_features.h"],
+    deps = [
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/utils:compatibility",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+)
+
 # Proto
 # =====
 
@@ -183,6 +222,28 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/utils:test",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "8bits_numerical_features_test",
+    srcs = ["8bits_numerical_features_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
+    deps = [
+        ":8bits_numerical_features",
+        "//yggdrasil_decision_forests/dataset:csv_example_reader",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/model:prediction_cc_proto",
+        "//yggdrasil_decision_forests/model/decision_tree",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )
