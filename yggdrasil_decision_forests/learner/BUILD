@@ -100,12 +100,8 @@ cc_library_ydf(
 # co-depend on each others.
 cc_library_ydf(
     name = "learner_library",
-    srcs = [
-        "learner_library.cc",
-    ],
-    hdrs = [
-        "learner_library.h",
-    ],
+    srcs = ["learner_library.cc"],
+    hdrs = ["learner_library.h"],
     deps = [
         ":abstract_learner",
         ":abstract_learner_cc_proto",
