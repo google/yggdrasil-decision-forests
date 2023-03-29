@@ -23,8 +23,8 @@ namespace utils {
 namespace {
 
 TEST(Regex, QuoteRegex) {
-  EXPECT_EQ(QuoteRegex("ABC"), "ABC");
-  EXPECT_EQ(QuoteRegex("^\\Hello_"), "\\^\\\\Hello_");
+  EXPECT_EQ(QuoteRegex("ABC", false), "ABC");
+  EXPECT_EQ(QuoteRegex("^\\Hello_", false), "\\^\\\\Hello_");
 }
 
 }  // namespace

@@ -925,7 +925,7 @@ DiscretizedNumericalIndex NumericalToDiscretizedNumerical(
 }
 
 std::string EscapeTrainingConfigFeatureName(absl::string_view feature_name) {
-  return utils::QuoteRegex(feature_name);
+  return utils::QuoteRegex(feature_name, /*full_match=*/true);
 }
 
 std::string UnstackedColumnName(const absl::string_view original_name,

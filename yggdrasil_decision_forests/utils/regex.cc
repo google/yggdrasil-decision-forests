@@ -17,10 +17,12 @@
 
 #include <array>
 
+#include "absl/strings/str_cat.h"
+
 namespace yggdrasil_decision_forests {
 namespace utils {
 
-std::string QuoteRegex(absl::string_view raw) {
+std::string QuoteRegex(absl::string_view raw, const bool full_match) {
   std::string result;
   result.reserve(raw.size() * 2);
   const std::array<char, 14> escape_characters = {
@@ -32,6 +34,11 @@ std::string QuoteRegex(absl::string_view raw) {
     }
     result += c;
   }
+
+  if (full_match) {
+    result = absl::StrCat("^", result, "$");
+  }
+
   return result;
 }
 

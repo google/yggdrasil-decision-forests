@@ -22,6 +22,7 @@
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/learner/multitasker/multitasker.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
+#include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/multitasker/multitasker.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -124,6 +125,84 @@ TEST_F(MultitaskerOnAdult, Base) {
     EXPECT_OK(model::LoadModel(prefix_model_path, &loaded_submodel,
                                load_submodel_io));
     EXPECT_EQ(loaded_submodel->label(), "age");
+  }
+}
+
+TEST_F(MultitaskerOnAdult, Stacked) {
+  auto* mt_config =
+      train_config_.MutableExtension(multitasker::proto::multitasker_config);
+
+  mt_config->mutable_base_learner()->set_learner("RANDOM_FOREST");
+  generic_parameters_ = model::proto::GenericHyperParameters();
+  auto* field = generic_parameters_->add_fields();
+  field->set_name("num_trees");
+  field->mutable_value()->set_integer(20);
+
+  auto* tt1 = mt_config->add_subtasks();
+  auto t1 = tt1->mutable_train_config();
+  tt1->set_primary(false);
+  auto* tt2 = mt_config->add_subtasks();
+  tt2->set_primary(false);
+  auto t2 = tt2->mutable_train_config();
+  auto* tt3 = mt_config->add_subtasks();
+  auto t3 = tt3->mutable_train_config();
+
+  t1->set_label("income");
+  t1->set_task(model::proto::Task::CLASSIFICATION);
+
+  t2->set_label("age");
+  t2->set_task(model::proto::Task::REGRESSION);
+
+  t3->set_label("relationship");
+  t3->set_task(model::proto::Task::CLASSIFICATION);
+
+  TrainAndEvaluateModel();
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
+
+  utils::RandomEngine rnd(1234);
+
+  auto* mt_model = dynamic_cast<MultitaskerModel*>(model_.get());
+  EXPECT_EQ(mt_model->models().size(), 3);
+
+  const auto features_to_str = [](const model::AbstractModel& model) {
+    std::vector<std::string> str_features;
+    for (const int feature : model.input_features()) {
+      str_features.push_back(model.data_spec().columns(feature).name());
+    }
+    return str_features;
+  };
+
+  {
+    auto* submodel = mt_model->model(0);
+    EXPECT_EQ(submodel->label(), "income");
+    EXPECT_THAT(features_to_str(*submodel),
+                testing::UnorderedElementsAre(
+                    "age", "workclass", "fnlwgt", "education", "education_num",
+                    "marital_status", "occupation", "relationship", "race",
+                    "sex", "capital_gain", "capital_loss", "hours_per_week",
+                    "native_country"));
+  }
+
+  {
+    auto* submodel = mt_model->model(1);
+    EXPECT_EQ(submodel->label(), "age");
+    EXPECT_THAT(features_to_str(*submodel),
+                testing::UnorderedElementsAre(
+                    "workclass", "fnlwgt", "education", "education_num",
+                    "marital_status", "occupation", "relationship", "race",
+                    "sex", "capital_gain", "capital_loss", "hours_per_week",
+                    "native_country", "income"));
+  }
+
+  {
+    auto* submodel = mt_model->model(2);
+    EXPECT_EQ(submodel->label(), "relationship");
+    EXPECT_THAT(features_to_str(*submodel),
+                testing::UnorderedElementsAre(
+                    "age", "workclass", "fnlwgt", "education", "education_num",
+                    "marital_status", "occupation", "race", "sex",
+                    "capital_gain", "capital_loss", "hours_per_week",
+                    "native_country", "income:0", "age:0"));
   }
 }
 

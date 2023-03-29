@@ -25,7 +25,13 @@ namespace utils {
 
 // Escapes a string for an exact match with std::regex_match for the ECMAScript
 // syntax (default of std::regex).
-std::string QuoteRegex(absl::string_view raw);
+//
+// Args:
+//   raw: String to escape.
+//   full_match: If false, build a search regex (i.e., look for "raw" in a
+//   string). If true, build a match regexp (i.e., look for the a string equal
+//   to "raw").
+std::string QuoteRegex(absl::string_view raw, bool full_match);
 
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

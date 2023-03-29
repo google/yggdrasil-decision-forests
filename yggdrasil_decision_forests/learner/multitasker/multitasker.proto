@@ -33,6 +33,8 @@ message MultitaskerTrainingConfig {
 message SubTask {
   // Definition of the sub tasks.
   optional model.proto.TrainingConfig train_config = 2;
+
+  optional bool primary = 1 [default = true];
 }
 
 extend model.proto.TrainingConfig {
