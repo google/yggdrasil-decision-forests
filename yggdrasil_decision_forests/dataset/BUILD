@@ -311,13 +311,13 @@ cc_library_ydf(
         ":formats_cc_proto",
         ":synthetic_dataset_cc_proto",
         ":vertical_dataset",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset/tensorflow:tf_example_io_interface",
         "//yggdrasil_decision_forests/utils:csv",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:hash",
         "//yggdrasil_decision_forests/utils:random",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
             "@tensorflow_pypi//:libtensorflow_framework",

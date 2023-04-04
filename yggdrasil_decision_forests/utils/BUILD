@@ -129,11 +129,11 @@ cc_library_ydf(
         ":logging",
         ":status_macros",
         ":tensorflow",
-        "@com_google_protobuf//:protobuf",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
+        "@com_google_protobuf//:protobuf",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
             "@tensorflow_pypi//:libtensorflow_framework",
@@ -481,10 +481,10 @@ cc_library_ydf(
     deps = select({
         "//conditions:default": [":usage_default"],
     }) + [
-        "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -1067,10 +1067,10 @@ cc_test(
         ":evaluation",
         ":filesystem",
         ":test",
-        "@com_google_googletest//:gtest_main",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:csv_example_writer",
         "//yggdrasil_decision_forests/dataset:example_reader",
+        "@com_google_googletest//:gtest_main",
     ] + select({
         "//yggdrasil_decision_forests:use_tensorflow_io": [":sharded_io_tfrecord"],
         "//conditions:default": [],
