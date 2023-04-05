@@ -64,6 +64,8 @@ enum Loss {
   // EXPERIMENTAl. Focal loss. Only valid for binary classification.
   // [https://arxiv.org/pdf/1708.02002.pdf]
   BINARY_FOCAL_LOSS = 6;
+  // Poisson log likelihood. Only valid for regression.
+  POISSON = 7;
 }
 
 // Log of the training. This proto is generated during the training of the

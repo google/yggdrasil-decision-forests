@@ -78,6 +78,7 @@ cc_library_ydf(
         ":loss_imp_mean_square_error",
         ":loss_imp_multinomial",
         ":loss_imp_ndcg",
+        ":loss_imp_poisson",
     ],
     alwayslink = 1,
 )
@@ -285,6 +286,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
     ],
+    alwayslink = 1,
 )
 
 # Test

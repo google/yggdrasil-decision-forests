@@ -1149,6 +1149,16 @@ TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
   YDF_EXPECT_METRIC_NEAR(metric::RMSE(evaluation_), 2.079, 0.02);
 }
 
+TEST_F(GradientBoostedTreesOnAbalone, PoissonLoss) {
+  deployment_config_.set_num_threads(5);
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::Loss::POISSON);
+
+  TrainAndEvaluateModel();
+  YDF_EXPECT_METRIC_NEAR(metric::RMSE(evaluation_), 2.15, 0.05);
+}
+
 class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {
   void SetUp() override {
     train_config_.set_learner(GradientBoostedTreesLearner::kRegisteredName);

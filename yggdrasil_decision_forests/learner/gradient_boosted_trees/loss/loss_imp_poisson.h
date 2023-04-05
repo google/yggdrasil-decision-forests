@@ -16,10 +16,13 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_POISSON_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_POISSON_H_
 
+#include <cmath>
+#include <cstddef>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -123,14 +126,19 @@ class PoissonLoss : public AbstractLoss {
         sum_exp_predictions += std::exp(prediction);
       }
     }
-    STATUS_CHECK_GT(sum_labels, 0);
-    // TODO: Implement clamping. Note: R implements an e+19 / e-19
+    // TODO: Revise clamping. Note: R implements an e+19 / e-19
     // clamping for poisson loss.
+    STATUS_CHECK_GE(sum_labels, 0);
+    double top_value;
+    if (sum_labels == 0) {
+      top_value = -19;
+    } else {
+      top_value = std::log(sum_labels) - std::log(sum_exp_predictions);
+    }
     STATUS_CHECK_GT(sum_exp_predictions, 0);
 
     node->mutable_node()->mutable_regressor()->set_top_value(
-        gbt_config_.shrinkage() *
-        (std::log(sum_labels) - std::log(sum_exp_predictions)));
+        gbt_config_.shrinkage() * top_value);
     return absl::OkStatus();
   }
 

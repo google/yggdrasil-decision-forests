@@ -31,8 +31,12 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -45,6 +49,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/structure_analysis.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -335,6 +340,20 @@ void GradientBoostedTreesModel::Predict(
         prediction->mutable_ranking()->set_relevance(accumulator);
       } else if (task() == model::proto::REGRESSION) {
         prediction->mutable_regression()->set_value(accumulator);
+      } else {
+        YDF_LOG(FATAL) << "Non supported task";
+      }
+    } break;
+    case proto::Loss::POISSON: {
+      double accumulator = initial_predictions_[0];
+      CallOnAllLeafs(dataset, row_idx,
+                     [&accumulator](const decision_tree::proto::Node& node) {
+                       accumulator += node.regressor().top_value();
+                     });
+      if (task() == model::proto::REGRESSION) {
+        double clamped_accumlator = utils::clamp(accumulator, -19., 19.);
+        prediction->mutable_regression()->set_value(
+            std::exp(clamped_accumlator));
       } else {
         YDF_LOG(FATAL) << "Non supported task";
       }
