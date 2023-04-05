@@ -69,7 +69,7 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
 class PoissonLossTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 };
 
-TEST_P(PoissonLossTest, LossStatusRegression) {
+TEST(PoissonLossTest, LossStatusRegression) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
   const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
@@ -77,7 +77,7 @@ TEST_P(PoissonLossTest, LossStatusRegression) {
   EXPECT_OK(loss_imp.Status());
 }
 
-TEST_P(PoissonLossTest, LossStatusClassification) {
+TEST(PoissonLossTest, LossStatusClassification) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
   const PoissonLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
@@ -85,7 +85,7 @@ TEST_P(PoissonLossTest, LossStatusClassification) {
   EXPECT_FALSE(loss_imp.Status().ok());
 }
 
-TEST_P(PoissonLossTest, LossStatusRanking) {
+TEST(PoissonLossTest, LossStatusRanking) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
   const PoissonLoss loss_imp({}, model::proto::Task::RANKING,
@@ -239,6 +239,60 @@ TEST_P(PoissonLossTest, UpdateGradientsPredictions) {
   } else {
     EXPECT_THAT(gradients.front().gradient,
                 ElementsAre(1.f - 2.5f, 2.f - 2.5f, 3.f - 2.5f, 4.f - 2.5f));
+  }
+}
+
+TEST_P(PoissonLossTest, ComputeLoss) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  const bool weighted = std::get<0>(GetParam());
+  const bool threaded = std::get<1>(GetParam());
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f};
+  }
+
+  std::vector<float> predictions = {1.f, 1.f, 2.f, 2.f};
+  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
+                             dataset.data_spec().columns(0));
+  LossResults loss_results;
+  if (threaded) {
+    utils::concurrency::ThreadPool thread_pool("", 4);
+    thread_pool.StartWorkers();
+    ASSERT_OK_AND_ASSIGN(loss_results,
+                         loss_imp.Loss(dataset,
+                                       /* label_col_idx= */ 0, predictions,
+                                       weights, nullptr, &thread_pool));
+  } else {
+    ASSERT_OK_AND_ASSIGN(
+        loss_results,
+        loss_imp.Loss(dataset,
+                      /* label_col_idx= */ 0, predictions, weights, nullptr));
+  }
+  if (weighted) {
+    const float expected_loss =
+        -(110.f - 6.f * std::exp(1.f) - 14.f * std::exp(2.f)) / 10.f;
+    const float expected_rmse = (2. * (1. - std::exp(1)) * (1. - std::exp(1)) +
+                                 4. * (2. - std::exp(1)) * (2. - std::exp(1)) +
+                                 6. * (3. - std::exp(2)) * (3. - std::exp(2)) +
+                                 8. * (4. - std::exp(2)) * (4. - std::exp(2))) /
+                                20.;
+    EXPECT_NEAR(loss_results.loss, expected_loss, kTestPrecision);
+    // For classification, the only secondary metric is also RMSE.
+    EXPECT_THAT(loss_results.secondary_metrics,
+                ElementsAre(FloatNear(expected_rmse, kTestPrecision)));
+  } else {
+    const float expected_loss =
+        -(17.f - 2.f * std::exp(1.f) - 2.f * std::exp(2.f)) / 2.f;
+    const float expected_rmse = ((1. - std::exp(1)) * (1. - std::exp(1)) +
+                                 (2. - std::exp(1)) * (2. - std::exp(1)) +
+                                 (3. - std::exp(2)) * (3. - std::exp(2)) +
+                                 (4. - std::exp(2)) * (4. - std::exp(2))) /
+                                4.;
+    EXPECT_NEAR(loss_results.loss, expected_loss, kTestPrecision);
+    // The only secondary metric is RMSE.
+    EXPECT_THAT(loss_results.secondary_metrics,
+                ElementsAre(FloatNear(expected_rmse, kTestPrecision)));
   }
 }
 

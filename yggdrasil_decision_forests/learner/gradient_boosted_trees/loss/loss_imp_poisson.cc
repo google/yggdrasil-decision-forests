@@ -30,6 +30,7 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/learner/types.h"
+#include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -177,7 +178,87 @@ absl::StatusOr<LossResults> PoissonLoss::Loss(
     const std::vector<float> &weights,
     const RankingGroupsIndices *ranking_index,
     utils::concurrency::ThreadPool *thread_pool) const {
-  return absl::UnimplementedError("Not implemented");
+  double sum_loss = 0;
+  double total_example_weight = 0;
+  double sum_square_error = 0;
+  if (thread_pool == nullptr) {
+    if (weights.empty()) {
+      LossImp<false>(labels, predictions, weights, 0, labels.size(), &sum_loss,
+                     &sum_square_error, &total_example_weight);
+    } else {
+      LossImp<true>(labels, predictions, weights, 0, labels.size(), &sum_loss,
+                    &sum_square_error, &total_example_weight);
+    }
+  } else {
+    const auto num_threads = thread_pool->num_threads();
+
+    struct PerThread {
+      double sum_loss = 0;
+      double sum_square_error = 0;
+      double total_example_weight = 0;
+    };
+    std::vector<PerThread> per_threads(num_threads);
+
+    decision_tree::ConcurrentForLoop(
+        num_threads, thread_pool, labels.size(),
+        [&labels, &predictions, &per_threads, &weights](
+            size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
+          auto &block = per_threads[block_idx];
+
+          if (weights.empty()) {
+            LossImp<false>(labels, predictions, weights, begin_idx, end_idx,
+                           &block.sum_loss, &block.sum_square_error,
+                           &block.total_example_weight);
+          } else {
+            LossImp<true>(labels, predictions, weights, begin_idx, end_idx,
+                          &block.sum_loss, &block.sum_square_error,
+                          &block.total_example_weight);
+          }
+        });
+
+    for (const auto &block : per_threads) {
+      sum_loss += block.sum_loss;
+      sum_square_error += block.sum_square_error;
+      total_example_weight += block.total_example_weight;
+    }
+  }
+  auto float_poisson_loss = static_cast<float>(sum_loss / total_example_weight);
+  auto float_rmse = static_cast<float>(sum_square_error / total_example_weight);
+  return LossResults{float_poisson_loss, {float_rmse}};
+}
+
+template <bool use_weights>
+void PoissonLoss::LossImp(const std::vector<float> &labels,
+                          const std::vector<float> &predictions,
+                          const std::vector<float> &weights,
+                          size_t begin_example_idx, size_t end_example_idx,
+                          double *__restrict sum_loss,
+                          double *__restrict sum_square_error,
+                          double *__restrict total_example_weight) {
+  if constexpr (!use_weights) {
+    *total_example_weight = end_example_idx - begin_example_idx;
+  }
+  for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
+       example_idx++) {
+    const float label = labels[example_idx];
+    const float prediction = predictions[example_idx];
+    const float exp_pred = std::exp(prediction);
+    if constexpr (use_weights) {
+      const float weight = weights[example_idx];
+      *total_example_weight += weight;
+      *sum_loss -= 2.f * weight * (label * prediction - exp_pred);
+      *sum_square_error += weight * (label - exp_pred) * (label - exp_pred);
+      DCheckIsFinite(*sum_loss);
+      DCheckIsFinite(*sum_square_error);
+    } else {
+      *sum_loss -= 2.f * (label * prediction - exp_pred);
+      *sum_square_error += (label - exp_pred) * (label - exp_pred);
+      DCheckIsFinite(*sum_loss);
+      DCheckIsFinite(*sum_square_error);
+    }
+    DCheckIsFinite(*sum_loss);
+    DCheckIsFinite(*sum_square_error);
+  }
 }
 
 }  // namespace gradient_boosted_trees

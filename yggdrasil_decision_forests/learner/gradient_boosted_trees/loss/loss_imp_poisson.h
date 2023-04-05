@@ -108,6 +108,15 @@ class PoissonLoss : public AbstractLoss {
       const std::vector<float>& weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const override;
+
+  template <bool use_weights>
+  static void LossImp(const std::vector<float>& labels,
+                      const std::vector<float>& predictions,
+                      const std::vector<float>& weights,
+                      size_t begin_example_idx, size_t end_example_idx,
+                      double* __restrict sum_loss,
+                      double* __restrict sum_square_error,
+                      double* __restrict total_example_weight);
 };
 REGISTER_AbstractGradientBoostedTreeLoss(PoissonLoss, "POISSON");
 
