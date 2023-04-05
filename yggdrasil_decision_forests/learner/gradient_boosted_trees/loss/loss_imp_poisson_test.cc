@@ -242,6 +242,14 @@ TEST_P(PoissonLossTest, UpdateGradientsPredictions) {
   }
 }
 
+TEST(PoissonLossTest, SecondaryMetricNames) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
+                             dataset.data_spec().columns(1));
+  EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("RMSE"));
+}
+
 INSTANTIATE_TEST_SUITE_P(PoissonLossTestWithWeights, PoissonLossTest,
                          Combine(Bool(), Bool()));
 

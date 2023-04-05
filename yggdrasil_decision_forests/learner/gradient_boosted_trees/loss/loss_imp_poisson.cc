@@ -143,7 +143,12 @@ absl::Status PoissonLoss::UpdatePredictions(
     const std::vector<const decision_tree::DecisionTree *> &new_trees,
     const dataset::VerticalDataset &dataset, std::vector<float> *predictions,
     double *mean_abs_prediction) const {
-  return absl::UnimplementedError("Not implemented");
+  if (new_trees.size() != 1) {
+    return absl::InternalError("Wrong number of trees");
+  }
+  UpdatePredictionWithSingleUnivariateTree(dataset, *new_trees.front(),
+                                           predictions, mean_abs_prediction);
+  return absl::OkStatus();
 }
 
 decision_tree::CreateSetLeafValueFunctor PoissonLoss::SetLeafFunctor(
@@ -164,7 +169,7 @@ PoissonLoss::SetLeafFunctorFromLabelStatistics() const {
 }
 
 std::vector<std::string> PoissonLoss::SecondaryMetricNames() const {
-  return {};
+  return {"RMSE"};
 }
 
 absl::StatusOr<LossResults> PoissonLoss::Loss(
