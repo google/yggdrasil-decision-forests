@@ -132,7 +132,7 @@ absl::Status SetCategoricalUpliftLabelDistribution(
 
   ASSIGN_OR_RETURN(const auto* const treatments,
                    dataset.ColumnWithCastWithStatus<
-              dataset::VerticalDataset::CategoricalColumn>(
+                       dataset::VerticalDataset::CategoricalColumn>(
                        config_link.uplift_treatment()));
 
   const auto& outcome_spec = dataset.data_spec().columns(config_link.label());
@@ -1208,9 +1208,9 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
       // Nothing to do.
       break;
     case proto::DecisionTreeTrainingConfig::kSparseObliqueSplit:
-          ASSIGN_OR_RETURN(
-              found_good_condition,
-              FindBestConditionSparseOblique(
+      ASSIGN_OR_RETURN(
+          found_good_condition,
+          FindBestConditionSparseOblique(
               train_dataset, selected_examples, weights, config, config_link,
               dt_config, parent, internal_config, label_stats, {},
               best_condition, random, &cache->splitter_cache_list[0]));
@@ -1495,7 +1495,7 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
 
     {
       // Record, but do not process, the worker response.
-    SplitterWorkResponse& response = maybe_response.value();
+      SplitterWorkResponse& response = maybe_response.value();
 
       // Release the cache immediately to be reused by other workers.
       cache->available_cache_idxs.push_front(response.manager_data.cache_idx);
@@ -1512,7 +1512,10 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
             cache->condition_list[response.manager_data.condition_idx]
                 .split_score();
 
-        if (new_split_score > best_split_score) {
+        if ((new_split_score > best_split_score) ||
+            (new_split_score == best_split_score &&
+             response.manager_data.condition_idx <
+                 durable_response.condition_idx)) {
           // This is the best condition so far. Keep it for processing.
           durable_response.condition_idx = response.manager_data.condition_idx;
         } else {
@@ -1523,7 +1526,7 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
           durable_response.condition_idx = -1;
           durable_response.status = SplitSearchResult::kNoBetterSplitFound;
         }
-        } else {
+      } else {
         // Return the condition to the condition pool.
         cache->available_condition_idxs.push_front(
             response.manager_data.condition_idx);
@@ -1555,10 +1558,10 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
         if (process_split_score > best_split_score) {
           if (best_condition_idx != -1) {
             cache->available_condition_idxs.push_front(best_condition_idx);
-        }
+          }
           best_condition_idx = durable_response->condition_idx;
           best_split_score = process_split_score;
-      } else {
+        } else {
           // Return the condition to the condition pool.
           cache->available_condition_idxs.push_front(
               durable_response->condition_idx);
