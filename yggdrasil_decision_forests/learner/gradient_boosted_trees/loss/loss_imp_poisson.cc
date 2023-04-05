@@ -30,7 +30,6 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/learner/types.h"
-#include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -155,12 +154,22 @@ absl::Status PoissonLoss::UpdatePredictions(
 decision_tree::CreateSetLeafValueFunctor PoissonLoss::SetLeafFunctor(
     const std::vector<float> &predictions,
     const std::vector<GradientData> &gradients, int label_col_idx) const {
-  return [](const dataset::VerticalDataset &,
-            const std::vector<UnsignedExampleIdx> &, const std::vector<float> &,
-            const model::proto::TrainingConfig &,
-            const model::proto::TrainingConfigLinking &,
-            decision_tree::NodeWithChildren *) {
-    return absl::UnimplementedError("Not implemented");
+  return [this, &predictions, label_col_idx](
+             const dataset::VerticalDataset &train_dataset,
+             const std::vector<UnsignedExampleIdx> &selected_examples,
+             const std::vector<float> &weights,
+             const model::proto::TrainingConfig &config,
+             const model::proto::TrainingConfigLinking &config_link,
+             decision_tree::NodeWithChildren *node) {
+    if (weights.empty()) {
+      return SetLeaf</*weighted=*/false>(train_dataset, selected_examples,
+                                         weights, config, config_link,
+                                         predictions, label_col_idx, node);
+    } else {
+      return SetLeaf</*weighted=*/true>(train_dataset, selected_examples,
+                                        weights, config, config_link,
+                                        predictions, label_col_idx, node);
+    }
   };
 }
 

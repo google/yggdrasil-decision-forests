@@ -24,10 +24,15 @@
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
+#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -43,6 +48,7 @@ using ::testing::ElementsAre;
 using ::testing::FloatNear;
 using ::testing::IsEmpty;
 using ::testing::Not;
+using ::testing::SizeIs;
 
 // Margin of error for numerical tests.
 constexpr float kTestPrecision = 0.000001f;
@@ -293,6 +299,64 @@ TEST_P(PoissonLossTest, ComputeLoss) {
     // The only secondary metric is RMSE.
     EXPECT_THAT(loss_results.secondary_metrics,
                 ElementsAre(FloatNear(expected_rmse, kTestPrecision)));
+  }
+}
+
+TEST_P(PoissonLossTest, SetLabelDistribution) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  const bool weighted = std::get<0>(GetParam());
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f};
+  }
+
+  proto::GradientBoostedTreesTrainingConfig gbt_config;
+  gbt_config.set_shrinkage(1.f);
+  std::vector<GradientData> gradients;
+  dataset::VerticalDataset gradient_dataset;
+  const PoissonLoss loss_imp(gbt_config, model::proto::Task::REGRESSION,
+                             dataset.data_spec().columns(0));
+  ASSERT_OK(internal::CreateGradientDataset(dataset,
+                                            /* label_col_idx= */ 0,
+                                            /*hessian_splits=*/false, loss_imp,
+                                            &gradient_dataset, &gradients,
+                                            nullptr));
+  EXPECT_THAT(gradients, SizeIs(1));
+
+  std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
+  std::vector<float> predictions(dataset.nrow(), 0.f);
+
+  model::proto::TrainingConfig config;
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(2);  // Gradient column.
+
+  decision_tree::NodeWithChildren node;
+  if (weighted) {
+    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/true>(
+        gradient_dataset, selected_examples, weights, config, config_link,
+        predictions,
+        /* label_col_idx= */ 0, &node));
+    // Top_value is the weighted mean of the labels
+    EXPECT_NEAR(node.node().regressor().top_value(), std::log(3),
+                kTestPrecision);
+    // Distribution of the gradients:
+    EXPECT_EQ(node.node().regressor().distribution().sum(), 0);
+    EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
+    // Total weight in the dataset.
+    EXPECT_EQ(node.node().regressor().distribution().count(), 20.);
+  } else {
+    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/false>(
+        gradient_dataset, selected_examples, weights, config, config_link,
+        predictions,
+        /* label_col_idx= */ 0, &node));
+    EXPECT_NEAR(node.node().regressor().top_value(), std::log(2.5),
+                kTestPrecision);
+    // Distribution of the gradients:
+    EXPECT_EQ(node.node().regressor().distribution().sum(), 0);
+    EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
+    // Same as the number of examples in the dataset.
+    EXPECT_EQ(node.node().regressor().distribution().count(), 4.);
   }
 }
 

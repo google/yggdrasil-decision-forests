@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -81,6 +82,7 @@ class PoissonLoss : public AbstractLoss {
       const std::vector<float>& predictions,
       const std::vector<GradientData>& gradients,
       int label_col_idx) const override;
+
   template <bool weighted>
   absl::Status SetLeaf(const dataset::VerticalDataset& train_dataset,
                        const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -90,7 +92,46 @@ class PoissonLoss : public AbstractLoss {
                        const std::vector<float>& predictions,
                        const int label_col_idx,
                        decision_tree::NodeWithChildren* node) const {
-    return absl::UnimplementedError("Not yet implemented");
+    if constexpr (weighted) {
+      STATUS_CHECK(weights.size() == train_dataset.nrow());
+    } else {
+      STATUS_CHECK(weights.empty());
+    }
+    // Initialize the distribution (as the "top_value" is overridden right
+    // after.
+    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
+        train_dataset, selected_examples, weights, config_link,
+        node->mutable_node()));
+
+    // Set the value of the leaf to be the residual:
+    //   log(\sum w_i * label_i) - log(\sum w_i exp(pred_i))
+    ASSIGN_OR_RETURN(
+        const auto* labels,
+        train_dataset.ColumnWithCastWithStatus<
+            dataset::VerticalDataset::NumericalColumn>(label_col_idx));
+    double sum_labels = 0;
+    double sum_exp_predictions = 0;
+    for (const auto example_idx : selected_examples) {
+      const float label = labels->values()[example_idx];
+      const float prediction = predictions[example_idx];
+      if constexpr (weighted) {
+        const float weight = weights[example_idx];
+        sum_labels += weight * label;
+        sum_exp_predictions += weight * std::exp(prediction);
+      } else {
+        sum_labels += label;
+        sum_exp_predictions += std::exp(prediction);
+      }
+    }
+    STATUS_CHECK_GT(sum_labels, 0);
+    // TODO: Implement clamping. Note: R implements an e+19 / e-19
+    // clamping for poisson loss.
+    STATUS_CHECK_GT(sum_exp_predictions, 0);
+
+    node->mutable_node()->mutable_regressor()->set_top_value(
+        gbt_config_.shrinkage() *
+        (std::log(sum_labels) - std::log(sum_exp_predictions)));
+    return absl::OkStatus();
   }
 
   absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
