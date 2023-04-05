@@ -37,7 +37,7 @@
 //
 // Use the loss functions and implementation details detailed in:
 //   https://statweb.stanford.edu/~jhf/ftp/trebst.pdf
-//   http://www.saedsayad.com/docs/gbm2.pdf
+//   https://cran.r-project.org/web/packages/gbm/vignettes/gbm.pdf
 //   https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/MSR-TR-2010-82.pdf
 
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_H_

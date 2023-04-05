@@ -15,8 +15,20 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_poisson.h"
 
+#include <cmath>
+#include <tuple>
+#include <vector>
+
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "absl/status/statusor.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
@@ -25,8 +37,12 @@ namespace model {
 namespace gradient_boosted_trees {
 namespace {
 
+using ::testing::Bool;
+using ::testing::Combine;
 using ::testing::ElementsAre;
 using ::testing::FloatNear;
+using ::testing::IsEmpty;
+using ::testing::Not;
 
 // Margin of error for numerical tests.
 constexpr float kTestPrecision = 0.000001f;
@@ -50,7 +66,8 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   return dataset;
 }
 
-class PoissonLossTest : public testing::TestWithParam<bool> {};
+class PoissonLossTest : public testing::TestWithParam<std::tuple<bool, bool>> {
+};
 
 TEST_P(PoissonLossTest, LossStatusRegression) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
@@ -79,7 +96,7 @@ TEST_P(PoissonLossTest, LossStatusRanking) {
 TEST_P(PoissonLossTest, InitialPredictionsClassic) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {2.f, 4.f, 6.f, 8.f};
@@ -118,8 +135,115 @@ TEST(PoissonLossTest, InitialPredictionsLabelStatistics) {
   EXPECT_THAT(init_pred, ElementsAre(FloatNear(log_mean, kTestPrecision)));
 }
 
+TEST_P(PoissonLossTest, UpdateGradientsLabelColIdx) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  const bool weighted = std::get<0>(GetParam());
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f};
+  }
+
+  dataset::VerticalDataset gradient_dataset;
+  std::vector<GradientData> gradients;
+  std::vector<float> predictions;
+  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
+                             dataset.data_spec().columns(0));
+  ASSERT_OK(internal::CreateGradientDataset(dataset,
+                                            /* label_col_idx= */ 0,
+                                            /*hessian_splits=*/false, loss_imp,
+                                            &gradient_dataset, &gradients,
+                                            &predictions));
+
+  ASSERT_OK_AND_ASSIGN(
+      const std::vector<float> loss_initial_predictions,
+      loss_imp.InitialPredictions(dataset,
+                                  /* label_col_idx =*/0, weights));
+  internal::SetInitialPredictions(loss_initial_predictions, dataset.nrow(),
+                                  &predictions);
+
+  // Initial predictions are log(2.5) (unweighted) and log(3) (weighted).
+
+  utils::RandomEngine random(1234);
+
+  ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
+                                     /* label_col_idx= */ 0, predictions,
+                                     /*ranking_index=*/nullptr, &gradients,
+                                     &random));
+
+  ASSERT_THAT(gradients, Not(IsEmpty()));
+  if (weighted) {
+    EXPECT_THAT(gradients.front().gradient,
+                ElementsAre(1.f - 3.f, 2.f - 3.f, 3.f - 3.f, 4.f - 3.f));
+  } else {
+    EXPECT_THAT(gradients.front().gradient,
+                ElementsAre(1.f - 2.5f, 2.f - 2.5f, 3.f - 2.5f, 4.f - 2.5f));
+  }
+}
+
+TEST_P(PoissonLossTest, UpdateGradientsPredictions) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  const bool weighted = std::get<0>(GetParam());
+  const bool threaded = std::get<1>(GetParam());
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f};
+  }
+
+  dataset::VerticalDataset gradient_dataset;
+  std::vector<GradientData> gradients;
+  std::vector<float> predictions;
+  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
+                             dataset.data_spec().columns(0));
+  std::vector<float> labels = {1.f, 2.f, 3.f, 4.f};
+  ASSERT_OK(internal::CreateGradientDataset(dataset,
+                                            /* label_col_idx= */ 0,
+                                            /*hessian_splits=*/false, loss_imp,
+                                            &gradient_dataset, &gradients,
+                                            &predictions));
+  GradientDataRef compact_gradient(gradients.size());
+  for (int i = 0; i < gradients.size(); i++) {
+    compact_gradient[i] = {&(gradients)[i].gradient, (gradients)[i].hessian};
+  }
+
+  // Initial predictions are log(2.5) (unweighted) and log(3) (weighted).
+  ASSERT_OK_AND_ASSIGN(
+      const std::vector<float> loss_initial_predictions,
+      loss_imp.InitialPredictions(dataset,
+                                  /* label_col_idx =*/0, weights));
+  internal::SetInitialPredictions(loss_initial_predictions, dataset.nrow(),
+                                  &predictions);
+
+  // Initial predictions are log(2.5) (unweighted) and log(3) (weighted).
+
+  utils::RandomEngine random(1234);
+
+  if (threaded) {
+    utils::concurrency::ThreadPool thread_pool("", 4);
+    thread_pool.StartWorkers();
+    ASSERT_OK(loss_imp.UpdateGradients(
+        labels, predictions,
+        /*ranking_index=*/nullptr, &compact_gradient, &random, &thread_pool));
+  } else {
+    ASSERT_OK(loss_imp.UpdateGradients(labels, predictions,
+                                       /*ranking_index=*/nullptr,
+                                       &compact_gradient, &random,
+                                       /*thread_pool=*/nullptr));
+  }
+
+  ASSERT_THAT(gradients, Not(IsEmpty()));
+  if (weighted) {
+    EXPECT_THAT(gradients.front().gradient,
+                ElementsAre(1.f - 3.f, 2.f - 3.f, 3.f - 3.f, 4.f - 3.f));
+  } else {
+    EXPECT_THAT(gradients.front().gradient,
+                ElementsAre(1.f - 2.5f, 2.f - 2.5f, 3.f - 2.5f, 4.f - 2.5f));
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(PoissonLossTestWithWeights, PoissonLossTest,
-                         testing::Bool());
+                         Combine(Bool(), Bool()));
 
 }  // namespace
 }  // namespace gradient_boosted_trees

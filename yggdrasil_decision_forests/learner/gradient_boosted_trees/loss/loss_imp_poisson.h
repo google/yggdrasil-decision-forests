@@ -23,6 +23,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
@@ -40,6 +41,10 @@ namespace gradient_boosted_trees {
 // regression problem where the label follows a Poisson distribution.
 class PoissonLoss : public AbstractLoss {
  public:
+  // For unit testing.
+  using AbstractLoss::Loss;
+  using AbstractLoss::UpdateGradients;
+
   PoissonLoss(const proto::GradientBoostedTreesTrainingConfig& gbt_config,
               model::proto::Task task,
               const dataset::proto::Column& label_column)
@@ -65,6 +70,12 @@ class PoissonLoss : public AbstractLoss {
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
+
+  static void UpdateGradientsImp(const std::vector<float>& labels,
+                                 const std::vector<float>& predictions,
+                                 size_t begin_example_idx,
+                                 size_t end_example_idx,
+                                 std::vector<float>* gradient_data);
 
   decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
       const std::vector<float>& predictions,

@@ -15,11 +15,26 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_poisson.h"
 
+#include <cmath>
+#include <cstddef>
+#include <string>
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
+#include "yggdrasil_decision_forests/learner/types.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -79,6 +94,58 @@ absl::Status PoissonLoss::Status() const {
   return absl::OkStatus();
 }
 
+absl::Status PoissonLoss::UpdateGradients(
+    const std::vector<float> &labels, const std::vector<float> &predictions,
+    const RankingGroupsIndices *ranking_index, GradientDataRef *gradients,
+    utils::RandomEngine *random,
+    utils::concurrency::ThreadPool *thread_pool) const {
+
+  // Set the gradient to:
+  //   label - exp(prediction)
+  if (gradients->size() != 1) {
+    return absl::InternalError("Wrong gradient shape");
+  }
+  const size_t num_examples = labels.size();
+  std::vector<float> &gradient_data = *(*gradients)[0].gradient;
+  if (thread_pool == nullptr) {
+    UpdateGradientsImp(labels, predictions, 0, num_examples, &gradient_data);
+  } else {
+    decision_tree::ConcurrentForLoop(
+        thread_pool->num_threads(), thread_pool, num_examples,
+        [&labels, &predictions, &gradient_data](
+            size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
+          UpdateGradientsImp(labels, predictions, begin_idx, end_idx,
+                             &gradient_data);
+        });
+  }
+  return absl::OkStatus();
+}
+
+void PoissonLoss::UpdateGradientsImp(const std::vector<float> &labels,
+                                     const std::vector<float> &predictions,
+                                     size_t begin_example_idx,
+                                     size_t end_example_idx,
+                                     std::vector<float> *gradient_data) {
+  // Set the gradient to:
+  //   label - exp(prediction)
+  for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
+       example_idx++) {
+    const float label = labels[example_idx];
+    const float prediction = predictions[example_idx];
+    const float exp_pred = std::exp(prediction);
+    DCheckIsFinite(prediction);
+    DCheckIsFinite(exp_pred);
+    (*gradient_data)[example_idx] = label - exp_pred;
+  }
+}
+
+absl::Status PoissonLoss::UpdatePredictions(
+    const std::vector<const decision_tree::DecisionTree *> &new_trees,
+    const dataset::VerticalDataset &dataset, std::vector<float> *predictions,
+    double *mean_abs_prediction) const {
+  return absl::UnimplementedError("Not implemented");
+}
+
 decision_tree::CreateSetLeafValueFunctor PoissonLoss::SetLeafFunctor(
     const std::vector<float> &predictions,
     const std::vector<GradientData> &gradients, int label_col_idx) const {
@@ -93,21 +160,6 @@ decision_tree::CreateSetLeafValueFunctor PoissonLoss::SetLeafFunctor(
 
 absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
 PoissonLoss::SetLeafFunctorFromLabelStatistics() const {
-  return absl::UnimplementedError("Not implemented");
-}
-
-absl::Status PoissonLoss::UpdatePredictions(
-    const std::vector<const decision_tree::DecisionTree *> &new_trees,
-    const dataset::VerticalDataset &dataset, std::vector<float> *predictions,
-    double *mean_abs_prediction) const {
-  return absl::UnimplementedError("Not implemented");
-}
-
-absl::Status PoissonLoss::UpdateGradients(
-    const std::vector<float> &labels, const std::vector<float> &predictions,
-    const RankingGroupsIndices *ranking_index, GradientDataRef *gradients,
-    utils::RandomEngine *random,
-    utils::concurrency::ThreadPool *thread_pool) const {
   return absl::UnimplementedError("Not implemented");
 }
 
