@@ -2206,9 +2206,9 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_categorical()->add_possible_values(kSamplingMethodNone);
     param.mutable_categorical()->add_possible_values(kSamplingMethodRandom);
     param.mutable_categorical()->add_possible_values(kSamplingMethodGOSS);
-    if (config.task() == model::proto::Task::RANKING) {
-      param.mutable_categorical()->add_possible_values(kSamplingMethodSelGB);
-    }
+    // kSamplingMethodSelGB is only available for Ranking, but is not excluded
+    // here.
+    param.mutable_categorical()->add_possible_values(kSamplingMethodSelGB);
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
         R"(Control the sampling of the datasets used to train individual trees.

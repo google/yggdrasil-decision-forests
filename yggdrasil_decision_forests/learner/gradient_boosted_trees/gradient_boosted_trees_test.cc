@@ -36,6 +36,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -1465,10 +1466,17 @@ TEST(DartPredictionAccumulator, Base) {
   EXPECT_NEAR(scaling[1], 0.5f, 0.0001f);
 }
 
-TEST(GradientBoostedTrees, PredefinedHyperParameters) {
+TEST(GradientBoostedTrees, PredefinedHyperParametersClassification) {
   model::proto::TrainingConfig train_config;
   train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
   utils::TestPredefinedHyperParametersAdultDataset(train_config, 2, 0.86);
+}
+
+TEST(GradientBoostedTrees, PredefinedHyperParametersRanking) {
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+  utils::TestPredefinedHyperParametersRankingDataset(train_config, 2,
+                                                     absl::nullopt);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, InterruptAndResumeTraining) {

@@ -318,6 +318,12 @@ void TestPredefinedHyperParametersAdultDataset(
     const int expected_num_preconfigured_parameters,
     absl::optional<float> min_accuracy);
 
+// Runs "TestPredefinedHyperParameters" on the synthetic ranking dataset.
+void TestPredefinedHyperParametersRankingDataset(
+    model::proto::TrainingConfig train_config,
+    int expected_num_preconfigured_parameters,
+    absl::optional<float> min_accuracy);
+
 // Randomly shards a dataset. Returns the sharded path in the temp directory.
 std::string ShardDataset(const dataset::VerticalDataset& dataset,
                          int num_shards, float sampling,

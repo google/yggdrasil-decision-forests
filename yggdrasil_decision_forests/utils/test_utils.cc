@@ -691,11 +691,9 @@ void ExpectEqualPredictions(
 void TestPredefinedHyperParameters(
     const absl::string_view train_ds_path, const absl::string_view test_ds_path,
     const model::proto::TrainingConfig& train_config,
+    dataset::proto::DataSpecification data_spec,
     const int expected_num_preconfigured_parameters,
     absl::optional<float> min_accuracy) {
-  // Loads the datasets.
-  dataset::proto::DataSpecification data_spec;
-  dataset::CreateDataSpec(train_ds_path, false, {}, &data_spec);
   dataset::VerticalDataset train_ds;
   CHECK_OK(LoadVerticalDataset(train_ds_path, data_spec, &train_ds));
   dataset::VerticalDataset test_ds;
@@ -721,9 +719,9 @@ void TestPredefinedHyperParameters(
     const auto model = learner->TrainWithStatus(train_ds).value();
 
     // Evaluate the model.
-    utils::RandomEngine rnd(1234);
-    const auto evaluation = model->Evaluate(test_ds, {}, &rnd);
     if (min_accuracy.has_value()) {
+      utils::RandomEngine rnd(1234);
+      const auto evaluation = model->Evaluate(test_ds, {}, &rnd);
       EXPECT_GE(metric::Accuracy(evaluation), min_accuracy.value());
     }
   }
@@ -739,12 +737,48 @@ void TestPredefinedHyperParametersAdultDataset(
                   "yggdrasil_decision_forests/test_data/dataset"));
   const auto train_ds_path = file::JoinPath(base_ds_path, "adult_train.csv");
   const auto test_ds_path = file::JoinPath(base_ds_path, "adult_test.csv");
+  // Create a dataspec.
+  dataset::proto::DataSpecification data_spec;
+  ASSERT_OK(
+      dataset::CreateDataSpecWithStatus(train_ds_path, false, {}, &data_spec));
 
   train_config.set_label("income");
 
-  TestPredefinedHyperParameters(train_ds_path, test_ds_path, train_config,
-                                expected_num_preconfigured_parameters,
-                                min_accuracy);
+  TestPredefinedHyperParameters(
+      train_ds_path, test_ds_path, train_config, data_spec,
+      expected_num_preconfigured_parameters, min_accuracy);
+}
+
+void TestPredefinedHyperParametersRankingDataset(
+    model::proto::TrainingConfig train_config,
+    const int expected_num_preconfigured_parameters,
+    absl::optional<float> min_accuracy) {
+  const auto base_ds_path = absl::StrCat(
+      "csv:", file::JoinPath(
+                  test::DataRootDirectory(),
+                  "yggdrasil_decision_forests/test_data/dataset"));
+  const auto train_ds_path =
+      file::JoinPath(base_ds_path, "synthetic_ranking_train.csv");
+  const auto test_ds_path =
+      file::JoinPath(base_ds_path, "synthetic_ranking_test.csv");
+
+  train_config.set_label("LABEL");
+  train_config.set_ranking_group("GROUP");
+  train_config.set_task(model::proto::Task::RANKING);
+
+  // Create a dataspec.
+  dataset::proto::DataSpecificationGuide guide;
+  auto* group_guide = guide.add_column_guides();
+  group_guide->set_column_name_pattern("^GROUP$");
+  group_guide->set_type(dataset::proto::HASH);
+
+  dataset::proto::DataSpecification data_spec;
+  ASSERT_OK(dataset::CreateDataSpecWithStatus(train_ds_path, false, guide,
+                                              &data_spec));
+
+  TestPredefinedHyperParameters(
+      train_ds_path, test_ds_path, train_config, data_spec,
+      expected_num_preconfigured_parameters, min_accuracy);
 }
 
 std::string ShardDataset(const dataset::VerticalDataset& dataset,
