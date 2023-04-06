@@ -87,7 +87,6 @@ cc_test(
     defines = ["SKIP_TIMING_TESTS"],
     shard_count = 20,
     tags = [
-        "nomsan",
     ],
     deps = [
         ":random_forest",

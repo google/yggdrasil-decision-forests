@@ -102,6 +102,8 @@ void BuildToyModelAndToyDataset(
   model->set_loss(Loss::BINOMIAL_LOG_LIKELIHOOD);
   model->mutable_initial_predictions()->push_back(1.f);
   *model->mutable_input_features() = {1, 2};
+  // Avoid an access to uninitialized memory when printing the model.
+  model->set_num_trees_per_iter(1);
 
   {
     // Tree #0:

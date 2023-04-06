@@ -100,6 +100,8 @@ cc_test(
     # indicated. This can create flakyness with concurrent execution of tests.
     defines = ["SKIP_TIMING_TESTS"],
     shard_count = 12,
+    tags = [
+    ],
     deps = [
         ":gradient_boosted_trees",
         ":gradient_boosted_trees_cc_proto",

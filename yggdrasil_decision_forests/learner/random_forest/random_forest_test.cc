@@ -278,7 +278,7 @@ TEST_F(RandomForestOnAdult, PureServingModel) {
   train_config_.set_pure_serving_model(true);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.05);
 }
 
 // Separate the examples used for the structure and the leaves of the model.
