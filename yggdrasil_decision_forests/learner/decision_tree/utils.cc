@@ -81,30 +81,6 @@ void SetPositiveAttributeSetOfCategoricalContainsCondition(
   SetPositiveAttributeSetOfCategoricalContainsCondition(
       positive_attribute_value, num_attribute_classes, condition);
 }
-void ConcurrentForLoop(
-    const size_t num_blocks, utils::concurrency::ThreadPool* thread_pool,
-    const size_t num_items,
-    const std::function<void(size_t block_idx, size_t begin_item_idx,
-                             size_t end_item_idx)>& function) {
-  DCHECK(thread_pool != nullptr);
-  if (num_blocks <= 1) {
-    function(0, 0, num_items);
-    return;
-  }
-  utils::concurrency::BlockingCounter blocker(num_blocks);
-  size_t begin_idx = 0;
-  const size_t block_size = (num_items + num_blocks - 1) / num_blocks;
-  for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
-    const auto end_idx = std::min(begin_idx + block_size, num_items);
-    thread_pool->Schedule(
-        [block_idx, begin_idx, end_idx, &blocker, &function]() -> void {
-          function(block_idx, begin_idx, end_idx);
-          blocker.DecrementCount();
-        });
-    begin_idx += block_size;
-  }
-  blocker.Wait();
-}
 
 }  // namespace decision_tree
 }  // namespace model

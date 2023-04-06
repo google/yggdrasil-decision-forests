@@ -302,6 +302,7 @@ alias(
 cc_library_ydf(
     name = "concurrency_default",
     srcs = [
+        "concurrency.cc",
         "concurrency_default.cc",
     ],
     hdrs = [

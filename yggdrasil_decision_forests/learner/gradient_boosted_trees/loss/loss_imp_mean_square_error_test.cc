@@ -27,6 +27,8 @@ namespace model {
 namespace gradient_boosted_trees {
 namespace {
 
+using ::testing::Bool;
+using ::testing::Combine;
 using ::testing::ElementsAre;
 using ::testing::FloatNear;
 using ::testing::IsEmpty;
@@ -55,12 +57,13 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   return dataset;
 }
 
-class MeanSquareErrorLossTest : public testing::TestWithParam<bool> {};
+class MeanSquareErrorLossTest
+    : public testing::TestWithParam<std::tuple<bool, bool>> {};
 
 TEST_P(MeanSquareErrorLossTest, InitialPredictions) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {2.f, 4.f, 6.f, 8.f};
@@ -83,7 +86,7 @@ TEST_P(MeanSquareErrorLossTest, InitialPredictions) {
 TEST_P(MeanSquareErrorLossTest, UpdateGradients) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {2.f, 4.f, 6.f, 8.f};
@@ -99,7 +102,6 @@ TEST_P(MeanSquareErrorLossTest, UpdateGradients) {
                                             /*hessian_splits=*/false, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
-
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> loss_initial_predictions,
       loss_imp.InitialPredictions(dataset,
@@ -126,7 +128,7 @@ TEST_P(MeanSquareErrorLossTest, UpdateGradients) {
 TEST_P(MeanSquareErrorLossTest, SetLabelDistribution) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {2.f, 4.f, 6.f, 8.f};
@@ -184,7 +186,8 @@ TEST_P(MeanSquareErrorLossTest, SetLabelDistribution) {
 TEST_P(MeanSquareErrorLossTest, ComputeClassificationLoss) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
+  const bool threaded = std::get<1>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {2.f, 4.f, 6.f, 8.f};
@@ -193,10 +196,20 @@ TEST_P(MeanSquareErrorLossTest, ComputeClassificationLoss) {
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
   const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::REGRESSION,
                                       dataset.data_spec().columns(0));
-  ASSERT_OK_AND_ASSIGN(
-      LossResults loss_results,
-      loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 0, predictions, weights, nullptr));
+  LossResults loss_results;
+  if (threaded) {
+    utils::concurrency::ThreadPool thread_pool("", 4);
+    thread_pool.StartWorkers();
+    ASSERT_OK_AND_ASSIGN(loss_results,
+                         loss_imp.Loss(dataset,
+                                       /* label_col_idx= */ 0, predictions,
+                                       weights, nullptr, &thread_pool));
+  } else {
+    ASSERT_OK_AND_ASSIGN(
+        loss_results,
+        loss_imp.Loss(dataset,
+                      /* label_col_idx= */ 0, predictions, weights, nullptr));
+  }
   if (weighted) {
     EXPECT_NEAR(loss_results.loss, std::sqrt(200. / 20.), kTestPrecision);
     // For classification, the only secondary metric is also RMSE.
@@ -213,7 +226,8 @@ TEST_P(MeanSquareErrorLossTest, ComputeClassificationLoss) {
 TEST_P(MeanSquareErrorLossTest, ComputeRankingLoss) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
+  const bool threaded = std::get<1>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {2.f, 4.f, 6.f, 8.f};
@@ -224,10 +238,20 @@ TEST_P(MeanSquareErrorLossTest, ComputeRankingLoss) {
                                       dataset.data_spec().columns(0));
   RankingGroupsIndices index;
   EXPECT_OK(index.Initialize(dataset, 0, 1));
-  ASSERT_OK_AND_ASSIGN(
-      LossResults loss_results,
-      loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 0, predictions, weights, &index));
+  LossResults loss_results;
+  if (threaded) {
+    utils::concurrency::ThreadPool thread_pool("", 4);
+    thread_pool.StartWorkers();
+    ASSERT_OK_AND_ASSIGN(loss_results,
+                         loss_imp.Loss(dataset,
+                                       /* label_col_idx= */ 0, predictions,
+                                       weights, &index, &thread_pool));
+  } else {
+    ASSERT_OK_AND_ASSIGN(
+        loss_results,
+        loss_imp.Loss(dataset,
+                      /* label_col_idx= */ 0, predictions, weights, &index));
+  }
   if (weighted) {
     EXPECT_NEAR(loss_results.loss, std::sqrt(200. / 20.), kTestPrecision);
     //  For ranking, first secondary metric is RMSE, second secondary metric is
@@ -263,8 +287,8 @@ TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRanking) {
               ElementsAre("rmse", "NDCG@5"));
 }
 
-INSTANTIATE_TEST_SUITE_P(MeanSquareErrorLossTestWithWeights,
-                         MeanSquareErrorLossTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(MeanSquareErrorLossTestWithWeightsAndThreads,
+                         MeanSquareErrorLossTest, Combine(Bool(), Bool()));
 
 }  // namespace
 }  // namespace gradient_boosted_trees

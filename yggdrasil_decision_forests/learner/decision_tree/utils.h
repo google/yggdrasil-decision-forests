@@ -107,26 +107,6 @@ inline float MidThreshold(const float a, const float b) {
   return threshold;
 }
 
-// Utility to apply a function over a range of elements using multi-threading.
-//
-// Given "num_items" elements divided into "num_blocks" contiguous blocks of
-// the same size (except possibly for the last one). This method calls
-// "function" on each block in parallel using the thread-pool.
-//
-// The method is blocking until all the "function" call have returned.
-//
-// For example, support num_items=10 and num_blocks=3 defines the following
-// blocks: [0,4), [4,8), [8,10). Then, "function" will be called in parallel on:
-//   function(block_idx=0, begin_item_idx=0, end_item_idx=0)
-//   function(block_idx=1, begin_item_idx=4, end_item_idx=8)
-//   function(block_idx=2, begin_item_idx=8, end_item_idx=10)
-//
-void ConcurrentForLoop(
-    size_t num_blocks, utils::concurrency::ThreadPool* thread_pool,
-    size_t num_items,
-    const std::function<void(size_t block_idx, size_t begin_item_idx,
-                             size_t end_item_idx)>& function);
-
 }  // namespace decision_tree
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

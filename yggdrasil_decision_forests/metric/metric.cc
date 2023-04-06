@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/metric/metric.h"
 
+#include <cstddef>
 #include <functional>
 #include <limits>
 #include <random>
@@ -36,6 +37,7 @@
 #include "yggdrasil_decision_forests/metric/ranking_mrr.h"
 #include "yggdrasil_decision_forests/metric/ranking_ndcg.h"
 #include "yggdrasil_decision_forests/metric/uplift.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -1804,31 +1806,84 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
   return eval;
 }
 
-absl::StatusOr<double> RMSE(const std::vector<float>& labels,
-                            const std::vector<float>& predictions,
-                            const std::vector<float>& weights) {
-  STATUS_CHECK_EQ(labels.size(), predictions.size());
-  STATUS_CHECK_EQ(labels.size(), weights.size());
-  double sum_loss = 0;
-  double sum_weights = 0;
-  for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
+template <bool use_weights>
+void RMSEImp(const std::vector<float>& labels,
+             const std::vector<float>& predictions,
+             const std::vector<float>& weights, size_t begin_example_idx,
+             size_t end_example_idx, double* __restrict sum_sq_err,
+             double* __restrict sum_weights) {
+  for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
+       example_idx++) {
     const float label = labels[example_idx];
     const float prediction = predictions[example_idx];
-    const float weight = weights[example_idx];
-    sum_weights += weight;
-    // Loss:
-    //   (label - prediction)^2
-    sum_loss += weight * (label - prediction) * (label - prediction);
+    if constexpr (use_weights) {
+      const float weight = weights[example_idx];
+      *sum_weights += weight;
+      // Loss:
+      //   (label - prediction)^2
+      *sum_sq_err += weight * (label - prediction) * (label - prediction);
+    } else {
+      *sum_sq_err += (label - prediction) * (label - prediction);
+    }
   }
+}
+
+absl::StatusOr<double> RMSE(const std::vector<float>& labels,
+                            const std::vector<float>& predictions,
+                            const std::vector<float>& weights,
+                            utils::concurrency::ThreadPool* thread_pool) {
+  double sum_sq_err = 0;
+  double sum_weights = 0;
+  if (thread_pool == nullptr) {
+    if (weights.empty()) {
+      RMSEImp<false>(labels, predictions, weights, 0, labels.size(),
+                     &sum_sq_err, &sum_weights);
+    } else {
+      RMSEImp<true>(labels, predictions, weights, 0, labels.size(), &sum_sq_err,
+                    &sum_weights);
+    }
+  } else {
+    const auto num_threads = thread_pool->num_threads();
+
+    struct PerThread {
+      double sum_sq_err = 0;
+      double sum_weights = 0;
+    };
+    std::vector<PerThread> per_threads(num_threads);
+
+    utils::concurrency::ConcurrentForLoop(
+        num_threads, thread_pool, labels.size(),
+        [&labels, &predictions, &per_threads, &weights](
+            size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
+          auto& block = per_threads[block_idx];
+          if (weights.empty()) {
+            RMSEImp<false>(labels, predictions, weights, begin_idx, end_idx,
+                           &block.sum_sq_err, &block.sum_weights);
+          } else {
+            RMSEImp<true>(labels, predictions, weights, begin_idx, end_idx,
+                          &block.sum_sq_err, &block.sum_weights);
+          }
+        });
+
+    for (const auto& block : per_threads) {
+      sum_sq_err += block.sum_sq_err;
+      sum_weights += block.sum_weights;
+    }
+  }
+  if (weights.empty()) {
+    sum_weights = labels.size();
+  }
+
   if (sum_weights > 0) {
-    return sqrt(sum_loss / sum_weights);
+    return sqrt(sum_sq_err / sum_weights);
   } else {
     return std::numeric_limits<double>::quiet_NaN();
   }
 }
 
 absl::StatusOr<double> RMSE(const std::vector<float>& labels,
-                            const std::vector<float>& predictions) {
+                            const std::vector<float>& predictions,
+                            utils::concurrency::ThreadPool* thread_pool) {
   STATUS_CHECK_EQ(labels.size(), predictions.size());
 
   double sum_loss = 0;

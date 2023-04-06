@@ -268,7 +268,7 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
     };
     std::vector<PerThread> per_threads(num_threads);
 
-    decision_tree::ConcurrentForLoop(
+    utils::concurrency::ConcurrentForLoop(
         num_threads, thread_pool, labels.size(),
         [&labels, &predictions, &per_threads, &weights, &confusion_matrix_size](
             size_t block_idx, size_t begin_idx, size_t end_idx) -> void {

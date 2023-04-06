@@ -139,17 +139,6 @@ cc_test(
 )
 
 cc_test(
-    name = "utils_test",
-    srcs = ["utils_test.cc"],
-    deps = [
-        ":utils",
-        "//yggdrasil_decision_forests/utils:concurrency",
-        "//yggdrasil_decision_forests/utils:test",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_test(
     name = "training_test",
     srcs = ["training_test.cc"],
     deps = [

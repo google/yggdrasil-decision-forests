@@ -164,7 +164,7 @@ absl::Status BinomialLogLikelihoodLoss::TemplatedUpdateGradients(
     TemplatedUpdateGradientsImp(labels, predictions, 0, num_examples,
                                 &gradient_data, hessian_data);
   } else {
-    decision_tree::ConcurrentForLoop(
+    utils::concurrency::ConcurrentForLoop(
         thread_pool->num_threads(), thread_pool, num_examples,
         [&labels, &predictions, &gradient_data, hessian_data](
             size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
@@ -294,7 +294,7 @@ absl::StatusOr<LossResults> BinomialLogLikelihoodLoss::TemplatedLoss(
     };
     std::vector<PerThread> per_threads(num_threads);
 
-    decision_tree::ConcurrentForLoop(
+    utils::concurrency::ConcurrentForLoop(
         num_threads, thread_pool, labels.size(),
         [&labels, &predictions, &per_threads, &weights, &confusion_matrix_size](
             size_t block_idx, size_t begin_idx, size_t end_idx) -> void {

@@ -52,4 +52,17 @@
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 
+namespace yggdrasil_decision_forests {
+namespace utils {
+namespace concurrency {
+
+void ConcurrentForLoop(
+    const size_t num_blocks, ThreadPool* thread_pool, const size_t num_items,
+    const std::function<void(size_t block_idx, size_t begin_item_idx,
+                             size_t end_item_idx)>& function);
+
+}  // namespace concurrency
+}  // namespace utils
+}  // namespace yggdrasil_decision_forests
+
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_CONCURRENCY_H_

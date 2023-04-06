@@ -193,11 +193,7 @@ absl::StatusOr<LossResults> MeanSquaredErrorLoss::Loss(
     utils::concurrency::ThreadPool* thread_pool) const {
   float loss_value;
   // The RMSE is also the loss.
-  if (weights.empty()) {
-    ASSIGN_OR_RETURN(loss_value, metric::RMSE(labels, predictions));
-  } else {
-    ASSIGN_OR_RETURN(loss_value, metric::RMSE(labels, predictions, weights));
-  }
+  ASSIGN_OR_RETURN(loss_value, metric::RMSE(labels, predictions, weights));
 
   std::vector<float> secondary_metrics = {loss_value};
   if (task_ == model::proto::Task::RANKING) {

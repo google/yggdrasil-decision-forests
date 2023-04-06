@@ -76,7 +76,7 @@ absl::Status TemplatedAggregateLabelStatistics(
     filler.InitializeAndZeroAccumulator(&accumulators[thread_idx]);
   }
 
-  decision_tree::ConcurrentForLoop(
+  utils::concurrency::ConcurrentForLoop(
       num_threads, thread_pool, num_examples,
       [&accumulators, &filler](size_t block_idx, size_t begin_idx,
                                size_t end_idx) -> void {

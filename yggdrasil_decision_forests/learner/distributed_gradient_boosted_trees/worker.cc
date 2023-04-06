@@ -1297,7 +1297,7 @@ absl::Status UpdateClosingNodesPredictions(
   }
 
   // Increase the prediction values.
-  decision_tree::ConcurrentForLoop(
+  utils::concurrency::ConcurrentForLoop(
       thread_pool->num_threads(), thread_pool, example_to_node.size(),
       [&example_to_node, &label_stats_per_node, &node_remapping, predictions,
        num_weak_models, weak_model_idx, &prediction_offset_per_node](
