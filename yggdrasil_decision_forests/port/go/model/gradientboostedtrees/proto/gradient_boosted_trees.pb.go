@@ -21,10 +21,11 @@
 package proto
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -54,6 +55,8 @@ const (
 	// EXPERIMENTAl. Focal loss. Only valid for binary classification.
 	// [https://arxiv.org/pdf/1708.02002.pdf]
 	Loss_BINARY_FOCAL_LOSS Loss = 6
+	// Poisson loss. Only valid for regression.
+	Loss_POISSON Loss = 7
 )
 
 // Enum value maps for Loss.
@@ -66,6 +69,7 @@ var (
 		4: "LAMBDA_MART_NDCG5",
 		5: "XE_NDCG_MART",
 		6: "BINARY_FOCAL_LOSS",
+		7: "POISSON",
 	}
 	Loss_value = map[string]int32{
 		"DEFAULT":                    0,
@@ -75,6 +79,7 @@ var (
 		"LAMBDA_MART_NDCG5":          4,
 		"XE_NDCG_MART":               5,
 		"BINARY_FOCAL_LOSS":          6,
+		"POISSON":                    7,
 	}
 )
 

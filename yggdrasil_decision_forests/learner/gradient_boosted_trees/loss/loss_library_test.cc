@@ -65,6 +65,9 @@ TEST(LossLibrary, CanonicalLosses) {
   EXPECT_OK(CreateLoss(proto::Loss::BINARY_FOCAL_LOSS,
                        model::proto::Task::CLASSIFICATION,
                        binary_categorical_label_column, config));
+
+  EXPECT_OK(CreateLoss(proto::Loss::POISSON, model::proto::Task::REGRESSION,
+                       numerical_label_column, config));
 }
 
 }  // namespace

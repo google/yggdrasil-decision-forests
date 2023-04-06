@@ -2082,6 +2082,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
 - `DEFAULT`: Select the loss automatically according to the task and label statistics.
 - `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.
 - `SQUARED_ERROR`: Least square loss. Only valid for regression.
+- `POISSON`: Poisson log likelihood loss. Mainly used for counting problems. Only valid for regression.
 - `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.
 - `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5.
 - `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.

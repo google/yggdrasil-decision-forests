@@ -4,7 +4,8 @@
 
 ### Feature
 
-- Rename experimental_analyze_model_and_dataset to analyze_model_and_dataset
+-   Rename experimental_analyze_model_and_dataset to analyze_model_and_dataset
+-   Add new GBT loss function `POISSON` for Poisson log likelihood.
 
 ## 1.4.0 - 2023-03-20
 

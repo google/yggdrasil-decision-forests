@@ -457,7 +457,7 @@ func NewRegressionGBDTGenericEngine(model *gbt.Model, compatibility example.Comp
 	if len(model.GbtHeader.GetInitialPredictions()) != 1 {
 		return nil, fmt.Errorf("Invalid initial predictions")
 	}
-	if model.GbtHeader.GetLoss() != gbt_pb.Loss_SQUARED_ERROR {
+	if model.GbtHeader.GetLoss() != gbt_pb.Loss_SQUARED_ERROR && model.GbtHeader.GetLoss() != gbt_pb.Loss_POISSON {
 		return nil, fmt.Errorf("Incompatible loss. Expecting squared error")
 	}
 
