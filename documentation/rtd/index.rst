@@ -9,8 +9,10 @@
 developed and used by Google, for the training, serving, and interpretation of Decision Forest
 models. YDF is open-source and is available in C++, CLI (command-line-interface),
 TensorFlow (under the name TensorFlow Decision Forests;TF-DF), Javascript, and Go
-(inference only). See the :doc:`features` page for the list of features. Read
-`Yggdrasil Decision Forests's paper <https://arxiv.org/abs/2212.02934>` for
+(inference only). 
+
+See the :doc:`features` page for the full list of features of YDF. Read the
+`Yggdrasil Decision Forests paper <https://arxiv.org/abs/2212.02934>`_ for
 details about YDF's design.
 
 |
@@ -66,6 +68,7 @@ Content
   apis
   improve_model
   hyper_parameters
+  early_stopping
   metrics
   What are decision forests <https://developers.google.com/machine-learning/decision-forests>
   features
