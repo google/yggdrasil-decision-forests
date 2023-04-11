@@ -86,8 +86,6 @@ cc_test(
     # indicated. This can create flakyness with concurrent execution of tests.
     defines = ["SKIP_TIMING_TESTS"],
     shard_count = 20,
-    tags = [
-    ],
     deps = [
         ":random_forest",
         ":random_forest_cc_proto",

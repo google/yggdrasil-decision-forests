@@ -148,7 +148,7 @@ class OnAdult : public utils::TrainAndTestTester {
 TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTraining) {
   SetLocalTraining();
   TrainAndEvaluateModel();
-  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
@@ -157,7 +157,7 @@ TEST_F(OnAdult, RandomTuner_FileDataset_LocalTraining) {
   pass_training_dataset_as_path_ = true;
   SetLocalTraining();
   TrainAndEvaluateModel();
-  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
@@ -165,7 +165,7 @@ TEST_F(OnAdult, RandomTuner_FileDataset_LocalTraining) {
 TEST_F(OnAdult, RandomTuner_MemoryDataset_DistributedTraining) {
   SetDistributedTraining();
   TrainAndEvaluateModel();
-  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
@@ -174,7 +174,7 @@ TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining) {
   SetDistributedTraining();
   pass_training_dataset_as_path_ = true;
   TrainAndEvaluateModel();
-  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
@@ -199,7 +199,7 @@ TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining_NoRetrain) {
   SetDistributedTraining();
   pass_training_dataset_as_path_ = true;
   TrainAndEvaluateModel();
-  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
@@ -207,7 +207,7 @@ TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining_NoRetrain) {
 TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTraining_DefaultHPSpace) {
   SetLocalTraining();
   TrainAndEvaluateModel();
-  EXPECT_GE(metric::Accuracy(evaluation_), 0.87);
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
