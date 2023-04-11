@@ -14,6 +14,7 @@ cc_library_ydf(
     hdrs = ["multitasker.h"],
     deps = [
         ":multitasker_cc_proto",
+        "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner:abstract_learner",
@@ -58,6 +59,8 @@ cc_test(
     deps = [
         ":multitasker",
         ":multitasker_cc_proto",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/learner:learner_library",
         "//yggdrasil_decision_forests/learner/random_forest",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/model:abstract_model",

@@ -18,6 +18,7 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_join.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
@@ -38,6 +39,26 @@ namespace multitasker {
 constexpr char MultitaskerLearner::kRegisteredName[];
 
 namespace {
+
+// Extracts the examples of "src" with non-missing value for the column
+// "label_idx" into "dst".
+absl::Status ExtractExamplesWithLabels(const int label_idx,
+                                       const dataset::VerticalDataset& src,
+                                       dataset::VerticalDataset* dst) {
+  *dst->mutable_data_spec() = src.data_spec();
+  dst->mutable_data_spec()->mutable_columns(label_idx)->set_count_nas(0);
+  RETURN_IF_ERROR(dst->CreateColumnsFromDataspec());
+  for (dataset::VerticalDataset::row_t row_idx = 0; row_idx < src.nrow();
+       row_idx++) {
+    dataset::proto::Example example;
+    src.ExtractExample(row_idx, &example);
+    if (example.attributes(label_idx).type_case() !=
+        dataset::proto::Example::Attribute::TYPE_NOT_SET) {
+      dst->AppendExample(example);
+    }
+  }
+  return absl::OkStatus();
+}
 
 std::string PredictionColNames(const model::AbstractModel& model,
                                const int prediction_idx) {
@@ -106,14 +127,41 @@ MultitaskerLearner::TrainWithStatus(
   STATUS_CHECK_LE(model->models_.size(), mt_config.subtasks_size());
   model->models_.resize(mt_config.subtasks_size());
 
-  ASSIGN_OR_RETURN(const auto first_subtraining_config,
-                   BuildSubTrainingConfig(0));
-  model::proto::TrainingConfigLinking first_subtraining_config_link;
-  RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
-      first_subtraining_config, train_dataset.data_spec(),
-      &first_subtraining_config_link));
-  InitializeModelWithAbstractTrainingConfig(
-      first_subtraining_config, first_subtraining_config_link, model.get());
+  // Initialize the model. Use the first task for meta-data.
+  model::proto::TrainingConfigLinking config_link;
+  {
+    ASSIGN_OR_RETURN(const auto first_config, BuildSubTrainingConfig(0));
+    RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
+        first_config, train_dataset.data_spec(), &config_link));
+    InitializeModelWithAbstractTrainingConfig(training_config(), config_link,
+                                              model.get());
+  }
+
+  // List the user specified input features.
+  std::set<int> all_features;
+  for (const int feature : config_link.features()) {
+    all_features.insert(feature);
+  }
+
+  // Remove all the labels (and other special columns) from the set of the input
+  // features.
+  for (int task_idx = 0; task_idx < mt_config.subtasks_size(); task_idx++) {
+    ASSIGN_OR_RETURN(const auto subtraining_config,
+                     BuildSubTrainingConfig(task_idx));
+    model::proto::TrainingConfigLinking subtraining_config_link;
+    RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
+        subtraining_config, train_dataset.data_spec(),
+        &subtraining_config_link));
+    if (subtraining_config_link.has_label()) {
+      all_features.erase(subtraining_config_link.label());
+    }
+    if (subtraining_config_link.cv_group() >= 0) {
+      all_features.erase(subtraining_config_link.cv_group());
+    }
+    if (subtraining_config_link.ranking_group() >= 0) {
+      all_features.erase(subtraining_config_link.ranking_group());
+    }
+  }
 
   utils::concurrency::Mutex mutex;
   absl::Status status;
@@ -139,33 +187,46 @@ MultitaskerLearner::TrainWithStatus(
   }
   std::vector<std::string> secondary_model_output;
 
-  const auto train_subtask = [&](const int subtask_idx, const bool primary) {
+  const auto train_subtask = [&](const int subtask_idx,
+                                 const bool primary) -> absl::Status {
     STATUS_CHECK_GE(subtask_idx, 0);
     ASSIGN_OR_RETURN(auto sublearner, BuildSubLearner(subtask_idx));
 
+    // Add the input features.
+    sublearner->mutable_training_config()->clear_features();
+    for (const int input_feature : all_features) {
+      sublearner->mutable_training_config()->add_features(QuoteFeatureName(
+          train_dataset.data_spec().columns()[input_feature].name()));
+    }
+
     std::unique_ptr<AbstractModel> submodel;
     if (primary) {
-      for (const int input_feature : first_subtraining_config_link.features()) {
-        sublearner->mutable_training_config()->add_features(QuoteFeatureName(
-            train_dataset.data_spec().columns()[input_feature].name()));
-      }
+      // Add the output of the secondary models as input features.
       for (const auto& new_feature : secondary_model_output) {
         sublearner->mutable_training_config()->add_features(
             QuoteFeatureName(new_feature));
       }
-
-      if (valid_dataset.has_value()) {
-        ASSIGN_OR_RETURN(submodel,
-                         sublearner->TrainWithStatus(primary_train_dataset,
-                                                     primary_valid_dataset));
-      } else {
-        ASSIGN_OR_RETURN(submodel,
-                         sublearner->TrainWithStatus(primary_train_dataset));
-      }
-    } else {
-      ASSIGN_OR_RETURN(
-          submodel, sublearner->TrainWithStatus(train_dataset, valid_dataset));
     }
+
+    int32_t label_idx;
+    RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
+        sublearner->training_config().label(),
+        primary_train_dataset.data_spec(), &label_idx));
+
+    // Extract the training / validation dataset
+    dataset::VerticalDataset local_train_ds;
+    RETURN_IF_ERROR(ExtractExamplesWithLabels(label_idx, primary_train_dataset,
+                                              &local_train_ds));
+    absl::optional<dataset::VerticalDataset> local_valid_ds;
+    if (valid_dataset.has_value()) {
+      local_valid_ds = dataset::VerticalDataset();
+      RETURN_IF_ERROR(ExtractExamplesWithLabels(
+          label_idx, primary_valid_dataset, &local_valid_ds.value()));
+    }
+
+    // Train
+    ASSIGN_OR_RETURN(
+        submodel, sublearner->TrainWithStatus(local_train_ds, local_valid_ds));
 
     utils::concurrency::MutexLock lock(&mutex);
     STATUS_CHECK_LT(subtask_idx, model->models_.size());
@@ -294,7 +355,7 @@ MultitaskerLearner::BuildSubLearner(const int learner_idx) const {
   ASSIGN_OR_RETURN(const auto sub_learner_config,
                    BuildSubTrainingConfig(learner_idx));
 
-  // Build sub-model learner.
+  // Build sub-learner
   std::unique_ptr<AbstractLearner> sub_learner;
   RETURN_IF_ERROR(GetLearner(sub_learner_config, &sub_learner));
   *sub_learner->mutable_deployment() = mt_config.base_learner_deployment();

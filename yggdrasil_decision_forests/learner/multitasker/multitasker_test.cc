@@ -20,6 +20,8 @@
 #include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/learner/multitasker/multitasker.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -34,6 +36,14 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace multitasker {
 namespace {
+
+std::vector<std::string> features_to_str(const model::AbstractModel& model) {
+  std::vector<std::string> str_features;
+  for (const int feature : model.input_features()) {
+    str_features.push_back(model.data_spec().columns(feature).name());
+  }
+  return str_features;
+}
 
 class MultitaskerOnAdult : public utils::TrainAndTestTester {
   void SetUp() override {
@@ -79,6 +89,12 @@ TEST_F(MultitaskerOnAdult, Base) {
   {
     auto* submodel = mt_model->model(0);
     EXPECT_EQ(submodel->label(), "income");
+    EXPECT_THAT(
+        features_to_str(*submodel),
+        testing::UnorderedElementsAre(
+            "workclass", "fnlwgt", "education", "education_num",
+            "marital_status", "occupation", "race", "sex", "capital_gain",
+            "capital_loss", "hours_per_week", "native_country"));
     metric::proto::EvaluationOptions eval_options;
     eval_options.set_task(model::proto::Task::CLASSIFICATION);
     auto eval = submodel->Evaluate(test_dataset_, eval_options, &rnd);
@@ -88,19 +104,31 @@ TEST_F(MultitaskerOnAdult, Base) {
   {
     auto* submodel = mt_model->model(1);
     EXPECT_EQ(submodel->label(), "age");
+    EXPECT_THAT(
+        features_to_str(*submodel),
+        testing::UnorderedElementsAre(
+            "workclass", "fnlwgt", "education", "education_num",
+            "marital_status", "occupation", "race", "sex", "capital_gain",
+            "capital_loss", "hours_per_week", "native_country"));
     metric::proto::EvaluationOptions eval_options;
     eval_options.set_task(model::proto::Task::REGRESSION);
     auto eval = submodel->Evaluate(test_dataset_, eval_options, &rnd);
-    YDF_EXPECT_METRIC_NEAR(metric::RMSE(eval), 9.957, 0.05);
+    YDF_EXPECT_METRIC_NEAR(metric::RMSE(eval), 10.2048, 0.05);
   }
 
   {
     auto* submodel = mt_model->model(2);
     EXPECT_EQ(submodel->label(), "relationship");
+    EXPECT_THAT(
+        features_to_str(*submodel),
+        testing::UnorderedElementsAre(
+            "workclass", "fnlwgt", "education", "education_num",
+            "marital_status", "occupation", "race", "sex", "capital_gain",
+            "capital_loss", "hours_per_week", "native_country"));
     metric::proto::EvaluationOptions eval_options;
     eval_options.set_task(model::proto::Task::CLASSIFICATION);
     auto eval = submodel->Evaluate(test_dataset_, eval_options, &rnd);
-    YDF_EXPECT_METRIC_NEAR(metric::Accuracy(eval), 0.786, 0.01);
+    YDF_EXPECT_METRIC_NEAR(metric::Accuracy(eval), 0.76474, 0.01);
   }
 
   {
@@ -175,23 +203,23 @@ TEST_F(MultitaskerOnAdult, Stacked) {
   {
     auto* submodel = mt_model->model(0);
     EXPECT_EQ(submodel->label(), "income");
-    EXPECT_THAT(features_to_str(*submodel),
-                testing::UnorderedElementsAre(
-                    "age", "workclass", "fnlwgt", "education", "education_num",
-                    "marital_status", "occupation", "relationship", "race",
-                    "sex", "capital_gain", "capital_loss", "hours_per_week",
-                    "native_country"));
+    EXPECT_THAT(
+        features_to_str(*submodel),
+        testing::UnorderedElementsAre(
+            "workclass", "fnlwgt", "education", "education_num",
+            "marital_status", "occupation", "race", "sex", "capital_gain",
+            "capital_loss", "hours_per_week", "native_country"));
   }
 
   {
     auto* submodel = mt_model->model(1);
     EXPECT_EQ(submodel->label(), "age");
-    EXPECT_THAT(features_to_str(*submodel),
-                testing::UnorderedElementsAre(
-                    "workclass", "fnlwgt", "education", "education_num",
-                    "marital_status", "occupation", "relationship", "race",
-                    "sex", "capital_gain", "capital_loss", "hours_per_week",
-                    "native_country", "income"));
+    EXPECT_THAT(
+        features_to_str(*submodel),
+        testing::UnorderedElementsAre(
+            "workclass", "fnlwgt", "education", "education_num",
+            "marital_status", "occupation", "race", "sex", "capital_gain",
+            "capital_loss", "hours_per_week", "native_country"));
   }
 
   {
@@ -199,10 +227,99 @@ TEST_F(MultitaskerOnAdult, Stacked) {
     EXPECT_EQ(submodel->label(), "relationship");
     EXPECT_THAT(features_to_str(*submodel),
                 testing::UnorderedElementsAre(
-                    "age", "workclass", "fnlwgt", "education", "education_num",
+                    "workclass", "fnlwgt", "education", "education_num",
                     "marital_status", "occupation", "race", "sex",
                     "capital_gain", "capital_loss", "hours_per_week",
                     "native_country", "income:0", "age:0"));
+  }
+}
+
+TEST(Multitasker, WithMissingValues) {
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(MultitaskerLearner::kRegisteredName);
+  train_config.set_label("unused");
+  auto* mt_config =
+      train_config.MutableExtension(multitasker::proto::multitasker_config);
+  mt_config->mutable_base_learner()->set_learner("RANDOM_FOREST");
+
+  auto* tt1 = mt_config->add_subtasks();
+  auto t1 = tt1->mutable_train_config();
+  tt1->set_primary(false);
+  auto* tt2 = mt_config->add_subtasks();
+  tt2->set_primary(false);
+  auto t2 = tt2->mutable_train_config();
+  auto* tt3 = mt_config->add_subtasks();
+  auto t3 = tt3->mutable_train_config();
+
+  t1->set_label("l1");
+  t1->set_task(model::proto::Task::REGRESSION);
+
+  t2->set_label("l2");
+  t2->set_task(model::proto::Task::REGRESSION);
+
+  t3->set_label("l3");
+  t3->set_task(model::proto::Task::REGRESSION);
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  CHECK_OK(model::GetLearner(train_config, &learner));
+
+  dataset::VerticalDataset dataset;
+  CHECK_OK(
+      dataset.AddColumn("f1", dataset::proto::ColumnType::NUMERICAL).status());
+  CHECK_OK(
+      dataset.AddColumn("f2", dataset::proto::ColumnType::NUMERICAL).status());
+  CHECK_OK(
+      dataset.AddColumn("l1", dataset::proto::ColumnType::NUMERICAL).status());
+  CHECK_OK(
+      dataset.AddColumn("l2", dataset::proto::ColumnType::NUMERICAL).status());
+  CHECK_OK(
+      dataset.AddColumn("l3", dataset::proto::ColumnType::NUMERICAL).status());
+
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+  CHECK_OK(dataset.AppendExampleWithStatus({{"f1", "0.1"},
+                                            {"f2", "0.1"},
+                                            {"l1", "0.1"},
+                                            {"l2", "0.1"},
+                                            {"l3", "0.1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus(
+      {{"f1", "0.1"}, {"f2", "0.1"}, {"l1", "0.1"}, {"l2", "0.1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus(
+      {{"f1", "0.1"}, {"f2", "0.1"}, {"l1", "0.1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"f1", "0.1"}, {"f2", "0.1"}}));
+  const auto model = learner->Train(dataset);
+
+  utils::RandomEngine rnd(1234);
+
+  auto* mt_model = dynamic_cast<MultitaskerModel*>(model.get());
+  EXPECT_EQ(mt_model->models().size(), 3);
+
+  const auto features_to_str = [](const model::AbstractModel& model) {
+    std::vector<std::string> str_features;
+    for (const int feature : model.input_features()) {
+      str_features.push_back(model.data_spec().columns(feature).name());
+    }
+    return str_features;
+  };
+
+  {
+    auto* submodel = mt_model->model(0);
+    EXPECT_EQ(submodel->label(), "l1");
+    EXPECT_THAT(features_to_str(*submodel),
+                testing::UnorderedElementsAre("f1", "f2"));
+  }
+
+  {
+    auto* submodel = mt_model->model(1);
+    EXPECT_EQ(submodel->label(), "l2");
+    EXPECT_THAT(features_to_str(*submodel),
+                testing::UnorderedElementsAre("f1", "f2"));
+  }
+
+  {
+    auto* submodel = mt_model->model(2);
+    EXPECT_EQ(submodel->label(), "l3");
+    EXPECT_THAT(features_to_str(*submodel),
+                testing::UnorderedElementsAre("f1", "f2", "l1:0", "l2:0"));
   }
 }
 

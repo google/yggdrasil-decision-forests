@@ -112,7 +112,7 @@ void MultitaskerModel::AppendDescriptionAndStatistics(
   AbstractModel::AppendDescriptionAndStatistics(full_definition, description);
   for (int model_idx = 0; model_idx < models_.size(); model_idx++) {
     const auto& model = models_[model_idx];
-    absl::SubstituteAndAppend(description, "model #$0:\n", model_idx);
+    absl::SubstituteAndAppend(description, "model #$0\n========\n", model_idx);
     model->AppendDescriptionAndStatistics(full_definition, description);
     absl::StrAppend(description, "\n");
   }
