@@ -12,14 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 #
-# Builds a binary release (like "build_binary_release.sh") in a Docker
-# container.
+# Start the build docker.
 #
 # Usage example:
-#   ./tools/build_binary_release.sh
+#   tools/start_build_docker.sh
+#   INSTALL_DEPENDENCIES=1 BUILD=1 PACK=1 ./tools/build_binary_release.sh
+#
 
 set -vex
 
@@ -32,5 +31,5 @@ DIRNAME=${PWD##*/}
 docker pull ${DOCKER}
 
 # Start docker
-docker run -it -v ${PWD}/..:/working_dir -w /working_dir/${DIRNAME} ${DOCKER} \
-  /bin/bash -c "INSTALL_DEPENDENCIES=1 BUILD=1 PACK=1 ./tools/build_binary_release.sh"
+docker run -it -v ${PWD}/..:/working_dir -w /working_dir/${DIRNAME} ${DOCKER} /bin/bash
+

@@ -2417,6 +2417,30 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
       attribute_idx, condition, &cache->cache_v2);
 }
 
+
+    template
+SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart < true>(
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<float>& weights, const std::vector<float>& attributes,
+    const std::vector<float>& labels, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, const InternalTrainConfig& internal_config,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
+    template 
+SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart< false>(
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<float>& weights, const std::vector<float>& attributes,
+    const std::vector<float>& labels, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, const InternalTrainConfig& internal_config,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
+
 SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
