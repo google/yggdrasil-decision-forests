@@ -32,8 +32,11 @@
 #
 #   # Compilation without TF support, GCC 9, C++17. running tests.
 #   ./tools/test_bazel.sh
-#    
-#   # Compilation with TF support, C++14 and C++14, Clang and gcc-9, no tests run.
+#
+#   # Compilation with TF support, C++17 and C++14, Clang and gcc-12, run all tests.
+#   TF_SUPPORT="ON" COMPILERS="gcc-12" CPP_VERSIONS="17" RUN_TESTS=1 ./tools/test_bazel.sh
+#
+#   # Compilation with TF support, C++14 and C++17, Clang and gcc-9, no tests run.
 #   TF_SUPPORT="ON" COMPILERS="clang;gcc-9" CPP_VERSIONS="14;17" RUN_TESTS=0 ./tools/test_bazel.sh
 #
 set -xev

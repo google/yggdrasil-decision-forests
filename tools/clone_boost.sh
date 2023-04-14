@@ -15,22 +15,8 @@
 
 
 #
-# Builds a binary release (like "build_binary_release.sh") in a Docker
-# container.
+# Clone boost manually. This is faster than having Bazel cloning it.
+# You can then compile YDF with from_git_repo = False in third_party/boost/workspace.bzl
 #
-# Usage example:
-#   ./tools/build_binary_release.sh
-
 set -vex
-
-DOCKER=ubuntu:18.04
-
-# Current directory
-DIRNAME=${PWD##*/}
-
-# Download docker
-docker pull ${DOCKER}
-
-# Start docker
-docker run -it -v ${PWD}/..:/working_dir -w /working_dir/${DIRNAME} ${DOCKER} \
-  /bin/bash -c "INSTALL_DEPENDENCIES=1 BUILD=1 PACK=1 ./tools/build_binary_release.sh"
+cd .. && git clone --progress --verbose --recurse-submodules -j8 --branch boost-1.75.0 https://github.com/boostorg/boost.git
