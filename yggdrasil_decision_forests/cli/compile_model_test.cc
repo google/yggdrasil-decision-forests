@@ -13,7 +13,9 @@
  * limitations under the License.
  */
 
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -69,6 +71,8 @@ TEST(CompileModelTest, Metadata) {
                              &uncompiled_model));
   model::proto::Metadata uncompiled_model_metadata_proto;
   uncompiled_model->metadata().Export(&uncompiled_model_metadata_proto);
+  // The owner is sanitized during model compilation.
+  uncompiled_model_metadata_proto.clear_owner();
   EXPECT_THAT(compiled_model->metadata,
               EqualsProto(uncompiled_model_metadata_proto));
 }

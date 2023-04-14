@@ -205,6 +205,8 @@ absl::StatusOr<const serving::decision_forest::
       absl::Base64Escape(
           flat_model.internal_features.data_spec().SerializeAsString()));
 
+  // Remove the owner name to prevent information leakage
+  flat_model.metadata.set_owner("");
   const std::string model_metadata = absl::Substitute(
       "\"$0\"", absl::Base64Escape(flat_model.metadata.SerializeAsString()));
 

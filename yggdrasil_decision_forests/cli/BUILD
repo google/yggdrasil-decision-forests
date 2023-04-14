@@ -209,6 +209,7 @@ cc_binary_ydf(
     name = "compile_model",
     srcs = ["compile_model.cc"],
     deps = [
+        ":all_file_systems",
         "//yggdrasil_decision_forests/serving/decision_forest:model_compiler",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
