@@ -358,22 +358,25 @@ absl::Status AbstractLearner::CheckConfiguration(
       break;
     case model::proto::Task::CLASSIFICATION:
       if (label_col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
-        return absl::InvalidArgumentError(
-            "The label column should be CATEGORICAL for a CLASSIFICATION "
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The label column \"", config.label(),
+            "\" should be CATEGORICAL for a CLASSIFICATION "
             "Task. Note: BOOLEAN columns should be set as CATEGORICAL using a "
-            "dataspec guide, even for a binary classification task.");
+            "dataspec guide, even for a binary classification task."));
       }
       break;
     case model::proto::Task::REGRESSION:
       if (label_col_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
         return absl::InvalidArgumentError(
-            "The label column should be NUMERICAL for a REGRESSION task.");
+            absl::StrCat("The label column \"", config.label(),
+                         "\" should be NUMERICAL for a REGRESSION task."));
       }
       break;
     case model::proto::Task::RANKING: {
       if (label_col_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
         return absl::InvalidArgumentError(
-            "The label column should be NUMERICAL for a RANKING task.");
+            absl::StrCat("The label column \"", config.label(),
+                         "\" should be NUMERICAL for a RANKING task."));
       }
       if (!config_link.has_ranking_group() || config_link.ranking_group() < 0) {
         return absl::InvalidArgumentError(
@@ -453,7 +456,9 @@ absl::Status AbstractLearner::CheckConfiguration(
   // Check the label don't contains NaN.
   if (label_col_spec.count_nas() != 0) {
     return absl::InvalidArgumentError(
-        "The label column should not contain NaN values.");
+        absl::Substitute("The label column \"$0\" should not contain NaN / "
+                         "missing values. $1 missing values are found.",
+                         config.label(), label_col_spec.count_nas()));
   }
   if (deployment.num_threads() < 0) {
     return absl::InvalidArgumentError("The number of threads should be >= 0");

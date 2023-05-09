@@ -22,7 +22,8 @@
 namespace yggdrasil_decision_forests {
 namespace logging {
 int logging_level = 2;
-}
+bool show_details = true;
+}  // namespace logging
 }  // namespace yggdrasil_decision_forests
 
 ABSL_FLAG(bool, alsologtostderr, true,

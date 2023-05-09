@@ -51,12 +51,17 @@ namespace yggdrasil_decision_forests {
 namespace logging {
 
 extern int logging_level;
+extern bool show_details;
 
 // Sets the amount of logging:
 // 0: Only fatal i.e. before a crash of the program.
 // 1: Only warning and fatal.
 // 2: Info, warning and fatal i.e. all logging. Default.
 inline void SetLoggingLevel(int level) { logging_level = level; }
+
+// If true, logging messages include the timestamp, filename and line. True by
+// default.
+inline void SetDetails(bool value) { value = show_details; }
 
 // Tests if a given logging level should be visible.
 inline bool IsLoggingEnabled(Severity severity) {
@@ -188,24 +193,26 @@ class LogMessage {
       return;
     }
 
-    std::clog << "[";
-    switch (sev) {
-      case INFO:
-        std::clog << "INFO";
-        break;
-      case WARNING:
-        std::clog << "WARNING";
-        break;
-      case FATAL:
-        std::clog << "FATAL";
-        break;
-      default:
-        std::clog << "UNDEF";
-        break;
+    if (yggdrasil_decision_forests::logging::show_details) {
+      std::clog << "[";
+      switch (sev) {
+        case INFO:
+          std::clog << "INFO";
+          break;
+        case WARNING:
+          std::clog << "WARNING";
+          break;
+        case FATAL:
+          std::clog << "FATAL";
+          break;
+        default:
+          std::clog << "UNDEF";
+          break;
+      }
+      std::clog << absl::FormatTime(" %y-%m-%d %H:%M:%E4S %Z ", absl::Now(),
+                                    absl::LocalTimeZone())
+                << ExtractFilename(file) << ":" << line << "] ";
     }
-    std::clog << absl::FormatTime(" %y-%m-%d %H:%M:%E4S %Z ", absl::Now(),
-                                  absl::LocalTimeZone())
-              << ExtractFilename(file) << ":" << line << "] ";
   }
 
   virtual ~LogMessage() {
