@@ -144,6 +144,11 @@ cc_library_ydf(
             "@org_tensorflow//tensorflow/core:lib",
             "@org_tensorflow//tensorflow/core/platform:path",
         ],
+    }) + select({
+        "//yggdrasil_decision_forests:use_absl_anyinvocable": [
+            "@com_google_absl//absl/functional:any_invocable",
+        ],
+        "//conditions:default": [],
     }),
 )
 

@@ -129,6 +129,10 @@ build:wasm --spawn_strategy=local
 build:wasm --cxxopt=-std=c++17
 build:wasm --host_cxxopt="-fno-exceptions"
 
+# Use absl::anyInvocable. This breaks builds with TF <= 2.12 but is required 
+# for builds with TF >= 2.13.
+build:use_absl_anyinvocable --define=use_absl_anyinvocable=1
+
 # TensorFlow specific.
 build:use_tensorflow_io --define=use_tensorflow_io=1
 
