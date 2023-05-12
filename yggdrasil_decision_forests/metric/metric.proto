@@ -259,6 +259,7 @@ message MetricAccessor {
     Loss loss = 3;
     Ranking ranking = 4;
     Uplift uplift = 5;
+    UserMetric user_metric = 6;
   }
 
   message Classification {
@@ -327,6 +328,10 @@ message MetricAccessor {
     }
     message Qini {}
     message CateCalibration {}
+  }
+
+  message UserMetric {
+    optional string metrics_name = 1;
   }
 }
 

@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -1635,6 +1636,13 @@ absl::StatusOr<double> GetMetricUplift(
   }
 }
 
+absl::StatusOr<double> GetUserCustomizedMetrics(
+    const proto::EvaluationResults& evaluation,
+    const proto::MetricAccessor::UserMetric& metric) {
+    // user_metrics is a mapping from metrics name to metrics value.
+    return evaluation.user_metrics().find(metric.metrics_name())->second;
+}
+
 // Returns an absl invalid status with an error message about the
 // non-availability of a metric in a given evaluation.
 absl::Status GetMetricFatalMissing(const absl::string_view required,
@@ -1678,6 +1686,8 @@ absl::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
         return GetMetricFatalMissing("uplift", evaluation, metric);
       }
       return GetMetricUplift(evaluation, metric.uplift());
+    case proto::MetricAccessor::kUserMetric:
+      return GetUserCustomizedMetrics(evaluation, metric.user_metric());
     case proto::MetricAccessor::TASK_NOT_SET:
       return absl::InvalidArgumentError("Metric accessor not set");
   }
