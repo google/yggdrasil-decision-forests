@@ -6,6 +6,11 @@
 
 -   Rename experimental_analyze_model_and_dataset to analyze_model_and_dataset
 -   Add new GBT loss function `POISSON` for Poisson log likelihood.
+-   Go API: Categorical string values available for inspection.
+
+### Fix
+
+-   Go API: fixed typo on OutOfVocabulary constant.
 
 ## 1.4.0 - 2023-03-20
 

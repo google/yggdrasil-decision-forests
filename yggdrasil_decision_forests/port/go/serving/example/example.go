@@ -25,8 +25,9 @@ import (
 	model_pb "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/proto"
 )
 
-// OutOfVabulary (OOV) is the special values of unknown or too-rare categorical values.
-const OutOfVabulary = uint32(0)
+// OutOfVocabulary (OOV) is the special values of unknown or too-rare categorical values.
+const OutOfVocabulary = uint32(0)
+const OutOfVabulary = uint32(0) // Old typo -- not to break any compatibilities for now.
 
 // NumericalFeatureID is the unique identifier of a numerical feature.
 type NumericalFeatureID int
@@ -66,9 +67,9 @@ type CategoricalSpec struct {
 	NumUniqueValues uint32
 
 	// Dictionary of string values to integer values for this feature.
-	// "dictionary" is nil if the feature does not have a dictionary i.e. the
-	// feature is feed with uint32 values directly.
-	dictionary map[string]uint32
+	// It is set to nil if the feature does not have a Dictionary i.e. the
+	// feature is fed with `uint32` values directly.
+	Dictionary map[string]uint32
 }
 
 // FeatureConstructionMap contains the mapping between the column index and the
@@ -125,10 +126,10 @@ func NewFeatures(dataspec *dataspec_pb.DataSpecification,
 			spec.NumUniqueValues = uint32(column.GetCategorical().GetNumberOfUniqueValues())
 
 			if !column.GetCategorical().GetIsAlreadyIntegerized() {
-				// Copy the dictionary
-				spec.dictionary = map[string]uint32{}
+				// Copy the Dictionary
+				spec.Dictionary = map[string]uint32{}
 				for itemKey, itemValue := range column.GetCategorical().GetItems() {
-					spec.dictionary[itemKey] = uint32(itemValue.GetIndex())
+					spec.Dictionary[itemKey] = uint32(itemValue.GetIndex())
 				}
 			}
 
@@ -156,6 +157,8 @@ func (f *Features) NumFeatures() int {
 // Models are natively able to handle missing values. Overriding the missing values is a form of
 // data pre-processing that should only be applied if such pre-processing is also applied during
 // training.
+//
+// This overrides all missing values from all features, both numerical and categorical.
 func (f *Features) OverrideMissingValuePlaceholders(numerical float32, categorical string) {
 	// Numerical values.
 	for i := 0; i < len(f.MissingNumericalValues); i++ {
@@ -165,10 +168,10 @@ func (f *Features) OverrideMissingValuePlaceholders(numerical float32, categoric
 	// Categorical values
 	for i := 0; i < len(f.MissingCategoricalValues); i++ {
 		spec := &f.CategoricalSpec[i]
-		if spec.dictionary != nil {
-			value, exists := spec.dictionary[categorical]
+		if spec.Dictionary != nil {
+			value, exists := spec.Dictionary[categorical]
 			if !exists {
-				value = OutOfVabulary
+				value = OutOfVocabulary
 			}
 			f.MissingCategoricalValues[i] = value
 		}
@@ -248,12 +251,12 @@ func (batch *Batch) SetCategorical(exampleIdx int, feature CategoricalFeatureID,
 func (batch *Batch) SetCategoricalFromString(exampleIdx int, feature CategoricalFeatureID, rawValue string) error {
 	spec := &batch.features.CategoricalSpec[feature]
 	// TODO: Report the feature name.
-	if spec.dictionary == nil {
-		return fmt.Errorf("failed to set Feature %d to %q because feature does not have dictionary and only accepts numerical values (uint32)", feature, rawValue)
+	if spec.Dictionary == nil {
+		return fmt.Errorf("failed to set Feature %d to %q because feature does not have Dictionary and only accepts numerical values (uint32)", feature, rawValue)
 	}
-	value, exists := spec.dictionary[rawValue]
+	value, exists := spec.Dictionary[rawValue]
 	if !exists {
-		value = OutOfVabulary
+		value = OutOfVocabulary
 	}
 
 	batch.CategoricalValues[int(feature)+exampleIdx*len(batch.features.CategoricalFeatures)] = value
@@ -307,7 +310,7 @@ func (batch *Batch) SetFromFields(exampleIdx int, header []string, values []stri
 				continue
 			}
 			spec := &batch.features.CategoricalSpec[categoricalFeatureID]
-			if spec.dictionary == nil {
+			if spec.Dictionary == nil {
 				// The feature value is an integer represented as an ASCII string.
 				value, err := strconv.ParseInt(rawValue, 10, 32)
 				if err != nil {
@@ -359,11 +362,11 @@ func (batch *Batch) ToStringDebug() string {
 		for name, featureID := range batch.features.CategoricalFeatures {
 			value := batch.CategoricalValues[int(featureID)+exampleIdx*len(batch.features.CategoricalFeatures)]
 			spec := &batch.features.CategoricalSpec[featureID]
-			if spec.dictionary == nil {
+			if spec.Dictionary == nil {
 				repr += fmt.Sprintf("\"%v\" (CATEGORICAL INTEGER id:%v): \"%v\"\n", name, featureID, value)
 			} else {
 				strValue := "<UNKNOWN>"
-				for itemKey, itemIdx := range spec.dictionary {
+				for itemKey, itemIdx := range spec.Dictionary {
 					if itemIdx == value {
 						strValue = itemKey
 						break
