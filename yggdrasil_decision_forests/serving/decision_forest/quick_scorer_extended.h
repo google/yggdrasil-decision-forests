@@ -290,8 +290,14 @@ void FinalizeIsHigherConditionItems(
 
 }  // namespace internal
 
-// Specialization of quick scorer for GBDT regression model.
+// Specialization of quick scorer for GBDT regression model with MSE loss.
 struct GradientBoostedTreesRegressionQuickScorerExtended
+    : internal::QuickScorerExtendedModel {
+  static constexpr model::proto::Task kTask = model::proto::Task::REGRESSION;
+};
+
+// Specialization of quick scorer for GBDT regression model with poisson loss.
+struct GradientBoostedTreesPoissonRegressionQuickScorerExtended
     : internal::QuickScorerExtendedModel {
   static constexpr model::proto::Task kTask = model::proto::Task::REGRESSION;
 };

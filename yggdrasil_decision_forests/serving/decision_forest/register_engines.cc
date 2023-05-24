@@ -22,6 +22,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended.h"
 #include "yggdrasil_decision_forests/serving/example_set_model_wrapper.h"
@@ -161,6 +162,10 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
     auto* gbt_model = dynamic_cast<const SourceModel*>(model);
     // This implementation is the most generic and least efficient engine.
     if (gbt_model == nullptr) {
+      return false;
+    }
+    // TODO: Support Poisson loss
+    if (gbt_model->loss() == gradient_boosted_trees::proto::POISSON) {
       return false;
     }
     return gbt_model->CheckStructure({/*.global_imputation_is_higher =*/false});
@@ -326,12 +331,21 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
         }
 
       case proto::REGRESSION: {
-        auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
-            serving::decision_forest::
-                GradientBoostedTreesRegressionQuickScorerExtended,
-            serving::decision_forest::Predict>>();
-        RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
-        return engine;
+        if (gbt_model->loss() == gradient_boosted_trees::proto::POISSON) {
+          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+              serving::decision_forest::
+                  GradientBoostedTreesPoissonRegressionQuickScorerExtended,
+              serving::decision_forest::Predict>>();
+          RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
+          return engine;
+        } else {
+          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+              serving::decision_forest::
+                  GradientBoostedTreesRegressionQuickScorerExtended,
+              serving::decision_forest::Predict>>();
+          RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
+          return engine;
+        }
       }
 
       case proto::RANKING: {
@@ -392,6 +406,12 @@ class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
                    .categorical()
                    .number_of_unique_values() == 3;
       case proto::REGRESSION:
+        if (gbt_model->loss() == gradient_boosted_trees::proto::POISSON) {
+          // TODO: Support Poisson loss.
+          return false;
+        } else {
+          return true;
+        }
       case proto::RANKING:
         return true;
       default:

@@ -80,6 +80,12 @@ float ActivationBinomialLogLikelihood(const float value) {
   return utils::clamp(1.f / (1.f + std::exp(-value)), 0.f, 1.f);
 }
 
+// Activation function for binary classification GBDT trained with Binomial
+// LogLikelihood loss.
+float ActivationPoisson(const float value) {
+  return std::exp(utils::clamp(value, -19.f, 19.f));
+}
+
 // Identity activation function.
 float ActivationIdentity(const float value) { return value; }
 
@@ -833,6 +839,30 @@ template void Predict<GradientBoostedTreesRankingQuickScorerExtended>(
 
 template <>
 void Predict(
+    const GradientBoostedTreesPoissonRegressionQuickScorerExtended& model,
+    const GradientBoostedTreesPoissonRegressionQuickScorerExtended::ExampleSet&
+        examples,
+    const int num_examples, std::vector<float>* predictions) {
+  if (model.output_logits) {
+    PredictQuickScorerMajorFeatureOffset<
+        GradientBoostedTreesPoissonRegressionQuickScorerExtended>(
+        model, examples.InternalCategoricalAndNumericalValues(),
+        examples.InternalCategoricalSetBeginAndEnds(),
+        examples.InternalCategoricalItemBuffer(), num_examples,
+        examples.NumberOfExamples(), predictions);
+  } else {
+    PredictQuickScorerMajorFeatureOffset<
+        GradientBoostedTreesPoissonRegressionQuickScorerExtended,
+        ActivationPoisson>(
+        model, examples.InternalCategoricalAndNumericalValues(),
+        examples.InternalCategoricalSetBeginAndEnds(),
+        examples.InternalCategoricalItemBuffer(), num_examples,
+        examples.NumberOfExamples(), predictions);
+  }
+}
+
+template <>
+void Predict(
     const GradientBoostedTreesBinaryClassificationQuickScorerExtended& model,
     const GradientBoostedTreesBinaryClassificationQuickScorerExtended::
         ExampleSet& examples,
@@ -906,6 +936,17 @@ absl::Status GenericToSpecializedModel(
   if (src.loss() != Loss::SQUARED_ERROR) {
     return absl::InvalidArgumentError(
         "The GBDT is not trained for regression with squared error loss.");
+  }
+  return BaseGenericToSpecializedModel(src, dst);
+}
+
+template <>
+absl::Status GenericToSpecializedModel(
+    const model::gradient_boosted_trees::GradientBoostedTreesModel& src,
+    GradientBoostedTreesPoissonRegressionQuickScorerExtended* dst) {
+  if (src.loss() != Loss::POISSON) {
+    return absl::InvalidArgumentError(
+        "The GBDT is not trained for regression with poisson loss.");
   }
   return BaseGenericToSpecializedModel(src, dst);
 }

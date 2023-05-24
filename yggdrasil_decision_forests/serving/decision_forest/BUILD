@@ -66,6 +66,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
         "//yggdrasil_decision_forests/serving:example_set_model_wrapper",
         "//yggdrasil_decision_forests/serving:fast_engine",
         "@com_google_absl//absl/status:statusor",
