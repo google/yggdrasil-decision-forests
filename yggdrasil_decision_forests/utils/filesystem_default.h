@@ -148,6 +148,13 @@ absl::StatusOr<bool> FileExists(absl::string_view path);
 //   EXPECT_EQ(basename, "file.txt");
 std::string GetBasename(absl::string_view path);
 
+// Sets a file as immutable. An immutable file cannot be modified (only
+// removed). Some distributed file systems can share immutable files more
+// efficiently.
+//
+// For the default file system, "SetImmutable" is a no-op.
+absl::Status SetImmutable(absl::string_view path);
+
 }  // namespace file
 
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_DEFAULT_H_

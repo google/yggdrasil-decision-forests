@@ -251,4 +251,6 @@ std::string GetBasename(absl::string_view path) {
   }
 }
 
+absl::Status SetImmutable(absl::string_view path) { return absl::OkStatus(); }
+
 }  // namespace file

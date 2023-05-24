@@ -64,7 +64,7 @@ absl::Status PrepareOutputFile(absl::string_view path) {
 }
 
 absl::Status FinalizeOutputFile(absl::string_view path) {
-  return absl::OkStatus();
+  return file::SetImmutable(path);
 }
 
 std::string ShardFilename(const absl::string_view base, const int shard_idx,

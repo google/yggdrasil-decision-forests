@@ -173,6 +173,11 @@ std::string GetBasename(absl::string_view path);
 // Renames a file or a directory.
 absl::Status Rename(absl::string_view from, absl::string_view to, int options);
 
+// Sets the file as immutable. An immutable file cannot be modified (only
+// removed). Some distributed file systems can share immutable files more
+// efficiently.
+absl::Status SetImmutable(absl::string_view path);
+
 }  // namespace file
 
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_TENSORFLOW_H_
