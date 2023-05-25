@@ -45,6 +45,11 @@ constexpr char kTensorFlowDecisionForestsAssets[] = "assets";
 // Note: This file is only used the simpleML Estimator to delay and retry
 // loading a model.
 constexpr char kModelDoneFileName[] = "done";
+
+// Add changes to the model path to improve loading performance here.
+std::string ImproveModelReadingPath(const absl::string_view path) {
+  return std::string(path);
+}
 }  // namespace
 
 std::vector<std::string> AllRegisteredModels() {
@@ -92,7 +97,7 @@ absl::Status LoadModel(absl::string_view directory,
                        std::unique_ptr<AbstractModel>* model,
                        ModelIOOptions io_options) {
   proto::AbstractModel header;
-  std::string effective_directory{directory};
+  std::string effective_directory = ImproveModelReadingPath(directory);
 
   if (!io_options.file_prefix) {
     auto prefix_or_status = DetectFilePrefix(directory);
