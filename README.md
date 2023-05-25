@@ -10,7 +10,7 @@ commands), in TensorFlow under the name
 (TF-DF), Go and in Javascript (inference only). YDF is supported on Linux,
 Windows, macOS, Raspberry, and Arduino (experimental).
 
-See [the documentation 📕](https://ydf.readthedocs.org/) more details.
+See [the documentation 📕](https://ydf.readthedocs.org/) for more details.
 
 ## Usage example
 
@@ -76,13 +76,15 @@ model.save("project/model")
 (see
 [TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests))
 
-## Google IO Presentation
+## Google I/O Presentation
 
 Yggdrasil Decision Forests powers TensorFlow Decision Forests.
 
-<center>
-<iframe width="560" height="315" src="https://www.youtube.com/embed/5qgk9QJ4rdQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-</center>
+<div align="center">
+    <a href="https://youtu.be/5qgk9QJ4rdQ">
+        <img src="https://img.youtube.com/vi/5qgk9QJ4rdQ/0.jpg"></img>
+    </a>
+</div>
 
 ## Documentation & Resources
 
