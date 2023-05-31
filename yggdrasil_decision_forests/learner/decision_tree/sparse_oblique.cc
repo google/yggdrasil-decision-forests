@@ -231,7 +231,7 @@ int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
                                                 num_projections_exponent))));
 }
 
-template <typename LabelStats>
+template <typename LabelStats, bool weighted>
 absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -244,6 +244,12 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
     const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
+  if constexpr (weighted) {
+    DCHECK_EQ(weights.size(), train_dataset.nrow());
+  } else {
+    DCHECK(weights.empty());
+  }
+
   if (config_link.numerical_features().empty()) {
     return false;
   }
@@ -275,7 +281,10 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
 
   // TODO: To cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);
-  const auto selected_weights = Extract(weights, selected_examples);
+  std::vector<float> selected_weights;
+  if constexpr (weighted) {
+    selected_weights = Extract(weights, selected_examples);
+  }
 
   std::vector<UnsignedExampleIdx> dense_example_idxs(selected_examples.size());
   std::iota(dense_example_idxs.begin(), dense_example_idxs.end(), 0);
@@ -304,31 +313,28 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
           current_projection.front().attribute_idx, {}, best_condition, cache);
     } else if constexpr (is_same<LabelStats,
                                  RegressionHessianLabelStats>::value) {
-      result = FindSplitLabelHessianRegressionFeatureNumericalCart<
-          /*weighted=*/true>(dense_example_idxs, selected_weights,
-                             projection_values, selected_labels.gradient_data,
-                             selected_labels.hessian_data, na_replacement,
-                             min_num_obs, dt_config, label_stats.sum_gradient,
-                             label_stats.sum_hessian, label_stats.sum_weights,
-                             current_projection.front().attribute_idx,
-                             internal_config, best_condition, cache);
+      result = FindSplitLabelHessianRegressionFeatureNumericalCart<weighted>(
+          dense_example_idxs, selected_weights, projection_values,
+          selected_labels.gradient_data, selected_labels.hessian_data,
+          na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
+          label_stats.sum_hessian, label_stats.sum_weights,
+          current_projection.front().attribute_idx, internal_config,
+          best_condition, cache);
     } else if constexpr (is_same<LabelStats, RegressionLabelStats>::value) {
       if (weights.empty()) {
-        result =
-            FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/false>(
-                dense_example_idxs, selected_weights, projection_values,
-                selected_labels, na_replacement, min_num_obs, dt_config,
-                label_stats.label_distribution,
-                current_projection.front().attribute_idx, {}, best_condition,
-                cache);
+        result = FindSplitLabelRegressionFeatureNumericalCart<weighted>(
+            dense_example_idxs, selected_weights, projection_values,
+            selected_labels, na_replacement, min_num_obs, dt_config,
+            label_stats.label_distribution,
+            current_projection.front().attribute_idx, {}, best_condition,
+            cache);
       } else {
-        result =
-            FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/true>(
-                dense_example_idxs, selected_weights, projection_values,
-                selected_labels, na_replacement, min_num_obs, dt_config,
-                label_stats.label_distribution,
-                current_projection.front().attribute_idx, {}, best_condition,
-                cache);
+        result = FindSplitLabelRegressionFeatureNumericalCart<weighted>(
+            dense_example_idxs, selected_weights, projection_values,
+            selected_labels, na_replacement, min_num_obs, dt_config,
+            label_stats.label_distribution,
+            current_projection.front().attribute_idx, {}, best_condition,
+            cache);
       }
     } else {
       static_assert(!is_same<LabelStats, LabelStats>::value,
@@ -365,10 +371,19 @@ absl::StatusOr<bool> FindBestConditionSparseOblique(
     const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
-  return FindBestConditionSparseObliqueTemplate<ClassificationLabelStats>(
-      train_dataset, selected_examples, weights, config, config_link, dt_config,
-      parent, internal_config, label_stats, override_num_projections,
-      best_condition, random, cache);
+  if (weights.empty()) {
+    return FindBestConditionSparseObliqueTemplate<ClassificationLabelStats,
+                                                  /*weighted=*/false>(
+        train_dataset, selected_examples, weights, config, config_link,
+        dt_config, parent, internal_config, label_stats,
+        override_num_projections, best_condition, random, cache);
+  } else {
+    return FindBestConditionSparseObliqueTemplate<ClassificationLabelStats,
+                                                  /*weighted=*/true>(
+        train_dataset, selected_examples, weights, config, config_link,
+        dt_config, parent, internal_config, label_stats,
+        override_num_projections, best_condition, random, cache);
+  }
 }
 
 absl::StatusOr<bool> FindBestConditionSparseOblique(
@@ -383,10 +398,19 @@ absl::StatusOr<bool> FindBestConditionSparseOblique(
     const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
-  return FindBestConditionSparseObliqueTemplate<RegressionHessianLabelStats>(
-      train_dataset, selected_examples, weights, config, config_link, dt_config,
-      parent, internal_config, label_stats, override_num_projections,
-      best_condition, random, cache);
+  if (weights.empty()) {
+    return FindBestConditionSparseObliqueTemplate<RegressionHessianLabelStats,
+                                                  /*weighted=*/false>(
+        train_dataset, selected_examples, weights, config, config_link,
+        dt_config, parent, internal_config, label_stats,
+        override_num_projections, best_condition, random, cache);
+  } else {
+    return FindBestConditionSparseObliqueTemplate<RegressionHessianLabelStats,
+                                                  /*weighted=*/true>(
+        train_dataset, selected_examples, weights, config, config_link,
+        dt_config, parent, internal_config, label_stats,
+        override_num_projections, best_condition, random, cache);
+  }
 }
 
 absl::StatusOr<bool> FindBestConditionSparseOblique(
@@ -401,10 +425,19 @@ absl::StatusOr<bool> FindBestConditionSparseOblique(
     const absl::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
-  return FindBestConditionSparseObliqueTemplate<RegressionLabelStats>(
-      train_dataset, selected_examples, weights, config, config_link, dt_config,
-      parent, internal_config, label_stats, override_num_projections,
-      best_condition, random, cache);
+  if (weights.empty()) {
+    return FindBestConditionSparseObliqueTemplate<RegressionLabelStats,
+                                                  /*weighted=*/false>(
+        train_dataset, selected_examples, weights, config, config_link,
+        dt_config, parent, internal_config, label_stats,
+        override_num_projections, best_condition, random, cache);
+  } else {
+    return FindBestConditionSparseObliqueTemplate<RegressionLabelStats,
+                                                  /*weighted=*/true>(
+        train_dataset, selected_examples, weights, config, config_link,
+        dt_config, parent, internal_config, label_stats,
+        override_num_projections, best_condition, random, cache);
+  }
 }
 
 }  // namespace decision_tree

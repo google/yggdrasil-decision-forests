@@ -425,18 +425,14 @@ RandomForestLearner::TrainWithStatus(
   std::vector<float> weights;
 
   // Determines if the training code supports `weights` to be empty if
-  // all the examples have the same weight.
+  // all the examples have the same weight. This triggers special handling for
+  // improved performance.
   //
-  // Currently, this feature is supported for:
-  // - Classification without oblique splits (default) and with local
-  //   imputation policy (default) to handle missing values.
-  bool use_optimized_unit_weights = false;
-  if (training_config().task() != model::proto::Task::CATEGORICAL_UPLIFT &&
-      training_config().task() != model::proto::Task::NUMERICAL_UPLIFT &&
-      rf_config.decision_tree().split_axis_case() !=
-          decision_tree::proto::DecisionTreeTrainingConfig::
-              kSparseObliqueSplit) {
-    use_optimized_unit_weights = true;
+  // This feature is not supported for uplifting.
+  bool use_optimized_unit_weights = true;
+  if (training_config().task() == model::proto::Task::CATEGORICAL_UPLIFT ||
+      training_config().task() == model::proto::Task::NUMERICAL_UPLIFT) {
+    use_optimized_unit_weights = false;
   }
 
   RETURN_IF_ERROR(dataset::GetWeights(train_dataset, config_link, &weights,
