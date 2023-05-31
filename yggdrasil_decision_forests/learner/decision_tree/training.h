@@ -38,6 +38,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -335,11 +336,37 @@ absl::Status SetLabelDistribution(
 // Default policy to set the label value of a leaf in a regression tree i.e. set
 // the value to the mean of the labels.
 // `weights` may be empty, corresponding to unit weights.
+template <bool weighted>
 absl::Status SetRegressionLabelDistribution(
     const dataset::VerticalDataset& dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
-    const model::proto::TrainingConfigLinking& config_link, proto::Node* node);
+    const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
+  if constexpr (weighted) {
+    STATUS_CHECK(weights.size() == dataset.nrow());
+  } else {
+    STATUS_CHECK(weights.empty());
+  }
+  ASSIGN_OR_RETURN(
+      const auto* const labels,
+      dataset
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+              config_link.label()));
+  utils::NormalDistributionDouble label_distribution;
+  if constexpr (weighted) {
+    for (const UnsignedExampleIdx example_idx : selected_examples) {
+      label_distribution.Add(labels->values()[example_idx],
+                             weights[example_idx]);
+    }
+  } else {
+    for (const UnsignedExampleIdx example_idx : selected_examples) {
+      label_distribution.Add(labels->values()[example_idx]);
+    }
+  }
+  label_distribution.Save(node->mutable_regressor()->mutable_distribution());
+  node->mutable_regressor()->set_top_value(label_distribution.Mean());
+  return absl::OkStatus();
+}
 
 // Training configuration for internal parameters not available to the user
 // directly.
@@ -509,7 +536,7 @@ SplitSearchResult FindBestCondition(
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache);
 
-// Following are the split finder function. Their name follow the patter:
+// Following are the split finder functions. Their name follow the patter:
 // FindSplitLabel{label_type}Feature{feature_type}{algorithm_name}.
 
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
@@ -527,6 +554,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
 
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
 // missing") for regression.
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureNA(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -535,10 +563,27 @@ SplitSearchResult FindSplitLabelRegressionFeatureNA(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
-    SplitterPerThreadCache* cache);
+    SplitterPerThreadCache* cache) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
+  FeatureIsMissingBucket::Filler feature_filler(attributes);
+
+  typename LabelNumericalBucket<weighted>::Filler label_filler(labels, weights);
+
+  typename LabelNumericalBucket<weighted>::Initializer initializer(
+      label_distribution);
+
+  return FindBestSplit_LabelRegressionFeatureNACart<weighted>(
+      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
+      attribute_idx, condition, &cache->cache_v2);
+}
 
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
 // missing") for hessian regression.
+template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -563,6 +608,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
     SplitterPerThreadCache* cache);
 
 // Search for the best split of the type Boolean for regression.
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<char>& attributes,
@@ -573,6 +619,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
     int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache);
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<char>& attributes,
@@ -625,6 +672,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
 // better than the split initially in "condition", and kInvalidAttribute is not
 // valid split was found.
 //
+// `weights` may be empty and this is equivalent to unit weights.
 SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
@@ -637,6 +685,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
 
 // Similarly to "FindSplitLabelClassificationFeatureNumericalCart", but uses an
 // histogram approach to find the best split.
+//
+// `weights` may be empty and this is equivalent to unit weights.
 SplitSearchResult FindSplitLabelClassificationFeatureNumericalHistogram(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
@@ -649,6 +699,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalHistogram(
 
 // Similar to "FindSplitLabelClassificationFeatureNumericalCart", but work on
 // pre-discretized numerical values.
+//
+// `weights` may be empty and this is equivalent to unit weights.
 SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -677,6 +729,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
     int32_t attribute_idx, const InternalTrainConfig& internal_config,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
@@ -687,6 +740,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache);
 
+template <bool weighted>
 SplitSearchResult
 FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -702,6 +756,7 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
 
 // Similarly to "FindSplitLabelClassificationFeatureNumericalCart", but uses an
 // histogram approach to find the best split.
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
@@ -714,6 +769,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
 
 // Similar to "FindSplitLabelClassificationFeatureNumericalCart", but work on
 // pre-discretized numerical values.
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -735,6 +791,8 @@ SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
 // Arguments are similar to "FindSplitLabelClassificationFeatureNumericalCart".
 // "num_attribute_classes" specifies the number of classes of the attribute
 // (i.e. the maximum value for the elements in "attributes").
+//
+// `weights` may be empty and this is equivalent to unit weights.
 SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
@@ -751,6 +809,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
 //
 // This function works similarly as
 // "FindSplitLabelClassificationFeatureCategorical" for categorical labels.
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
@@ -761,6 +820,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
     const int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
@@ -795,6 +855,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
 //      score = new_score.
 //    return positive_set
 //
+// `weights` may be empty and this is equivalent to unit weights.
 SplitSearchResult
 FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -811,6 +872,7 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
 // "FindSplitLabelClassificationFeatureCategoricalSetGreedyForward", but for
 // regression.
 // The "information gain" is replaced by the "variance reduction".
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,

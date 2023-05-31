@@ -255,6 +255,8 @@ void SetConditionHelper(
 //
 // If the feature only contains missing values, the "na_replacement" argument is
 // left unchanged.
+//
+// `weights` may be empty which is equivalent to unit weights.
 void LocalImputationForNumericalAttribute(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
@@ -343,6 +345,7 @@ bool MinMaxNumericalAttribute(
 }
 
 // Search for the attribute item that maximize the immediate variance reduction.
+template <bool weighted>
 std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
     const double variance_reduction, const int32_t num_attribute_classes,
     const utils::BinaryToNormalDistributionDouble& split_label_distribution,
@@ -353,7 +356,11 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
     const std::vector<float>& labels, const double initial_variance,
     std::vector<UnsignedExampleIdx>* running_attr_bank_idx,
     std::vector<bool>* candidate_attributes_bitmap) {
-  DCHECK_EQ(weights.size(), labels.size());
+  if (weighted) {
+    DCHECK_EQ(weights.size(), labels.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   // Search for the attribute item that maximize the variance reduction. Note:
   // We ignore attribute that reduce the current variance reduction.
   double best_candidate_variance_reduction = variance_reduction;
@@ -406,10 +413,17 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
       if (match) {
         // Add the example to the positive set and remove it from the
         // negative.
-        candidate_split_label_distribution.mutable_pos()->Add(
-            labels[example_idx], weights[example_idx]);
-        candidate_split_label_distribution.mutable_neg()->Add(
-            labels[example_idx], -weights[example_idx]);
+        if constexpr (weighted) {
+          candidate_split_label_distribution.mutable_pos()->Add(
+              labels[example_idx], weights[example_idx]);
+          candidate_split_label_distribution.mutable_neg()->Add(
+              labels[example_idx], -weights[example_idx]);
+        } else {
+          candidate_split_label_distribution.mutable_pos()->Add(
+              labels[example_idx]);
+          candidate_split_label_distribution.mutable_neg()->Sub(
+              labels[example_idx]);
+        }
       } else {
         num_absent_in_negative_set++;
       }
@@ -473,10 +487,17 @@ absl::Status SetLabelDistribution(
       }
       break;
     case model::proto::Task::REGRESSION:
-      RETURN_IF_ERROR(SetRegressionLabelDistribution(
-          train_dataset, selected_examples, weights, config_link,
-          node->mutable_node()));
-      break;
+      if (weights.empty()) {
+        RETURN_IF_ERROR(SetRegressionLabelDistribution</*weighted=*/false>(
+            train_dataset, selected_examples, weights, config_link,
+            node->mutable_node()));
+        break;
+      } else {
+        RETURN_IF_ERROR(SetRegressionLabelDistribution</*weighted=*/true>(
+            train_dataset, selected_examples, weights, config_link,
+            node->mutable_node()));
+        break;
+      }
 
     case model::proto::Task::CATEGORICAL_UPLIFT:
       RETURN_IF_ERROR(SetCategoricalUpliftLabelDistribution(
@@ -674,12 +695,23 @@ SplitSearchResult FindBestCondition(
               ->values();
       const auto na_replacement = attribute_column_spec.numerical().mean();
       if (dt_config.numerical_split().type() == proto::NumericalSplit::EXACT) {
-        result = FindSplitLabelHessianRegressionFeatureNumericalCart(
-            selected_examples, weights, attribute_data,
-            label_stats.gradient_data, label_stats.hessian_data, na_replacement,
-            min_num_obs, dt_config, label_stats.sum_gradient,
-            label_stats.sum_hessian, label_stats.sum_weights, attribute_idx,
-            internal_config, best_condition, cache);
+        if (weights.empty()) {
+          result = FindSplitLabelHessianRegressionFeatureNumericalCart<
+              /*weighted=*/false>(
+              selected_examples, weights, attribute_data,
+              label_stats.gradient_data, label_stats.hessian_data,
+              na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
+              label_stats.sum_hessian, label_stats.sum_weights, attribute_idx,
+              internal_config, best_condition, cache);
+        } else {
+          result = FindSplitLabelHessianRegressionFeatureNumericalCart<
+              /*weighted=*/true>(
+              selected_examples, weights, attribute_data,
+              label_stats.gradient_data, label_stats.hessian_data,
+              na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
+              label_stats.sum_hessian, label_stats.sum_weights, attribute_idx,
+              internal_config, best_condition, cache);
+        }
       } else {
         YDF_LOG(FATAL) << "Only split exact implemented for hessian gains.";
       }
@@ -704,13 +736,25 @@ SplitSearchResult FindBestCondition(
       const auto na_replacement_index =
           dataset::NumericalToDiscretizedNumerical(attribute_column_spec,
                                                    na_replacement);
-      result = FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
-          selected_examples, weights, attribute_data, num_bins,
-          label_stats.gradient_data, label_stats.hessian_data,
-          na_replacement_index, min_num_obs, dt_config,
-          label_stats.sum_gradient, label_stats.sum_hessian,
-          label_stats.sum_weights, attribute_idx, internal_config,
-          best_condition, cache);
+      if (weights.empty()) {
+        result = FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<
+            /*weighted=*/false>(
+            selected_examples, weights, attribute_data, num_bins,
+            label_stats.gradient_data, label_stats.hessian_data,
+            na_replacement_index, min_num_obs, dt_config,
+            label_stats.sum_gradient, label_stats.sum_hessian,
+            label_stats.sum_weights, attribute_idx, internal_config,
+            best_condition, cache);
+      } else {
+        result = FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<
+            /*weighted=*/true>(selected_examples, weights, attribute_data,
+                               num_bins, label_stats.gradient_data,
+                               label_stats.hessian_data, na_replacement_index,
+                               min_num_obs, dt_config, label_stats.sum_gradient,
+                               label_stats.sum_hessian, label_stats.sum_weights,
+                               attribute_idx, internal_config, best_condition,
+                               cache);
+      }
     } break;
 
     case dataset::proto::ColumnType::CATEGORICAL: {
@@ -725,12 +769,25 @@ SplitSearchResult FindBestCondition(
           attribute_column_spec.categorical().most_frequent_value();
       const auto num_attribute_classes =
           attribute_column_spec.categorical().number_of_unique_values();
-      result = FindSplitLabelHessianRegressionFeatureCategorical(
-          selected_examples, weights, attribute_data, label_stats.gradient_data,
-          label_stats.hessian_data, num_attribute_classes, na_replacement,
-          min_num_obs, dt_config, label_stats.sum_gradient,
-          label_stats.sum_hessian, label_stats.sum_weights, attribute_idx,
-          internal_config, best_condition, cache, random);
+      if (weights.empty()) {
+        result = FindSplitLabelHessianRegressionFeatureCategorical<
+            /*weighted=*/false>(
+            selected_examples, weights, attribute_data,
+            label_stats.gradient_data, label_stats.hessian_data,
+            num_attribute_classes, na_replacement, min_num_obs, dt_config,
+            label_stats.sum_gradient, label_stats.sum_hessian,
+            label_stats.sum_weights, attribute_idx, internal_config,
+            best_condition, cache, random);
+      } else {
+        result = FindSplitLabelHessianRegressionFeatureCategorical<
+            /*weighted=*/true>(
+            selected_examples, weights, attribute_data,
+            label_stats.gradient_data, label_stats.hessian_data,
+            num_attribute_classes, na_replacement, min_num_obs, dt_config,
+            label_stats.sum_gradient, label_stats.sum_hessian,
+            label_stats.sum_weights, attribute_idx, internal_config,
+            best_condition, cache, random);
+      }
     } break;
 
     case dataset::proto::ColumnType::BOOLEAN: {
@@ -744,12 +801,25 @@ SplitSearchResult FindBestCondition(
       const auto na_replacement =
           attribute_column_spec.boolean().count_true() >=
           attribute_column_spec.boolean().count_false();
-      result = FindSplitLabelHessianRegressionFeatureBoolean(
-          selected_examples, weights, attribute_data, label_stats.gradient_data,
-          label_stats.hessian_data, na_replacement, min_num_obs, dt_config,
-          label_stats.sum_gradient, label_stats.sum_hessian,
-          label_stats.sum_weights, attribute_idx, internal_config,
-          best_condition, cache);
+      if (weights.empty()) {
+        result =
+            FindSplitLabelHessianRegressionFeatureBoolean</*weighted=*/false>(
+                selected_examples, weights, attribute_data,
+                label_stats.gradient_data, label_stats.hessian_data,
+                na_replacement, min_num_obs, dt_config,
+                label_stats.sum_gradient, label_stats.sum_hessian,
+                label_stats.sum_weights, attribute_idx, internal_config,
+                best_condition, cache);
+      } else {
+        result =
+            FindSplitLabelHessianRegressionFeatureBoolean</*weighted=*/true>(
+                selected_examples, weights, attribute_data,
+                label_stats.gradient_data, label_stats.hessian_data,
+                na_replacement, min_num_obs, dt_config,
+                label_stats.sum_gradient, label_stats.sum_hessian,
+                label_stats.sum_weights, attribute_idx, internal_config,
+                best_condition, cache);
+      }
     } break;
 
     default:
@@ -762,13 +832,25 @@ SplitSearchResult FindBestCondition(
 
   // Condition of the type "Attr is NA".
   if (dt_config.allow_na_conditions()) {
-    const auto na_result = FindSplitLabelHessianRegressionFeatureNA(
-        selected_examples, weights, train_dataset.column(attribute_idx),
-        label_stats.gradient_data, label_stats.hessian_data, min_num_obs,
-        dt_config, label_stats.sum_gradient, label_stats.sum_hessian,
-        label_stats.sum_weights, attribute_idx, internal_config, best_condition,
-        cache);
-    result = std::min(result, na_result);
+    if (weights.empty()) {
+      const auto na_result =
+          FindSplitLabelHessianRegressionFeatureNA</*weighted=*/false>(
+              selected_examples, weights, train_dataset.column(attribute_idx),
+              label_stats.gradient_data, label_stats.hessian_data, min_num_obs,
+              dt_config, label_stats.sum_gradient, label_stats.sum_hessian,
+              label_stats.sum_weights, attribute_idx, internal_config,
+              best_condition, cache);
+      result = std::min(result, na_result);
+    } else {
+      const auto na_result =
+          FindSplitLabelHessianRegressionFeatureNA</*weighted=*/true>(
+              selected_examples, weights, train_dataset.column(attribute_idx),
+              label_stats.gradient_data, label_stats.hessian_data, min_num_obs,
+              dt_config, label_stats.sum_gradient, label_stats.sum_hessian,
+              label_stats.sum_weights, attribute_idx, internal_config,
+              best_condition, cache);
+      result = std::min(result, na_result);
+    }
   }
 
   return result;
@@ -825,11 +907,21 @@ SplitSearchResult FindBestCondition(
                   internal_config, best_condition, cache);
         }
       } else {
-        result = FindSplitLabelRegressionFeatureNumericalHistogram(
-            selected_examples, weights, attribute_data, label_stats.label_data,
-            na_replacement, min_num_obs, dt_config,
-            label_stats.label_distribution, attribute_idx, random,
-            best_condition);
+        if (weights.empty()) {
+          result = FindSplitLabelRegressionFeatureNumericalHistogram<
+              /*weighted=*/false>(selected_examples, weights, attribute_data,
+                                  label_stats.label_data, na_replacement,
+                                  min_num_obs, dt_config,
+                                  label_stats.label_distribution, attribute_idx,
+                                  random, best_condition);
+        } else {
+          result = FindSplitLabelRegressionFeatureNumericalHistogram<
+              /*weighted=*/true>(selected_examples, weights, attribute_data,
+                                 label_stats.label_data, na_replacement,
+                                 min_num_obs, dt_config,
+                                 label_stats.label_distribution, attribute_idx,
+                                 random, best_condition);
+        }
       }
     } break;
 
@@ -852,10 +944,21 @@ SplitSearchResult FindBestCondition(
       const auto na_replacement_index =
           dataset::NumericalToDiscretizedNumerical(attribute_column_spec,
                                                    na_replacement);
-      result = FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
-          selected_examples, weights, attribute_data, num_bins,
-          label_stats.label_data, na_replacement_index, min_num_obs, dt_config,
-          label_stats.label_distribution, attribute_idx, best_condition, cache);
+      if (weights.empty()) {
+        result = FindSplitLabelRegressionFeatureDiscretizedNumericalCart<
+            /*weighted=*/false>(selected_examples, weights, attribute_data,
+                                num_bins, label_stats.label_data,
+                                na_replacement_index, min_num_obs, dt_config,
+                                label_stats.label_distribution, attribute_idx,
+                                best_condition, cache);
+      } else {
+        result = FindSplitLabelRegressionFeatureDiscretizedNumericalCart<
+            /*weighted=*/true>(selected_examples, weights, attribute_data,
+                               num_bins, label_stats.label_data,
+                               na_replacement_index, min_num_obs, dt_config,
+                               label_stats.label_distribution, attribute_idx,
+                               best_condition, cache);
+      }
     } break;
 
     case dataset::proto::ColumnType::CATEGORICAL: {
@@ -870,11 +973,19 @@ SplitSearchResult FindBestCondition(
           attribute_column_spec.categorical().most_frequent_value();
       const auto num_attribute_classes =
           attribute_column_spec.categorical().number_of_unique_values();
-      result = FindSplitLabelRegressionFeatureCategorical(
-          selected_examples, weights, attribute_data, label_stats.label_data,
-          num_attribute_classes, na_replacement, min_num_obs, dt_config,
-          label_stats.label_distribution, attribute_idx, best_condition, cache,
-          random);
+      if (weights.empty()) {
+        result = FindSplitLabelRegressionFeatureCategorical</*weighted=*/false>(
+            selected_examples, weights, attribute_data, label_stats.label_data,
+            num_attribute_classes, na_replacement, min_num_obs, dt_config,
+            label_stats.label_distribution, attribute_idx, best_condition,
+            cache, random);
+      } else {
+        result = FindSplitLabelRegressionFeatureCategorical</*weighted=*/true>(
+            selected_examples, weights, attribute_data, label_stats.label_data,
+            num_attribute_classes, na_replacement, min_num_obs, dt_config,
+            label_stats.label_distribution, attribute_idx, best_condition,
+            cache, random);
+      }
     } break;
 
     case dataset::proto::ColumnType::CATEGORICAL_SET: {
@@ -885,11 +996,21 @@ SplitSearchResult FindBestCondition(
               .value();
       const auto num_attribute_classes =
           attribute_column_spec.categorical().number_of_unique_values();
-      result = FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
-          selected_examples, weights, *attribute_data, label_stats.label_data,
-          num_attribute_classes, min_num_obs, dt_config,
-          label_stats.label_distribution, attribute_idx, best_condition,
-          random);
+      if (weights.empty()) {
+        result = FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<
+            /*weighted=*/false>(selected_examples, weights, *attribute_data,
+                                label_stats.label_data, num_attribute_classes,
+                                min_num_obs, dt_config,
+                                label_stats.label_distribution, attribute_idx,
+                                best_condition, random);
+      } else {
+        result = FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<
+            /*weighted=*/true>(selected_examples, weights, *attribute_data,
+                               label_stats.label_data, num_attribute_classes,
+                               min_num_obs, dt_config,
+                               label_stats.label_distribution, attribute_idx,
+                               best_condition, random);
+      }
     } break;
 
     case dataset::proto::ColumnType::BOOLEAN: {
@@ -903,10 +1024,19 @@ SplitSearchResult FindBestCondition(
       const auto na_replacement =
           attribute_column_spec.boolean().count_true() >=
           attribute_column_spec.boolean().count_false();
-      result = FindSplitLabelRegressionFeatureBoolean(
-          selected_examples, weights, attribute_data, label_stats.label_data,
-          na_replacement, min_num_obs, dt_config,
-          label_stats.label_distribution, attribute_idx, best_condition, cache);
+      if (weights.empty()) {
+        result = FindSplitLabelRegressionFeatureBoolean</*weighted=*/false>(
+            selected_examples, weights, attribute_data, label_stats.label_data,
+            na_replacement, min_num_obs, dt_config,
+            label_stats.label_distribution, attribute_idx, best_condition,
+            cache);
+      } else {
+        result = FindSplitLabelRegressionFeatureBoolean</*weighted=*/true>(
+            selected_examples, weights, attribute_data, label_stats.label_data,
+            na_replacement, min_num_obs, dt_config,
+            label_stats.label_distribution, attribute_idx, best_condition,
+            cache);
+      }
     } break;
 
     default:
@@ -919,11 +1049,23 @@ SplitSearchResult FindBestCondition(
 
   // Condition of the type "Attr is NA".
   if (dt_config.allow_na_conditions()) {
-    const auto na_result = FindSplitLabelRegressionFeatureNA(
-        selected_examples, weights, train_dataset.column(attribute_idx),
-        label_stats.label_data, min_num_obs, dt_config,
-        label_stats.label_distribution, attribute_idx, best_condition, cache);
-    result = std::min(result, na_result);
+    if (weights.empty()) {
+      const auto na_result =
+          FindSplitLabelRegressionFeatureNA</*weighted=*/false>(
+              selected_examples, weights, train_dataset.column(attribute_idx),
+              label_stats.label_data, min_num_obs, dt_config,
+              label_stats.label_distribution, attribute_idx, best_condition,
+              cache);
+      result = std::min(result, na_result);
+    } else {
+      const auto na_result =
+          FindSplitLabelRegressionFeatureNA</*weighted=*/true>(
+              selected_examples, weights, train_dataset.column(attribute_idx),
+              label_stats.label_data, min_num_obs, dt_config,
+              label_stats.label_distribution, attribute_idx, best_condition,
+              cache);
+      result = std::min(result, na_result);
+    }
   }
 
   return result;
@@ -1799,6 +1941,9 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalHistogram(
     const int32_t attribute_idx, utils::RandomEngine* random,
     proto::NodeCondition* condition) {
   DCHECK(condition != nullptr);
+  if (!weights.empty()) {
+    DCHECK_EQ(weights.size(), labels.size());
+  }
 
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
@@ -1915,6 +2060,9 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, const InternalTrainConfig& internal_config,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
+  if (!weights.empty()) {
+    DCHECK_EQ(weights.size(), labels.size());
+  }
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForNumericalAttribute(selected_examples, weights, attributes,
@@ -2096,6 +2244,9 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  if (!weights.empty()) {
+    DCHECK_EQ(weights.size(), labels.size());
+  }
   FeatureDiscretizedNumericalBucket::Filler feature_filler(
       num_bins, na_replacement, attributes);
   if (num_label_classes == 3) {
@@ -2143,6 +2294,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
   }
 }
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
@@ -2153,7 +2305,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
     const int32_t attribute_idx, utils::RandomEngine* random,
     proto::NodeCondition* condition) {
   DCHECK(condition != nullptr);
-  DCHECK_EQ(weights.size(), labels.size());
+  if constexpr (weighted) {
+    DCHECK_EQ(weights.size(), labels.size());
+  } else {
+    DCHECK(weights.empty());
+  }
 
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
@@ -2194,7 +2350,6 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
   // Compute the split score of each threshold.
   for (const auto example_idx : selected_examples) {
     const float label = labels[example_idx];
-    const float weight = weights[example_idx];
     float attribute = attributes[example_idx];
     if (std::isnan(attribute)) {
       attribute = na_replacement;
@@ -2208,7 +2363,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
     }
     --it_split;
     it_split->num_positive_examples_without_weights++;
-    it_split->pos_label_dist.Add(label, weight);
+    if constexpr (weighted) {
+      it_split->pos_label_dist.Add(label, weights[example_idx]);
+    } else {
+      it_split->pos_label_dist.Add(label);
+    }
   }
 
   for (int split_idx = candidate_splits.size() - 2; split_idx >= 0;
@@ -2271,6 +2430,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
   }
 }
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<float>& attributes,
@@ -2280,6 +2440,11 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
     double sum_hessian, double sum_weights, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForNumericalAttribute(selected_examples, weights, attributes,
@@ -2289,13 +2454,14 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
   FeatureNumericalBucket::Filler feature_filler(selected_examples.size(),
                                                 na_replacement, attributes);
 
-  LabelHessianNumericalOneValueBucket::Filler label_filler(gradients, hessians,
-                                                           weights);
+  typename LabelHessianNumericalOneValueBucket<weighted>::Filler label_filler(
+      gradients, hessians, weights);
 
-  LabelHessianNumericalOneValueBucket::Initializer initializer(
-      sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
-      internal_config.hessian_l2_numerical,
-      dt_config.internal().hessian_split_score_subtract_parent());
+  typename LabelHessianNumericalOneValueBucket<weighted>::Initializer
+      initializer(sum_gradient, sum_hessian, sum_weights,
+                  internal_config.hessian_l1,
+                  internal_config.hessian_l2_numerical,
+                  dt_config.internal().hessian_split_score_subtract_parent());
 
   if (dt_config.internal().sorting_strategy() ==
           proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -2315,7 +2481,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
               ->presorted_numerical_features()[attribute_idx];
 
       return ScanSplitsPresortedSparse<
-          FeatureNumericalLabelHessianNumericalOneValue,
+          FeatureNumericalLabelHessianNumericalOneValue<weighted>,
           LabelHessianNumericalScoreAccumulator>(
           internal_config.preprocessing->num_examples(), selected_examples,
           sorted_attributes.items, feature_filler, label_filler, initializer,
@@ -2325,11 +2491,12 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
     }
   }
 
-  return FindBestSplit_LabelHessianRegressionFeatureNumerical(
+  return FindBestSplit_LabelHessianRegressionFeatureNumerical<weighted>(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
+template <bool weighted>
 SplitSearchResult
 FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -2342,21 +2509,26 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
     double sum_hessian, double sum_weights, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   FeatureDiscretizedNumericalBucket::Filler feature_filler(
       num_bins, na_replacement, attributes);
 
-  LabelHessianNumericalBucket::Filler label_filler(
+  typename LabelHessianNumericalBucket<weighted>::Filler label_filler(
       gradients, hessians, weights, internal_config.hessian_l1,
       internal_config.hessian_l2_categorical);
 
-  LabelHessianNumericalBucket::Initializer initializer(
+  typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_categorical,
       dt_config.internal().hessian_split_score_subtract_parent());
 
-  return FindBestSplit_LabelHessianRegressionFeatureDiscretizedNumerical(
-      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
-      attribute_idx, condition, &cache->cache_v2);
+  return FindBestSplit_LabelHessianRegressionFeatureDiscretizedNumerical<
+      weighted>(selected_examples, feature_filler, label_filler, initializer,
+                min_num_obs, attribute_idx, condition, &cache->cache_v2);
 }
 
 template <bool weighted>
@@ -2369,6 +2541,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, const InternalTrainConfig& internal_config,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForNumericalAttribute(selected_examples, weights, attributes,
@@ -2437,6 +2614,7 @@ template SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart<false>(
     int32_t attribute_idx, const InternalTrainConfig& internal_config,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -2448,14 +2626,20 @@ SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   FeatureDiscretizedNumericalBucket::Filler feature_filler(
       num_bins, na_replacement, attributes);
 
-  LabelNumericalBucket::Filler label_filler(labels, weights);
+  typename LabelNumericalBucket<weighted>::Filler label_filler(labels, weights);
 
-  LabelNumericalBucket::Initializer initializer(label_distribution);
+  typename LabelNumericalBucket<weighted>::Initializer initializer(
+      label_distribution);
 
-  return FindBestSplit_LabelRegressionFeatureDiscretizedNumerical(
+  return FindBestSplit_LabelRegressionFeatureDiscretizedNumerical<weighted>(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
@@ -2470,6 +2654,9 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  if (!weights.empty()) {
+    DCHECK_EQ(weights.size(), labels.size());
+  }
   FeatureIsMissingBucket::Filler feature_filler(attributes);
   if (num_label_classes == 3) {
     // Binary classification.
@@ -2518,26 +2705,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
   }
 }
 
-SplitSearchResult FindSplitLabelRegressionFeatureNA(
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const dataset::VerticalDataset::AbstractColumn* attributes,
-    const std::vector<float>& labels, const UnsignedExampleIdx min_num_obs,
-    const proto::DecisionTreeTrainingConfig& dt_config,
-    const utils::NormalDistributionDouble& label_distribution,
-    const int32_t attribute_idx, proto::NodeCondition* condition,
-    SplitterPerThreadCache* cache) {
-  FeatureIsMissingBucket::Filler feature_filler(attributes);
-
-  LabelNumericalBucket::Filler label_filler(labels, weights);
-
-  LabelNumericalBucket::Initializer initializer(label_distribution);
-
-  return FindBestSplit_LabelRegressionFeatureNACart(
-      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
-      attribute_idx, condition, &cache->cache_v2);
-}
-
+template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -2549,18 +2717,23 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
     const double sum_weights, const int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   FeatureIsMissingBucket::Filler feature_filler(attributes);
 
-  LabelHessianNumericalBucket::Filler label_filler(
+  typename LabelHessianNumericalBucket<weighted>::Filler label_filler(
       gradients, hessians, weights, internal_config.hessian_l1,
       internal_config.hessian_l2_numerical);
 
-  LabelHessianNumericalBucket::Initializer initializer(
+  typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_numerical,
       dt_config.internal().hessian_split_score_subtract_parent());
 
-  return FindBestSplit_LabelHessianRegressionFeatureNACart(
+  return FindBestSplit_LabelHessianRegressionFeatureNACart<weighted>(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
@@ -2574,6 +2747,9 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
     const utils::IntegerDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  if (!weights.empty()) {
+    DCHECK_EQ(weights.size(), labels.size());
+  }
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForBooleanAttribute(selected_examples, weights, attributes,
@@ -2631,6 +2807,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
   }
 }
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<char>& attributes,
@@ -2640,6 +2817,12 @@ SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
+
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForBooleanAttribute(selected_examples, weights, attributes,
@@ -2647,14 +2830,35 @@ SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
   }
 
   FeatureBooleanBucket::Filler feature_filler(na_replacement, attributes);
-  LabelNumericalBucket::Filler label_filler(labels, weights);
-  LabelNumericalBucket::Initializer initializer(label_distribution);
+  typename LabelNumericalBucket<weighted>::Filler label_filler(labels, weights);
+  typename LabelNumericalBucket<weighted>::Initializer initializer(
+      label_distribution);
 
-  return FindBestSplit_LabelRegressionFeatureBooleanCart(
+  return FindBestSplit_LabelRegressionFeatureBooleanCart<weighted>(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
+template SplitSearchResult FindSplitLabelRegressionFeatureBoolean<true>(
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& labels, bool na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+template SplitSearchResult FindSplitLabelRegressionFeatureBoolean<false>(
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& labels, bool na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
+template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<char>& attributes,
@@ -2665,6 +2869,11 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
     const double sum_weights, const int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForBooleanAttribute(selected_examples, weights, attributes,
@@ -2672,20 +2881,21 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
   }
 
   FeatureBooleanBucket::Filler feature_filler(na_replacement, attributes);
-  LabelHessianNumericalBucket::Filler label_filler(
+  typename LabelHessianNumericalBucket<weighted>::Filler label_filler(
       gradients, hessians, weights, internal_config.hessian_l1,
       internal_config.hessian_l2_numerical);
 
-  LabelHessianNumericalBucket::Initializer initializer(
+  typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_numerical,
       dt_config.internal().hessian_split_score_subtract_parent());
 
-  return FindBestSplit_LabelHessianRegressionFeatureBooleanCart(
+  return FindBestSplit_LabelHessianRegressionFeatureBooleanCart<weighted>(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
@@ -2697,6 +2907,11 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
     const double sum_weights, const int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForCategoricalAttribute(selected_examples, weights,
@@ -2706,11 +2921,11 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
 
   FeatureCategoricalBucket::Filler feature_filler(num_attribute_classes,
                                                   na_replacement, attributes);
-  LabelHessianNumericalBucket::Filler label_filler(
+  typename LabelHessianNumericalBucket<weighted>::Filler label_filler(
       gradients, hessians, weights, internal_config.hessian_l1,
       internal_config.hessian_l2_categorical);
 
-  LabelHessianNumericalBucket::Initializer initializer(
+  typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_categorical,
       dt_config.internal().hessian_split_score_subtract_parent());
@@ -2723,12 +2938,14 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
   switch (algorithm) {
     case proto::Categorical::ALGORITHM_NOT_SET:
     case proto::Categorical::kCart:
-      return FindBestSplit_LabelHessianRegressionFeatureCategoricalCart(
-          selected_examples, feature_filler, label_filler, initializer,
-          min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      return FindBestSplit_LabelHessianRegressionFeatureCategoricalCart<
+          weighted>(selected_examples, feature_filler, label_filler,
+                    initializer, min_num_obs, attribute_idx, condition,
+                    &cache->cache_v2);
 
     case proto::Categorical::kRandom:
-      return FindBestSplit_LabelHessianRegressionFeatureCategoricalRandom(
+      return FindBestSplit_LabelHessianRegressionFeatureCategoricalRandom<
+          weighted>(
           selected_examples, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx,
           NumTrialsForRandomCategoricalSplit(dt_config.categorical().random()),
@@ -2739,6 +2956,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
   }
 }
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
@@ -2748,6 +2966,12 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random) {
+  if constexpr (weighted) {
+    DCHECK_GE(weights.size(), selected_examples.size());
+  } else {
+    DCHECK(weights.empty());
+  }
+
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForCategoricalAttribute(selected_examples, weights,
@@ -2757,9 +2981,10 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
 
   FeatureCategoricalBucket::Filler feature_filler(num_attribute_classes,
                                                   na_replacement, attributes);
-  LabelNumericalBucket::Filler label_filler(labels, weights);
+  typename LabelNumericalBucket<weighted>::Filler label_filler(labels, weights);
 
-  LabelNumericalBucket::Initializer initializer(label_distribution);
+  typename LabelNumericalBucket<weighted>::Initializer initializer(
+      label_distribution);
 
   const auto algorithm =
       (num_attribute_classes < dt_config.categorical().arity_limit_for_random())
@@ -2769,12 +2994,12 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
   switch (algorithm) {
     case proto::Categorical::ALGORITHM_NOT_SET:
     case proto::Categorical::kCart:
-      return FindBestSplit_LabelRegressionFeatureCategoricalCart(
+      return FindBestSplit_LabelRegressionFeatureCategoricalCart<weighted>(
           selected_examples, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx, condition, &cache->cache_v2);
 
     case proto::Categorical::kRandom:
-      return FindBestSplit_LabelRegressionFeatureCategoricalRandom(
+      return FindBestSplit_LabelRegressionFeatureCategoricalRandom<weighted>(
           selected_examples, feature_filler, label_filler, initializer,
           min_num_obs, attribute_idx,
           NumTrialsForRandomCategoricalSplit(dt_config.categorical().random()),
@@ -2796,6 +3021,9 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
     utils::RandomEngine* random) {
+  if (!weights.empty()) {
+    DCHECK_EQ(weights.size(), labels.size());
+  }
   // Bitmap of available attribute values. During the course of the algorithm,
   // an attribute value is available if:
   //  - It is selected by the initial random sampling of candidate attribute
@@ -3010,6 +3238,7 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
   }
 }
 
+template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -3020,7 +3249,11 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
     utils::RandomEngine* random) {
-  DCHECK_EQ(weights.size(), labels.size());
+  if constexpr (weighted) {
+    DCHECK_EQ(weights.size(), labels.size());
+  } else {
+    DCHECK(weights.empty());
+  }
   // Bitmap of available attribute values. During the course of the algorithm,
   // an attribute value is available if:
   //  - It is selected by the initial random sampling of candidate attribute
@@ -3096,7 +3329,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     int best_attr_value;
     double best_candidate_variance_reduction;
     std::tie(best_attr_value, best_candidate_variance_reduction) =
-        GetAttributeValueWithMaximumVarianceReduction(
+        GetAttributeValueWithMaximumVarianceReduction<weighted>(
             variance_reduction, num_attribute_classes, split_label_distribution,
             selected_examples, positive_selected_example_bitmap,
             attribute_values, attribute_bank, weights, labels, initial_variance,
@@ -3126,10 +3359,15 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
               best_attr_value);
       if (match) {
         positive_selected_example_bitmap[select_idx] = true;
-        split_label_distribution.mutable_pos()->Add(labels[example_idx],
-                                                    weights[example_idx]);
-        split_label_distribution.mutable_neg()->Add(labels[example_idx],
-                                                    -weights[example_idx]);
+        if constexpr (weighted) {
+          split_label_distribution.mutable_pos()->Add(labels[example_idx],
+                                                      weights[example_idx]);
+          split_label_distribution.mutable_neg()->Sub(labels[example_idx],
+                                                      weights[example_idx]);
+        } else {
+          split_label_distribution.mutable_pos()->Add(labels[example_idx]);
+          split_label_distribution.mutable_neg()->Sub(labels[example_idx]);
+        }
         split_label_distribution_no_weights.mutable_pos()->Add(
             labels[example_idx]);
         split_label_distribution_no_weights.mutable_neg()->Sub(
@@ -3344,6 +3582,9 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
     const utils::IntegerDistributionDouble& label_distribution,
     int32_t attribute_idx, utils::RandomEngine* random,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
+  if (!weights.empty()) {
+    DCHECK_EQ(weights.size(), labels.size());
+  }
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForCategoricalAttribute(selected_examples, weights,
@@ -3399,6 +3640,7 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureNumericalCart(
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  DCHECK(!weights.empty());
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForNumericalAttribute(selected_examples, weights, attributes,
@@ -3430,6 +3672,7 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureNumericalCart(
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
+  DCHECK(!weights.empty());
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForNumericalAttribute(selected_examples, weights, attributes,
@@ -3461,6 +3704,7 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random) {
+  DCHECK(!weights.empty());
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForCategoricalAttribute(selected_examples, weights,
@@ -3514,6 +3758,7 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
     const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random) {
+  DCHECK(!weights.empty());
   if (dt_config.missing_value_policy() ==
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION) {
     LocalImputationForCategoricalAttribute(selected_examples, weights,
@@ -3660,33 +3905,6 @@ void GenerateRandomImputationOnColumn(
     local_example_idx++;
   }
   CHECK_OK(src->ExtractAndAppend(source_indices, dst));
-}
-
-absl::Status SetRegressionLabelDistribution(
-    const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
-  ASSIGN_OR_RETURN(
-      const auto* const labels,
-      dataset
-          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
-              config_link.label()));
-  utils::NormalDistributionDouble label_distribution;
-  if (weights.empty()) {
-    for (const UnsignedExampleIdx example_idx : selected_examples) {
-      label_distribution.Add(labels->values()[example_idx], 1.f);
-    }
-  } else {
-    STATUS_CHECK(weights.size() == dataset.nrow());
-    for (const UnsignedExampleIdx example_idx : selected_examples) {
-      label_distribution.Add(labels->values()[example_idx],
-                             weights[example_idx]);
-    }
-  }
-  label_distribution.Save(node->mutable_regressor()->mutable_distribution());
-  node->mutable_regressor()->set_top_value(label_distribution.Mean());
-  return absl::OkStatus();
 }
 
 void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {

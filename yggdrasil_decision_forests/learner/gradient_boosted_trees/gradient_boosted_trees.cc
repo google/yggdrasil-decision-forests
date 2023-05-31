@@ -1125,11 +1125,28 @@ GradientBoostedTreesLearner::TrainWithStatus(
 
   // Compute the example weights.
   std::vector<float> weights, validation_weights;
+
+  // Determines if the training code supports `weights` to be empty if
+  // all the examples have the same weight.
+  //
+  // Currently, this feature is not supported for gradient one side sampling and
+  // oblique splits.
+  bool use_optimized_unit_weights = true;
+  if (config.gbt_config->has_gradient_one_side_sampling() ||
+      config.gbt_config->decision_tree().split_axis_case() ==
+          decision_tree::proto::DecisionTreeTrainingConfig::
+              kSparseObliqueSplit ||
+      config.train_config.task() == model::proto::CATEGORICAL_UPLIFT ||
+      config.train_config.task() == model::proto::NUMERICAL_UPLIFT) {
+    use_optimized_unit_weights = false;
+  }
   RETURN_IF_ERROR(dataset::GetWeights(sub_train_dataset,
-                                      config.train_config_link, &weights));
+                                      config.train_config_link, &weights,
+                                      use_optimized_unit_weights));
   if (has_validation_dataset) {
-    RETURN_IF_ERROR(dataset::GetWeights(
-        validation_dataset, config.train_config_link, &validation_weights));
+    RETURN_IF_ERROR(
+        dataset::GetWeights(validation_dataset, config.train_config_link,
+                            &validation_weights, use_optimized_unit_weights));
   }
 
   // Initialize the training dataset for individual trees (called gradient

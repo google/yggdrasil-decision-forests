@@ -117,37 +117,50 @@ using FeatureNumericalLabelNumericalOneValue =
     ExampleBucketSet<ExampleBucket<FeatureNumericalBucket,
                                    LabelNumericalOneValueBucket<weighted>>>;
 
-using FeatureDiscretizedNumericalLabelNumerical = ExampleBucketSet<
-    ExampleBucket<FeatureDiscretizedNumericalBucket, LabelNumericalBucket>>;
+template <bool weighted>
+using FeatureDiscretizedNumericalLabelNumerical =
+    ExampleBucketSet<ExampleBucket<FeatureDiscretizedNumericalBucket,
+                                   LabelNumericalBucket<weighted>>>;
 
+template <bool weighted>
 using FeatureCategoricalLabelNumerical = ExampleBucketSet<
-    ExampleBucket<FeatureCategoricalBucket, LabelNumericalBucket>>;
+    ExampleBucket<FeatureCategoricalBucket, LabelNumericalBucket<weighted>>>;
 
-using FeatureBooleanLabelNumerical =
-    ExampleBucketSet<ExampleBucket<FeatureBooleanBucket, LabelNumericalBucket>>;
+template <bool weighted>
+using FeatureBooleanLabelNumerical = ExampleBucketSet<
+    ExampleBucket<FeatureBooleanBucket, LabelNumericalBucket<weighted>>>;
 
+template <bool weighted>
 using FeatureIsMissingLabelNumerical = ExampleBucketSet<
-    ExampleBucket<FeatureIsMissingBucket, LabelNumericalBucket>>;
+    ExampleBucket<FeatureIsMissingBucket, LabelNumericalBucket<weighted>>>;
 
 // Label: Hessian Numerical.
 
-using FeatureNumericalLabelHessianNumericalOneValue = ExampleBucketSet<
-    ExampleBucket<FeatureNumericalBucket, LabelHessianNumericalOneValueBucket>>;
+template <bool weighted>
+using FeatureNumericalLabelHessianNumericalOneValue =
+    ExampleBucketSet<ExampleBucket<
+        FeatureNumericalBucket, LabelHessianNumericalOneValueBucket<weighted>>>;
 
+template <bool weighted>
 using FeatureDiscretizedNumericalLabelHessianNumerical =
     ExampleBucketSet<ExampleBucket<FeatureDiscretizedNumericalBucket,
-                                   LabelHessianNumericalBucket>>;
+                                   LabelHessianNumericalBucket<weighted>>>;
 
-using FeatureCategoricalLabelHessianNumerical = ExampleBucketSet<
-    ExampleBucket<FeatureCategoricalBucket, LabelHessianNumericalBucket>>;
+template <bool weighted>
+using FeatureCategoricalLabelHessianNumerical =
+    ExampleBucketSet<ExampleBucket<FeatureCategoricalBucket,
+                                   LabelHessianNumericalBucket<weighted>>>;
 
+template <bool weighted>
 using FeatureBooleanLabelHessianNumerical = ExampleBucketSet<
-    ExampleBucket<FeatureBooleanBucket, LabelHessianNumericalBucket>>;
+    ExampleBucket<FeatureBooleanBucket, LabelHessianNumericalBucket<weighted>>>;
 
-using FeatureIsMissingLabelHessianNumerical = ExampleBucketSet<
-    ExampleBucket<FeatureIsMissingBucket, LabelHessianNumericalBucket>>;
+template <bool weighted>
+using FeatureIsMissingLabelHessianNumerical =
+    ExampleBucketSet<ExampleBucket<FeatureIsMissingBucket,
+                                   LabelHessianNumericalBucket<weighted>>>;
 
-// Label: Categorical.
+// Label: Weighted Categorical.
 
 using LabelWeightedCategoricalOneValueBucket =
     LabelCategoricalOneValueBucket<true>;
@@ -195,7 +208,7 @@ using FeatureBooleanLabelUnweightedCategorical = ExampleBucketSet<
 using FeatureIsMissingLabelUnweightedCategorical = ExampleBucketSet<
     ExampleBucket<FeatureIsMissingBucket, LabelUnweightedCategoricalBucket>>;
 
-// Label: Binary Categorical.
+// Label: Weighted Binary Categorical.
 
 using LabelWeightedBinaryCategoricalOneValueBucket =
     LabelBinaryCategoricalOneValueBucket<true>;
@@ -277,13 +290,20 @@ struct PerThreadCacheV2 {
 
   FeatureNumericalLabelNumericalOneValue</*weighted=*/true>
       example_bucket_set_num_1;
-  FeatureDiscretizedNumericalLabelNumerical example_bucket_set_num_5;
-  FeatureCategoricalLabelNumerical example_bucket_set_num_2;
-  FeatureIsMissingLabelNumerical example_bucket_set_num_3;
-  FeatureBooleanLabelNumerical example_bucket_set_num_4;
+  FeatureDiscretizedNumericalLabelNumerical</*weighted=*/true>
+      example_bucket_set_num_5;
+  FeatureCategoricalLabelNumerical</*weighted=*/true> example_bucket_set_num_2;
+  FeatureIsMissingLabelNumerical</*weighted=*/true> example_bucket_set_num_3;
+  FeatureBooleanLabelNumerical</*weighted=*/true> example_bucket_set_num_4;
 
   FeatureNumericalLabelNumericalOneValue</*weighted=*/false>
       example_bucket_set_unum_1;
+  FeatureDiscretizedNumericalLabelNumerical</*weighted=*/false>
+      example_bucket_set_unum_5;
+  FeatureCategoricalLabelNumerical</*weighted=*/false>
+      example_bucket_set_unum_2;
+  FeatureIsMissingLabelNumerical</*weighted=*/false> example_bucket_set_unum_3;
+  FeatureBooleanLabelNumerical</*weighted=*/false> example_bucket_set_unum_4;
 
   FeatureNumericalLabelCategoricalOneValue example_bucket_set_cat_1;
   FeatureDiscretizedNumericalLabelCategorical example_bucket_set_cat_5;
@@ -298,11 +318,27 @@ struct PerThreadCacheV2 {
   FeatureIsMissingLabelUnweightedCategorical example_bucket_set_ucat_3;
   FeatureBooleanLabelUnweightedCategorical example_bucket_set_ucat_4;
 
-  FeatureNumericalLabelHessianNumericalOneValue example_bucket_set_hnum_1;
-  FeatureDiscretizedNumericalLabelHessianNumerical example_bucket_set_hnum_5;
-  FeatureCategoricalLabelHessianNumerical example_bucket_set_hnum_2;
-  FeatureIsMissingLabelHessianNumerical example_bucket_set_hnum_3;
-  FeatureBooleanLabelHessianNumerical example_bucket_set_hnum_4;
+  FeatureNumericalLabelHessianNumericalOneValue</*weighted=*/true>
+      example_bucket_set_hnum_1;
+  FeatureDiscretizedNumericalLabelHessianNumerical</*weighted=*/true>
+      example_bucket_set_hnum_5;
+  FeatureCategoricalLabelHessianNumerical</*weighted=*/true>
+      example_bucket_set_hnum_2;
+  FeatureIsMissingLabelHessianNumerical</*weighted=*/true>
+      example_bucket_set_hnum_3;
+  FeatureBooleanLabelHessianNumerical</*weighted=*/true>
+      example_bucket_set_hnum_4;
+
+  FeatureNumericalLabelHessianNumericalOneValue</*weighted=*/false>
+      example_bucket_set_uhnum_1;
+  FeatureDiscretizedNumericalLabelHessianNumerical</*weighted=*/false>
+      example_bucket_set_uhnum_5;
+  FeatureCategoricalLabelHessianNumerical</*weighted=*/false>
+      example_bucket_set_uhnum_2;
+  FeatureIsMissingLabelHessianNumerical</*weighted=*/false>
+      example_bucket_set_uhnum_3;
+  FeatureBooleanLabelHessianNumerical</*weighted=*/false>
+      example_bucket_set_uhnum_4;
 
   FeatureNumericalLabelBinaryCategoricalOneValue example_bucket_set_bcat_1;
   FeatureDiscretizedNumericalLabelBinaryCategorical example_bucket_set_bcat_5;
@@ -362,39 +398,84 @@ auto* GetCachedExampleBucketSet(PerThreadCacheV2* cache) {
                               /*weighted=*/true>>) {
     return &cache->example_bucket_set_num_1;
   } else if constexpr (is_same_v<ExampleBucketSet,
-                                 FeatureDiscretizedNumericalLabelNumerical>) {
+                                 FeatureDiscretizedNumericalLabelNumerical<
+                                     /*weighted=*/true>>) {
     return &cache->example_bucket_set_num_5;
   } else if constexpr (is_same_v<ExampleBucketSet,
-                                 FeatureCategoricalLabelNumerical>) {
+                                 FeatureCategoricalLabelNumerical<
+                                     /*weighted=*/true>>) {
     return &cache->example_bucket_set_num_2;
-  } else if constexpr (is_same_v<ExampleBucketSet,
-                                 FeatureIsMissingLabelNumerical>) {
+  } else if constexpr (is_same_v<
+                           ExampleBucketSet,
+                           FeatureIsMissingLabelNumerical</*weighted=*/true>>) {
     return &cache->example_bucket_set_num_3;
-  } else if constexpr (is_same_v<ExampleBucketSet,
-                                 FeatureBooleanLabelNumerical>) {
+  } else if constexpr (is_same_v<ExampleBucketSet, FeatureBooleanLabelNumerical<
+                                                       /*weighted=*/true>>) {
     return &cache->example_bucket_set_num_4;
   } else if constexpr (is_same_v<ExampleBucketSet,
                                  FeatureNumericalLabelNumericalOneValue<
                                      /*weighted=*/false>>) {
+    // Unweighted Numerical.
     return &cache->example_bucket_set_unum_1;
-  } else if constexpr (is_same_v<
-                           ExampleBucketSet,
-                           FeatureNumericalLabelHessianNumericalOneValue>) {
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureDiscretizedNumericalLabelNumerical<
+                                     /*weighted=*/false>>) {
+    return &cache->example_bucket_set_unum_5;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureCategoricalLabelNumerical<
+                                     /*weighted=*/false>>) {
+    return &cache->example_bucket_set_unum_2;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureIsMissingLabelNumerical<
+                                     /*weighted=*/false>>) {
+    return &cache->example_bucket_set_unum_3;
+  } else if constexpr (is_same_v<ExampleBucketSet, FeatureBooleanLabelNumerical<
+                                                       /*weighted=*/false>>) {
+    return &cache->example_bucket_set_unum_4;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureNumericalLabelHessianNumericalOneValue<
+                                     /*weighted=*/true>>) {
     // Hessian Numerical.
     return &cache->example_bucket_set_hnum_1;
   } else if constexpr (is_same_v<
                            ExampleBucketSet,
-                           FeatureDiscretizedNumericalLabelHessianNumerical>) {
+                           FeatureDiscretizedNumericalLabelHessianNumerical<
+                               /*weighted=*/true>>) {
     return &cache->example_bucket_set_hnum_5;
   } else if constexpr (is_same_v<ExampleBucketSet,
-                                 FeatureCategoricalLabelHessianNumerical>) {
+                                 FeatureCategoricalLabelHessianNumerical<
+                                     /*weighted=*/true>>) {
     return &cache->example_bucket_set_hnum_2;
   } else if constexpr (is_same_v<ExampleBucketSet,
-                                 FeatureIsMissingLabelHessianNumerical>) {
+                                 FeatureIsMissingLabelHessianNumerical<
+                                     /*weighted=*/true>>) {
     return &cache->example_bucket_set_hnum_3;
   } else if constexpr (is_same_v<ExampleBucketSet,
-                                 FeatureBooleanLabelHessianNumerical>) {
+                                 FeatureBooleanLabelHessianNumerical<
+                                     /*weighted=*/true>>) {
     return &cache->example_bucket_set_hnum_4;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureNumericalLabelHessianNumericalOneValue<
+                                     /*weighted=*/false>>) {
+    // Unweighted Hessian Numerical.
+    return &cache->example_bucket_set_uhnum_1;
+  } else if constexpr (is_same_v<
+                           ExampleBucketSet,
+                           FeatureDiscretizedNumericalLabelHessianNumerical<
+                               /*weighted=*/false>>) {
+    return &cache->example_bucket_set_uhnum_5;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureCategoricalLabelHessianNumerical<
+                                     /*weighted=*/false>>) {
+    return &cache->example_bucket_set_uhnum_2;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureIsMissingLabelHessianNumerical<
+                                     /*weighted=*/false>>) {
+    return &cache->example_bucket_set_uhnum_3;
+  } else if constexpr (is_same_v<ExampleBucketSet,
+                                 FeatureBooleanLabelHessianNumerical<
+                                     /*weighted=*/false>>) {
+    return &cache->example_bucket_set_uhnum_4;
   } else if constexpr (is_same_v<ExampleBucketSet,
                                  FeatureNumericalLabelCategoricalOneValue>) {
     // Categorical.
@@ -712,6 +793,8 @@ SplitSearchResult ScanSplits(
 
     if (score > best_score) {
 #ifdef YDF_DEBUG_PRINT_SPLIT
+      YDF_LOG(INFO) << "Score:" << std::setprecision(16) << score
+                    << " Best_score: " << best_score;
       YDF_LOG(INFO) << "\tnew best split";
 #endif
 
@@ -1302,27 +1385,33 @@ constexpr auto FindBestSplit_LabelRegressionFeatureNumerical =
                   LabelNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelRegressionFeatureDiscretizedNumerical =
-    FindBestSplit<FeatureDiscretizedNumericalLabelNumerical,
+    FindBestSplit<FeatureDiscretizedNumericalLabelNumerical<weighted>,
                   LabelNumericalScoreAccumulator,
                   /*require_label_sorting*/ false,
                   /*bucket_interpolation=*/true>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelRegressionFeatureCategoricalCart =
-    FindBestSplit<FeatureCategoricalLabelNumerical,
+    FindBestSplit<FeatureCategoricalLabelNumerical<weighted>,
                   LabelNumericalScoreAccumulator,
                   /*require_label_sorting*/ true>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelRegressionFeatureCategoricalRandom =
-    FindBestSplitRandom<FeatureCategoricalLabelNumerical,
+    FindBestSplitRandom<FeatureCategoricalLabelNumerical<weighted>,
                         LabelNumericalScoreAccumulator>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelRegressionFeatureBooleanCart =
-    FindBestSplit<FeatureBooleanLabelNumerical, LabelNumericalScoreAccumulator,
+    FindBestSplit<FeatureBooleanLabelNumerical<weighted>,
+                  LabelNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelRegressionFeatureNACart =
-    FindBestSplit<FeatureIsMissingLabelNumerical,
+    FindBestSplit<FeatureIsMissingLabelNumerical<weighted>,
                   LabelNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
 
@@ -1448,33 +1537,39 @@ constexpr auto FindBestSplit_LabelUnweightedBinaryClassificationFeatureNACart =
 
 // Label: Hessian Regression.
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureNumerical =
-    FindBestSplit<FeatureNumericalLabelHessianNumericalOneValue,
+    FindBestSplit<FeatureNumericalLabelHessianNumericalOneValue<weighted>,
                   LabelHessianNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureDiscretizedNumerical =
-    FindBestSplit<FeatureDiscretizedNumericalLabelHessianNumerical,
+    FindBestSplit<FeatureDiscretizedNumericalLabelHessianNumerical<weighted>,
                   LabelHessianNumericalScoreAccumulator,
                   /*require_label_sorting*/ false,
                   /*bucket_interpolation=*/true>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureCategoricalCart =
-    FindBestSplit<FeatureCategoricalLabelHessianNumerical,
+    FindBestSplit<FeatureCategoricalLabelHessianNumerical<weighted>,
                   LabelHessianNumericalScoreAccumulator,
                   /*require_label_sorting*/ true>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureCategoricalRandom =
-    FindBestSplitRandom<FeatureCategoricalLabelHessianNumerical,
+    FindBestSplitRandom<FeatureCategoricalLabelHessianNumerical<weighted>,
                         LabelHessianNumericalScoreAccumulator>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureBooleanCart =
-    FindBestSplit<FeatureBooleanLabelHessianNumerical,
+    FindBestSplit<FeatureBooleanLabelHessianNumerical<weighted>,
                   LabelHessianNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
 
+template <bool weighted>
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureNACart =
-    FindBestSplit<FeatureIsMissingLabelHessianNumerical,
+    FindBestSplit<FeatureIsMissingLabelHessianNumerical<weighted>,
                   LabelHessianNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
 

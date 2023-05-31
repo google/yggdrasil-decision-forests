@@ -304,13 +304,14 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
           current_projection.front().attribute_idx, {}, best_condition, cache);
     } else if constexpr (is_same<LabelStats,
                                  RegressionHessianLabelStats>::value) {
-      result = FindSplitLabelHessianRegressionFeatureNumericalCart(
-          dense_example_idxs, selected_weights, projection_values,
-          selected_labels.gradient_data, selected_labels.hessian_data,
-          na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
-          label_stats.sum_hessian, label_stats.sum_weights,
-          current_projection.front().attribute_idx, internal_config,
-          best_condition, cache);
+      result = FindSplitLabelHessianRegressionFeatureNumericalCart<
+          /*weighted=*/true>(dense_example_idxs, selected_weights,
+                             projection_values, selected_labels.gradient_data,
+                             selected_labels.hessian_data, na_replacement,
+                             min_num_obs, dt_config, label_stats.sum_gradient,
+                             label_stats.sum_hessian, label_stats.sum_weights,
+                             current_projection.front().attribute_idx,
+                             internal_config, best_condition, cache);
     } else if constexpr (is_same<LabelStats, RegressionLabelStats>::value) {
       if (weights.empty()) {
         result =

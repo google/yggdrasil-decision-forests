@@ -130,7 +130,7 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
     DCHECK_GE(gbt_config_.shrinkage(), 0);
 
     if (!gbt_config_.use_hessian_gain()) {
-      RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
+      RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution<weighted>(
           train_dataset, selected_examples, weights, config_link,
           node->mutable_node()));
       // Even if "use_hessian_gain" is not enabled for the splits, we use a

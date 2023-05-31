@@ -102,7 +102,7 @@ class PoissonLoss : public AbstractLoss {
     }
     // Initialize the distribution (as the "top_value" is overridden right
     // after.
-    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
+    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution<weighted>(
         train_dataset, selected_examples, weights, config_link,
         node->mutable_node()));
 

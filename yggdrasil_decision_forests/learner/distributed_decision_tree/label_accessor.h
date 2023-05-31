@@ -111,7 +111,8 @@ class RegressionLabelFiller {
  public:
   // How to represent a label value.
   typedef float Label;
-  typedef decision_tree::LabelNumericalBucket LabelBucket;
+  // TODO: Add special handling for unit weights.
+  typedef decision_tree::LabelNumericalBucket</*weighted*/ true> LabelBucket;
   typedef decision_tree::LabelNumericalScoreAccumulator Accumulator;
   typedef LabelBucket::Initializer AccumulatorInitializer;
 
@@ -167,7 +168,9 @@ class RegressionLabelFiller {
 class RegressionWithHessianLabelFiller {
  public:
   // How to represent a label value.
-  typedef decision_tree::LabelNumericalWithHessianBucket LabelBucket;
+  // TODO: Add special handling for unit weights.
+  typedef decision_tree::LabelNumericalWithHessianBucket</*weighted=*/true>
+      LabelBucket;
   typedef decision_tree::LabelNumericalWithHessianScoreAccumulator Accumulator;
   typedef LabelBucket::Initializer AccumulatorInitializer;
 

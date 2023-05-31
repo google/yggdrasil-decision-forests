@@ -136,17 +136,9 @@ class BinaryFocalLoss : public BinomialLogLikelihoodLoss {
       DCHECK(weights.empty());
     }
     if (!gbt_config_.use_hessian_gain()) {
-      if (weights.empty()) {
-        RETURN_IF_ERROR(
-            decision_tree::SetRegressionLabelDistribution(
-                train_dataset, selected_examples, weights, config_link,
-                node->mutable_node()));
-      } else {
-        RETURN_IF_ERROR(
-            decision_tree::SetRegressionLabelDistribution(
-                train_dataset, selected_examples, weights, config_link,
-                node->mutable_node()));
-      }
+      RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution<weighted>(
+          train_dataset, selected_examples, weights, config_link,
+          node->mutable_node()));
       // Even if "use_hessian_gain" is not enabled for the splits. We use a
       // Newton step in the leaves i.e. if "use_hessian_gain" is false, we need
       // all the information.

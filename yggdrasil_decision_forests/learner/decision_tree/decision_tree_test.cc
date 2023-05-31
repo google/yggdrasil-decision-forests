@@ -757,10 +757,26 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForClassification) {
   YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
-TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForRegression) {
+template <typename TestParam>
+class FindBestSplitTest;
+
+template <bool weighted>
+class FindBestSplitTest<std::integral_constant<bool, weighted>>
+    : public ::testing::Test {
+ protected:
+  static inline constexpr bool kWeighted = weighted;
+};
+using BoolTypes = ::testing::Types<std::false_type, std::true_type>;
+
+TYPED_TEST_SUITE(FindBestSplitTest, BoolTypes);
+
+TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartIsNaForRegression) {
   // Small basic dataset.
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
-  const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
+  std::vector<float> weights;
+  if constexpr (TestFixture::kWeighted) {
+    weights = {1.f, 2.f, 3.f, 4.f, 5.f, 6.f};
+  }
   const std::vector<float> labels = {1, 1, 0, 0, 1, 0};
 
   dataset::VerticalDataset::NumericalColumn attributes;
@@ -780,12 +796,16 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForRegression) {
   utils::NormalDistributionDouble label_distribution;
   for (int example_idx = 0; example_idx < selected_examples.size();
        example_idx++) {
-    label_distribution.Add(labels[example_idx], weights[example_idx]);
+    if constexpr (TestFixture::kWeighted) {
+      label_distribution.Add(labels[example_idx], weights[example_idx]);
+    } else {
+      label_distribution.Add(labels[example_idx]);
+    }
   }
 
   proto::NodeCondition best_condition;
   SplitterPerThreadCache cache;
-  EXPECT_EQ(FindSplitLabelRegressionFeatureNA(
+  EXPECT_EQ(FindSplitLabelRegressionFeatureNA<TestFixture::kWeighted>(
                 selected_examples, weights, &attributes, labels, min_num_obs,
                 dt_config, label_distribution, -1, &best_condition, &cache),
             SplitSearchResult::kBetterSplitFound);
@@ -793,23 +813,39 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForRegression) {
   EXPECT_EQ(best_condition.condition().type_case(),
             proto::Condition::kNaCondition);
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 6);
-  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 6);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 4);
-  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 4);
-  // > varb = function (x) { mean(x*x) - mean(x)^2 }
-  // > varb(c(1,1,0,0,1,0)) - 4/6*varb(c(1,1,1,0)) - 2/6*varb(c(0,0))
-  EXPECT_NEAR(best_condition.split_score(), 0.125, 0.01);
+  if constexpr (TestFixture::kWeighted) {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 21);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 18);
+    // Same split as unweighted, score manually verified with numpy.
+    EXPECT_NEAR(best_condition.split_score(), 0.063869f, TEST_PRECISION);
+    // TODO: The "better split" is just an artifact of incorrect
+    // rounding.
+    EXPECT_EQ(FindSplitLabelRegressionFeatureNA<TestFixture::kWeighted>(
+                  selected_examples, weights, &attributes, labels, min_num_obs,
+                  dt_config, label_distribution, -1, &best_condition, &cache),
+              SplitSearchResult::kBetterSplitFound);
+  } else {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 6);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 4);
+    // > varb = function (x) { mean(x*x) - mean(x)^2 }
+    // > varb(c(1,1,0,0,1,0)) - 4/6*varb(c(1,1,1,0)) - 2/6*varb(c(0,0))
+    EXPECT_NEAR(best_condition.split_score(), 0.125, 0.01);
+    EXPECT_EQ(FindSplitLabelRegressionFeatureNA<TestFixture::kWeighted>(
+                  selected_examples, weights, &attributes, labels, min_num_obs,
+                  dt_config, label_distribution, -1, &best_condition, &cache),
+              SplitSearchResult::kNoBetterSplitFound);
+  }
 
-  EXPECT_EQ(FindSplitLabelRegressionFeatureNA(
-                selected_examples, weights, &attributes, labels, min_num_obs,
-                dt_config, label_distribution, -1, &best_condition, &cache),
-            SplitSearchResult::kNoBetterSplitFound);
   YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
-TEST(DecisionTree, FindBestNumericalSplitHistogramForRegression) {
+TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitHistogramForRegression) {
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2};
-  const std::vector<float> weights = {1.f, 1.f, 1.f};
+  std::vector<float> weights;
+  if constexpr (TestFixture::kWeighted) {
+    weights = {1.f, 2.f, 3.f};
+  }
   const float na = std::numeric_limits<float>::quiet_NaN();
   std::vector<float> attributes = {0, 1, na};
   const std::vector<float> labels = {0, 1, 0};
@@ -817,9 +853,16 @@ TEST(DecisionTree, FindBestNumericalSplitHistogramForRegression) {
   const UnsignedExampleIdx min_num_obs = 1;
   // Compute the label distribution.
   utils::NormalDistributionDouble label_distribution;
-  for (int example_idx = 0; example_idx < selected_examples.size();
-       example_idx++) {
-    label_distribution.Add(labels[example_idx], weights[example_idx]);
+  if constexpr (TestFixture::kWeighted) {
+    for (int example_idx = 0; example_idx < selected_examples.size();
+         example_idx++) {
+      label_distribution.Add(labels[example_idx], weights[example_idx]);
+    }
+  } else {
+    for (int example_idx = 0; example_idx < selected_examples.size();
+         example_idx++) {
+      label_distribution.Add(labels[example_idx]);
+    }
   }
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_numerical_split()->set_type(
@@ -833,48 +876,43 @@ TEST(DecisionTree, FindBestNumericalSplitHistogramForRegression) {
   const float threshold = threshold_distribution(random);
 
   random = saved_state;
-  EXPECT_EQ(FindSplitLabelRegressionFeatureNumericalHistogram(
-                selected_examples, weights, attributes, labels, na_replacement,
-                min_num_obs, dt_config, label_distribution, -1, &random,
-                &best_condition),
-            SplitSearchResult::kBetterSplitFound);
+  EXPECT_EQ(
+      FindSplitLabelRegressionFeatureNumericalHistogram<TestFixture::kWeighted>(
+          selected_examples, weights, attributes, labels, na_replacement,
+          min_num_obs, dt_config, label_distribution, -1, &random,
+          &best_condition),
+      SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(),
             threshold);
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 3);
-  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 3);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
-  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
+  if constexpr (TestFixture::kWeighted) {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 6);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 5);
+  } else {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 3);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
+  }
   EXPECT_EQ(best_condition.na_value(), true);
 
   random = saved_state;
-  EXPECT_EQ(FindSplitLabelRegressionFeatureNumericalHistogram(
-                selected_examples, weights, attributes, labels, na_replacement,
-                min_num_obs, dt_config, label_distribution, -1, &random,
-                &best_condition),
-            SplitSearchResult::kNoBetterSplitFound);
+  EXPECT_EQ(
+      FindSplitLabelRegressionFeatureNumericalHistogram<TestFixture::kWeighted>(
+          selected_examples, weights, attributes, labels, na_replacement,
+          min_num_obs, dt_config, label_distribution, -1, &random,
+          &best_condition),
+      SplitSearchResult::kNoBetterSplitFound);
 
   attributes = {1, 1, 1, 1, 1, 1};
   random = saved_state;
-  EXPECT_EQ(FindSplitLabelRegressionFeatureNumericalHistogram(
-                selected_examples, weights, attributes, labels, na_replacement,
-                min_num_obs, dt_config, label_distribution, -1, &random,
-                &best_condition),
-            SplitSearchResult::kInvalidAttribute);
+  EXPECT_EQ(
+      FindSplitLabelRegressionFeatureNumericalHistogram<TestFixture::kWeighted>(
+          selected_examples, weights, attributes, labels, na_replacement,
+          min_num_obs, dt_config, label_distribution, -1, &random,
+          &best_condition),
+      SplitSearchResult::kInvalidAttribute);
 }
-
-template <typename TestParam>
-class FindBestSplitTest;
-
-template <bool weighted>
-class FindBestSplitTest<std::integral_constant<bool, weighted>>
-    : public ::testing::Test {
- protected:
-  static inline constexpr bool kWeighted = weighted;
-};
-using BoolTypes = ::testing::Types<std::false_type, std::true_type>;
-
-TYPED_TEST_SUITE(FindBestSplitTest, BoolTypes);
 
 TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitCartNumericalLabelBase) {
   std::vector<float> weights;
@@ -1127,10 +1165,13 @@ TYPED_TEST(FindBestSplitTest,
   }
 }
 
-TEST(DecisionTree, FindBestCategoricalSplitCartNumericalLabels) {
+TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
   // Small basic dataset.
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
-  const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
+  std::vector<float> weights;
+  if constexpr (TestFixture::kWeighted) {
+    weights = {1., 2., 3., 4., 5., 6.};
+  }
   std::vector<int32_t> attributes = {2, 3, 0, 1, -1, -1};
   const std::vector<float> labels = {1.f, 1.f, 0.f, 0.f, 1.f, 0.f};
   const int32_t num_attribute_classes = 4;
@@ -1145,12 +1186,16 @@ TEST(DecisionTree, FindBestCategoricalSplitCartNumericalLabels) {
   utils::NormalDistributionDouble label_distribution;
   for (int example_idx = 0; example_idx < selected_examples.size();
        example_idx++) {
-    label_distribution.Add(labels[example_idx], weights[example_idx]);
+    if constexpr (TestFixture::kWeighted) {
+      label_distribution.Add(labels[example_idx], weights[example_idx]);
+    } else {
+      label_distribution.Add(labels[example_idx]);
+    }
   }
 
   proto::NodeCondition best_condition;
   SplitterPerThreadCache cache;
-  EXPECT_EQ(FindSplitLabelRegressionFeatureCategorical(
+  EXPECT_EQ(FindSplitLabelRegressionFeatureCategorical<TestFixture::kWeighted>(
                 selected_examples, weights, attributes, labels,
                 num_attribute_classes, na_replacement, min_num_obs, dt_config,
                 label_distribution, -1, &best_condition, &cache, &rnd),
@@ -1163,25 +1208,42 @@ TEST(DecisionTree, FindBestCategoricalSplitCartNumericalLabels) {
       best_condition.condition().contains_bitmap_condition().elements_bitmap(),
       "\014");
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 6);
-  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 6);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
-  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
-  EXPECT_EQ(best_condition.na_value(), false);
-  // > varb = function (x) { mean(x*x) - mean(x)^2 }
-  // > varb(c(1,1,0,0,1,0)) - 4/6*varb(c(0,0,1,0)) - 2/6*varb(c(1,1))
-  EXPECT_NEAR(best_condition.split_score(), 0.125, 0.0001);
+  if constexpr (TestFixture::kWeighted) {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 21);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 3);
+    EXPECT_EQ(best_condition.na_value(), false);
+    // Verified with numpy, same split as unweighted
+    EXPECT_NEAR(best_condition.split_score(), 0.0638699, 0.0001);
+    // TODO: The better split is the same as before, but it's an
+    // artifact of incorrect rounding.
+    EXPECT_EQ(
+        FindSplitLabelRegressionFeatureCategorical<TestFixture::kWeighted>(
+            selected_examples, weights, attributes, labels,
+            num_attribute_classes, na_replacement, min_num_obs, dt_config,
+            label_distribution, -1, &best_condition, &cache, &rnd),
+        SplitSearchResult::kBetterSplitFound);
+  } else {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 6);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
+    EXPECT_EQ(best_condition.na_value(), false);
+    // > varb = function (x) { mean(x*x) - mean(x)^2 }
+    // > varb(c(1,1,0,0,1,0)) - 4/6*varb(c(0,0,1,0)) - 2/6*varb(c(1,1))
+    EXPECT_NEAR(best_condition.split_score(), 0.125, 0.0001);
+    EXPECT_EQ(
+        FindSplitLabelRegressionFeatureCategorical<TestFixture::kWeighted>(
+            selected_examples, weights, attributes, labels,
+            num_attribute_classes, na_replacement, min_num_obs, dt_config,
+            label_distribution, -1, &best_condition, &cache, &rnd),
+        SplitSearchResult::kNoBetterSplitFound);
+  }
 
-  EXPECT_EQ(FindSplitLabelRegressionFeatureCategorical(
-                selected_examples, weights, attributes, labels,
-                num_attribute_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &best_condition, &cache, &rnd),
-            SplitSearchResult::kNoBetterSplitFound);
   YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // Since all the attributes have the same value, there are no valid splits.
   attributes = {1, 1, 1, 1, 1, 1};
 
-  EXPECT_EQ(FindSplitLabelRegressionFeatureCategorical(
+  EXPECT_EQ(FindSplitLabelRegressionFeatureCategorical<TestFixture::kWeighted>(
                 selected_examples, weights, attributes, labels,
                 num_attribute_classes, na_replacement, min_num_obs, dt_config,
                 label_distribution, -1, &best_condition, &cache, &rnd),
@@ -1234,11 +1296,15 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
   YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
-TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForRegression) {
+TYPED_TEST(FindBestSplitTest,
+           FindBestCategoricalSplitCartBooleanForRegression) {
   // Small basic dataset.
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   std::vector<char> attributes = {0, 1, 0, 1, 0, 0};
-  const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
+  std::vector<float> weights;
+  if constexpr (TestFixture::kWeighted) {
+    weights = {1., 2., 3., 4., 5., 6.};
+  }
   const std::vector<float> labels = {1, 0, 0, 0, 0, 1};
 
   // Configuration.
@@ -1251,13 +1317,17 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForRegression) {
   utils::NormalDistributionDouble label_distribution;
   for (int example_idx = 0; example_idx < selected_examples.size();
        example_idx++) {
-    label_distribution.Add(labels[example_idx], weights[example_idx]);
+    if constexpr (TestFixture::kWeighted) {
+      label_distribution.Add(labels[example_idx], weights[example_idx]);
+    } else {
+      label_distribution.Add(labels[example_idx]);
+    }
   }
 
   proto::NodeCondition best_condition;
   SplitterPerThreadCache cache;
   EXPECT_EQ(
-      FindSplitLabelRegressionFeatureBoolean(
+      FindSplitLabelRegressionFeatureBoolean<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, false, min_num_obs,
           dt_config, label_distribution, -1, &best_condition, &cache),
       SplitSearchResult::kBetterSplitFound);
@@ -1265,15 +1335,22 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForRegression) {
   EXPECT_EQ(best_condition.condition().type_case(),
             proto::Condition::kTrueValueCondition);
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 6);
-  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 6);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
-  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
-  // > varb = function (x) { mean(x*x) - mean(x)^2 }
-  // > varb(c(1,0,0,0,0,1)) - 4/6*varb(c(1,0,0,1)) - 2/6*varb(c(0,0))
-  EXPECT_NEAR(best_condition.split_score(), 0.055, 0.01);
+  if constexpr (TestFixture::kWeighted) {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 21);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 6);
+    // Verified with Numpy
+    EXPECT_NEAR(best_condition.split_score(), 0.0444, 0.0001);
+  } else {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 6);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
+    // > varb = function (x) { mean(x*x) - mean(x)^2 }
+    // > varb(c(1,0,0,0,0,1)) - 4/6*varb(c(1,0,0,1)) - 2/6*varb(c(0,0))
+    EXPECT_NEAR(best_condition.split_score(), 0.055, 0.01);
+  }
 
   EXPECT_EQ(
-      FindSplitLabelRegressionFeatureBoolean(
+      FindSplitLabelRegressionFeatureBoolean<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, false, min_num_obs,
           dt_config, label_distribution, -1, &best_condition, &cache),
       SplitSearchResult::kNoBetterSplitFound);
@@ -1725,17 +1802,20 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
   EXPECT_NEAR(best_condition.split_score(), 0.2157616, 0.0001);
 }
 
-TEST(DecisionTree, FindBestCategoricalSetSplitCartForRegression) {
+TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
   // List of selected examples.
   std::vector<UnsignedExampleIdx> selected = {0, 1, 2, 3, 4, 5, 6, 7};
   // Uniform weights.
-  std::vector<float> weights = {1, 1, 1, 1, 1, 1, 1, 1};
+  std::vector<float> weights;
+  if constexpr (TestFixture::kWeighted) {
+    weights = {1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f};
+  }
   // Example labels. Ultimately, we want the first 4 examples to be in one
   // child, and the 4 other in the other.
   std::vector<float> labels_v1 = {1, 2, 3, 4, 11, 12, 13, 14};
   std::vector<float> labels_v2 = {1, 3, 4, 2, 13, 12, 11, 14};
 
-  // A good attribute that perfectly separate the labels.
+  // A good attribute that perfectly separates the labels.
   // We would want the split to be "attribute \intersect {0,1,2} is empty".
   //
   // In the case of label_v1 because of the greedy selection, item 5 will be
@@ -1774,12 +1854,20 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartForRegression) {
   // Compute the label distribution.
   utils::NormalDistributionDouble label_distribution_v1;
   for (const auto example_idx : selected) {
-    label_distribution_v1.Add(labels_v1[example_idx], weights[example_idx]);
+    if constexpr (TestFixture::kWeighted) {
+      label_distribution_v1.Add(labels_v1[example_idx], weights[example_idx]);
+    } else {
+      label_distribution_v1.Add(labels_v1[example_idx]);
+    }
   }
 
   utils::NormalDistributionDouble label_distribution_v2;
   for (const auto example_idx : selected) {
-    label_distribution_v2.Add(labels_v2[example_idx], weights[example_idx]);
+    if constexpr (TestFixture::kWeighted) {
+      label_distribution_v2.Add(labels_v2[example_idx], weights[example_idx]);
+    } else {
+      label_distribution_v2.Add(labels_v2[example_idx]);
+    }
   }
 
   utils::RandomEngine rnd(1234);
@@ -1787,13 +1875,15 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartForRegression) {
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
 
-  EXPECT_EQ(FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
+  EXPECT_EQ(FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<
+                TestFixture::kWeighted>(
                 selected, weights, attributes_non_valid, labels_v1,
                 num_attribute_classes, min_num_obs, dt_config,
                 label_distribution_v1, -1, &best_condition, &rnd),
             SplitSearchResult::kInvalidAttribute);
 
-  EXPECT_EQ(FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
+  EXPECT_EQ(FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<
+                TestFixture::kWeighted>(
                 selected, weights, attributes_perfect, labels_v1,
                 num_attribute_classes, min_num_obs, dt_config,
                 label_distribution_v1, -1, &best_condition, &rnd),
@@ -1806,17 +1896,26 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartForRegression) {
       best_condition.condition().contains_bitmap_condition().elements_bitmap(),
       " ");
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
-  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
-  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
-  EXPECT_EQ(best_condition.na_value(), false);
-  // R>  var(c(1,2,3,4,11,12,13,14)) - (var(c(1,2,3,4,11,12)) * (6/8) +
-  // var(c(13,14)) * (2/8)) = 12
-  // With "var" the variance.
-  EXPECT_NEAR(best_condition.split_score(), 12., 0.0001);
+  if constexpr (TestFixture::kWeighted) {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 36);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 15);
+    EXPECT_EQ(best_condition.na_value(), false);
+    // Same split as unweighted, verified with numpy
+    EXPECT_NEAR(best_condition.split_score(), 8.9174, 0.0001);
+  } else {
+    EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
+    EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
+    EXPECT_EQ(best_condition.na_value(), false);
+    // R>  var(c(1,2,3,4,11,12,13,14)) - (var(c(1,2,3,4,11,12)) * (6/8) +
+    // var(c(13,14)) * (2/8)) = 12
+    // With "var" the variance.
+    EXPECT_NEAR(best_condition.split_score(), 12., 0.0001);
+  }
 
   proto::NodeCondition best_condition_v2;
-  EXPECT_EQ(FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
+  EXPECT_EQ(FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<
+                TestFixture::kWeighted>(
                 selected, weights, attributes_perfect, labels_v2,
                 num_attribute_classes, min_num_obs, dt_config,
                 label_distribution_v2, -1, &best_condition_v2, &rnd),
@@ -1830,14 +1929,22 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartForRegression) {
                 .elements_bitmap(),
             "\x07");
   EXPECT_EQ(best_condition_v2.num_training_examples_without_weight(), 8);
-  EXPECT_EQ(best_condition_v2.num_training_examples_with_weight(), 8);
   EXPECT_EQ(best_condition_v2.num_pos_training_examples_without_weight(), 4);
-  EXPECT_EQ(best_condition_v2.num_pos_training_examples_with_weight(), 4);
-  EXPECT_EQ(best_condition_v2.na_value(), false);
-  // R>   var(c(1,2,3,4,11,12,13,14)) - (var(c(1,2,3,4)) * (4/8) +
-  // var(c(11,12,13,14)) * (4/8)) = 25
-  // With "var" the variance (not the sampling variance).
-  EXPECT_NEAR(best_condition_v2.split_score(), 25., 0.0001);
+  if constexpr (TestFixture::kWeighted) {
+    EXPECT_EQ(best_condition_v2.num_training_examples_with_weight(), 36);
+    EXPECT_EQ(best_condition_v2.num_pos_training_examples_with_weight(), 10);
+    EXPECT_EQ(best_condition_v2.na_value(), false);
+    // Same split as unweighted, score verified with numpy.
+    EXPECT_NEAR(best_condition_v2.split_score(), 19.4188, 0.0001);
+  } else {
+    EXPECT_EQ(best_condition_v2.num_training_examples_with_weight(), 8);
+    EXPECT_EQ(best_condition_v2.num_pos_training_examples_with_weight(), 4);
+    EXPECT_EQ(best_condition_v2.na_value(), false);
+    // R>   var(c(1,2,3,4,11,12,13,14)) - (var(c(1,2,3,4)) * (4/8) +
+    // var(c(11,12,13,14)) * (4/8)) = 25
+    // With "var" the variance (not the sampling variance).
+    EXPECT_NEAR(best_condition_v2.split_score(), 25., 0.0001);
+  }
 }
 
 TEST(DecisionTree, MaskItemsForCategoricalForSetGreedySelection) {

@@ -129,7 +129,7 @@ class NormalDistributionDouble {
   double count_ = 0;
 };
 
-// Mean of a normal distribution proto. This function is analog to
+// Mean of a normal distribution proto. This function is analogous to
 // NormalDistributionDouble::Mean on a proto.
 inline double Mean(const proto::NormalDistributionDouble& dist) {
   if (dist.count() == 0) {

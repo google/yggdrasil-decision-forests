@@ -94,6 +94,28 @@ struct FloatValueOnly {
   float value;
 };
 
+struct FloatGradientHessianAndWeight {
+  float gradient;
+  float hessian;
+  float weight;
+};
+
+struct FloatGradientHessianOnly {
+  float gradient;
+  float hessian;
+};
+
+struct FloatSumGradientHessianAndWeight {
+  float sum_gradient;
+  float sum_hessian;
+  float sum_weight;
+};
+
+struct FloatSumGradientHessianOnly {
+  float sum_gradient;
+  float sum_hessian;
+};
+
 struct SumTruesAndWeights {
   double sum_trues;
   double sum_weights;
@@ -582,8 +604,8 @@ inline std::ostream& operator<<(std::ostream& os,
 // Accumulators
 // ============
 //
-// ScoreAccumulators accumulate accumulating the label statistics for a set of
-// buckets. They should implement the following methods.
+// ScoreAccumulators accumulate the label statistics for a set of buckets. They
+// should implement the following methods.
 //
 // Score obtained for all the scanned bucket. The score of the split will be 1)
 // the example weighted sum of the scores of the accumulators (if
@@ -969,18 +991,29 @@ inline std::ostream& operator<<(
   return os;
 }
 
+template <bool weighted>
 struct LabelHessianNumericalOneValueBucket {
-  float gradient;
-  float hessian;
-  float weight;
+  typedef typename std::conditional_t<weighted,
+                                      internal::FloatGradientHessianAndWeight,
+                                      internal::FloatGradientHessianOnly>
+      GradientHessianAndMaybeWeight;
+  GradientHessianAndMaybeWeight content;
   static constexpr int count = 1;  // NOLINT
 
   void AddToScoreAcc(LabelHessianNumericalScoreAccumulator* acc) const {
-    acc->Add(gradient, hessian, weight);
+    if constexpr (weighted) {
+      acc->Add(content.gradient, content.hessian, content.weight);
+    } else {
+      acc->Add(content.gradient, content.hessian, 1.f);
+    }
   }
 
   void SubToScoreAcc(LabelHessianNumericalScoreAccumulator* acc) const {
-    acc->Sub(gradient, hessian, weight);
+    if constexpr (weighted) {
+      acc->Sub(content.gradient, content.hessian, content.weight);
+    } else {
+      acc->Sub(content.gradient, content.hessian, 1.f);
+    }
   }
 
   class Initializer {
@@ -1043,7 +1076,11 @@ struct LabelHessianNumericalOneValueBucket {
            const std::vector<float>& hessians,
            const std::vector<float>& weights)
         : gradients_(gradients), hessians_(hessians), weights_(weights) {
-      DCHECK(!weights.empty());
+      if constexpr (weighted) {
+        DCHECK_GE(weights.size(), gradients.size());
+      } else {
+        DCHECK(weights.empty());
+      }
     }
 
     void InitializeAndZero(LabelHessianNumericalOneValueBucket* acc) const {}
@@ -1052,46 +1089,68 @@ struct LabelHessianNumericalOneValueBucket {
 
     void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelHessianNumericalOneValueBucket* acc) const {
-      acc->gradient = gradients_[example_idx];
-      acc->hessian = hessians_[example_idx];
-      acc->weight = weights_[example_idx];
+      acc->content.gradient = gradients_[example_idx];
+      acc->content.hessian = hessians_[example_idx];
+      if constexpr (weighted) {
+        acc->content.weight = weights_[example_idx];
+      }
     }
 
     template <typename ExampleIdx>
     void AddDirectToScoreAcc(const ExampleIdx example_idx,
                              LabelHessianNumericalScoreAccumulator* acc) const {
-      acc->Add(gradients_[example_idx], hessians_[example_idx],
-               weights_[example_idx]);
+      if constexpr (weighted) {
+        acc->Add(gradients_[example_idx], hessians_[example_idx],
+                 weights_[example_idx]);
+      } else {
+        acc->Add(gradients_[example_idx], hessians_[example_idx], 1.f);
+      }
     }
 
     template <typename ExampleIdx>
     void SubDirectToScoreAcc(const ExampleIdx example_idx,
                              LabelHessianNumericalScoreAccumulator* acc) const {
-      acc->Sub(gradients_[example_idx], hessians_[example_idx],
-               weights_[example_idx]);
+      if constexpr (weighted) {
+        acc->Sub(gradients_[example_idx], hessians_[example_idx],
+                 weights_[example_idx]);
+      } else {
+        acc->Sub(gradients_[example_idx], hessians_[example_idx], 1.f);
+      }
     }
 
     template <typename ExampleIdx>
     void AddDirectToScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
         LabelHessianNumericalScoreAccumulator* acc) const {
-      acc->Add(gradients_[example_idx], hessians_[example_idx],
-               weights_[example_idx] * num_duplicates);
+      if constexpr (weighted) {
+        acc->Add(gradients_[example_idx], hessians_[example_idx],
+                 weights_[example_idx] * num_duplicates);
+      } else {
+        acc->Add<float>(gradients_[example_idx], hessians_[example_idx],
+                 num_duplicates);
+      }
     }
 
     template <typename ExampleIdx>
     void SubDirectToScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
         LabelHessianNumericalScoreAccumulator* acc) const {
-      acc->Sub(gradients_[example_idx], hessians_[example_idx],
-               weights_[example_idx] * num_duplicates);
+      if constexpr (weighted) {
+        acc->Sub(gradients_[example_idx], hessians_[example_idx],
+                 weights_[example_idx] * num_duplicates);
+      } else {
+        acc->Sub<float>(gradients_[example_idx], hessians_[example_idx],
+                 num_duplicates);
+      }
     }
 
     template <typename ExampleIdx>
     void Prefetch(const ExampleIdx example_idx) const {
       PREFETCH(&gradients_[example_idx]);
       PREFETCH(&hessians_[example_idx]);
-      PREFETCH(&weights_[example_idx]);
+      if constexpr (weighted) {
+        PREFETCH(&weights_[example_idx]);
+      }
     }
 
    private:
@@ -1099,15 +1158,20 @@ struct LabelHessianNumericalOneValueBucket {
     const std::vector<float>& hessians_;
     const std::vector<float>& weights_;
   };
-
-  friend std::ostream& operator<<(
-      std::ostream& os, const LabelHessianNumericalOneValueBucket& data);
 };
 
 inline std::ostream& operator<<(
-    std::ostream& os, const LabelHessianNumericalOneValueBucket& data) {
-  os << "gradient:" << data.gradient << " hessian:" << data.hessian
-     << " weight:" << data.weight << " count:" << data.count;
+    std::ostream& os, const LabelHessianNumericalOneValueBucket<false>& data) {
+  os << "gradient:" << data.content.gradient
+     << " hessian:" << data.content.hessian << " count:" << data.count;
+  return os;
+}
+
+inline std::ostream& operator<<(
+    std::ostream& os, const LabelHessianNumericalOneValueBucket<true>& data) {
+  os << "gradient:" << data.content.gradient
+     << " hessian:" << data.content.hessian << " weight:" << data.content.weight
+     << " count:" << data.count;
   return os;
 }
 
@@ -1392,7 +1456,7 @@ struct LabelBinaryCategoricalOneValueBucket {
         acc->AddOne(label_[example_idx] == 2,
                     weights_[example_idx] * num_duplicates);
       } else {
-        acc->AddOne(label_[example_idx] == 2, 1.f * num_duplicates);
+        acc->AddOne(label_[example_idx] == 2, num_duplicates);
       }
     }
 
@@ -1404,7 +1468,7 @@ struct LabelBinaryCategoricalOneValueBucket {
         acc->SubOne(label_[example_idx] == 2,
                     weights_[example_idx] * num_duplicates);
       } else {
-        acc->SubOne(label_[example_idx] == 2, 1.f * num_duplicates);
+        acc->SubOne(label_[example_idx] == 2, num_duplicates);
       }
     }
 
@@ -1438,6 +1502,7 @@ inline std::ostream& operator<<(
   return os;
 }
 
+template <bool weighted>
 struct LabelNumericalBucket {
   utils::NormalDistributionDouble value;
   int64_t count;
@@ -1502,7 +1567,11 @@ struct LabelNumericalBucket {
    public:
     Filler(const std::vector<float>& label, const std::vector<float>& weights)
         : label_(label), weights_(weights) {
-      DCHECK_EQ(weights.size(), label.size());
+      if constexpr (weighted) {
+        DCHECK_EQ(weights.size(), label.size());
+      } else {
+        DCHECK(weights.empty());
+      }
     }
 
     void InitializeAndZero(LabelNumericalBucket* acc) const {
@@ -1514,7 +1583,11 @@ struct LabelNumericalBucket {
 
     void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelNumericalBucket* acc) const {
-      acc->value.Add(label_[example_idx], weights_[example_idx]);
+      if constexpr (weighted) {
+        acc->value.Add(label_[example_idx], weights_[example_idx]);
+      } else {
+        acc->value.Add(label_[example_idx]);
+      }
       acc->count++;
     }
 
@@ -1522,18 +1595,22 @@ struct LabelNumericalBucket {
     const std::vector<float>& label_;
     const std::vector<float>& weights_;
   };
-
-  friend std::ostream& operator<<(std::ostream& os,
-                                  const LabelNumericalBucket& data);
 };
 
 inline std::ostream& operator<<(std::ostream& os,
-                                const LabelNumericalBucket& data) {
+                                const LabelNumericalBucket<false>& data) {
+  os << "value:{mean:" << data.value.Mean()
+     << " obs:" << data.value.NumObservations() << "} count:" << data.count;
+  return os;
+}
+inline std::ostream& operator<<(std::ostream& os,
+                                const LabelNumericalBucket<true>& data) {
   os << "value:{mean:" << data.value.Mean()
      << " obs:" << data.value.NumObservations() << "} count:" << data.count;
   return os;
 }
 
+template <bool weighted>
 struct LabelNumericalWithHessianBucket {
   utils::NormalDistributionDouble value;
   double sum_hessian;
@@ -1597,36 +1674,54 @@ struct LabelNumericalWithHessianBucket {
     double sum_hessian_;
   };
 
-  friend std::ostream& operator<<(std::ostream& os,
-                                  const LabelNumericalWithHessianBucket& data);
+  friend std::ostream& operator<<(
+      std::ostream& os, const LabelNumericalWithHessianBucket<weighted>& data);
 };
 
-inline std::ostream& operator<<(std::ostream& os,
-                                const LabelNumericalWithHessianBucket& data) {
+inline std::ostream& operator<<(
+    std::ostream& os, const LabelNumericalWithHessianBucket<false>& data) {
+  os << "value:{mean:" << data.value.Mean()
+     << " obs:" << data.value.NumObservations() << "} count:" << data.count;
+  return os;
+}
+inline std::ostream& operator<<(
+    std::ostream& os, const LabelNumericalWithHessianBucket<true>& data) {
   os << "value:{mean:" << data.value.Mean()
      << " obs:" << data.value.NumObservations() << "} count:" << data.count;
   return os;
 }
 
+template <bool weighted>
 struct LabelHessianNumericalBucket {
   // The priority is defined as ~ "sum_gradient / sum_hessian" (with extra
   // regularization and check of sum_hessian = 0.
-  // This value is computed from doubles, and then simply compared (i.e. this is
-  // not an accumulator).
-  // In memory, it will get aligned to the feature bucket of size 4 bytes.
+  // This value is computed from doubles, and then simply compared (i.e. this
+  // is not an accumulator). In memory, it will get aligned to the feature
+  // bucket of size 4 bytes.
   float priority;
 
-  double sum_gradient;
-  double sum_hessian;
-  double sum_weight;
+  typedef
+      typename std::conditional_t<weighted,
+                                  internal::FloatSumGradientHessianAndWeight,
+                                  internal::FloatSumGradientHessianOnly>
+          SumGradientHessianAndMaybeWeights;
+  SumGradientHessianAndMaybeWeights content;
   int64_t count;
 
   void AddToScoreAcc(LabelHessianNumericalScoreAccumulator* acc) const {
-    acc->Add(sum_gradient, sum_hessian, sum_weight);
+    if constexpr (weighted) {
+      acc->Add(content.sum_gradient, content.sum_hessian, content.sum_weight);
+    } else {
+      acc->Add(content.sum_gradient, content.sum_hessian, 1.f);
+    }
   }
 
   void SubToScoreAcc(LabelHessianNumericalScoreAccumulator* acc) const {
-    acc->Sub(sum_gradient, sum_hessian, sum_weight);
+    if constexpr (weighted) {
+      acc->Sub(content.sum_gradient, content.sum_hessian, content.sum_weight);
+    } else {
+      acc->Sub(content.sum_gradient, content.sum_hessian, 1.f);
+    }
   }
 
   bool operator<(const LabelHessianNumericalBucket& other) const {
@@ -1698,20 +1793,26 @@ struct LabelHessianNumericalBucket {
           weights_(weights),
           hessian_l1_(hessian_l1),
           hessian_l2_(hessian_l2) {
-      DCHECK(!weights.empty());
+      if constexpr (weighted) {
+        DCHECK_GE(weights.size(), gradients.size());
+      } else {
+        DCHECK(weights.empty());
+      }
     }
 
     void InitializeAndZero(LabelHessianNumericalBucket* acc) const {
-      acc->sum_gradient = 0;
-      acc->sum_hessian = 0;
-      acc->sum_weight = 0;
+      acc->content.sum_gradient = 0;
+      acc->content.sum_hessian = 0;
+      if constexpr (weighted) {
+        acc->content.sum_weight = 0;
+      }
       acc->count = 0;
     }
 
     void Finalize(LabelHessianNumericalBucket* acc) const {
-      if (acc->sum_hessian > 0) {
-        acc->priority = l1_threshold(acc->sum_gradient, hessian_l1_) /
-                        (acc->sum_hessian + hessian_l2_);
+      if (acc->content.sum_hessian > 0) {
+        acc->priority = l1_threshold(acc->content.sum_gradient, hessian_l1_) /
+                        (acc->content.sum_hessian + hessian_l2_);
       } else {
         acc->priority = 0.;
       }
@@ -1719,9 +1820,11 @@ struct LabelHessianNumericalBucket {
 
     void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelHessianNumericalBucket* acc) const {
-      acc->sum_gradient += gradients_[example_idx];
-      acc->sum_hessian += hessians_[example_idx];
-      acc->sum_weight += weights_[example_idx];
+      acc->content.sum_gradient += gradients_[example_idx];
+      acc->content.sum_hessian += hessians_[example_idx];
+      if constexpr (weighted) {
+        acc->content.sum_weight += weights_[example_idx];
+      }
       acc->count++;
     }
 
@@ -1733,16 +1836,19 @@ struct LabelHessianNumericalBucket {
     const double hessian_l1_;
     const double hessian_l2_;
   };
-
-  friend std::ostream& operator<<(std::ostream& os,
-                                  const LabelHessianNumericalBucket& data);
 };
 
+inline std::ostream& operator<<(
+    std::ostream& os, const LabelHessianNumericalBucket<false>& data) {
+  os << "value:{sum_gradient:" << data.content.sum_gradient
+     << " sum_hessian:" << data.content.sum_hessian << "} count:" << data.count;
+  return os;
+}
 inline std::ostream& operator<<(std::ostream& os,
-                                const LabelHessianNumericalBucket& data) {
-  os << "value:{sum_gradient:" << data.sum_gradient
-     << " sum_hessian:" << data.sum_hessian << " sum_weight:" << data.sum_weight
-     << "} count:" << data.count;
+                                const LabelHessianNumericalBucket<true>& data) {
+  os << "value:{sum_gradient:" << data.content.sum_gradient
+     << " sum_hessian:" << data.content.sum_hessian
+     << " sum_weight:" << data.content.sum_weight << "} count:" << data.count;
   return os;
 }
 
@@ -1857,7 +1963,7 @@ struct LabelCategoricalBucket {
   };
 
   friend std::ostream& operator<<(std::ostream& os,
-                                  const LabelNumericalBucket& data);
+                                  const LabelNumericalBucket<weighted>& data);
 };
 
 inline std::ostream& operator<<(std::ostream& os,
@@ -1965,38 +2071,39 @@ struct LabelBinaryCategoricalBucket {
       } else {
         DCHECK(weights.empty());
       }
-  }
-
-  void InitializeAndZero(LabelBinaryCategoricalBucket<weighted>* bucket) const {
-    bucket->count = 0;
-    bucket->content.sum_trues = 0;
-    if constexpr (weighted) {
-      bucket->content.sum_weights = 0;
     }
-  }
 
-  void Finalize(LabelBinaryCategoricalBucket<weighted>* bucket) const {}
-
-  void ConsumeExample(const UnsignedExampleIdx example_idx,
-                      LabelBinaryCategoricalBucket* bucket) const {
-    static float table[] = {0.f, 1.f};
-    bucket->count++;
-    if constexpr (weighted) {
-      bucket->content.sum_trues +=
-          table[label_[example_idx] == 2] * weights_[example_idx];
-      bucket->content.sum_weights += weights_[example_idx];
-    } else {
-      bucket->content.sum_trues += table[label_[example_idx] == 2];
+    void InitializeAndZero(
+        LabelBinaryCategoricalBucket<weighted>* bucket) const {
+      bucket->count = 0;
+      bucket->content.sum_trues = 0;
+      if constexpr (weighted) {
+        bucket->content.sum_weights = 0;
+      }
     }
-  }
 
- private:
-  const std::vector<int>& label_;
-  const std::vector<float>& weights_;
+    void Finalize(LabelBinaryCategoricalBucket<weighted>* bucket) const {}
+
+    void ConsumeExample(const UnsignedExampleIdx example_idx,
+                        LabelBinaryCategoricalBucket* bucket) const {
+      static float table[] = {0.f, 1.f};
+      bucket->count++;
+      if constexpr (weighted) {
+        bucket->content.sum_trues +=
+            table[label_[example_idx] == 2] * weights_[example_idx];
+        bucket->content.sum_weights += weights_[example_idx];
+      } else {
+        bucket->content.sum_trues += table[label_[example_idx] == 2];
+      }
+    }
+
+   private:
+    const std::vector<int>& label_;
+    const std::vector<float>& weights_;
   };
 
   friend std::ostream& operator<<(std::ostream& os,
-                                  const LabelNumericalBucket& data);
+                                  const LabelNumericalBucket<weighted>& data);
 };
 
 inline std::ostream& operator<<(

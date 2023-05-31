@@ -70,8 +70,8 @@ TEST(DecisionTreeTrainingTest, SetRegressionLabelDistributionWeighted) {
 
   proto::Node node;
 
-  ASSERT_OK(SetRegressionLabelDistribution(dataset, selected_examples, weights,
-                                           config_link, &node));
+  ASSERT_OK(SetRegressionLabelDistribution</*weighted=*/true>(
+      dataset, selected_examples, weights, config_link, &node));
   EXPECT_NEAR(node.regressor().top_value(), 2.8f, kTestPrecision);
   // // Distribution of the gradients:
   EXPECT_EQ(node.regressor().distribution().sum(), 56);
@@ -91,8 +91,8 @@ TEST(DecisionTreeTrainingTest, SetRegressionLabelDistributionUnweighted) {
 
   proto::Node node;
 
-  ASSERT_OK(SetRegressionLabelDistribution(dataset, selected_examples, weights,
-                                           config_link, &node));
+  ASSERT_OK(SetRegressionLabelDistribution</*weighted=*/false>(
+      dataset, selected_examples, weights, config_link, &node));
   EXPECT_NEAR(node.regressor().top_value(), 2.f, kTestPrecision);
   // // Distribution of the gradients:
   EXPECT_EQ(node.regressor().distribution().sum(), 8);
@@ -109,8 +109,8 @@ TEST(DecisionTreeTrainingTest,
   model::proto::TrainingConfigLinking config_link;
   proto::Node node;
 
-  EXPECT_THAT(SetRegressionLabelDistribution(dataset, selected_examples,
-                                             weights, config_link, &node),
+  EXPECT_THAT(SetRegressionLabelDistribution</*weighted=*/true>(
+                  dataset, selected_examples, weights, config_link, &node),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 

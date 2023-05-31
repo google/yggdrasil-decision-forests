@@ -431,7 +431,8 @@ RandomForestLearner::TrainWithStatus(
   // - Classification without oblique splits (default) and with local
   //   imputation policy (default) to handle missing values.
   bool use_optimized_unit_weights = false;
-  if (training_config().task() == model::proto::Task::CLASSIFICATION &&
+  if (training_config().task() != model::proto::Task::CATEGORICAL_UPLIFT &&
+      training_config().task() != model::proto::Task::NUMERICAL_UPLIFT &&
       rf_config.decision_tree().split_axis_case() !=
           decision_tree::proto::DecisionTreeTrainingConfig::
               kSparseObliqueSplit) {

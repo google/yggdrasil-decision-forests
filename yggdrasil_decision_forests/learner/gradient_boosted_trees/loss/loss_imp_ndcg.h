@@ -113,7 +113,7 @@ absl::Status SetLeafNDCG(
   if constexpr (weighted) DCHECK_LE(selected_examples.size(), weights.size());
   if constexpr (!weighted) DCHECK(weights.empty());
   if (!gbt_config.use_hessian_gain()) {
-    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution(
+    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution<weighted>(
         train_dataset, selected_examples, weights, config_link,
         node->mutable_node()));
   }
