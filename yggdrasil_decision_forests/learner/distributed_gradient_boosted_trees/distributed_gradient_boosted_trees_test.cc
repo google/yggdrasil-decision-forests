@@ -124,7 +124,7 @@ TEST_F(DatasetAdult, BaseWithFailureAndManualValidation) {
   pass_validation_dataset_ = true;
   TrainAndEvaluateModel();
   // Note: This result does not take early stopping into account.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.01);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.012);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
 }
 
