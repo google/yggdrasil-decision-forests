@@ -54,7 +54,7 @@ plot::Curve* AddCurve(plot::Plot* plot) {
 
 // Gets the first categorical label value to plot in PDP curves.
 //
-// In binary classification, the two label classes lead to symatical curves.
+// In binary classification, the two label classes lead to symmetrical curves.
 // Therefore, the first label class is skipped in the case of binary
 // classification.
 int FirstCategoricalLabelValueForPdpPlot(
@@ -687,7 +687,6 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
   }
 
   // Partial Dependence Plots
-  utils::PartialDependencePlotSet pdp_set;
   if (options.pdp().enabled()) {
     ASSIGN_OR_RETURN(const auto attribute_idxs,
                      GenerateAttributesCombinations(
@@ -703,7 +702,6 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
   }
 
   // Conditional Expectation Plot
-  utils::ConditionalExpectationPlotSet cond_set;
   if (options.cep().enabled()) {
     ASSIGN_OR_RETURN(const auto attribute_idxs,
                      GenerateAttributesCombinations(
