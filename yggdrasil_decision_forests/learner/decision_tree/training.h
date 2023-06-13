@@ -929,7 +929,7 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
     SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 // Find the best possible oblique condition.
-absl::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -1052,6 +1052,10 @@ absl::Status PresortNumericalFeatures(
 // Set the default values of the hyper-parameters.
 void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config);
 
+// Number of attributes to test when looking for an optimal split.
+int NumAttributesToTest(const proto::DecisionTreeTrainingConfig& dt_config,
+                        int num_attributes, model::proto::Task task);
+
 namespace internal {
 
 // Initializes the item mask i.e. the bitmap of the items to consider or to
@@ -1089,10 +1093,10 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
                            const std::vector<UnsignedExampleIdx>& examples,
                            const proto::NodeCondition& condition,
                            bool dataset_is_dense,
-    bool error_on_wrong_splitter_statistics,
+                           bool error_on_wrong_splitter_statistics,
                            std::vector<UnsignedExampleIdx>* positive_examples,
                            std::vector<UnsignedExampleIdx>* negative_examples,
-    const bool examples_are_training_examples = true);
+                           const bool examples_are_training_examples = true);
 
 // Copies the content on uplift categorical leaf output to a label distribution.
 void UpliftLeafToLabelDist(const decision_tree::proto::NodeUpliftOutput& leaf,

@@ -111,6 +111,15 @@ message Condition {
     repeated int32 attributes = 1 [packed = true];
     repeated float weights = 2 [packed = true];
     optional float threshold = 3;
+
+    // If set, "na_replacements" defines the replacement values for missing
+    // attributes. For example, if attributes = [3,5], where attribute 3 is
+    // available and attribute 5 is missing. The condition will be evaluated
+    // with attribute 3's value and the replacement value na_replacements[1].
+    //
+    // If not set, in case of a missing value of any of the attributes, the
+    // condition evaluates to "na_value".
+    repeated float na_replacements = 4 [packed = true];
   }
 
   // Type of condition.

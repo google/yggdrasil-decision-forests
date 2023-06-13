@@ -40,7 +40,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/sparse_oblique.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_scanner.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
@@ -1222,7 +1222,7 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
   if (request.num_oblique_projections_to_run.has_value()) {
     DCHECK_EQ(request.attribute_idx, -1);
     const auto found_oblique_condition =
-        FindBestConditionSparseOblique(
+        FindBestConditionOblique(
             request.common->train_dataset, request.common->selected_examples,
             weights, config, config_link, dt_config, request.common->parent,
             internal_config, request.common->label_stats,
@@ -1282,7 +1282,7 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
   return response;
 }
 
-absl::StatusOr<bool> FindBestConditionSparseOblique(
+absl::StatusOr<bool> FindBestConditionOblique(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -1298,7 +1298,7 @@ absl::StatusOr<bool> FindBestConditionSparseOblique(
     case model::proto::Task::CLASSIFICATION: {
       const auto& class_label_stats =
           utils::down_cast<const ClassificationLabelStats&>(label_stats);
-      return FindBestConditionSparseOblique(
+      return FindBestConditionOblique(
           train_dataset, selected_examples, weights, config, config_link,
           dt_config, parent, internal_config, class_label_stats,
           override_num_projections, best_condition, random, cache);
@@ -1307,14 +1307,14 @@ absl::StatusOr<bool> FindBestConditionSparseOblique(
       if (internal_config.use_hessian_gain) {
         const auto& reg_label_stats =
             utils::down_cast<const RegressionHessianLabelStats&>(label_stats);
-        return FindBestConditionSparseOblique(
+        return FindBestConditionOblique(
             train_dataset, selected_examples, weights, config, config_link,
             dt_config, parent, internal_config, reg_label_stats,
             override_num_projections, best_condition, random, cache);
       } else {
         const auto& reg_label_stats =
             utils::down_cast<const RegressionLabelStats&>(label_stats);
-        return FindBestConditionSparseOblique(
+        return FindBestConditionOblique(
             train_dataset, selected_examples, weights, config, config_link,
             dt_config, parent, internal_config, reg_label_stats,
             override_num_projections, best_condition, random, cache);
@@ -1350,9 +1350,10 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
       // Nothing to do.
       break;
     case proto::DecisionTreeTrainingConfig::kSparseObliqueSplit:
+    case proto::DecisionTreeTrainingConfig::kMhldObliqueSplit:
       ASSIGN_OR_RETURN(
           found_good_condition,
-          FindBestConditionSparseOblique(
+          FindBestConditionOblique(
               train_dataset, selected_examples, weights, config, config_link,
               dt_config, parent, internal_config, label_stats, {},
               best_condition, random, &cache->splitter_cache_list[0]));
@@ -1523,6 +1524,12 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
                                               min_projections_per_request - 1) /
                                                  min_projections_per_request);
     oblique = num_oblique_projections > 0;
+  } else if (config_link.numerical_features_size() > 0 &&
+             dt_config.split_axis_case() ==
+                 proto::DecisionTreeTrainingConfig::kMhldObliqueSplit) {
+    num_oblique_projections = 1;
+    num_oblique_jobs = 1;
+    oblique = true;
   }
 
   // Prepare caches.
@@ -3804,6 +3811,53 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
   }
 }
 
+int NumAttributesToTest(const proto::DecisionTreeTrainingConfig& dt_config,
+                        const int num_attributes,
+                        const model::proto::Task task) {
+  int num_attributes_to_test;
+  // User specified number of candidate attributes.
+  if (dt_config.has_num_candidate_attributes_ratio() &&
+      dt_config.num_candidate_attributes_ratio() >= 0) {
+    if (dt_config.has_num_candidate_attributes() &&
+        dt_config.num_candidate_attributes() > 0) {
+      YDF_LOG(WARNING) << "Both \"num_candidate_attributes\" and "
+                          "\"num_candidate_attributes_ratio\" are specified. "
+                          "Ignoring \"num_candidate_attributes\".";
+    }
+    num_attributes_to_test = static_cast<int>(
+        std::ceil(dt_config.num_candidate_attributes_ratio() * num_attributes));
+  } else {
+    num_attributes_to_test = dt_config.num_candidate_attributes();
+  }
+
+  // Automatic number of attribute selection logic.
+  if (num_attributes_to_test == 0) {
+    switch (task) {
+      default:
+      case model::proto::Task::CATEGORICAL_UPLIFT:
+      case model::proto::Task::CLASSIFICATION:
+        num_attributes_to_test = static_cast<int>(
+            ceil(std::sqrt(static_cast<double>(num_attributes))));
+        break;
+      case model::proto::Task::REGRESSION:
+        num_attributes_to_test =
+            static_cast<int>(ceil(static_cast<double>(num_attributes) / 3));
+        break;
+    }
+  }
+
+  // Special value to use all the available attributes.
+  if (num_attributes_to_test == -1) {
+    num_attributes_to_test = static_cast<int>(num_attributes);
+  }
+
+  // Make sure we don't select more than the available attributes.
+  num_attributes_to_test =
+      std::min(num_attributes_to_test, static_cast<int>(num_attributes));
+
+  return num_attributes_to_test;
+}
+
 void GetCandidateAttributes(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -3815,46 +3869,8 @@ void GetCandidateAttributes(
   std::shuffle(candidate_attributes->begin(), candidate_attributes->end(),
                *random);
 
-  // User specified number of candidate attributes.
-  if (dt_config.has_num_candidate_attributes_ratio() &&
-      dt_config.num_candidate_attributes_ratio() >= 0) {
-    if (dt_config.has_num_candidate_attributes() &&
-        dt_config.num_candidate_attributes() > 0) {
-      YDF_LOG(WARNING) << "Both \"num_candidate_attributes\" and "
-                          "\"num_candidate_attributes_ratio\" are specified. "
-                          "Ignoring \"num_candidate_attributes\".";
-    }
-    *num_attributes_to_test =
-        static_cast<int>(std::ceil(dt_config.num_candidate_attributes_ratio() *
-                                   config_link.features_size()));
-  } else {
-    *num_attributes_to_test = dt_config.num_candidate_attributes();
-  }
-
-  // Automatic number of attribute selection logic.
-  if (*num_attributes_to_test == 0) {
-    switch (config.task()) {
-      default:
-      case model::proto::Task::CATEGORICAL_UPLIFT:
-      case model::proto::Task::CLASSIFICATION:
-        *num_attributes_to_test = static_cast<int>(
-            ceil(std::sqrt(static_cast<double>(candidate_attributes->size()))));
-        break;
-      case model::proto::Task::REGRESSION:
-        *num_attributes_to_test = static_cast<int>(
-            ceil(static_cast<double>(candidate_attributes->size()) / 3));
-        break;
-    }
-  }
-
-  // Special value to use all the available attributes.
-  if (*num_attributes_to_test == -1) {
-    *num_attributes_to_test = static_cast<int>(candidate_attributes->size());
-  }
-
-  // Make sure we don't select more than the available attributes.
-  *num_attributes_to_test = std::min(
-      *num_attributes_to_test, static_cast<int>(candidate_attributes->size()));
+  *num_attributes_to_test = NumAttributesToTest(
+      dt_config, candidate_attributes->size(), config.task());
 }
 
 void GenerateRandomImputation(const dataset::VerticalDataset& src,
@@ -3932,6 +3948,7 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
       config->internal().sorting_strategy() ==
           proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
     if (config->has_sparse_oblique_split() ||
+        config->has_mhld_oblique_split() ||
         config->missing_value_policy() !=
             proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION) {
       config->mutable_internal()->set_sorting_strategy(
@@ -4542,8 +4559,8 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
   // equal to the expected number of positive examples. A miss alignment
   // generally indicates that the splitter does not work correctly.
   //
-  // Incorrectly working splitters can makes the model worst than expected if
-  // the error happen often. It such error happen rarely, the impact is likely
+  // Incorrectly working splitters can make the model worst than expected if
+  // the error happens often. If such error happen rarely, the impact is likely
   // insignificant.
   //
   // This generates an error in unit testing and a warning otherwise.
@@ -4555,17 +4572,24 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
            examples.size() -
                condition.num_pos_training_examples_without_weight()))) {
     const std::string message = absl::Substitute(
-        "The number of positive/negative examples predicted by the splitter "
-        "are different from the observations ($1!=$4) for the attribute "
-        "\"$5\". This problem is generally caused by extreme floating point "
-        "values (e.g. value>=10e30) and might prevent the model from training. "
-        "Make sure to check the dataspec Details: eval:examples:$0 "
-        "eval:positive_examples:$1 eval:negative_examples:$2 splitter:cond:$3",
-        /*$0*/ examples.size(), /*$1*/ positive_examples->size(),
+        "The effective split of examples does not match the expected split "
+        "returned by the splitter algorithm. This problem can be caused by (1) "
+        "large floating point values (e.g. value>=10e30) or (2) a bug in the "
+        "software. You can turn this error in a warning with "
+        "internal_error_on_wrong_splitter_statistics=false.\n\nDetails:\n"
+        "Num examples: $0\n"
+        "Effective num positive examples: $1\n"
+        "Expected num positive example: $4\n"
+        "Effective num negative examples: $2\n"
+        "Condition: $3\n"
+        "Attribute spec: $5",
+        /*$0*/ examples.size(),
+        /*$1*/ positive_examples->size(),
         /*$2*/ negative_examples->size(),
         /*$3*/ condition.DebugString(),
         /*$4*/ condition.num_pos_training_examples_without_weight(),
-        /*$5*/ dataset.data_spec().columns(condition.attribute()).name());
+        /*$5*/
+        dataset.data_spec().columns(condition.attribute()).DebugString());
     if (error_on_wrong_splitter_statistics) {
       return absl::InternalError(message);
     } else {

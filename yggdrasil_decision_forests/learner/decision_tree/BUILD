@@ -11,11 +11,11 @@ package(
 cc_library_ydf(
     name = "training",
     srcs = [
-        "sparse_oblique.cc",
+        "oblique.cc",
         "training.cc",
     ],
     hdrs = [
-        "sparse_oblique.h",
+        "oblique.h",
         "splitter_accumulator.h",
         "splitter_accumulator_uplift.h",
         "splitter_scanner.h",
@@ -48,7 +48,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
-        "@com_google_protobuf//:protobuf_lite",
+        "@eigen3//:eigen",
     ] + select({
         "//conditions:default": [
         ],
@@ -143,6 +143,7 @@ cc_test(
     srcs = ["training_test.cc"],
     deps = [
         ":training",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/utils:test",

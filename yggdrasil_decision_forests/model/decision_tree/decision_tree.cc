@@ -571,7 +571,9 @@ bool EvalConditionFromColumn(
     const dataset::VerticalDataset::AbstractColumn* column_data,
     const dataset::VerticalDataset& dataset, const row_t example_idx) {
   // Handle NA values.
-  if (ABSL_PREDICT_FALSE(column_data->IsNa(example_idx))) {
+  if (ABSL_PREDICT_FALSE(condition.condition().type_case() !=
+                             proto::Condition::TypeCase::kObliqueCondition &&
+                         column_data->IsNa(example_idx))) {
     if (condition.condition().type_case() !=
         proto::Condition::TypeCase::kNaCondition) {
       return condition.na_value();
@@ -678,10 +680,14 @@ bool EvalConditionFromColumn(
         const auto* numerical_column =
             static_cast<const dataset::VerticalDataset::NumericalColumn* const>(
                 local_column_data);
-        if (numerical_column->IsNa(example_idx)) {
-          return condition.na_value();
+        float value = numerical_column->values()[example_idx];
+        if (std::isnan(value)) {
+          if (oblique.na_replacements_size() == 0) {
+            return condition.na_value();
+          }
+          DCHECK_EQ(oblique.na_replacements_size(), oblique.attributes_size());
+          value = oblique.na_replacements(item_idx);
         }
-        const auto value = numerical_column->values()[example_idx];
         sum += value * oblique.weights(item_idx);
       }
       return sum >= oblique.threshold();
@@ -798,9 +804,13 @@ bool EvalCondition(const proto::NodeCondition& condition,
       for (int item_idx = 0; item_idx < oblique.attributes_size(); item_idx++) {
         const auto attribute_idx = oblique.attributes(item_idx);
         const auto& sub_attribute = example.attributes(attribute_idx);
-        const auto value = sub_attribute.numerical();
+        auto value = sub_attribute.numerical();
         if (!sub_attribute.has_numerical() || std::isnan(value)) {
-          return condition.na_value();
+          if (oblique.na_replacements_size() == 0) {
+            return condition.na_value();
+          }
+          DCHECK_EQ(oblique.na_replacements_size(), oblique.attributes_size());
+          value = oblique.na_replacements(item_idx);
         }
         sum += value * oblique.weights(item_idx);
       }

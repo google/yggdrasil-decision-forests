@@ -579,7 +579,17 @@ TEST_F(RandomForestOnAdult, SparseOblique) {
   rf_config->set_winner_take_all_inference(false);
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.855, 0.01);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8571, 0.01);
+}
+
+TEST_F(RandomForestOnAdult, MHLDTOblique) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  deployment_config_.set_num_threads(0);
+  rf_config->set_winner_take_all_inference(false);
+  rf_config->mutable_decision_tree()->mutable_mhld_oblique_split();
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8568, 0.01);
 }
 
 TEST_F(RandomForestOnAdult, MakingAModelPurePureServingModel) {
@@ -1049,6 +1059,30 @@ TEST_F(RandomForestOnSyntheticClassification, Base) {
   // This test has a lot of variance because of the small number of examples
   // , large size of the feature space, and procedurally generated dataset.
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.764, 0.03);
+}
+
+TEST_F(RandomForestOnSyntheticClassification, SparseOblique) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_num_trees(50);
+  rf_config->set_winner_take_all_inference(false);
+  rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  rf_config->mutable_decision_tree()
+      ->set_internal_error_on_wrong_splitter_statistics(true);
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.764, 0.03);
+}
+
+TEST_F(RandomForestOnSyntheticClassification, MHLDTOblique) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_num_trees(50);
+  rf_config->set_winner_take_all_inference(false);
+  rf_config->mutable_decision_tree()->mutable_mhld_oblique_split();
+  rf_config->mutable_decision_tree()
+      ->set_internal_error_on_wrong_splitter_statistics(true);
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.764, 0.04);
 }
 
 TEST(RandomForest, PredefinedHyperParameters) {

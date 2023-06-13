@@ -21,7 +21,7 @@ import "yggdrasil_decision_forests/utils/distribution.proto";
 
 // Training configuration for the Random Forest algorithm.
 message DecisionTreeTrainingConfig {
-  // Next ID: 24
+  // Next ID: 26
 
   // Basic parameters.
 
@@ -143,6 +143,10 @@ message DecisionTreeTrainingConfig {
     // "Sparse Projection Oblique Random Forests", Tomita et al., 2020. These
     // splits are tested iif. "sparse_oblique_split" is set.
     SparseObliqueSplit sparse_oblique_split = 20;
+
+    // Oblique splits from "Classification Based on Multivariate Contrast
+    // Patterns" by  Canete-Sifuentes et al.
+    MHLDObliqueSplit mhld_oblique_split = 25;
   }
 
   // See "split_axis".
@@ -181,6 +185,12 @@ message DecisionTreeTrainingConfig {
     // value.
     optional int32 max_num_projections = 2 [default = 6000];
 
+    // Minimum number of projections.
+    //
+    // The method described in the paper does not have this logic.
+    // TODO: Default to a larger value, e.g., 10.
+    optional int32 min_num_projections = 6 [default = 1];
+
     // Density of the projections as an exponent of the number of features.
     // Each feature has a probability "projection_density_factor /
     // num_features" (noted lambda in the paper) to be in each projection
@@ -212,6 +222,20 @@ message DecisionTreeTrainingConfig {
       // entire train dataset.
       MIN_MAX = 2;
     }
+  }
+
+  message MHLDObliqueSplit {
+    // Maximum number of attributes in the projection. Increasing this value
+    // increases the training time. Decreasing this value acts as a
+    // regularization. The value should be in [2, num_numerical_features]. If
+    // the value is above num_numerical_features, the value is capped to
+    // num_numerical_features. The value 1 is allowed but results in ordinary
+    // (non-oblique) splits
+    optional int32 max_num_attributes = 1 [default = 4];
+
+    // If true, applies the attribute sampling in "num_candidate_attributes" and
+    // "num_candidate_attributes_ratio". If false, all attributes are tested.
+    optional bool sample_attributes = 2 [default = false];
   }
 
   // Uplift specific hyper-parameters.

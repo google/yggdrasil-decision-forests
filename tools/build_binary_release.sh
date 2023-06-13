@@ -71,12 +71,10 @@ if [[ ! -z ${PACK+z} ]]; then
   CLI="bazel-bin/yggdrasil_decision_forests/cli"
 
   cp -f configure/cli_readme.txt ${CLI}/README
-  cp -f documentation/cli.txt ${CLI}/
 
   pushd ${CLI}
   zip -j cli_linux.zip \
     README \
-    cli.txt \
     train \
     show_model \
     show_dataspec \

@@ -8,6 +8,7 @@ load("//third_party/farmhash:workspace.bzl", farmhash = "deps")
 load("//third_party/boost:workspace.bzl", boost = "deps")
 load("//third_party/grpc:workspace.bzl", grpc = "deps")
 load("//third_party/rapidjson:workspace.bzl", rapidjson = "deps")
+load("//third_party/eigen3:workspace.bzl", eigen = "deps")
 
 def load_dependencies(repo_name = "", exclude_repo = []):
     if "gtest" not in exclude_repo:
@@ -36,3 +37,6 @@ def load_dependencies(repo_name = "", exclude_repo = []):
 
     if "rapidjson" not in exclude_repo:
         rapidjson(prefix = repo_name)
+
+    if "eigen" not in exclude_repo:
+        eigen()
