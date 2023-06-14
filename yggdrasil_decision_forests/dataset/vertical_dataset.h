@@ -14,10 +14,6 @@
  */
 
 // Definition of VerticalDataset, a in-memory storage of data column by column.
-//
-// Note: VerticalDataset is used to in the implementation of the original Random
-// Forest algorithm (see ../algorithm/random_forest.h).
-//
 
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_VERTICAL_DATASET_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_VERTICAL_DATASET_H_
@@ -47,8 +43,8 @@
 namespace yggdrasil_decision_forests {
 namespace dataset {
 
-// In memory transactional dataset with heterogen column type, stored column by
-// column for fast row-wise iteration.
+// In-memory transactional dataset with heterogeneous column type, stored column
+// by column for fast row-wise iteration.
 class VerticalDataset {
  public:
   // Row index type.
@@ -732,7 +728,7 @@ class VerticalDataset {
 
   // Reserves the memory for "num_rows" examples on each existing columns.
   // It is not required to reserve the memory, but it can speed-up the code
-  // (similarly to std::vector:reserve).m
+  // (similarly to std::vector:reserve).
   void Reserve(row_t num_rows,
                const absl::optional<std::vector<int>>& load_columns = {});
 
