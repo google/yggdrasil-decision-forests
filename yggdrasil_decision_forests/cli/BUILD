@@ -251,7 +251,7 @@ genrule(
     TESTDATA_BASEDIR=$$(dirname $$(echo $(locations //yggdrasil_decision_forests/test_data) | cut -d ' ' -f1))/model/synthetic_ranking_gbdt_numerical/
     $(location :compile_model) --model $$TESTDATA_BASEDIR --namespace test_model > $@
     """,
-    exec_tools = [":compile_model"],
+    tools = [":compile_model"],
 )
 
 cc_library_ydf(
