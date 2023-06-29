@@ -4231,7 +4231,7 @@ absl::Status NodeTrain(
     const InternalTrainConfig& internal_config, NodeWithChildren* node,
     utils::RandomEngine* random, PerThreadCache* cache) {
   if (selected_examples.empty()) {
-    return absl::InternalError("No example feed to the no trainer");
+    return absl::InternalError("No examples fed to the node trainer");
   }
   // Set the node value (i.e. the label distribution).
   RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
