@@ -378,7 +378,7 @@ RandomForestLearner::TrainWithStatus(
     if (training_config().task() == model::proto::Task::RANKING) {
       tip =
           " You probably want to try the GRADIENT_BOOSTED_TREES learner that "
-          "support ranking.";
+          "supports ranking.";
     }
     return absl::InvalidArgumentError(absl::StrCat(
         "The RANDOM_FOREST learner does not support the task ",

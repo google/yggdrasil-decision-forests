@@ -419,6 +419,12 @@ absl::Status GradientBoostedTreesLearner::CheckConfiguration(
           "Unset sample_with_shards.");
     }
   }
+  if (config.task() == model::proto::CATEGORICAL_UPLIFT ||
+      config.task() == model::proto::NUMERICAL_UPLIFT) {
+    return absl::InvalidArgumentError(
+        "Uplifting is not supported with Gradient Boosted Trees. Choose Random "
+        "Forests for building uplift models.");
+  }
 
   return absl::OkStatus();
 }

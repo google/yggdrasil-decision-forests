@@ -141,6 +141,8 @@ message TrainingConfig {
   // Categorical column identifying the treatment group in an uplift task.
   // For example, whether a patient received a treatment in a study about the
   // impact of a medication.
+  //
+  // Only binary treatments are currently supported.
   optional string uplift_treatment = 12;
 
   // Metadata of the model.

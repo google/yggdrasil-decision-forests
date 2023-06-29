@@ -431,6 +431,12 @@ absl::Status AbstractLearner::CheckConfiguration(
         return absl::InvalidArgumentError(
             "The \"uplift_treatment\" column must be CATEGORICAL.");
       }
+      const auto num_treatment_classes =
+          uplift_treatment_col_spec.categorical().number_of_unique_values();
+      if (num_treatment_classes > 3) {
+        return absl::InvalidArgumentError(
+            "Uplift only supports binary treatments.");
+      }
     } break;
     case model::proto::Task::NUMERICAL_UPLIFT: {
       if (label_col_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
@@ -450,6 +456,12 @@ absl::Status AbstractLearner::CheckConfiguration(
           dataset::proto::ColumnType::CATEGORICAL) {
         return absl::InvalidArgumentError(
             "The \"uplift_treatment\" column must be CATEGORICAL.");
+      }
+      const auto num_treatment_classes =
+          uplift_treatment_col_spec.categorical().number_of_unique_values();
+      if (num_treatment_classes > 3) {
+        return absl::InvalidArgumentError(
+            "Uplift only supports binary treatments.");
       }
     } break;
   }

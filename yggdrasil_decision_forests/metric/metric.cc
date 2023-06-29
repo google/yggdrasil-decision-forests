@@ -814,12 +814,12 @@ absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
       eval->mutable_ranking();
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
-      CHECK_OK(uplift::InitializeCategoricalUpliftEvaluation(
+      RETURN_IF_ERROR(uplift::InitializeCategoricalUpliftEvaluation(
           option, label_column, eval));
       break;
     case model::proto::Task::NUMERICAL_UPLIFT:
-      CHECK_OK(uplift::InitializeNumericalUpliftEvaluation(option, label_column,
-                                                           eval));
+      RETURN_IF_ERROR(uplift::InitializeNumericalUpliftEvaluation(
+          option, label_column, eval));
       break;
     default:
       STATUS_FATALS("Non supported task type: ",
