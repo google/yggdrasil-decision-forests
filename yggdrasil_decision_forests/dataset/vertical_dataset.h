@@ -134,6 +134,21 @@ class VerticalDataset {
       return casted_column;
     }
 
+    // Cast the column with checks.
+    template <typename T>
+    absl::StatusOr<T*> MutableCastWithStatus() {
+      static_assert(
+          std::is_base_of<AbstractColumn, T>::value,
+          "The template class argument does not derive AbstractColumn.");
+      T* const casted_column = dynamic_cast<T* const>(this);
+      if (!casted_column) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Column \"", name(), " has type ", proto::ColumnType_Name(type()),
+            " and is not compatible with type ", typeid(T).name()));
+      }
+      return casted_column;
+    }
+
     // Used and reserved memory expressed in bytes.
     virtual std::pair<uint64_t, uint64_t> memory_usage() const = 0;
 

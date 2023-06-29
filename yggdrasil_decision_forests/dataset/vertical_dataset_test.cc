@@ -188,6 +188,19 @@ TEST(VerticalDataset, ColumnWithCast) {
             nullptr);
 }
 
+TEST(VerticalDataset, MutableCastWithStatus) {
+  VerticalDataset dataset;
+  proto::Column column_spec;
+  column_spec.set_type(proto::NUMERICAL);
+  column_spec.set_name("toy_column");
+  ASSERT_OK_AND_ASSIGN(auto* abstract_column, dataset.AddColumn(column_spec));
+  ASSERT_OK_AND_ASSIGN(
+      auto* column,
+      abstract_column
+          ->MutableCastWithStatus<dataset::VerticalDataset::NumericalColumn>());
+  EXPECT_EQ(column->type(), proto::NUMERICAL);
+}
+
 TEST(VerticalDataset, MapExampleToProtoExample) {
   proto::DataSpecification data_spec;
   AddColumn("a", proto::ColumnType::NUMERICAL, &data_spec);
