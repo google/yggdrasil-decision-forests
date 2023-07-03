@@ -2,16 +2,27 @@
 
 ## HEAD
 
+## 1.5.0 - 2023-07-03
+
 ### Feature
 
 -   Rename experimental_analyze_model_and_dataset to analyze_model_and_dataset
 -   Add new GBT loss function `POISSON` for Poisson log likelihood.
 -   Go API: Categorical string values available for inspection.
 -   Improved training speed for unit-weight datasets.
+-   Support for MHLD oblique decision trees.
+-   Multi-threaded RMSE computation.
+-   Added Uint8 inference engine.
+-   Added Multi-task learning where the output of models trained as "secondary"
+    are used as input for the models trained as "primary"
 
 ### Fix
 
 -   Go API: fixed typo on OutOfVocabulary constant.
+-   Error messages for Uplift models.
+-   Remove owner leakage in the model compiler.
+-   Fix buggy restriction for SelGB sampling
+-   Improve documentation.
 
 ## 1.4.0 - 2023-03-20
 
