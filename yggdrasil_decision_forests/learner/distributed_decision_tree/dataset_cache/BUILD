@@ -103,6 +103,7 @@ cc_library_ydf(
     hdrs = ["dataset_cache_common.h"],
     deps = [
         ":column_cache",
+        ":dataset_cache_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/learner:types",
         "//yggdrasil_decision_forests/learner/decision_tree:utils",

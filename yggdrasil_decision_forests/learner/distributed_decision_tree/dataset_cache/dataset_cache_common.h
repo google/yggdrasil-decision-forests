@@ -89,6 +89,17 @@ std::string RawColumnFileDirectory(absl::string_view directory, int column_idx);
 std::string PartialRawColumnFileDirectory(absl::string_view directory,
                                           int column_idx);
 
+// Checks that the files expected to be created by the worker are present in the
+// cache directory. This method is expensive.
+//
+// This method is used when using the TensorFlow distribution library to
+// double check that a worker returning a successful work has effectively done
+// the work.
+//
+// This function does not check the validity of the content of the files.
+bool HasAllRequiredFiles(absl::string_view cache_path, int num_columns,
+                         int num_shards);
+
 // Background:
 // An "example index with delta bit" is an example index (i.e. an integer
 // specifying the index of an example in a list) with an extra bit of

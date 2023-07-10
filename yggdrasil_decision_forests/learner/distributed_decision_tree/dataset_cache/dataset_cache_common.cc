@@ -23,6 +23,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 
 namespace yggdrasil_decision_forests {
@@ -163,6 +164,44 @@ absl::StatusOr<std::vector<float>> ExtractDiscretizedBoundariesWithDownsampling(
 
   return dataset::GenDiscretizedBoundaries(unique_values_and_counts,
                                            num_discretized_values, 1, {});
+}
+
+bool HasAllRequiredFiles(absl::string_view cache_path, const int num_columns,
+                         const int num_shards) {
+  YDF_LOG(INFO) << "Checking required files in partial cache.";
+
+  using model::distributed_decision_tree::dataset_cache::proto::
+      PartialColumnShardMetadata;
+
+  std::atomic<bool> is_valid{true};
+  {
+    utils::concurrency::ThreadPool thread_pool("HasAllRequiredFiles",
+                                               /*num_threads=*/20);
+
+    // Parse all the metadata.pb files.
+    thread_pool.StartWorkers();
+    for (int col_idx = 0; col_idx < num_columns; col_idx++) {
+      for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
+        const auto shard_meta_data_path = absl::StrCat(
+            PartialRawColumnFilePath(cache_path, col_idx, shard_idx),
+            kFilenameMetaDataPostfix);
+        thread_pool.Schedule([shard_meta_data_path, &is_valid]() {
+          if (!is_valid) {
+            return;
+          }
+          PartialColumnShardMetadata ignore;
+          const auto status = file::GetBinaryProto(shard_meta_data_path,
+                                                   &ignore, file::Defaults());
+          if (!status.ok()) {
+            YDF_LOG(INFO) << "Cannot parse " << shard_meta_data_path
+                          << ". Issue: " << status.message();
+            is_valid = false;
+          }
+        });
+      }
+    }
+  }
+  return is_valid;
 }
 
 }  // namespace dataset_cache
