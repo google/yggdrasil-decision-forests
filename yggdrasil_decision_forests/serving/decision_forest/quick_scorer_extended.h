@@ -50,8 +50,8 @@
 //   - Maximum of 65k unique input features.
 //   - Support categorical and numerical features.
 //
-// Unlike the other simpleML optimized inference engine, categorical are not
-// restricted to have a maximum of 32 unique values.
+// Unlike the other YDF optimized inference engines, categorical features are
+// not restricted to have a maximum of 32 unique values.
 //
 // The algorithm are described in the following papers:
 //

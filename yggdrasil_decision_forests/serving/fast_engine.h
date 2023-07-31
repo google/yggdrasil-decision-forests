@@ -14,7 +14,7 @@
  */
 
 // Semi-fast generic inference engine which does not require for the model to
-// known as compilation time and is faster than simpleML's "generic inference"
+// known as compilation time and is faster than YDF's "generic inference"
 // engine.
 //
 // If inference speed is a central concern and the model can be known at compile

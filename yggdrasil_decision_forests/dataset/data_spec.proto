@@ -191,14 +191,14 @@ message BooleanSpec {
 //   (non strictly) to "boundaries.back()". If i \in [1, boundaries.size()[, the
 //   original value is in between "boundaries[i-1]" and "boundaries[i]".
 //
-// Because encoding a numericla value into a discretized numerical value is
-// loosely, the original numerical value cannot be recovered. In this case, the
+// Because encoding a numerical value into a discretized numerical value is
+// lossy, the original numerical value cannot be recovered. In this case, the
 // following logic is applied:
-//   If i==-1, the numercal value is "std::nan" (this is now simpleML represent
-//   missing numerical values). If i==0, the numercal value is
-//   "boundaries.front()-1". If i==boundaries.size(), the numercal value is
-//   "boundaries.back()+1". If i \in [1, boundaries.size()[, the numerical value
-//   is "(boundaries[i-1]+boundaries[i])/2".
+//   If i==-1, the numercal value is "std::nan" (corresponding to a missing
+//   value). If i==0, the numerical value is "boundaries.front()-1". If
+//   i==boundaries.size(), the numerical value is "boundaries.back()+1". If i
+//   \in [1, boundaries.size()[, the numerical value is
+//   "(boundaries[i-1]+boundaries[i])/2".
 message DiscretizedNumericalSpec {
   // Boundaries in between the bins.
   // The number of bins is boundaries.size() + 1.
@@ -302,7 +302,7 @@ message DataSpecificationGuide {
   optional bool detect_boolean_as_numerical = 5 [default = false];
   // Detects numerical values (i.e. NUMERICAL) as DISCRETIZED_NUMERICAL.
   // DISCRETIZED_NUMERICAL values are discretized at loading time. Some
-  // algorithms (e.g. the simpleML decision forest algorithms) will handle
+  // algorithms (e.g. the YDF decision forest algorithms) will handle
   // NUMERICAL and DISCRETIZED_NUMERICAL types differently. Generally,
   // discretized columns are faster to train but can lead to sub-optimal models.
   optional bool detect_numerical_as_discretized_numerical = 6 [default = false];
@@ -358,7 +358,7 @@ message CategoricalGuide {
   //   - The value should be greater or equal to -1.
   //   - The value -1 is the "missing value".
   //   - The value 0 is the "out-of-dictionary value".
-  //   - Several simpleML algorithms assume this is a "dense index" i.e. if the
+  //   - Several YDF algorithms assume this is a "dense index" i.e. if the
   //     column is an input feature, it is best to have it being dense.
   optional bool is_already_integerized = 3;
 

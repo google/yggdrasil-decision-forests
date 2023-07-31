@@ -120,6 +120,6 @@ Optional, models can implements the following logics:
 -   Optimized inference engines
 
 A *model* can be stored on disk in a directory. The structure and content of the
-directory depend on the model implementation (and framework; remember that a
-simpleML model can wrap other framework model formats). A model is loaded in
-memory before being applied, processed or analysed. A model is standalone.
+directory depend on the model implementation (and framework; remember that a YDF
+model can wrap other framework model formats). A model is loaded in memory
+before being applied, processed or analysed. A model is standalone.

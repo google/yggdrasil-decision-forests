@@ -125,7 +125,7 @@ absl::Status UpdateDataSpecWithCsvExample(
             "The value \"", value, "\" of attribute \"", col->name(),
             "\" cannot be parsed as a float.  Possible reasons => solution: "
             "1) You forced the type NUMERICAL => Set the type to something "
-            "else. 2) You specified a regression task (simpleML Playground) "
+            "else. 2) You specified a regression task "
             "for a classification => Set the task to classification."));
       }
       FillContentNumericalFeature(num_value, col_acc);

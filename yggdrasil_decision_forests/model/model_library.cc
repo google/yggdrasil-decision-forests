@@ -42,8 +42,7 @@ constexpr char kTensorFlowDecisionForestsAssets[] = "assets";
 
 // Last file created in the model directory when a model is exported.
 //
-// Note: This file is only used the simpleML Estimator to delay and retry
-// loading a model.
+// Note: This file is only used by YDF to delay and retry loading a model.
 constexpr char kModelDoneFileName[] = "done";
 
 // Add changes to the model path to improve loading performance here.

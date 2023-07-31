@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-// Generation of synthetic dataset suited for simpleML.
+// Generation of synthetic datasets suited for Yggdrasil Decision Forests.
 //
 // Features
 //   - Classification and regression.

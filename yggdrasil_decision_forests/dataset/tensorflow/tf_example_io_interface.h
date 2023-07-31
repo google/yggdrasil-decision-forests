@@ -16,7 +16,7 @@
 // This class contains utility functions to read and write tensorflow.Example
 // from/to disk, as where as for the manipulation of tf.Examples.
 //
-// This file also contains wrappers for the simpleML Example reader (!=
+// This file also contains wrappers for the YDF Example reader (!=
 // tf.Example) and dataspec creator from tf.Example readers.
 //
 // Usage example: Creating a reader of tensorflow.Examples contained in a

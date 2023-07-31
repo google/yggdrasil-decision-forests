@@ -111,7 +111,7 @@ message GenericHyperParameterSpecification {
 
     // Links to the documentation of the hyper-parameter.
     message Documentation {
-      // Path to the proto relative to simpleML root directory.
+      // Path to the proto relative to YDF root directory.
       optional string proto_path = 1;
 
       // Name of the proto field. If not specific, use "name" instead.

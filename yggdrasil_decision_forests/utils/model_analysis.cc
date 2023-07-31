@@ -758,9 +758,9 @@ absl::StatusOr<std::string> CreateHtmlReport(
     h::Html report_header;
     report_header.Append(h::H1("Model and Dataset Analysis Report"));
     report_header.Append(h::P(
-        absl::FormatTime(absl::RFC3339_sec, absl::Now(), absl::LocalTimeZone()),
-        h::Br(),
-        "Report generated with Yggdrasil Decision Forests / simpleML"));
+        absl::FormatTime(absl::RFC3339_sec, absl::Now(),
+        absl::LocalTimeZone()), h::Br(),
+        "Report generated with Yggdrasil Decision Forests"));
     html.Append(report_header);
   }
 

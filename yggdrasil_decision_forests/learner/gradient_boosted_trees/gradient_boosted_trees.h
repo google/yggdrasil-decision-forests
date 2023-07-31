@@ -29,7 +29,7 @@
 // For more details:
 // https://en.wikipedia.org/wiki/Gradient_boosting#Gradient_tree_boosting
 //
-// Uses the CART implementation of SimpleML i.e. this implementations supports
+// Uses the CART implementation of YDF i.e. this implementations supports
 // numerical, categorical and categorical set input features.
 //
 // This implementation supports Classification (binary and multi-classes),
