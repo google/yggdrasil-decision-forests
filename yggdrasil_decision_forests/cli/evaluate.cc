@@ -24,7 +24,6 @@
 #include <memory>
 
 #include "absl/flags/flag.h"
-#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
@@ -56,14 +55,14 @@ constexpr char kUsageMessage[] = "Evaluates a model.";
 namespace yggdrasil_decision_forests {
 namespace cli {
 
-absl::Status Evaluate() {
+void Evaluate() {
   // Check required flags.
-  STATUS_CHECK(!absl::GetFlag(FLAGS_dataset).empty());
-  STATUS_CHECK(!absl::GetFlag(FLAGS_model).empty());
+  QCHECK(!absl::GetFlag(FLAGS_dataset).empty());
+  QCHECK(!absl::GetFlag(FLAGS_model).empty());
 
   // Load the model
   std::unique_ptr<model::AbstractModel> model;
-  RETURN_IF_ERROR(model::LoadModel(absl::GetFlag(FLAGS_model), &model));
+  QCHECK_OK(model::LoadModel(absl::GetFlag(FLAGS_model), &model));
 
   metric::proto::EvaluationOptions options =
       utils::ParseTextProto<metric::proto::EvaluationOptions>(
@@ -89,19 +88,16 @@ absl::Status Evaluate() {
   const auto format = absl::GetFlag(FLAGS_format);
   if (format == "text") {
     std::string report;
-    RETURN_IF_ERROR(metric::AppendTextReportWithStatus(evaluation, &report));
+    CHECK_OK(metric::AppendTextReportWithStatus(evaluation, &report));
     std::cout << "Evaluation:" << std::endl << report;
   } else if (format == "html") {
     std::string report;
-    RETURN_IF_ERROR(metric::AppendHtmlReport(evaluation, &report));
+    CHECK_OK(metric::AppendHtmlReport(evaluation, &report));
     std::cout << report;
   } else {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Unknown output format: ", format,
-                     ". Possible values are: text, html."));
+    YDF_LOG(FATAL) << "Unknown output format: " << format
+                   << ". Possible values are: text, html.";
   }
-
-  return absl::OkStatus();
 }
 
 }  // namespace cli
@@ -109,6 +105,6 @@ absl::Status Evaluate() {
 
 int main(int argc, char** argv) {
   InitLogging(kUsageMessage, &argc, &argv, true);
-  CHECK_OK(yggdrasil_decision_forests::cli::Evaluate());
+  yggdrasil_decision_forests::cli::Evaluate();
   return 0;
 }

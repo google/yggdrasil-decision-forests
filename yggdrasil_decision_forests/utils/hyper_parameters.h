@@ -31,12 +31,12 @@ namespace utils {
 // Helper function to consume generic hyper-parameters.
 class GenericHyperParameterConsumer {
  public:
-  static absl::StatusOr<GenericHyperParameterConsumer> Create(
+  explicit GenericHyperParameterConsumer(
       const model::proto::GenericHyperParameters& generic_hyper_parameters);
 
   // Returns a hparam if present.
-  absl::StatusOr<absl::optional<model::proto::GenericHyperParameters::Field>>
-  Get(absl::string_view key);
+  absl::optional<model::proto::GenericHyperParameters::Field> Get(
+      absl::string_view key);
 
   // Ensures that all the fields have been consumed.
   // Returns OK if all the hyper-parameters have been consumed.
@@ -50,9 +50,6 @@ class GenericHyperParameterConsumer {
       generic_hyper_parameters_;
   // Already consumed hyper-parameters.
   absl::flat_hash_set<std::string> consumed_values_;
-
-  friend absl::StatusOr<GenericHyperParameterConsumer> Create(
-      const model::proto::GenericHyperParameters& generic_hyper_parameters);
 };
 
 // Tests if the default value of a field satisfy a condition.

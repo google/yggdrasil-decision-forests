@@ -83,9 +83,8 @@ TEST(Registration, WithConstructorArguments) {
             "SubClassA2Tata");
   EXPECT_THAT(
       BaseClassARegisterer::Create("A3", "Tata").status(),
-      StatusIs(
-          absl::StatusCode::kInvalidArgument,
-          "No registration found with key \"A3\" in the registration pool"));
+      StatusIs(absl::StatusCode::kInvalidArgument,
+               "No class registered with key \"A3\" in the class pool"));
 }
 
 TEST(Registration, WithOutConstructorArguments) {

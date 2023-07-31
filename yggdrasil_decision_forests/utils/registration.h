@@ -148,12 +148,9 @@ class ClassPool {
       return item->Create(args...);
     }
     return absl::InvalidArgumentError(absl::Substitute(
-        "No registration found with key \"$0\" in the registration pool "
-        "\"$1\". The available registrations are \"$2\". This error indicates "
-        "that a dependency is missing in your cc_binary or cc_library.\n\n"
-        "To find the corresponding build rule, search for the key in the "
-        "source code, and add the matching cc_library. Registration are "
-        "created with the REGISTRATION_REGISTER_CLASS macro.",
+        "No class registered with key \"$0\" in the class pool \"$1\". "
+        "Registered classes are \"$2\". Add as a dependency the cc_library "
+        "rule that defines this class in your BUILD file.",
         name, typeid(Interface).name(),
         absl::StrJoin(InternalGetNames(), ",")));
   }

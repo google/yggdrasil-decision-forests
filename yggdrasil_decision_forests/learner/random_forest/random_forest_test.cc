@@ -712,9 +712,9 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(predictions.size(), dataset.nrow());
 
   std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices = {1};
-  EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
+  internal::UpdateOOBPredictionsWithNewTree(
       dataset, config, sorted_non_oob_example_indices, true,
-      *model.decision_trees()[0].get(), {}, &rnd, &predictions));
+      *model.decision_trees()[0].get(), {}, &rnd, &predictions);
   EXPECT_EQ(predictions[0].num_trees, 1);
   EXPECT_EQ(predictions[0].classification.NumObservations(), 1);
   EXPECT_EQ(predictions[0].classification.TopClass(), 1);
@@ -732,9 +732,9 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(internal::EvaluationSnippet(evaluation_1),
             "accuracy:0.5 logloss:18.0218");
 
-  EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
+  internal::UpdateOOBPredictionsWithNewTree(
       dataset, config, sorted_non_oob_example_indices, true,
-      *model.decision_trees()[1].get(), {}, &rnd, &predictions));
+      *model.decision_trees()[1].get(), {}, &rnd, &predictions);
   EXPECT_EQ(predictions[0].num_trees, 2);
   EXPECT_EQ(predictions[0].classification.NumObservations(), 2);
   EXPECT_EQ(predictions[0].classification.TopClass(), 1);
@@ -782,23 +782,23 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
   std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices = {1};
 
   // Baseline
-  EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
+  internal::UpdateOOBPredictionsWithNewTree(
       dataset, config, sorted_non_oob_example_indices, true,
-      *model.decision_trees()[0].get(), {}, &rnd, &oob_predictions));
-  EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
+      *model.decision_trees()[0].get(), {}, &rnd, &oob_predictions);
+  internal::UpdateOOBPredictionsWithNewTree(
       dataset, config, sorted_non_oob_example_indices, true,
-      *model.decision_trees()[1].get(), {}, &rnd, &oob_predictions));
+      *model.decision_trees()[1].get(), {}, &rnd, &oob_predictions);
 
   // Shuffled
   for (int repetition = 0; repetition < 100; repetition++) {
-    EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
+    internal::UpdateOOBPredictionsWithNewTree(
         dataset, config, sorted_non_oob_example_indices, true,
         *model.decision_trees()[0].get(), 0, &rnd,
-        &oob_predictions_per_input_features[0]));
-    EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
+        &oob_predictions_per_input_features[0]);
+    internal::UpdateOOBPredictionsWithNewTree(
         dataset, config, sorted_non_oob_example_indices, true,
         *model.decision_trees()[1].get(), 0, &rnd,
-        &oob_predictions_per_input_features[0]));
+        &oob_predictions_per_input_features[0]);
   }
 
   // Compute importance.

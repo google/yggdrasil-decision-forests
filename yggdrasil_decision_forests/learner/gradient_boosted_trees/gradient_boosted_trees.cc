@@ -260,7 +260,8 @@ absl::Status FinalizeModelWithValidationDataset(
 
       DCHECK_EQ(mdl->NumTrees() % mdl->num_trees_per_iter(), 0)
           << "The number of trees should be divisible by the number of trees "
-             "per iteration.";
+             "per "
+             "iteration.";
 
       if (mdl->NumTrees() ==
           (early_stopping_initial_iteration + 1) * mdl->num_trees_per_iter()) {
@@ -576,8 +577,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   RETURN_IF_ERROR(utils::ExpandInputShards(dataset_path, &all_shards));
 
   YDF_LOG(INFO) << "Training gradient boosted tree on " << all_shards.size()
-                << " shards and " << config.train_config_link.features().size()
-                << " features.";
+                << " shard(s) and "
+                << config.train_config_link.features().size() << " feature(s).";
   if (all_shards.size() < 10) {
     return absl::InvalidArgumentError(absl::Substitute(
         "The number of shards in $0 is too small $1<10. For best "
@@ -1011,7 +1012,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           (absl::Now() - begin_training) >
               absl::Seconds(
                   training_config().maximum_training_duration_seconds())) {
-        YDF_LOG(INFO) << "Maximum training duration reached. Stop training.";
+        YDF_LOG(INFO)
+            << "Stop training because of the maximum training duration.";
         break;
       }
     }  // End of training loss.
@@ -1081,8 +1083,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
       BuildAllTrainingConfiguration(train_dataset.data_spec(), &config));
 
   YDF_LOG(INFO) << "Training gradient boosted tree on " << train_dataset.nrow()
-                << " examples and "
-                << config.train_config_link.features().size() << " features.";
+                << " example(s) and "
+                << config.train_config_link.features().size() << " feature(s).";
 
   utils::usage::OnTrainingStart(train_dataset.data_spec(), config.train_config,
                                 config.train_config_link, train_dataset.nrow());
@@ -1336,7 +1338,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
   for (; iter_idx < config.gbt_config->num_trees(); iter_idx++) {
     // The user interrupted the training.
     if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
-      YDF_LOG(INFO) << "Training interrupted per user.";
+      YDF_LOG(INFO) << "Training interrupted per request.";
       break;
     }
 
@@ -1546,7 +1548,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
           (absl::Now() - begin_training) >
               absl::Seconds(
                   training_config().maximum_training_duration_seconds())) {
-        YDF_LOG(INFO) << "Maximum training duration reached. Stop training.";
+        YDF_LOG(INFO)
+            << "Stop training because of the maximum training duration.";
         break;
       }
     }  // End of training loss.
@@ -1560,7 +1563,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
 
     // Export a snapshot
     if (deployment_.try_resume_training() && next_snapshot < absl::Now()) {
-      YDF_LOG(INFO) << "Create a model snapshot at iteration " << iter_idx;
+      YDF_LOG(INFO) << "Create a snapshot of the model at iteration "
+                    << iter_idx;
       const auto model_path = file::JoinPath(deployment_.cache_path(),
                                              absl::StrCat("model_", iter_idx));
 
@@ -1587,7 +1591,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
   if (deployment_.try_resume_training()) {
     const auto last_snapshot = utils::GetGreatestSnapshot(snapshot_directory);
     if (!last_snapshot.ok() || last_snapshot.value() < iter_idx) {
-      YDF_LOG(INFO) << "Create final model snapshot at iteration " << iter_idx;
+      YDF_LOG(INFO) << "Create final snapshot of the model at iteration "
+                    << iter_idx;
       const auto model_path = file::JoinPath(deployment_.cache_path(),
                                              absl::StrCat("model_", iter_idx));
 
@@ -1656,65 +1661,58 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
       generic_hyper_params));
 
   {
-    ASSIGN_OR_RETURN(const auto hparam, generic_hyper_params->Get(kHParamLoss));
+    const auto hparam = generic_hyper_params->Get(kHParamLoss);
     if (hparam.has_value()) {
       const auto& str_loss = hparam.value().value().categorical();
       model::gradient_boosted_trees::proto::Loss loss;
       if (!model::gradient_boosted_trees::proto::Loss_Parse(str_loss, &loss)) {
         return absl::InvalidArgumentError(
-            absl::Substitute("Unknown loss \"$0\"", str_loss));
+            absl::Substitute("The loss value \"$0\" is unknown.", str_loss));
       }
       gbt_config->set_loss(loss);
     }
   }
 
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamNumTrees));
+    const auto hparam = generic_hyper_params->Get(kHParamNumTrees);
     if (hparam.has_value()) {
       gbt_config->set_num_trees(hparam.value().value().integer());
     }
   }
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamShrinkage));
+    const auto hparam = generic_hyper_params->Get(kHParamShrinkage);
     if (hparam.has_value()) {
       gbt_config->set_shrinkage(hparam.value().value().real());
     }
   }
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamL1Regularization));
+    const auto hparam = generic_hyper_params->Get(kHParamL1Regularization);
     if (hparam.has_value()) {
       gbt_config->set_l1_regularization(hparam.value().value().real());
     }
   }
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamL2Regularization));
+    const auto hparam = generic_hyper_params->Get(kHParamL2Regularization);
     if (hparam.has_value()) {
       gbt_config->set_l2_regularization(hparam.value().value().real());
     }
   }
   {
-    ASSIGN_OR_RETURN(
-        const auto hparam,
-        generic_hyper_params->Get(kHParamL2CategoricalRegularization));
+    const auto hparam =
+        generic_hyper_params->Get(kHParamL2CategoricalRegularization);
     if (hparam.has_value()) {
       gbt_config->set_l2_regularization_categorical(
           hparam.value().value().real());
     }
   }
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamLambdaLoss));
+    const auto hparam = generic_hyper_params->Get(kHParamLambdaLoss);
     if (hparam.has_value()) {
       gbt_config->set_lambda_loss(hparam.value().value().real());
     }
   }
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamForestExtraction));
+    const auto hparam = generic_hyper_params->Get(kHParamForestExtraction);
     if (hparam.has_value()) {
       if (hparam.value().value().categorical() == kHParamForestExtractionMart) {
         gbt_config->mutable_mart();
@@ -1729,25 +1727,22 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     }
   }
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamDartDropOut));
+    const auto hparam = generic_hyper_params->Get(kHParamDartDropOut);
     if (hparam.has_value() && gbt_config->has_dart()) {
       gbt_config->mutable_dart()->set_dropout_rate(
           hparam.value().value().real());
     }
   }
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(
-                         kHParamAdaptSubsampleForMaximumTrainingDuration));
+    const auto hparam = generic_hyper_params->Get(
+        kHParamAdaptSubsampleForMaximumTrainingDuration);
     if (hparam.has_value()) {
       gbt_config->set_adapt_subsample_for_maximum_training_duration(
           hparam.value().value().categorical() == "true");
     }
   }
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamUseHessianGain));
+    const auto hparam = generic_hyper_params->Get(kHParamUseHessianGain);
     if (hparam.has_value()) {
       gbt_config->set_use_hessian_gain(hparam.value().value().categorical() ==
                                        "true");
@@ -1755,8 +1750,8 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   // Determine the sampling strategy.
-  ASSIGN_OR_RETURN(const auto sampling_method_hparam,
-                   generic_hyper_params->Get(kHParamSamplingMethod));
+  const auto sampling_method_hparam =
+      generic_hyper_params->Get(kHParamSamplingMethod);
   if (sampling_method_hparam.has_value()) {
     // The preferred way of choosing a sampling method and setting its params.
     const auto sampling_method =
@@ -1793,8 +1788,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
 
   // Set sampling strategy's hyperparameters.
   {
-    ASSIGN_OR_RETURN(const auto subsample,
-                     generic_hyper_params->Get(kHParamSubsample));
+    const auto subsample = generic_hyper_params->Get(kHParamSubsample);
     if (subsample.has_value()) {
       if (gbt_config->sampling_methods_case() ==
               proto::GradientBoostedTreesTrainingConfig::
@@ -1802,7 +1796,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
           gbt_config->sampling_methods_case() ==
               proto::GradientBoostedTreesTrainingConfig::
                   kStochasticGradientBoosting) {
-        // Note: Force stochastic gb if the sampling method is "NONE" and the
+        // Note: Force stocastic gb if the sampling method is "NONE" and the
         // "subsampling" parameter is set.
         gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(
             subsample.value().value().real());
@@ -1815,8 +1809,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(const auto alpha,
-                     generic_hyper_params->Get(kHParamGossAlpha));
+    const auto alpha = generic_hyper_params->Get(kHParamGossAlpha);
     if (alpha.has_value()) {
       if (gbt_config->has_gradient_one_side_sampling()) {
         gbt_config->mutable_gradient_one_side_sampling()->set_alpha(
@@ -1827,8 +1820,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
                "to \"GOSS\".";
       }
     }
-    ASSIGN_OR_RETURN(const auto beta,
-                     generic_hyper_params->Get(kHParamGossBeta));
+    const auto beta = generic_hyper_params->Get(kHParamGossBeta);
     if (beta.has_value()) {
       if (gbt_config->has_gradient_one_side_sampling()) {
         gbt_config->mutable_gradient_one_side_sampling()->set_beta(
@@ -1842,8 +1834,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(const auto selgb,
-                     generic_hyper_params->Get(kHParamSelGBRatio));
+    const auto selgb = generic_hyper_params->Get(kHParamSelGBRatio);
     if (selgb.has_value()) {
       if (gbt_config->has_selective_gradient_boosting()) {
         gbt_config->mutable_selective_gradient_boosting()->set_ratio(
@@ -1857,17 +1848,15 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamValidationSetRatio));
+    const auto hparam = generic_hyper_params->Get(kHParamValidationSetRatio);
     if (hparam.has_value()) {
       gbt_config->set_validation_set_ratio(hparam.value().value().real());
     }
   }
 
   {
-    ASSIGN_OR_RETURN(
-        const auto hparam,
-        generic_hyper_params->Get(kHParamEarlyStoppingNumTreesLookAhead));
+    const auto hparam =
+        generic_hyper_params->Get(kHParamEarlyStoppingNumTreesLookAhead);
     if (hparam.has_value()) {
       gbt_config->set_early_stopping_num_trees_look_ahead(
           hparam.value().value().integer());
@@ -1875,9 +1864,8 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(
-        const auto hparam,
-        generic_hyper_params->Get(kHParamEarlyStoppingInitialIteration));
+    const auto hparam =
+        generic_hyper_params->Get(kHParamEarlyStoppingInitialIteration);
     if (hparam.has_value()) {
       gbt_config->set_early_stopping_initial_iteration(
           hparam.value().value().integer());
@@ -1885,8 +1873,8 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(const auto hparam, generic_hyper_params->Get(
-                                            kHParamValidationIntervalInTrees));
+    const auto hparam =
+        generic_hyper_params->Get(kHParamValidationIntervalInTrees);
     if (hparam.has_value()) {
       gbt_config->set_validation_interval_in_trees(
           hparam.value().value().integer());
@@ -1894,8 +1882,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamEarlyStopping));
+    const auto hparam = generic_hyper_params->Get(kHParamEarlyStopping);
     if (hparam.has_value()) {
       const auto early_stopping = hparam.value().value().categorical();
       if (early_stopping == kHParamEarlyStoppingNone) {
@@ -1914,8 +1901,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamApplyLinkFunction));
+    const auto hparam = generic_hyper_params->Get(kHParamApplyLinkFunction);
     if (hparam.has_value()) {
       gbt_config->set_apply_link_function(
           hparam.value().value().categorical() == "true");
@@ -1923,9 +1909,8 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(
-        const auto hparam,
-        generic_hyper_params->Get(kHParamComputePermutationVariableImportance));
+    const auto hparam =
+        generic_hyper_params->Get(kHParamComputePermutationVariableImportance);
     if (hparam.has_value()) {
       gbt_config->set_compute_permutation_variable_importance(
           hparam.value().value().categorical() == "true");
@@ -1933,8 +1918,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamFocalLossGamma));
+    const auto hparam = generic_hyper_params->Get(kHParamFocalLossGamma);
     if (hparam.has_value()) {
       gbt_config->mutable_binary_focal_loss_options()
           ->set_misprediction_exponent(hparam.value().value().real());
@@ -1942,8 +1926,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamFocalLossAlpha));
+    const auto hparam = generic_hyper_params->Get(kHParamFocalLossAlpha);
     if (hparam.has_value()) {
       gbt_config->mutable_binary_focal_loss_options()
           ->set_positive_sample_coefficient(hparam.value().value().real());
@@ -2116,7 +2099,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
 
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Loss optimized by the model. If not specified (DEFAULT) the loss is selected according to the \"task\" and label data. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:
+        R"(The loss optimized by the model. If not specified (DEFAULT) the loss is selected automatically according to the \"task\" and label statistics. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:
 - `DEFAULT`: Select the loss automatically according to the task and label statistics.
 - `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.
 - `SQUARED_ERROR`: Least square loss. Only valid for regression.
@@ -2142,7 +2125,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_real()->set_default_value(gbt_config.shrinkage());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Multiplicative coefficient applied to the predictions of each tree in a decision tree ensemble to prevent overfitting. This works similarly to the learning rate in neural networks. Reducing this value can improve accuracy (assuming enough trees are trained), but it will also increase the size of the model.)");
+        R"(Coefficient applied to each tree prediction. A small value (0.02) tends to give more accurate results (assuming enough trees are trained), but results in larger models. Analogous to neural network learning rate.)");
   }
   {
     auto& param =
@@ -2223,7 +2206,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Control how the maximum training duration is enforced. If set to False, the training will stop when the training time is reached. If set to True, the number of examples sampled to train each tree of the forest will be shrunk to ensure that all the trees are trained in time.)");
+        R"(Control how the maximum training duration (if set) is applied. If false, the training stop when the time is used. If true, the size of the sampled datasets used train individual trees are adapted dynamically so that all the trees are trained in time.)");
   }
 
   {
@@ -2235,7 +2218,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Use true, leaf values are set to `sum gradient / sum hessian` (regularization terms not shown). If false, leaf values are set to `mean gradient` (regularization terms not shown). This parameter does not impact the split term (always using the hessian term). Available for all losses except regression.)");
+        R"(Use true, uses a formulation of split gain with a hessian term i.e. optimizes the splits to minimize the variance of "gradient / hessian. Available for all losses except regression.)");
   }
 
   {
@@ -2341,7 +2324,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
         gbt_config.validation_interval_in_trees());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Evaluate the model on the validation set of every "validation_interval_in_trees" tree. Increasing this value reduce the cost of validation and can impact the early stopping policy (as early stopping is only tested during the validation).)");
+        R"(Evaluate the model on the validation set every "validation_interval_in_trees" trees. Increasing this value reduce the cost of validation and can impact the early stopping policy (as early stopping is only tested during the validation).)");
   }
 
   {
@@ -2370,7 +2353,8 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Determines whether to apply the link function (or activation function) to the model predictions. For instance, in the case of binary classification, the link function converts logic into probabilities. If apply_link_function=true, the model will return a probability. If apply_link_function=false, the model will return a logic. If the model does not have a link function, the apply_link_function flag will have no effect.)");
+        R"(If true, applies the link function (a.k.a. activation function), if any, before returning the model prediction. If false, returns the pre-link function model output.
+For example, in the case of binary classification, the pre-link function output is a logic while the post-link function is a probability.)");
   }
 
   {

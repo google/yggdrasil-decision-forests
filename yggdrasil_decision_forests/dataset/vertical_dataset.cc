@@ -250,8 +250,7 @@ absl::Status VerticalDataset::CreateColumnsFromDataspec() {
 absl::Status VerticalDataset::NumericalColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
-  ASSIGN_OR_RETURN(auto* cast_dst,
-                   dst->MutableCastWithStatus<NumericalColumn>());
+  auto* cast_dst = dst->MutableCast<NumericalColumn>();
   *cast_dst->mutable_values() = values();
   return absl::OkStatus();
 }
@@ -259,7 +258,7 @@ absl::Status VerticalDataset::NumericalColumn::ConvertToGivenDataspec(
 absl::Status VerticalDataset::HashColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
-  ASSIGN_OR_RETURN(auto* cast_dst, dst->MutableCastWithStatus<HashColumn>());
+  auto* cast_dst = dst->MutableCast<HashColumn>();
   *cast_dst->mutable_values() = values();
   return absl::OkStatus();
 }
@@ -267,7 +266,7 @@ absl::Status VerticalDataset::HashColumn::ConvertToGivenDataspec(
 absl::Status VerticalDataset::BooleanColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
-  ASSIGN_OR_RETURN(auto* cast_dst, dst->MutableCastWithStatus<BooleanColumn>());
+  auto* cast_dst = dst->MutableCast<BooleanColumn>();
   *cast_dst->mutable_values() = values();
   return absl::OkStatus();
 }
@@ -275,8 +274,7 @@ absl::Status VerticalDataset::BooleanColumn::ConvertToGivenDataspec(
 absl::Status VerticalDataset::NumericalSetColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
-  ASSIGN_OR_RETURN(auto* cast_dst,
-                   dst->MutableCastWithStatus<NumericalSetColumn>());
+  auto* cast_dst = dst->MutableCast<NumericalSetColumn>();
   cast_dst->mutable_values() = values();
   cast_dst->mutable_bank() = bank();
   return absl::OkStatus();
@@ -285,8 +283,7 @@ absl::Status VerticalDataset::NumericalSetColumn::ConvertToGivenDataspec(
 absl::Status VerticalDataset::NumericalListColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
-  ASSIGN_OR_RETURN(auto* cast_dst,
-                   dst->MutableCastWithStatus<NumericalListColumn>());
+  auto* cast_dst = dst->MutableCast<NumericalListColumn>();
   cast_dst->mutable_values() = values();
   cast_dst->mutable_bank() = bank();
   return absl::OkStatus();
@@ -295,7 +292,7 @@ absl::Status VerticalDataset::NumericalListColumn::ConvertToGivenDataspec(
 absl::Status VerticalDataset::StringColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
-  ASSIGN_OR_RETURN(auto* cast_dst, dst->MutableCastWithStatus<StringColumn>());
+  auto* cast_dst = dst->MutableCast<StringColumn>();
   *cast_dst->mutable_values() = values();
   return absl::OkStatus();
 }
@@ -303,8 +300,7 @@ absl::Status VerticalDataset::StringColumn::ConvertToGivenDataspec(
 absl::Status VerticalDataset::CategoricalColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
-  ASSIGN_OR_RETURN(auto* cast_dst,
-                   dst->MutableCastWithStatus<CategoricalColumn>());
+  auto* cast_dst = dst->MutableCast<CategoricalColumn>();
   RETURN_IF_ERROR(CheckCompatibleCategocialColumnSpec(src_spec, dst_spec));
   if (src_spec.categorical().is_already_integerized()) {
     *cast_dst->mutable_values() = values();
@@ -338,8 +334,7 @@ VerticalDataset::DiscretizedNumericalColumn::ConvertToGivenDataspec(
 absl::Status VerticalDataset::CategoricalSetColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
-  ASSIGN_OR_RETURN(auto* cast_dst,
-                   dst->MutableCastWithStatus<CategoricalSetColumn>());
+  auto* cast_dst = dst->MutableCast<CategoricalSetColumn>();
   cast_dst->mutable_values() = values();
   if (src_spec.categorical().is_already_integerized()) {
     cast_dst->mutable_bank() = bank();
@@ -359,8 +354,7 @@ absl::Status VerticalDataset::CategoricalSetColumn::ConvertToGivenDataspec(
 absl::Status VerticalDataset::CategoricalListColumn::ConvertToGivenDataspec(
     AbstractColumn* dst, const proto::Column& src_spec,
     const proto::Column& dst_spec) const {
-  ASSIGN_OR_RETURN(auto* cast_dst,
-                   dst->MutableCastWithStatus<CategoricalListColumn>());
+  auto* cast_dst = dst->MutableCast<CategoricalListColumn>();
   cast_dst->mutable_values() = values();
   if (src_spec.categorical().is_already_integerized()) {
     cast_dst->mutable_bank() = bank();

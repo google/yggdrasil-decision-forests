@@ -249,7 +249,8 @@ absl::Status ExampleToPrediction(
       }
     } break;
     default:
-      STATUS_FATAL("Non supported task.");
+      YDF_LOG(FATAL) << "Non supported task.";
+      break;
   }
 
   return absl::OkStatus();
@@ -314,7 +315,8 @@ absl::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
       }
     } break;
     default:
-      STATUS_FATAL("Non supported task.");
+      YDF_LOG(FATAL) << "Non supported task.";
+      break;
   }
 
   // Column spec for the prediction key.

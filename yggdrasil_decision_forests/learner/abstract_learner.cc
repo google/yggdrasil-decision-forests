@@ -484,8 +484,7 @@ absl::Status AbstractLearner::SetHyperParameters(
                    GetGenericHyperParameterSpecification());
   RETURN_IF_ERROR(CheckGenericHyperParameterSpecification(generic_hyper_params,
                                                           h_param_spec));
-  ASSIGN_OR_RETURN(auto consumer, utils::GenericHyperParameterConsumer::Create(
-                                      generic_hyper_params));
+  utils::GenericHyperParameterConsumer consumer(generic_hyper_params);
   RETURN_IF_ERROR(SetHyperParametersImpl(&consumer));
   return consumer.CheckThatAllHyperparametersAreConsumed();
 }
@@ -493,9 +492,8 @@ absl::Status AbstractLearner::SetHyperParameters(
 absl::Status AbstractLearner::SetHyperParametersImpl(
     utils::GenericHyperParameterConsumer* generic_hyper_params) {
   {
-    ASSIGN_OR_RETURN(
-        const auto hparam,
-        generic_hyper_params->Get(kHParamMaximumTrainingDurationSeconds));
+    const auto hparam =
+        generic_hyper_params->Get(kHParamMaximumTrainingDurationSeconds);
     if (hparam.has_value()) {
       if (hparam.value().value().real() >= 0) {
         training_config_.set_maximum_training_duration_seconds(
@@ -507,9 +505,8 @@ absl::Status AbstractLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(
-        const auto hparam,
-        generic_hyper_params->Get(kHParamMaximumModelSizeInMemoryInBytes));
+    const auto hparam =
+        generic_hyper_params->Get(kHParamMaximumModelSizeInMemoryInBytes);
     if (hparam.has_value()) {
       if (hparam.value().value().real() >= 0) {
         training_config_.set_maximum_model_size_in_memory_in_bytes(
@@ -521,16 +518,14 @@ absl::Status AbstractLearner::SetHyperParametersImpl(
   }
 
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamRandomSeed));
+    const auto hparam = generic_hyper_params->Get(kHParamRandomSeed);
     if (hparam.has_value()) {
       training_config_.set_random_seed(hparam.value().value().integer());
     }
   }
 
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamPureServingModel));
+    const auto hparam = generic_hyper_params->Get(kHParamPureServingModel);
     if (hparam.has_value()) {
       training_config_.set_pure_serving_model(
           hparam.value().value().categorical() == kTrue);

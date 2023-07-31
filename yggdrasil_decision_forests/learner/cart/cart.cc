@@ -91,8 +91,7 @@ absl::Status CartLearner::SetHyperParametersImpl(
       generic_hyper_params));
 
   {
-    ASSIGN_OR_RETURN(const auto hparam,
-                     generic_hyper_params->Get(kHParamValidationRatio));
+    const auto hparam = generic_hyper_params->Get(kHParamValidationRatio);
     if (hparam.has_value()) {
       cart_config->set_validation_ratio(hparam.value().value().real());
     }

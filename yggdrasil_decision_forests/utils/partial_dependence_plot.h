@@ -99,8 +99,8 @@ absl::Status AppendAttributesCombinations2D(
 
 // Creates a list of attribute sets from user set flags.
 absl::StatusOr<std::vector<std::vector<int>>> GenerateAttributesCombinations(
-    const model::AbstractModel& model, bool flag_1d, bool flag_2d,
-    bool flag_2d_categorical_numerical);
+    const model::AbstractModel& model, const bool flag_1d, const bool flag_2d,
+    const bool flag_2d_categorical_numerical);
 
 namespace internal {
 

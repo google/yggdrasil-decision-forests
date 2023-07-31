@@ -341,9 +341,7 @@ void GradientBoostedTreesModel::Predict(
       } else if (task() == model::proto::REGRESSION) {
         prediction->mutable_regression()->set_value(accumulator);
       } else {
-        YDF_LOG(FATAL)
-            << "The gradient boosted model does not support this task with a "
-               "squared error loss.";
+        YDF_LOG(FATAL) << "Non supported task";
       }
     } break;
     case proto::Loss::POISSON: {
@@ -357,9 +355,7 @@ void GradientBoostedTreesModel::Predict(
         prediction->mutable_regression()->set_value(
             std::exp(clamped_accumlator));
       } else {
-        YDF_LOG(FATAL)
-            << "The gradient boosted model does not support this task with a "
-               "poison loss.";
+        YDF_LOG(FATAL) << "Non supported task";
       }
     } break;
     case proto::Loss::LAMBDA_MART_NDCG5:
@@ -372,7 +368,7 @@ void GradientBoostedTreesModel::Predict(
       prediction->mutable_ranking()->set_relevance(accumulator);
     } break;
     default:
-      NOT_IMPLEMENTED;
+      YDF_LOG(FATAL) << "Not implemented";
   }
 }
 
@@ -465,7 +461,7 @@ void GradientBoostedTreesModel::Predict(
       prediction->mutable_ranking()->set_relevance(accumulator);
     } break;
     default:
-      NOT_IMPLEMENTED;
+      YDF_LOG(FATAL) << "Not implemented";
   }
 }
 

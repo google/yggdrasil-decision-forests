@@ -41,7 +41,4 @@
 #define NOTREACHED() DCHECK(false);
 #endif
 
-#define NOT_IMPLEMENTED YDF_LOG(FATAL) << "Not implemented";
-#define NOT_IMPLEMENTED_ARG(arg) YDF_LOG(FATAL) << "Not implemented: " << arg;
-
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_LOGGING_H_

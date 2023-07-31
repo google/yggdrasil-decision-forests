@@ -41,7 +41,6 @@
 //     empty string (i.e. --new_file_prefix=) to remove the model prefix.
 //
 #include "absl/flags/flag.h"
-#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -69,21 +68,21 @@ constexpr char kUsageMessage[] = "Edits a trained model.";
 namespace yggdrasil_decision_forests {
 namespace cli {
 
-absl::Status EditModel() {
+void EditModel() {
   // Check required flags.
   const auto input = absl::GetFlag(FLAGS_input);
   const auto output = absl::GetFlag(FLAGS_output);
 
   if (input == kStringNoSet) {
-    return absl::InvalidArgumentError("--input required");
+    YDF_LOG(FATAL) << "--input required";
   }
   if (output == kStringNoSet) {
-    return absl::InvalidArgumentError("--output required");
+    YDF_LOG(FATAL) << "--output required";
   }
 
   YDF_LOG(INFO) << "Loading model";
   std::unique_ptr<model::AbstractModel> model;
-  RETURN_IF_ERROR(model::LoadModel(input, &model));
+  QCHECK_OK(model::LoadModel(input, &model));
   auto* label_column =
       model->mutable_data_spec()->mutable_columns(model->label_col_idx());
 
@@ -98,9 +97,9 @@ absl::Status EditModel() {
   if (absl::GetFlag(FLAGS_new_weights_name) != kStringNoSet) {
     auto weights = model->weights();
     if (!weights.has_value()) {
-      return absl::InvalidArgumentError(
-          "Cannot apply --new_weights_name because the model is not "
-          "weighted.");
+      YDF_LOG(FATAL)
+          << "Cannot apply --new_weights_name because the model is not "
+             "weighted.";
     }
     auto* weight_column = model->mutable_data_spec()->mutable_columns(
         weights.value().attribute_idx());
@@ -109,7 +108,7 @@ absl::Status EditModel() {
 
   // Pure serving
   if (absl::GetFlag(FLAGS_pure_serving) != kStringNoSet) {
-    RETURN_IF_ERROR(model->MakePureServing());
+    QCHECK_OK(model->MakePureServing());
   }
 
   // Change how the model is exported.
@@ -118,9 +117,7 @@ absl::Status EditModel() {
     output_options.file_prefix = absl::GetFlag(FLAGS_new_file_prefix);
   }
   YDF_LOG(INFO) << "Saving model";
-  RETURN_IF_ERROR(model::SaveModel(output, model.get(), output_options));
-
-  return absl::OkStatus();
+  QCHECK_OK(model::SaveModel(output, model.get(), output_options));
 }
 
 }  // namespace cli
@@ -128,6 +125,6 @@ absl::Status EditModel() {
 
 int main(int argc, char** argv) {
   InitLogging(kUsageMessage, &argc, &argv, true);
-  QCHECK_OK(yggdrasil_decision_forests::cli::EditModel());
+  yggdrasil_decision_forests::cli::EditModel();
   return 0;
 }

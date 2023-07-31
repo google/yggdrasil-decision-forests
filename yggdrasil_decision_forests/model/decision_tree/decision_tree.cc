@@ -80,7 +80,7 @@ void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
                             std::string* description) {
   switch (node.output_case()) {
     case proto::Node::OUTPUT_NOT_SET:
-      absl::StrAppend(description, "Non set node");
+      YDF_LOG(FATAL) << "Not supported";
       break;
 
     case proto::Node::OutputCase::kClassifier: {
@@ -694,7 +694,7 @@ bool EvalConditionFromColumn(
     }
 
     default:
-      NOT_IMPLEMENTED;
+      YDF_LOG(FATAL) << "Non implemented";
   }
   return false;
 }
@@ -818,9 +818,7 @@ bool EvalCondition(const proto::NodeCondition& condition,
     }
 
     default:
-      YDF_LOG(FATAL) << absl::StrCat("Support for ",
-                                     condition.condition().type_case(),
-                                     " condition is not implemented");
+      YDF_LOG(FATAL) << "Non implemented";
   }
   return false;
 }

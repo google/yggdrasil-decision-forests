@@ -314,8 +314,7 @@ void RandomForestModel::Predict(const dataset::VerticalDataset& dataset,
       PredictUplift(dataset, row_idx, prediction);
       break;
     default:
-      YDF_LOG(FATAL) << "The task " << model::proto::Task_Name(task_)
-                     << " is not supported by the Random Forest model.";
+      YDF_LOG(FATAL) << "Non supported task.";
       break;
   }
 }
@@ -335,7 +334,7 @@ void RandomForestModel::Predict(const dataset::proto::Example& example,
       PredictUplift(example, prediction);
       break;
     default:
-      YDF_LOG(FATAL) << "The Random Forest model does not support this task.";
+      YDF_LOG(FATAL) << "Non supported task.";
       break;
   }
 }
@@ -673,7 +672,7 @@ std::string EvaluationSnippet(
       return absl::Substitute("qini:$0 auuc:$1", metric::Qini(evaluation),
                               metric::AUUC(evaluation));
     default:
-      NOT_IMPLEMENTED;
+      YDF_LOG(FATAL) << "Not implemented";
   }
 }
 

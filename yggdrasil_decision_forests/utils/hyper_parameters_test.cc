@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
@@ -29,16 +30,16 @@ using test::StatusIs;
 
 TEST(HyperParameterConsumer, Base) {
   const model::proto::GenericHyperParameters hparams = PARSE_TEST_PROTO(
-      R"pb(
+      R"(
         fields {
           name: "B"
           value { categorical: "TOTO" }
         }
-      )pb");
-  auto consumer = GenericHyperParameterConsumer::Create(hparams).value();
-  EXPECT_FALSE(consumer.Get("A").value().has_value());
+      )");
+  GenericHyperParameterConsumer consumer(hparams);
+  EXPECT_FALSE(consumer.Get("A").has_value());
   EXPECT_FALSE(consumer.CheckThatAllHyperparametersAreConsumed().ok());
-  EXPECT_TRUE(consumer.Get("B").value().has_value());
+  EXPECT_TRUE(consumer.Get("B").has_value());
   EXPECT_TRUE(consumer.CheckThatAllHyperparametersAreConsumed().ok());
 }
 
