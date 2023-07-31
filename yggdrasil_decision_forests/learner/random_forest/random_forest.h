@@ -130,7 +130,7 @@ struct PredictionAccumulator {
 // Initialize a vector of accumulators to support the task specified in
 // "config*".
 void InitializeOOBPredictionAccumulators(
-    const UnsignedExampleIdx num_predictions,
+    UnsignedExampleIdx num_predictions,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const dataset::proto::DataSpecification& data_spec,
@@ -143,21 +143,20 @@ void InitializeOOBPredictionAccumulators(
 // If "shuffled_attribute_idx" is set, the decision tree will be applied while
 // simulating the random shuffling of the value of the attribute
 // "shuffled_attribute_idx.value()" using "rnd" as source of randomness.
-void UpdateOOBPredictionsWithNewTree(
+absl::Status UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
     std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
-    const bool winner_take_all_inference,
+    bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
-    const absl::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
+    absl::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
     std::vector<PredictionAccumulator>* oob_predictions);
 
 // Evaluates the OOB predictions. Examples without any tree predictions are
 // skipped.
 absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
-    const dataset::VerticalDataset& train_dataset,
-    const model::proto::Task task, const int label_col_idx,
-    int uplift_treatment_col_idx,
+    const dataset::VerticalDataset& train_dataset, model::proto::Task task,
+    int label_col_idx, int uplift_treatment_col_idx,
     const absl::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
     const std::vector<PredictionAccumulator>& oob_predictions,
     bool for_permutation_importance = false);
@@ -167,15 +166,14 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
     const std::vector<internal::PredictionAccumulator>& oob_predictions,
     const std::vector<std::vector<internal::PredictionAccumulator>>&
         oob_predictions_per_input_features,
-    const dataset::VerticalDataset& dataset, const int num_threads,
+    const dataset::VerticalDataset& dataset, int num_threads,
     RandomForestModel* model);
 
 // Selects the examples to train one tree. Selects "num_samples" integers in [0,
 // num_examples[ with replacement.
-void SampleTrainingExamples(const UnsignedExampleIdx num_examples,
-                            const UnsignedExampleIdx num_samples,
-                            const bool with_replacement,
-                            utils::RandomEngine* random,
+void SampleTrainingExamples(UnsignedExampleIdx num_examples,
+                            UnsignedExampleIdx num_samples,
+                            bool with_replacement, utils::RandomEngine* random,
                             std::vector<UnsignedExampleIdx>* selected);
 
 // Exports the Out-of-bag predictions of a model to disk.

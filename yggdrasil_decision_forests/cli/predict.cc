@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "absl/flags/flag.h"
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -70,15 +71,15 @@ constexpr char kUsageMessage[] =
 namespace yggdrasil_decision_forests {
 namespace cli {
 
-void Predict() {
+absl::Status Predict() {
   // Check required flags.
-  QCHECK(!absl::GetFlag(FLAGS_dataset).empty());
-  QCHECK(!absl::GetFlag(FLAGS_output).empty());
-  QCHECK(!absl::GetFlag(FLAGS_model).empty());
+  STATUS_CHECK(!absl::GetFlag(FLAGS_dataset).empty());
+  STATUS_CHECK(!absl::GetFlag(FLAGS_output).empty());
+  STATUS_CHECK(!absl::GetFlag(FLAGS_model).empty());
 
   // Load the model
   std::unique_ptr<model::AbstractModel> model;
-  QCHECK_OK(model::LoadModel(absl::GetFlag(FLAGS_model), &model));
+  RETURN_IF_ERROR(model::LoadModel(absl::GetFlag(FLAGS_model), &model));
 
   // Dataspec used to read the dataset.
   auto data_spec = model->data_spec();
@@ -103,7 +104,8 @@ void Predict() {
           std::find(required_columns.begin(), required_columns.end(),
                     key_col_idx) != required_columns.end();
       if (key_is_input_feature) {
-        YDF_LOG(FATAL) << "The --key cannot be an input feature of the model.";
+        return absl::InvalidArgumentError(
+            "The --key cannot be an input feature of the model.");
       }
       // Turn the column into a raw string to make sure no processing is applied
       // during reading.
@@ -120,9 +122,9 @@ void Predict() {
   // loading the dataset will fail if one of them is missing). The other columns
   // (e.g. label, weights) are optional.
   dataset::VerticalDataset dataset;
-  QCHECK_OK(LoadVerticalDataset(absl::GetFlag(FLAGS_dataset), data_spec,
-                                &dataset,
-                                /*ensure_non_missing=*/required_columns));
+  RETURN_IF_ERROR(LoadVerticalDataset(absl::GetFlag(FLAGS_dataset), data_spec,
+                                      &dataset,
+                                      /*ensure_non_missing=*/required_columns));
 
   // Compute the predictions.
   std::vector<model::proto::Prediction> predictions;
@@ -135,7 +137,7 @@ void Predict() {
     // Convert dataset to efficient format.
     auto engine = std::move(engine_or.value());
     auto examples = engine->AllocateExamples(dataset.nrow());
-    QCHECK_OK(serving::CopyVerticalDatasetToAbstractExampleSet(
+    RETURN_IF_ERROR(serving::CopyVerticalDatasetToAbstractExampleSet(
         dataset, 0, dataset.nrow(), engine->features(), examples.get()));
 
     // Apply the model.
@@ -183,10 +185,12 @@ void Predict() {
     optional_prediction_key = key;
   }
 
-  QCHECK_OK(utils::ExportPredictions(
+  RETURN_IF_ERROR(utils::ExportPredictions(
       predictions, model->task(), label_column, absl::GetFlag(FLAGS_output),
       absl::GetFlag(FLAGS_num_records_by_shard_in_output),
       optional_prediction_key));
+
+  return absl::OkStatus();
 }
 
 }  // namespace cli
@@ -194,6 +198,6 @@ void Predict() {
 
 int main(int argc, char** argv) {
   InitLogging(kUsageMessage, &argc, &argv, true);
-  yggdrasil_decision_forests::cli::Predict();
+  QCHECK_OK(yggdrasil_decision_forests::cli::Predict());
   return 0;
 }

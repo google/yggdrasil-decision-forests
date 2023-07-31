@@ -2289,7 +2289,8 @@ TEST(DecisionTree, GenericHyperParameterCategorical) {
   EXPECT_FALSE(dt_config.categorical().has_random());
 
   absl::flat_hash_set<std::string> consumed_hparams;
-  utils::GenericHyperParameterConsumer generic_hyper_params(hparams);
+  auto generic_hyper_params =
+      utils::GenericHyperParameterConsumer::Create(hparams).value();
   EXPECT_OK(
       SetHyperParameters(&consumed_hparams, &dt_config, &generic_hyper_params));
   EXPECT_TRUE(dt_config.categorical().has_random());

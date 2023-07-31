@@ -27,6 +27,7 @@
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -68,7 +69,9 @@ GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path) {
     if (format == proto::INVALID) {
       continue;
     }
-    if (DatasetFormatToPrefix(format) == prefix) {
+    ASSIGN_OR_RETURN(const std::string proposed_prefix,
+                     DatasetFormatToPrefix(format));
+    if (proposed_prefix == prefix) {
       return std::make_pair(std::string(path), format);
     }
   }
@@ -76,11 +79,11 @@ GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path) {
       absl::StrCat("Unknown format \"", prefix, "\" in \"", typed_path, "\""));
 }
 
-std::string FormatToRecommendedExtension(proto::DatasetFormat format) {
+absl::StatusOr<std::string> FormatToRecommendedExtension(
+    proto::DatasetFormat format) {
   switch (format) {
     case proto::INVALID:
-      YDF_LOG(FATAL) << "Invalid format";
-      break;
+      return absl::InvalidArgumentError("Invalid format");
     case proto::FORMAT_CSV:
       return "csv";
     case proto::FORMAT_TFE_TFRECORD:
@@ -90,11 +93,10 @@ std::string FormatToRecommendedExtension(proto::DatasetFormat format) {
   }
 }
 
-std::string DatasetFormatToPrefix(proto::DatasetFormat format) {
+absl::StatusOr<std::string> DatasetFormatToPrefix(proto::DatasetFormat format) {
   switch (format) {
     case proto::INVALID:
-      YDF_LOG(FATAL) << "Invalid format";
-      break;
+      return absl::InvalidArgumentError("Invalid format");
     case proto::FORMAT_CSV:
       return FORMAT_CSV;
     case proto::FORMAT_TFE_TFRECORD:

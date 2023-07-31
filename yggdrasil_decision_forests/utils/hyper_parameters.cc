@@ -30,28 +30,32 @@
 namespace yggdrasil_decision_forests {
 namespace utils {
 
-GenericHyperParameterConsumer::GenericHyperParameterConsumer(
+absl::StatusOr<GenericHyperParameterConsumer>
+GenericHyperParameterConsumer::Create(
     const model::proto::GenericHyperParameters& generic_hyper_parameters) {
+  GenericHyperParameterConsumer consumer;
+
   for (const auto& field : generic_hyper_parameters.fields()) {
-    if (generic_hyper_parameters_.find(field.name()) !=
-        generic_hyper_parameters_.end()) {
-      YDF_LOG(FATAL) << "The field \"" << field.name()
-                     << "\" is defined several times.";
+    if (consumer.generic_hyper_parameters_.find(field.name()) !=
+        consumer.generic_hyper_parameters_.end()) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "The field \"", field.name(), "\" is defined several times."));
     }
-    generic_hyper_parameters_[field.name()] = field;
+    consumer.generic_hyper_parameters_[field.name()] = field;
   }
+  return consumer;
 }
 
-absl::optional<model::proto::GenericHyperParameters::Field>
+absl::StatusOr<absl::optional<model::proto::GenericHyperParameters::Field>>
 GenericHyperParameterConsumer::Get(const absl::string_view key) {
   if (consumed_values_.find(key) != consumed_values_.end()) {
-    YDF_LOG(FATAL) << absl::StrCat("Already consumed hyper-parameter \"", key,
-                                   "\".");
+    return absl::InvalidArgumentError(
+        absl::StrCat("Already consumed hyper-parameter \"", key, "\"."));
   }
   consumed_values_.insert(std::string(key));
   const auto value_it = generic_hyper_parameters_.find(key);
   if (value_it == generic_hyper_parameters_.end()) {
-    return {};
+    return absl::optional<model::proto::GenericHyperParameters::Field>{};
   }
   return value_it->second;
 }

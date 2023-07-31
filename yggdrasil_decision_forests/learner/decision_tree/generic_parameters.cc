@@ -385,30 +385,33 @@ absl::Status SetHyperParameters(
   bool max_nodes_is_set = false;
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamMaxDepth);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamMaxDepth));
     if (hparam.has_value()) {
       dt_config->set_max_depth(hparam.value().value().integer());
     }
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamMinExamples);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamMinExamples));
     if (hparam.has_value()) {
       dt_config->set_min_examples(hparam.value().value().integer());
     }
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamNumCandidateAttributes);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamNumCandidateAttributes));
     if (hparam.has_value()) {
       dt_config->set_num_candidate_attributes(hparam.value().value().integer());
     }
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamNumCandidateAttributesRatio);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamNumCandidateAttributesRatio));
     if (hparam.has_value()) {
       const auto value = hparam.value().value().real();
       if (value >= 0) {
@@ -418,8 +421,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamInSplitMinExampleCheck);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamInSplitMinExampleCheck));
     if (hparam.has_value()) {
       dt_config->set_in_split_min_examples_check(
           hparam.value().value().categorical() == kTrue);
@@ -427,7 +430,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamAllowNaConditions);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamAllowNaConditions));
     if (hparam.has_value()) {
       dt_config->set_allow_na_conditions(hparam.value().value().categorical() ==
                                          kTrue);
@@ -435,7 +439,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamMissingValuePolicy);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamMissingValuePolicy));
     if (hparam.has_value()) {
       decision_tree::proto::DecisionTreeTrainingConfig::MissingValuePolicy
           value;
@@ -451,8 +456,9 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamCategoricalSetSplitGreedySampling);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamCategoricalSetSplitGreedySampling));
     if (hparam.has_value()) {
       dt_config->mutable_categorical_set_greedy_forward()->set_sampling(
           hparam.value().value().real());
@@ -460,8 +466,9 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamCategoricalSetSplitMaxNumItems);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamCategoricalSetSplitMaxNumItems));
     if (hparam.has_value()) {
       dt_config->mutable_categorical_set_greedy_forward()->set_max_num_items(
           hparam.value().value().integer());
@@ -469,8 +476,9 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamCategoricalSetSplitMinItemFrequency);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamCategoricalSetSplitMinItemFrequency));
     if (hparam.has_value()) {
       dt_config->mutable_categorical_set_greedy_forward()
           ->set_min_item_frequency(hparam.value().value().integer());
@@ -478,7 +486,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamGrowingStrategy);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamGrowingStrategy));
     if (hparam.has_value()) {
       if (hparam.value().value().categorical() == kGrowingStrategyLocal) {
         dt_config->mutable_growing_strategy_local();
@@ -494,7 +503,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamMaxNumNodes);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamMaxNumNodes));
     if (hparam.has_value()) {
       max_nodes = hparam.value().value().integer();
       max_nodes_is_set = true;
@@ -513,7 +523,8 @@ absl::Status SetHyperParameters(
 
   // Oblique trees
   {
-    const auto hparam = generic_hyper_params->Get(kHParamSplitAxis);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamSplitAxis));
     if (hparam.has_value()) {
       const auto hparam_value = hparam.value().value().categorical();
       if (hparam_value == kHParamSplitAxisAxisAligned) {
@@ -528,8 +539,9 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(
-        kHParamSplitAxisSparseObliqueNumProjectionsExponent);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(
+                         kHParamSplitAxisSparseObliqueNumProjectionsExponent));
     if (hparam.has_value()) {
       const auto hparam_value = hparam.value().value().real();
       if (dt_config->has_sparse_oblique_split()) {
@@ -544,8 +556,9 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(
-        kHParamSplitAxisSparseObliqueProjectionDensityFactor);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(
+                         kHParamSplitAxisSparseObliqueProjectionDensityFactor));
     if (hparam.has_value()) {
       const auto hparam_value = hparam.value().value().real();
       if (dt_config->has_sparse_oblique_split()) {
@@ -560,8 +573,9 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamSplitAxisSparseObliqueNormalization);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamSplitAxisSparseObliqueNormalization));
     if (hparam.has_value()) {
       decision_tree::proto::DecisionTreeTrainingConfig::SparseObliqueSplit::
           Normalization value;
@@ -583,8 +597,9 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamSplitAxisSparseObliqueWeights);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamSplitAxisSparseObliqueWeights));
     if (hparam.has_value()) {
       if (dt_config->has_sparse_oblique_split()) {
         const auto& value = hparam.value().value().categorical();
@@ -608,7 +623,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamCategoricalAlgorithm);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamCategoricalAlgorithm));
     if (hparam.has_value()) {
       const auto value = hparam.value().value().categorical();
       if (value == kCategoricalAlgorithmCART) {
@@ -626,7 +642,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamSortingStrategy);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamSortingStrategy));
     if (hparam.has_value()) {
       const auto value = hparam.value().value().categorical();
       if (value == kHParamSortingStrategyInNode) {
@@ -654,8 +671,9 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamKeepNonLeafLabelDistribution);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamKeepNonLeafLabelDistribution));
     if (hparam.has_value()) {
       dt_config->set_keep_non_leaf_label_distribution(
           hparam.value().value().categorical() == kTrue);
@@ -663,8 +681,9 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamUpliftMinExamplesInTreatment);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamUpliftMinExamplesInTreatment));
     if (hparam.has_value()) {
       dt_config->mutable_uplift()->set_min_examples_in_treatment(
           hparam.value().value().integer());
@@ -672,7 +691,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamUpliftSplitScore);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamUpliftSplitScore));
     if (hparam.has_value()) {
       const auto value = hparam.value().value().categorical();
       if (value == kHParamUpliftSplitScoreKL ||
@@ -701,7 +721,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamHonest);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamHonest));
     if (hparam.has_value()) {
       if (hparam.value().value().categorical() == kTrue) {
         dt_config->mutable_honest();
@@ -712,8 +733,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamHonestRatioLeafExamples);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamHonestRatioLeafExamples));
     if (hparam.has_value()) {
       if (dt_config->has_honest()) {
         dt_config->mutable_honest()->set_ratio_leaf_examples(
@@ -723,7 +744,8 @@ absl::Status SetHyperParameters(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamHonestFixedSeparation);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamHonestFixedSeparation));
     if (hparam.has_value()) {
       if (dt_config->has_honest()) {
         dt_config->mutable_honest()->set_fixed_separation(

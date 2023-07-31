@@ -976,9 +976,9 @@ absl::Status PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
          col_idx++) {
       if (num_examples_per_columns[col_idx] !=
           num_examples_per_columns.front()) {
-        YDF_LOG(FATAL)
-            << "Invalid partial dataset cache: The different columns do "
-               "not have the same number of examples.";
+        return absl::InvalidArgumentError(
+            "Invalid partial dataset cache: The different columns do "
+            "not have the same number of examples.");
       }
     }
   }

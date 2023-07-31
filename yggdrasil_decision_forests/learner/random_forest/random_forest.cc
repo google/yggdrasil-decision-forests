@@ -99,29 +99,33 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
       generic_hyper_params));
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamNumTrees);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamNumTrees));
     if (hparam.has_value()) {
       rf_config->set_num_trees(hparam.value().value().integer());
     }
   }
   {
-    const auto hparam = generic_hyper_params->Get(kHParamWinnerTakeAll);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamWinnerTakeAll));
     if (hparam.has_value()) {
       rf_config->set_winner_take_all_inference(
           hparam.value().value().categorical() == "true");
     }
   }
   {
-    const auto hparam = generic_hyper_params->Get(
-        kHParamAdaptBootstrapSizeRatioForMaximumTrainingDuration);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(
+            kHParamAdaptBootstrapSizeRatioForMaximumTrainingDuration));
     if (hparam.has_value()) {
       rf_config->set_adapt_bootstrap_size_ratio_for_maximum_training_duration(
           hparam.value().value().categorical() == "true");
     }
   }
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamComputeOOBPerformances);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamComputeOOBPerformances));
     if (hparam.has_value()) {
       rf_config->set_compute_oob_performances(
           hparam.value().value().categorical() == "true");
@@ -129,8 +133,9 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamComputeOOBVariableImportance);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamComputeOOBVariableImportance));
     if (hparam.has_value()) {
       rf_config->set_compute_oob_variable_importances(
           hparam.value().value().categorical() == "true");
@@ -141,8 +146,8 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamBootstrapTrainingDataset);
+    ASSIGN_OR_RETURN(const auto hparam, generic_hyper_params->Get(
+                                            kHParamBootstrapTrainingDataset));
     if (hparam.has_value()) {
       rf_config->set_bootstrap_training_dataset(
           hparam.value().value().categorical() == "true");
@@ -150,8 +155,9 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamNumOOBVariableImportancePermutations);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamNumOOBVariableImportancePermutations));
     if (hparam.has_value()) {
       rf_config->set_num_oob_variable_importances_permutations(
           hparam.value().value().integer());
@@ -159,15 +165,16 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamBootstrapSizeRatio);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamBootstrapSizeRatio));
     if (hparam.has_value()) {
       rf_config->set_bootstrap_size_ratio(hparam.value().value().real());
     }
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamSamplingWithReplacement);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamSamplingWithReplacement));
     if (hparam.has_value()) {
       rf_config->set_sampling_with_replacement(
           hparam.value().value().categorical() == "true");
@@ -241,7 +248,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_integer()->set_default_value(rf_config.num_trees());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Number of individual decision trees. Increasing the number of trees can increase the quality of the model at the expense of size, training speed, and inference latency.)");
+        R"(Number of individual decision trees. Increasing the number of trees can improve the model's accuracy, but it also increases the model's size, training time, and inference latency.)");
   }
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamWinnerTakeAll);
@@ -253,7 +260,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_documentation()->set_proto_field("winner_take_all_inference");
 
     param.mutable_documentation()->set_description(
-        R"(Control how classification trees vote. If true, each tree votes for one class. If false, each tree vote for a distribution of classes. winner_take_all_inference=false is often preferable.)");
+        R"(Control how classification trees vote. By default, each tree votes for a single class. However, setting winner_take_all_inference=false allows each tree to vote for a distribution of classes. This is often preferable, as it can improve the accuracy of the model.)");
   }
   {
     auto& param = hparam_def.mutable_fields()->operator[](
@@ -266,7 +273,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Control how the maximum training duration (if set) is applied. If false, the training stop when the time is used. If true, adapts the size of the sampled dataset used to train each tree such that `num_trees` will train within `maximum_training_duration`. Has no effect if there is no maximum training duration specified.)");
+        R"(Control how the maximum training duration is enforced. If set to False, the training will stop when the training time is reached. If set to True, the size of the bag of examples used to train each tree of the forest will be shrunk to ensure that all the trees are trained in time.)");
   }
   {
     auto& param =
@@ -277,7 +284,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(If true, compute the Out-of-bag evaluation (then available in the summary and model inspector). This evaluation is a cheap alternative to cross-validation evaluation.)");
+        R"(If True, the out-of-bag (OOB) evaluation is computed at the end of the training. This evaluation is a cheap alternative to cross-validation evaluation, as it does not require a validation or testing dataset. The OOB evaluation is available in the model summary and model inspector.)");
   }
 
   {
@@ -289,7 +296,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(If true, compute the Out-of-bag feature importance (then available in the summary and model inspector). Note that the OOB feature importance can be expensive to compute.)");
+        R"(If true, the out-of-bag (OOB) feature importance will be computed. This option is expensive to compute. The OOB variable importances are available in the model summary and model inspector.)");
   }
 
   {
@@ -301,7 +308,8 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(If true (default), each tree is trained on a separate dataset sampled with replacement from the original dataset. If false, all the trees are trained on the entire same dataset. If bootstrap_training_dataset:false, OOB metrics are not available. bootstrap_training_dataset=false is used in "Extremely randomized trees" (https://link.springer.com/content/pdf/10.1007%2Fs10994-006-6226-1.pdf).)");
+        R"(If true, train each tree on a subset of examples sampled with replacement from the original dataset. This operation is known as bootstrapping. If false, all the trees are trained on the entire dataset. In this case, OOB metrics are not available.
+"Extreme randomized trees" (ERTs) are a type of random forest that uses bootstrapping, but with a more randomized approach to feature selection. This makes ERTs more robust to overfitting (https://link.springer.com/content/pdf/10.1007%2Fs10994-006-6226-1.pdf).)");
   }
 
   {
@@ -312,7 +320,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
         rf_config.num_oob_variable_importances_permutations());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Number of time the dataset is re-shuffled to compute the permutation variable importances. Increasing this value increase the training time (if "compute_oob_variable_importances:true") as well as the stability of the oob variable importance metrics.)");
+        R"(Number of times the dataset is shuffled and evaluated when computing permutation variable importances. Increasing this value can increase the quality of the importance metrics, but it will also increase the training time.)");
   }
 
   {
@@ -322,7 +330,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_real()->set_default_value(rf_config.bootstrap_size_ratio());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Number of examples used to train each trees; expressed as a ratio of the training dataset size.)");
+        R"(Ratio of examples used to train each tree.)");
   }
 
   {
@@ -334,7 +342,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(If true, the training examples are sampled with replacement. If false, the training samples are sampled without replacement. Only used when "bootstrap_training_dataset=true". If false (sampling without replacement) and if "bootstrap_size_ratio=1" (default), all the examples are used to train all the trees (you probably do not want that).)");
+        R"(Determines whether the examples are sampled with replacement or without replacement. If true, the examples are sampled with replacement, which means that an example can be selected more than once. If false, the examples are sampled without replacement, which means that an example can only be selected once.)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
@@ -376,9 +384,7 @@ RandomForestLearner::TrainWithStatus(
       training_config().task() != model::proto::Task::NUMERICAL_UPLIFT) {
     std::string tip;
     if (training_config().task() == model::proto::Task::RANKING) {
-      tip =
-          " You probably want to try the GRADIENT_BOOSTED_TREES learner that "
-          "supports ranking.";
+      tip = " Note: The GRADIENT_BOOSTED_TREES learner supports this task.";
     }
     return absl::InvalidArgumentError(absl::StrCat(
         "The RANDOM_FOREST learner does not support the task ",
@@ -400,9 +406,9 @@ RandomForestLearner::TrainWithStatus(
 
   if (training_config().task() == model::proto::Task::NUMERICAL_UPLIFT &&
       rf_config.compute_oob_performances()) {
-    YDF_LOG(WARNING)
-        << "RF does not support OOB performances with the numerical "
-           "uplift task (yet).";
+    YDF_LOG(WARNING) << "The RANDOM_FOREST learner does not support OOB "
+                        "performances with the numerical "
+                        "uplift task.";
     rf_config.set_compute_oob_performances(false);
   }
 
@@ -414,8 +420,8 @@ RandomForestLearner::TrainWithStatus(
   internal::InitializeModelWithTrainingConfig(config_with_default, config_link,
                                               mdl.get());
   YDF_LOG(INFO) << "Training random forest on " << train_dataset.nrow()
-                << " example(s) and " << config_link.features().size()
-                << " feature(s).";
+                << " examples and " << config_link.features().size()
+                << " features.";
   RETURN_IF_ERROR(CheckConfiguration(train_dataset.data_spec(),
                                      config_with_default, config_link,
                                      rf_config, deployment()));
@@ -578,7 +584,7 @@ RandomForestLearner::TrainWithStatus(
         if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
           if (!training_stopped_early) {
             training_stopped_early = true;
-            YDF_LOG(INFO) << "Training interrupted per request";
+            YDF_LOG(INFO) << "Training interrupted per user";
           }
           return;
         }
@@ -597,8 +603,8 @@ RandomForestLearner::TrainWithStatus(
                   training_config().maximum_training_duration_seconds())) {
             if (!training_stopped_early) {
               training_stopped_early = true;
-              YDF_LOG(INFO) << "Stop training because of the maximum training "
-                               "duration.";
+              YDF_LOG(INFO)
+                  << "Maximum training duration reached. Stop training.";
             }
             return;
           }
@@ -744,10 +750,15 @@ RandomForestLearner::TrainWithStatus(
         if (compute_oob_performances) {
           utils::concurrency::MutexLock lock(&oob_metrics_mutex);
           // Update the prediction accumulator.
-          internal::UpdateOOBPredictionsWithNewTree(
+          const auto local_status = internal::UpdateOOBPredictionsWithNewTree(
               train_dataset, config_with_default, selected_examples,
               rf_config.winner_take_all_inference(), *decision_tree, {},
               &random, &oob_predictions);
+          if (!local_status.ok()) {
+            utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+            concurrent_fields.status.Update(local_status);
+            return;
+          }
 
           // Evaluate the accumulated predictions.
           // Compute OOB if one of the condition is true:
@@ -809,11 +820,17 @@ RandomForestLearner::TrainWithStatus(
                    permutation_idx <
                    rf_config.num_oob_variable_importances_permutations();
                    permutation_idx++) {
-                internal::UpdateOOBPredictionsWithNewTree(
-                    train_dataset, config_with_default, selected_examples,
-                    rf_config.winner_take_all_inference(), *decision_tree,
-                    feature_idx, &random,
-                    &oob_predictions_per_input_features[feature_idx]);
+                const auto local_status =
+                    internal::UpdateOOBPredictionsWithNewTree(
+                        train_dataset, config_with_default, selected_examples,
+                        rf_config.winner_take_all_inference(), *decision_tree,
+                        feature_idx, &random,
+                        &oob_predictions_per_input_features[feature_idx]);
+                if (!local_status.ok()) {
+                  utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+                  concurrent_fields.status.Update(local_status);
+                  return;
+                }
               }
             }
           }
@@ -880,7 +897,7 @@ RandomForestLearner::TrainWithStatus(
   if (compute_oob_performances &&
       !mdl->mutable_out_of_bag_evaluations()->empty()) {
     YDF_LOG(INFO)
-        << "Final OOB metrics: "
+        << "Final out-of-bag evaluation: "
         << internal::EvaluationSnippet(
                mdl->mutable_out_of_bag_evaluations()->back().evaluation());
   }
@@ -951,7 +968,7 @@ void InitializeOOBPredictionAccumulators(
   }
 }
 
-void UpdateOOBPredictionsWithNewTree(
+absl::Status UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
     std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
@@ -1004,7 +1021,7 @@ void UpdateOOBPredictionsWithNewTree(
         AddRegressionLeafToAccumulator(*leaf, &accumulator.regression);
         break;
       case model::proto::Task::RANKING:
-        YDF_LOG(FATAL) << "OOB not implemented for Uplift.";
+        return absl::InvalidArgumentError("OOB not implemented for Uplift.");
         break;
       case model::proto::Task::CATEGORICAL_UPLIFT:
         AddUpliftLeafToAccumulator(*leaf, &accumulator.uplift);
@@ -1013,6 +1030,7 @@ void UpdateOOBPredictionsWithNewTree(
         YDF_LOG(WARNING) << "Not implemented";
     }
   }
+  return absl::OkStatus();
 }
 
 absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(

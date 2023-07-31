@@ -138,8 +138,10 @@ AbstractModel::EvaluateWithStatus(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
     std::vector<model::proto::Prediction>* predictions) const {
-  CHECK_EQ(option.task(), task())
-      << "The evaluation and the model tasks differ.";
+  if (option.task() != task()) {
+    return absl::InvalidArgumentError(
+        "The evaluation and the model tasks differ");
+  }
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
       metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
@@ -153,8 +155,10 @@ AbstractModel::EvaluateWithStatus(
     const absl::string_view typed_path,
     const metric::proto::EvaluationOptions& option,
     utils::RandomEngine* rnd) const {
-  CHECK_EQ(option.task(), task())
-      << "The evaluation and the model tasks differ.";
+  if (option.task() != task()) {
+    return absl::InvalidArgumentError(
+        "The evaluation and the model tasks differ");
+  }
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
       metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
@@ -171,7 +175,8 @@ AbstractModel::EvaluateOverrideType(
     const int override_group_col_idx, utils::RandomEngine* rnd,
     std::vector<model::proto::Prediction>* predictions) const {
   if (option.task() == override_task) {
-    STATUS_FATAL("The evaluation and the model tasks differ.");
+    return absl::InvalidArgumentError(
+        "The evaluation and the model tasks differ");
   }
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
@@ -376,7 +381,7 @@ absl::Status AbstractModel::AppendEvaluation(
   }
   if (dataset.nrow() == 0) {
     return absl::InvalidArgumentError(
-        "The dataset is empty. Cannot evaluate model.");
+        "Cannot evaluate a model on an empty dataset.");
   }
 
   auto engine_or_status = BuildFastEngine();
@@ -608,8 +613,8 @@ absl::Status ChangePredictionType(proto::Task src_task, proto::Task dst_task,
              dst_task == proto::Task::RANKING) {
     if (src_pred.classification().distribution().counts_size() != 3) {
       STATUS_FATAL(
-          "Conversion CLASSIFICATION -> RANKING only possible for "
-          "binary classification.");
+          "The task conversion from CLASSIFICATION to RANKING only possible "
+          "for binary classification.");
     }
     dst_pred->mutable_ranking()->set_relevance(
         src_pred.classification().distribution().counts(2) /
@@ -621,9 +626,8 @@ absl::Status ChangePredictionType(proto::Task src_task, proto::Task dst_task,
              dst_task == proto::Task::REGRESSION) {
     dst_pred->mutable_regression()->set_value(src_pred.ranking().relevance());
   } else {
-    STATUS_FATALS("Non supported override of task from ",
-                  proto::Task_Name(src_task), " to ",
-                  proto::Task_Name(dst_task));
+    STATUS_FATALS("Cannot change the task from ", proto::Task_Name(src_task),
+                  " to ", proto::Task_Name(dst_task));
   }
   return absl::OkStatus();
 }
@@ -701,7 +705,8 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
         prediction->mutable_ranking()->set_group_id(
             hash_groups->values()[row_idx]);
       } else {
-        STATUS_FATAL("The group attribute should be CATEGORICAL or HASH");
+        STATUS_FATAL(
+            "The group attribute should be of type CATEGORICAL or HASH");
       }
     } break;
     case proto::Task::CATEGORICAL_UPLIFT: {
@@ -719,7 +724,7 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
         prediction->mutable_uplift()->set_outcome_numerical(
             numerical_outcomes->values()[row_idx]);
       } else {
-        STATUS_FATAL("Not supported outcome type");
+        STATUS_FATAL("Non supported label type for CATEGORICAL_UPLIFT task.");
       }
       ASSIGN_OR_RETURN(const auto& treatments,
                        dataset.ColumnWithCastWithStatus<
@@ -746,7 +751,8 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
     } break;
 
     default:
-      STATUS_FATAL("Non supported task.");
+      STATUS_FATAL(
+          absl::StrCat("Non supported task: ", model::proto::Task_Name(task)));
       break;
   }
   return absl::OkStatus();
@@ -787,12 +793,14 @@ absl::Status SetGroundTruth(const dataset::proto::Example& example,
               example.attributes(columns.group_col_idx).hash());
           break;
         default:
-          STATUS_FATAL("The group attribute should be CATEGORICAL or HASH");
+          STATUS_FATAL(
+              "The group attribute should be of type CATEGORICAL or HASH");
           break;
       }
     } break;
     default:
-      STATUS_FATAL("Non supported task.");
+      STATUS_FATAL(
+          absl::StrCat("Non supported task: ", model::proto::Task_Name(task)));
       break;
   }
   return absl::OkStatus();

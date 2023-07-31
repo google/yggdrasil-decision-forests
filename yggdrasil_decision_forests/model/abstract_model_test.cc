@@ -61,22 +61,22 @@ class Engine1 : public serving::FastEngine {
  public:
   std::unique_ptr<serving::AbstractExampleSet> AllocateExamples(
       int num_examples) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    NOT_IMPLEMENTED;
     return {};
   }
 
   void Predict(const serving::AbstractExampleSet& examples, int num_examples,
                std::vector<float>* predictions) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    NOT_IMPLEMENTED;
   }
 
   int NumPredictionDimension() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    NOT_IMPLEMENTED;
     return 1;
   }
 
   const serving::FeaturesDefinition& features() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    NOT_IMPLEMENTED;
     return features_;
   }
 
@@ -115,22 +115,22 @@ class Engine2 : public serving::FastEngine {
  public:
   std::unique_ptr<serving::AbstractExampleSet> AllocateExamples(
       int num_examples) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    NOT_IMPLEMENTED;
     return {};
   }
 
   void Predict(const serving::AbstractExampleSet& examples, int num_examples,
                std::vector<float>* predictions) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    NOT_IMPLEMENTED;
   }
 
   int NumPredictionDimension() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    NOT_IMPLEMENTED;
     return 1;
   }
 
   const serving::FeaturesDefinition& features() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    NOT_IMPLEMENTED;
     return features_;
   }
 

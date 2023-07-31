@@ -83,8 +83,9 @@ absl::Status DistributedGradientBoostedTreesLearner::SetHyperParametersImpl(
           gradient_boosted_trees::proto::gradient_boosted_trees_config));
 
   {
-    const auto hparam = generic_hyper_params->Get(
-        kHParamMaxUniqueValuesForDiscretizedNumerical);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(
+                         kHParamMaxUniqueValuesForDiscretizedNumerical));
     if (hparam.has_value()) {
       dgbt_config->mutable_create_cache()
           ->set_max_unique_values_for_discretized_numerical(
@@ -93,7 +94,8 @@ absl::Status DistributedGradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    const auto hparam = generic_hyper_params->Get(kHParamWorkerLogs);
+    ASSIGN_OR_RETURN(const auto hparam,
+                     generic_hyper_params->Get(kHParamWorkerLogs));
     if (hparam.has_value()) {
       dgbt_config->set_worker_logs(hparam.value().value().categorical() ==
                                    "true");
@@ -101,8 +103,9 @@ absl::Status DistributedGradientBoostedTreesLearner::SetHyperParametersImpl(
   }
 
   {
-    const auto hparam =
-        generic_hyper_params->Get(kHParamForceNumericalDiscretization);
+    ASSIGN_OR_RETURN(
+        const auto hparam,
+        generic_hyper_params->Get(kHParamForceNumericalDiscretization));
     if (hparam.has_value()) {
       dgbt_config->mutable_create_cache()->set_force_numerical_discretization(
           hparam.value().value().categorical() == "true");

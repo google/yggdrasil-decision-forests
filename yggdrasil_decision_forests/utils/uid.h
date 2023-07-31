@@ -18,7 +18,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_UID_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_UID_H_
 
-#include <random>
+#include <limits>
+#include <string>
 
 #include "absl/random/random.h"
 #include "absl/strings/str_format.h"

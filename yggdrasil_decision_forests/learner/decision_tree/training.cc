@@ -2959,7 +2959,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      YDF_LOG(FATAL) << "Non supported";
+      NOT_IMPLEMENTED;
   }
 }
 
@@ -3013,7 +3013,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      YDF_LOG(FATAL) << "Non supported";
+      NOT_IMPLEMENTED;
   }
 }
 
@@ -3753,7 +3753,7 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      YDF_LOG(FATAL) << "Non supported";
+      NOT_IMPLEMENTED;
   }
 }
 
@@ -3807,7 +3807,7 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      YDF_LOG(FATAL) << "Non supported";
+      NOT_IMPLEMENTED;
   }
 }
 
@@ -4509,7 +4509,7 @@ std::vector<float> GenHistogramBins(const proto::NumericalSplit::Type type,
       }
     } break;
     default:
-      YDF_LOG(FATAL) << "Numerical histogram not implemented";
+      NOT_IMPLEMENTED_ARG("Numerical histogram");
   }
   std::sort(candidate_splits.begin(), candidate_splits.end());
   return candidate_splits;

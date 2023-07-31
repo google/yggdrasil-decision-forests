@@ -49,7 +49,7 @@ absl::Status ExpandInputShards(absl::string_view sharded_path,
 
 // Generates the file paths corresponding to a sharded path, or a simple
 // path.
-absl::Status ExpandOutputShards(const absl::string_view sharded_path,
+absl::Status ExpandOutputShards(absl::string_view sharded_path,
                                 std::vector<std::string>* paths);
 
 // Helper class for the sequential reading of sharded files.
@@ -72,7 +72,7 @@ class ShardedReader : public ProtoReaderInterface<T> {
   // Start reading a given file (i.e. not a sharded path).
   virtual absl::Status OpenShard(absl::string_view path) = 0;
 
-  // Try to retive the next available example in the last file open with
+  // Try to retrieve the next available example in the last file open with
   // "OpenShard". Returns false if no more examples are available.
   virtual absl::StatusOr<bool> NextInShard(T* value) = 0;
 
@@ -98,7 +98,7 @@ class ShardedWriter : public ProtoWriterInterface<T> {
   // Open a typed sharded path. If num_records_by_shard==-1, all the examples
   // are written in the first shard.
   absl::Status Open(absl::string_view sharded_path,
-                    const int64_t num_records_by_shard);
+                    int64_t num_records_by_shard);
 
   // Write a new record.
   absl::Status Write(const T& value);
@@ -158,8 +158,8 @@ template <typename T>
 absl::Status ShardedWriter<T>::OpenNextShard() {
   num_records_in_cur_shard_ = 0;
   if (cur_path_idx_ + 1 >= paths_.size()) {
-    YDF_LOG(INFO)
-        << "Not enough shards allocated. Continue to write in the last shard.";
+    YDF_LOG(INFO) << "Not enough shards to satisfy 'num_records_by_shard'. The "
+                     "last records are written to the last shard.";
     return absl::OkStatus();
   }
   cur_path_idx_++;

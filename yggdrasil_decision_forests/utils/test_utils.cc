@@ -98,7 +98,7 @@ void TrainAndTestTester::ConfigureForSyntheticDataset() {
       synthetic_dataset_.mutable_regression();
       break;
     default:
-      YDF_LOG(FATAL) << "Non supported task";
+      NOT_IMPLEMENTED;
   }
 }
 
@@ -256,7 +256,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
             EXPECT_NEAR(metric::Qini(e1), metric::Qini(e2), 0.001);
             break;
           default:
-            YDF_LOG(FATAL) << "Not implemented";
+            NOT_IMPLEMENTED;
         }
       };
 
@@ -583,7 +583,7 @@ void ExpectEqualPredictions(const model::proto::Task task,
     } break;
 
     default:
-      YDF_LOG(FATAL) << "Not supported task";
+      NOT_IMPLEMENTED;
   }
 }
 

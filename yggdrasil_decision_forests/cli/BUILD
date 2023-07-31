@@ -127,7 +127,9 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/serving/decision_forest:register_engines",
         "//yggdrasil_decision_forests/utils:evaluation",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -153,6 +155,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:random",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -167,7 +170,9 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/model:all_models",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],
 )

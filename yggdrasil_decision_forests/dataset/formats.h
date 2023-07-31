@@ -48,7 +48,7 @@ std::pair<std::string, proto::DatasetFormat> GetDatasetPathAndType(
 
 // Same as "GetDatasetPathAndType", but return a status in case of error.
 absl::StatusOr<std::pair<std::string, proto::DatasetFormat>>
-GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path);
+GetDatasetPathAndTypeOrStatus(absl::string_view typed_path);
 
 // Tests if a string is a typed path.
 bool IsTypedPath(absl::string_view maybe_typed_path);
@@ -59,10 +59,11 @@ absl::StatusOr<std::pair<std::string, std::string>> SplitTypeAndPath(
     absl::string_view typed_path);
 
 // Gets the recommended file extension for a dataset format.
-std::string FormatToRecommendedExtension(proto::DatasetFormat format);
+absl::StatusOr<std::string> FormatToRecommendedExtension(
+    proto::DatasetFormat format);
 
 // Formats to type prefix.
-std::string DatasetFormatToPrefix(proto::DatasetFormat format);
+absl::StatusOr<std::string> DatasetFormatToPrefix(proto::DatasetFormat format);
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
