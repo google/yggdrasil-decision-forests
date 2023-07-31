@@ -2,74 +2,114 @@
 <img src="documentation/image/logo.png"  />
 </p>
 
-**Yggdrasil Decision Forests** (**YDF**) is a collection of state-of-the-art
-algorithms for the training, serving, and interpretation of **Decision Forest**
-models. The library is available in C++, CLI (command-line-interface, i.e. shell
-commands), in TensorFlow under the name
-[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests)
-(TF-DF), Go and in Javascript (inference only). YDF is supported on Linux,
-Windows, macOS, Raspberry, and Arduino (experimental).
+**Yggdrasil Decision Forests** (YDF) is a production-grade collection of
+algorithms for the training, serving, and interpretation of decision forest
+models. YDF is open-source and is available in C++, command-line interface
+(CLI), TensorFlow (under the name
+[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests);
+TF-DF), JavaScript (inference only), and Go (inference only). YDF is supported
+on Linux, Windows, macOS, Raspberry Pi, and Arduino (experimental).
 
-See [the documentation 📕](https://ydf.readthedocs.org/) for more details.
+To learn more about YDF, check
+[the documentation 📕](https://ydf.readthedocs.org/).
+
+For details about YDF design, read our KDD 2023 paper
+[Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://arxiv.org/abs/2212.02934).
+
+## Features
+
+-   Random Forest, Gradient Boosted Trees, CART, and variations such as Dart,
+    Extremely randomized trees.
+-   Classification, regression, ranking and uplifting.
+-   Model evaluation e.g. accuracy, auc, roc, auuc, pr-auc, confidence
+    boundaries, ndgc.
+-   Model analysis e.g. pdp, cep, variable importance, model plotting, structure
+    analysis.
+-   Native support for numerical, categorical, boolean, categorical-set (e.g.
+    text) features.
+-   Native support for missing values.
+-   State of the art tree learning features e.g. oblique split, honest tree,
+    hessian score, global tree optimization.
+-   Distributed training.
+-   Automatic hyper-parameter tuning.
+-   Fast model inference e.g. vpred, quick-scorer extended.
+-   Cross compatible API and models: C++, CLI, Go, JavaScript and Python.
+
+See the [feature list](https://ydf.readthedocs.io/en/latest/features.html) for
+more details.
 
 ## Usage example
 
-Train, evaluate, and benchmark the speed of a model in a few shell lines with
-the CLI interface:
+With the **CLI** you can train, evaluate, and benchmark the speed of a model as
+follows:
 
 ```shell
 # Download YDF.
 wget https://github.com/google/yggdrasil-decision-forests/releases/download/1.0.0/cli_linux.zip
 unzip cli_linux.zip
-# Training configuration
+
+# Create a training configuration
 echo 'label:"my_label" learner:"RANDOM_FOREST" ' > config.pbtxt
-# Scan the dataset
+
+# List columns in training dataset
 infer_dataspec --dataset="csv:train.csv" --output="spec.pbtxt"
-# Train a model
+
+# Train model
 train --dataset="csv:train.csv" --dataspec="spec.pbtxt" --config="config.pbtxt" --output="my_model"
-# Evaluate the model
+
+# Evaluate model
 evaluate --dataset="csv:test.csv" --model="my_model" > evaluation.txt
+
 # Benchmark the speed of the model
 benchmark_inference --dataset="csv:test.csv" --model="my_model" > benchmark.txt
 ```
 
 (based on [examples/beginner.sh](examples/beginner.sh))
 
-or use the C++ interface:
+The same model can be trained in C++ as follows:
 
 ```c++
-auto dataset_path = "csv:/train@10";
-// Training configuration
+auto dataset_path = "csv:train.csv";
+
+// List columns in training dataset
+DataSpecification spec;
+CreateDataSpec(dataset_path, false, {}, &spec);
+
+// Create a training configuration
 TrainingConfig train_config;
 train_config.set_learner("RANDOM_FOREST");
 train_config.set_task(Task::CLASSIFICATION);
 train_config.set_label("my_label");
-// Scan the dataset
-DataSpecification spec;
-CreateDataSpec(dataset_path, false, {}, &spec);
-// Train a model
+
+// Train model
 std::unique_ptr<AbstractLearner> learner;
 GetLearner(train_config, &learner);
 auto model = learner->Train(dataset_path, spec);
-// Export the model
+
+// Export model
 SaveModel("my_model", model.get());
 ```
 
 (based on [examples/beginner.cc](examples/beginner.cc))
 
-or use the Keras/Python interface of TensorFlow Decision Forests:
+The same model can be trained in Python using TensorFlow Decision Forests as
+follows:
 
 ```python
 import tensorflow_decision_forests as tfdf
 import pandas as pd
-# Load the dataset in a Pandas dataframe.
+
+# Load dataset in a Pandas dataframe.
 train_df = pd.read_csv("project/train.csv")
-# Convert the dataset into a TensorFlow dataset.
+
+# Convert dataset into a TensorFlow dataset.
 train_ds = tfdf.keras.pd_dataframe_to_tf_dataset(train_df, label="my_label")
-# Train the model
+
+# Train model
 model = tfdf.keras.RandomForestModel()
 model.fit(train_ds)
-# Export a SavedModel.
+
+# Export model.
 model.save("project/model")
 ```
 

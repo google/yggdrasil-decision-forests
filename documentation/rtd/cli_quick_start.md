@@ -1,32 +1,36 @@
 # Quick Start with the CLI API
 
+This page explains how to train, evaluate, analyze, generate predictions, and
+measure the inference speed of a binary classification model using the CLI API.
+
 ``` {note}
-This page is the *Quick Start* for the *CLI API*.
-See the [list of available training APIs](apis) for other available APIs.
+An end-to-end example is available [here](https://github.com/google/yggdrasil-decision-forests/blob/main/examples/beginner.sh).
 ```
 
-On this page, we train, evaluate, analyze, generate predictions, and measure the
-inference speed of a binary classification model using the CLI API.
-
 ``` {note}
-An end-to-end example of the CLI API is available [here](https://github.com/google/yggdrasil-decision-forests/blob/main/examples/beginner.sh).
+For an overview of the other APIs, check the [API](apis) page.
 ```
 
 ## Install YDF CLI
 
-The latest CLI release of YDF is available on the
+**1.** Go to the YDF GitHub
 [Github release page](https://github.com/google/yggdrasil-decision-forests/releases).
 
-```shell
-# Download and extract the last CLI release of YDF.
-wget https://github.com/google/yggdrasil-decision-forests/releases/download/1.0.0/cli_linux.zip
-unzip cli_linux.zip
-```
+**2.** Download the latest CLI release for your operating system. For example,
+to download the CLI release for Linux, click the "Download" button next to the
+"cli_linux.zip" file.
 
-Each binary in the release archive executes a different task. For example, the
-`train` command trains a model. Each command is explained in the
-[cli.txt](cli_commands) file available in the archive, or using the `--help`
-flag. For example:
+**3.** Extract the ZIP file to a directory of your choice e.g. `unzip
+cli_linux.zip`.
+
+**4.** Open a terminal window and navigate to the directory where you extracted
+the ZIP file.
+
+Each executable (e.g. `train`, `evaluate`) executes a different task. For
+example, the `train` command trains a model.
+
+Each command is explained in the [command](cli_commands) page, or using the
+`--help` flag:
 
 ```shell
 # Print the help of the 'train' command.
@@ -36,8 +40,13 @@ flag. For example:
 ## Download dataset
 
 For this example, we use the
-[UCI Adult](https://archive.ics.uci.edu/ml/datasets/adult) dataset. First, we
-download a copy of the dataset:
+[UCI Adult dataset](https://archive.ics.uci.edu/ml/datasets/adult). This dataset
+is a binary classification dataset, where the goal is to predict whether an
+individual's income is greater than $50,000. The features in the dataset are a
+mix of numerical and categorical.
+
+First, we download a copy of the dataset from the UCI Machine Learning
+Repository:
 
 ```shell
 DATASET_SRC=https://raw.githubusercontent.com/google/yggdrasil-decision-forests/main/yggdrasil_decision_forests/test_data/dataset
@@ -45,22 +54,19 @@ wget -q ${DATASET_SRC}/adult_train.csv -O adult_train.csv
 wget -q ${DATASET_SRC}/adult_test.csv -O adult_test.csv
 ```
 
+The first 3 examples of the training dataset are:
+
 ```shell
-# Display the first 3 examples
-head -n 4 adult_train.csv
-```
+$ head -n 4 adult_train.csv
 
-Result:
-
-```text
 age,workclass,fnlwgt,education,education_num,marital_status,occupation,relationship,race,sex,capital_gain,capital_loss,hours_per_week,native_country,income
 44,Private,228057,7th-8th,4,Married-civ-spouse,Machine-op-inspct,Wife,White,Female,0,0,40,Dominican-Republic,<=50K
 20,Private,299047,Some-college,10,Never-married,Other-service,Not-in-family,White,Female,0,0,20,United-States,<=50K
 40,Private,342164,HS-grad,9,Separated,Adm-clerical,Unmarried,White,Female,0,0,37,United-States,<=50K
 ```
 
-This dataset is stored in two CSV files containing respectively the training and
-testing examples. YDF supports csv files directly.
+The dataset is stored in two CSV files, one for training and one for testing.
+YDF can load CSV files directly, making it a convenient way to use this dataset.
 
 ``` {note}
 When passing a dataset path to a command, the format of the dataset is always specified using a prefix.
@@ -70,21 +76,21 @@ See [here](https://github.com/google/yggdrasil-decision-forests/blob/main/docume
 
 ## Create dataspec
 
-In this dataset, input features are either numerical (e.g. `age`) or categorical
-(e.g., `education`). Some examples have missing values. YDF detects
-automatically the semantics of the features (e.g., numerical, categorical) and
-handles missing values natively. The *dataspec* (short for *dataset
-specification*) is a file that contains the name, type and meta-dataset of the
-columns in a dataset. The dataspec is created automatically with the
-`infer_dataspec` command.
+A **dataspec** (short for *dataset specification*) is a description of a
+dataset. It includes a list of available columns, the semantic (or type) of each
+column, and any other meta-data such as dictionaries or the rate of missing
+values.
+
+The dataspec can be computed automatically using the `infer_dataspec` command
+and stored in a dataspec file.
 
 ```shell
 # Create the dataspec
 ./infer_dataspec --dataset=csv:adult_train.csv --output=dataspec.pbtxt
 ```
 
-The dataspec file `dataspec.pbtxt` can be printed using the `show_dataspec`
-command:
+Looking at the dataspec before training a model is a great way to detect issues
+in the dataset, such as missing values, or incorrect data types.
 
 ```shell
 # Display the dataspec
@@ -131,23 +137,22 @@ Terminology:
     vocab-size: Number of unique values.
 ```
 
-The dataspec shows important information about the dataset. It important to
-check that the dataset looks as expected before continuing with the modeling.
+This example dataset contains 22,792 examples and 15 columns. There are 9
+categorical and 6 numerical columns. The semantics of a column refers to the
+type of data it contains.
 
-In this example, the dataset contains 22'792 examples and 15 columns. There are
-9 categorical and 6 numerical columns (we call this the *semantics* of the
-column. `education` is a categorical column with 17 unique possible values. The
-most frequent of those values is `HS-grad` (32% of all values).
+For example, the `education` column is a categorical column with 17 unique
+possible values. The most frequent value is `HS-grad` (32% of all values).
 
 ## (Optional) Create dataspec with a guide
 
-In his example, the semantics of the columns were correctly detected. However,
-when value representation is ambiguous, this might not be the
-case. For example, the semantic of *enum* values (i.e., categorical values
-represented as an integer) cannot be detected automatically in a .csv file.
+In the example, the semantics of the columns were correctly detected. However,
+this might not be the case when the value representation is ambiguous. For
+example, the semantics of enum values (i.e., categorical values represented as
+an integer) cannot be automatically detected in a .csv file.
 
-In such a case, we would re-run the `infer_dataspec` command with an extra flag
-to indicate the real semantic of the miss-detected column. For example, to force
+In such cases, we can re-run the `infer_dataspec` command with an extra flag to
+indicate the real semantic of the miss-detected column. For example, to force
 `age` to be detected as a numerical column, we would run:
 
 ```shell
@@ -164,9 +169,9 @@ EOF
 
 ## Train model
 
-The model is trained with the `train` command. The hyper-parameters and other
-configurations for the model training (e.g. label, features) are specified in a
-*training configuration* file.
+The model is trained with the `train` command. The label, features,
+hyper-parameters and other training settings are specified in a training
+configuration file.
 
 ```shell
 # Create a training configuration file
@@ -210,32 +215,32 @@ Results:
 
 A few remarks:
 
--   Input features were not specified. Therefore, all the columns are used as
-    input features except for the label.
+-   Since no input features were specified, all columns except for the label are
+    used as input features.
 
--   DFs natively consume numerical, categorical, categorical-set features and
-    missing values. Numerical features do not need to be normalized. Categorical
-    string values do not need to be encoded in a dictionary.
+-   DFs natively consume numerical, categorical, and categorical-set features,
+    as well as missing values. Numerical features do not need to be normalized,
+    and categorical string values do not need to be encoded in a dictionary.
 
--   Except for the `num_trees`, no training hyper-parameter is specified. The
-    default values of all hyper-parameters are set such that they provide
-    reasonable results in most situations. We will discuss alternative default
-    values (called *hyper-parameter templates*) and automated tuning
-    hyper-parameters later. The list of all hyper-parameters and their default
-    value is available in the [hyper-parameters page)(hyper_parameters).
+-   Except for the `num_trees` hyperparameter, no training hyperparameters were
+    specified. The default values of all hyperparameters are set such that they
+    provide reasonable results in most situations. We will discuss alternative
+    default values (called hyperparameter templates) and automated tuning of
+    hyperparameters later. The list of all hyperparameters and their default
+    values is available in the [hyperparameters page](hyper_parameters).
 
 -   No validation dataset was provided for the training. Not all learners
-    require a validation dataset. In this example, the `GRADIENT_BOOSTED_TREES`
-    learner requires a validation dataset if early stopping is enabled (which is
-    the case by default). In this case, 10% of the training dataset is used for
-    validation. This rate can be changed using the `validation_ratio` parameter.
-    Alternatively, the validation dataset can be provided with the
-    `--valid_dataset` flag. The final model contains 136 trees for a validation
-    accuracy of ~0.8702.
+    require a validation dataset. However, the `GRADIENT_BOOSTED_TREES` learner
+    used in this example requires a validation dataset if early stopping is
+    enabled (which is the case by default). In this case, 10% of the training
+    dataset is used for validation. This rate can be changed using the
+    `validation_ratio` parameter. Alternatively, the validation dataset can be
+    provided with the `--valid_dataset` flag. The final model contains 136 trees
+    for a validation accuracy of approximately 0.8702.
 
 ## Show model information
 
-Information about the model can be shown using the `show_model` command.
+Details about the model are shown with the `show_model` command.
 
 ```shell
 # Show information about the model.
@@ -392,10 +397,8 @@ The structure of the tree of the model can be printed using the `--full_definiti
 
 ## Evaluate model
 
-Next, we evaluate the model on the testing dataset using the `evaluate` command.
-The evaluation result can be exported to a text file (`--format=text`; default)
-or to an Html file with plots (`--format=html`). Html can be open with your web
-browser.
+The evaluation results are computed and printed as text (`--format=text`,
+default) or as HTML with plots (`--format=html`) with the `evaluate` command.
 
 ```shell
 # Evaluate the model and print the result in the console.
@@ -439,7 +442,7 @@ One vs other classes:
     ap: 0.830674   CI95[B][0.817513 0.843892]
 ```
 
-Interpretation:
+**Observations:**
 
 -   The test dataset contains 9769 examples.
 -   The test accuracy is 0.874399 with 95% confidence interval boundaries of
@@ -449,8 +452,8 @@ Interpretation:
     0.977947] when computed with bootstrapping.
 -   The PR-AUC and AP metrics are also available.
 
-The next command evaluates the model and exports the evaluation report to an
-Html file.
+The following command evaluates the model and exports the evaluation report to
+an HTML file.
 
 ```shell
 # Evaluate the model and print the result in an Html file.
@@ -461,8 +464,7 @@ Html file.
 
 ## Generate predictions
 
-Exporting the predictions of a model can be useful for further analysis. The
-`predict` command exports the predictions of a model to a file.
+The predictions are computed and exported to file with the `predict` command.
 
 ```shell
 # Exports the prediction of the model to a csv file
@@ -483,23 +485,21 @@ Results:
 
 ## Benchmark model inference speed
 
-In time-critical applications, the speed of inference of a model can be
-important. The `benchmark_inference` command measures the inference speed of the
+In time-critical applications, the inference speed of a model can be crucial.
+The `benchmark_inference` command measures the average inference time of the
 model.
 
 ``` {note}
 YDF has multiple algorithms to compute the predictions of a model.
-Those inference algorithms differ in speed and coverage. When generating
-predictions (e.g. `predict` command, or when using the C++ API) YDF
-automatically uses the fastest algorithm available.
+These algorithms differ in speed and coverage. When generating predictions,
+YDF automatically uses the fastest algorithm compatible.
 
-For comparison, the `benchmark_inference` shows the speed of all the available
-algorithms.
+The `benchmark_inference` shows the speed of all the compatible algorithms.
 ```
 
 ``` {note}
-Unless specified, inference algorithms are single-threaded.
-It is up to the user to parallelize the model inference using multi-threading.
+Inference algorithms are single-threaded, meaning that they can only process one data point at a time.
+It is up to the user to parallelize inference using multi-threading.
 ```
 
 ```shell

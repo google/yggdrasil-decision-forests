@@ -5,29 +5,51 @@
 
 |
 
-**Yggdrasil Decision Forests** (YDF) is a production grade collection of algorithms,
-developed and used by Google, for the training, serving, and interpretation of Decision Forest
-models. YDF is open-source and is available in C++, CLI (command-line-interface),
-TensorFlow (under the name TensorFlow Decision Forests;TF-DF), Javascript, and Go
-(inference only). 
+**Yggdrasil Decision Forests** (YDF) is a production-grade collection of
+algorithms for the training, serving, and interpretation of decision forest
+models. YDF is open-source and is available in C++, command-line interface
+(CLI), TensorFlow (under the name
+`TensorFlow Decision Forests <https://github.com/tensorflow/decision-forests>`_ ;
+TF-DF), JavaScript (inference only), and Go (inference only). YDF is supported on Linux, Windows,
+macOS, Raspberry Pi, and Arduino (experimental).
 
-See the :doc:`features` page for the full list of features of YDF. Read the
-`Yggdrasil Decision Forests paper <https://arxiv.org/abs/2212.02934>`_ for
-details about YDF's design.
+For details about YDF design, read our KDD 2022 paper
+`Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library <https://arxiv.org/abs/2212.02934>`_ .
 
-|
+Features
+========
+
+-   Random Forest, Gradient Boosted Trees, CART, and variations such as
+    Dart, Extremely randomized trees.
+-   Classification, regression, ranking and uplifting.
+-   Model evaluation e.g. accuracy, auc, roc, auuc, pr-auc, confidence
+    boundaries, ndgc.
+-   Model analysis e.g. pdp, cep, variable importance, model plotting, structure
+    analysis.
+-   Native support for numerical, categorical, boolean, categorical-set (e.g.
+    text) features.
+-   Native support for missing values.
+-   State of the art tree learning features e.g. oblique split, honest tree,
+    hessian score, global tree optimization.
+-   Distributed training.
+-   Automatic hyper-parameter tuning.
+-   Fast model inference e.g. vpred, quick-scorer extended.
+-   Cross compatible API and models: C++, CLI, Go, JavaScript and Python.
+
+See the `feature list <https://ydf.readthedocs.io/en/latest/features.html>`_ for
+more details.
+
+About TensorFlow Decision Forests
+=================================
+
+`TensorFlow Decision Forests <https://www.tensorflow.org/decision_forests>`_ is a library for training, evaluating, interpreting, and inferring decision forest models in TensorFlow.
+TensorFlow Decision Forests uses Yggdrasil Decision Forests for model training.
+TensorFlow Decision Forests models are compatible with Yggdrasil Decision Forests.
 
 .. image:: image/tfdf_logo.png
   :width: 200
   :alt: TensorFlow Decision Forests logo
   :align: center
-
-|
-
-**TensorFlow Decision Forests** (TF-DF) is the official port of YDF to
-TensorFlow using the `Keras API <https://keras.io/>`_. TF-DF makes it easy to train
-and use decision forests in the TensorFlow ecosystem.
-
 
 
 Content
