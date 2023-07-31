@@ -30,7 +30,6 @@ cc_binary(
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/learner:all_learners",
         "//yggdrasil_decision_forests/learner:learner_library",
-        "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:report",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:filesystem",

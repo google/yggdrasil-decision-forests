@@ -123,7 +123,7 @@ inline bool IsNa(const proto::Example::Attribute& value) {
 // Returns a human readable representation of the dataspec. Easier to read and
 // more informative than proto's DebugString() method.
 std::string PrintHumanReadable(const proto::DataSpecification& data_spec,
-                               bool sort_by_column_names);
+                               bool sort_by_column_names = false);
 
 // Returns the integer representation of a categorical value provided as a
 // string.

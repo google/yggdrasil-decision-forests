@@ -32,6 +32,18 @@ std::vector<std::string> AllRegisteredLearners() {
   return AbstractLearnerRegisterer::GetNames();
 }
 
+absl::StatusOr<std::unique_ptr<AbstractLearner>> GetLearner(
+    const proto::TrainingConfig& train_config,
+    const proto::DeploymentConfig& deployment_config,
+    const std::string& log_directory) {
+  std::unique_ptr<AbstractLearner> learner;
+  RETURN_IF_ERROR(GetLearner(train_config, &learner, deployment_config));
+  if (!log_directory.empty()) {
+    learner->set_log_directory(log_directory);
+  }
+  return learner;
+}
+
 absl::Status GetLearner(const proto::TrainingConfig& train_config,
                         std::unique_ptr<AbstractLearner>* learner,
                         const proto::DeploymentConfig& deployment_config) {

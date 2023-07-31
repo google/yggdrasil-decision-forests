@@ -13,26 +13,29 @@
  * limitations under the License.
  */
 
-// Beginner example for the C++ interface.
+// Simple example of the C++ API.
 //
 // This program do the following:
-//   - Scan the dataset columns to create a dataspec.
-//   - Print a human readable report of the dataspec.
+//   - Scan the dataset to create a dataspec.
+//   - Print the dataspec.
 //   - Train a Random Forest model.
-//   - Export the model to disk.
-//   - Print and export a description of the model (meta-data and structure).
+//   - Save the model.
+//   - Print model details (e.g. meta-data, variable importance, structure).
 //   - Evaluate the model on a test dataset.
-//   - Instantiate a serving engine with the model.
-//   - Run a couple of predictions with the serving engine.
+//   - Convert the model into an engine (i.e. a model optimized for serving).
+//   - Generate some predictions with the engine.
 //
-// Most of the sections are equivalent as calling one of the CLI command. This
-// is indicated in the comments. For example, the comment "Same as
-// :infer_dataspec" indicates that the following section is equivalent as
-// running the "infer_dataspec" CLI command.
+// Many functions in the C++ API have 1:1 a correspondence with the CLI API
+// commands. Those cases are annotated.
 //
-// When converting a CLI pipeline in C++, it is also interesting to look at the
-// implementation of each CLI command. Generally, one CLI command contains one
-// or a small number of C++ calls.
+// The C++ API does not use exceptions. Instead, most functions return an
+// `absl::Status` or an `absl::StatusOr` (i.e. a `absl::Status` with some
+// result). The macros QCHECK_OK and  absl::StatusOr.value() can be used to
+// check such status and extract the result.
+//
+// This code relies heavily on Absl, notably `absl::StrCat`. This method is a
+// simple string concatenation function, equivalent but more efficient than
+// absl::StrCat("hello ", "world") <=> std::string("hello ") + string("world").
 //
 // Usage example:
 //   bazel build -c opt \
@@ -41,14 +44,12 @@
 //   bazel-bin/yggdrasil_decision_forests/examples/beginner_cc \
 //   --alsologtostderr
 //
-
 #include "absl/flags/flag.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
-#include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -56,126 +57,131 @@
 
 ABSL_FLAG(std::string, dataset_dir,
           "yggdrasil_decision_forests/test_data/dataset",
-          "Directory containing the \"adult_train.csv\" and \"adult_test.csv\" "
-          "datasets.");
+          "Input directory containing the datasets: \"adult_train.csv\" and "
+          "\"adult_test.csv\"");
 
 ABSL_FLAG(std::string, output_dir, "/tmp/yggdrasil_decision_forest",
-          "Output directory for the model and evaluation");
+          "Output directory to save the model, evaluation and other results.");
 
-namespace ygg = yggdrasil_decision_forests;
+// Commonly used alias.
+namespace ydf = yggdrasil_decision_forests;
 
 int main(int argc, char** argv) {
-  // Enable the logging. Optional in most cases.
+  // Enable the logging. Optional.
   InitLogging(argv[0], &argc, &argv, true);
 
-  // Path to the training and testing dataset.
-  const auto train_dataset_path = absl::StrCat(
-      "csv:",
-      file::JoinPath(absl::GetFlag(FLAGS_dataset_dir), "adult_train.csv"));
+  // Read flags.
+  const std::string dataset_dir = absl::GetFlag(FLAGS_dataset_dir);
+  const std::string output_dir = absl::GetFlag(FLAGS_output_dir);
 
-  const auto test_dataset_path = absl::StrCat(
-      "csv:",
-      file::JoinPath(absl::GetFlag(FLAGS_dataset_dir), "adult_test.csv"));
+  // Training and testing dataset paths.
+  //
+  // Note: The prefix (e.g."csv:") indicates the format of the dataset.
+  const auto train_path =
+      absl::StrCat("csv:", file::JoinPath(dataset_dir, "adult_train.csv"));
+  const auto test_path =
+      absl::StrCat("csv:", file::JoinPath(dataset_dir, "adult_test.csv"));
 
-  // Create the output directory
-  QCHECK_OK(file::RecursivelyCreateDir(absl::GetFlag(FLAGS_output_dir),
-                                       file::Defaults()));
+  // Create output directory.
+  QCHECK_OK(file::RecursivelyCreateDir(output_dir, file::Defaults()));
 
-  // Scan the columns of the dataset to create a dataspec.
-  // Same as :infer_dataspec
+  // Scan dataset to create a dataspec.
+  //
+  // The dataspec is the list of available columns and their meta-data.
+  //
+  // This is similar to the "infer_dataspec" CLI command.
   YDF_LOG(INFO) << "Create dataspec";
-  const auto dataspec_path =
-      file::JoinPath(absl::GetFlag(FLAGS_output_dir), "dataspec.pbtxt");
-  ygg::dataset::proto::DataSpecification dataspec;
-  ygg::dataset::CreateDataSpec(train_dataset_path, false, /*guide=*/{},
-                               &dataspec);
+  const auto dataspec_path = file::JoinPath(output_dir, "dataspec.pbtxt");
+  const auto dataspec = ydf::dataset::CreateDataSpec(train_path).value();
+  // Save the dataspec.
   QCHECK_OK(file::SetTextProto(dataspec_path, dataspec, file::Defaults()));
 
-  // Display the dataspec in a human readable form.
-  // Same as :show_dataspec
-  YDF_LOG(INFO) << "Nice print of the dataspec";
-  const auto dataspec_report =
-      ygg::dataset::PrintHumanReadable(dataspec, false);
+  // Print dataspec.
+  //
+  // This is similar to the "show_dataspec" CLI command.
+  YDF_LOG(INFO) << "Print dataspec";
+  std::string dataspec_report = ydf::dataset::PrintHumanReadable(dataspec);
+  YDF_LOG(INFO) << "Dataspec:\n" << dataspec_report;
+  // Save dataspec print in a .txt file.
   QCHECK_OK(
       file::SetContent(absl::StrCat(dataspec_path, ".txt"), dataspec_report));
-  YDF_LOG(INFO) << "Dataspec:\n" << dataspec_report;
 
-  // Train the model.
-  // Same as :train
+  // Train model.
   YDF_LOG(INFO) << "Train model";
 
   // Configure the learner.
-  ygg::model::proto::TrainingConfig train_config;
+  ydf::model::proto::TrainingConfig train_config;
   train_config.set_learner("RANDOM_FOREST");
-  train_config.set_task(ygg::model::proto::Task::CLASSIFICATION);
+  train_config.set_task(ydf::model::proto::Task::CLASSIFICATION);
   train_config.set_label("income");
-  std::unique_ptr<ygg::model::AbstractLearner> learner;
-  QCHECK_OK(GetLearner(train_config, &learner));
+  const auto learner = ydf::model::GetLearner(train_config).value();
 
-  // Set to export the training logs.
-  learner->set_log_directory(absl::GetFlag(FLAGS_output_dir));
-
-  // Effectively train the model.
-  auto model = learner->TrainWithStatus(train_dataset_path, dataspec).value();
+  // Effectively train model.
+  //
+  // This is similar to the "train" CLI command.
+  auto model = learner->TrainWithStatus(train_path, dataspec).value();
 
   // Save the model.
   YDF_LOG(INFO) << "Export the model";
-  const auto model_path =
-      file::JoinPath(absl::GetFlag(FLAGS_output_dir), "model");
-  QCHECK_OK(ygg::model::SaveModel(model_path, model.get()));
+  const auto model_path = file::JoinPath(output_dir, "model");
+  QCHECK_OK(ydf::model::SaveModel(model_path, *model));
 
-  // Show information about the model.
-  // Like :show_model, but without the list of compatible engines.
-  std::string model_description;
-  model->AppendDescriptionAndStatistics(/*full_definition=*/false,
-                                        &model_description);
+  // Show details about model.
+  //
+  // This is similar to the "show_model" CLI command.
+  std::string model_description = model->DescriptionAndStatistics();
+  YDF_LOG(INFO) << "Model:\n" << model_description;
+  // Save details in a .txt file.
   QCHECK_OK(
       file::SetContent(absl::StrCat(model_path, ".txt"), model_description));
-  YDF_LOG(INFO) << "Model:\n" << model_description;
 
-  // Evaluate the model
-  // Same as :evaluate
-  ygg::dataset::VerticalDataset test_dataset;
-  QCHECK_OK(ygg::dataset::LoadVerticalDataset(
-      test_dataset_path, model->data_spec(), &test_dataset));
-
-  ygg::utils::RandomEngine rnd;
-  ygg::metric::proto::EvaluationOptions evaluation_options;
-  evaluation_options.set_task(model->task());
+  // Evaluate model
+  //
+  // This is similar to the "evaluate" CLI command.
+  ydf::dataset::VerticalDataset test_dataset;
+  QCHECK_OK(ydf::dataset::LoadVerticalDataset(test_path, model->data_spec(),
+                                              &test_dataset));
 
   // The effective evaluation.
-  const ygg::metric::proto::EvaluationResults evaluation =
-      model->Evaluate(test_dataset, evaluation_options, &rnd);
+  ydf::utils::RandomEngine rnd;
+  const auto evaluation = model->Evaluate(test_dataset, {}, &rnd);
 
-  // Export the raw evaluation.
-  const auto evaluation_path =
-      file::JoinPath(absl::GetFlag(FLAGS_output_dir), "evaluation.pbtxt");
+  // Save the raw evaluation.
+  std::string evaluation_path = file::JoinPath(output_dir, "evaluation.pbtxt");
   QCHECK_OK(file::SetTextProto(evaluation_path, evaluation, file::Defaults()));
 
-  // Export the evaluation to a nice text.
-  std::string evaluation_report;
-  QCHECK_OK(
-      ygg::metric::AppendTextReportWithStatus(evaluation, &evaluation_report));
+  // Save the evaluation in a text file.
+  std::string evaluation_report = ydf::metric::TextReport(evaluation).value();
   QCHECK_OK(file::SetContent(absl::StrCat(evaluation_path, ".txt"),
                              evaluation_report));
   YDF_LOG(INFO) << "Evaluation:\n" << evaluation_report;
 
-  // Compile the model for fast inference.
-  const std::unique_ptr<ygg::serving::FastEngine> serving_engine =
-      model->BuildFastEngine().value();
-  const auto& features = serving_engine->features();
+  // Compile the model into an engine for fast inference.
+  const auto engine = model->BuildFastEngine().value();
 
-  // Handle to two features.
+  // At this point, the model is not needed anymore.
+  model.reset();
+
+  // Get handle of features about the engine.
+  //
+  // Note: Feature handles should be extracted one and then saved at not to
+  // reacquire them for each inference.
+  const auto& features = engine->features();
   const auto age_feature = features.GetNumericalFeatureId("age").value();
   const auto education_feature =
       features.GetCategoricalFeatureId("education").value();
 
   // Allocate a batch of 5 examples.
-  std::unique_ptr<ygg::serving::AbstractExampleSet> examples =
-      serving_engine->AllocateExamples(5);
+  //
+  // Note: Batch of examples can be reused to maximize the program efficiency.
+  std::unique_ptr<ydf::serving::AbstractExampleSet> examples =
+      engine->AllocateExamples(5);
 
-  // Set all the values as missing. This is only necessary if you don't set all
-  // the feature values manually e.g. SetNumerical.
+  // Fill the batch with missing values. We will then override the non-missing
+  // values.
+  //
+  // Filling the batch with missing values is only necessary if you don't plan
+  // on setting all the feature values manually.
   examples->FillMissing(features);
 
   // Set the value of "age" and "eduction" for the first example.
@@ -183,14 +189,17 @@ int main(int argc, char** argv) {
   examples->SetCategorical(/*example_idx=*/0, education_feature, "HS-grad",
                            features);
 
-  // Run the predictions on the first two examples.
+  // Compute predictions on the first two examples.
   std::vector<float> batch_of_predictions;
-  serving_engine->Predict(*examples, 2, &batch_of_predictions);
+  engine->Predict(*examples, 2, &batch_of_predictions);
 
+  // Print predictions.
   YDF_LOG(INFO) << "Predictions:";
   for (const float prediction : batch_of_predictions) {
     YDF_LOG(INFO) << "\t" << prediction;
   }
+
+  YDF_LOG(INFO) << "The results are available in " << output_dir;
 
   return 0;
 }

@@ -33,6 +33,12 @@ absl::Status GetLearner(const proto::TrainingConfig& train_config,
                         std::unique_ptr<AbstractLearner>* learner,
                         const proto::DeploymentConfig& deployment_config = {});
 
+// Equivalent to "GetLearner" above.
+absl::StatusOr<std::unique_ptr<AbstractLearner>> GetLearner(
+    const proto::TrainingConfig& train_config,
+    const proto::DeploymentConfig& deployment_config = {},
+    const std::string& log_directory = {});
+
 // Returns the list of all registered learners.
 std::vector<std::string> AllRegisteredLearners();
 

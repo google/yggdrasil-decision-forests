@@ -68,6 +68,11 @@ absl::Status CreateEmptyModel(const absl::string_view model_name,
   return absl::OkStatus();
 }
 
+absl::Status SaveModel(absl::string_view directory, const AbstractModel& mdl,
+                       ModelIOOptions io_options) {
+  return SaveModel(directory, &mdl, io_options);
+}
+
 absl::Status SaveModel(absl::string_view directory,
                        const AbstractModel* const mdl,
                        ModelIOOptions io_options) {

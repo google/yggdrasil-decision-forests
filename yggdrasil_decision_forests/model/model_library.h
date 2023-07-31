@@ -42,6 +42,10 @@ absl::Status SaveModel(absl::string_view directory,
                        const AbstractModel* const mdl,
                        ModelIOOptions io_options = {});
 
+// Equivalent to "SaveModel" above.
+absl::Status SaveModel(absl::string_view directory, const AbstractModel& mdl,
+                       ModelIOOptions io_options = {});
+
 // Load a model from a directory previously created with "SaveModel". If
 // `prefix` is nonempty, only files whose file names use that prefix are
 // considered.

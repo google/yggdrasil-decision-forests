@@ -381,6 +381,14 @@ void MergeColumnGuide(const proto::ColumnGuide& src, proto::ColumnGuide* dst) {
   dst->MergeFrom(src);
 }
 
+absl::StatusOr<proto::DataSpecification> CreateDataSpec(
+    absl::string_view typed_path, const proto::DataSpecificationGuide& guide) {
+  proto::DataSpecification spec;
+  RETURN_IF_ERROR(
+      CreateDataSpecWithStatus(typed_path, /*use_flume=*/false, guide, &spec));
+  return spec;
+}
+
 void CreateDataSpec(absl::string_view typed_path, bool use_flume,
                     const proto::DataSpecificationGuide& guide,
                     proto::DataSpecification* data_spec) {

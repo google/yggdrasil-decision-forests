@@ -41,6 +41,11 @@ absl::Status CreateDataSpecWithStatus(
     const proto::DataSpecificationGuide& guide,
     proto::DataSpecification* data_spec);
 
+// Alternative form with StatusOr.
+absl::StatusOr<proto::DataSpecification> CreateDataSpec(
+    absl::string_view typed_path,
+    const proto::DataSpecificationGuide& guide = {});
+
 // Deprecated. Use "CreateDataSpecWithStatus" instead.
 void CreateDataSpec(absl::string_view typed_path, bool use_flume,
                     const proto::DataSpecificationGuide& guide,
