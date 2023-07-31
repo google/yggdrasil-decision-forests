@@ -36,75 +36,18 @@
 #   - Protocol buffer for Go:  protoc
 #   - Go plugins for the protocol compiler
 #
-# Steps to run it:
-#
-# 1. Go (`cd`) the citc client, under `google3/third_party/yggdrasil_decision_forests/port/go`.
-#    directory.
-#
-#    $ cd third_party/yggdrasil_decision_forests/port/go
-#
-# 2. Execute the script. It will generate the corresponding directories and
-#    thin wrapper go code.
-# 3. Create/snapshot a CL with the changes and upload it to Critique. Save the
-#    CL number.
-#
-#    $ CL=<the actual CL number>
-#
-# 4. Go back (`cd`) to `google3` and run copybara to generate a local OSS
-#    version with the new code.
-#
-#    $ rm -rf "${HOME}/git/yggdrasil-decision-forests" \
-#      && /google/bin/releases/copybara/public/copybara/copybara \
-#         ../../../../third_party/yggdrasil_decision_forests/copy.bara.sky \
-#         presubmit_piper_to_gerrit "${CL}" --dry-run --init-history --squash \
-#         --force --git-destination-path ${HOME}/git/yggdrasil-decision-forests\
-#         --ignore-noop
-# 
-#    And then go that directory, under the golang port -- typically this will be
-#    `cd ~/git/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go`
-#
-# 5. In each of the proto directories generated, run `go generate` to actually
-#    generate the proto handling code (`*.pb.go` files). One can do:
-#
-#     $ find . -type d -name proto \
-#       | while read dd ; do \
-#          echo $dd ; pushd ${dd} ; go generate ; popd ; printf "\n\n\n" ; \
-#         done   
-#
-# 6. Check that the generated file compiles, to double check. Either with
-#    `go build ./...` or more specifically:
-# 
-#     $ find . -type d -name proto \
-#       | while read dd ; do \
-#          echo $dd ; pushd ${dd} ; go build ; popd ; printf "\n\n\n" ; \
-#         done   
-#
-# 7. Copy back the generated `.pb.go` files back to the citc client. This is
-#    because typically the generated files are include in the repository for
-#    Go packages, so that users don't need to install extra software to build.
-
-# Check we are in the Golang port directory.
-GOLANG_PORT_DIR="third_party/yggdrasil_decision_forests/port/go"
-current_path="$(pwd)"
-if [[ ! "${current_path}" == *"${GOLANG_PORT_DIR}" ]]; then
-  echo "Please, run this script to from .../${GOLANG_PORT_DIR}. You are in ${current_path}."
-  exit 1
-fi
-
-# List of proto_files used in port/go. Should includ both those imported
-# explicitly and the dependencies. FutureWork: figure out dependencies 
-# automatically.
 proto_files="$(
 	find . -type f -name '*.go' | 
 		xargs egrep '_go_proto"$' | 
-		perl -ne 's/.*?\s+\"(.*)\"/$1/g; s/_go_proto/.proto/g; s|google3/third_party/yggdrasil_decision_forests/||g; print;' | sort | uniq) 
+		perl -ne 's/.*?\s+\"(.*)\"/$1/g; s/_go_proto/.proto/g; s|yggdrasil_decision_forests/||g; print;' | sort | uniq) 
 	utils/distribution.proto 
 	dataset/weight.proto
 	model/hyperparameter.proto
   metric/metric.proto
   model/prediction.proto"
 
-# Convert a name to Ga package name: that is, without "_".
+
+# Convert a name to Go package name: that is, without "_".
 function go_name() {
   echo $1 | tr -d '_'
 }

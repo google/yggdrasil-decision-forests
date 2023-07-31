@@ -41,8 +41,8 @@ your model. These steps only need to be done once per model.
 
 ```go
 import (
-    model_io "google3/third_party/yggdrasil_decision_forests/port/go/model/io/canonical/canonical"
-    "google3/third_party/yggdrasil_decision_forests/port/go/serving/serving"
+    model_io "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/model/io/canonical/canonical"
+    "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/serving/serving"
 )
 
 // Loads the model in memory.
