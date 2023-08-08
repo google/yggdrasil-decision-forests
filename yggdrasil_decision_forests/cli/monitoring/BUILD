@@ -1,3 +1,4 @@
+load("//third_party/bazel_rules/rules_python/python:py_binary.bzl", "py_binary")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_binary_ydf")
 
 package(
