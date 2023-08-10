@@ -2340,7 +2340,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_description(
         R"(Early stopping detects the overfitting of the model and halts it training using the validation dataset controlled by `validation_ratio`.
 - `NONE`: No early stopping. The model is trained entirely.
-- `MIN_LOSS_FINAL`: No early stopping. However, the model is then truncated to maximize the validation loss.
+- `MIN_LOSS_FINAL`: No early stopping. However, the model is then truncated to minimize the validation loss.
 - `LOSS_INCREASE`: Stop the training when the validation does not decrease for `early_stopping_num_trees_look_ahead` trees.)");
   }
 
