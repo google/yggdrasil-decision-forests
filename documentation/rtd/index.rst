@@ -13,8 +13,10 @@ models. YDF is open-source and is available in C++, command-line interface
 TF-DF), JavaScript (inference only), and Go (inference only). YDF is supported on Linux, Windows,
 macOS, Raspberry Pi, and Arduino (experimental).
 
-For details about YDF design, read our KDD 2022 paper
-`Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library <https://arxiv.org/abs/2212.02934>`_ .
+For details about YDF design, read our KDD 2023 paper
+`Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library <https://doi.org/10.1145/3580305.3599933>`_ .
+See also the `extended version <https://arxiv.org/abs/2212.02934>`_  with
+additional details about the experimental evaluation of the library.
 
 Features
 ========
