@@ -15,10 +15,7 @@ Check our
 on tensorflow.org for more details.
 
 ``` {note}
-TensorFlow Serving 2.11 was not yet released (Oct. 2022). In the meantime,
-*TensorFlow Serving 2.11 Nightly* with support with TF-DF is available
-[here](https://github.com/tensorflow/decision-forests/releases/tag/serving-1.0.1).
-Prior version of TF Serving (e.g. TF Serving 2.8-2.10) are compatible with
-TF-DF. However, they requires to be *re-compiled* with TF-DF support
+Old versions of TF Serving (e.g. TF Serving 2.8-2.10) are compatible with
+TF-DF. However, they require to be *re-compiled* with TF-DF support
 ([instructions](https://github.com/tensorflow/decision-forests/blob/main/documentation/tensorflow_serving.md#compile-tf-seringtf-decision-forests-from-source)).
 ```

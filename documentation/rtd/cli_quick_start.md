@@ -71,7 +71,7 @@ YDF can load CSV files directly, making it a convenient way to use this dataset.
 ``` {note}
 When passing a dataset path to a command, the format of the dataset is always specified using a prefix.
 For example, the prefix `csv:` in the path `csv:/path/to/my/file` indicates that the file is a csv file.
-See [here](https://github.com/google/yggdrasil-decision-forests/blob/main/documentation/user_manual.md#dataset-path-and-format) for the list of supported dataset formats.
+See [here](https://github.com/google/yggdrasil-decision-forests/blob/main/documentation/rtd/cli_user_manual.md#dataset-path-and-format) for the list of supported dataset formats.
 ```
 
 ## Create dataspec
