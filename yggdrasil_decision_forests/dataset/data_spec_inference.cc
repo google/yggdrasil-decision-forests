@@ -607,13 +607,6 @@ absl::Status UpdateCategoricalIntColumnSpec(
   if (int_value <= -1) {
     col->set_count_nas(col->count_nas() + 1);
   } else {
-    if (int_value < 0) {
-      return absl::InvalidArgumentError(
-          absl::Substitute("Pre-integerized categorical features should be "
-                           "greater or equal (special Out-of-vocabulary value) "
-                           "to zero. Value $0 found for feature $1.",
-                           int_value, col->name()));
-    }
     if (int_value >= col->categorical().number_of_unique_values()) {
       col->mutable_categorical()->set_number_of_unique_values(int_value + 1);
     }
