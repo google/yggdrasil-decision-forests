@@ -46,7 +46,7 @@ namespace {
 absl::Status LoadVerticalDatasetSingleThread(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec, VerticalDataset* dataset,
-    absl::optional<std::vector<int>> required_columns,
+    const absl::optional<std::vector<int>>& required_columns,
     const LoadConfig& config) {
   // Initialize dataset.
   dataset->set_data_spec(data_spec);
@@ -117,7 +117,7 @@ absl::StatusOr<std::unique_ptr<BlockOfExamples>> LoadShard(
 absl::Status LoadVerticalDataset(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec, VerticalDataset* dataset,
-    absl::optional<std::vector<int>> required_columns,
+    const absl::optional<std::vector<int>>& required_columns,
     const LoadConfig& config) {
   // Extract the shards from the dataset path.
   std::string path, prefix;

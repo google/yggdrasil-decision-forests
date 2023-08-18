@@ -37,6 +37,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -48,7 +49,7 @@ namespace dataset {
 class VerticalDataset {
  public:
   // Row index type.
-  typedef int64_t row_t;
+  typedef SignedExampleIdx row_t;
 
   // Abstract representation of a column.
   class AbstractColumn {
@@ -110,8 +111,9 @@ class VerticalDataset {
     virtual absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
                                           AbstractColumn* dst) const = 0;
 
-    virtual absl::Status ExtractAndAppend(const std::vector<uint32_t>& indices,
-                                          AbstractColumn* dst) const = 0;
+    virtual absl::Status ExtractAndAppend(
+        const std::vector<UnsignedExampleIdx>& indices,
+        AbstractColumn* dst) const = 0;
 
     // Converts the content of a column to another dataspec.
     virtual absl::Status ConvertToGivenDataspec(
@@ -180,8 +182,9 @@ class VerticalDataset {
     absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
                                   AbstractColumn* dst) const override;
 
-    absl::Status ExtractAndAppend(const std::vector<uint32_t>& indices,
-                                  AbstractColumn* dst) const override;
+    absl::Status ExtractAndAppend(
+        const std::vector<UnsignedExampleIdx>& indices,
+        AbstractColumn* dst) const override;
 
     std::pair<uint64_t, uint64_t> memory_usage() const override {
       return std::pair<uint64_t, uint64_t>(values_.size() * sizeof(T),
@@ -235,8 +238,9 @@ class VerticalDataset {
     absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
                                   AbstractColumn* dst) const override;
 
-    absl::Status ExtractAndAppend(const std::vector<uint32_t>& indices,
-                                  AbstractColumn* dst) const override;
+    absl::Status ExtractAndAppend(
+        const std::vector<UnsignedExampleIdx>& indices,
+        AbstractColumn* dst) const override;
 
     const std::vector<std::pair<size_t, size_t>>& values() const {
       return values_;
@@ -721,9 +725,9 @@ class VerticalDataset {
   // If "load_columns" is set, only the columns specified in it will be loaded.
   absl::Status AppendExampleWithStatus(
       const proto::Example& example,
-      const absl::optional<std::vector<int>> load_columns = {});
+      const absl::optional<std::vector<int>>& load_columns = {});
   void AppendExample(const proto::Example& example,
-                     const absl::optional<std::vector<int>> load_columns = {});
+                     const absl::optional<std::vector<int>>& load_columns = {});
 
   absl::Status AppendExampleWithStatus(
       const std::unordered_map<std::string, std::string>& example);
@@ -842,7 +846,7 @@ absl::Status VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
 
 template <typename T>
 absl::Status VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
-    const std::vector<uint32_t>& indices, AbstractColumn* dst) const {
+    const std::vector<UnsignedExampleIdx>& indices, AbstractColumn* dst) const {
   auto* cast_dst =
       dynamic_cast<VerticalDataset::TemplateScalarStorage<T>*>(dst);
   STATUS_CHECK(cast_dst != nullptr);
@@ -891,12 +895,12 @@ absl::Status VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
 
 template <typename T>
 absl::Status VerticalDataset::TemplateMultiValueStorage<T>::ExtractAndAppend(
-    const std::vector<uint32_t>& indices, AbstractColumn* dst) const {
+    const std::vector<UnsignedExampleIdx>& indices, AbstractColumn* dst) const {
   auto* cast_dst =
       dynamic_cast<VerticalDataset::TemplateMultiValueStorage<T>*>(dst);
   STATUS_CHECK(cast_dst != nullptr);
   if (values_.empty() && !indices.empty()) {
-    YDF_LOG(FATAL) << "ExtractAndAppend on an empty column";
+    return absl::InvalidArgumentError("ExtractAndAppend on an empty column");
   }
   cast_dst->Reserve(dst->nrows() + indices.size());
   for (const auto row_idx : indices) {

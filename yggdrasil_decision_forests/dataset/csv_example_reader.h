@@ -59,8 +59,9 @@ class CsvExampleReader final : public ExampleReaderInterface {
  private:
   class Implementation final : public utils::ShardedReader<proto::Example> {
    public:
-    explicit Implementation(const proto::DataSpecification& data_spec,
-                            absl::optional<std::vector<int>> required_columns);
+    explicit Implementation(
+        const proto::DataSpecification& data_spec,
+        const absl::optional<std::vector<int>>& required_columns);
 
    protected:
     // Opens the .csv file at "path", and check that the header is as expected.

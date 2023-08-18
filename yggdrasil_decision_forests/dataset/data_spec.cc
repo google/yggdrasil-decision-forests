@@ -127,7 +127,7 @@ int32_t CategoricalStringToValue(const std::string& value,
 }
 
 absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
-    const std::string& value, const proto::Column& col_spec) {
+    const absl::string_view value, const proto::Column& col_spec) {
   if (col_spec.categorical().is_already_integerized()) {
     int32_t int_value;
     if (!absl::SimpleAtoi(value, &int_value)) {
@@ -146,6 +146,13 @@ absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
       return value_in_dict->second.index();
     }
   }
+}
+
+// TODO: Remove this version when external protobuffer supports dictionary
+// query with absl::string_view.
+absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
+    const std::string& value, const proto::Column& col_spec) {
+  return CategoricalStringToValueWithStatus(absl::string_view{value}, col_spec);
 }
 
 absl::Status BuildColIdxToFeatureLabelIdx(
@@ -270,7 +277,7 @@ bool HasColumn(absl::string_view name,
   return false;
 }
 
-absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
+absl::Status CsvRowToExample(const std::vector<absl::string_view>& csv_fields,
                              const proto::DataSpecification& data_spec,
                              const std::vector<int>& col_idx_to_field_idx,
                              proto::Example* example) {

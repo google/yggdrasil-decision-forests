@@ -15,11 +15,22 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
+#include <random>
+#include <string>
+
 #include "gmock/gmock.h"
+#include "absl/debugging/leak_check.h"
+#include "absl/strings/str_format.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
+#include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
 
@@ -404,6 +415,130 @@ TEST(ProtoIO, Base) {
   EXPECT_TRUE(reader.Next(&read_node).value());
   EXPECT_THAT(read_node, EqualsProto(node_2));
   EXPECT_FALSE(reader.Next(&read_node).value());
+}
+
+// Test training on 2.2B examples (i.e. more than 2^31). The test will fail if
+// YDF is compiled with 32-bits example index.
+//
+// This test is disabled in presubmit as it requires a large amount of disk
+// (~100GB) and RAM. The test takes ~15 minutes to run on a workstation. You can
+// make the test run fast / require less resource by reducing the number of
+// examples.
+//
+// The test can be run manually as follow:
+//
+// bazel test -c opt --test_strategy=local --test_output=streamed --test_ \
+// arg=--alsologtostderr --copt=-mfma --copt=-mavx2 \
+// --define=ydf_example_idx_num_bits=64 \
+// //yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees:distributed_gradient_boosted_trees_test\
+// --test_filter=LargeDataset.Base --test_timeout=1000000
+//
+// This test creates a large amount of data in the
+// "/tmp/ydf_large_distributed_test" directory. Executing the test multiple time
+// will re-use this data possibly skipping some of the computation (e.g.,
+// creation of the synthetic dataset, creation of the dataset cache, training of
+// the model) and run significantly faster.
+//
+// This test can be run on a large (but still smaller than 2B examples) dataset
+// by decreasing the "num_shards" value.
+TEST(DISABLED_LargeDataset, Base) {
+  absl::LeakCheckDisabler disabler;
+
+  // Create a large csv dataset.
+  const size_t num_shards = 110;
+  const size_t num_examples_per_shards = 20000000;  // 20M examples per shard.
+  CHECK_GT(num_shards * num_examples_per_shards, size_t(1) << 31);
+
+  const auto tmp_dir = "/tmp/ydf_large_distributed_test";
+
+  const auto ds_dir = file::JoinPath(tmp_dir, "ds");
+  const auto ds_path = file::JoinPath(ds_dir, absl::StrCat("ds@", num_shards));
+  std::vector<std::string> shard_paths;
+  file::GenerateShardedFilenames(ds_path, &shard_paths);
+  if (file::FileExists(shard_paths.back()).value()) {
+    YDF_LOG(INFO) << "Dataset already present";
+  } else {
+    YDF_LOG(INFO) << "Create dataset: " << ds_path;
+    CHECK_OK(file::RecursivelyCreateDir(ds_dir, file::Defaults()));
+
+    const auto create_shard = [&](const int shard_idx) {
+      YDF_LOG(INFO) << "Write shard " << shard_idx << " of " << num_shards;
+      const auto& path = shard_paths[shard_idx];
+      auto writer = file::OpenOutputFile(path).value();
+      std::minstd_rand0 rnd(shard_idx);
+      std::uniform_real_distribution<float> unif_dist;
+      CHECK_OK(writer->Write("f1,f2,l\n"));
+      std::string buffer;
+      for (int example_idx = 0; example_idx < num_examples_per_shards;
+           example_idx++) {
+        const float f1 = unif_dist(rnd);
+        const float f2 = unif_dist(rnd);
+        const float l = unif_dist(rnd);
+        buffer.clear();
+        // Note: f1 will be discretized, hence faster to train than f2.
+        absl::StrAppendFormat(&buffer, "%.3f,%f,%.3f\n", f1, f2, l);
+        CHECK_OK(writer->Write(buffer));
+      }
+      CHECK_OK(writer->Close());
+    };
+
+    {
+      ThreadPool pool("create_dataset", /*num_threads=*/5);
+      pool.StartWorkers();
+      for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
+        pool.Schedule([shard_idx, create_shard]() { create_shard(shard_idx); });
+      }
+    }
+  }
+
+  YDF_LOG(INFO) << "Create dataspec";
+  const auto dataspec =
+      dataset::CreateDataSpec(absl::StrCat("csv:", shard_paths.front()))
+          .value();
+  std::string dataspec_report = dataset::PrintHumanReadable(dataspec);
+  YDF_LOG(INFO) << "Dataspec:\n" << dataspec_report;
+
+  YDF_LOG(INFO) << "Train model";
+  model::proto::TrainingConfig train_config = PARSE_TEST_PROTO(R"pb(
+    learner: "DISTRIBUTED_GRADIENT_BOOSTED_TREES"
+    task: REGRESSION
+    label: "l"
+    [yggdrasil_decision_forests.model.distributed_gradient_boosted_trees.proto
+         .distributed_gradient_boosted_trees_config] {
+      checkpoint_interval_trees: 10
+      worker_logs: true
+      gbt { export_logs_during_training_in_trees: 10 num_trees: 2 }
+      create_cache {
+        # Significantly speed-up training of f2 feature.
+        force_numerical_discretization: true
+      }
+    }
+  )pb");
+
+  model::proto::DeploymentConfig deploy_config =
+      PARSE_TEST_PROTO(absl::Substitute(
+          R"pb(
+            num_threads: 4
+            num_io_threads: 4
+            try_resume_training: true
+            cache_path: "$0"
+            distribute {
+              implementation_key: "MULTI_THREAD"
+              [yggdrasil_decision_forests.distribute.proto.multi_thread] {
+                num_workers: 2
+              }
+            }
+          )pb",
+          file::JoinPath(tmp_dir, "cache")));
+
+  const auto learner = model::GetLearner(train_config, deploy_config,
+                                         file::JoinPath(tmp_dir, "logs"))
+                           .value();
+  auto model =
+      learner->TrainWithStatus(absl::StrCat("csv:", ds_path), dataspec).value();
+
+  YDF_LOG(INFO) << "Model trained";
+  YDF_LOG(INFO) << model->DescriptionAndStatistics(true);
 }
 
 }  // namespace

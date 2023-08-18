@@ -48,7 +48,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator_uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
-#include "yggdrasil_decision_forests/learner/types.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"

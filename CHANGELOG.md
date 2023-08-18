@@ -2,6 +2,15 @@
 
 ## HEAD
 
+### Feature
+
+-   Improve speed of dataset reading and writing.
+
+### Fix
+
+-   Proper error message when using distributed training on more than 2^31
+    (i.e., ~2B) examples while compiling YDF with 32-bits example index.
+
 ## 1.5.0 - 2023-07-03
 
 ### Feature
@@ -23,6 +32,8 @@
 -   Remove owner leakage in the model compiler.
 -   Fix buggy restriction for SelGB sampling
 -   Improve documentation.
+
+### Change
 
 ## 1.4.0 - 2023-03-20
 

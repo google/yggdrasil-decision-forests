@@ -36,6 +36,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_LABEL_ACCESSOR_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_LABEL_ACCESSOR_H_
 
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 
 namespace yggdrasil_decision_forests {
@@ -43,7 +44,7 @@ namespace model {
 namespace distributed_decision_tree {
 
 // How to represent an example index.
-typedef uint64_t ExampleIndex;
+typedef UnsignedExampleIdx ExampleIndex;
 
 // Categorical label filler. Alternative to LabelCategoricalBucket::Filler.
 class ClassificationLabelFiller {

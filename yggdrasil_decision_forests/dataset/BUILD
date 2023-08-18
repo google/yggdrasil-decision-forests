@@ -139,6 +139,7 @@ cc_library_ydf(
         ":data_spec",
         ":data_spec_cc_proto",
         ":example_cc_proto",
+        ":types",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/memory",
@@ -325,6 +326,21 @@ cc_library_ydf(
         ],
         "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
     }),
+)
+
+cc_library_ydf(
+    name = "types",
+    srcs = ["types.cc"],
+    hdrs = ["types.h"],
+    defines = select({
+        "//yggdrasil_decision_forests:example_idx_32bits": ["YGGDRASIL_EXAMPLE_IDX_32_BITS"],
+        "//yggdrasil_decision_forests:example_idx_64bits": ["YGGDRASIL_EXAMPLE_IDX_64_BITS"],
+        "//conditions:default": ["YGGDRASIL_EXAMPLE_IDX_32_BITS"],
+    }),
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+    ],
 )
 
 # Proto

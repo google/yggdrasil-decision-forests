@@ -19,9 +19,9 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
-#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/math.h"
@@ -448,7 +448,7 @@ absl::Status SeparateDatasetColumns(
 
   // Receive and rename the results.
   for (int result_idx = 0; result_idx < pending_requests; result_idx++) {
-    LOG_INFO_EVERY_N_SEC(10, _ << "\tSeparate the dataset by columns "
+    LOG_INFO_EVERY_N_SEC(10, _ << "\tSplit dataset by columns "
                                << (result_idx + 1) << "/" << pending_requests);
     ASSIGN_OR_RETURN(
         const auto generic_result,

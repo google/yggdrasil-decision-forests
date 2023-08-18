@@ -15,10 +15,12 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_reader.h"
 
+#include <limits>
 #include <numeric>
 
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
@@ -65,6 +67,8 @@ absl::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
                 << " / " << cache->meta_data_.columns_size()
                 << " feature(s) and " << cache->meta_data_.num_examples()
                 << " example(s)";
+
+  RETURN_IF_ERROR(dataset::CheckNumExamples(cache->meta_data_.num_examples()));
 
   if (cache->meta_data_.has_weight_column_idx()) {
     // Load the weight values.

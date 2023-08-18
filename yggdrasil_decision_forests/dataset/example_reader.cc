@@ -39,7 +39,7 @@ namespace dataset {
 absl::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>> required_columns) {
+    const absl::optional<std::vector<int>>& required_columns) {
   std::string sharded_path;
   proto::DatasetFormat format;
   ASSIGN_OR_RETURN(std::tie(sharded_path, format),

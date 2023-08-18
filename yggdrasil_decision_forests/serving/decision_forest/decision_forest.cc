@@ -1106,11 +1106,13 @@ absl::Status LoadFlatBatchFromDataset(
         const auto num_examples = end_example_idx - begin_example_idx;
         const auto num_batches =
             (num_examples + batch_size_value - 1) / batch_size_value;
-        for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
-          const int64_t begin_batch_example_idx =
+        for (int batch_idx = 0; batch_idx < num_batches; batch_idx++) {
+          const auto begin_batch_example_idx =
               begin_example_idx + batch_idx * batch_size_value;
-          const int64_t end_batch_example_idx = std::min(
-              begin_batch_example_idx + batch_size_value, end_example_idx);
+          const auto end_batch_example_idx =
+              std::min(static_cast<VerticalDataset::row_t>(
+                           begin_batch_example_idx + batch_size_value),
+                       end_example_idx);
           for (int node_feature_idx = 0;
                node_feature_idx < feature_names.size(); ++node_feature_idx) {
             for (VerticalDataset::row_t example_idx = begin_batch_example_idx;

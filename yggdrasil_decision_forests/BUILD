@@ -56,15 +56,15 @@ config_setting(
 # contains zero-weighted examples).
 #
 # Possible values:
-#   (default) --define=example_idx_num_bits=32 => Up to 2'147'483'647 training
+#   (default) --define=ydf_example_idx_num_bits=32 => Up to 2'147'483'647 training
 #     examples.
-#   --define=example_idx_num_bits=64 => Up to 10^19 training examples.
+#   --define=ydf_example_idx_num_bits=64 => Up to 10^19 training examples.
 config_setting(
     name = "example_idx_32bits",
-    values = {"define": "example_idx_num_bits=32"},
+    values = {"define": "ydf_example_idx_num_bits=32"},
 )
 
 config_setting(
     name = "example_idx_64bits",
-    values = {"define": "example_idx_num_bits=64"},
+    values = {"define": "ydf_example_idx_num_bits=64"},
 )

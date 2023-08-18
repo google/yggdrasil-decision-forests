@@ -42,7 +42,7 @@ using proto::ColumnType;
 
 CsvExampleReader::Implementation::Implementation(
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>> required_columns)
+    const absl::optional<std::vector<int>>& required_columns)
     : data_spec_(data_spec), required_columns_(required_columns) {}
 
 absl::Status CsvExampleReader::Implementation::OpenShard(
@@ -79,8 +79,8 @@ absl::StatusOr<bool> CsvExampleReader::Implementation::NextInShard(
   if (!has_row) {
     return false;
   }
-  RETURN_IF_ERROR(CsvRowToExample({row->begin(), row->end()}, data_spec_,
-                                  col_idx_to_field_idx_, example));
+  RETURN_IF_ERROR(
+      CsvRowToExample(*row, data_spec_, col_idx_to_field_idx_, example));
   return true;
 }
 

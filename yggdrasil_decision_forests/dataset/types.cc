@@ -13,24 +13,28 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/learner/types.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/substitute.h"
 
 namespace yggdrasil_decision_forests {
-namespace model {
+namespace dataset {
 
 absl::Status CheckNumExamples(size_t num_examples) {
   const auto max = std::numeric_limits<SignedExampleIdx>::max();
   if (num_examples > max) {
-    return absl::InvalidArgumentError(
-        absl::Substitute("Too many training example ($0 > $1). Recompile the "
-                         "binary with --define=example_idx_num_bits=64.",
-                         num_examples, max));
+    return absl::InvalidArgumentError(absl::Substitute(
+        "The dataset contains to many example ($0 > $1). Compile Yggdrasil "
+        "Decision Forests with support for 64-bits example index with the "
+        "following flag to train on more example: "
+        "--define=ydf_example_idx_num_bits=64. Warning: 64-bits example index "
+        "can increase up to 2x the RAM usage of YDF. Don't use it for datasets "
+        "with less than 2^31 i.e. ~2B examples.",
+        num_examples, max));
   }
   return absl::OkStatus();
 }
 
-}  // namespace model
+}  // namespace dataset
 }  // namespace yggdrasil_decision_forests

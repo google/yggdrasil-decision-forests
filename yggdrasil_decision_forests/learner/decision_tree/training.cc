@@ -3902,14 +3902,18 @@ void GenerateRandomImputationOnColumn(
       non_na_examples.push_back(example_idx);
     }
   }
-  std::uniform_int_distribution<UnsignedExampleIdx> non_na_example_dist(
-      0, std::max(static_cast<UnsignedExampleIdx>(0),
-                  static_cast<UnsignedExampleIdx>(non_na_examples.size()) - 1));
-  std::vector<UnsignedExampleIdx> source_indices = examples;
+
   if (non_na_examples.empty()) {
-    CHECK_OK(src->ExtractAndAppend(source_indices, dst));
+    CHECK_OK(src->ExtractAndAppend(examples, dst));
     return;
   }
+
+  std::uniform_int_distribution<SignedExampleIdx> non_na_example_dist(
+      0, std::max(static_cast<SignedExampleIdx>(0),
+                  static_cast<SignedExampleIdx>(non_na_examples.size()) - 1));
+
+  std::vector<SignedExampleIdx> source_indices;
+  source_indices.resize(examples.size());
 
   UnsignedExampleIdx local_example_idx = 0;
   for (const auto example_idx : examples) {
@@ -3917,6 +3921,8 @@ void GenerateRandomImputationOnColumn(
       // Sample a random non-na value.
       source_indices[local_example_idx] =
           non_na_examples[non_na_example_dist(*random)];
+    } else {
+      source_indices[local_example_idx] = example_idx;
     }
     local_example_idx++;
   }
@@ -4377,7 +4383,7 @@ absl::Status PresortNumericalFeatures(
     const model::proto::TrainingConfigLinking& config_link,
     const int num_threads, Preprocessing* preprocessing) {
   // Check number of examples.
-  RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
+  RETURN_IF_ERROR(dataset::CheckNumExamples(train_dataset.nrow()));
 
   preprocessing->mutable_presorted_numerical_features()->resize(
       train_dataset.data_spec().columns_size());

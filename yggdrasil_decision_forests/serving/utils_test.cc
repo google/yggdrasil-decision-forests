@@ -214,8 +214,8 @@ void feature_statistics_adult(const ExampleFormat format) {
   std::vector<NumericalOrCategoricalValue> flat_examples;
   for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
     const int64_t begin_example_idx = batch_idx * batch_size;
-    const int64_t end_example_idx =
-        std::min(begin_example_idx + batch_size, dataset.nrow());
+    const int64_t end_example_idx = std::min(
+        begin_example_idx + batch_size, static_cast<int64_t>(dataset.nrow()));
 
     CHECK_OK(decision_forest::LoadFlatBatchFromDataset(
         dataset, begin_example_idx, end_example_idx,

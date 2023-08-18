@@ -16,12 +16,12 @@
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_worker.h"
 
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
-#include "yggdrasil_decision_forests/learner/types.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -267,15 +267,15 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
 absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
     const proto::WorkerRequest::SortNumericalColumn& request,
     proto::WorkerResult::SortNumericalColumn* result) {
-  YDF_LOG(INFO) << "Sorting numerical column #" << request.column_idx();
+  YDF_LOG(INFO) << "Sort numerical column #" << request.column_idx() << " with "
+                << request.num_examples() << " examples";
 
   // Read the values.
-  YDF_LOG(INFO) << "Allocate " << request.num_examples()
-                << " examples for column  #" << request.column_idx();
+  YDF_LOG(INFO) << "Allocate buffer [column #" << request.column_idx() << "]";
   // TODO: Read the shards in parallel.
   std::vector<std::pair<float, model::SignedExampleIdx>> value_and_example_idxs(
       request.num_examples());
-  YDF_LOG(INFO) << "Start reading column  #" << request.column_idx();
+  YDF_LOG(INFO) << "Load data [column #" << request.column_idx() << "]";
   const int input_buffer_size = kIOBufferSizeInBytes / sizeof(float);
   ShardedFloatColumnReader reader;
   RETURN_IF_ERROR(reader.Open(
@@ -299,13 +299,12 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
   RETURN_IF_ERROR(reader.Close());
 
   // Sort the values.
-  YDF_LOG(INFO) << "Sort the numerical values of column #"
-                << request.column_idx();
+  YDF_LOG(INFO) << "Sort data [column #" << request.column_idx() << "]";
   std::sort(value_and_example_idxs.begin(), value_and_example_idxs.end());
 
   // Export the sorted values.
-  YDF_LOG(INFO) << "Export the pre-sorted numerical values of column #"
-                << request.column_idx();
+  YDF_LOG(INFO) << "Save sorted numerical values [column #"
+                << request.column_idx() << "]";
 
   result->set_output_directory(
       file::JoinPath(request.output_base_directory(), utils::GenUniqueId()));
@@ -327,8 +326,8 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
   result->mutable_metadata()->set_num_unique_values(num_unique_values);
   YDF_LOG(INFO) << "Found " << num_unique_values << "/"
                 << request.num_examples()
-                << " unique values on numerical column #"
-                << request.column_idx() << ".";
+                << " unique values on numerical [column #"
+                << request.column_idx() << "]";
 
   // Select how export the values (pre-sorted or discretized).
   result->mutable_metadata()->set_discretized(
@@ -337,12 +336,12 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
           request.max_unique_values_for_discretized_numerical());
 
   if (result->metadata().discretized()) {
-    YDF_LOG(INFO) << "Exported column  column #" << request.column_idx()
+    YDF_LOG(INFO) << "Exported column column #" << request.column_idx()
                   << " as pre-discretized";
     RETURN_IF_ERROR(ExportSortedDiscretizedNumericalColumn(
         request, value_and_example_idxs, num_unique_values, result));
   } else {
-    YDF_LOG(INFO) << "Exported column  column #" << request.column_idx()
+    YDF_LOG(INFO) << "Exported column column #" << request.column_idx()
                   << " as pre-sorted";
     RETURN_IF_ERROR(
         ExportSortedNumericalColumn(request, value_and_example_idxs, result));

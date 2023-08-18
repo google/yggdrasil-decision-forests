@@ -63,7 +63,7 @@ namespace dataset {
 //
 absl::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
-    absl::optional<std::vector<int>> required_columns = {});
+    const absl::optional<std::vector<int>>& required_columns = {});
 
 // Checks if the format of a typed dataset is supported i.e. a dataset reader is
 // registered for this format. Returns true, if the format is supported. Returns

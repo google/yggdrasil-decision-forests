@@ -133,14 +133,14 @@ int VerticalDataset::ColumnNameToColumnIdx(absl::string_view name) const {
 
 void VerticalDataset::AppendExample(
     const proto::Example& example,
-    const absl::optional<std::vector<int>> load_columns) {
+    const absl::optional<std::vector<int>>& load_columns) {
   // TODO: Update.
   CHECK_OK(AppendExampleWithStatus(example, load_columns));
 }
 
 absl::Status VerticalDataset::AppendExampleWithStatus(
     const proto::Example& example,
-    const absl::optional<std::vector<int>> load_columns) {
+    const absl::optional<std::vector<int>>& load_columns) {
   DCHECK_EQ(columns_.size(), example.attributes_size());
   if (load_columns.has_value()) {
     for (int col_idx : load_columns.value()) {
@@ -905,7 +905,7 @@ void MapExampleToProtoExample(
 absl::Status MapExampleToProtoExampleWithStatus(
     const std::unordered_map<std::string, std::string>& src,
     const proto::DataSpecification& data_spec, proto::Example* dst) {
-  std::vector<std::string> flat_values;
+  std::vector<absl::string_view> flat_values;
   std::vector<int> col_idx_to_field_idx(data_spec.columns_size(), -1);
   for (const auto& src_value : src) {
     const int col_idx = GetColumnIdxFromName(src_value.first, data_spec);

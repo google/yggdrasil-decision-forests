@@ -50,7 +50,7 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping/early_stopping.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
-#include "yggdrasil_decision_forests/learner/types.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/metric/ranking_ndcg.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -651,7 +651,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
                                             num_sample_train_shards, &random),
                        dataset_prefix, data_spec, config,
                        /*allocate_gradient=*/true, mdl.get()));
-  RETURN_IF_ERROR(CheckNumExamples(current_train_dataset->dataset.nrow()));
+  RETURN_IF_ERROR(dataset::CheckNumExamples(current_train_dataset->dataset.nrow()));
   YDF_LOG(INFO) << current_train_dataset->dataset.nrow()
                 << " examples loaded in the first training sample in "
                 << (absl::Now() - begin_load_first_sample);
@@ -1075,7 +1075,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
   //     all the gradients).
 
   const auto begin_training = absl::Now();
-  RETURN_IF_ERROR(CheckNumExamples(train_dataset.nrow()));
+  RETURN_IF_ERROR(dataset::CheckNumExamples(train_dataset.nrow()));
 
   // Initialize the configuration.
   internal::AllTrainingConfiguration config;

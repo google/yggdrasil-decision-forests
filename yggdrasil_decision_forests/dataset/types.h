@@ -13,21 +13,21 @@
  * limitations under the License.
  */
 
-#ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_TYPES_H_
-#define YGGDRASIL_DECISION_FORESTS_LEARNER_TYPES_H_
+#ifndef YGGDRASIL_DECISION_FORESTS_DATASET_TYPES_H_
+#define YGGDRASIL_DECISION_FORESTS_DATASET_TYPES_H_
 
 #include <cstdint>
 
 #include "absl/status/status.h"
 
 namespace yggdrasil_decision_forests {
-namespace model {
+namespace dataset {
 
 // "ExampleIdx" is a signed integer able to store the number of examples in a
 // training dataset.
 //
-// ExampleIdx is controlled by the --define=example_idx_num_bits={32,64} flag.
-// See the documentation of this flag for more details.
+// ExampleIdx is controlled by the --define=ydf_example_idx_num_bits={32,64}
+// flag. See the documentation of this flag for more details.
 #if defined(YGGDRASIL_EXAMPLE_IDX_32_BITS)
 typedef int32_t SignedExampleIdx;
 typedef uint32_t UnsignedExampleIdx;
@@ -42,7 +42,14 @@ typedef uint64_t UnsignedExampleIdx;
 // "SignedExampleIdx".
 absl::Status CheckNumExamples(size_t num_examples);
 
+}  // namespace dataset
+
+namespace model {
+// Alias in "model" namespace.
+typedef dataset::SignedExampleIdx SignedExampleIdx;
+typedef dataset::UnsignedExampleIdx UnsignedExampleIdx;
 }  // namespace model
+
 }  // namespace yggdrasil_decision_forests
 
-#endif  // YGGDRASIL_DECISION_FORESTS_LEARNER_TYPES_H_
+#endif  // YGGDRASIL_DECISION_FORESTS_DATASET_TYPES_H_

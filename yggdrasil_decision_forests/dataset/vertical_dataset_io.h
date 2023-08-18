@@ -67,7 +67,7 @@ struct LoadConfig {
 absl::Status LoadVerticalDataset(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
     VerticalDataset* dataset,
-    absl::optional<std::vector<int>> required_columns = {},
+    const absl::optional<std::vector<int>>& required_columns = {},
     const LoadConfig& config = {});
 
 // Save the dataset to a file (or a set of files). If
