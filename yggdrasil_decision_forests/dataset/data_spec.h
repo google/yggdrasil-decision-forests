@@ -86,7 +86,7 @@ absl::Status GetSingleColumnIdxFromName(
 // Converts a single row from a csv into an Example.
 // If col_idx_to_field_idx[i] == -1, all the values of the i-th column are
 // replaced by empty values.
-absl::Status CsvRowToExample(const std::vector<absl::string_view>& csv_fields,
+absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
                              const proto::DataSpecification& data_spec,
                              const std::vector<int>& col_idx_to_field_idx,
                              proto::Example* example);
@@ -127,8 +127,7 @@ std::string PrintHumanReadable(const proto::DataSpecification& data_spec,
 
 // Returns the integer representation of a categorical value provided as a
 // string.
-absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
-    absl::string_view value, const proto::Column& col_spec);
+//
 // TODO: Remove this version when external protobuffer will support
 // map query with absl::string_view.
 absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(

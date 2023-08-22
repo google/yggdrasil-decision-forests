@@ -79,8 +79,8 @@ absl::StatusOr<bool> CsvExampleReader::Implementation::NextInShard(
   if (!has_row) {
     return false;
   }
-  RETURN_IF_ERROR(
-      CsvRowToExample(*row, data_spec_, col_idx_to_field_idx_, example));
+  RETURN_IF_ERROR(CsvRowToExample({row->begin(), row->end()}, data_spec_,
+                                  col_idx_to_field_idx_, example));
   return true;
 }
 

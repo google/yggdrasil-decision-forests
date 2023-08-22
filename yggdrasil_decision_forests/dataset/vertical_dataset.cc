@@ -905,7 +905,7 @@ void MapExampleToProtoExample(
 absl::Status MapExampleToProtoExampleWithStatus(
     const std::unordered_map<std::string, std::string>& src,
     const proto::DataSpecification& data_spec, proto::Example* dst) {
-  std::vector<absl::string_view> flat_values;
+  std::vector<std::string> flat_values;
   std::vector<int> col_idx_to_field_idx(data_spec.columns_size(), -1);
   for (const auto& src_value : src) {
     const int col_idx = GetColumnIdxFromName(src_value.first, data_spec);
