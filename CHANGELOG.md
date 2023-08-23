@@ -1,6 +1,6 @@
 # Changelog
 
-## HEAD
+## 1.6.0 - rc0 2023-08-22
 
 ### Feature
 
