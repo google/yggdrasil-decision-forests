@@ -60,6 +60,9 @@ absl::Status DistributeCLIManager::Initialize() {
   }
 
   // Create the log directory.
+  if (!config_.distribute_config().has_working_directory()) {
+    return absl::InvalidArgumentError("working_directory is not set");
+  }
   log_dir_ =
       file::JoinPath(config_.distribute_config().working_directory(), "logs");
   if (!config_.skip_already_run_commands()) {
