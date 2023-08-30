@@ -110,12 +110,12 @@ absl::StatusOr<bool> Run(const std::string& command,
   CloseHandle(stdout_write);
 
   std::array<char, 2048> buffer;
-  DWORD bytesRead;
+  DWORD num_read_bytes;
   absl::Status pending_status;
-  while (ReadFile(stdout_read, buffer.data(), buffer.size() - 1, &bytesRead,
-                  NULL) != 0 &&
-         bytesRead != 0) {
-    buffer[bytesRead] = '\0';
+  while (ReadFile(stdout_read, buffer.data(), buffer.size() - 1,
+                  &num_read_bytes, NULL) != 0 &&
+         num_read_bytes != 0) {
+    buffer[num_read_bytes] = '\0';
 
     const auto write_log_status = log_closer.stream()->Write(buffer.data());
     if (!write_log_status.ok()) {
@@ -133,13 +133,13 @@ absl::StatusOr<bool> Run(const std::string& command,
   CloseHandle(stdout_read);
 
   WaitForSingleObject(pi.hProcess, INFINITE);
-  DWORD exitCode;
-  GetExitCodeProcess(pi.hProcess, &exitCode);
+  DWORD exit_code;
+  GetExitCodeProcess(pi.hProcess, &exit_code);
 
   CloseHandle(pi.hProcess);
   CloseHandle(pi.hThread);
 
-  return exitCode == 0;
+  return exit_code == 0;
 }
 #endif
 
