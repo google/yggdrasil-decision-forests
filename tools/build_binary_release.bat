@@ -52,8 +52,6 @@ copy configure\cli_readme.txt dist\README
 7z a -tzip dist\cli_windows.zip^
  .\dist\README^
  LICENSE^
- CHANGELOG.md^
- .\documentation\cli.txt^
  .\%CLI%\train.exe^
  .\%CLI%\show_model.exe^
  .\%CLI%\show_dataspec.exe^
@@ -65,7 +63,7 @@ copy configure\cli_readme.txt dist\README
  .\%CLI%\benchmark_inference.exe^
  .\%CLI%\analyze_model_and_dataset.exe^
  .\%CLI%\compute_variable_importances.exe^
- .\%CLI%\..\distribute\implementations\grpc\grpc_worker_main.exe
+ .\%CLI%\..\utils\distribute\implementations\grpc\grpc_worker_main.exe
 
 goto :EOF
 :error
