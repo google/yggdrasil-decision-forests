@@ -41,6 +41,12 @@ std::string TmpDirectory() {
   return path;
 }
 
+#ifdef _WIN32
+
+bool IsPortAvailable(int port) {return true;}
+
+#else
+
 #include <netinet/in.h>
 
 // Copied from tensorflow/core/platform/default/net.cc.
@@ -99,6 +105,7 @@ bool IsPortAvailable(int port) {
 
   return true;
 }
+#endif
 
 int PickUnusedPortOrDie() {
   // Ephemeral ports.
