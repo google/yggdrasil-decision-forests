@@ -14,16 +14,45 @@
 
 :: Pack the CLI binary in an archive.
 
-set CLI="bazel-bin\yggdrasil_decision_forests\cli"
+:: It is recommanded to use Bazelisk: https://github.com/bazelbuild/bazelisk/releases
+set BAZEL=bazel.exe
+%BAZEL% version
 
+:: Bazel is compatible with Visual Studio 2017 and 2019.
+:: https://bazel.build/configure/windows#using
+:: If you have multiple or other version of VS (e.g., VS2022), set "BAZEL_VC"
+:: accordingly. For example:
+:: set BAZEL_VC=C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC
+
+:: Disable support for TensorFlow datasets and IO.
+copy /Y WORKSPACE_NO_TF WORKSPACE
+
+:: Compile CLI binaries
+set C=//yggdrasil_decision_forests/cli
+
+%BAZEL% build --config=windows_cpp17 --config=windows_avx2^
+ %C%:train^
+ %C%:show_model^
+ %C%:show_dataspec^
+ %C%:predict^
+ %C%:infer_dataspec^
+ %C%:evaluate^
+ %C%:edit_model^
+ %C%:convert_dataset^
+ %C%:benchmark_inference^
+ %C%:analyze_model_and_dataset^
+ %C%:compute_variable_importances^
+ //yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_worker_main^
+ || goto :error
+
+:: Pack binaries in a zip
+set CLI="bazel-bin\yggdrasil_decision_forests\cli"
 mkdir dist
 copy configure\cli_readme.txt dist\README
 
 7z a -tzip dist\cli_windows.zip^
  .\dist\README^
  LICENSE^
- CHANGELOG.md^
- .\documentation\cli.txt^
  .\%CLI%\train.exe^
  .\%CLI%\show_model.exe^
  .\%CLI%\show_dataspec.exe^
@@ -33,5 +62,12 @@ copy configure\cli_readme.txt dist\README
  .\%CLI%\edit_model.exe^
  .\%CLI%\convert_dataset.exe^
  .\%CLI%\benchmark_inference.exe^
- .\%CLI%\utils\synthetic_dataset.exe^
- .\%CLI%\distribute\implementations\grpc\grpc_worker_main.exe
+ .\%CLI%\analyze_model_and_dataset.exe^
+ .\%CLI%\compute_variable_importances.exe^
+ .\%CLI%\..\utils\distribute\implementations\grpc\grpc_worker_main.exe
+
+goto :EOF
+:error
+echo Failed with error #%errorlevel%.
+exit /b %ERRORLEVEL%
+

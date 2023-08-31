@@ -28,7 +28,7 @@ cc_library_ydf(
     name = "all_learners_except_hparam_optimizer",
     deps = [
         "//yggdrasil_decision_forests/learner/cart",
-        "//yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees",
+        "//yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees:dgbt",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/learner/random_forest",
     ],

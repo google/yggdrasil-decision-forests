@@ -1110,7 +1110,7 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
   // Schedule the prediction updates.
   utils::concurrency::StreamProcessor<int, int> processor(
       "update predictions", num_threads,
-      [num_examples, this, num_prediction_dimensions, &caches](
+      [num_examples, this, num_prediction_dimensions, &caches, batch_size](
           const int batch_idx, const int thread_idx) -> int {
         auto& cache = caches[thread_idx];
 

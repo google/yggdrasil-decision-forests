@@ -15,8 +15,14 @@
 
 #include "yggdrasil_decision_forests/utils/distribute_cli/distribute_cli_worker.h"
 
+#ifndef _WIN32
 #include <stdio.h>  // popen, pclose
+#endif
 
+#include <array>
+#include <string>
+
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/time/time.h"
@@ -34,42 +40,123 @@ using Blob = distribute::Blob;
 
 }  // namespace
 
+#ifndef _WIN32
+absl::StatusOr<bool> Run(const std::string& command,
+                         const std::string& log_path,
+                         const bool display_commands_output) {
+  // Output file stream for the logs.
+  ASSIGN_OR_RETURN(auto log_handle, file::OpenOutputFile(log_path));
+  file::OutputFileCloser log_closer(std::move(log_handle));
+
+  std::array<char, 2048> buffer;
+  FILE* pipe = popen(absl::StrCat(command, " 2>&1").c_str(), "r");
+  if (!pipe) {
+    YDF_LOG(WARNING) << "popen() failed";
+    return absl::InvalidArgumentError("popen() failed");
+  }
+  absl::Status pending_status;
+  while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+    const auto write_log_status = log_closer.stream()->Write(buffer.data());
+    if (!write_log_status.ok()) {
+      YDF_LOG(WARNING) << "Failure to write logs: "
+                       << write_log_status.message();
+      pending_status.Update(write_log_status);
+      break;
+    }
+    if (display_commands_output) {
+      puts(buffer.data());
+    }
+  }
+  int pclose_status = pclose(pipe);
+  // In some implementations, WEXITSTATUS requires a lvalue.
+  auto error = WEXITSTATUS(pclose_status);
+  RETURN_IF_ERROR(log_closer.Close());
+  RETURN_IF_ERROR(pending_status);
+
+  return error == 0;
+}
+#else
+
+#include <Windows.h>
+absl::StatusOr<bool> Run(const std::string& command,
+                         const std::string& log_path,
+                         const bool display_commands_output) {
+  // Output file stream for the logs.
+  ASSIGN_OR_RETURN(auto log_handle, file::OpenOutputFile(log_path));
+  file::OutputFileCloser log_closer(std::move(log_handle));
+
+  // Create pipes for capturing stdout and stderr
+  HANDLE stdout_read, stdout_write;
+  SECURITY_ATTRIBUTES sec;
+  sec.nLength = sizeof(SECURITY_ATTRIBUTES);
+  sec.bInheritHandle = true;
+  sec.lpSecurityDescriptor = nullptr;
+
+  if (!CreatePipe(&stdout_read, &stdout_write, &sec, 0)) {
+    return false;
+  }
+
+  STARTUPINFOA si;
+  PROCESS_INFORMATION pi;
+
+  ZeroMemory(&si, sizeof(STARTUPINFOA));
+  si.cb = sizeof(STARTUPINFOA);
+  si.hStdError = stdout_write;   // Redirect stderr to the same pipe
+  si.hStdOutput = stdout_write;  // Redirect stdout to the same pipe
+  si.dwFlags |= STARTF_USESTDHANDLES;
+
+  std::string mutable_command = command;
+  if (!CreateProcessA(nullptr, &mutable_command[0], nullptr, nullptr, true, 0,
+                      nullptr, nullptr, &si, &pi)) {
+    CloseHandle(stdout_read);
+    CloseHandle(stdout_write);
+    return false;
+  }
+
+  CloseHandle(stdout_write);
+
+  std::array<char, 2048> buffer;
+  DWORD num_read_bytes;
+  absl::Status pending_status;
+  while (ReadFile(stdout_read, buffer.data(), buffer.size() - 1,
+                  &num_read_bytes, NULL) != 0 &&
+         num_read_bytes != 0) {
+    buffer[num_read_bytes] = '\0';
+
+    const auto write_log_status = log_closer.stream()->Write(buffer.data());
+    if (!write_log_status.ok()) {
+      YDF_LOG(WARNING) << "Failure to write logs: "
+                       << write_log_status.message();
+      pending_status.Update(write_log_status);
+      break;
+    }
+    if (display_commands_output) {
+      puts(buffer.data());
+    }
+  }
+  RETURN_IF_ERROR(pending_status);
+
+  CloseHandle(stdout_read);
+
+  WaitForSingleObject(pi.hProcess, INFINITE);
+  DWORD exit_code;
+  GetExitCodeProcess(pi.hProcess, &exit_code);
+
+  CloseHandle(pi.hProcess);
+  CloseHandle(pi.hThread);
+
+  return exit_code == 0;
+}
+#endif
+
 absl::Status Worker::RunCommand(const absl::string_view command,
                                 const absl::string_view log_path) {
-  int error = 0;
-  {
-    file::RecursivelyDelete(log_path, file::Defaults()).IgnoreError();
-
-    // Output file stream for the logs.
-    ASSIGN_OR_RETURN(auto log_handle, file::OpenOutputFile(log_path));
-    file::OutputFileCloser log_closer(std::move(log_handle));
-
-    std::array<char, 2048> buffer;
-    FILE* pipe = popen(absl::StrCat(command, " 2>&1").c_str(), "r");
-    if (!pipe) {
-      YDF_LOG(WARNING) << "popen() failed";
-      return absl::InvalidArgumentError("popen() failed");
-    }
-    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
-      const auto write_log_status = log_closer.stream()->Write(buffer.data());
-      if (!write_log_status.ok()) {
-        YDF_LOG(WARNING) << "Failure to write logs: "
-                         << write_log_status.message();
-        pclose(pipe);
-        return write_log_status;
-      }
-      if (welcome_.display_commands_output()) {
-        puts(buffer.data());
-      }
-    }
-    int pclose_status = pclose(pipe);
-    // In some implementations, WEXITSTATUS requires a lvalue.
-    error = WEXITSTATUS(pclose_status);
-    RETURN_IF_ERROR(log_closer.Close());
-
-    if (error == 0) {
-      return absl::OkStatus();
-    }
+  file::RecursivelyDelete(log_path, file::Defaults()).IgnoreError();
+  ASSIGN_OR_RETURN(const bool command_worked,
+                   Run(std::string(command), std::string(log_path),
+                       welcome_.display_commands_output()));
+  if (command_worked) {
+    return absl::OkStatus();
   }
 
   if (welcome_.display_output()) {
@@ -90,10 +177,10 @@ absl::Status Worker::RunCommand(const absl::string_view command,
   }
 
   std::string error_message = absl::Substitute(
-      "The following command failed with code $3:\n\n$0\n\nLog files: "
+      "The following command failed:\n\n$0\n\nLog files: "
       "$1\n\nLast 5k "
       "characters of logs:\n\n$2",
-      command, log_path, end_of_logs, error);
+      command, log_path, end_of_logs);
   return absl::InvalidArgumentError(error_message);
 }
 
