@@ -17,10 +17,9 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iterator>
+#include <cstdint>
 #include <memory>
 #include <numeric>
-#include <random>
 #include <set>
 #include <string>
 #include <utility>
@@ -28,20 +27,18 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -50,6 +47,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/fold_generator.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
@@ -62,8 +60,12 @@ absl::Status AbstractLearner::LinkTrainingConfig(
     proto::TrainingConfigLinking* config_link) {
   // Label.
   int32_t label;
-  RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(training_config.label(),
-                                                      data_spec, &label));
+  if (!training_config.has_label()) {
+    STATUS_FATAL("No label specified in the training config. Aborting.");
+  }
+  RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
+      training_config.label(), data_spec, &label,
+      "Retrieving label column failed. "));
   config_link->set_label(label);
   config_link->set_num_label_classes(
       data_spec.columns(label).categorical().number_of_unique_values());
@@ -72,7 +74,8 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   int32_t cv_group = -1;
   if (training_config.has_cv_group()) {
     RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
-        training_config.cv_group(), data_spec, &cv_group));
+        training_config.cv_group(), data_spec, &cv_group,
+        "Retrieving cross-validation group column failed. "));
   }
   config_link->set_cv_group(cv_group);
 
@@ -83,7 +86,8 @@ absl::Status AbstractLearner::LinkTrainingConfig(
       return absl::InvalidArgumentError(
           "\"ranking_group\" should be specified for a ranking task.");
     RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
-        training_config.ranking_group(), data_spec, &ranking_group));
+        training_config.ranking_group(), data_spec, &ranking_group,
+        "Retrieving ranking_group column failed. "));
   } else {
     if (training_config.has_ranking_group())
       return absl::InvalidArgumentError(
@@ -99,7 +103,8 @@ absl::Status AbstractLearner::LinkTrainingConfig(
       return absl::InvalidArgumentError(
           "\"uplift_treatment\" should be specified for an uplift task.");
     RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
-        training_config.uplift_treatment(), data_spec, &uplift_treatment));
+        training_config.uplift_treatment(), data_spec, &uplift_treatment,
+        "Retrieving uplift_treatment column failed. "));
   } else {
     if (training_config.has_uplift_treatment())
       return absl::InvalidArgumentError(
@@ -117,9 +122,8 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   // List the model input features.
   std::vector<int32_t> feature_idxs;
   if (training_config.features().empty()) {
-    YDF_LOG(INFO)
-        << "No input feature specified. Using all the available input "
-           "features as input signal.";
+    YDF_LOG(INFO) << "No input feature explicitly specified. Using all the "
+                     "available input features.";
     feature_idxs.assign(data_spec.columns_size(), 0);
     std::iota(feature_idxs.begin(), feature_idxs.end(), 0);
   } else {

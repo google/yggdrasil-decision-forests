@@ -5,6 +5,7 @@
 ## Fix
 
 -   Fix Window compilation with Visual Studio 2019
+-   Improved error messages for invalid training configuration
 
 ## Breaking change
 
@@ -16,6 +17,8 @@
     Note most case, importing the learners with
     `//third_party/yggdrasil_decision_forests/learner:all_learners` is
     recommended.
+-   The training configuration must contain a label. A missing label is no
+    longer interpreted as the label being the input feature "".
 
 ## 1.6.0 - rc0 2023-08-22
 

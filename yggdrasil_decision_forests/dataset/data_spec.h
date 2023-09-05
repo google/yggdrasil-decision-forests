@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #include <limits>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -78,10 +79,12 @@ void GetMultipleColumnIdxFromName(
     std::vector<int32_t>* column_idxs);
 
 // Returns a column idx from a regular expression on the column name. If none or
-// several columns are matching the regular expression, the function fails.
+// several columns are matching the regular expression, the function fails with
+// its error message starting with `error_message_prefix` (if specified).
 absl::Status GetSingleColumnIdxFromName(
     absl::string_view column_name_regex,
-    const dataset::proto::DataSpecification& data_spec, int32_t* column_idx);
+    const dataset::proto::DataSpecification& data_spec, int32_t* column_idx,
+    absl::string_view error_message_prefix = "");
 
 // Converts a single row from a csv into an Example.
 // If col_idx_to_field_idx[i] == -1, all the values of the i-th column are
