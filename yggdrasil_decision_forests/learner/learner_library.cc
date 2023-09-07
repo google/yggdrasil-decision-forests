@@ -48,7 +48,8 @@ absl::Status GetLearner(const proto::TrainingConfig& train_config,
                         std::unique_ptr<AbstractLearner>* learner,
                         const proto::DeploymentConfig& deployment_config) {
   if (train_config.learner().empty()) {
-    return absl::InvalidArgumentError("\"learner\" field required.");
+    return absl::InvalidArgumentError(
+        "No \"learner\" set in the training configuration.");
   }
 
   auto effective_train_config = train_config;
