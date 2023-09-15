@@ -138,8 +138,9 @@ AbstractModel::EvaluateWithStatus(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
     std::vector<model::proto::Prediction>* predictions) const {
-  CHECK_EQ(option.task(), task())
-      << "The evaluation and the model tasks differ.";
+  if (option.task() != task()) {
+    STATUS_FATAL("The evaluation and the model tasks differ.");
+  }
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
       metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
@@ -153,12 +154,43 @@ AbstractModel::EvaluateWithStatus(
     const absl::string_view typed_path,
     const metric::proto::EvaluationOptions& option,
     utils::RandomEngine* rnd) const {
-  CHECK_EQ(option.task(), task())
-      << "The evaluation and the model tasks differ.";
+  if (option.task() != task()) {
+    STATUS_FATAL("The evaluation and the model tasks differ.");
+  }
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
       metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
   RETURN_IF_ERROR(AppendEvaluation(typed_path, option, rnd, &eval));
+  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
+  return eval;
+}
+
+absl::StatusOr<metric::proto::EvaluationResults>
+AbstractModel::EvaluateWithEngine(
+    const serving::FastEngine& engine, const dataset::VerticalDataset& dataset,
+    const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
+    std::vector<model::proto::Prediction>* predictions) const {
+  if (option.task() != task()) {
+    STATUS_FATAL("The evaluation and the model tasks differ.");
+  }
+  metric::proto::EvaluationResults eval;
+  RETURN_IF_ERROR(
+      metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
+
+  dataset::proto::LinkedWeightDefinition weight_links;
+  if (option.has_weights()) {
+    RETURN_IF_ERROR(dataset::GetLinkedWeightDefinition(
+        option.weights(), data_spec_, &weight_links));
+  }
+  if (dataset.nrow() == 0) {
+    STATUS_FATAL("The dataset is empty. Cannot evaluate model.");
+  }
+
+  RETURN_IF_ERROR(AppendEvaluationWithEngine(dataset, option, weight_links,
+                                             engine, rnd, predictions, &eval));
+
+  eval.set_num_folds(eval.num_folds() + 1);
+
   RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
   return eval;
 }
@@ -170,7 +202,7 @@ AbstractModel::EvaluateOverrideType(
     const proto::Task override_task, const int override_label_col_idx,
     const int override_group_col_idx, utils::RandomEngine* rnd,
     std::vector<model::proto::Prediction>* predictions) const {
-  if (option.task() == override_task) {
+  if (option.task() != override_task) {
     STATUS_FATAL("The evaluation and the model tasks differ.");
   }
   metric::proto::EvaluationResults eval;
