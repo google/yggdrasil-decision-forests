@@ -54,21 +54,26 @@ build_and_maybe_test () {
     # Not all tests can be run without TF support
     local testable_components=""
     local buildable_cli_components=""
+    local python_components=""
     if [ "$3" = 0 ]; then
       # No tensorflow support
       cp -f WORKSPACE_NO_TF WORKSPACE
       buildable_cli_components=":all"
       testable_components="metric/...:all"
+      # Include PYDF components
+      python_components="//yggdrasil_decision_forests/port/python/...:all"
     else 
       cp -f WORKSPACE_WITH_TF WORKSPACE
       flags="${flags} --config=use_tensorflow_io"
       buildable_cli_components="/...:all"
       testable_components="...:all"
+      # Exclude PYDF components.
+      python_components="-//yggdrasil_decision_forests/port/python/...:all"
     fi
 
-    time ${BAZEL} build //yggdrasil_decision_forests/cli${buildable_cli_components}  //examples:beginner_cc ${flags}
+    time ${BAZEL} build //yggdrasil_decision_forests/cli${buildable_cli_components} ${python_components} //examples:beginner_cc ${flags}
     if [ "$RUN_TESTS" = 1 ]; then
-      time ${BAZEL} test //yggdrasil_decision_forests/${testable_components}  //examples:beginner_cc ${flags}
+      time ${BAZEL} test //yggdrasil_decision_forests/${testable_components} ${python_components} //examples:beginner_cc ${flags}
     fi
     echo "Building and maybe testing YDF complete."
 } 

@@ -39,10 +39,11 @@ apt-get -y --no-install-recommends install \
   ca-certificates \
   build-essential \
   g++-10 \
-  clang-10 \
+  clang-12 \
   git \
   python3 \
   python3-pip \
+  python3-dev \
   zip \
   wget
 
@@ -59,7 +60,7 @@ if [[ ! -z ${BUILD+z} ]]; then
   cp -f WORKSPACE_WITH_TF WORKSPACE
 
   BAZEL="./bazelisk"
-  FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io --repo_env=CC=clang-10"
+  FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io --repo_env=CC=clang-12"
   ${BAZEL} build //yggdrasil_decision_forests/cli/...:all \
     //yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_worker_main ${FLAGS}
 
