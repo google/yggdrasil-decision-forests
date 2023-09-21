@@ -152,13 +152,15 @@ YDF can be compiled with or without TensorFlow. Compiling with TensorFlow adds
 the following features:
 
 -   Use TensorFlow for all IO operations. Without TensorFlow, IO operations are
-    done using `<filesystem>` introduced in C++17.
+    done using `<filesystem>` introduced in C++17 or the experimental filesystem
+    of C++14.
 
 -   Support of TensorFlow Record dataset format.
 
 ``` {note}
-Compiling with TensorFlow IO is currently (Sept 2022) a solution to compile
-YDF with C++14. However, this compatibility might be dropped at time.
+Compiling without TensorFlow support, GCC 9,  is currently (Sept 2023) the only 
+solution to compile YDF with C++14. However, this compatibility might be dropped
+ at time. Compiling the Python port with C++14 is not supported.
 ```
 
 To enable TensorFlow support:

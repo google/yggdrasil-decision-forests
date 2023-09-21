@@ -16,7 +16,11 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_DEFAULT_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_DEFAULT_H_
 
+#if __cplusplus > 201402L
 #include <filesystem>
+#else
+#include <experimental/filesystem>
+#endif
 #include <fstream>
 #include <iostream>
 #include <vector>
