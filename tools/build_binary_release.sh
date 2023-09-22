@@ -34,8 +34,8 @@ set -vex
 # Install the build dependencies
 if [[ ! -z ${INSTALL_DEPENDENCIES+z} ]]; then
 
-apt-get update
-apt-get -y --no-install-recommends install \
+sudo apt-get update
+sudo apt-get -y --no-install-recommends install \
   ca-certificates \
   build-essential \
   g++-10 \
