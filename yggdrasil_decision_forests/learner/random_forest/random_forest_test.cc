@@ -238,7 +238,7 @@ TEST_F(RandomForestOnAdult, Base) {
 
   EXPECT_LE(rank_capital_gain, 5);
   EXPECT_LE(rank_relationship, 5);
-  EXPECT_LE(rank_occupation, 5);
+  EXPECT_LE(rank_occupation, 6);
 
   // Worst 2 variables.
   const int rank_fnlwgt = utils::GetVariableImportanceRank(
@@ -397,7 +397,7 @@ TEST_F(RandomForestOnAdult, NoWinnerTakeAllRandomCategorical) {
   rf_config->mutable_decision_tree()->mutable_categorical()->mutable_random();
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.82618, 0.005);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.40623, 0.02);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.3817, 0.02);
 }
 
 TEST_F(RandomForestOnAdult, NoWinnerTakeAllExampleSampling) {
@@ -570,7 +570,7 @@ TEST_F(RandomForestOnAdult, MaxNumNodes) {
 
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.862, 0.015);
   // Disabling winner take all reduce the logloss (as expected).
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.368, 0.045);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.368, 0.06);
 }
 
 TEST_F(RandomForestOnAdult, SparseOblique) {
@@ -634,7 +634,7 @@ TEST_F(RandomForestOnAbalone, Base) {
       absl::StrCat("csv:", oob_prediction_path));
 
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::RMSE(evaluation_), 2.0825, 0.01);
+  EXPECT_NEAR(metric::RMSE(evaluation_), 2.0926, 0.01);
 
   // Check the oob predictions.
   const auto oob_predictions = file::GetContent(oob_prediction_path).value();

@@ -240,6 +240,7 @@ void BinomialLogLikelihoodLoss::TemplatedLossImp(
     const std::vector<float>& weights, size_t begin_example_idx,
     size_t end_example_idx, double* __restrict sum_loss,
     utils::IntegersConfusionMatrixDouble* confusion_matrix) {
+  double local_sum_loss = 0;
   for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
        example_idx++) {
     // The loss function expects a 0/1 label.
@@ -250,19 +251,19 @@ void BinomialLogLikelihoodLoss::TemplatedLossImp(
     if constexpr (use_weights) {
       const float weight = weights[example_idx];
       confusion_matrix->Add(labels[example_idx], predicted_label, weight);
-      *sum_loss -=
+      local_sum_loss -=
           2 * weight *
           (label_for_loss * prediction - std::log(1.f + std::exp(prediction)));
     } else {
       confusion_matrix->Add(labels[example_idx], predicted_label, 1.f);
       // Loss:
       //   -2 * ( label * prediction - log(1+exp(prediction)))
-      *sum_loss -= 2 * (label_for_loss * prediction -
-                        std::log(1.f + std::exp(prediction)));
-      DCheckIsFinite(*sum_loss);
+      local_sum_loss -= 2 * (label_for_loss * prediction -
+                             std::log(1.f + std::exp(prediction)));
     }
-    DCheckIsFinite(*sum_loss);
+    DCheckIsFinite(local_sum_loss);
   }
+  *sum_loss += local_sum_loss;
 }
 
 template <typename T>

@@ -168,14 +168,11 @@ class TrainAndTestTester : public ::testing::Test {
   // the logs.
   bool show_full_model_structure_ = false;
 
-  // If false, models trained and and evaluated in unit tests are expected to
-  // always be the same for a given implementation of the pseudo random number
-  // generator and a given version of the code. If true, training noise in
-  // injected through initial dataset shuffeling and randomization of the pseudo
-  // random number generator seed.
-  //
-  // TODO: Default to true.
+  // If true, shuffle the datasets in unit tests.
   bool inject_random_noise_ = false;
+
+  // If true, randomize learner seeds in unit tests.
+  bool change_random_seed_ = false;
 
  private:
   std::pair<std::string, std::string> GetTrainAndTestDatasetPaths();
@@ -335,13 +332,11 @@ absl::Status ExportUpliftPredictionsToTFUpliftCsvFormat(
     const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
     absl::string_view output_csv_path);
 
-// Internal implementation of "YDF_EXPECT_METRIC_NEAR".
-void InternalExportMetricCondition(const absl::string_view test,
-                                   const double value, const double center,
-                                   const double margin,
-                                   const absl::string_view metric,
-                                   const int line,
-                                   const absl::string_view file);
+// Internal implementation of "YDF_TEST_METRIC".
+void InternalExportMetricCondition(absl::string_view test, double value,
+                                   double center, double margin, double gold,
+                                   absl::string_view metric, int line,
+                                   absl::string_view file);
 
 // Gets the name of the current test.
 template <typename T>
@@ -370,21 +365,40 @@ int GetVariableImportanceRank(
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
 
-// Checks that "value" is in [center-margin, center+margin].
-#define YDF_EXPECT_METRIC_NEAR(value, center, margin)                        \
+// Checks that "value" is in [center-margin, center+margin] (margin test) and
+// equal to "golden". If "kYdfTestMetricCheckGold=False" or if "golden=NaN",
+// only check the margin test.
+//
+#define YDF_TEST_METRIC(value, center, margin, golden)                       \
   ::yggdrasil_decision_forests::utils::InternalExportMetricCondition(        \
       ::yggdrasil_decision_forests::utils::InternalGetTestName(this), value, \
-      center, margin, #value, __LINE__, __FILE__)
+      center, margin, golden, #value, __LINE__, __FILE__)
 
-// If set, exports the metric conditions (both valid and invalid) tested by
-// "YDF_EXPECT_METRIC_NEAR" in csv files in the directory specified by
-// "EXPORT_METRIC_CONDITION". Note: The directory should be already existing.
-// This command is compatible with "--runs_per_test" (e.g. --runs_per_test=50).
+// TODO: Simplify protocol.
 //
-// EXPORT_METRIC_CONDITION is especially useful with tests with
-// "inject_random_noise_=true" in order to study the distibution of metrics and
-// better adjust the valid range.
+// The following block allows to export unit-test evaluation metrics to csv
+// files, to then analyse the distribution of metrics in a notebook, and
+// possibly update valid margins.
 //
-// #define EXPORT_METRIC_CONDITION "/tmp/metric_condition"
+// If "kYdfTestMetricDumpDir" is set, the result of unit test metrics
+// tested with "YDF_TEST_METRIC" are exported to csv files in the
+// directory specified by "kYdfTestMetricDumpDir" (Note: The directory
+// should already exist) and the tests become non-failing (i.e., if a
+// metric is not in a valid range, the test does not fail).
+//
+// YDF training is deterministic modulo changes in implementation of the random
+// generator (or equivalent, e.g. change of default random seed, change of query
+// order of the random generator) and floating point compiler optimizations.
+// Stability of unit tests to random seeds can be tested with
+// "change_random_seed_=True" in conjunction with value for "--runs_per_test"
+// e.g. "--runs_per_test=100".
+//
+
+// If set, export metrics to disk, and disable metric unit tests.
+constexpr char kYdfTestMetricDumpDir[] = "";
+// To enable logging of unit test metrics.
+// constexpr char kYdfTestMetricDumpDir[] = "/tmp/metric_condition";
+
+constexpr bool kYdfTestMetricCheckGold = false;
 
 #endif  // YGGDRASIL_DECISION_FORESTS_TOOL_TEST_UTILS_H_
