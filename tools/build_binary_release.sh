@@ -34,8 +34,16 @@ set -vex
 # Install the build dependencies
 if [[ ! -z ${INSTALL_DEPENDENCIES+z} ]]; then
 
-apt-get update
-apt-get -y --no-install-recommends install \
+# If the script is running as root (e.g. in the build docker), don't use sudo.
+if [ $(id -u) -eq 0 ]
+then
+  SUDO=""
+else
+  SUDO=sudo
+fi
+
+$SUDO apt-get update
+$SUDO apt-get -y --no-install-recommends install \
   ca-certificates \
   build-essential \
   g++-10 \

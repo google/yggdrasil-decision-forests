@@ -58,7 +58,7 @@ YDF **with** Docker run the following command:
 Instead, to build YDF **without** Docker run:
 
 ```shell
-INSTALL_DEPENDENCIES=1 BUILD=1./tools/build_binary_release.sh
+INSTALL_DEPENDENCIES=1 BUILD=1 ./tools/build_binary_release.sh
 ```
 
 Building options (e.g., select the compiler, disable support for TensorFlow,
