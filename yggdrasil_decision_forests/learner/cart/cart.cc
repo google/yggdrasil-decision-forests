@@ -113,7 +113,7 @@ CartLearner::GetGenericHyperParameterSpecification() const {
                    AbstractLearner::GetGenericHyperParameterSpecification());
 
   hparam_def.mutable_documentation()->set_description(
-      R"(A CART (Classification and Regression Trees) a decision tree. The non-leaf nodes contains conditions (also known as splits) while the leaf nodes contains prediction values. The training dataset is divided in two parts. The first is used to grow the tree while the second is used to prune the tree.)");
+      R"(A CART (Classification and Regression Trees) a decision tree. The non-leaf nodes contains conditions (also known as splits) while the leaf nodes contain prediction values. The training dataset is divided in two parts. The first is used to grow the tree while the second is used to prune the tree.)");
 
   model::proto::TrainingConfig config;
   const auto proto_path = "learner/cart/cart.proto";
@@ -127,7 +127,7 @@ CartLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_real()->set_default_value(cart_config.validation_ratio());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Ratio of the training dataset used to create the validation dataset used to prune the tree. If set to 0, the entire dataset is used for training, and the tree is not pruned.)");
+        R"(Ratio of the training dataset used to create the validation dataset for pruning the tree. If set to 0, the entire dataset is used for training, and the tree is not pruned.)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
