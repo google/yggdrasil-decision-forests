@@ -16,21 +16,27 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_TRAINING_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_TRAINING_H_
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <random>
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/time/time.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator_uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_scanner.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/circular_buffer.h"
@@ -44,12 +50,12 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
 
-// Defines a generic collection of label statistics.
+// Label statistics.
 struct LabelStats {
   virtual ~LabelStats() = default;
 };
 
-// Structure that encapsulates label statistics for Classification.
+// Label statistics for Classification.
 struct ClassificationLabelStats : LabelStats {
   explicit ClassificationLabelStats(const std::vector<int32_t>& label_data)
       : label_data(label_data) {}
@@ -59,7 +65,7 @@ struct ClassificationLabelStats : LabelStats {
   utils::IntegerDistributionDouble label_distribution;
 };
 
-// Structure that encapsulates label statistics for Regression.
+// Label statistics for Regression.
 struct RegressionLabelStats : LabelStats {
   explicit RegressionLabelStats(const std::vector<float>& label_data)
       : label_data(label_data) {}
@@ -68,7 +74,7 @@ struct RegressionLabelStats : LabelStats {
   utils::NormalDistributionDouble label_distribution;
 };
 
-// Structure that encapsulates label statistics for Regression.
+// Label statistics for Regression with hessian.
 struct RegressionHessianLabelStats : LabelStats {
   RegressionHessianLabelStats(const std::vector<float>& gradient_data,
                               const std::vector<float>& hessian_data)
@@ -81,8 +87,8 @@ struct RegressionHessianLabelStats : LabelStats {
   double sum_weights;
 };
 
-// Structure that encapsulates label statistics for uplift with categorical
-// treatment and categorical outcome.
+// Label statistics for uplift with categorical treatment and categorical
+// outcome.
 struct CategoricalUpliftLabelStats : LabelStats {
   explicit CategoricalUpliftLabelStats(
       const std::vector<int32_t>& outcome_values,
@@ -103,8 +109,7 @@ struct CategoricalUpliftLabelStats : LabelStats {
   UpliftLabelDistribution label_distribution;
 };
 
-// Structure that encapsulates label statistics for uplift with categorical
-// treatment and numerical outcome..
+// Label statistics for uplift with categorical treatment and numerical outcome.
 struct NumericalUpliftLabelStats : LabelStats {
   explicit NumericalUpliftLabelStats(
       const std::vector<float>& outcome_values,
@@ -380,6 +385,9 @@ struct InternalTrainConfig {
 
   // Index of the hessian column in the dataset.
   int hessian_col_idx = -1;
+
+  // Index of the gradient column in the dataset.
+  int gradient_col_idx = -1;
 
   // Regularization terms.
   float hessian_l1 = 0.f;

@@ -117,69 +117,11 @@ TEST_P(MeanSquareErrorLossTest, UpdateGradients) {
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
   if (weighted) {
-  EXPECT_THAT(gradients.front().gradient,
-              ElementsAre(1.f - 3.f, 2.f - 3.f, 3.f - 3.f, 4.f - 3.f));
+    EXPECT_THAT(gradients.front().gradient,
+                ElementsAre(1.f - 3.f, 2.f - 3.f, 3.f - 3.f, 4.f - 3.f));
   } else {
-  EXPECT_THAT(gradients.front().gradient,
-              ElementsAre(1.f - 2.5f, 2.f - 2.5f, 3.f - 2.5f, 4.f - 2.5f));
-  }
-}
-
-TEST_P(MeanSquareErrorLossTest, SetLabelDistribution) {
-  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
-                       CreateToyDataset());
-  const bool weighted = std::get<0>(GetParam());
-  std::vector<float> weights;
-  if (weighted) {
-    weights = {2.f, 4.f, 6.f, 8.f};
-  }
-
-  proto::GradientBoostedTreesTrainingConfig gbt_config;
-  gbt_config.set_shrinkage(1.f);
-  std::vector<GradientData> gradients;
-  dataset::VerticalDataset gradient_dataset;
-  const MeanSquaredErrorLoss loss_imp(gbt_config,
-                                      model::proto::Task::REGRESSION,
-                                      dataset.data_spec().columns(0));
-  ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, loss_imp,
-                                            &gradient_dataset, &gradients,
-                                            nullptr));
-  EXPECT_THAT(gradients, SizeIs(1));
-
-  std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
-  std::vector<float> predictions(dataset.nrow(), 0.f);
-
-  model::proto::TrainingConfig config;
-  model::proto::TrainingConfigLinking config_link;
-  config_link.set_label(2);  // Gradient column.
-
-  decision_tree::NodeWithChildren node;
-  if (weighted) {
-    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/true>(
-        gradient_dataset, selected_examples, weights, config, config_link,
-        predictions,
-        /* label_col_idx= */ 0, &node));
-    // Top_value is the weighted mean of the labels
-    EXPECT_EQ(node.node().regressor().top_value(), 3.f);
-    // Distribution of the gradients:
-    EXPECT_EQ(node.node().regressor().distribution().sum(), 0);
-    EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
-    // Total weight in the dataset.
-    EXPECT_EQ(node.node().regressor().distribution().count(), 20.);
-  } else {
-    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/false>(
-        gradient_dataset, selected_examples, weights, config, config_link,
-        predictions,
-        /* label_col_idx= */ 0, &node));
-    // Top value is the mean of the labels.
-    EXPECT_EQ(node.node().regressor().top_value(), 2.5f);
-    // Distribution of the gradients:
-    EXPECT_EQ(node.node().regressor().distribution().sum(), 0);
-    EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 0);
-    // Same as the number of examples in the dataset.
-    EXPECT_EQ(node.node().regressor().distribution().count(), 4.);
+    EXPECT_THAT(gradients.front().gradient,
+                ElementsAre(1.f - 2.5f, 2.f - 2.5f, 3.f - 2.5f, 4.f - 2.5f));
   }
 }
 

@@ -75,14 +75,14 @@ absl::Status CrossEntropyNDCGLoss::UpdateGradients(
   // TODO: Implement thread_pool.
 
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
-  std::vector<float>& second_order_derivative_data = *((*gradients)[0].hessian);
+  std::vector<float>& hessian_data = *((*gradients)[0].hessian);
+  DCHECK_EQ(gradient_data.size(), hessian_data.size());
 
   std::uniform_real_distribution<float> distribution(0.0, 1.0);
 
   // Reset gradient accumulators.
   std::fill(gradient_data.begin(), gradient_data.end(), 0.f);
-  std::fill(second_order_derivative_data.begin(),
-            second_order_derivative_data.end(), 0.f);
+  std::fill(hessian_data.begin(), hessian_data.end(), 0.f);
 
   // A vector of predictions for items in a group.
   std::vector<float> preds;
@@ -169,44 +169,9 @@ absl::Status CrossEntropyNDCGLoss::UpdateGradients(
     for (int idx = 0; idx < group_size; idx++) {
       const auto example_idx = group.items[idx].example_idx;
       gradient_data[example_idx] -= preds[idx] * (sum_l2 - params[idx]);
-      second_order_derivative_data[example_idx] =
-          preds[idx] * (1.f - preds[idx]);
+      hessian_data[example_idx] = preds[idx] * (1.f - preds[idx]);
     }
   }
-  return absl::OkStatus();
-}
-
-decision_tree::CreateSetLeafValueFunctor CrossEntropyNDCGLoss::SetLeafFunctor(
-    const std::vector<float>& predictions,
-    const std::vector<GradientData>& gradients, const int label_col_idx) const {
-  return [this, &predictions, &gradients, label_col_idx](
-             const dataset::VerticalDataset& train_dataset,
-             const std::vector<UnsignedExampleIdx>& selected_examples,
-             const std::vector<float>& weights,
-             const model::proto::TrainingConfig& config,
-             const model::proto::TrainingConfigLinking& config_link,
-             decision_tree::NodeWithChildren* node) {
-    if (weights.empty()) {
-      return SetLeafNDCG</*weighted=*/false>(
-          train_dataset, selected_examples, weights, config, config_link,
-          predictions, gbt_config_, gradients, label_col_idx, node);
-    } else {
-      return SetLeafNDCG</*weighted=*/true>(
-          train_dataset, selected_examples, weights, config, config_link,
-          predictions, gbt_config_, gradients, label_col_idx, node);
-    }
-  };
-}
-
-absl::Status CrossEntropyNDCGLoss::UpdatePredictions(
-    const std::vector<const decision_tree::DecisionTree*>& new_trees,
-    const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
-    double* mean_abs_prediction) const {
-  if (new_trees.size() != 1) {
-    return absl::InternalError("Wrong number of trees");
-  }
-  UpdatePredictionWithSingleUnivariateTree(dataset, *new_trees.front(),
-                                           predictions, mean_abs_prediction);
   return absl::OkStatus();
 }
 

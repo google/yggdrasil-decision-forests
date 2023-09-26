@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <iterator>
 #include <limits>
@@ -33,15 +34,19 @@
 
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
+#include "absl/time/time.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator_uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_scanner.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -53,6 +58,7 @@
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -1831,11 +1837,12 @@ absl::StatusOr<bool> FindBestCondition(
 
     case model::proto::Task::REGRESSION: {
       if (internal_config.use_hessian_gain) {
+        DCHECK_EQ(internal_config.gradient_col_idx, config_link.label());
         RegressionHessianLabelStats label_stat(
             train_dataset
                 .ColumnWithCastWithStatus<
                     dataset::VerticalDataset::NumericalColumn>(
-                    config_link.label())
+                    internal_config.gradient_col_idx)
                 .value()
                 ->values(),
             train_dataset
@@ -1845,6 +1852,7 @@ absl::StatusOr<bool> FindBestCondition(
                 .value()
                 ->values());
 
+        DCHECK(parent.regressor().has_sum_gradients());
         label_stat.sum_gradient = parent.regressor().sum_gradients();
         label_stat.sum_hessian = parent.regressor().sum_hessians();
         label_stat.sum_weights = parent.regressor().sum_weights();
@@ -1862,6 +1870,7 @@ absl::StatusOr<bool> FindBestCondition(
                 .value()
                 ->values());
 
+        DCHECK(parent.regressor().has_distribution());
         label_stat.label_distribution.Load(parent.regressor().distribution());
 
         return FindBestConditionManager(

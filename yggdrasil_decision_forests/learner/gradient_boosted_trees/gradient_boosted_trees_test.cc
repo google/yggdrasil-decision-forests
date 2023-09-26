@@ -45,6 +45,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping/early_stopping.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
@@ -240,6 +241,7 @@ TEST(GradientBoostedTrees, CreateGradientDataset) {
           }
         }
         columns { type: NUMERICAL name: "__gradient__0" }
+        columns { type: NUMERICAL name: "__hessian__0" }
       )pb");
   EXPECT_THAT(gradient_dataset.data_spec(), EqualsProto(expected_data_spec));
 
@@ -260,7 +262,8 @@ TEST(GradientBoostedTrees, SampleTrainingExamplesWithGoss) {
   std::vector<float> weights(num_rows, 1.f);
 
   std::vector<float> dim1_values = {0.8, 2.0, -0.1, -3.2};
-  GradientData dim1{/*.gradient =*/dim1_values};
+  std::vector<float> hessian_values = {1, 1, 1, 1, 1};
+  GradientData dim1{.gradient = dim1_values, .hessian = hessian_values};
   std::vector<GradientData> gradients = {dim1};
 
   utils::RandomEngine random(1234);
@@ -340,7 +343,6 @@ class GradientBoostedTreesOnAdult : public utils::TrainAndTestTester {
     train_config_.set_learner(GradientBoostedTreesLearner::kRegisteredName);
     train_config_.set_task(model::proto::Task::CLASSIFICATION);
     train_config_.set_label("income");
-    train_config_.add_features(".*");
     dataset_filename_ = "adult.csv";
     dataset_sampling_ = 0.2f;
     deployment_config_.set_num_threads(1);
@@ -365,7 +367,7 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8644, 0.0099, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2979, 0.0127, 0.2949);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2979, 0.0127, 0.294);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
@@ -387,7 +389,7 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
   // is significantly better (which is expected as, unlike RF, GBT is
   // calibrated).
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8647, 0.0099, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2984, 0.0162, 0.2949);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2984, 0.0162, 0.294);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
@@ -481,8 +483,8 @@ TEST_F(GradientBoostedTreesOnAdult, Honest) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->mutable_decision_tree()->mutable_honest();
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8589, 0.0131, 0.8557);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3095, 0.015, 0.3135);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8589, 0.0131, 0.8609);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3095, 0.015, 0.3075);
 }
 // Train a GBT with a validation dataset provided as a VerticalDataset.
 TEST_F(GradientBoostedTreesOnAdult, ValidVerticalDataset) {
@@ -678,8 +680,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseNoQuickScorer) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8596, 0.0134, 0.8566);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3146, 0.0212, 0.3104);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8596, 0.0134, 0.8569);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3146, 0.0212, 0.3111);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
@@ -734,7 +736,7 @@ TEST_F(GradientBoostedTreesOnAdult, GossDeprecated) {
   TrainAndEvaluateModel();
 
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86, 0.012, 0.86);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3106, 0.0168, 0.3048);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3106, 0.0168, 0.3074);
 }
 
 // Train and test a model on the adult dataset with Goss sampling.
@@ -748,7 +750,7 @@ TEST_F(GradientBoostedTreesOnAdult, Goss) {
   TrainAndEvaluateModel();
 
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8601, 0.0127, 0.86);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3095, 0.0138, 0.3048);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3095, 0.0138, 0.3074);
 }
 
 // Train and test a model on the adult dataset.
@@ -766,8 +768,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDiscretizedNumerical) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8649, 0.0097, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2986, 0.0148, 0.2955);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8649, 0.0097, 0.8618);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2986, 0.0148, 0.2957);
 }
 
 // Train and test a model on the adult dataset.
@@ -804,7 +806,7 @@ TEST_F(GradientBoostedTreesOnAdult, BaseWithWeights) {
   TrainAndEvaluateModel(/*numerical_weight_attribute=*/"age");
 
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8388, 0.0146, 0.8375);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3614, 0.0313, 0.3534);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3614, 0.0313, 0.3533);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, NumCandidateAttributeRatio) {
@@ -838,8 +840,8 @@ TEST_F(GradientBoostedTreesOnAdult, LeafWiseGrow) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8662, 0.0094, 0.8639);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3026, 0.0218, 0.2931);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8662, 0.0094, 0.8646);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3026, 0.0218, 0.2958);
 }
 
 // Train and test a model on the adult dataset with L2 regularization.
@@ -858,7 +860,7 @@ TEST_F(GradientBoostedTreesOnAdult, L2Regularization) {
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8639, 0.0097, 0.8621);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.011, 0.2953);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.011, 0.2952);
 }
 
 // Multiclass version of the algorithm on the binary class adult dataset.
@@ -875,8 +877,8 @@ TEST_F(GradientBoostedTreesOnAdult, FakeMulticlass) {
 
   // Note: As expected, the results are similar to the binary class
   // implementation.
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8641, 0.0099, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2979, 0.0126, 0.2969);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8641, 0.0099, 0.8646);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2979, 0.0126, 0.2966);
 }
 
 // Multiclass version of the algorithm on the binary class adult dataset with L2
@@ -895,8 +897,8 @@ TEST_F(GradientBoostedTreesOnAdult, FakeMulticlassL2Regularization) {
 
   // Note: As expected, the results are similar to the binary class
   // implementation.
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8649, 0.0092, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3002, 0.0152, 0.2952);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8649, 0.0092, 0.8725);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3002, 0.0152, 0.2953);
 }
 
 // Train and test a model on the adult dataset for a maximum given duration.
@@ -1045,8 +1047,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianRandomCategorical) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8636, 0.0092, 0.8664);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2924, 0.0112, 0.2904);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8636, 0.0092, 0.859);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2924, 0.0112, 0.2934);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianDiscretizedNumerical) {
@@ -1087,7 +1089,7 @@ TEST_F(GradientBoostedTreesOnAdult, PureServingModel) {
   TrainAndEvaluateModel();
 
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8661, 0.0134, 0.8615);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3001, 0.0204, 0.2975);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3001, 0.0204, 0.2977);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, MakingAModelPurePureServingModel) {
@@ -1097,14 +1099,14 @@ TEST_F(GradientBoostedTreesOnAdult, MakingAModelPurePureServingModel) {
   TrainAndEvaluateModel();
 
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8676, 0.0129, 0.8615);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.0167, 0.2975);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.0167, 0.2977);
   const auto pre_pruning_size = model_->ModelSizeInBytes().value();
   YDF_LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
 
   CHECK_OK(model_->MakePureServing());
 
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8676, 0.0129, 0.8615);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.0167, 0.2975);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.0167, 0.2977);
 
   const auto post_pruning_size = model_->ModelSizeInBytes().value();
   YDF_LOG(INFO) << "post_pruning_size:" << post_pruning_size;
@@ -1137,7 +1139,7 @@ TEST_F(GradientBoostedTreesOnAbalone, L2Regularization) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_l2_regularization(0.1f);
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1593, 0.0776, 2.1145);
+  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1593, 0.0776, 2.1241);
 }
 
 TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
@@ -1156,7 +1158,7 @@ TEST_F(GradientBoostedTreesOnAbalone, PoissonLoss) {
   gbt_config->set_loss(proto::Loss::POISSON);
 
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1563, 0.0852, 2.1232);
+  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1563, 0.0852, 2.1491);
 }
 
 class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {
@@ -1176,7 +1178,7 @@ class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {
 TEST_F(GradientBoostedTreesOnIris, Base) {
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9533, 0.03, 0.96);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2988, 0.2562, 0.2193);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2988, 0.2562, 0.2255);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 
@@ -1186,7 +1188,7 @@ TEST_F(GradientBoostedTreesOnIris, Hessian) {
   gbt_config->set_use_hessian_gain(true);
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.94, 0.05, 0.9733);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3225, 0.3002, 0.138);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3225, 0.3002, 0.1462);
 }
 
 TEST_F(GradientBoostedTreesOnIris, Dart) {
@@ -1197,7 +1199,7 @@ TEST_F(GradientBoostedTreesOnIris, Dart) {
   gbt_config->mutable_decision_tree()->set_num_candidate_attributes(8);
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9467, 0.04, 0.9733);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1925, 0.1226, 0.18);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1925, 0.1226, 0.2009);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 
@@ -1217,8 +1219,8 @@ class GradientBoostedTreesOnDNA : public utils::TrainAndTestTester {
 
 TEST_F(GradientBoostedTreesOnDNA, Base) {
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9507, 0.0108, 0.9517);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1933, 0.08, 0.1446);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9507, 0.0108, 0.9542);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1933, 0.08, 0.1452);
   // Note: R RandomForest has an OOB accuracy of 0.909.
 }
 
@@ -1227,15 +1229,15 @@ TEST_F(GradientBoostedTreesOnDNA, Hessian) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_use_hessian_gain(true);
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9539, 0.0099, 0.9573);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1831, 0.0743, 0.1403);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9539, 0.0099, 0.9554);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1831, 0.0743, 0.1442);
 }
 
 TEST_F(GradientBoostedTreesOnDNA, BaseBooleanAsNumerical) {
   guide_filename_ = "dna_guide.pbtxt";
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9514, 0.0118, 0.9517);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1757, 0.0568, 0.1446);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9514, 0.0118, 0.9542);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1757, 0.0568, 0.1452);
   // Note: R RandomForest has an OOB accuracy of 0.909.
 }
 
@@ -1246,7 +1248,7 @@ TEST_F(GradientBoostedTreesOnDNA, HessianBooleanAsNumerical) {
   guide_filename_ = "dna_guide.pbtxt";
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9532, 0.0118, 0.9567);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1813, 0.0716, 0.1422);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1813, 0.0716, 0.1442);
 }
 
 TEST(GradientBoostedTrees, SetHyperParameters) {

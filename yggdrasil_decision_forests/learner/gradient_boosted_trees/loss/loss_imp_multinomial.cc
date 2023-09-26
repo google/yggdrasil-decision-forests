@@ -90,7 +90,7 @@ absl::Status MultinomialLogLikelihoodLoss::TemplatedUpdateGradients(
   absl::FixedArray<float> accumulator(gradients->size());
   const auto num_examples = labels.size();
   const auto use_hessian_gain = (*gradients)[0].hessian;
-  if (gbt_config_.use_hessian_gain() && !use_hessian_gain) {
+  if (!use_hessian_gain) {
     return absl::InternalError("Hessian missing");
   }
   for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
@@ -113,12 +113,13 @@ absl::Status MultinomialLogLikelihoodLoss::TemplatedUpdateGradients(
       const float grad = label - prediction;
       const float abs_grad = std::abs(grad);
       DCheckIsFinite(grad);
-      (*(*gradients)[grad_idx].gradient)[example_idx] = grad;
-      if (use_hessian_gain) {
-        (*(*gradients)[grad_idx].hessian)[example_idx] =
-            abs_grad * (1 - abs_grad);
-        DCheckIsFinite(abs_grad * (1 - abs_grad));
-      }
+
+      auto& gradient_data = (*(*gradients)[grad_idx].gradient);
+      auto& hessian_data = (*(*gradients)[grad_idx].hessian);
+      DCHECK_EQ(gradient_data.size(), hessian_data.size());
+      gradient_data[example_idx] = grad;
+      hessian_data[example_idx] = abs_grad * (1 - abs_grad);
+      DCheckIsFinite(abs_grad * (1 - abs_grad));
     }
   }
   return absl::OkStatus();
@@ -142,40 +143,6 @@ absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
                                   random, thread_pool);
 }
 
-decision_tree::CreateSetLeafValueFunctor
-MultinomialLogLikelihoodLoss::SetLeafFunctor(
-    const std::vector<float>& predictions,
-    const std::vector<GradientData>& gradients, const int label_col_idx) const {
-  return [this, &predictions, label_col_idx](
-             const dataset::VerticalDataset& train_dataset,
-             const std::vector<UnsignedExampleIdx>& selected_examples,
-             const std::vector<float>& weights,
-             const model::proto::TrainingConfig& config,
-             const model::proto::TrainingConfigLinking& config_link,
-             decision_tree::NodeWithChildren* node) {
-    if (weights.empty()) {
-      return SetLeaf</*weighted=*/false>(train_dataset, selected_examples,
-                                         weights, config, config_link,
-                                         predictions, label_col_idx, node);
-    } else {
-      return SetLeaf</*weighted=*/true>(train_dataset, selected_examples,
-                                        weights, config, config_link,
-                                        predictions, label_col_idx, node);
-    }
-  };
-}
-
-absl::Status MultinomialLogLikelihoodLoss::UpdatePredictions(
-    const std::vector<const decision_tree::DecisionTree*>& new_trees,
-    const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
-    double* mean_abs_prediction) const {
-  if (new_trees.size() != dimension_) {
-    return absl::InternalError("Wrong number of trees");
-  }
-  UpdatePredictionWithMultipleUnivariateTrees(dataset, new_trees, predictions,
-                                              mean_abs_prediction);
-  return absl::OkStatus();
-}
 
 std::vector<std::string> MultinomialLogLikelihoodLoss::SecondaryMetricNames()
     const {

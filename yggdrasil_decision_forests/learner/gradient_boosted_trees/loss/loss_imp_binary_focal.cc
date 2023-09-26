@@ -156,7 +156,7 @@ absl::Status BinaryFocalLoss::TemplatedUpdateGradients(
 
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
   std::vector<float>* hessian_data = (*gradients)[0].hessian;
-  if (gbt_config_.use_hessian_gain() && hessian_data == nullptr) {
+  if (hessian_data == nullptr) {
     return absl::InternalError("Hessian missing");
   }
   const size_t num_examples = labels.size();
@@ -201,6 +201,7 @@ void BinaryFocalLoss::TemplatedUpdateGradientsImp(
     const std::vector<T>& labels, const std::vector<float>& predictions,
     size_t begin_example_idx, size_t end_example_idx, float gamma, float alpha,
     std::vector<float>* gradient_data, std::vector<float>* hessian_data) {
+  DCHECK_EQ(gradient_data->size(), hessian_data->size());
   for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
        example_idx++) {
     const bool is_positive = (labels[example_idx] == 2);
@@ -224,39 +225,6 @@ void BinaryFocalLoss::TemplatedUpdateGradientsImp(
   }
 }
 
-decision_tree::CreateSetLeafValueFunctor BinaryFocalLoss::SetLeafFunctor(
-    const std::vector<float>& predictions,
-    const std::vector<GradientData>& gradients, const int label_col_idx) const {
-  return [this, &predictions, label_col_idx](
-             const dataset::VerticalDataset& train_dataset,
-             const std::vector<UnsignedExampleIdx>& selected_examples,
-             const std::vector<float>& weights,
-             const model::proto::TrainingConfig& config,
-             const model::proto::TrainingConfigLinking& config_link,
-             decision_tree::NodeWithChildren* node) {
-    if (weights.empty()) {
-      return SetLeaf</*weighted=*/false>(train_dataset, selected_examples,
-                                         weights, config, config_link,
-                                         predictions, label_col_idx, node);
-    } else {
-      return SetLeaf</*weighted=*/true>(train_dataset, selected_examples,
-                                        weights, config, config_link,
-                                        predictions, label_col_idx, node);
-    }
-  };
-}
-
-absl::Status BinaryFocalLoss::UpdatePredictions(
-    const std::vector<const decision_tree::DecisionTree*>& new_trees,
-    const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
-    double* mean_abs_prediction) const {
-  if (new_trees.size() != 1) {
-    return absl::InternalError("Wrong number of trees");
-  }
-  UpdatePredictionWithSingleUnivariateTree(dataset, *new_trees.front(),
-                                           predictions, mean_abs_prediction);
-  return absl::OkStatus();
-}
 
 std::vector<std::string> BinaryFocalLoss::SecondaryMetricNames() const {
   return {"accuracy"};

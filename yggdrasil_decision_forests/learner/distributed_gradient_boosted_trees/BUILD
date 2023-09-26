@@ -29,6 +29,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:all_implementations",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_interface",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/utils:filesystem",
@@ -72,6 +73,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:uid",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
     alwayslink = 1,
 )

@@ -43,12 +43,12 @@
 
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator_uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
@@ -716,18 +716,28 @@ struct LabelBinaryCategoricalScoreAccumulator {
     this->sum_weights = weights;
   }
 
-  // template <typename T>
   void AddOne(const bool value, const float weights) {
     static float table[] = {0.f, 1.f};
     sum_trues += table[value] * weights;
     sum_weights += weights;
   }
 
-  // template <typename T>
+  void AddOne(const bool value) {
+    static float table[] = {0.f, 1.f};
+    sum_trues += table[value];
+    sum_weights += 1.;
+  }
+
   void SubOne(const bool value, const float weights) {
     static float table[] = {0.f, 1.f};
     sum_trues -= table[value] * weights;
     sum_weights -= weights;
+  }
+
+  void SubOne(const bool value) {
+    static float table[] = {0.f, 1.f};
+    sum_trues -= table[value];
+    sum_weights -= 1.;
   }
 
   void AddMany(const double trues, const double weights) {
@@ -1127,7 +1137,7 @@ struct LabelHessianNumericalOneValueBucket {
                  weights_[example_idx] * num_duplicates);
       } else {
         acc->Add<float>(gradients_[example_idx], hessians_[example_idx],
-                 num_duplicates);
+                        num_duplicates);
       }
     }
 
@@ -1140,7 +1150,7 @@ struct LabelHessianNumericalOneValueBucket {
                  weights_[example_idx] * num_duplicates);
       } else {
         acc->Sub<float>(gradients_[example_idx], hessians_[example_idx],
-                 num_duplicates);
+                        num_duplicates);
       }
     }
 
@@ -1351,7 +1361,7 @@ struct LabelBinaryCategoricalOneValueBucket {
     if constexpr (weighted) {
       acc->AddOne(content.value, content.weight);
     } else {
-      acc->AddOne(content.value, 1.f);
+      acc->AddOne(content.value);
     }
   }
 
@@ -1359,7 +1369,7 @@ struct LabelBinaryCategoricalOneValueBucket {
     if constexpr (weighted) {
       acc->SubOne(content.value, content.weight);
     } else {
-      acc->SubOne(content.value, 1.f);
+      acc->SubOne(content.value);
     }
   }
 
@@ -1433,7 +1443,7 @@ struct LabelBinaryCategoricalOneValueBucket {
       if constexpr (weighted) {
         acc->AddOne(label_[example_idx] == 2, weights_[example_idx]);
       } else {
-        acc->AddOne(label_[example_idx] == 2, 1.f);
+        acc->AddOne(label_[example_idx] == 2);
       }
     }
 
@@ -1444,7 +1454,7 @@ struct LabelBinaryCategoricalOneValueBucket {
       if constexpr (weighted) {
         acc->SubOne(label_[example_idx] == 2, weights_[example_idx]);
       } else {
-        acc->SubOne(label_[example_idx] == 2, 1.f);
+        acc->SubOne(label_[example_idx] == 2);
       }
     }
 
