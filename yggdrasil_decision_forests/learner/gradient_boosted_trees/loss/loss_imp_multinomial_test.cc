@@ -152,6 +152,57 @@ TEST(MultinomialLogLikelihoodLossTest, UpdateGradients) {
                                     FloatNear(-1.f / 3.f, kTestPrecision)));
 }
 
+TEST_P(MultinomialLogLikelihoodLossTest, SetLabelDistribution) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset gradient_dataset,
+                       CreateToyGradientDataset());
+  const bool weighted = GetParam().weighted;
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {2.f, 4.f, 6.f, 8.f, 10.f, 12.f};
+  }
+
+  proto::GradientBoostedTreesTrainingConfig gbt_config;
+  gbt_config.set_shrinkage(0.2f);
+
+  const MultinomialLogLikelihoodLoss loss_imp(
+      gbt_config, model::proto::Task::CLASSIFICATION,
+      gradient_dataset.data_spec().columns(1));
+
+  std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
+  std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
+  model::proto::TrainingConfig config;
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(2);  // Gradient column.
+
+  decision_tree::NodeWithChildren node;
+
+  if (weighted) {
+    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/true>(
+        gradient_dataset, selected_examples, weights, config, config_link,
+        predictions,
+        /* label_col_idx= */ 1, &node));
+    EXPECT_NEAR(node.node().regressor().top_value(), 0.2f * 104.f / 129.f,
+                kTestPrecision);
+    // Distribution of the gradients:
+    EXPECT_EQ(node.node().regressor().distribution().sum(), 13.f / 2.f);
+    EXPECT_EQ(node.node().regressor().distribution().sum_squares(),
+              50.f / 16.f);
+    // Total weight of the dataset
+    EXPECT_EQ(node.node().regressor().distribution().count(), 42.);
+  } else {
+    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/false>(
+        gradient_dataset, selected_examples, weights, config, config_link,
+        predictions,
+        /* label_col_idx= */ 1, &node));
+    EXPECT_NEAR(node.node().regressor().top_value(), 0.2f * 16.f / 26.f,
+                kTestPrecision);
+    // Distribution of the gradients:
+    EXPECT_EQ(node.node().regressor().distribution().sum(), 0.75f);
+    EXPECT_EQ(node.node().regressor().distribution().sum_squares(), 7.f / 16.f);
+    // Total weight of the dataset
+    EXPECT_EQ(node.node().regressor().distribution().count(), 6.);
+  }
+}
 
 TEST(MultinomialLogLikelihoodLossTest, SecondaryMetricName) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());

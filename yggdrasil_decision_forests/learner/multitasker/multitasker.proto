@@ -19,8 +19,6 @@ package yggdrasil_decision_forests.model.multitasker.proto;
 
 import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 
-option java_outer_classname = "MultitaskerLearner";
-
 message MultitaskerTrainingConfig {
   // Learner for the sub-tasks.
   optional model.proto.TrainingConfig base_learner = 1;

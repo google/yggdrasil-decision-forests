@@ -869,7 +869,7 @@ reasonable time.
 <font size="2">
 
 A CART (Classification and Regression Trees) a decision tree. The non-leaf nodes
-contains conditions (also known as splits) while the leaf nodes contain
+contains conditions (also known as splits) while the leaf nodes contains
 prediction values. The training dataset is divided in two parts. The first is
 used to grow the tree while the second is used to prune the tree.
 
@@ -1121,8 +1121,8 @@ learner hyper-parameters.
 
 -   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
 
--   Ratio of the training dataset used to create the validation dataset for
-    pruning the tree. If set to 0, the entire dataset is used for training, and
+-   Ratio of the training dataset used to create the validation dataset used to
+    prune the tree. If set to 0, the entire dataset is used for training, and
     the tree is not pruned.
 
 </font>

@@ -45,7 +45,7 @@ absl::Status AbstractLoss::UpdateGradients(
     std::vector<GradientData>* gradients, utils::RandomEngine* random) const {
   GradientDataRef compact_gradient(gradients->size());
   for (int i = 0; i < gradients->size(); i++) {
-    compact_gradient[i] = {&(*gradients)[i].gradient, &(*gradients)[i].hessian};
+    compact_gradient[i] = {&(*gradients)[i].gradient, (*gradients)[i].hessian};
   }
 
   const auto* categorical_labels =

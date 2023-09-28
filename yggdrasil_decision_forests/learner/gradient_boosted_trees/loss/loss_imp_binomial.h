@@ -61,7 +61,9 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
   absl::Status Status() const override;
 
   LossShape Shape() const override {
-    return LossShape{.gradient_dim = 1, .prediction_dim = 1};
+    return LossShape{/*.gradient_dim =*/1,
+                     /*.prediction_dim =*/1,
+                     /*.has_hessian =*/gbt_config_.use_hessian_gain()};
   };
 
   // Returns the initial predictions on the dataset.
@@ -103,6 +105,110 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
+  decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
+      const std::vector<float>& predictions,
+      const std::vector<GradientData>& gradients,
+      int label_col_idx) const override;
+
+  // Sets the gain at leaf `node`.
+  //
+  // `weights` may be empty, which is interpreted as unit weights.
+  template <bool weighted>
+  absl::Status SetLeaf(const dataset::VerticalDataset& train_dataset,
+                       const std::vector<UnsignedExampleIdx>& selected_examples,
+                       const std::vector<float>& weights,
+                       const model::proto::TrainingConfig& config,
+                       const model::proto::TrainingConfigLinking& config_link,
+                       const std::vector<float>& predictions,
+                       const int label_col_idx,
+                       decision_tree::NodeWithChildren* node) const {
+    if constexpr (weighted) {
+      DCHECK_LE(selected_examples.size(), weights.size());
+    } else {
+      DCHECK(weights.empty());
+    }
+    DCHECK_GE(gbt_config_.shrinkage(), 0);
+
+    if (!gbt_config_.use_hessian_gain()) {
+      RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution<weighted>(
+          train_dataset, selected_examples, weights, config_link,
+          node->mutable_node()));
+      // Even if "use_hessian_gain" is not enabled for the splits, we use a
+      // Newton step in the leaves i.e. if "use_hessian_gain" is false, we need
+      // all the information.
+    }
+
+    // `labels` is not owning.
+    ASSIGN_OR_RETURN(
+        const dataset::VerticalDataset::CategoricalColumn* labels,
+        train_dataset.ColumnWithCastWithStatus<
+            dataset::VerticalDataset::CategoricalColumn>(label_col_idx));
+    double numerator = 0;
+    double denominator = 0;
+    double sum_weights = 0;
+    if constexpr (!weighted) {
+      sum_weights = selected_examples.size();
+    }
+    // Set the value of the leaf to:
+    //   (\sum_i weight[i] * (label[i] - p[i]) ) / (\sum_i weight[i] * p[i] *
+    //   (1-p[i]))
+    // with: p[i] = 1/(1+exp(-prediction)
+    for (const auto example_idx : selected_examples) {
+      // For binary classification, the positive examples correspond to class 2.
+      const float label = labels->values()[example_idx] == 2;
+      const float prediction = predictions[example_idx];
+      const float p = 1.f / (1.f + std::exp(-prediction));
+      if constexpr (weighted) {
+        const float weight = weights[example_idx];
+        numerator += weight * (label - p);
+        denominator += weight * p * (1.f - p);
+        sum_weights += weight;
+      } else {
+        numerator += (label - p);
+        denominator += p * (1.f - p);
+      }
+      DCheckIsFinite(numerator);
+      DCheckIsFinite(denominator);
+    }
+    if (!std::isfinite(numerator) || !std::isfinite(denominator)) {
+      return absl::InternalError("SetLeaf found invalid predictions");
+    }
+
+    if (denominator <= kMinHessianForNewtonStep) {
+      denominator = kMinHessianForNewtonStep;
+    }
+
+    if (gbt_config_.use_hessian_gain()) {
+      auto* regressor = node->mutable_node()->mutable_regressor();
+      regressor->set_sum_gradients(numerator);
+      regressor->set_sum_hessians(denominator);
+      regressor->set_sum_weights(sum_weights);
+    }
+
+    const float leaf_value =
+        gbt_config_.shrinkage() *
+        static_cast<float>(decision_tree::l1_threshold(
+                               numerator, gbt_config_.l1_regularization()) /
+                           (denominator + gbt_config_.l2_regularization()));
+
+    node->mutable_node()->mutable_regressor()->set_top_value(
+        utils::clamp(leaf_value, -gbt_config_.clamp_leaf_logit(),
+                     gbt_config_.clamp_leaf_logit()));
+    return absl::OkStatus();
+  }
+
+  absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+  SetLeafFunctorFromLabelStatistics() const override {
+    return [&](const decision_tree::proto::LabelStatistics& label_stats,
+               decision_tree::proto::Node* node) {
+      return SetLeafValueWithNewtonRaphsonStep(gbt_config_, label_stats, node);
+    };
+  }
+
+  absl::Status UpdatePredictions(
+      const std::vector<const decision_tree::DecisionTree*>& new_trees,
+      const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
+      double* mean_abs_prediction) const override;
 
   std::vector<std::string> SecondaryMetricNames() const override;
 

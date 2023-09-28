@@ -25,7 +25,6 @@
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/worker.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -502,13 +501,8 @@ TrainWithCache(
   auto weak_learner_train_config = config;
   weak_learner_train_config.set_task(model::proto::Task::REGRESSION);
 
-  const auto set_leaf_functor =
-      [gbt_config = spe_config.gbt()](
-          const decision_tree::proto::LabelStatistics& label_stats,
-          decision_tree::proto::Node* leaf) {
-        return gradient_boosted_trees::SetLeafValueWithNewtonRaphsonStep(
-            gbt_config, label_stats, leaf);
-      };
+  ASSIGN_OR_RETURN(const auto set_leaf_functor,
+                   loss->SetLeafFunctorFromLabelStatistics());
 
   Evaluation training_evaluation;
   auto time_last_checkpoint = absl::Now();

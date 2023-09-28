@@ -60,14 +60,15 @@ class NDCGLoss : public AbstractLoss {
   bool RequireGroupingAttribute() const override { return true; }
 
   LossShape Shape() const override {
-    return LossShape{.gradient_dim = 1, .prediction_dim = 1};
+    return LossShape{/*.gradient_dim =*/1, /*.prediction_dim =*/1,
+                     /*.has_hessian =*/true};
   };
 
   absl::StatusOr<std::vector<float>> InitialPredictions(
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const override;
 
-  absl::StatusOr<std::vector<float>> InitialPredictions(
+  virtual absl::StatusOr<std::vector<float>> InitialPredictions(
       const decision_tree::proto::LabelStatistics& label_statistics)
       const override;
 
@@ -76,6 +77,16 @@ class NDCGLoss : public AbstractLoss {
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
+
+  decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
+      const std::vector<float>& predictions,
+      const std::vector<GradientData>& gradients,
+      int label_col_idx) const override;
+
+  absl::Status UpdatePredictions(
+      const std::vector<const decision_tree::DecisionTree*>& new_trees,
+      const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
+      double* mean_abs_prediction) const override;
 
   std::vector<std::string> SecondaryMetricNames() const override;
 
@@ -88,7 +99,68 @@ class NDCGLoss : public AbstractLoss {
 
 REGISTER_AbstractGradientBoostedTreeLoss(NDCGLoss, "LAMBDA_MART_NDCG5");
 
+template <bool weighted>
+absl::Status SetLeafNDCG(
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<float>& weights,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const std::vector<float>& predictions,
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
+    const std::vector<GradientData>& gradients, const int label_col_idx,
+    decision_tree::NodeWithChildren* node) {
+  if constexpr (weighted) DCHECK_LE(selected_examples.size(), weights.size());
+  if constexpr (!weighted) DCHECK(weights.empty());
+  if (!gbt_config.use_hessian_gain()) {
+    RETURN_IF_ERROR(decision_tree::SetRegressionLabelDistribution<weighted>(
+        train_dataset, selected_examples, weights, config_link,
+        node->mutable_node()));
+  }
 
+  const auto& gradient_data = gradients.front().gradient;
+  const auto& second_order_derivative_data = *(gradients.front().hessian);
+
+  double sum_weighted_gradient = 0;
+  double sum_weighted_second_order_derivative = 0;
+  double sum_weights = 0;
+  if constexpr (!weighted) {
+    sum_weights = selected_examples.size();
+  }
+  for (const auto example_idx : selected_examples) {
+    if constexpr (weighted) {
+      const float weight = weights[example_idx];
+      sum_weighted_gradient += weight * gradient_data[example_idx];
+      sum_weighted_second_order_derivative +=
+          weight * second_order_derivative_data[example_idx];
+      sum_weights += weight;
+    } else {
+      sum_weighted_gradient += gradient_data[example_idx];
+      sum_weighted_second_order_derivative +=
+          second_order_derivative_data[example_idx];
+    }
+  }
+  DCheckIsFinite(sum_weighted_gradient);
+  DCheckIsFinite(sum_weighted_second_order_derivative);
+
+  if (sum_weighted_second_order_derivative <= kMinHessianForNewtonStep) {
+    sum_weighted_second_order_derivative = kMinHessianForNewtonStep;
+  }
+
+  if (gbt_config.use_hessian_gain()) {
+    auto* reg = node->mutable_node()->mutable_regressor();
+    reg->set_sum_gradients(sum_weighted_gradient);
+    reg->set_sum_hessians(sum_weighted_second_order_derivative);
+    reg->set_sum_weights(sum_weights);
+  }
+
+  node->mutable_node()->mutable_regressor()->set_top_value(
+      gbt_config.shrinkage() *
+      decision_tree::l1_threshold(sum_weighted_gradient,
+                                  gbt_config.l1_regularization()) /
+      (sum_weighted_second_order_derivative + gbt_config.l2_regularization()));
+  return absl::OkStatus();
+}
 }  // namespace gradient_boosted_trees
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

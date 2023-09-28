@@ -581,11 +581,11 @@ absl::StatusOr<utils::plot::MultiPlot> Plot(
 
   // Each attributes takes two rows of plots: one for the pdp plot, and one
   // for the density plot.
-  const int num_rows_per_columns = 2;
+  const int num_rows_per_attributes = 2;
 
   const int num_cols = std::max(1, options.figure_width() / sub_plot_width);
   const int num_rows =
-      (pdp_set.pdps_size() + num_cols - 1) / num_cols * num_rows_per_columns;
+      (pdp_set.pdps_size() + num_cols - 1) / num_cols * num_rows_per_attributes;
   *recommended_width_px = sub_plot_width;
   *recommended_height_px = sub_plot_height;
 
@@ -597,7 +597,7 @@ absl::StatusOr<utils::plot::MultiPlot> Plot(
     multiplot.items.push_back(absl::make_unique<plot::MultiPlotItem>());
     auto* pdp_plot = multiplot.items.back().get();
     pdp_plot->col = pdp_idx % num_cols;
-    pdp_plot->row = (pdp_idx / num_cols) * num_rows_per_columns;
+    pdp_plot->row = (pdp_idx / num_cols) * num_rows_per_attributes;
 
     multiplot.items.push_back(absl::make_unique<plot::MultiPlotItem>());
     auto* density_plot = multiplot.items.back().get();

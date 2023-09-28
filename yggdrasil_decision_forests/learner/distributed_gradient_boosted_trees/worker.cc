@@ -18,7 +18,6 @@
 #include <numeric>
 
 #include "absl/status/status.h"
-#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
@@ -27,7 +26,6 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -442,7 +440,7 @@ DistributedGradientBoostedTreesWorker::InitializeTrainingWorkerMemory(
     YDF_LOG(INFO) << "Initialize worker memory";
   }
 
-  // Allocate the memory for the gradient and hessian. Create a
+  // Allocate the memory for the gradient and hessian (if needed). Create a
   // "label_accessor" for each gradient+hessian buffer.
   weak_models_.resize(num_weak_models);
   for (int weak_model_idx = 0; weak_model_idx < weak_models_.size();
@@ -450,16 +448,29 @@ DistributedGradientBoostedTreesWorker::InitializeTrainingWorkerMemory(
     auto& weak_model = weak_models_[weak_model_idx];
 
     weak_model.gradients.resize(dataset_->num_examples());
-    weak_model.hessians.resize(dataset_->num_examples());
+    if (welcome_.train_config().task() != model::proto::Task::REGRESSION) {
+      weak_model.hessians.resize(dataset_->num_examples());
 
-    if (spe_config.gbt().use_hessian_gain()) {
-      return absl::InternalError("Use hessian gain not implemented.");
+      if (spe_config.gbt().use_hessian_gain()) {
+        return absl::InternalError("Use hessian gain not implemented.");
+      } else {
+        weak_model.label_accessor_type =
+            distributed_decision_tree::LabelAccessorType::kNumericalWithHessian;
+        weak_model.label_accessor = absl::make_unique<
+            distributed_decision_tree::RegressionWithHessianLabelAccessor>(
+            weak_model.gradients, weak_model.hessians, dataset_->weights());
+      }
+    } else {
+      if (spe_config.gbt().use_hessian_gain()) {
+        return absl::InternalError("Hessian gain not supported for regression");
+      }
+      weak_model.label_accessor_type =
+          distributed_decision_tree::LabelAccessorType::kAutomatic;
+      weak_model.hessians.clear();
+      weak_model.label_accessor =
+          absl::make_unique<distributed_decision_tree::RegressionLabelAccessor>(
+              weak_model.gradients, dataset_->weights());
     }
-    weak_model.label_accessor_type =
-        distributed_decision_tree::LabelAccessorType::kNumericalWithHessian;
-    weak_model.label_accessor = absl::make_unique<
-        distributed_decision_tree::RegressionWithHessianLabelAccessor>(
-        weak_model.gradients, weak_model.hessians, dataset_->weights());
   }
 
   // The "gradient_ref" is used by some methods to access the gradient+hessian
@@ -529,16 +540,11 @@ absl::Status DistributedGradientBoostedTreesWorker::StartNewIter(
   auto weak_learner_train_config = welcome_.train_config();
   weak_learner_train_config.set_task(model::proto::Task::REGRESSION);
 
+  ASSIGN_OR_RETURN(const auto set_leaf_functor,
+                   loss_->SetLeafFunctorFromLabelStatistics());
+
   const auto& spe_config = welcome_.train_config().GetExtension(
       proto::distributed_gradient_boosted_trees_config);
-
-  const auto set_leaf_functor =
-      [gbt_config = spe_config.gbt()](
-          const decision_tree::proto::LabelStatistics& label_stats,
-          decision_tree::proto::Node* leaf) {
-        return gradient_boosted_trees::SetLeafValueWithNewtonRaphsonStep(
-            gbt_config, label_stats, leaf);
-      };
 
   for (int weak_model_idx = 0; weak_model_idx < weak_models_.size();
        weak_model_idx++) {
@@ -1104,7 +1110,7 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
   // Schedule the prediction updates.
   utils::concurrency::StreamProcessor<int, int> processor(
       "update predictions", num_threads,
-      [num_examples, this, num_prediction_dimensions, &caches, batch_size](
+      [num_examples, this, num_prediction_dimensions, &caches](
           const int batch_idx, const int thread_idx) -> int {
         auto& cache = caches[thread_idx];
 

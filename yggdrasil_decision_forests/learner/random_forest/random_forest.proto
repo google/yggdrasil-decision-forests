@@ -20,8 +20,6 @@ package yggdrasil_decision_forests.model.random_forest.proto;
 import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
 
-option java_outer_classname = "RandomForestLearner";
-
 // Training configuration for the Random Forest algorithm.
 message RandomForestTrainingConfig {
   // Next ID: 17

@@ -17,17 +17,18 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
+#include <iterator>
 #include <memory>
 #include <numeric>
+#include <random>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -35,12 +36,12 @@
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -49,7 +50,6 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/fold_generator.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
-#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
@@ -62,12 +62,8 @@ absl::Status AbstractLearner::LinkTrainingConfig(
     proto::TrainingConfigLinking* config_link) {
   // Label.
   int32_t label;
-  if (!training_config.has_label()) {
-    STATUS_FATAL("No label specified in the training config. Aborting.");
-  }
-  RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
-      training_config.label(), data_spec, &label,
-      "Retrieving label column failed. "));
+  RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(training_config.label(),
+                                                      data_spec, &label));
   config_link->set_label(label);
   config_link->set_num_label_classes(
       data_spec.columns(label).categorical().number_of_unique_values());
@@ -76,8 +72,7 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   int32_t cv_group = -1;
   if (training_config.has_cv_group()) {
     RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
-        training_config.cv_group(), data_spec, &cv_group,
-        "Retrieving cross-validation group column failed. "));
+        training_config.cv_group(), data_spec, &cv_group));
   }
   config_link->set_cv_group(cv_group);
 
@@ -88,8 +83,7 @@ absl::Status AbstractLearner::LinkTrainingConfig(
       return absl::InvalidArgumentError(
           "\"ranking_group\" should be specified for a ranking task.");
     RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
-        training_config.ranking_group(), data_spec, &ranking_group,
-        "Retrieving ranking_group column failed. "));
+        training_config.ranking_group(), data_spec, &ranking_group));
   } else {
     if (training_config.has_ranking_group())
       return absl::InvalidArgumentError(
@@ -105,8 +99,7 @@ absl::Status AbstractLearner::LinkTrainingConfig(
       return absl::InvalidArgumentError(
           "\"uplift_treatment\" should be specified for an uplift task.");
     RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
-        training_config.uplift_treatment(), data_spec, &uplift_treatment,
-        "Retrieving uplift_treatment column failed. "));
+        training_config.uplift_treatment(), data_spec, &uplift_treatment));
   } else {
     if (training_config.has_uplift_treatment())
       return absl::InvalidArgumentError(
@@ -124,8 +117,9 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   // List the model input features.
   std::vector<int32_t> feature_idxs;
   if (training_config.features().empty()) {
-    YDF_LOG(INFO) << "No input feature explicitly specified. Using all the "
-                     "available input features.";
+    YDF_LOG(INFO)
+        << "No input feature specified. Using all the available input "
+           "features as input signal.";
     feature_idxs.assign(data_spec.columns_size(), 0);
     std::iota(feature_idxs.begin(), feature_idxs.end(), 0);
   } else {
@@ -214,56 +208,11 @@ absl::Status AbstractLearner::LinkTrainingConfig(
 
   *config_link->mutable_features() = {feature_idxs.begin(), feature_idxs.end()};
 
-  // Index numerical features
+  // Index the numerical features.
   config_link->clear_numerical_features();
-  absl::flat_hash_set<int> numerical_features;
   for (const auto feature_idx : feature_idxs) {
     if (data_spec.columns(feature_idx).type() == dataset::proto::NUMERICAL) {
       config_link->add_numerical_features(feature_idx);
-      numerical_features.insert(feature_idx);
-    }
-  }
-
-  // Allocate per-attributes array
-  config_link->clear_per_columns();
-  for (int i = 0; i < data_spec.columns_size(); i++) {
-    config_link->add_per_columns();
-  }
-
-  // Monotonicity constraints
-  for (const auto& src : training_config.monotonic_constraints()) {
-    if (src.feature().empty()) {
-      return absl::InvalidArgumentError(
-          "Empty \"feature\" in a monotonicity constraint");
-    }
-    std::vector<int32_t> feature_idxs;
-    dataset::GetMultipleColumnIdxFromName({src.feature()}, data_spec,
-                                          &feature_idxs);
-    if (feature_idxs.empty()) {
-      return absl::InvalidArgumentError(
-          absl::StrCat(src.feature(), " does not match any input features"));
-    }
-    for (const int src_feature : feature_idxs) {
-      if (numerical_features.find(src_feature) == numerical_features.end()) {
-        // Build error message.
-        std::vector<std::string> str_numerical_features;
-        str_numerical_features.reserve(numerical_features.size());
-        for (const auto feature_idx : numerical_features) {
-          str_numerical_features.push_back(
-              data_spec.columns(feature_idx).name());
-        }
-
-        return absl::InvalidArgumentError(absl::Substitute(
-            "Feature \"$0\" caught by regular expression \"$1\" is not a "
-            "numerical input feature of the "
-            "model. Make sure this "
-            "feature is also defined as input feature of the model, and that "
-            "it is numerical. The numerical input features are: [$2].",
-            data_spec.columns(src_feature).name(), src.feature(),
-            absl::StrJoin(str_numerical_features, ", ")));
-      }
-      auto* dst = config_link->mutable_per_columns(src_feature);
-      *dst->mutable_monotonic_constraint() = src;
     }
   }
 
@@ -815,14 +764,6 @@ absl::Status AbstractLearner::CheckCapabilities() const {
         absl::Substitute("The learner $0 does not support the "
                          "\"maximum_model_size_in_memory_in_bytes\" flag.",
                          training_config().learner()));
-  }
-
-  // Monotonic constraints
-  if (!capabilities.support_monotonic_constraints() &&
-      training_config().monotonic_constraints_size() > 0) {
-    return absl::InvalidArgumentError(absl::Substitute(
-        "The learner $0 does not support monotonic constraints.",
-        training_config().learner()));
   }
 
   return absl::OkStatus();

@@ -13,20 +13,10 @@ models. YDF is open-source and is available in C++, command-line interface
 TF-DF), JavaScript (inference only), and Go (inference only). YDF is supported on Linux, Windows,
 macOS, Raspberry Pi, and Arduino (experimental).
 
-News
-====
-
-- *Sep, 2023* :bdg-danger:`Release` We are releasing `Temporian <https://temporian.readthedocs.io>`_, a library for preprocessing and feature engineering of temporal data.
-- *Sep, 2023* :bdg-warning:`News` Start of `our Discord <https://discord.gg/D8NK9Ac6ZF>`_ server.
-- *Aug, 2023* :bdg-primary:`Publication` `Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library <https://dl.acm.org/doi/10.1145/3580305.3599933>`_ at KDD'2023 (`extended version <https://arxiv.org/abs/2212.02934>`_)
-- *Jul, 2023* :bdg-danger:`Release` TensorFlow Decision Forests `1.5.0 <https://github.com/tensorflow/decision-forests/releases/tag/1.5.0>`_
-- *Jul, 2023* :bdg-danger:`Release` Yggdrasil Decision Forests `1.5.0 <https://github.com/google/yggdrasil-decision-forests/releases/tag/1.5.0>`_
-- *May, 2023* :bdg-success:`Presentation` `Simple ML for Sheets <https://simplemlforsheets.com/>`_ at `Google IO 2023 <https://io.google/2023/program/e695ebdd-b968-4b85-98d9-0a722892e842>`_
-- *Sep, 2022* :bdg-danger:`Release` `Go API <https://ydf.readthedocs.io/en/latest/go_serving.html>`_ to run Yggdrasil Decision Forest models.
-- *Jul, 2022* :bdg-primary:`Publication` `Generative Trees: Adversarial and Copycat <https://proceedings.mlr.press/v162/nock22a.html>`_ at ICML'2022
-- *Jun, 2022* :bdg-danger:`Release` `JavaScript API <https://ydf.readthedocs.io/en/latest/js_serving.html>`_ to train and run Yggdrasil Decision Forest models.
-- *May, 2021* :bdg-success:`Presentation` `TensorFlow Decision Forests <https://www.tensorflow.org/decision_forests>`_ at `Google IO 2021 <https://io.google/2021/session/c89df7a7-0aac-4e4d-8b5d-894492bbf406/?lng=en>`_
-
+For details about YDF design, read our KDD 2023 paper
+`Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library <https://doi.org/10.1145/3580305.3599933>`_ .
+See also the `extended version <https://arxiv.org/abs/2212.02934>`_  with
+additional details about the experimental evaluation of the library.
 
 Features
 ========

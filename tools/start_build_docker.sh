@@ -17,7 +17,7 @@
 
 set -vex
 
-DOCKER=ubuntu:20.04
+DOCKER=ubuntu:18.04
 
 # Current directory
 DIRNAME=${PWD##*/}

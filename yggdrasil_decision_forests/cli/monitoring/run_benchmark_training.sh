@@ -29,5 +29,5 @@ bazel-bin/third_party/yggdrasil_decision_forests/cli/monitoring/benchmark_traini
 
 # Let's assume you generated a benchmark in /tmp/train_benchmark_old.csv
 bazel run -c opt //third_party/yggdrasil_decision_forests/cli/monitoring:compare_benchmark -- \
- --old=/tmp/train_benchmark_old.csv \
- --new=/tmp/train_benchmark_new.csv
+ --p1=/tmp/train_benchmark_old.csv \
+ --p2=/tmp/train_benchmark_new.csv

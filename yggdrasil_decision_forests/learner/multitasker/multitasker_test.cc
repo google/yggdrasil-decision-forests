@@ -15,8 +15,6 @@
 
 #include "yggdrasil_decision_forests/learner/multitasker/multitasker.h"
 
-#include <limits>
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/flags/flag.h"
@@ -81,8 +79,7 @@ TEST_F(MultitaskerOnAdult, Base) {
   t3->set_task(model::proto::Task::CLASSIFICATION);
 
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.860, 0.01,
-                  std::numeric_limits<double>::quiet_NaN());
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
 
   utils::RandomEngine rnd(1234);
 
@@ -101,8 +98,7 @@ TEST_F(MultitaskerOnAdult, Base) {
     metric::proto::EvaluationOptions eval_options;
     eval_options.set_task(model::proto::Task::CLASSIFICATION);
     auto eval = submodel->Evaluate(test_dataset_, eval_options, &rnd);
-    YDF_TEST_METRIC(metric::Accuracy(eval), 0.860, 0.01,
-                    std::numeric_limits<double>::quiet_NaN());
+    YDF_EXPECT_METRIC_NEAR(metric::Accuracy(eval), 0.860, 0.01);
   }
 
   {
@@ -117,8 +113,7 @@ TEST_F(MultitaskerOnAdult, Base) {
     metric::proto::EvaluationOptions eval_options;
     eval_options.set_task(model::proto::Task::REGRESSION);
     auto eval = submodel->Evaluate(test_dataset_, eval_options, &rnd);
-    YDF_TEST_METRIC(metric::RMSE(eval), 10.2048, 0.05,
-                    std::numeric_limits<double>::quiet_NaN());
+    YDF_EXPECT_METRIC_NEAR(metric::RMSE(eval), 10.2048, 0.05);
   }
 
   {
@@ -133,8 +128,7 @@ TEST_F(MultitaskerOnAdult, Base) {
     metric::proto::EvaluationOptions eval_options;
     eval_options.set_task(model::proto::Task::CLASSIFICATION);
     auto eval = submodel->Evaluate(test_dataset_, eval_options, &rnd);
-    YDF_TEST_METRIC(metric::Accuracy(eval), 0.76474, 0.01,
-                    std::numeric_limits<double>::quiet_NaN());
+    YDF_EXPECT_METRIC_NEAR(metric::Accuracy(eval), 0.76474, 0.01);
   }
 
   {
@@ -191,8 +185,7 @@ TEST_F(MultitaskerOnAdult, Stacked) {
   t3->set_task(model::proto::Task::CLASSIFICATION);
 
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.860, 0.01,
-                  std::numeric_limits<double>::quiet_NaN());
+  YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
 
   utils::RandomEngine rnd(1234);
 

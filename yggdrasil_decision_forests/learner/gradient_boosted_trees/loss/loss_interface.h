@@ -52,25 +52,14 @@ struct LossResults {
   absl::optional<utils::IntegersConfusionMatrixDouble> confusion_table;
 };
 
-// One dimension of gradient and hessian values.
+// One dimension of gradients values.
+// Also contains the hessian values (is hessian are materialized).
 struct GradientData {
   // Values of the gradient. "values[i]" is the gradient of the i-th example.
   // The data is NOT owned by this pointer. In practice, this field is only
   // initialized by "CreateGradientDataset" and points to the data owned by the
   // "sub_train_dataset" VerticalDataset.
   std::vector<float>& gradient;
-
-  // Second order derivative of the loss according to the prediction.
-  //
-  // Used to set the leaf values with a newtonian step. Also used to find the
-  // best split if the "use_hessian_gain" hyper-parameter is True.
-  std::vector<float>& hessian;
-
-  // Column containing the gradient in the virtual dataset.
-  const int gradient_col_idx;
-
-  // Column containing the hessian in the virtual dataset.
-  const int hessian_col_idx;
 
   // Name of the column containing the gradient data in the virtual training
   // dataset. The virtual training dataset is a shallow copy of the training
@@ -80,6 +69,19 @@ struct GradientData {
   // Training configuration for the learning of gradient.
   model::proto::TrainingConfig config;
   model::proto::TrainingConfigLinking config_link;
+
+  // Second order derivative of the loss according to the prediction.
+  // Only used for Ranking. In order cases (e.g. classification) the second
+  // order derivative can be recovered from the gradient and/or is constant, and
+  // "second_order_derivative" is empty.
+  //
+  // The second order derivative to set the leaf values using a newtonian step.
+  // This field is only used (currently only for ranking) when the computation
+  // of the second order derivative is non trivial (e.g. constant).
+  std::vector<float>* hessian = nullptr;
+
+  // Index of the hessian column in the gradient dataset.
+  int hessian_col_idx = -1;
 };
 
 struct UnitGradientDataRef {
@@ -99,6 +101,10 @@ struct LossShape {
 
   // Number of dimensions of the predictions.
   int prediction_dim;
+
+  // If true, a buffer is allocated to materialize the loss's hessian. If
+  // allocated, the hessian has the same shape as the gradient.
+  bool has_hessian;
 };
 
 // Index of example groups optimized for query. Used for ranking.
@@ -237,6 +243,45 @@ class AbstractLoss {
                                const RankingGroupsIndices* ranking_index,
                                std::vector<GradientData>* gradients,
                                utils::RandomEngine* random) const;
+
+  // Creates a function able to set the value of a leaf.
+  //
+  // The returned CreateSetLeafValueFunctor uses the object (this) and possibly
+  // "predictions" and "gradients". All of them should outlive calls to the
+  // returned function.
+  //
+  // "label_col_idx" corresponds to the label of the task solved by the GBT. The
+  // training config (including the label index) passed to the
+  // "CreateSetLeafValueFunctor" corresponds to the training label of the
+  // individual tree i.e. the gradient.
+  virtual decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
+      const std::vector<float>& predictions,
+      const std::vector<GradientData>& gradients, int label_col_idx) const = 0;
+
+  virtual absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
+  SetLeafFunctorFromLabelStatistics() const {
+    return absl::InternalError(
+        "SetLeafFunctorFromLabelStatistics not implemented");
+  }
+
+  // Updates the prediction accumulator (contains the predictions of the trees
+  // trained so far) with a newly learned tree (or list of trees, for
+  // multi-variate gradients).
+  //
+  // Args:
+  //   new_trees: List of newly learned trees. The i-th tree corresponds to the
+  //     i-th gradient dimension.
+  //   dataset: Training or validation dataset.
+  //   predictions: (input+output) Predictions containing of the result of all
+  //     the previous call to "InitialPredictions" and all the previous
+  //     "UpdatePredictions" calls. In most cases, it is easier for this
+  //     prediction accumulation not to have the activation function applied.
+  //   mean_abs_prediction: (output) Return value for the mean absolute
+  //     prediction of the tree. Used to plot the "impact" of each new tree.
+  virtual absl::Status UpdatePredictions(
+      const std::vector<const decision_tree::DecisionTree*>& new_trees,
+      const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
+      double* mean_abs_prediction) const = 0;
 
   // Gets the name of the metrics returned in "secondary_metric" of the "Loss"
   // method.

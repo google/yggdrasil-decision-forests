@@ -18,7 +18,6 @@
 #include <cxxabi.h>
 
 #include <algorithm>
-#include <cstring>
 #include <memory>
 #include <random>
 #include <string>
@@ -70,7 +69,6 @@ namespace utils {
 
 namespace {
 
-// Shuffles a dataset randomly. Does not rely on a static seed.
 void ShuffleDataset(dataset::VerticalDataset* dataset) {
   absl::BitGen bitgen;
   std::vector<dataset::VerticalDataset::row_t> example_idxs(dataset->nrow());
@@ -78,45 +76,6 @@ void ShuffleDataset(dataset::VerticalDataset* dataset) {
   std::shuffle(example_idxs.begin(), example_idxs.end(), bitgen);
   *dataset = dataset->Extract(example_idxs).value();
 }
-
-// Generates a random seed. Does not rely on a static seed.
-int64_t RandomSeed() {
-  absl::BitGen bitgen;
-  return bitgen();
-}
-
-// Generates a deterministic sequence of boolean value approximating poorly a
-// binomial distribution sampling.
-class DeterministicBinomial {
- public:
-  DeterministicBinomial(const float rate) : rate_(rate) {}
-
-  bool Sample() {
-    if (num_total_ == 0) {
-      // Always return false first, unless the rate is 1.
-      num_total_++;
-      if (rate_ == 1) {
-        num_pos_++;
-        return true;
-      }
-      return false;
-    }
-
-    if (num_pos_ > rate_ * num_total_) {
-      num_total_++;
-      return false;
-    } else {
-      num_pos_++;
-      num_total_++;
-      return true;
-    }
-  }
-
- private:
-  float rate_;
-  int num_pos_ = 0;
-  int num_total_ = 0;
-};
 
 }  // namespace
 
@@ -177,8 +136,9 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   // Configure the learner.
   CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
 
-  if (change_random_seed_ && !learner_->training_config().has_random_seed()) {
-    learner_->mutable_training_config()->set_random_seed(RandomSeed());
+  if (inject_random_noise_ && !learner_->training_config().has_random_seed()) {
+    absl::BitGen bitgen;
+    learner_->mutable_training_config()->set_random_seed(bitgen());
   }
 
   if (generic_parameters_.has_value()) {
@@ -244,7 +204,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   YDF_LOG(INFO) << "Training duration: " << training_duration_;
 
   // Evaluate the model.
-  utils::RandomEngine rnd(1234);  // Not used
+  utils::RandomEngine rnd(1234);
   evaluation_ = model_->Evaluate(test_dataset_, eval_options_, &rnd);
 
   // Print the model evaluation.
@@ -446,22 +406,21 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
   CHECK_OK(LoadVerticalDataset(train_path, data_spec, &dataset));
 
   // Split the dataset in two folds: training and testing.
-  std::vector<dataset::VerticalDataset::row_t> train_example_idxs;
-  std::vector<dataset::VerticalDataset::row_t> test_example_idxs;
-  std::vector<dataset::VerticalDataset::row_t> valid_example_idxs;
+  std::vector<dataset::VerticalDataset::row_t> train_example_idxs,
+      test_example_idxs, valid_example_idxs;
 
-  DeterministicBinomial sampling(dataset_sampling_);
-  DeterministicBinomial train_test_split(split_train_ratio_);
-  DeterministicBinomial test_valid_split(0.5f);
-
-  // TODO: Make deterministic.
   utils::RandomEngine rnd(1234);
   std::uniform_real_distribution<double> dist_01;
+  // If a validation example should be generated (i.e.
+  // pass_validation_dataset_=true), next_example_is_valid indicates if the next
+  // example will be used for validation or testing.
+  bool next_example_is_valid = true;
 
   for (dataset::VerticalDataset::row_t example_idx = 0;
        example_idx < dataset.nrow(); example_idx++) {
     // Down-sampling of examples.
-    if (!sampling.Sample()) {
+    // TODO: Make the split deterministic.
+    if (dataset_sampling_ < dist_01(rnd)) {
       continue;
     }
 
@@ -479,13 +438,21 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
       }
     }
 
-    const bool is_training_example = train_test_split.Sample();
+    bool is_training_example;
+    if (split_train_ratio_ == 0.5f) {
+      // Deterministic split.
+      is_training_example = (example_idx % 2) == 0;
+    } else {
+      is_training_example = dist_01(rnd) < split_train_ratio_;
+    }
 
     if (is_training_example) {
       train_example_idxs.push_back(example_idx);
     } else {
-      if (pass_validation_dataset_ && test_valid_split.Sample()) {
-        valid_example_idxs.push_back(example_idx);
+      if (pass_validation_dataset_) {
+        (next_example_is_valid ? valid_example_idxs : test_example_idxs)
+            .push_back(example_idx);
+        next_example_is_valid ^= true;
       } else {
         test_example_idxs.push_back(example_idx);
       }
@@ -753,7 +720,7 @@ void TestPredefinedHyperParameters(
 
     // Evaluate the model.
     if (min_accuracy.has_value()) {
-      utils::RandomEngine rnd(1234);  // Not used.
+      utils::RandomEngine rnd(1234);
       const auto evaluation = model->Evaluate(test_ds, {}, &rnd);
       EXPECT_GE(metric::Accuracy(evaluation), min_accuracy.value());
     }
@@ -880,53 +847,32 @@ absl::Status ExportUpliftPredictionsToTFUpliftCsvFormat(
 
 void InternalExportMetricCondition(const absl::string_view test,
                                    const double value, const double center,
-                                   const double margin, const double golden,
+                                   const double margin,
                                    const absl::string_view metric,
                                    const int line,
                                    const absl::string_view file) {
-  // Margin of error when comparing golden metric values.
-  constexpr double kGoldenMargin = 0.0001;
-
   const auto filename = file::GetBasename(file);
-  const bool golden_test = kYdfTestMetricCheckGold && !std::isnan(golden);
-
-  double abs_diff_margin = std::abs(value - center);
-  double abs_diff_golden = std::abs(value - golden);
-  bool success_margin = abs_diff_margin < margin;
-  bool success_golden = abs_diff_golden < kGoldenMargin;
-
-  if (strlen(kYdfTestMetricDumpDir) > 0) {
-    // Export metric to csv file.
-    const auto uid = GenUniqueId();
-    const auto path =
-        file::JoinPath(kYdfTestMetricDumpDir, absl::StrCat(uid, ".csv"));
-    std::string content = absl::StrCat(
-        "test,value,center,margin,metric,line,filename,success_margin,success_"
-        "golden,golden\n",
-        test, ",", value, ",", center, ",", margin, ",", metric, ",", line, ",",
-        filename, ",", success_margin, ",", success_golden, ",", golden);
-    CHECK_OK(file::SetContent(path, content));
-  } else {
-    if (!success_margin) {
-      EXPECT_TRUE(false) << "Non satisfied range condition for " << metric
-                         << " in " << test << "\ndefined at\n"
-                         << file << ":" << line << "\nThe metric value "
-                         << value << " is not in " << center << " +- " << margin
-                         << ".\ni.e. not in [" << (center - margin) << " , "
-                         << (center + margin)
-                         << "].\nThe absolute value of the difference is "
-                         << abs_diff_margin << ".";
-    }
-
-    if (golden_test && !success_golden) {
-      EXPECT_TRUE(false) << "Non satisfied golden value condition for " << metric
-                         << " in " << test << "\ndefined at\n"
-                         << file << ":" << line << "\nThe metric value "
-                         << value << " is different from " << golden
-                         << " (margin:" << kGoldenMargin
-                         << ").\nThe absolute value of the difference is "
-                         << abs_diff_golden << ".";
-    }
+  const auto abs_diff = std::abs(value - center);
+  const auto success = abs_diff < margin;
+#ifdef EXPORT_METRIC_CONDITION
+  const auto uid = GenUniqueId();
+  const auto path =
+      file::JoinPath(EXPORT_METRIC_CONDITION, absl::StrCat(uid, ".csv"));
+  std::string content =
+      absl::StrCat("test,value,center,margin,metric,line,filename,success\n",
+                   test, ",", value, ",", center, ",", margin, ",", metric, ",",
+                   line, ",", filename, ",", success);
+  CHECK_OK(file::SetContent(path, content));
+#endif
+  if (!success) {
+    EXPECT_TRUE(false) << "Non satisfied range condition for " << metric
+                       << " in " << test << "\ndefined at\n"
+                       << file << ":" << line << "\nThe metric value " << value
+                       << " is not in " << center << " +- " << margin
+                       << ".\ni.e. not in [" << (center - margin) << " , "
+                       << (center + margin)
+                       << "].\nThe absolute value of the difference is "
+                       << abs_diff << ".";
   }
 }
 

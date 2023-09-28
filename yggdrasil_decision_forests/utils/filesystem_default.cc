@@ -15,11 +15,7 @@
 
 #include "yggdrasil_decision_forests/utils/filesystem_default.h"
 
-#if __cplusplus > 201402L
 #include <filesystem>
-#else
-#include <experimental/filesystem>
-#endif
 #include <regex>  // NOLINT
 
 #include "absl/status/status.h"
@@ -30,12 +26,6 @@
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
-
-#if __cplusplus > 201402L
-namespace fs = std::filesystem;
-#else
-namespace fs = std::experimental::filesystem;
-#endif
 
 // Converts a absl::string_view into an object compatible with std::filesystem.
 #ifdef ABSL_USES_STD_STRING_VIEW
@@ -49,7 +39,7 @@ namespace file {
 namespace ygg = ::yggdrasil_decision_forests;
 
 std::string JoinPathList(std::initializer_list<absl::string_view> paths) {
-  fs::path all_paths;
+  std::filesystem::path all_paths;
   for (const auto& path : paths) {
     all_paths /= SV_ABSL_TO_STD(path);
   }
@@ -90,17 +80,19 @@ bool GenerateShardedFilenames(absl::string_view spec,
 absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
                    const int options) {
   try {
-    const auto search_dir = fs::path(SV_ABSL_TO_STD(pattern)).parent_path();
-    const auto filename = fs::path(SV_ABSL_TO_STD(pattern)).filename().string();
+    const auto search_dir =
+        std::filesystem::path(SV_ABSL_TO_STD(pattern)).parent_path();
+    const auto filename =
+        std::filesystem::path(SV_ABSL_TO_STD(pattern)).filename().string();
     std::string regexp_filename =
         absl::StrReplaceAll(filename, {{".", "\\."}, {"*", ".*"}, {"?", "."}});
     std::regex regexp_pattern(regexp_filename);
     std::error_code error;
 
-    const fs::directory_iterator path_end;
-    for (auto path = fs::directory_iterator(search_dir, error);
+    const std::filesystem::directory_iterator path_end;
+    for (auto path = std::filesystem::directory_iterator(search_dir, error);
          !error && path != path_end; path.increment(error)) {
-      if (!fs::is_regular_file(path->path())) {
+      if (!path->is_regular_file(error)) {
         continue;
       }
       if (std::regex_match(path->path().filename().string(), regexp_pattern)) {
@@ -120,7 +112,7 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
 
 absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
   try {
-    fs::create_directories(SV_ABSL_TO_STD(path));
+    std::filesystem::create_directories(SV_ABSL_TO_STD(path));
     return absl::OkStatus();
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
@@ -130,7 +122,7 @@ absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
 // Delete the directory "path".
 absl::Status RecursivelyDelete(absl::string_view path, int options) {
   try {
-    fs::remove(SV_ABSL_TO_STD(path));
+    std::filesystem::remove(SV_ABSL_TO_STD(path));
     return absl::OkStatus();
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
@@ -238,12 +230,12 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
 }
 
 absl::StatusOr<bool> FileExists(absl::string_view path) {
-  return fs::exists(SV_ABSL_TO_STD(path));
+  return std::filesystem::exists(SV_ABSL_TO_STD(path));
 }
 
 absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
   try {
-    fs::rename(SV_ABSL_TO_STD(from), SV_ABSL_TO_STD(to));
+    std::filesystem::rename(SV_ABSL_TO_STD(from), SV_ABSL_TO_STD(to));
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
   }
@@ -252,14 +244,7 @@ absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
 
 std::string GetBasename(absl::string_view path) {
   try {
-    auto filename = fs::path(std::string(path)).filename().string();
-#if __cplusplus == 201402L
-    // The experimental C++14 filesystem reports a . if the filename is empty.
-    if (filename == ".") {
-      return "";
-    }
-#endif
-    return filename;
+    return std::filesystem::path(std::string(path)).filename().string();
   } catch (const std::exception& e) {
     YDF_LOG(ERROR) << "Error parsing basename of " << path << ": " << e.what();
     return "";
