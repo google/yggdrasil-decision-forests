@@ -85,17 +85,17 @@ dataset::VerticalDataset ShuffleDatasetColumns(
     const auto src_column = dataset.column(column_idx);
 
     // Compute the permutation of the indices.
-    std::vector<dataset::VerticalDataset::row_t> permited_indices(
+    std::vector<dataset::VerticalDataset::row_t> permitted_indices(
         dataset.nrow());
-    std::iota(permited_indices.begin(), permited_indices.end(), 0);
-    std::shuffle(permited_indices.begin(), permited_indices.end(), *rnd);
+    std::iota(permitted_indices.begin(), permitted_indices.end(), 0);
+    std::shuffle(permitted_indices.begin(), permitted_indices.end(), *rnd);
 
     // Permute the values.
     for (dataset::VerticalDataset::row_t example_idx = 0;
          example_idx < dataset.nrow(); example_idx++) {
       dataset::proto::Example::Attribute value;
       src_column->ExtractExample(example_idx, &value);
-      dst_permuted_column->Set(permited_indices[example_idx], value);
+      dst_permuted_column->Set(permitted_indices[example_idx], value);
     }
   }
   return permuted_dataset;

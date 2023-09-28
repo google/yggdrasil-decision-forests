@@ -793,7 +793,7 @@ absl::Status LDACache::ComputeClassification(
   sb_.assign(num_features * num_features, 0);
   for (int shifted_class = 0; shifted_class < shifted_num_classes;
        shifted_class++) {
-    internal::SubstractTransposeMultiplyAdd(
+    internal::SubtractTransposeMultiplyAdd(
         weight_per_class[shifted_class],
         absl::MakeSpan(mean_per_feature_and_class)
             .subspan(shifted_class * num_features, num_features),
@@ -808,7 +808,7 @@ absl::Status LDACache::ComputeClassification(
     DCHECK_GE(shifted_class, 0);
     const float weight = (weights.empty()) ? 1.f : weights[example_idx];
 
-    internal::SubstractTransposeMultiplyAdd(
+    internal::SubtractTransposeMultiplyAdd(
         weight, example_idx, selected_features, projection_evaluator,
         absl::MakeSpan(mean_per_feature_and_class)
             .subspan(shifted_class * num_features, num_features),
@@ -947,7 +947,7 @@ absl::Status ProjectionEvaluator::ExtractAttribute(
   return absl::OkStatus();
 }
 
-void SubstractTransposeMultiplyAdd(double weight, absl::Span<double> a,
+void SubtractTransposeMultiplyAdd(double weight, absl::Span<double> a,
                                    absl::Span<double> b,
                                    std::vector<double>& output) {
   DCHECK_EQ(a.size(), b.size());
@@ -961,7 +961,7 @@ void SubstractTransposeMultiplyAdd(double weight, absl::Span<double> a,
   }
 }
 
-void SubstractTransposeMultiplyAdd(
+void SubtractTransposeMultiplyAdd(
     double weight, std::size_t example_idx,
     const std::vector<int>& selected_features,
     const ProjectionEvaluator& projection_evaluator, absl::Span<double> b,

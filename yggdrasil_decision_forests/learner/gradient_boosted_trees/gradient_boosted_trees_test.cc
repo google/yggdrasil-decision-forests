@@ -427,7 +427,7 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaHalf) {
       0.5f);
   TrainAndEvaluateModel();
 
-  // Slighly better accuracy, but worse log loss; we are not
+  // Slightly better accuracy, but worse log loss; we are not
   // optimizing for log loss directly any more.
   YDF_EXPECT_METRIC_NEAR(metric::Accuracy(evaluation_), 0.8605, 0.003);
   YDF_EXPECT_METRIC_NEAR(metric::LogLoss(evaluation_), 0.3310, 0.004);
@@ -773,7 +773,7 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDiscretizedNumerical) {
 }
 
 // Train and test a model on the adult dataset.
-TEST_F(GradientBoostedTreesOnAdult, BaseAggresiveDiscretizedNumerical) {
+TEST_F(GradientBoostedTreesOnAdult, BaseAggressiveDiscretizedNumerical) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_num_trees(100);
@@ -1612,13 +1612,13 @@ TEST_F(GradientBoostedTreesOnAdult, BinomialLogLikelihoodConfusionTablesAgree) {
       model_->ValidationEvaluation().classification().confusion();
 
   utils::RandomEngine rnd(1234);
-  const auto a_posteriori_evaulation =
+  const auto a_posteriori_evaluation =
       model_->Evaluate(valid_dataset_, {}, &rnd);
 
-  ASSERT_TRUE(a_posteriori_evaulation.has_classification());
-  ASSERT_TRUE(a_posteriori_evaulation.classification().has_confusion());
+  ASSERT_TRUE(a_posteriori_evaluation.has_classification());
+  ASSERT_TRUE(a_posteriori_evaluation.classification().has_confusion());
   auto evaluation_confusion_table =
-      a_posteriori_evaulation.classification().confusion();
+      a_posteriori_evaluation.classification().confusion();
   EXPECT_THAT(training_logs_confusion_table,
               EqualsProto(evaluation_confusion_table));
 }
@@ -1638,13 +1638,13 @@ TEST_F(GradientBoostedTreesOnAdult,
       model_->ValidationEvaluation().classification().confusion();
 
   utils::RandomEngine rnd(1234);
-  const auto a_posteriori_evaulation =
+  const auto a_posteriori_evaluation =
       model_->Evaluate(valid_dataset_, {}, &rnd);
 
-  ASSERT_TRUE(a_posteriori_evaulation.has_classification());
-  ASSERT_TRUE(a_posteriori_evaulation.classification().has_confusion());
+  ASSERT_TRUE(a_posteriori_evaluation.has_classification());
+  ASSERT_TRUE(a_posteriori_evaluation.classification().has_confusion());
   auto evaluation_confusion_table =
-      a_posteriori_evaulation.classification().confusion();
+      a_posteriori_evaluation.classification().confusion();
   EXPECT_THAT(training_logs_confusion_table,
               EqualsProto(evaluation_confusion_table));
 }

@@ -59,7 +59,7 @@ message DistributedGradientBoostedTreesTrainingConfig {
   // training. If no validation dataset is available, all the workers are used
   // for training independently of the value of "ratio_evaluation_workers".
   //
-  // Validation and training are running concurently. Increase this value if
+  // Validation and training are running concurrently. Increase this value if
   // the validation takes more time than the training (High average duration of
   // the"EndIter" stage; see the training logs).
   optional float ratio_evaluation_workers = 9 [default = 0.1];

@@ -1,0 +1,8 @@
+[type.po]
+extend-glob = ["*.csv", "*.ipynb"]
+check-file = false
+
+[default.extend-words]
+FPR = "FPR"
+iif = "iif"
+countr = "countr"

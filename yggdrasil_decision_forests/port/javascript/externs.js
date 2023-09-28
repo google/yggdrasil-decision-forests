@@ -99,7 +99,7 @@ let InternalTFDFPredictions;
 let LoadModelOptions;
 
 /**
- * Output predictions whe using the TF-DF signature.
+ * Output predictions when using the TF-DF signature.
  *
  * @typedef {{
  *   densePredictions: !Array<!Array<number>>,

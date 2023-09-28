@@ -23,7 +23,7 @@ message LoadBalancerOptions {
   // work). In other words, the memory / cpu usage of worker can increase by up
   // to "max_unbalance_ratio" * "initial / default / balanced usage".
   //
-  // For example, suppose a 100MB dataset splitted among 10 workers. In the
+  // For example, suppose a 100MB dataset split among 10 workers. In the
   // balanced state, each worker receive 1/10 of the dataset i.e. 10MB of data.
   // If `max_unbalance_ratio = 0.2`, a fast worker can receive up to 10MB * 1.2
   // = 12MB of data.

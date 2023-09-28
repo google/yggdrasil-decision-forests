@@ -32,7 +32,7 @@
 //   }
 //
 //   absl::StatusOr<Blob> RunRequest(Blob blob) override {
-//     YDF_LOG(INFo) << "Processing " << blob;
+//     YDF_LOG(INFO) << "Processing " << blob;
 //     return "MyAnswer";
 //   }
 // };

@@ -210,7 +210,7 @@ using SplitterFinderStreamProcessor =
 
 // Records the status of workers in a concurrent setup.
 // Part of the worker response (SplitterWorkResponse) that need to be kept in
-// order to simulate sequencial feature splitting.
+// order to simulate sequential feature splitting.
 struct SplitterWorkDurableResponse {
   // Index of the condition if status==kBetterSplitFound.
   int condition_idx;

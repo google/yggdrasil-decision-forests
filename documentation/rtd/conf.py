@@ -1,4 +1,4 @@
-"""Configuration for the Sphinx documentaiton generator."""
+"""Configuration for the Sphinx documentation generator."""
 
 project = "Yggdrasil Decision Forests"
 copyright = "2022, Google"

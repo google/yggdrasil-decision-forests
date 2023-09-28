@@ -63,7 +63,7 @@ class End2End : public ::testing::Test {
 
     proto::CreateDatasetCacheConfig config;
 
-    // Tha "age" column will not be discretized (72 unique values), while the
+    // The "age" column will not be discretized (72 unique values), while the
     // "education_num" will be (15 unique values).
     config.set_max_unique_values_for_discretized_numerical(32);
     int32_t label_column_idx;

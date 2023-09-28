@@ -113,7 +113,7 @@ absl::StatusOr<model::proto::Metadata> CreateMetadata(
 // Get a non-owning pointer to the pre-compiled model.
 //
 // The model can be used for predictions on flat example sets. The model lives
-// on the heap and should its memory should not be freed since the underyling
+// on the heap and should its memory should not be freed since the underlying
 // variable is static.
 absl::StatusOr<const serving::decision_forest::
                    GradientBoostedTreesRankingNumericalOnly* const> GetModel() {

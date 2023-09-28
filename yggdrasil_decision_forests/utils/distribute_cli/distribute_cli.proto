@@ -40,7 +40,7 @@ message Config {
   // For remote distributed execution, using display_worker_output=true and
   // display_commands_output=false generally works well. For local execution,
   // using display_worker_output=false and display_commands_output=false
-  // generally works well. For local exeuction of a single task at a time (e.g.
+  // generally works well. For local execution of a single task at a time (e.g.
   // for debugging), using display_worker_output=true and
   // display_commands_output=true generally works well.
 

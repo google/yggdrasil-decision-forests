@@ -69,7 +69,7 @@ class DatasetCacheReader {
   // Trainings weights. Empty if the training examples are not weighted.
   const std::vector<float>& weights() const;
 
-  // Iterator over the delta-bit example indices orded according to the
+  // Iterator over the delta-bit example indices ordered according to the
   // "column_idx"-th numerical column.
   //
   // See the documentation of "MaskDeltaBit" and "MaskExampleIdx" for an

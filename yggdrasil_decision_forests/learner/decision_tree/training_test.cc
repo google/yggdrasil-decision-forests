@@ -383,13 +383,13 @@ TEST(MHLDTOblique, LDACache) {
   EXPECT_THAT(extracted, Pointwise(DoubleNear(eps), {15.334, 9., 9., 13.201}));
 }
 
-TEST(MHLDTOblique, SubstractTransposeMultiplyAdd) {
+TEST(MHLDTOblique, SubtractTransposeMultiplyAdd) {
   const double eps = 0.001;
 
   std::vector<double> a = {0, 2};
   std::vector<double> b = {2, 1};
   std::vector<double> output(4, 0);
-  internal::SubstractTransposeMultiplyAdd(1., absl::MakeSpan(a),
+  internal::SubtractTransposeMultiplyAdd(1., absl::MakeSpan(a),
                                           absl::MakeSpan(b), output);
   EXPECT_THAT(output, Pointwise(DoubleNear(eps), {4, -2, -2, 1}));
 }
