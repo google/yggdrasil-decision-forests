@@ -61,15 +61,14 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
   bool RequireGroupingAttribute() const override { return true; }
 
   LossShape Shape() const override {
-    return LossShape{/*.gradient_dim =*/1, /*.prediction_dim =*/1,
-                     /*.has_hessian =*/true};
+    return LossShape{.gradient_dim = 1, .prediction_dim = 1};
   };
 
   absl::StatusOr<std::vector<float>> InitialPredictions(
       const dataset::VerticalDataset& dataset, int label_col_idx,
       const std::vector<float>& weights) const override;
 
-  virtual absl::StatusOr<std::vector<float>> InitialPredictions(
+  absl::StatusOr<std::vector<float>> InitialPredictions(
       const decision_tree::proto::LabelStatistics& label_statistics)
       const override;
 
@@ -79,15 +78,6 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
-  decision_tree::CreateSetLeafValueFunctor SetLeafFunctor(
-      const std::vector<float>& predictions,
-      const std::vector<GradientData>& gradients,
-      int label_col_idx) const override;
-
-  absl::Status UpdatePredictions(
-      const std::vector<const decision_tree::DecisionTree*>& new_trees,
-      const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
-      double* mean_abs_prediction) const override;
 
   std::vector<std::string> SecondaryMetricNames() const override;
 

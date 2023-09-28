@@ -39,6 +39,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
@@ -49,8 +50,9 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping/early_stopping.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/metric/ranking_ndcg.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -365,11 +367,13 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
         begin_training +
         absl::Seconds(config.train_config.maximum_training_duration_seconds());
   }
-
   decision_tree::InternalTrainConfig internal_config;
-  internal_config.set_leaf_value_functor = config.loss->SetLeafFunctor(
-      predictions, gradients, config.train_config_link.label());
-  internal_config.use_hessian_gain = config.gbt_config->use_hessian_gain();
+  internal_config.set_leaf_value_functor =
+      SetLeafValueWithNewtonRaphsonStepFunctor(*config.gbt_config,
+                                               gradients[grad_idx]);
+  internal_config.hessian_score = config.gbt_config->use_hessian_gain();
+  internal_config.hessian_leaf = true;
+  internal_config.gradient_col_idx = gradients[grad_idx].gradient_col_idx;
   internal_config.hessian_col_idx = gradients[grad_idx].hessian_col_idx;
   internal_config.hessian_l1 = config.gbt_config->l1_regularization();
   internal_config.hessian_l2_numerical = config.gbt_config->l2_regularization();
@@ -424,6 +428,13 @@ absl::Status GradientBoostedTreesLearner::CheckConfiguration(
     return absl::InvalidArgumentError(
         "Uplifting is not supported with Gradient Boosted Trees. Choose Random "
         "Forests for building uplift models.");
+  }
+
+  if (config.monotonic_constraints_size() > 0 &&
+      !gbt_config.use_hessian_gain()) {
+    return absl::InvalidArgumentError(
+        "Gradient Boosted Trees does not support monotonic constraints with "
+        "use_hessian_gain=false.");
   }
 
   return absl::OkStatus();
@@ -651,7 +662,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
                                             num_sample_train_shards, &random),
                        dataset_prefix, data_spec, config,
                        /*allocate_gradient=*/true, mdl.get()));
-  RETURN_IF_ERROR(dataset::CheckNumExamples(current_train_dataset->dataset.nrow()));
+  RETURN_IF_ERROR(
+      dataset::CheckNumExamples(current_train_dataset->dataset.nrow()));
   YDF_LOG(INFO) << current_train_dataset->dataset.nrow()
                 << " examples loaded in the first training sample in "
                 << (absl::Now() - begin_load_first_sample);
@@ -804,7 +816,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           }
 
           // Caches the predictions of the trees.
-          RETURN_IF_ERROR(config.loss->UpdatePredictions(
+          RETURN_IF_ERROR(UpdatePredictions(
               last_trees, next_train_dataset->gradient_dataset,
               &next_train_dataset->predictions,
               /*mean_abs_prediction=*/nullptr));
@@ -903,19 +915,19 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 
     if (has_validation_dataset) {
       // Update the predictions on the validation dataset.
-      RETURN_IF_ERROR(config.loss->UpdatePredictions(
-          RemoveUniquePtr(new_trees), validation->gradient_dataset,
-          &validation->predictions,
-          /*mean_abs_prediction=*/nullptr));
+      RETURN_IF_ERROR(UpdatePredictions(RemoveUniquePtr(new_trees),
+                                        validation->gradient_dataset,
+                                        &validation->predictions,
+                                        /*mean_abs_prediction=*/nullptr));
       validation->predictions_from_num_trees += new_trees.size();
     }
 
     if (recycle_next) {
       // Update the predictions on the sample because it will be recycled.
-      RETURN_IF_ERROR(config.loss->UpdatePredictions(
-          RemoveUniquePtr(new_trees), current_train_dataset->gradient_dataset,
-          &current_train_dataset->predictions,
-          /*mean_abs_prediction=*/nullptr));
+      RETURN_IF_ERROR(UpdatePredictions(RemoveUniquePtr(new_trees),
+                                        current_train_dataset->gradient_dataset,
+                                        &current_train_dataset->predictions,
+                                        /*mean_abs_prediction=*/nullptr));
       current_train_dataset->predictions_from_num_trees += new_trees.size();
     }
 
@@ -1251,11 +1263,11 @@ GradientBoostedTreesLearner::TrainWithStatus(
       config.gbt_config->early_stopping_initial_iteration());
   early_stopping.set_trees_per_iterations(mdl->num_trees_per_iter_);
 
-  if (config.gbt_config->use_hessian_gain() &&
-      gradients.front().hessian_col_idx == -1) {
-    return absl::InvalidArgumentError(
-        "Loss does not support hessian optimization");
-  }
+  // if (config.gbt_config->use_hessian_gain() &&
+  //     gradients.front().hessian_col_idx == -1) {
+  //   return absl::InvalidArgumentError(
+  //       "Loss does not support hessian optimization");
+  // }
 
   ASSIGN_OR_RETURN(
       const auto preprocessing,
@@ -1444,16 +1456,16 @@ GradientBoostedTreesLearner::TrainWithStatus(
       }
     } else {
       // Update the predictions on the training dataset.
-      RETURN_IF_ERROR(config.loss->UpdatePredictions(
+      RETURN_IF_ERROR(UpdatePredictions(
           RemoveUniquePtr(new_trees), gradient_sub_train_dataset,
           &sub_train_predictions, &mean_abs_prediction));
 
       if (has_validation_dataset) {
         // Update the predictions on the validation dataset.
-        RETURN_IF_ERROR(config.loss->UpdatePredictions(
-            RemoveUniquePtr(new_trees), gradient_validation_dataset,
-            &validation_predictions,
-            /*mean_abs_prediction=*/nullptr));
+        RETURN_IF_ERROR(UpdatePredictions(RemoveUniquePtr(new_trees),
+                                          gradient_validation_dataset,
+                                          &validation_predictions,
+                                          /*mean_abs_prediction=*/nullptr));
       }
     }
 
@@ -2582,31 +2594,38 @@ absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
       gradient_spec.set_name(grad_col_name);
       gradient_spec.set_type(dataset::proto::ColumnType::NUMERICAL);
 
-      GradientData gradient = {
-          /*.gradient =*/
-          *(dynamic_cast<dataset::VerticalDataset::NumericalColumn*>(
-                gradient_dataset->AddColumn(gradient_spec).value())
-                ->mutable_values()),
-          /*.gradient_column_name =*/grad_col_name};
+      const auto hessian_col_name = HessianColumnName(gradient_idx);
+      dataset::proto::Column hessian_col_spec;
+      hessian_col_spec.set_name(hessian_col_name);
+      hessian_col_spec.set_type(dataset::proto::ColumnType::NUMERICAL);
 
-      if (loss_shape.has_hessian) {
-        const auto hessian_col_name = HessianColumnName(gradient_idx);
-        dataset::proto::Column hessian_col_spec;
-        hessian_col_spec.set_name(hessian_col_name);
-        hessian_col_spec.set_type(dataset::proto::ColumnType::NUMERICAL);
+      const int gradient_column_idx = gradient_dataset->ncol();
+      ASSIGN_OR_RETURN(auto gradient_column,
+                       gradient_dataset->AddColumn(gradient_spec));
+      const int hessian_column_idx = gradient_dataset->ncol();
+      ASSIGN_OR_RETURN(auto hessian_column,
+                       gradient_dataset->AddColumn(hessian_col_spec));
 
-        // Note: These values will be set correctly before use.
-        gradient.hessian =
-            dynamic_cast<dataset::VerticalDataset::NumericalColumn*>(
-                gradient_dataset->AddColumn(hessian_col_spec).value())
-                ->mutable_values();
-        gradient.hessian_col_idx =
-            gradient_dataset->ColumnNameToColumnIdx(hessian_col_name);
-        if (gradient.hessian_col_idx < 0) {
-          return absl::InternalError("No allocated hessian column");
-        }
-      }
-      gradients->push_back(std::move(gradient));
+      std::vector<float>* gradient_data =
+          (dynamic_cast<dataset::VerticalDataset::NumericalColumn*>(
+               gradient_column)
+               ->mutable_values());
+
+      std::vector<float>* hessian_data =
+          (dynamic_cast<dataset::VerticalDataset::NumericalColumn*>(
+               hessian_column)
+               ->mutable_values());
+
+      std::fill(gradient_data->begin(), gradient_data->end(),
+                std::numeric_limits<float>::quiet_NaN());
+      std::fill(hessian_data->begin(), hessian_data->end(),
+                std::numeric_limits<float>::quiet_NaN());
+
+      gradients->push_back({.gradient = *gradient_data,
+                            .hessian = *hessian_data,
+                            .gradient_col_idx = gradient_column_idx,
+                            .hessian_col_idx = hessian_column_idx,
+                            .gradient_column_name = grad_col_name});
     }
   }
 
@@ -2671,8 +2690,8 @@ absl::Status ComputePredictions(
       selected_trees[tree_idx] =
           trees[iter_idx * mdl->num_trees_per_iter() + tree_idx];
     }
-    RETURN_IF_ERROR(config.loss->UpdatePredictions(
-        selected_trees, gradient_dataset, predictions, nullptr));
+    RETURN_IF_ERROR(UpdatePredictions(selected_trees, gradient_dataset,
+                                      predictions, nullptr));
   }
   return absl::OkStatus();
 }
@@ -2920,9 +2939,9 @@ absl::Status DartPredictionAccumulator::UpdateWithNewIteration(
   TreePredictions tree_prediction;
   tree_prediction.predictions.assign(predictions_.size(), 0.f);
   tree_prediction.weight = 1.0f / (selected_iter_idxs.size() + 1);
-  RETURN_IF_ERROR(loss_impl.UpdatePredictions(
-      RemoveUniquePtr(new_trees), gradient_dataset,
-      &tree_prediction.predictions, mean_abs_prediction));
+  RETURN_IF_ERROR(
+      UpdatePredictions(RemoveUniquePtr(new_trees), gradient_dataset,
+                        &tree_prediction.predictions, mean_abs_prediction));
 
   const float sampled_factor = static_cast<float>(selected_iter_idxs.size()) /
                                (selected_iter_idxs.size() + 1);

@@ -42,9 +42,6 @@
 //   - Iterate over the buckets and fill update the score accumulator. At each
 //     step, evaluate the score of the split.
 //
-// If SIMPLE_ML_DEBUG_DECISION_TREE_SPLITTER is set, the algorithm will log the
-// detail in the splitter work.
-//
 // If the preprocessor "YDF_DEBUG_PRINT_SPLIT" is set, detailed logs of the
 // splitting algorithm are printed with YDF_LOG(INFO).
 //
@@ -64,6 +61,7 @@
 
 #include "absl/base/attributes.h"
 #include "absl/status/statusor.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
@@ -680,9 +678,10 @@ template <typename ExampleBucketSet, typename LabelScoreAccumulator,
 SplitSearchResult ScanSplits(
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
-    const ExampleBucketSet& example_bucket_set, const int64_t num_examples,
-    const int min_num_obs, const int attribute_idx,
-    proto::NodeCondition* condition, PerThreadCacheV2* cache) {
+    const ExampleBucketSet& example_bucket_set,
+    const SignedExampleIdx num_examples, const int min_num_obs,
+    const int attribute_idx, proto::NodeCondition* condition,
+    PerThreadCacheV2* cache) {
   using FeatureBucketType = typename ExampleBucketSet::FeatureBucketType;
 
   if (example_bucket_set.items.size() <= 1) {
@@ -706,8 +705,8 @@ SplitSearchResult ScanSplits(
   initializer.InitFull(&pos);
 
   // Running statistics.
-  int64_t num_pos_examples = num_examples;
-  int64_t num_neg_examples = 0;
+  SignedExampleIdx num_pos_examples = num_examples;
+  SignedExampleIdx num_neg_examples = 0;
   bool tried_one_split = false;
 
   const double weighted_num_examples = pos.WeightedNumExamples();
@@ -856,8 +855,9 @@ SplitSearchResult ScanSplitsCustomOrder(
     const std::vector<std::pair<float, int32_t>>& bucket_order,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const Initializer& initializer, const ExampleBucketSet& example_bucket_set,
-    const int64_t num_examples, const int min_num_obs, const int attribute_idx,
-    proto::NodeCondition* condition, PerThreadCacheV2* cache) {
+    const SignedExampleIdx num_examples, const int min_num_obs,
+    const int attribute_idx, proto::NodeCondition* condition,
+    PerThreadCacheV2* cache) {
   using FeatureBucketType = typename ExampleBucketSet::FeatureBucketType;
 
   if (example_bucket_set.items.size() <= 1) {
@@ -881,8 +881,8 @@ SplitSearchResult ScanSplitsCustomOrder(
   initializer.InitFull(&pos);
 
   // Running statistics.
-  int64_t num_pos_examples = num_examples;
-  int64_t num_neg_examples = 0;
+  SignedExampleIdx num_pos_examples = num_examples;
+  SignedExampleIdx num_neg_examples = 0;
   bool tried_one_split = false;
 
   const double weighted_num_examples = pos.WeightedNumExamples();
@@ -1025,8 +1025,9 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   initializer.InitFull(&pos);
 
   // Running statistics.
-  int64_t num_pos_examples = selected_examples.size();
-  int64_t max_num_pos_examples = selected_examples.size() - min_num_obs;
+  SignedExampleIdx num_pos_examples = selected_examples.size();
+  SignedExampleIdx max_num_pos_examples =
+      selected_examples.size() - min_num_obs;
 
   // At least one split was tested.
   bool tried_one_split = false;
@@ -1038,10 +1039,10 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   // Statistics of the best split found so far.
   double best_score =
       std::max<double>(condition->split_score(), initializer.MinimumScore());
-  int64_t best_num_pos_training_examples_without_weight;
-  int64_t best_num_pos_training_examples_with_weight;
-  int64_t best_sorted_example_idx = -1;
-  int64_t best_previous_sorted_example_idx = -1;
+  SignedExampleIdx best_num_pos_training_examples_without_weight;
+  SignedExampleIdx best_num_pos_training_examples_with_weight;
+  SignedExampleIdx best_sorted_example_idx = -1;
+  SignedExampleIdx best_previous_sorted_example_idx = -1;
 
   constexpr auto new_value_mask = ((SparseItem::ExampleIdx)1)
                                   << (sizeof(SparseItem::ExampleIdx) * 8 - 1);
@@ -1087,7 +1088,8 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
     // Test Split
     if (new_attribute_value) {
       if (num_pos_examples >= min_num_obs &&
-          num_pos_examples <= max_num_pos_examples) {
+          num_pos_examples <= max_num_pos_examples &&
+          initializer.IsValidSplit(neg, pos)) {
         // Compute the split's score.
         const auto score =
             Score<>(initializer, weighted_num_examples, pos, neg);
@@ -1193,8 +1195,9 @@ SplitSearchResult ScanSplitsRandomBuckets(
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
     const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
-    const ExampleBucketSet& example_bucket_set, const int64_t num_examples,
-    const int min_num_obs, const int attribute_idx,
+    const ExampleBucketSet& example_bucket_set,
+    const SignedExampleIdx num_examples, const int min_num_obs,
+    const int attribute_idx,
     const std::function<int(const int num_non_empty_buckets)>& num_trials_fn,
     proto::NodeCondition* condition, PerThreadCacheV2* cache,
     utils::RandomEngine* random) {
@@ -1223,8 +1226,8 @@ SplitSearchResult ScanSplitsRandomBuckets(
   initializer.InitFull(&pos);
 
   // Running statistics.
-  int64_t num_pos_examples;
-  int64_t num_neg_examples;
+  SignedExampleIdx num_pos_examples;
+  SignedExampleIdx num_neg_examples;
   bool tried_one_split = false;
 
   const double weighted_num_examples = pos.WeightedNumExamples();

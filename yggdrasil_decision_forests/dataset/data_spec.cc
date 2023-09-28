@@ -17,11 +17,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <iterator>
 #include <limits>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <regex>  // NOLINT
 #include <string>
 #include <utility>
@@ -220,17 +222,20 @@ void GetMultipleColumnIdxFromName(
 
 absl::Status GetSingleColumnIdxFromName(
     const absl::string_view column_name_regex,
-    const dataset::proto::DataSpecification& data_spec, int32_t* column_idx) {
+    const dataset::proto::DataSpecification& data_spec, int32_t* column_idx,
+    absl::string_view error_message_prefix) {
   std::vector<std::string> tmp_pattern_vector{std::string(column_name_regex)};
   std::vector<int32_t> tmp_column_idxs;
   GetMultipleColumnIdxFromName(tmp_pattern_vector, data_spec, &tmp_column_idxs);
   if (tmp_column_idxs.empty()) {
-    return absl::InvalidArgumentError(absl::StrCat(
-        "\"", column_name_regex, "\" does not match any column names."));
+    return absl::InvalidArgumentError(
+        absl::StrCat(error_message_prefix, "\"", column_name_regex,
+                     "\" does not match any column names."));
   }
   if (tmp_column_idxs.size() > 1) {
-    return absl::InvalidArgumentError(absl::StrCat(
-        "\"", column_name_regex, "\" matches more than one column names."));
+    return absl::InvalidArgumentError(
+        absl::StrCat(error_message_prefix, "\"", column_name_regex,
+                     "\" matches more than one column names."));
   }
   *column_idx = tmp_column_idxs[0];
   return absl::OkStatus();

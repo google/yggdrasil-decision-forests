@@ -22,10 +22,11 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -52,7 +53,7 @@ constexpr int kBinomialLossSecondaryMetricClassificationIdx = 0;
 
 // Minimum length of the hessian (i.e. denominator) in the Newton step
 // optimization.
-constexpr float kMinHessianForNewtonStep = 0.001f;
+constexpr double kMinHessianForNewtonStep = 0.001;
 
 // Ensures that the value is finite i.e. not NaN and not infinite.
 // This is a no-op in release mode.
@@ -61,21 +62,31 @@ void DCheckIsFinite(T v) {
   DCHECK(!std::isnan(v) && !std::isinf(v));
 }
 
-// Set a leaf's value using one stop of the Newton–Raphson method.
-// The label statistics should contain gradients + hessian values.
+// Set a leaf's value using one step of the Newton–Raphson method by using
+// pre-computed and PRE-AGGREGATED gradient and hessians. The label statistics
+// should contain gradients + hessian values.
 absl::Status SetLeafValueWithNewtonRaphsonStep(
     const proto::GradientBoostedTreesTrainingConfig& gbt_config_,
     const decision_tree::proto::LabelStatistics& label_statistics,
     decision_tree::proto::Node* node);
 
-void UpdatePredictionWithMultipleUnivariateTrees(
-    const dataset::VerticalDataset& dataset,
-    const std::vector<const decision_tree::DecisionTree*>& trees,
-    std::vector<float>* predictions, double* mean_abs_prediction);
+// Creates a function to set leaf's values using one step of the Newton–Raphson
+// method by using pre-computed (but not pre-aggregated) gradient and hessians.
+decision_tree::CreateSetLeafValueFunctor
+SetLeafValueWithNewtonRaphsonStepFunctor(
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
+    const GradientData& gradients);
 
-void UpdatePredictionWithSingleUnivariateTree(
-    const dataset::VerticalDataset& dataset,
-    const decision_tree::DecisionTree& tree, std::vector<float>* predictions,
+template <bool weighted>
+absl::Status SetLeafValueWithNewtonRaphsonStep(
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<float>& weights, const GradientData& gradients,
+    decision_tree::NodeWithChildren* node);
+
+absl::Status UpdatePredictions(
+    const std::vector<const decision_tree::DecisionTree*>& trees,
+    const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
     double* mean_abs_prediction);
 
 }  // namespace gradient_boosted_trees

@@ -23,7 +23,6 @@
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -106,6 +105,22 @@ TEST(AbstractModel, LinkTrainingConfigFullyMissingFeatures) {
 
   EXPECT_EQ(config_link.label(), 0);
   EXPECT_THAT(config_link.features(), ElementsAre(3));
+}
+
+TEST(AbstractModel, LinkTrainingConfigMissingLabel) {
+  proto::TrainingConfig training_config;
+
+  dataset::proto::DataSpecification data_spec;
+  data_spec.add_columns()->set_name("A");
+  data_spec.add_columns()->set_name("B");
+  data_spec.add_columns()->set_name("");
+
+  data_spec.set_created_num_rows(10);
+  proto::TrainingConfigLinking config_link;
+  EXPECT_THAT(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                  &config_link),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "No label specified in the training config. Aborting."));
 }
 
 TEST(AbstractLearner, GenericHyperParameters) {

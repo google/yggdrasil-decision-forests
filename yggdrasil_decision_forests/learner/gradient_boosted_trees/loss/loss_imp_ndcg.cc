@@ -74,7 +74,9 @@ absl::Status NDCGLoss::UpdateGradients(
   // TODO: Implement thread_pool.
 
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
-  std::vector<float>& second_order_derivative_data = *(*gradients)[0].hessian;
+  std::vector<float>& hessian_data = *(*gradients)[0].hessian;
+  DCHECK_EQ(gradient_data.size(), hessian_data.size());
+
   metric::NDCGCalculator ndcg_calculator(kNDCG5Truncation);
 
   const float lambda_loss = gbt_config_.lambda_loss();
@@ -82,8 +84,7 @@ absl::Status NDCGLoss::UpdateGradients(
 
   // Reset gradient accumulators.
   std::fill(gradient_data.begin(), gradient_data.end(), 0.f);
-  std::fill(second_order_derivative_data.begin(),
-            second_order_derivative_data.end(), 0.f);
+  std::fill(hessian_data.begin(), hessian_data.end(), 0.f);
 
   // "pred_and_in_ground_idx[j].first" is the prediction for the example
   // "group[pred_and_in_ground_idx[j].second].example_idx".
@@ -133,7 +134,7 @@ absl::Status NDCGLoss::UpdateGradients(
       // example
       // "group[pred_and_in_ground_idx[item_1_idx].second].example_idx".
       float& grad_1 = gradient_data[example_1_idx];
-      float& second_order_1 = second_order_derivative_data[example_1_idx];
+      float& second_order_1 = hessian_data[example_1_idx];
 
       for (int item_2_idx = item_1_idx + 1; item_2_idx < num_pred_and_in_ground;
            item_2_idx++) {
@@ -190,46 +191,13 @@ absl::Status NDCGLoss::UpdateGradients(
         DCheckIsFinite(second_order_1);
 
         gradient_data[example_2_idx] -= unit_grad;
-        second_order_derivative_data[example_2_idx] += unit_second_order;
+        hessian_data[example_2_idx] += unit_second_order;
       }
     }
   }
   return absl::OkStatus();
 }
 
-decision_tree::CreateSetLeafValueFunctor NDCGLoss::SetLeafFunctor(
-    const std::vector<float>& predictions,
-    const std::vector<GradientData>& gradients, const int label_col_idx) const {
-  return [this, &predictions, &gradients, label_col_idx](
-             const dataset::VerticalDataset& train_dataset,
-             const std::vector<UnsignedExampleIdx>& selected_examples,
-             const std::vector<float>& weights,
-             const model::proto::TrainingConfig& config,
-             const model::proto::TrainingConfigLinking& config_link,
-             decision_tree::NodeWithChildren* node) {
-    if (weights.empty()) {
-      return SetLeafNDCG</*weighted=*/false>(
-          train_dataset, selected_examples, weights, config, config_link,
-          predictions, gbt_config_, gradients, label_col_idx, node);
-    } else {
-      return SetLeafNDCG</*weighted=*/true>(
-          train_dataset, selected_examples, weights, config, config_link,
-          predictions, gbt_config_, gradients, label_col_idx, node);
-    }
-  };
-}
-
-absl::Status NDCGLoss::UpdatePredictions(
-    const std::vector<const decision_tree::DecisionTree*>& new_trees,
-    const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
-    double* mean_abs_prediction) const {
-  if (new_trees.size() != 1) {
-    return absl::InternalError("Wrong number of trees");
-  }
-  UpdatePredictionWithSingleUnivariateTree(dataset, *new_trees.front(),
-                                           predictions, mean_abs_prediction);
-  return absl::OkStatus();
-}
 
 std::vector<std::string> NDCGLoss::SecondaryMetricNames() const {
   return {"NDCG@5"};

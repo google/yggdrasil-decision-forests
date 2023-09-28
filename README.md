@@ -166,6 +166,11 @@ the following paper:
 Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library,
 Guillame-Bert et al., KDD 2023: 4068-4077. doi:10.1145/3580305.3599933
 
+## Contact
+
+You can contact the core development team at
+[decision-forests-contact@google.com](mailto:decision-forests-contact@google.com).
+
 ## Credits
 
 Yggdrasil Decision Forests and TensorFlow Decision Forests are developed by:

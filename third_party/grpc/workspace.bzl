@@ -3,9 +3,11 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 def deps():
+    GRPC_VERSION = "1.58.1"
+    GRPC_SHA = "860bf758a1437a03318bf09db8e87cb8149a2f578954110ce8549e147f868b62"
     http_archive(
         name = "com_github_grpc_grpc",
-        urls = ["https://github.com/grpc/grpc/archive/refs/tags/v1.50.0.zip"],
-        strip_prefix = "grpc-1.50.0",
-        sha256 = "01f66f8349f3fe1f5c07f992206a101090f9ecb81dca355ff254fbf09e1c62a5",
+        urls = ["https://github.com/grpc/grpc/archive/refs/tags/v{version}.tar.gz".format(version = GRPC_VERSION)],
+        strip_prefix = "grpc-{version}".format(version = GRPC_VERSION),
+        sha256 = GRPC_SHA,
     )

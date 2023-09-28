@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <limits>
 #include <numeric>
@@ -30,12 +31,12 @@
 #include "Eigen/Dense"
 #include "Eigen/Eigenvalues"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -94,12 +95,17 @@ GradientAndHessian ExtractLabels(
 
 // Randomly generates a projection. A projection cannot be empty. If the
 // projection contains only one dimension, the weight is guaranteed to be 1.
+// If the projection contains an input feature with monotonic constraint,
+// monotonic_direction is set to 1 (i.e. the projection should be monotonically
+// increasing).
 void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
                       const dataset::proto::DataSpecification& data_spec,
-                      const google::protobuf::RepeatedField<int32_t>& numerical_features,
+                      const model::proto::TrainingConfigLinking& config_link,
                       const float projection_density,
                       internal::Projection* projection,
+                      int8_t* monotonic_direction,
                       utils::RandomEngine* random) {
+  *monotonic_direction = 0;
   projection->clear();
   std::uniform_real_distribution<float> unif01;
   std::uniform_real_distribution<float> unif1m1(-1.f, 1.f);
@@ -109,6 +115,20 @@ void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
     if (dt_config.sparse_oblique_split().binary_weight()) {
       weight = (weight >= 0) ? 1.f : -1.f;
     }
+
+    if (config_link.per_columns_size() > 0 &&
+        config_link.per_columns(feature).has_monotonic_constraint()) {
+      const bool direction_increasing =
+          config_link.per_columns(feature).monotonic_constraint().direction() ==
+          model::proto::MonotonicConstraint::INCREASING;
+      if (direction_increasing == (weight < 0)) {
+        weight = -weight;
+      }
+      // As soon as one selected feature is monotonic, the oblique split becomes
+      // monotonic.
+      *monotonic_direction = 1;
+    }
+
     const auto& spec = data_spec.columns(feature).numerical();
     switch (dt_config.sparse_oblique_split().normalization()) {
       case proto::DecisionTreeTrainingConfig::SparseObliqueSplit::NONE:
@@ -121,17 +141,17 @@ void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
     }
   };
 
-  for (const auto feature : numerical_features) {
+  for (const auto feature : config_link.numerical_features()) {
     if (unif01(*random) < projection_density) {
       projection->push_back({feature, gen_weight(feature)});
     }
   }
   if (projection->empty()) {
     std::uniform_int_distribution<int> unif_feature_idx(
-        0, numerical_features.size() - 1);
-    projection->push_back(
-        {/*.attribute_idx =*/numerical_features[unif_feature_idx(*random)],
-         /*.weight =*/1.f});
+        0, config_link.numerical_features_size() - 1);
+    projection->push_back({/*.attribute_idx =*/config_link.numerical_features(
+                               unif_feature_idx(*random)),
+                           /*.weight =*/1.f});
   } else if (projection->size() == 1) {
     projection->front().weight = 1.f;
   }
@@ -196,8 +216,8 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats,
     const absl::optional<int>& override_num_projections,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache) {
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   if (!weights.empty()) {
     DCHECK_EQ(weights.size(), train_dataset.nrow());
   }
@@ -241,9 +261,10 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
   for (int projection_idx = 0; projection_idx < num_projections;
        projection_idx++) {
     // Generate a current_projection.
-    SampleProjection(dt_config, train_dataset.data_spec(),
-                     config_link.numerical_features(), projection_density,
-                     &current_projection, random);
+    int8_t monotonic_direction;
+    SampleProjection(dt_config, train_dataset.data_spec(), config_link,
+                     projection_density, &current_projection,
+                     &monotonic_direction, random);
 
     // Pre-compute the result of the current_projection.
     RETURN_IF_ERROR(projection_evaluator.Evaluate(
@@ -254,7 +275,8 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
         EvaluateProjection(
             dt_config, label_stats, dense_example_idxs, selected_weights,
             selected_labels, projection_values, internal_config,
-            current_projection.front().attribute_idx, best_condition, cache));
+            current_projection.front().attribute_idx, constraints,
+            monotonic_direction, best_condition, cache));
 
     if (result == SplitSearchResult::kBetterSplitFound) {
       best_projection = current_projection;
@@ -350,6 +372,7 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
     const std::vector<float>& selected_weights, const Labels& selected_labels,
     const std::vector<float>& projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
@@ -379,7 +402,7 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
           selected_labels.gradient_data, selected_labels.hessian_data,
           na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
           label_stats.sum_hessian, label_stats.sum_weights, first_attribute_idx,
-          internal_config, condition, cache);
+          internal_config, constraints, monotonic_direction, condition, cache);
 
     } else {
       result = FindSplitLabelHessianRegressionFeatureNumericalCart<
@@ -388,7 +411,7 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
           selected_labels.gradient_data, selected_labels.hessian_data,
           na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
           label_stats.sum_hessian, label_stats.sum_weights, first_attribute_idx,
-          internal_config, condition, cache);
+          internal_config, constraints, monotonic_direction, condition, cache);
     }
   } else if constexpr (is_same<LabelStats, RegressionLabelStats>::value) {
     if (!selected_weights.empty()) {
@@ -421,11 +444,13 @@ absl::Status EvaluateProjectionAndSetCondition(
     const std::vector<float>& projection_values, const Projection& projection,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
-  ASSIGN_OR_RETURN(const auto result,
-                   EvaluateProjection(
-                       dt_config, label_stats, dense_example_idxs,
-                       selected_weights, selected_labels, projection_values,
-                       internal_config, first_attribute_idx, condition, cache));
+  ASSIGN_OR_RETURN(
+      const auto result,
+      EvaluateProjection(dt_config, label_stats, dense_example_idxs,
+                         selected_weights, selected_labels, projection_values,
+                         internal_config, first_attribute_idx,
+                         /*constraints=*/{}, /*monotonic_direction=*/0,
+                         condition, cache));
 
   if (result == SplitSearchResult::kBetterSplitFound) {
     RETURN_IF_ERROR(SetCondition(
@@ -647,7 +672,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
       return FindBestConditionSparseObliqueTemplate<ClassificationLabelStats>(
           train_dataset, selected_examples, weights, config, config_link,
           dt_config, parent, internal_config, label_stats,
-          override_num_projections, best_condition, random, cache);
+          override_num_projections, {}, best_condition, random, cache);
     case proto::DecisionTreeTrainingConfig::kMhldObliqueSplit:
       return FindBestConditionMHLDObliqueTemplate<ClassificationLabelStats>(
           train_dataset, selected_examples, weights, config, config_link,
@@ -669,15 +694,15 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionHessianLabelStats& label_stats,
     const absl::optional<int>& override_num_projections,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache) {
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   switch (dt_config.split_axis_case()) {
     case proto::DecisionTreeTrainingConfig::kSparseObliqueSplit:
       return FindBestConditionSparseObliqueTemplate<
           RegressionHessianLabelStats>(
           train_dataset, selected_examples, weights, config, config_link,
           dt_config, parent, internal_config, label_stats,
-          override_num_projections, best_condition, random, cache);
+          override_num_projections, constraints, best_condition, random, cache);
     case proto::DecisionTreeTrainingConfig::kMhldObliqueSplit:
       return FindBestConditionMHLDObliqueTemplate<RegressionHessianLabelStats>(
           train_dataset, selected_examples, weights, config, config_link,
@@ -706,7 +731,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
       return FindBestConditionSparseObliqueTemplate<RegressionLabelStats>(
           train_dataset, selected_examples, weights, config, config_link,
           dt_config, parent, internal_config, label_stats,
-          override_num_projections, best_condition, random, cache);
+          override_num_projections, {}, best_condition, random, cache);
     case proto::DecisionTreeTrainingConfig::kMhldObliqueSplit:
       return FindBestConditionMHLDObliqueTemplate<RegressionLabelStats>(
           train_dataset, selected_examples, weights, config, config_link,

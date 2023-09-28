@@ -603,7 +603,10 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:optional",
-    ],
+    ] + select({
+        "//yggdrasil_decision_forests:use_tensorflow_io": [":sharded_io_tfrecord"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_library_ydf(

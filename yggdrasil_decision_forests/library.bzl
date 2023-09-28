@@ -9,8 +9,20 @@ load("//third_party/boost:workspace.bzl", boost = "deps")
 load("//third_party/grpc:workspace.bzl", grpc = "deps")
 load("//third_party/rapidjson:workspace.bzl", rapidjson = "deps")
 load("//third_party/eigen3:workspace.bzl", eigen = "deps")
+load("//third_party/pybind11:workspace.bzl", pybind11 = "deps")
+load("//third_party/pybind11_abseil:workspace.bzl", pybind11_abseil = "deps")
+load("//third_party/pybind11_protobuf:workspace.bzl", pybind11_protobuf = "deps")
 
 def load_dependencies(repo_name = "", exclude_repo = []):
+    if "pybind11" not in exclude_repo:
+        pybind11()
+
+    if "pybind11_abseil" not in exclude_repo:
+        pybind11_abseil()
+
+    if "pybind11_protobuf" not in exclude_repo:
+        pybind11_protobuf()
+
     if "gtest" not in exclude_repo:
         gtest()
 
@@ -40,23 +52,3 @@ def load_dependencies(repo_name = "", exclude_repo = []):
 
     if "eigen" not in exclude_repo:
         eigen()
-
-# Placeholder to use until bazel supports py_strict_binary.
-def py_strict_binary(name, **kwargs):
-    native.py_binary(name = name, **kwargs)
-
-# Placeholder to use until bazel supports py_strict_library.
-def py_strict_library(name, **kwargs):
-    native.py_library(name = name, **kwargs)
-
-# Placeholder to use until bazel supports pytype_strict_binary.
-def pytype_strict_binary(name, **kwargs):
-    native.py_binary(name = name, **kwargs)
-
-# Placeholder to use until bazel supports pytype_strict_library.
-def pytype_strict_library(name, **kwargs):
-    native.py_library(name = name, **kwargs)
-
-# Placeholder to use until bazel supports pytype_library.
-def pytype_library(name, **kwargs):
-    native.py_library(name = name, **kwargs)

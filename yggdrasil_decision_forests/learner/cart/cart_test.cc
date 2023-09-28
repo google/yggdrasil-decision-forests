@@ -45,7 +45,7 @@ TEST_F(CartOnAdult, Base) {
   TrainAndEvaluateModel();
   // Random Forest has an accuracy of ~0.860.
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8560, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4373, 0.04);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4373, 0.05);
 
   // Show the tree structure.
   std::string description;

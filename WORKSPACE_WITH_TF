@@ -32,7 +32,7 @@ tensorflow()
 boost()
 # grpc()  # We use the protobuf linked in tensorflow.
 rapidjson()
-eigen()
+# eigen()
 
 # The initialization of YDF dependencies is commented. TensorFlow
 # is in charge of initializing them.

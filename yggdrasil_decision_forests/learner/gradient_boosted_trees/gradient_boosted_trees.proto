@@ -21,6 +21,8 @@ import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
 import "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.proto";
 
+option java_outer_classname = "GradientBoostedTreesLearner";
+
 // Training configuration for the Gradient Boosted Trees algorithm.
 message GradientBoostedTreesTrainingConfig {
   // Next ID: 38

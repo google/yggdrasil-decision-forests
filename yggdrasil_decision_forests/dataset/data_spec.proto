@@ -349,7 +349,7 @@ message CategoricalGuide {
   // special value.
   optional int32 min_vocab_frequency = 1 [default = 5];
   // Maximum number of unique categorical values. If more values are present,
-  // the less frequent values are considered <RARE>.
+  // the less frequent values are considered <OOD>.
   optional int32 max_vocab_count = 2 [default = 2000];
   // If is_already_integerized=false, a dictionary is build for the feature.
   // Even if the feature is an integer or a float. If

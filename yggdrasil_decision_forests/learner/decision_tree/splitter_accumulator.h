@@ -43,12 +43,12 @@
 
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator_uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
@@ -716,18 +716,28 @@ struct LabelBinaryCategoricalScoreAccumulator {
     this->sum_weights = weights;
   }
 
-  // template <typename T>
   void AddOne(const bool value, const float weights) {
     static float table[] = {0.f, 1.f};
     sum_trues += table[value] * weights;
     sum_weights += weights;
   }
 
-  // template <typename T>
+  void AddOne(const bool value) {
+    static float table[] = {0.f, 1.f};
+    sum_trues += table[value];
+    sum_weights += 1.;
+  }
+
   void SubOne(const bool value, const float weights) {
     static float table[] = {0.f, 1.f};
     sum_trues -= table[value] * weights;
     sum_weights -= weights;
+  }
+
+  void SubOne(const bool value) {
+    static float table[] = {0.f, 1.f};
+    sum_trues -= table[value];
+    sum_weights -= 1.;
   }
 
   void AddMany(const double trues, const double weights) {
@@ -747,9 +757,37 @@ struct LabelBinaryCategoricalScoreAccumulator {
 struct LabelHessianNumericalScoreAccumulator {
   static constexpr bool kNormalizeByWeight = false;
 
+  // Minimum hessian value when computing hessian scores and leaf values.
+  static constexpr double kMinHessianForNewtonStep = 0.001;
+
   double Score() const {
-    const double sum_gradient_l1 = l1_threshold(sum_gradient, hessian_l1);
-    return (sum_gradient_l1 * sum_gradient_l1) / (sum_hessian + hessian_l2);
+    const double numerator = l1_threshold(sum_gradient, hessian_l1);
+    const double denominator =
+        std::max(sum_hessian, kMinHessianForNewtonStep) + hessian_l2;
+
+    if (constraints.min_max_output.has_value()) {
+      const double leaf = numerator / denominator;
+      const auto constraint_min = constraints.min_max_output.value().min;
+      const auto constraint_max = constraints.min_max_output.value().max;
+      if (leaf < constraint_min) {
+        return std::abs(constraint_min * numerator) / denominator;
+      } else if (leaf > constraint_max) {
+        return std::abs(constraint_max * numerator) / denominator;
+      }
+    }
+
+    // grad^2 / hessian
+    return numerator * numerator / denominator;
+  }
+
+  // Leaf value without any constraint applied.
+  double LeafNoConstraints() const {
+    const double numerator = l1_threshold(sum_gradient, hessian_l1);
+    const double denominator =
+        std::max(sum_hessian, kMinHessianForNewtonStep) + hessian_l2;
+
+    // grad / hessian
+    return numerator / denominator;
   }
 
   double WeightedNumExamples() const { return sum_weights; }
@@ -793,6 +831,10 @@ struct LabelHessianNumericalScoreAccumulator {
   // Regularization parameters.
   double hessian_l1;
   double hessian_l2;
+
+  // Optional constraint on the leaf values.
+  // If set, constraints.min_max.has_value() is true.
+  NodeConstraints constraints;
 };
 
 // ===============
@@ -1021,12 +1063,16 @@ struct LabelHessianNumericalOneValueBucket {
     Initializer(const double sum_gradient, const double sum_hessian,
                 const double sum_weights, const double hessian_l1,
                 const double hessian_l2,
-                const bool hessian_split_score_subtract_parent)
+                const bool hessian_split_score_subtract_parent,
+                const int8_t monotonic_direction,
+                const NodeConstraints& constraints)
         : sum_gradient_(sum_gradient),
           sum_hessian_(sum_hessian),
           sum_weights_(sum_weights),
           hessian_l1_(hessian_l1),
-          hessian_l2_(hessian_l2) {
+          hessian_l2_(hessian_l2),
+          monotonic_direction_(monotonic_direction),
+          constraints_(constraints) {
       const double sum_gradient_l1 = l1_threshold(sum_gradient, hessian_l1);
       const auto parent_score =
           (sum_gradient_l1 * sum_gradient_l1) / (sum_hessian + hessian_l2);
@@ -1042,11 +1088,13 @@ struct LabelHessianNumericalOneValueBucket {
     void InitEmpty(LabelHessianNumericalScoreAccumulator* acc) const {
       acc->Clear();
       acc->SetRegularization(hessian_l1_, hessian_l2_);
+      acc->constraints = constraints_;
     }
 
     void InitFull(LabelHessianNumericalScoreAccumulator* acc) const {
       acc->Set(sum_gradient_, sum_hessian_, sum_weights_);
       acc->SetRegularization(hessian_l1_, hessian_l2_);
+      acc->constraints = constraints_;
     }
 
     double NormalizeScore(const double score) const {
@@ -1055,6 +1103,11 @@ struct LabelHessianNumericalOneValueBucket {
 
     bool IsValidSplit(const LabelHessianNumericalScoreAccumulator& neg,
                       const LabelHessianNumericalScoreAccumulator& pos) const {
+      if (monotonic_direction_ != 0) {
+        const bool pos_is_greater =
+            pos.LeafNoConstraints() >= neg.LeafNoConstraints();
+        return pos_is_greater == (monotonic_direction_ == 1);
+      }
       return true;
     }
 
@@ -1068,6 +1121,13 @@ struct LabelHessianNumericalOneValueBucket {
     const double hessian_l2_;
     double parent_score_;
     double min_score_;
+
+    // +1/-1 if the feature is monotonic increasing / decreasing. 0 if the
+    // feature is not constrained.
+    const int8_t monotonic_direction_ = 0;
+
+    // Constraints on the leaf.
+    const NodeConstraints& constraints_;
   };
 
   class Filler {
@@ -1127,7 +1187,7 @@ struct LabelHessianNumericalOneValueBucket {
                  weights_[example_idx] * num_duplicates);
       } else {
         acc->Add<float>(gradients_[example_idx], hessians_[example_idx],
-                 num_duplicates);
+                        num_duplicates);
       }
     }
 
@@ -1140,7 +1200,7 @@ struct LabelHessianNumericalOneValueBucket {
                  weights_[example_idx] * num_duplicates);
       } else {
         acc->Sub<float>(gradients_[example_idx], hessians_[example_idx],
-                 num_duplicates);
+                        num_duplicates);
       }
     }
 
@@ -1351,7 +1411,7 @@ struct LabelBinaryCategoricalOneValueBucket {
     if constexpr (weighted) {
       acc->AddOne(content.value, content.weight);
     } else {
-      acc->AddOne(content.value, 1.f);
+      acc->AddOne(content.value);
     }
   }
 
@@ -1359,7 +1419,7 @@ struct LabelBinaryCategoricalOneValueBucket {
     if constexpr (weighted) {
       acc->SubOne(content.value, content.weight);
     } else {
-      acc->SubOne(content.value, 1.f);
+      acc->SubOne(content.value);
     }
   }
 
@@ -1433,7 +1493,7 @@ struct LabelBinaryCategoricalOneValueBucket {
       if constexpr (weighted) {
         acc->AddOne(label_[example_idx] == 2, weights_[example_idx]);
       } else {
-        acc->AddOne(label_[example_idx] == 2, 1.f);
+        acc->AddOne(label_[example_idx] == 2);
       }
     }
 
@@ -1444,7 +1504,7 @@ struct LabelBinaryCategoricalOneValueBucket {
       if constexpr (weighted) {
         acc->SubOne(label_[example_idx] == 2, weights_[example_idx]);
       } else {
-        acc->SubOne(label_[example_idx] == 2, 1.f);
+        acc->SubOne(label_[example_idx] == 2);
       }
     }
 
@@ -1733,12 +1793,16 @@ struct LabelHessianNumericalBucket {
     Initializer(const double sum_gradient, const double sum_hessian,
                 const double sum_weights, const double hessian_l1,
                 const double hessian_l2,
-                const bool hessian_split_score_subtract_parent)
+                const bool hessian_split_score_subtract_parent,
+                const int8_t monotonic_direction,
+                const NodeConstraints& constraints)
         : sum_gradient_(sum_gradient),
           sum_hessian_(sum_hessian),
           sum_weights_(sum_weights),
           hessian_l1_(hessian_l1),
-          hessian_l2_(hessian_l2) {
+          hessian_l2_(hessian_l2),
+          monotonic_direction_(monotonic_direction),
+          constraints_(constraints) {
       const double sum_gradient_l1 = l1_threshold(sum_gradient, hessian_l1);
       const auto parent_score =
           (sum_gradient_l1 * sum_gradient_l1) / (sum_hessian + hessian_l2);
@@ -1754,11 +1818,13 @@ struct LabelHessianNumericalBucket {
     void InitEmpty(LabelHessianNumericalScoreAccumulator* acc) const {
       acc->Clear();
       acc->SetRegularization(hessian_l1_, hessian_l2_);
+      acc->constraints = constraints_;
     }
 
     void InitFull(LabelHessianNumericalScoreAccumulator* acc) const {
       acc->Set(sum_gradient_, sum_hessian_, sum_weights_);
       acc->SetRegularization(hessian_l1_, hessian_l2_);
+      acc->constraints = constraints_;
     }
 
     double NormalizeScore(const double score) const {
@@ -1767,6 +1833,11 @@ struct LabelHessianNumericalBucket {
 
     bool IsValidSplit(const LabelHessianNumericalScoreAccumulator& neg,
                       const LabelHessianNumericalScoreAccumulator& pos) const {
+      if (monotonic_direction_ != 0) {
+        const bool pos_is_greater =
+            pos.LeafNoConstraints() >= neg.LeafNoConstraints();
+        return pos_is_greater == (monotonic_direction_ == 1);
+      }
       return true;
     }
 
@@ -1780,6 +1851,13 @@ struct LabelHessianNumericalBucket {
     const double hessian_l2_;
     double parent_score_;
     double min_score_;
+
+    // +1/-1 if the feature is monotonic increasing / decreasing. 0 if the
+    // feature is not constrained.
+    const int8_t monotonic_direction_ = 0;
+
+    // Constraints on the leaf.
+    const NodeConstraints& constraints_;
   };
 
   class Filler {

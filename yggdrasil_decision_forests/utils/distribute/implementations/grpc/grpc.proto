@@ -69,11 +69,21 @@ message WorkerConfig {
 
 // GRPC service.
 service Server {
-  rpc Run(Query) returns (Answer);
-  rpc WorkerRun(WorkerQuery) returns (WorkerAnswer);
-  rpc Shutdown(ShutdownQuery) returns (Empty);
-  rpc Ping(Empty) returns (Empty);
-  rpc UpdateWorkerAddress(UpdateWorkerAddressQuery) returns (Empty);
+  rpc Run(Query) returns (Answer) {
+    // [AUTOMATION]: Internal rpc option goes here.
+  }
+  rpc WorkerRun(WorkerQuery) returns (WorkerAnswer) {
+    // [AUTOMATION]: Internal rpc option goes here.
+  }
+  rpc Shutdown(ShutdownQuery) returns (Empty) {
+    // [AUTOMATION]: Internal rpc option goes here.
+  }
+  rpc Ping(Empty) returns (Empty) {
+    // [AUTOMATION]: Internal rpc option goes here.
+  }
+  rpc UpdateWorkerAddress(UpdateWorkerAddressQuery) returns (Empty) {
+    // [AUTOMATION]: Internal rpc option goes here.
+  }
 }
 
 message Query {

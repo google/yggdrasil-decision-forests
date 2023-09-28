@@ -34,6 +34,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -685,7 +686,7 @@ TEST(DecisionTree, FindBestConditionClassification) {
   PerThreadCache cache;
   EXPECT_TRUE(FindBestCondition(dataset, selected_examples, weights, config,
                                 config_link, dt_config, {}, tree.root().node(),
-                                {}, &condition, &random, &cache)
+                                {}, {}, &condition, &random, &cache)
                   .value());
 
   // We test that a condition was created on attribute 0 or 1 (non
@@ -2074,7 +2075,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_NoFeatures) {
 
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats,
+                    dt_config, setup, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2112,7 +2113,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_AlwaysInvalid) {
   best_condition.set_split_score(0.f);
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats,
+                    dt_config, setup, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2156,7 +2157,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
   best_condition.set_split_score(1000.f);
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats,
+                    dt_config, setup, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2167,7 +2168,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
   best_condition.set_split_score(0.f);
   result = FindBestConditionConcurrentManager(
                dataset, selected_examples, weights, config, config_link,
-               dt_config, setup, parent, internal_config, label_stats,
+               dt_config, setup, parent, internal_config, label_stats, {},
                &best_condition, &random, &cache)
                .value();
 
@@ -2209,7 +2210,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Alternate) {
   best_condition.set_split_score(0.f);
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats,
+                    dt_config, setup, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2251,7 +2252,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
   best_condition.set_split_score(1000.f);
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats,
+                    dt_config, setup, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2264,7 +2265,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
   best_condition.set_split_score(0.f);
   result = FindBestConditionConcurrentManager(
                dataset, selected_examples, weights, config, config_link,
-               dt_config, setup, parent, internal_config, label_stats,
+               dt_config, setup, parent, internal_config, label_stats, {},
                &best_condition, &random, &cache)
                .value();
   EXPECT_TRUE(result);
@@ -2699,6 +2700,102 @@ TEST(DecisionTree, MinNumExamplePerTreatment) {
             /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache),
         SplitSearchResult::kNoBetterSplitFound);
   }
+}
+
+TEST(Monotonic, FindSplitLabelHessianRegressionFeatureNumericalCart) {
+  std::vector<float> weights;
+  const std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
+  const std::vector<float> attributes{1, 2, 3, 4};
+  const std::vector<float> gradients{-10, -10, 10, 10};
+  const std::vector<float> hessians{1, 1, 1, 1};
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+  const double sum_gradient =
+      std::accumulate(gradients.begin(), gradients.end(), 0.);
+  const double sum_hessian =
+      std::accumulate(hessians.begin(), hessians.end(), 0.);
+  const double sum_weights = selected_examples.size();
+
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
+                selected_examples, weights, attributes, gradients, hessians, 2,
+                1, dt_config, sum_gradient, sum_hessian, sum_weights, -1, {},
+                {}, 0, &best_condition, &cache),
+            SplitSearchResult::kBetterSplitFound);
+
+  EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 2.5f);
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 4);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
+  EXPECT_EQ(best_condition.na_value(), false);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 4);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
+  EXPECT_NEAR(best_condition.split_score(), 10 * 10 * 4, TEST_PRECISION);
+}
+
+TEST(Monotonic,
+     FindSplitLabelHessianRegressionFeatureNumericalCartWithRangeConstraint) {
+  std::vector<float> weights;
+  const std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
+  const std::vector<float> attributes{1, 2, 3, 4};
+  const std::vector<float> gradients{-10, -10, 10, 10};
+  const std::vector<float> hessians{1, 1, 1, 1};
+  const NodeConstraints constraints = {
+      .min_max_output = NodeConstraints::MinMax{.min = -5, .max = 5}};
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+  const double sum_gradient =
+      std::accumulate(gradients.begin(), gradients.end(), 0.);
+  const double sum_hessian =
+      std::accumulate(hessians.begin(), hessians.end(), 0.);
+  const double sum_weights = selected_examples.size();
+
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
+                selected_examples, weights, attributes, gradients, hessians, 2,
+                1, dt_config, sum_gradient, sum_hessian, sum_weights, -1, {},
+                constraints, 0, &best_condition, &cache),
+            SplitSearchResult::kBetterSplitFound);
+
+  EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 2.5f);
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 4);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
+  EXPECT_EQ(best_condition.na_value(), false);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 4);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
+  EXPECT_NEAR(best_condition.split_score(), 5 * 20 / 2 * 2, TEST_PRECISION);
+}
+
+TEST(
+    Monotonic,
+    FindSplitLabelHessianRegressionFeatureNumericalCartWithMonotonicConstraint) {
+  std::vector<float> weights;
+  const std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2};
+  const std::vector<float> attributes{1, 2, 3};
+  const std::vector<float> gradients{-1, 1, -10};
+  const std::vector<float> hessians{1, 1, 1};
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+  const double sum_gradient =
+      std::accumulate(gradients.begin(), gradients.end(), 0.);
+  const double sum_hessian =
+      std::accumulate(hessians.begin(), hessians.end(), 0.);
+  const double sum_weights = selected_examples.size();
+
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
+                selected_examples, weights, attributes, gradients, hessians, 2,
+                1, dt_config, sum_gradient, sum_hessian, sum_weights, -1, {},
+                {}, 1, &best_condition, &cache),
+            SplitSearchResult::kInvalidAttribute);
 }
 
 }  // namespace

@@ -54,6 +54,8 @@ build_and_maybe_test () {
     # Not all tests can be run without TF support
     local testable_components=""
     local buildable_cli_components=""
+    # Do not build the PYDF targets, use tools/test_pydf.sh instead
+    local pydf_targets="-//yggdrasil_decision_forests/port/python/...:all"
     if [ "$3" = 0 ]; then
       # No tensorflow support
       cp -f WORKSPACE_NO_TF WORKSPACE
@@ -66,9 +68,9 @@ build_and_maybe_test () {
       testable_components="...:all"
     fi
 
-    time ${BAZEL} build //yggdrasil_decision_forests/cli${buildable_cli_components}  //examples:beginner_cc ${flags}
+    time ${BAZEL} build ${flags} -- //yggdrasil_decision_forests/cli${buildable_cli_components} ${pydf_targets} //examples:beginner_cc
     if [ "$RUN_TESTS" = 1 ]; then
-      time ${BAZEL} test //yggdrasil_decision_forests/${testable_components}  //examples:beginner_cc ${flags}
+      time ${BAZEL} test ${flags} -- //yggdrasil_decision_forests/${testable_components} ${pydf_targets} //examples:beginner_cc
     fi
     echo "Building and maybe testing YDF complete."
 } 

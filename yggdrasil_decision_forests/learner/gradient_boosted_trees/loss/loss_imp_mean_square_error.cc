@@ -112,71 +112,18 @@ absl::Status MeanSquaredErrorLoss::UpdateGradients(
   }
   const auto num_examples = labels.size();
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
+  std::vector<float>& hessian_data = *(*gradients)[0].hessian;
+  DCHECK_EQ(gradient_data.size(), hessian_data.size());
+
   for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
     const float label = labels[example_idx];
     const float prediction = predictions[example_idx];
     gradient_data[example_idx] = label - prediction;
+    hessian_data[example_idx] = 1.f;
   }
   return absl::OkStatus();
 }
 
-absl::Status MeanSquaredErrorLoss::UpdatePredictions(
-    const std::vector<const decision_tree::DecisionTree*>& new_trees,
-    const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
-    double* mean_abs_prediction) const {
-  if (new_trees.size() != 1) {
-    return absl::InternalError("Wrong number of trees");
-  }
-  UpdatePredictionWithSingleUnivariateTree(dataset, *new_trees.front(),
-                                           predictions, mean_abs_prediction);
-  return absl::OkStatus();
-}
-
-decision_tree::CreateSetLeafValueFunctor MeanSquaredErrorLoss::SetLeafFunctor(
-    const std::vector<float>& predictions,
-    const std::vector<GradientData>& gradients, const int label_col_idx) const {
-  return [this, &predictions, label_col_idx](
-             const dataset::VerticalDataset& train_dataset,
-             const std::vector<UnsignedExampleIdx>& selected_examples,
-             const std::vector<float>& weights,
-             const model::proto::TrainingConfig& config,
-             const model::proto::TrainingConfigLinking& config_link,
-             decision_tree::NodeWithChildren* node) {
-    if (weights.empty()) {
-      return SetLeaf</*weighted=*/false>(train_dataset, selected_examples,
-                                         weights, config, config_link,
-                                         predictions, label_col_idx, node);
-    } else {
-      return SetLeaf</*weighted=*/true>(train_dataset, selected_examples,
-                                        weights, config, config_link,
-                                        predictions, label_col_idx, node);
-    }
-  };
-}
-
-absl::StatusOr<decision_tree::SetLeafValueFromLabelStatsFunctor>
-MeanSquaredErrorLoss::SetLeafFunctorFromLabelStatistics() const {
-  return [&](const decision_tree::proto::LabelStatistics& label_stats,
-             decision_tree::proto::Node* node) {
-    if (!label_stats.has_regression()) {
-      return absl::InternalError("No regression data available");
-    }
-
-    double denominator = label_stats.regression().labels().count();
-    if (denominator <= 0) {
-      YDF_LOG(WARNING) << "Zero or negative weights in node";
-      denominator = 1.0;
-    }
-
-    const float leaf_value =
-        gbt_config_.shrinkage() *
-        (label_stats.regression().labels().sum() /
-         (denominator + gbt_config_.l2_regularization() / 2));
-
-    node->mutable_regressor()->set_top_value(leaf_value);
-    return absl::OkStatus();
-  };
-}
 
 std::vector<std::string> MeanSquaredErrorLoss::SecondaryMetricNames() const {
   if (task_ == model::proto::Task::RANKING) {

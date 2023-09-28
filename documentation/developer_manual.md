@@ -4,13 +4,7 @@
 
 <!--ts-->
 
-*   [Developer Manual](#developer-manual)
-    *   [Table of Contents](#table-of-contents)
-    *   [Design principles](#design-principles)
-    *   [Where to change the code](#where-to-change-the-code)
-    *   [Integration with existing code](#integration-with-existing-code)
-    *   [How to test the code](#how-to-test-the-code)
-    *   [Models and Learners](#models-and-learners)
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 
 <!--te-->
 

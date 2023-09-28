@@ -131,59 +131,6 @@ TEST(BinomialLogLikelihoodLossTest, UpdateGradients) {
               ElementsAre(-0.5f, 0.5f, -0.5f, 0.5f));
 }
 
-TEST_P(BinomialLogLikelihoodLossTest, SetLabelDistribution) {
-  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset gradient_dataset,
-                       CreateToyGradientDataset());
-  const bool weighted = GetParam();
-  std::vector<float> weights;
-  if (weighted) {
-    weights = {2.f, 4.f, 6.f, 8.f};
-  }
-
-  proto::GradientBoostedTreesTrainingConfig gbt_config;
-  gbt_config.set_shrinkage(0.2f);
-
-  const auto loss_imp =
-      BinomialLogLikelihoodLoss(gbt_config, model::proto::Task::CLASSIFICATION,
-                                gradient_dataset.data_spec().columns(1));
-
-  std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
-  std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
-
-  model::proto::TrainingConfig config;
-  model::proto::TrainingConfigLinking config_link;
-  config_link.set_label(2);  // Gradient column.
-
-  decision_tree::NodeWithChildren node;
-  if (weighted) {
-    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/true>(
-        gradient_dataset, selected_examples, weights, config, config_link,
-        predictions,
-        /* label_col_idx= */ 1, &node));
-
-    // Node output:
-    // 0.2 * ((2*.5+4*-.5+6*.5+8*-.5)/(2*.25+4*-.25+6*.25+8*-.25)) = 4/50
-    EXPECT_NEAR(node.node().regressor().top_value(), 0.08, kTestPrecision);
-    EXPECT_EQ(node.node().regressor().distribution().sum(), 56);
-    EXPECT_EQ(node.node().regressor().distribution().sum_squares(),
-              2 * 16 + 4 * 16 + 8 * 64);
-    EXPECT_EQ(node.node().regressor().distribution().count(), 20);
-  } else {
-    ASSERT_OK(loss_imp.SetLeaf</*weighted=*/false>(
-        gradient_dataset, selected_examples, weights, config, config_link,
-        predictions,
-        /* label_col_idx= */ 1, &node));
-
-    // Node output: Half positive, half negative.
-    // 0.2 * (2*(1-0.5)+2*(0-0.5))/( 4*0.5*(1-0.5) ) = 0
-    EXPECT_EQ(node.node().regressor().top_value(), 0);
-    EXPECT_EQ(node.node().regressor().distribution().sum(), 8);
-    EXPECT_EQ(node.node().regressor().distribution().sum_squares(),
-              16 + 16 + 64);
-    EXPECT_EQ(node.node().regressor().distribution().count(), 4);
-  }
-}
-
 TEST_P(BinomialLogLikelihoodLossTest, ComputeLoss) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   const bool weighted = GetParam();

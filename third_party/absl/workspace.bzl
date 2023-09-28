@@ -9,6 +9,7 @@ def deps():
 
     http_archive(
         name = "com_google_absl",
-        urls = ["https://github.com/abseil/abseil-cpp/archive/master.zip"],
-        strip_prefix = "abseil-cpp-master",
+        #  Abseil LTS branch, Aug 2023
+        urls = ["https://github.com/abseil/abseil-cpp/archive/29bf8085f3bf17b84d30e34b3d7ff8248fda404e.zip"],
+        strip_prefix = "abseil-cpp-29bf8085f3bf17b84d30e34b3d7ff8248fda404e",
     )

@@ -365,6 +365,18 @@ message DecisionTreeTrainingConfig {
     // rank, the "false" method is better than the "true" one by a small but
     // visible margin.
     optional bool hessian_split_score_subtract_parent = 22 [default = false];
+
+    // If true, partially checks monotonic constraints of trees after training.
+    // This option is used by unit testing. That is, check that the value of a
+    // positive node is greater than the value of a generative note (in case of
+    // increasing monotonic constraint). If false and if a monotonic constraint
+    // is not satisfied, the monotonic constraint is manually enforced.
+    //
+    // The current checking implementation might detect as non-monotonic trees
+    // that are in fact monotonic (e.g. false positive). However, with the
+    // current algorithm used to create monotonic constraints, this checking
+    // algorithm cannot create false positives.
+    optional bool check_monotonic_constraints = 23 [default = false];
   }
 
   // Deprecated tag numbers.

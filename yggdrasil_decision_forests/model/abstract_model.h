@@ -203,6 +203,12 @@ class AbstractModel {
       const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
       std::vector<model::proto::Prediction>* predictions = nullptr) const;
 
+  absl::StatusOr<metric::proto::EvaluationResults> EvaluateWithEngine(
+      const serving::FastEngine& engine,
+      const dataset::VerticalDataset& dataset,
+      const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
+      std::vector<model::proto::Prediction>* predictions = nullptr) const;
+
   // Evaluates the model on a dataset stored in disk. `typed_path` defines
   // the type and the path pattern of the files, as described in
   // `yggdrasil_decision_forests/datasets/format.h` file.

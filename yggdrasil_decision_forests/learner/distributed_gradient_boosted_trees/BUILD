@@ -9,12 +9,12 @@ package(
 # =======
 
 cc_library_ydf(
-    name = "distributed_gradient_boosted_trees",
+    name = "dgbt",
     srcs = ["distributed_gradient_boosted_trees.cc"],
     hdrs = ["distributed_gradient_boosted_trees.h"],
     deps = [
         ":common",
-        ":distributed_gradient_boosted_trees_cc_proto",
+        ":dgbt_cc_proto",
         ":worker_cc_proto",
         "//yggdrasil_decision_forests/dataset:formats",
         "//yggdrasil_decision_forests/dataset:types",
@@ -29,6 +29,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:all_implementations",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_interface",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/utils:filesystem",
@@ -51,7 +52,7 @@ cc_library_ydf(
     hdrs = ["worker.h"],
     deps = [
         ":common",
-        ":distributed_gradient_boosted_trees_cc_proto",
+        ":dgbt_cc_proto",
         ":worker_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
@@ -72,6 +73,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:uid",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
     alwayslink = 1,
 )
@@ -95,7 +97,7 @@ cc_library_ydf(
 # ========
 
 all_proto_library(
-    name = "distributed_gradient_boosted_trees_proto",
+    name = "dgbt_proto",
     srcs = ["distributed_gradient_boosted_trees.proto"],
     deps = [
         "//yggdrasil_decision_forests/learner:abstract_learner_proto",
@@ -132,7 +134,7 @@ cc_test(
     tags = ["manual"],
     deps = [
         ":common",
-        ":distributed_gradient_boosted_trees",
+        ":dgbt",
         ":worker",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",

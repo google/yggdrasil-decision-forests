@@ -1,15 +1,31 @@
 # Changelog
 
-## 1.6.0 - rc0 2023-08-22
+## Breaking changes
+
+-   The dependency to the distributed gradient boosted trees learner is renamed
+    from
+    `//third_party/yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees`
+    to
+    `//third_party/yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees:dgbt`.
+    Note most case, importing the learners with
+    `//third_party/yggdrasil_decision_forests/learner:all_learners` is
+    recommended.
+-   The training configuration must contain a label. A missing label is no
+    longer interpreted as the label being the input feature "".
 
 ### Feature
 
+
+-   Add support for monotonic constraints for gradient boosted trees.
 -   Improve speed of dataset reading and writing.
 
 ### Fix
 
 -   Proper error message when using distributed training on more than 2^31
     (i.e., ~2B) examples while compiling YDF with 32-bits example index.
+-   Fix Window compilation with Visual Studio 2019
+-   Improved error messages for invalid training configuration
+-   Replaced outdated dependencies
 
 ## 1.5.0 - 2023-07-03
 

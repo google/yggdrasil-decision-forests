@@ -107,6 +107,19 @@ inline float MidThreshold(const float a, const float b) {
   return threshold;
 }
 
+// Constraints applied to a node during training.
+struct NodeConstraints {
+  // Minimum and maximum value of the node output.
+  // Note: Min or max can be -/+ infinity.
+  struct MinMax {
+    float min = -std::numeric_limits<float>::infinity();
+    float max = std::numeric_limits<float>::infinity();
+  };
+  absl::optional<MinMax> min_max_output;
+
+  static NodeConstraints CreateNodeConstraints() { return NodeConstraints(); }
+};
+
 }  // namespace decision_tree
 }  // namespace model
 }  // namespace yggdrasil_decision_forests
