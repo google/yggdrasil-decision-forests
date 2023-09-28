@@ -42,11 +42,11 @@
 
 #include <vector>
 
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -84,8 +84,8 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionHessianLabelStats& label_stats,
     const absl::optional<int>& override_num_projections,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache);
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
 // Regression.
 absl::StatusOr<bool> FindBestConditionOblique(

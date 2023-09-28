@@ -2,6 +2,8 @@
 
 ## HEAD
 
+-   Add support for monotonic constraints for gradient boosted trees.
+
 ## Fix
 
 -   Fix Window compilation with Visual Studio 2019

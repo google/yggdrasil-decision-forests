@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <random>
 #include <utility>
@@ -161,12 +162,24 @@ struct SplitterPerThreadCache {
   utils::RandomEngine random;
 };
 
+// Applies a constraint over a leaf.
+absl::Status ApplyConstraintOnNode(const NodeConstraints& constraint,
+                                   NodeWithChildren* node);
+
+// Divides a monotonic constraint over node's children.
+absl::Status DivideMonotonicConstraintToChildren(
+    const NodeConstraints& constraint, bool direction_increasing,
+    bool check_monotonic, NodeWithChildren* parent_node,
+    NodeWithChildren* pos_node, NodeWithChildren* neg_node,
+    NodeConstraints* pos_constraint, NodeConstraints* neg_constraint);
+
 // Set of immutable arguments in a splitter work request.
 struct SplitterWorkRequestCommon {
   const dataset::VerticalDataset& train_dataset;
   const std::vector<UnsignedExampleIdx>& selected_examples;
   const proto::Node& parent;
   const LabelStats& label_stats;
+  const NodeConstraints& constraints;
 };
 
 // Data packed with the work request that can be used by the manager to pass
@@ -378,18 +391,26 @@ absl::Status SetRegressionLabelDistribution(
 struct InternalTrainConfig {
   CreateSetLeafValueFunctor set_leaf_value_functor = SetLabelDistribution;
 
-  // If true, evaluate split gain using the formulation relying on the hessian.
-  // In this case, "hessian_col_idx" should be a numerical column containing the
-  // hessian. The label column is expected to contain the gradient.
-  bool use_hessian_gain = false;
+  // If true, the split score relies on a hessian: ~gradient^2/hessian (+
+  // regularization). This is only possible for regression. Require
+  // hessian_leaf=true.
+  //
+  // If false, the split score is a classical decision tree score. e.g.,
+  // reduction of variance in the case of regression.
+  bool hessian_score = false;
 
-  // Index of the hessian column in the dataset.
+  // If true, the leaf relies on the hessian. This is only possible for
+  // regression.
+  bool hessian_leaf = false;
+
+  // Index of the hessian column in the dataset. Only used if hessian_leaf=true.
   int hessian_col_idx = -1;
 
-  // Index of the gradient column in the dataset.
+  // Index of the gradient column in the dataset.  Only used if
+  // hessian_leaf=true.
   int gradient_col_idx = -1;
 
-  // Regularization terms.
+  // Regularization terms for hessian_score=true.
   float hessian_l1 = 0.f;
   float hessian_l2_numerical = 0.f;
   float hessian_l2_categorical = 0.f;
@@ -414,6 +435,8 @@ struct InternalTrainConfig {
 
 // Find the best condition for this node. Return true iff a good condition has
 // been found.
+// This is the entry point when searching for a condition.
+// All other "FindBestCondition*" functions are called by this one.
 absl::StatusOr<bool> FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -423,8 +446,8 @@ absl::StatusOr<bool> FindBestCondition(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    PerThreadCache* cache);
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, PerThreadCache* cache);
 
 // Contains logic to switch between a single-threaded splitter and a concurrent
 // implementation.
@@ -437,8 +460,9 @@ absl::StatusOr<bool> FindBestConditionManager(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const LabelStats& label_stats, proto::NodeCondition* best_condition,
-    utils::RandomEngine* random, PerThreadCache* cache);
+    const LabelStats& label_stats, const NodeConstraints& constraints,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    PerThreadCache* cache);
 
 // This is an implementation of FindBestConditionManager that is optimized for
 // execution in a single thread.
@@ -450,8 +474,9 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const LabelStats& label_stats, proto::NodeCondition* best_condition,
-    utils::RandomEngine* random, PerThreadCache* cache);
+    const LabelStats& label_stats, const NodeConstraints& constraints,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    PerThreadCache* cache);
 
 // This is a concurrent implementation of FindBestConditionManager.
 absl::StatusOr<bool> FindBestConditionConcurrentManager(
@@ -463,8 +488,9 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const LabelStats& label_stats, proto::NodeCondition* best_condition,
-    utils::RandomEngine* random, PerThreadCache* cache);
+    const LabelStats& label_stats, const NodeConstraints& constraints,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    PerThreadCache* cache);
 
 // A worker that receives splitter work requests and dispatches those to the
 // right specialized splitter function.
@@ -488,9 +514,9 @@ SplitSearchResult FindBestCondition(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const ClassificationLabelStats& label_stats, const int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache);
+    const ClassificationLabelStats& label_stats, int32_t attribute_idx,
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
 // Specialization in the case of regression.
 SplitSearchResult FindBestCondition(
@@ -501,9 +527,9 @@ SplitSearchResult FindBestCondition(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const RegressionLabelStats& label_stats, const int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache);
+    const RegressionLabelStats& label_stats, int32_t attribute_idx,
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
 // Specialization in the case of regression with hessian gain.
 SplitSearchResult FindBestCondition(
@@ -514,9 +540,9 @@ SplitSearchResult FindBestCondition(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const RegressionHessianLabelStats& label_stats, const int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache);
+    const RegressionHessianLabelStats& label_stats, int32_t attribute_idx,
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
 // Specialization in the case of uplift with categorical outcome.
 SplitSearchResult FindBestCondition(
@@ -528,8 +554,8 @@ SplitSearchResult FindBestCondition(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const CategoricalUpliftLabelStats& label_stats, int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache);
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
 // Specialization in the case of uplift with numerical outcome.
 SplitSearchResult FindBestCondition(
@@ -541,8 +567,8 @@ SplitSearchResult FindBestCondition(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const NumericalUpliftLabelStats& label_stats, int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache);
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
 // Following are the split finder functions. Their name follow the patter:
 // FindSplitLabel{label_type}Feature{feature_type}{algorithm_name}.
@@ -601,7 +627,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const double sum_gradient, const double sum_hessian,
     const double sum_weights, const int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache);
 
 // Search for the best split of the type Boolean for classification.
@@ -635,7 +662,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
     bool na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
     double sum_hessian, double sum_weights, int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache);
 
 // Search for the best split for a numerical attribute and a categorical label
@@ -745,8 +773,9 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
     float na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
     double sum_hessian, double sum_weights, int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
-    SplitterPerThreadCache* cache);
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
 template <bool weighted>
 SplitSearchResult
@@ -759,8 +788,9 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
     double sum_hessian, double sum_weights, int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
-    SplitterPerThreadCache* cache);
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
 // Similarly to "FindSplitLabelClassificationFeatureNumericalCart", but uses an
 // histogram approach to find the best split.
@@ -837,7 +867,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
     double sum_hessian, double sum_weights, int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 // Looks for the best split for a categorical set attribute and a categorical
@@ -947,8 +978,8 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats,
     const absl::optional<int>& override_num_projections,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache);
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
 // Returns the number of attributes to test ("num_attributes_to_test") and a
 // list of candidate attributes to test in order ("candidate_attributes").
@@ -1039,9 +1070,10 @@ absl::Status NodeTrain(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const model::proto::DeploymentConfig& deployment,
     const SplitterConcurrencySetup& splitter_concurrency_setup,
-    const std::vector<float>& weights, const int32_t depth,
-    const InternalTrainConfig& internal_config, NodeWithChildren* node,
-    utils::RandomEngine* random, PerThreadCache* cache);
+    const std::vector<float>& weights, int32_t depth,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, bool set_leaf_already_set,
+    NodeWithChildren* node, utils::RandomEngine* random, PerThreadCache* cache);
 
 // Preprocess the dataset before any tree training.
 absl::StatusOr<Preprocessing> PreprocessTrainingDataset(
@@ -1063,6 +1095,11 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config);
 // Number of attributes to test when looking for an optimal split.
 int NumAttributesToTest(const proto::DecisionTreeTrainingConfig& dt_config,
                         int num_attributes, model::proto::Task task);
+
+// Returns -1 if a feature is decreasing monotonic, +1 if a feature is a
+// increasing monotonic, and 0 if a feature is not constrained.
+int8_t MonotonicConstraintSign(
+    const model::proto::TrainingConfigLinking& config_link, int attribute_idx);
 
 namespace internal {
 

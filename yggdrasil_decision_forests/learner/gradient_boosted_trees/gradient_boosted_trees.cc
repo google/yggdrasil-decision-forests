@@ -371,7 +371,8 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
   internal_config.set_leaf_value_functor =
       SetLeafValueWithNewtonRaphsonStepFunctor(*config.gbt_config,
                                                gradients[grad_idx]);
-  internal_config.use_hessian_gain = config.gbt_config->use_hessian_gain();
+  internal_config.hessian_score = config.gbt_config->use_hessian_gain();
+  internal_config.hessian_leaf = true;
   internal_config.gradient_col_idx = gradients[grad_idx].gradient_col_idx;
   internal_config.hessian_col_idx = gradients[grad_idx].hessian_col_idx;
   internal_config.hessian_l1 = config.gbt_config->l1_regularization();
@@ -427,6 +428,13 @@ absl::Status GradientBoostedTreesLearner::CheckConfiguration(
     return absl::InvalidArgumentError(
         "Uplifting is not supported with Gradient Boosted Trees. Choose Random "
         "Forests for building uplift models.");
+  }
+
+  if (config.monotonic_constraints_size() > 0 &&
+      !gbt_config.use_hessian_gain()) {
+    return absl::InvalidArgumentError(
+        "Gradient Boosted Trees does not support monotonic constraints with "
+        "use_hessian_gain=false.");
   }
 
   return absl::OkStatus();

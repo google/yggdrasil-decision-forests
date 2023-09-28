@@ -53,7 +53,7 @@ constexpr int kBinomialLossSecondaryMetricClassificationIdx = 0;
 
 // Minimum length of the hessian (i.e. denominator) in the Newton step
 // optimization.
-constexpr float kMinHessianForNewtonStep = 0.001f;
+constexpr double kMinHessianForNewtonStep = 0.001;
 
 // Ensures that the value is finite i.e. not NaN and not infinite.
 // This is a no-op in release mode.

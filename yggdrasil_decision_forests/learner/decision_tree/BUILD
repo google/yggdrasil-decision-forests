@@ -119,6 +119,7 @@ cc_test(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset:types",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/learner:abstract_learner",

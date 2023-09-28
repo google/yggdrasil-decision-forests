@@ -157,6 +157,9 @@ message TrainingConfig {
   // serving speed or RAM usage of model serving.
   optional bool pure_serving_model = 14 [default = false];
 
+  // Set of monotonic constraints between the model's input features and output.
+  repeated MonotonicConstraint monotonic_constraints = 15;
+
   // Learner specific configuration/hyper-parameters.
   // The message/extension is dependent on the "learner". For example, see
   // "yggdrasil_decision_forests/learner/random_forest.proto" for the parameters
@@ -198,6 +201,11 @@ message TrainingConfigLinking {
 
   // Index of the column matching "uplift_treatment" in the "TrainingConfig".
   optional int32 uplift_treatment = 12 [default = -1];
+
+  // Data for specific dataset columns.
+  // This field is either empty, or contains exactly one value for each column
+  // in the dataset.
+  repeated PerColumn per_columns = 13;
 }
 
 // Returns a list of hyper-parameter sets that outperforms the default
@@ -249,4 +257,32 @@ message LearnerCapabilities {
   // If true, the algorithm supports training with a maximum model size
   // (maximum_model_size_in_memory_in_bytes).
   optional bool support_max_model_size_in_memory = 5 [default = false];
+
+  // If true, the algorithm supports monotonic constraints over numerical
+  // features.
+  optional bool support_monotonic_constraints = 6 [default = false];
+}
+
+// Monotonic constraints between model's output and numerical input features.
+message MonotonicConstraint {
+  // Regular expressions over the input features.
+  optional string feature = 1;
+
+  optional Direction direction = 2 [default = INCREASING];
+
+  enum Direction {
+    // Ensure the model output is monotonic increasing (non-strict) with the
+    // feature.
+    INCREASING = 0;
+
+    // Ensure the model output is monotonic decreasing (non-strict) with the
+    // feature.
+    DECREASING = 1;
+  }
+}
+
+message PerColumn {
+  // If set, the attribute has a monotonic constraint.
+  // Note: monotonic_constraint.feature might not be set.
+  optional MonotonicConstraint monotonic_constraint = 1;
 }

@@ -42,9 +42,6 @@
 //   - Iterate over the buckets and fill update the score accumulator. At each
 //     step, evaluate the score of the split.
 //
-// If SIMPLE_ML_DEBUG_DECISION_TREE_SPLITTER is set, the algorithm will log the
-// detail in the splitter work.
-//
 // If the preprocessor "YDF_DEBUG_PRINT_SPLIT" is set, detailed logs of the
 // splitting algorithm are printed with YDF_LOG(INFO).
 //
@@ -1091,7 +1088,8 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
     // Test Split
     if (new_attribute_value) {
       if (num_pos_examples >= min_num_obs &&
-          num_pos_examples <= max_num_pos_examples) {
+          num_pos_examples <= max_num_pos_examples &&
+          initializer.IsValidSplit(neg, pos)) {
         // Compute the split's score.
         const auto score =
             Score<>(initializer, weighted_num_examples, pos, neg);

@@ -64,6 +64,7 @@
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
@@ -397,6 +398,117 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
       decision_tree::CheckStructureOptions::GlobalImuptation()));
 }
 
+TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraints) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+
+  gbt_config->set_use_hessian_gain(true);
+
+  // Ensures that the tree is monotonic.
+  gbt_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_check_monotonic_constraints(true);
+
+  auto* constrain_1 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_1->set_feature("^age$");
+  constrain_1->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* constrain_2 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_2->set_feature("^hours_per_week$");
+  constrain_2->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* constrain_3 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_3->set_feature("^education_num$");
+  constrain_3->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  TrainAndEvaluateModel();
+
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8641, 0.009, 0.8627);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2972, 0.0181, 0.2902);
+
+  // Show the tree structure.
+  std::string description;
+  model_->AppendDescriptionAndStatistics(true, &description);
+  YDF_LOG(INFO) << description;
+
+  QCHECK_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
+      *model_, test_dataset_, "", "",
+      file::JoinPath(test::TmpDirectory(), "analysis"), {}));
+}
+
+TEST_F(GradientBoostedTreesOnAdult, DecreasingMonotonicConstraints) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+
+  gbt_config->set_use_hessian_gain(true);
+
+  // Ensures that the tree is monotonic.
+  gbt_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_check_monotonic_constraints(true);
+
+  auto* constrain_1 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_1->set_feature("^age$");
+  constrain_1->set_direction(model::proto::MonotonicConstraint::DECREASING);
+
+  auto* constrain_2 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_2->set_feature("^hours_per_week$");
+  constrain_2->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* constrain_3 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_3->set_feature("^education_num$");
+  constrain_3->set_direction(model::proto::MonotonicConstraint::DECREASING);
+
+  TrainAndEvaluateModel();
+
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8586, 0.0094, 0.8587);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.309, 0.0156, 0.3028);
+
+  // Show the tree structure.
+  std::string description;
+  model_->AppendDescriptionAndStatistics(true, &description);
+  YDF_LOG(INFO) << description;
+
+  QCHECK_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
+      *model_, test_dataset_, "", "",
+      file::JoinPath(test::TmpDirectory(), "analysis"), {}));
+}
+
+TEST_F(GradientBoostedTreesOnAdult, ObliqueMonotonicConstraints) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+
+  gbt_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+
+  gbt_config->set_use_hessian_gain(true);
+
+  auto* constrain_1 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_1->set_feature("^age$");
+  constrain_1->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* constrain_2 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_2->set_feature("^hours_per_week$");
+  constrain_2->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* constrain_3 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_3->set_feature("^education_num$");
+  constrain_3->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  TrainAndEvaluateModel();
+
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.861, 0.009, 0.8596);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3049, 0.0195, 0.3057);
+
+  // Show the tree structure.
+  std::string description;
+  model_->AppendDescriptionAndStatistics(true, &description);
+  YDF_LOG(INFO) << description;
+
+  QCHECK_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
+      *model_, test_dataset_, "", "",
+      file::JoinPath(test::TmpDirectory(), "analysis"), {}));
+}
+
 // Train and test a model on the adult dataset with focal loss, but with gamma
 // equals zero, which equals to log loss.
 TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaZero) {
@@ -430,7 +542,7 @@ TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaHalf) {
       0.5f);
   TrainAndEvaluateModel();
 
-  // Slighly better accuracy, but worse log loss; we are not
+  // Slightly better accuracy, but worse log loss; we are not
   // optimizing for log loss directly any more.
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8653, 0.0094, 0.8624);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3226, 0.0218, 0.3145);
@@ -1062,8 +1174,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianDiscretizedNumerical) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8662, 0.0104, 0.8664);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2938, 0.0116, 0.2899);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8662, 0.0104, 0.8642);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2938, 0.0116, 0.2930);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianL2Categorical) {
@@ -1199,7 +1311,7 @@ TEST_F(GradientBoostedTreesOnIris, Dart) {
   gbt_config->mutable_decision_tree()->set_num_candidate_attributes(8);
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9467, 0.04, 0.9733);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1925, 0.1226, 0.2009);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1925, 0.1226, 0.2019);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 

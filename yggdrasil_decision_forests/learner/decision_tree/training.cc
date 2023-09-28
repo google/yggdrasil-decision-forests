@@ -35,6 +35,8 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/time/time.h"
 #include "absl/types/optional.h"
@@ -53,6 +55,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/cast.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
@@ -65,6 +68,21 @@ namespace model {
 namespace decision_tree {
 
 namespace {
+
+// Generates a failure absl status if the configuration contains monotonic
+// constraints.
+absl::Status FailIfMonotonic(
+    const model::proto::TrainingConfigLinking& config_link,
+    const int attribute_idx, const NodeConstraints& constraints,
+    const absl::string_view why) {
+  if (config_link.per_columns_size() > 0 &&
+      (config_link.per_columns(attribute_idx).has_monotonic_constraint() ||
+       constraints.min_max_output.has_value())) {
+    return absl::InternalError(
+        absl::StrCat("Monotonic constraints not supported for ", why));
+  }
+  return absl::OkStatus();
+}
 
 // Number of trials to run when learning a categorical split with randomly
 // generated masks.
@@ -533,13 +551,16 @@ SplitSearchResult FindBestCondition(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const ClassificationLabelStats& label_stats, const int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache) {
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
 
   const auto& attribute_column_spec =
       train_dataset.data_spec().columns(attribute_idx);
+
+  CHECK_OK(FailIfMonotonic(config_link, attribute_idx, constraints,
+                           "classification"));
 
   SplitSearchResult result;
 
@@ -676,8 +697,8 @@ SplitSearchResult FindBestCondition(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionHessianLabelStats& label_stats, const int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache) {
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
 
@@ -685,6 +706,9 @@ SplitSearchResult FindBestCondition(
       train_dataset.data_spec().columns(attribute_idx);
 
   SplitSearchResult result;
+
+  const int8_t monotonic_direction =
+      MonotonicConstraintSign(config_link, attribute_idx);
 
   switch (train_dataset.column(attribute_idx)->type()) {
     case dataset::proto::ColumnType::NUMERICAL: {
@@ -708,7 +732,8 @@ SplitSearchResult FindBestCondition(
               label_stats.gradient_data, label_stats.hessian_data,
               na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
               label_stats.sum_hessian, label_stats.sum_weights, attribute_idx,
-              internal_config, best_condition, cache);
+              internal_config, constraints, monotonic_direction, best_condition,
+              cache);
         } else {
           result = FindSplitLabelHessianRegressionFeatureNumericalCart<
               /*weighted=*/true>(
@@ -716,7 +741,8 @@ SplitSearchResult FindBestCondition(
               label_stats.gradient_data, label_stats.hessian_data,
               na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
               label_stats.sum_hessian, label_stats.sum_weights, attribute_idx,
-              internal_config, best_condition, cache);
+              internal_config, constraints, monotonic_direction, best_condition,
+              cache);
         }
       } else {
         YDF_LOG(FATAL) << "Only split exact implemented for hessian gains.";
@@ -750,7 +776,7 @@ SplitSearchResult FindBestCondition(
             na_replacement_index, min_num_obs, dt_config,
             label_stats.sum_gradient, label_stats.sum_hessian,
             label_stats.sum_weights, attribute_idx, internal_config,
-            best_condition, cache);
+            constraints, monotonic_direction, best_condition, cache);
       } else {
         result = FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<
             /*weighted=*/true>(selected_examples, weights, attribute_data,
@@ -758,8 +784,8 @@ SplitSearchResult FindBestCondition(
                                label_stats.hessian_data, na_replacement_index,
                                min_num_obs, dt_config, label_stats.sum_gradient,
                                label_stats.sum_hessian, label_stats.sum_weights,
-                               attribute_idx, internal_config, best_condition,
-                               cache);
+                               attribute_idx, internal_config, constraints,
+                               monotonic_direction, best_condition, cache);
       }
     } break;
 
@@ -783,7 +809,7 @@ SplitSearchResult FindBestCondition(
             num_attribute_classes, na_replacement, min_num_obs, dt_config,
             label_stats.sum_gradient, label_stats.sum_hessian,
             label_stats.sum_weights, attribute_idx, internal_config,
-            best_condition, cache, random);
+            constraints, best_condition, cache, random);
       } else {
         result = FindSplitLabelHessianRegressionFeatureCategorical<
             /*weighted=*/true>(
@@ -792,7 +818,7 @@ SplitSearchResult FindBestCondition(
             num_attribute_classes, na_replacement, min_num_obs, dt_config,
             label_stats.sum_gradient, label_stats.sum_hessian,
             label_stats.sum_weights, attribute_idx, internal_config,
-            best_condition, cache, random);
+            constraints, best_condition, cache, random);
       }
     } break;
 
@@ -815,7 +841,7 @@ SplitSearchResult FindBestCondition(
                 na_replacement, min_num_obs, dt_config,
                 label_stats.sum_gradient, label_stats.sum_hessian,
                 label_stats.sum_weights, attribute_idx, internal_config,
-                best_condition, cache);
+                constraints, best_condition, cache);
       } else {
         result =
             FindSplitLabelHessianRegressionFeatureBoolean</*weighted=*/true>(
@@ -824,7 +850,7 @@ SplitSearchResult FindBestCondition(
                 na_replacement, min_num_obs, dt_config,
                 label_stats.sum_gradient, label_stats.sum_hessian,
                 label_stats.sum_weights, attribute_idx, internal_config,
-                best_condition, cache);
+                constraints, best_condition, cache);
       }
     } break;
 
@@ -845,7 +871,7 @@ SplitSearchResult FindBestCondition(
               label_stats.gradient_data, label_stats.hessian_data, min_num_obs,
               dt_config, label_stats.sum_gradient, label_stats.sum_hessian,
               label_stats.sum_weights, attribute_idx, internal_config,
-              best_condition, cache);
+              constraints, best_condition, cache);
       result = std::min(result, na_result);
     } else {
       const auto na_result =
@@ -854,7 +880,7 @@ SplitSearchResult FindBestCondition(
               label_stats.gradient_data, label_stats.hessian_data, min_num_obs,
               dt_config, label_stats.sum_gradient, label_stats.sum_hessian,
               label_stats.sum_weights, attribute_idx, internal_config,
-              best_condition, cache);
+              constraints, best_condition, cache);
       result = std::min(result, na_result);
     }
   }
@@ -872,8 +898,8 @@ SplitSearchResult FindBestCondition(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionLabelStats& label_stats, const int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache) {
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
 
@@ -881,6 +907,9 @@ SplitSearchResult FindBestCondition(
       train_dataset.data_spec().columns(attribute_idx);
 
   SplitSearchResult result;
+
+  CHECK_OK(
+      FailIfMonotonic(config_link, attribute_idx, constraints, "regression"));
 
   switch (train_dataset.column(attribute_idx)->type()) {
     case dataset::proto::ColumnType::NUMERICAL: {
@@ -1087,12 +1116,15 @@ SplitSearchResult FindBestCondition(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const CategoricalUpliftLabelStats& label_stats, const int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache) {
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
   const auto& attribute_column_spec =
       train_dataset.data_spec().columns(attribute_idx);
+
+  CHECK_OK(FailIfMonotonic(config_link, attribute_idx, constraints,
+                           "categorical uplift"));
 
   SplitSearchResult result;
 
@@ -1156,12 +1188,15 @@ SplitSearchResult FindBestCondition(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const NumericalUpliftLabelStats& label_stats, const int32_t attribute_idx,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache) {
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
   const auto& attribute_column_spec =
       train_dataset.data_spec().columns(attribute_idx);
+
+  CHECK_OK(FailIfMonotonic(config_link, attribute_idx, constraints,
+                           "numerical uplift"));
 
   SplitSearchResult result;
 
@@ -1232,7 +1267,8 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
             request.common->train_dataset, request.common->selected_examples,
             weights, config, config_link, dt_config, request.common->parent,
             internal_config, request.common->label_stats,
-            request.num_oblique_projections_to_run.value(), request.condition,
+            request.num_oblique_projections_to_run.value(),
+            request.common->constraints, request.condition,
             &request.splitter_cache->random, request.splitter_cache)
             .value();
 
@@ -1253,11 +1289,11 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
           request.common->train_dataset, request.common->selected_examples,
           weights, config, config_link, dt_config, request.common->parent,
           internal_config, label_stats, request.attribute_idx,
-          request.condition, &request.splitter_cache->random,
-          request.splitter_cache);
+          request.common->constraints, request.condition,
+          &request.splitter_cache->random, request.splitter_cache);
     } break;
     case model::proto::Task::REGRESSION:
-      if (internal_config.use_hessian_gain) {
+      if (internal_config.hessian_score) {
         const auto& label_stats =
             utils::down_cast<const RegressionHessianLabelStats&>(
                 request.common->label_stats);
@@ -1266,8 +1302,8 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
             request.common->train_dataset, request.common->selected_examples,
             weights, config, config_link, dt_config, request.common->parent,
             internal_config, label_stats, request.attribute_idx,
-            request.condition, &request.splitter_cache->random,
-            request.splitter_cache);
+            request.common->constraints, request.condition,
+            &request.splitter_cache->random, request.splitter_cache);
 
       } else {
         const auto& label_stats = utils::down_cast<const RegressionLabelStats&>(
@@ -1277,8 +1313,8 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
             request.common->train_dataset, request.common->selected_examples,
             weights, config, config_link, dt_config, request.common->parent,
             internal_config, label_stats, request.attribute_idx,
-            request.condition, &request.splitter_cache->random,
-            request.splitter_cache);
+            request.common->constraints, request.condition,
+            &request.splitter_cache->random, request.splitter_cache);
       }
       break;
     default:
@@ -1298,8 +1334,8 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats,
     const absl::optional<int>& override_num_projections,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    SplitterPerThreadCache* cache) {
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   switch (config.task()) {
     case model::proto::Task::CLASSIFICATION: {
       const auto& class_label_stats =
@@ -1310,13 +1346,14 @@ absl::StatusOr<bool> FindBestConditionOblique(
           override_num_projections, best_condition, random, cache);
     } break;
     case model::proto::Task::REGRESSION:
-      if (internal_config.use_hessian_gain) {
+      if (internal_config.hessian_score) {
         const auto& reg_label_stats =
             utils::down_cast<const RegressionHessianLabelStats&>(label_stats);
         return FindBestConditionOblique(
             train_dataset, selected_examples, weights, config, config_link,
             dt_config, parent, internal_config, reg_label_stats,
-            override_num_projections, best_condition, random, cache);
+            override_num_projections, constraints, best_condition, random,
+            cache);
       } else {
         const auto& reg_label_stats =
             utils::down_cast<const RegressionLabelStats&>(label_stats);
@@ -1342,8 +1379,9 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const LabelStats& label_stats, proto::NodeCondition* best_condition,
-    utils::RandomEngine* random, PerThreadCache* cache) {
+    const LabelStats& label_stats, const NodeConstraints& constraints,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    PerThreadCache* cache) {
   // Single Thread Setup.
   cache->splitter_cache_list.resize(1);
 
@@ -1361,7 +1399,7 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
           found_good_condition,
           FindBestConditionOblique(
               train_dataset, selected_examples, weights, config, config_link,
-              dt_config, parent, internal_config, label_stats, {},
+              dt_config, parent, internal_config, label_stats, {}, constraints,
               best_condition, random, &cache->splitter_cache_list[0]));
       break;
   }
@@ -1389,22 +1427,22 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
         const auto& class_label_stats =
             utils::down_cast<const ClassificationLabelStats&>(label_stats);
 
-        result =
-            FindBestCondition(train_dataset, selected_examples, weights, config,
-                              config_link, dt_config, parent, internal_config,
-                              class_label_stats, attribute_idx, best_condition,
-                              random, &cache->splitter_cache_list[0]);
+        result = FindBestCondition(train_dataset, selected_examples, weights,
+                                   config, config_link, dt_config, parent,
+                                   internal_config, class_label_stats,
+                                   attribute_idx, constraints, best_condition,
+                                   random, &cache->splitter_cache_list[0]);
       } break;
       case model::proto::Task::REGRESSION:
-        if (internal_config.use_hessian_gain) {
+        if (internal_config.hessian_score) {
           const auto& reg_label_stats =
               utils::down_cast<const RegressionHessianLabelStats&>(label_stats);
 
           result = FindBestCondition(train_dataset, selected_examples, weights,
                                      config, config_link, dt_config, parent,
                                      internal_config, reg_label_stats,
-                                     attribute_idx, best_condition, random,
-                                     &cache->splitter_cache_list[0]);
+                                     attribute_idx, constraints, best_condition,
+                                     random, &cache->splitter_cache_list[0]);
 
         } else {
           const auto& reg_label_stats =
@@ -1413,29 +1451,29 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
           result = FindBestCondition(train_dataset, selected_examples, weights,
                                      config, config_link, dt_config, parent,
                                      internal_config, reg_label_stats,
-                                     attribute_idx, best_condition, random,
-                                     &cache->splitter_cache_list[0]);
+                                     attribute_idx, constraints, best_condition,
+                                     random, &cache->splitter_cache_list[0]);
         }
         break;
 
       case model::proto::Task::CATEGORICAL_UPLIFT: {
         const auto& uplift_label_stats =
             utils::down_cast<const CategoricalUpliftLabelStats&>(label_stats);
-        result =
-            FindBestCondition(train_dataset, selected_examples, weights, config,
-                              config_link, dt_config, parent, internal_config,
-                              uplift_label_stats, attribute_idx, best_condition,
-                              random, &cache->splitter_cache_list[0]);
+        result = FindBestCondition(train_dataset, selected_examples, weights,
+                                   config, config_link, dt_config, parent,
+                                   internal_config, uplift_label_stats,
+                                   attribute_idx, constraints, best_condition,
+                                   random, &cache->splitter_cache_list[0]);
       } break;
 
       case model::proto::Task::NUMERICAL_UPLIFT: {
         const auto& uplift_label_stats =
             utils::down_cast<const NumericalUpliftLabelStats&>(label_stats);
-        result =
-            FindBestCondition(train_dataset, selected_examples, weights, config,
-                              config_link, dt_config, parent, internal_config,
-                              uplift_label_stats, attribute_idx, best_condition,
-                              random, &cache->splitter_cache_list[0]);
+        result = FindBestCondition(train_dataset, selected_examples, weights,
+                                   config, config_link, dt_config, parent,
+                                   internal_config, uplift_label_stats,
+                                   attribute_idx, constraints, best_condition,
+                                   random, &cache->splitter_cache_list[0]);
       } break;
 
       default:
@@ -1461,8 +1499,9 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const LabelStats& label_stats, proto::NodeCondition* best_condition,
-    utils::RandomEngine* random, PerThreadCache* cache) {
+    const LabelStats& label_stats, const NodeConstraints& constraints,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    PerThreadCache* cache) {
   // This method looks for the best split using worker threads.
   //
   // Background:
@@ -1501,10 +1540,11 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
   }
 
   SplitterWorkRequestCommon common{
-      /*.train_dataset =*/train_dataset,
-      /*.selected_examples =*/selected_examples,
-      /*.parent =*/parent,
-      /*.label_stats =*/label_stats,
+      .train_dataset = train_dataset,
+      .selected_examples = selected_examples,
+      .parent = parent,
+      .label_stats = label_stats,
+      .constraints = constraints,
   };
 
   // Computes the number of oblique projections to evaluate and how to group
@@ -1777,19 +1817,23 @@ absl::StatusOr<bool> FindBestConditionManager(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    const LabelStats& label_stats, proto::NodeCondition* best_condition,
-    utils::RandomEngine* random, PerThreadCache* cache) {
+    const LabelStats& label_stats, const NodeConstraints& constraints,
+    proto::NodeCondition* best_condition, utils::RandomEngine* random,
+    PerThreadCache* cache) {
   if (splitter_concurrency_setup.concurrent_execution) {
     return FindBestConditionConcurrentManager(
         train_dataset, selected_examples, weights, config, config_link,
         dt_config, splitter_concurrency_setup, parent, internal_config,
-        label_stats, best_condition, random, cache);
+        label_stats, constraints, best_condition, random, cache);
   }
   return FindBestConditionSingleThreadManager(
       train_dataset, selected_examples, weights, config, config_link, dt_config,
-      parent, internal_config, label_stats, best_condition, random, cache);
+      parent, internal_config, label_stats, constraints, best_condition, random,
+      cache);
 }
 
+// This is the entry point when searching for a condition.
+// All other "FindBestCondition*" functions are called by this one.
 absl::StatusOr<bool> FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -1799,13 +1843,11 @@ absl::StatusOr<bool> FindBestCondition(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
-    proto::NodeCondition* best_condition, utils::RandomEngine* random,
-    PerThreadCache* cache) {
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, PerThreadCache* cache) {
   switch (config.task()) {
     case model::proto::Task::CLASSIFICATION: {
-      if (internal_config.use_hessian_gain) {
-        return absl::InternalError("Expect use_hessian_gain=false");
-      }
+      STATUS_CHECK(!internal_config.hessian_score);
       ClassificationLabelStats label_stat(
           train_dataset
               .ColumnWithCastWithStatus<
@@ -1832,11 +1874,14 @@ absl::StatusOr<bool> FindBestCondition(
       return FindBestConditionManager(
           train_dataset, selected_examples, weights, config, config_link,
           dt_config, splitter_concurrency_setup, parent, internal_config,
-          label_stat, best_condition, random, cache);
+          label_stat, constraints, best_condition, random, cache);
     } break;
 
     case model::proto::Task::REGRESSION: {
-      if (internal_config.use_hessian_gain) {
+      if (internal_config.hessian_score) {
+        DCHECK_NE(internal_config.gradient_col_idx, -1);
+        DCHECK_NE(internal_config.hessian_col_idx, -1);
+
         DCHECK_EQ(internal_config.gradient_col_idx, config_link.label());
         RegressionHessianLabelStats label_stat(
             train_dataset
@@ -1860,7 +1905,7 @@ absl::StatusOr<bool> FindBestCondition(
         return FindBestConditionManager(
             train_dataset, selected_examples, weights, config, config_link,
             dt_config, splitter_concurrency_setup, parent, internal_config,
-            label_stat, best_condition, random, cache);
+            label_stat, constraints, best_condition, random, cache);
       } else {
         RegressionLabelStats label_stat(
             train_dataset
@@ -1876,14 +1921,12 @@ absl::StatusOr<bool> FindBestCondition(
         return FindBestConditionManager(
             train_dataset, selected_examples, weights, config, config_link,
             dt_config, splitter_concurrency_setup, parent, internal_config,
-            label_stat, best_condition, random, cache);
+            label_stat, constraints, best_condition, random, cache);
       }
     } break;
 
     case model::proto::Task::CATEGORICAL_UPLIFT: {
-      if (internal_config.use_hessian_gain) {
-        return absl::InternalError("Hessian gain not supported for uplift");
-      }
+      STATUS_CHECK(!internal_config.hessian_score);
       const auto& outcome_spec =
           train_dataset.data_spec().columns(config_link.label());
       const auto& treatment_spec =
@@ -1911,13 +1954,11 @@ absl::StatusOr<bool> FindBestCondition(
       return FindBestConditionManager(
           train_dataset, selected_examples, weights, config, config_link,
           dt_config, splitter_concurrency_setup, parent, internal_config,
-          label_stat, best_condition, random, cache);
+          label_stat, constraints, best_condition, random, cache);
     } break;
 
     case model::proto::Task::NUMERICAL_UPLIFT: {
-      if (internal_config.use_hessian_gain) {
-        return absl::InternalError("Hessian gain not supported for uplift");
-      }
+      STATUS_CHECK(!internal_config.hessian_score);
       const auto& treatment_spec =
           train_dataset.data_spec().columns(config_link.uplift_treatment());
 
@@ -1938,7 +1979,7 @@ absl::StatusOr<bool> FindBestCondition(
       return FindBestConditionManager(
           train_dataset, selected_examples, weights, config, config_link,
           dt_config, splitter_concurrency_setup, parent, internal_config,
-          label_stat, best_condition, random, cache);
+          label_stat, constraints, best_condition, random, cache);
     } break;
 
     default:
@@ -2454,8 +2495,9 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
     float na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
     double sum_hessian, double sum_weights, int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
-    SplitterPerThreadCache* cache) {
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, const int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
   if constexpr (weighted) {
     DCHECK_GE(weights.size(), selected_examples.size());
   } else {
@@ -2477,7 +2519,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
       initializer(sum_gradient, sum_hessian, sum_weights,
                   internal_config.hessian_l1,
                   internal_config.hessian_l2_numerical,
-                  dt_config.internal().hessian_split_score_subtract_parent());
+                  dt_config.internal().hessian_split_score_subtract_parent(),
+                  monotonic_direction, constraints);
 
   if (dt_config.internal().sorting_strategy() ==
           proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
@@ -2523,8 +2566,9 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
     double sum_hessian, double sum_weights, int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
-    SplitterPerThreadCache* cache) {
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
   if constexpr (weighted) {
     DCHECK_GE(weights.size(), selected_examples.size());
   } else {
@@ -2535,12 +2579,13 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
 
   typename LabelHessianNumericalBucket<weighted>::Filler label_filler(
       gradients, hessians, weights, internal_config.hessian_l1,
-      internal_config.hessian_l2_categorical);
+      internal_config.hessian_l2_numerical);
 
   typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
-      internal_config.hessian_l2_categorical,
-      dt_config.internal().hessian_split_score_subtract_parent());
+      internal_config.hessian_l2_numerical,
+      dt_config.internal().hessian_split_score_subtract_parent(),
+      monotonic_direction, constraints);
 
   return FindBestSplit_LabelHessianRegressionFeatureDiscretizedNumerical<
       weighted>(selected_examples, feature_filler, label_filler, initializer,
@@ -2731,7 +2776,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const double sum_gradient, const double sum_hessian,
     const double sum_weights, const int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
   if constexpr (weighted) {
     DCHECK_GE(weights.size(), selected_examples.size());
@@ -2747,7 +2793,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
   typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_numerical,
-      dt_config.internal().hessian_split_score_subtract_parent());
+      dt_config.internal().hessian_split_score_subtract_parent(),
+      /*monotonic_direction=*/0, constraints);
 
   return FindBestSplit_LabelHessianRegressionFeatureNACart<weighted>(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
@@ -2883,7 +2930,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const double sum_gradient, const double sum_hessian,
     const double sum_weights, const int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
   if constexpr (weighted) {
     DCHECK_GE(weights.size(), selected_examples.size());
@@ -2904,7 +2952,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
   typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_numerical,
-      dt_config.internal().hessian_split_score_subtract_parent());
+      dt_config.internal().hessian_split_score_subtract_parent(),
+      /*monotonic_direction=*/0, constraints);
 
   return FindBestSplit_LabelHessianRegressionFeatureBooleanCart<weighted>(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
@@ -2921,7 +2970,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const double sum_gradient, const double sum_hessian,
     const double sum_weights, const int32_t attribute_idx,
-    const InternalTrainConfig& internal_config, proto::NodeCondition* condition,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random) {
   if constexpr (weighted) {
     DCHECK_GE(weights.size(), selected_examples.size());
@@ -2944,7 +2994,8 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
   typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_categorical,
-      dt_config.internal().hessian_split_score_subtract_parent());
+      dt_config.internal().hessian_split_score_subtract_parent(),
+      /*monotonic_direction=*/0, constraints);
 
   const auto algorithm =
       (num_attribute_classes < dt_config.categorical().arity_limit_for_random())
@@ -3452,12 +3503,6 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
         // classification.
         continue;
       }
-
-#ifdef SIMPLE_ML_DEBUG_DECISION_TREE_SPLITTER
-      YDF_LOG(INFO) << "Scan CatCat one vs others for positive_label_value:"
-                    << positive_label_value << " Item size :"
-                    << sizeof(example_set_accumulator.items[0]);
-#endif
 
       // Order value of the buckets.
       for (int bucket_idx = 0; bucket_idx < bucket_order.size(); bucket_idx++) {
@@ -3994,6 +4039,13 @@ absl::Status GrowTreeBestFirstGlobal(
     const std::vector<float>& weights,
     const InternalTrainConfig& internal_config, NodeWithChildren* root,
     utils::RandomEngine* random) {
+  if (config.monotonic_constraints_size() > 0) {
+    return absl::InvalidArgumentError(
+        "Global growth of decision trees (i.e. "
+        "growing_strategy=kGrowingStrategyBestFirstGlobal) does not support "
+        "monotonic constraints.");
+  }
+
   if (optional_leaf_examples) {
     return absl::InvalidArgumentError(
         "honest trees are not (yet) supported with "
@@ -4005,6 +4057,15 @@ absl::Status GrowTreeBestFirstGlobal(
     return absl::InvalidArgumentError(
         "Random local imputation not supported in best first global "
         "tree growth.");
+  }
+  if (config_link.per_columns_size() > 0) {
+    for (const auto feature : config_link.features()) {
+      if (config_link.per_columns(feature).has_monotonic_constraint()) {
+        return absl::InvalidArgumentError(
+            "GBT with growing_strategy_best_first_global does not support "
+            "monotonic constraints.");
+      }
+    }
   }
 
   PerThreadCache cache;
@@ -4048,7 +4109,7 @@ absl::Status GrowTreeBestFirstGlobal(
         const auto has_better_condition,
         FindBestCondition(train_dataset, example_idxs, weights, config,
                           config_link, dt_config, splitter_concurrency_setup,
-                          node->node(), internal_config, &condition, random,
+                          node->node(), internal_config, {}, &condition, random,
                           &cache));
     if (!has_better_condition) {
       // No good condition found. Close the branch.
@@ -4218,12 +4279,13 @@ absl::Status DecisionTreeCoreTrain(
   PerThreadCache cache;
   switch (dt_config.growing_strategy_case()) {
     case proto::DecisionTreeTrainingConfig::GROWING_STRATEGY_NOT_SET:
-    case proto::DecisionTreeTrainingConfig::kGrowingStrategyLocal:
+    case proto::DecisionTreeTrainingConfig::kGrowingStrategyLocal: {
+      const auto constraints = NodeConstraints::CreateNodeConstraints();
       return NodeTrain(train_dataset, selected_examples, optional_leaf_examples,
                        config, config_link, dt_config, deployment,
                        splitter_concurrency_setup, weights, 1, internal_config,
-                       dt->mutable_root(), random, &cache);
-      break;
+                       constraints, false, dt->mutable_root(), random, &cache);
+    } break;
     case proto::DecisionTreeTrainingConfig::kGrowingStrategyBestFirstGlobal:
       return GrowTreeBestFirstGlobal(
           train_dataset, selected_examples, optional_leaf_examples, config,
@@ -4243,16 +4305,22 @@ absl::Status NodeTrain(
     const model::proto::DeploymentConfig& deployment,
     const SplitterConcurrencySetup& splitter_concurrency_setup,
     const std::vector<float>& weights, const int32_t depth,
-    const InternalTrainConfig& internal_config, NodeWithChildren* node,
-    utils::RandomEngine* random, PerThreadCache* cache) {
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, bool set_leaf_already_set,
+    NodeWithChildren* node, utils::RandomEngine* random,
+    PerThreadCache* cache) {
   if (selected_examples.empty()) {
     return absl::InternalError("No examples fed to the node trainer");
   }
-  // Set the node value (i.e. the label distribution).
-  RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
-      train_dataset, selected_examples, weights, config, config_link, node));
   node->mutable_node()->set_num_pos_training_examples_without_weight(
       selected_examples.size());
+
+  if (!set_leaf_already_set) {
+    // Set the node value (i.e. the label distribution).
+    RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
+        train_dataset, selected_examples, weights, config, config_link, node));
+    RETURN_IF_ERROR(ApplyConstraintOnNode(constraints, node));
+  }
 
   if (selected_examples.size() < dt_config.min_examples() ||
       (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth()) ||
@@ -4263,12 +4331,14 @@ absl::Status NodeTrain(
       RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
           train_dataset, *optional_leaf_examples, weights, config, config_link,
           node));
+      RETURN_IF_ERROR(ApplyConstraintOnNode(constraints, node));
     }
 
     // Stop the growth of the branch.
     node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
     return absl::OkStatus();
   }
+
   // Dataset used to train this node.
   const dataset::VerticalDataset* local_train_dataset = &train_dataset;
   const std::vector<UnsignedExampleIdx>* local_selected_examples =
@@ -4305,8 +4375,8 @@ absl::Status NodeTrain(
       FindBestCondition(
           *local_train_dataset, *local_selected_examples, weights, config,
           config_link, dt_config, splitter_concurrency_setup, node->node(),
-          internal_config, node->mutable_node()->mutable_condition(), random,
-          cache));
+          internal_config, constraints,
+          node->mutable_node()->mutable_condition(), random, cache));
   if (!has_better_condition) {
     // No good condition found. Close the branch.
     node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
@@ -4349,16 +4419,44 @@ absl::Status NodeTrain(
         /*examples_are_training_examples=*/false));
   }
 
+  // Set leaf outputs
+  RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
+      train_dataset, positive_examples, weights, config, config_link,
+      node->mutable_pos_child()));
+  RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
+      train_dataset, negative_examples, weights, config, config_link,
+      node->mutable_neg_child()));
+  RETURN_IF_ERROR(
+      ApplyConstraintOnNode(constraints, node->mutable_pos_child()));
+  RETURN_IF_ERROR(
+      ApplyConstraintOnNode(constraints, node->mutable_neg_child()));
+
+  // Children constraints
+  auto pos_constraints = constraints;
+  auto neg_constraints = constraints;
+  const int monotonic_constraint_sign = MonotonicConstraintSign(
+      config_link, node->node().condition().attribute());
+  if (monotonic_constraint_sign != 0) {
+    RETURN_IF_ERROR(DivideMonotonicConstraintToChildren(
+        constraints, monotonic_constraint_sign == 1,
+        dt_config.internal().check_monotonic_constraints(), node,
+        node->mutable_pos_child(), node->mutable_neg_child(), &pos_constraints,
+        &neg_constraints));
+  }
+
   // Positive child.
   RETURN_IF_ERROR(NodeTrain(
       train_dataset, positive_examples, positive_node_only_examples, config,
       config_link, dt_config, deployment, splitter_concurrency_setup, weights,
-      depth + 1, internal_config, node->mutable_pos_child(), random, cache));
+      depth + 1, internal_config, pos_constraints, true,
+      node->mutable_pos_child(), random, cache));
+
   // Negative child.
   RETURN_IF_ERROR(NodeTrain(
       train_dataset, negative_examples, negative_node_only_examples, config,
       config_link, dt_config, deployment, splitter_concurrency_setup, weights,
-      depth + 1, internal_config, node->mutable_neg_child(), random, cache));
+      depth + 1, internal_config, neg_constraints, true,
+      node->mutable_neg_child(), random, cache));
   return absl::OkStatus();
 }
 
@@ -4458,6 +4556,95 @@ absl::Status PresortNumericalFeatures(
     });
   }
   return absl::OkStatus();
+}
+
+absl::Status ApplyConstraintOnNode(const NodeConstraints& constraint,
+                                   NodeWithChildren* node) {
+  if (!constraint.min_max_output.has_value()) {
+    return absl::OkStatus();
+  }
+  auto* reg = node->mutable_node()->mutable_regressor();
+  STATUS_CHECK(reg->has_top_value());
+  reg->set_top_value(utils::clamp(reg->top_value(),
+                                  constraint.min_max_output.value().min,
+                                  constraint.min_max_output.value().max));
+  return absl::OkStatus();
+}
+
+absl::Status DivideMonotonicConstraintToChildren(
+    const NodeConstraints& constraint, bool direction_increasing,
+    const bool check_monotonic, NodeWithChildren* parent_node,
+    NodeWithChildren* pos_node, NodeWithChildren* neg_node,
+    NodeConstraints* pos_constraint, NodeConstraints* neg_constraint) {
+  STATUS_CHECK(parent_node->node().regressor().has_top_value());
+  STATUS_CHECK(pos_node->node().regressor().has_top_value());
+  STATUS_CHECK(neg_node->node().regressor().has_top_value());
+
+  // TODO: Experiment with other ways to select limit.
+  float limit = parent_node->node().regressor().top_value();
+
+  if (check_monotonic) {
+    // A failure is indicative of an issue with the splitter i.e. the
+    // "FindCondition" function call just before.
+
+    const auto check = [direction_increasing](auto a, auto b) {
+      if (direction_increasing) {
+        STATUS_CHECK_GE(a, b);
+      } else {
+        STATUS_CHECK_LE(a, b);
+      }
+      return absl::OkStatus();
+    };
+
+    const float pos_value = pos_node->node().regressor().top_value();
+    const float neg_value = neg_node->node().regressor().top_value();
+    const float parent_value = parent_node->node().regressor().top_value();
+    RETURN_IF_ERROR(check(pos_value, neg_value));
+    RETURN_IF_ERROR(check(pos_value, parent_value));
+    RETURN_IF_ERROR(check(parent_value, neg_value));
+  }
+  if ((pos_node->node().regressor().top_value() <
+       neg_node->node().regressor().top_value()) == direction_increasing) {
+    const float center = (pos_node->node().regressor().top_value() +
+                          neg_node->node().regressor().top_value()) /
+                         2;
+    pos_node->mutable_node()->mutable_regressor()->set_top_value(center);
+    neg_node->mutable_node()->mutable_regressor()->set_top_value(center);
+    limit = center;
+  }
+
+  if (!pos_constraint->min_max_output.has_value()) {
+    pos_constraint->min_max_output = NodeConstraints::MinMax();
+  }
+  if (!neg_constraint->min_max_output.has_value()) {
+    neg_constraint->min_max_output = NodeConstraints::MinMax();
+  }
+
+  if (direction_increasing) {
+    pos_constraint->min_max_output.value().min = limit;
+    neg_constraint->min_max_output.value().max = limit;
+  } else {
+    pos_constraint->min_max_output.value().max = limit;
+    neg_constraint->min_max_output.value().min = limit;
+  }
+
+  return absl::OkStatus();
+}
+
+int8_t MonotonicConstraintSign(
+    const model::proto::TrainingConfigLinking& config_link,
+    const int attribute_idx) {
+  if (config_link.per_columns_size() == 0) {
+    return 0;
+  }
+  const auto& link_condition_attribute = config_link.per_columns(attribute_idx);
+  if (link_condition_attribute.has_monotonic_constraint()) {
+    const bool direction_increasing =
+        link_condition_attribute.monotonic_constraint().direction() ==
+        model::proto::MonotonicConstraint::INCREASING;
+    return direction_increasing ? +1 : -1;
+  }
+  return 0;
 }
 
 namespace internal {
