@@ -908,7 +908,7 @@ void InternalExportMetricCondition(const absl::string_view test,
     CHECK_OK(file::SetContent(path, content));
   } else {
     if (!success_margin) {
-      EXPECT_TRUE(false) << "Non satified range condition for " << metric
+      EXPECT_TRUE(false) << "Non satisfied range condition for " << metric
                          << " in " << test << "\ndefined at\n"
                          << file << ":" << line << "\nThe metric value "
                          << value << " is not in " << center << " +- " << margin
@@ -919,7 +919,7 @@ void InternalExportMetricCondition(const absl::string_view test,
     }
 
     if (golden_test && !success_golden) {
-      EXPECT_TRUE(false) << "Non satified golden value condition for " << metric
+      EXPECT_TRUE(false) << "Non satisfied golden value condition for " << metric
                          << " in " << test << "\ndefined at\n"
                          << file << ":" << line << "\nThe metric value "
                          << value << " is different from " << golden

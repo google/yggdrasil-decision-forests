@@ -29,7 +29,7 @@
 namespace ydf = yggdrasil_decision_forests;
 
 // Special prefix value that indicates that the prefix is not specified. Loading
-// a model without specifying the prefix enables the automatic prefix seach
+// a model without specifying the prefix enables the automatic prefix search
 // logic.
 constexpr char kNoPrefix[] = "__NO_PREFIX__";
 

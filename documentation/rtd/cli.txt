@@ -25,7 +25,7 @@ train: Train a ML model and export it to disk.
       dataset, the effective validation dataset is extracted from the training
       dataset.); default: "";
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.
 
@@ -47,7 +47,7 @@ show_model: Display the statistics and structure of a model.
       models, show the tree structure.); default: false;
     --model (Model directory.); default: "";
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.
 
@@ -61,7 +61,7 @@ show_dataspec: Print a human readable representation of a dataspec.
     --sort_by_column_names (If true, sort the columns by names. If false, sort
       the columns by column index.); default: true;
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.
 
@@ -78,7 +78,7 @@ predict: Apply a model on a dataset and export the predictions to disk.
     --output (Output prediction specified with [type]:[path] format. e.g.
       "csv:/path/to/dataset.csv".); default: "";
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.
 
@@ -93,7 +93,7 @@ infer_dataspec: Infers the dataspec of a dataset i.e. the name, type and meta-da
       detection of the columns.); default: "";
     --output (Output dataspec path.); default: "";
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.
 
@@ -106,7 +106,7 @@ evaluate: Evaluates a model.
     --options (Path to optional evaluation configuration.
       proto::EvaluationOptions Text proto.); default: "";
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.
 
@@ -130,7 +130,7 @@ convert_dataset: Converts a dataset from one format to another. The dataspec of 
       conversion is greedy. If num_records_by_shard is too low, all the
       remaining examples will be put in the last shard.); default: -1;
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.
 
@@ -151,7 +151,7 @@ benchmark_inference: Benchmarks the inference time of a model with the available
     --warmup_runs (Number of runs through the dataset before the benchmark.);
       default: 1;
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.
 
@@ -169,7 +169,7 @@ edit_model: Edits a trained model.
       meta-data. Can reduce significantly the size of the model.);
       default: "__NO__SET__";
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.
 
@@ -191,6 +191,6 @@ synthetic_dataset: Create a synthetic dataset.
     --valid (Optional [type]:[path] path to the output validation dataset.);
       default: "";
 
-Try --helpfull to get a list of all flags or --help=substring shows help for
+Try --helpful to get a list of all flags or --help=substring shows help for
 flags which include specified substring in either in the name, or description or
 path.

@@ -30,7 +30,7 @@
 # by the Go OSS port. The small wrapper it creates could be created manually,
 # but it's an error prone process, hence the script.
 #
-# Requrements
+# Requirements
 #
 #   - Go
 #   - Protocol buffer for Go:  protoc

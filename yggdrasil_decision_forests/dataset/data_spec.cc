@@ -49,7 +49,7 @@ namespace {
 
 using proto::ColumnType;
 
-// Margin added or removed to the extrem boundaries in the conversion from
+// Margin added or removed to the extreme boundaries in the conversion from
 // discretized to non-discretized numerical values. This value is (currently)
 // only used for display. In case of a modeling use, the dataspec will be
 // customized for the user / algorithm to choose this value.

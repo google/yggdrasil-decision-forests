@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Configuration for the Sphinx documentaiton generator."""
+"""Configuration for the Sphinx documentation generator."""
 
 project = "Yggdrasil Decision Forests"
 copyright = "2022, Google"

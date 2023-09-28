@@ -27,8 +27,8 @@ Usage example:
 	// Load a model
 	model, err := io.Load("/path/to/model")
 
-	// Compile the model for fast infernce.
-	// At this point, the "model objet can be discarded.
+	// Compile the model for fast inference.
+	// At this point, the "model object can be discarded.
 	engine, err := NewEngine(model)
 
 	// b/235436797: When running a model trained with the TensorFlow Decision

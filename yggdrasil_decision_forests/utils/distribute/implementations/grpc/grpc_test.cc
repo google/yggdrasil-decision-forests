@@ -138,7 +138,7 @@ TEST(GRPC, TestMessup) {
     // old worker #0 by the new worker #0. After this change, any call to the
     // old worker #0 will trigger a YDF_LOG(FATAL).
 
-    // Mark worker #0 as forbiden. New requests to this worker will trigger a
+    // Mark worker #0 as forbidden. New requests to this worker will trigger a
     // YDF_LOG(FATAL).
     CHECK_OK(all.manager->BlockingRequest("forbidden", 0).status());
 
@@ -150,7 +150,7 @@ TEST(GRPC, TestMessup) {
     const int port = test::PickUnusedPortOrDie();
     CHECK_GT(port, 0);
 
-    // Isolate the forbiden worker thread.
+    // Isolate the forbidden worker thread.
     all.discarded_worker_threads.push_back(
         std::move(all.worker_threads.front()));
 

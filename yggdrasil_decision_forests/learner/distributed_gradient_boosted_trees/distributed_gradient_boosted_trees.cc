@@ -589,7 +589,7 @@ TrainWithCache(
                                previous_validation_evaluation, spe_config,
                                metric_names, monitoring, load_balancer);
 
-  // Finalize the model with the assuption that all the trees are used i.e. not
+  // Finalize the model with the assumption that all the trees are used i.e. not
   // early stopping.
   if (model->training_logs().entries_size() > 0) {
     const auto& last_entry = model->training_logs().entries(
@@ -759,7 +759,7 @@ absl::Status RunIteration(
   // TODO: Maximum training time.
   // TODO: Training interruption.
 
-  // Note: The valiation evaluation is asynchronous and is generally (unless a
+  // Note: The validation evaluation is asynchronous and is generally (unless a
   // checkpoint was just made, or this is the last iteration) late by one
   // iteration.
   absl::optional<proto::Evaluation> validation_evaluation;
@@ -879,7 +879,7 @@ absl::Status CreateCheckpoint(
   RETURN_IF_ERROR(file::RecursivelyCreateDir(checkpoint_dir, file::Defaults()));
 
   // Save the worker-side checkpoint content.
-  // Also retreive the "validation_aggregator" with any pending evaluation on
+  // Also retrieve the "validation_aggregator" with any pending evaluation on
   // the validation dataset.
   RETURN_IF_ERROR(EmitCreateCheckpoint(
       iter_idx, label_statistics.num_examples(), checkpoint.num_shards(),
@@ -1435,7 +1435,7 @@ absl::Status EmitCreateCheckpoint(
             std::min(num_examples, (shard_idx + 1) * num_example_per_shard)};
   };
 
-  // Send the checkpoint requrest to a subset of the training workers.
+  // Send the checkpoint request to a subset of the training workers.
   int num_requests = 0;
   for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
     proto::WorkerRequest generic_request;
@@ -1451,7 +1451,7 @@ absl::Status EmitCreateCheckpoint(
     num_requests++;
   }
 
-  // Send the checkpoint requrest to all the evaluation workers.
+  // Send the checkpoint request to all the evaluation workers.
   //
   // Note: Exceptionnaly, we are sending two different types of requests at the
   // same time to make the checkpoint creation more efficient.
@@ -2009,7 +2009,7 @@ absl::Status PartialEvaluationAggregator::AddPartial(
   item.set_num_fragments(item.num_fragments() + 1);
   if (item.num_fragments() > data_.num_fragments()) {
     return absl::InvalidArgumentError(
-        "Too many fragments recevied for a given iter_idx");
+        "Too many fragments received for a given iter_idx");
   }
 
   return absl::OkStatus();

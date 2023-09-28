@@ -120,8 +120,8 @@ absl::Status GRPCManager::InitializeWorkers(
       }
       break;
     case proto::GRPCImp::kGrpcAddresses:
-      for (const auto& addresse : imp_config.grpc_addresses().addresses()) {
-        worker_addresses.push_back(addresse);
+      for (const auto& address : imp_config.grpc_addresses().addresses()) {
+        worker_addresses.push_back(address);
       }
       break;
     default:
@@ -309,7 +309,7 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
                          << " failed with error: " << status.error_message();
       }
       if (IsTransientError(status)) {
-        // The worker is temporarly not available.
+        // The worker is `temporarily not available.
         absl::SleepFor(absl::Seconds(5));
         ASSIGN_OR_RETURN(stub, UpdateWorkerConnection(worker));
         continue;
@@ -317,7 +317,7 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
         // Something is not right.
         YDF_LOG(INFO)
             << "Fatal error in GRPC communication. If this is in fact a "
-               "transiant error, update \"IsTransiantError\" accordingly.";
+               "trensiant error, update \"IsTrensiantError\" accordingly.";
         return GrpcStatusToAbslStatus(status);
       }
     }

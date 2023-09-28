@@ -341,17 +341,17 @@ absl::Status FinalizeComputeSpecColumnCategorical(
     // Check the column does not have missing values.
     if (col->count_nas() > 0) {
       return absl::InvalidArgumentError(
-          "The most frequent item / global imputation item cannot be overriden "
+          "The most frequent item / global imputation item cannot be overridden "
           "if the column contains missing values.");
     }
 
-    // Get the index of the overriden item.
+    // Get the index of the overridden item.
     const auto& item = col_guide.categorial().override_most_frequent_item();
     if (item.has_str_value()) {
       auto item_it = col->categorical().items().find(item.str_value());
       if (item_it == col->categorical().items().end()) {
         return absl::InvalidArgumentError(
-            "The overrident frequent item / global imputation item does not "
+            "The overridden frequent item / global imputation item does not "
             "exist in the dataset");
       } else {
         col->mutable_categorical()->set_most_frequent_value(

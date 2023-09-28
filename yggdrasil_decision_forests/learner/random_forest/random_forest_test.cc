@@ -407,7 +407,7 @@ TEST_F(RandomForestOnAdult, NoWinnerTakeAllExampleSampling) {
   rf_config->set_winner_take_all_inference(false);
   rf_config->set_bootstrap_size_ratio(0.2f);
   TrainAndEvaluateModel();
-  // Similar (should be slighly better) to the dataset sampling.
+  // Similar (should be slightly better) to the dataset sampling.
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.862, 0.015);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.310, 0.04);
 }
@@ -487,7 +487,7 @@ TEST_F(RandomForestOnAdult, MaximumSize) {
 
   TrainAndEvaluateModel();
   // Add an extra 3kB to help with the test flakiness.
-  // Note: the model can be slighly larger than the
+  // Note: the model can be slightly larger than the
   // "set_maximum_model_size_in_memory_in_bytes" directive.
   EXPECT_LT(model_->ModelSizeInBytes().value(), max_size + 3 * 1024);
 

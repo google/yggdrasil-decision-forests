@@ -18,7 +18,7 @@
 //
 // Glossary:
 //
-// An "open node" is a leaf that is candidate to be splitted i.e. the node can
+// An "open node" is a leaf that is candidate to be split i.e. the node can
 // be transformed in a non-leaf node. In layer-wise learning, the open nodes are
 // all the nodes in the currently trained layer that satisfy the nodes splitting
 // constraints (e.g. minimum number of examples).
@@ -101,7 +101,7 @@ typedef std::function<absl::Status(
 //   // Create the root node.
 //   builder->SetRootValue(label_satistics);
 //
-//   // Initialy, all the examples are in the root (which is the only node).
+//   // Initially, all the examples are in the root (which is the only node).
 //   auto example_to_node = CreateExampleToNodeMap(num_examples);
 //   LabelStatsPerNode label_stats_per_node({label_satistics});
 //

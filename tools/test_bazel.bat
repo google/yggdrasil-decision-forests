@@ -14,13 +14,13 @@
 
 :: Compile and runs the unit tests.
 
-:: It is recommanded to use Bazelisk: https://github.com/bazelbuild/bazelisk/releases
+:: It is recommended to use Bazelisk: https://github.com/bazelbuild/bazelisk/releases
 set BAZEL=bazel.exe
 %BAZEL% version
 
 :: TF_SUPPORT=1 add support for TF.Record of TF.Example datasets and relies on
 :: the TensorFlow filesystem. If you don't need this dataset format,
-:: TF_SUPPORT=0 is recommanded.
+:: TF_SUPPORT=0 is recommended.
 set TF_SUPPORT=0
 
 :: Bazel is compatible with Visual Studio 2017 and 2019.

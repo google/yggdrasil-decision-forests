@@ -1334,8 +1334,8 @@ TEST(Metric, EvaluationOfRankingCI) {
 
   // Add some predictions.
   // Note: The predictions are generated randomly. Therefore, the NDCG should be
-  // close to the default NDCG. In addition, we generate enought predictions for
-  // the CI to be somehow close to a closed form CI computed with a Studient
+  // close to the default NDCG. In addition, we generate enough predictions for
+  // the CI to be somehow close to a closed form CI computed with a Student
   // distribution.
   for (int group_idx = 0; group_idx < num_groups; group_idx++) {
     for (int item_idx = 0; item_idx < num_items_per_groups; item_idx++) {

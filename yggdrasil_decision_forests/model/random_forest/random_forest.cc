@@ -553,9 +553,9 @@ std::vector<std::string> RandomForestModel::AvailableVariableImportances()
                      << model::proto::Task_Name(task())
                      << " does not implement VariableImportances.";
   }
-  const auto structual = AvailableStructuralVariableImportances();
-  variable_importances.insert(variable_importances.end(), structual.begin(),
-                              structual.end());
+  const auto structural = AvailableStructuralVariableImportances();
+  variable_importances.insert(variable_importances.end(), structural.begin(),
+                              structural.end());
 
   // Remove possible duplicates.
   std::sort(variable_importances.begin(), variable_importances.end());
