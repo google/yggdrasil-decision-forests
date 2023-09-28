@@ -20,7 +20,7 @@ set BAZEL=bazel.exe
 
 :: TF_SUPPORT=1 add support for TF.Record of TF.Example datasets and relies on
 :: the TensorFlow filesystem. If you don't need this dataset format,
-:: TF_SUPPORT=0 is recommended.
+:: TF_SUPPORT=0 is recommanded.
 set TF_SUPPORT=0
 
 :: Bazel is compatible with Visual Studio 2017 and 2019.
