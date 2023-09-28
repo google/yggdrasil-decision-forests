@@ -39,7 +39,7 @@ namespace gradient_boosted_trees {
 // this value. The most likely scenario would be a
 // configuration/dataset-preparation error. Since the running time is quadratic
 // with the number of documents in a group, increasing this value further might
-// allow very slow configurations.
+// allow very slow configuations.
 //
 // Since there exist a few valid use cases for large ranking groups, violating
 // this maximum only triggers a stern warning.

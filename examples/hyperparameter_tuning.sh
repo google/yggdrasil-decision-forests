@@ -118,7 +118,7 @@ label: "income"
 
   # Hyper-parameter space to optimize.
   #
-  # The space of hyper-parameter to optimize can be defined automatically or
+  # The space of hyper-paramter to optimize can be defined automatically or
   # manually.
 
   # Automatically set the hyper-parameters to optimize.

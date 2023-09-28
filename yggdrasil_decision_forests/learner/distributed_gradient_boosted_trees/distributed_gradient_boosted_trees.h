@@ -24,7 +24,7 @@
 // this case, an error message will be raised during the
 // DistributedGradientBoostedTreesLearner object construction.
 //
-// DistributedGradientBoostedTreesLearner only support training from a dataset
+// DistributedGradientBoostedTreesLearner only support trainig from a dataset
 // path (i.e. training on in-memory dataset is not allowed).
 //
 // At the start of the training, the dataset is divided by columns and shards
@@ -215,7 +215,7 @@ class PartialEvaluationAggregator {
   // Adds a partial evaluation.
   absl::Status AddPartial(const proto::Evaluation& evaluation);
 
-  // Retrieves a full evaluation. Fails if the evaluation cannot be fulled build
+  // Retrives a full evaluation. Fails if the evaluation cannot be fulled build
   // i.e. if there are less than "num_fragments" evaluations with the requested
   // "iter_idx".
   absl::StatusOr<proto::Evaluation> GetAggregated(const int iter_idx) const;
@@ -258,7 +258,7 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const dataset::proto::DataSpecification& data_spec);
 
-// Initialize the model for training.
+// Initiliaze the model for training.
 absl::StatusOr<
     std::unique_ptr<gradient_boosted_trees::GradientBoostedTreesModel>>
 InitializeModel(

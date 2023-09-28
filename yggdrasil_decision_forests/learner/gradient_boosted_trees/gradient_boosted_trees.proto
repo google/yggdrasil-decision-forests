@@ -58,7 +58,7 @@ message GradientBoostedTreesTrainingConfig {
     // parameter) and extraction of the validation dataset
     // ("validation_set_ratio" parameter) are done at the example-level.
     //
-    // This method is fast, accurate but consume a lot of memory is the dataset
+    // This method is fast, accurate but comsume a lot of memory is the dataset
     // is large (e.g. >10B values).
     SampleInMemory sample_in_memory = 32;
 
@@ -207,7 +207,7 @@ message GradientBoostedTreesTrainingConfig {
 
     // A hypertuning coefficient to multiply the loss and its gradient(s) in
     // case of a positive sample.
-    // Loss and gradient on positive samples will be multiplied by
+    // Loss and gradient on positive samples will be multipled by
     // positive_sample_coefficient, on negative samples will be multiplied
     // by (1 - positive_sample_coefficient)
     // Corresponds to the 'alpha' parameter in

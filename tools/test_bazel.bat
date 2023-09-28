@@ -14,7 +14,7 @@
 
 :: Compile and runs the unit tests.
 
-:: It is recommended to use Bazelisk: https://github.com/bazelbuild/bazelisk/releases
+:: It is recommanded to use Bazelisk: https://github.com/bazelbuild/bazelisk/releases
 set BAZEL=bazel.exe
 ::-4.0.0-windows-x86_64.exe
 %BAZEL% version

@@ -404,9 +404,9 @@ TEST(ProtoIO, Base) {
   )pb");
 
   proto::WorkerRequest::EndIter::Tree dst;
-  EndIterTreeProtoWriter writer(&dst);
-  EXPECT_OK(writer.Write(node_1));
-  EXPECT_OK(writer.Write(node_2));
+  EndIterTreeProtoWriter writter(&dst);
+  EXPECT_OK(writter.Write(node_1));
+  EXPECT_OK(writter.Write(node_2));
 
   decision_tree::proto::Node read_node;
   EndIterTreeProtoReader reader(dst);

@@ -27,7 +27,7 @@ ABSL_FLAG(std::string, url_type, "GITHUB",
           "Type of url to the protobuffer definition.");
 
 // Converts a source file path (relative to the ydf directory) and search
-// keyword into an url. When opening this url, the user expects to see the
+// keyword into an url. When openning this url, the user expects to see the
 // source file content.
 std::string url(absl::string_view path, absl::string_view keyword) {
   const auto& url_type = absl::GetFlag(FLAGS_url_type);

@@ -164,7 +164,7 @@ func loadDataset(engine engine.Engine, typedPath string) (*example.Batch, error)
 	}
 }
 
-// parseTypedPath parses a typed path into its constituents.
+// parseTypedPath parses a typed path into its consituents.
 //
 // For example:
 //

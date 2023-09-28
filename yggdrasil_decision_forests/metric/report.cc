@@ -555,7 +555,7 @@ absl::Status AppendTextReportRanking(const proto::EvaluationResults& eval,
                   ": ", DefaultNDCG(eval), "\n");
   absl::StrAppend(report, "Number of groups: ", eval.ranking().num_groups(),
                   "\n");
-  absl::StrAppend(report, "Number of items in groups: mean:",
+  absl::StrAppend(report, "Numer of items in groups: mean:",
                   eval.ranking().mean_num_items_in_group(),
                   " min:", eval.ranking().min_num_items_in_group(),
                   " max:", eval.ranking().max_num_items_in_group(), "\n");

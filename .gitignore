@@ -1,4 +1,0 @@
-bazel*
-dist
-**/.DS_Store
-.coverage

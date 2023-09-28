@@ -351,9 +351,9 @@ void GradientBoostedTreesModel::Predict(
                        accumulator += node.regressor().top_value();
                      });
       if (task() == model::proto::REGRESSION) {
-        double clamped_accumulator = utils::clamp(accumulator, -19., 19.);
+        double clamped_accumlator = utils::clamp(accumulator, -19., 19.);
         prediction->mutable_regression()->set_value(
-            std::exp(clamped_accumulator));
+            std::exp(clamped_accumlator));
       } else {
         YDF_LOG(FATAL) << "Non supported task";
       }
@@ -636,9 +636,9 @@ void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
 std::vector<std::string>
 GradientBoostedTreesModel::AvailableVariableImportances() const {
   auto variable_importances = AbstractModel::AvailableVariableImportances();
-  const auto structural = AvailableStructuralVariableImportances();
-  variable_importances.insert(variable_importances.end(), structural.begin(),
-                              structural.end());
+  const auto structual = AvailableStructuralVariableImportances();
+  variable_importances.insert(variable_importances.end(), structual.begin(),
+                              structual.end());
 
   // Remove possible duplicates.
   std::sort(variable_importances.begin(), variable_importances.end());

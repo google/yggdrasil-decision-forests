@@ -143,7 +143,7 @@ float DiscretizedNumericalToNumerical(const std::vector<float>& boundaries,
 
 // Generates the boundaries of a discretized numerical feature.
 //
-// Creates exactly enough boundaries to separate all the values in
+// Creates exactly enought boundaries to separate all the values in
 // "value_and_example_idxs".
 //
 // "value_and_example_idxs" needs to be sorted according to the float value.
@@ -156,7 +156,7 @@ ExtractDiscretizedBoundariesWithoutDownsampling(
 // Generates the boundaries of a discretized numerical feature.
 //
 // Creates "num_discretized_values" boundaries to separate the values in
-// "value_and_example_idxs" as well as possible. The boundaries are essentially
+// "value_and_example_idxs" as well as possible. The boudaries are essentially
 // quantiles (with some improvement in case a given value speads over multiple
 // quantiles).
 //

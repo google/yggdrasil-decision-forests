@@ -32,7 +32,7 @@ protection. Unless documented, engines are not multi-threaded.
 The following code illustrates the three stages:
 
 ``` {note}
-For a full working example with handling of absl's status,
+For a full working example with handeling of absl's status,
 check
 [this example](https://github.com/google/yggdrasil-decision-forests/blob/main/examples/beginner.cc).
 ```
@@ -111,12 +111,12 @@ contains the probability of each class for each example as follow (example
 major, prediction minor):
 
 ```
-probability example 0 class 0
-probability example 0 class 1
-probability example 0 class 2
-probability example 1 class 0
-probability example 1 class 1
-probability example 1 class 2
+probablity example 0 class 0
+probablity example 0 class 1
+probablity example 0 class 2
+probablity example 1 class 0
+probablity example 1 class 1
+probablity example 1 class 2
 ```
 
 ## Example format

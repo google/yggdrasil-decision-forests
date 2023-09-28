@@ -77,7 +77,7 @@ absl::Status Benchmark() {
 
   YDF_LOG(INFO) << "Details:\n" << EngineDetails(engine);
 
-  // Copy data to the format expected by the engine
+  // Copy data to the format expectd by the engine
   std::vector<uint8_t> examples(engine.num_features * dataset.nrow());
   for (int example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
     for (int local_feature_idx = 0; local_feature_idx < engine.num_features;

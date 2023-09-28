@@ -163,7 +163,7 @@ absl::Status PredictionToExample(
       }
       // There are two excluded label values:
       // 0: Out-of-vocabulary.
-      // 1: Treatment.
+      // 1: Treatement.
       for (int label_value = 2; label_value < num_label_values; label_value++) {
         const int effect_idx = label_value - 2;
         prediction_as_example->add_attributes()->set_numerical(

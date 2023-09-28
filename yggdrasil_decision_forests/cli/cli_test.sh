@@ -25,7 +25,7 @@ TRAIN_DS="csv:$ROOT_DIR/test_data/dataset/adult_train.csv"
 TEST_DS="csv:$ROOT_DIR/test_data/dataset/adult_test.csv"
 
 # Utility to remove the type of a typed path. For example "csv:/file"
-# before "/file".
+# befores "/file".
 function untype() {
   echo "${1#*:}"
 }

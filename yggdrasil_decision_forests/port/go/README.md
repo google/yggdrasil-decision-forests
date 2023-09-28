@@ -46,7 +46,7 @@ import (
 model, err := model_io.LoadModel(runfiles.Path(modelPath))
 
 // Compile / optimize the model for serving. After this statement, "model" can
-// be discarded, only the prepared "engine" is needed.
+// be discarded, only hte prepared "engine" is needed.
 engine, err := serving.NewEngine(model)
 
 // When running a model trained with the TensorFlow Decision Forests API (in

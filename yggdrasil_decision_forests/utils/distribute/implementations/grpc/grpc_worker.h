@@ -177,7 +177,7 @@ class WorkerService final : public proto::Server::Service {
   // manager have changed.
   bool stopping_worker_ GUARDED_BY(mutex_) = false;
 
-  // Signal when the worker are done being stopped i.e. stopping_worker_ goes
+  // Signal when the worker are done beeing stopped i.e. stopping_worker_ goes
   // from true to false.
   utils::concurrency::CondVar stopping_worker_done_cv_;
 
@@ -185,7 +185,7 @@ class WorkerService final : public proto::Server::Service {
   // running (i.e. num_active_requests_=0).
   utils::concurrency::CondVar request_done_cv_;
 
-  // Number of requests currently being processed.
+  // Number of requests currently beeing processed.
   int num_active_requests_ GUARDED_BY(mutex_) = 0;
 
   // Does the worker uses LOAS.

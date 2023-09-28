@@ -382,7 +382,7 @@ int GetVariableImportanceRank(
 // This command is compatible with "--runs_per_test" (e.g. --runs_per_test=50).
 //
 // EXPORT_METRIC_CONDITION is especially useful with tests with
-// "inject_random_noise_=true" in order to study the distribution of metrics and
+// "inject_random_noise_=true" in order to study the distibution of metrics and
 // better adjust the valid range.
 //
 // #define EXPORT_METRIC_CONDITION "/tmp/metric_condition"

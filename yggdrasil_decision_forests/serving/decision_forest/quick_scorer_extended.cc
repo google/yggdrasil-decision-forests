@@ -1137,7 +1137,7 @@ std::string DescribeQuickScorer(const Model& model, const bool detailed) {
                 sizeof(LeafMask)),
             internal::QuickScorerExtendedModel::kMaxLeafs);
         absl::SubstituteAndAppend(&structure,
-                                  "\t\tmask:$0 = $1 threshold:$2 tree:$3\n",
+                                  "\t\tmask:$0 = $1 thre:$2 tree:$3\n",
                                   sub_item.leaf_mask, bitmap_representation,
                                   sub_item.threshold, sub_item.tree_idx);
       }
@@ -1149,7 +1149,7 @@ std::string DescribeQuickScorer(const Model& model, const bool detailed) {
                 sizeof(LeafMask)),
             internal::QuickScorerExtendedModel::kMaxLeafs);
         absl::SubstituteAndAppend(
-            &structure, "\t\tmask:$0 = $1 threshold:MISSING tree:$2\n",
+            &structure, "\t\tmask:$0 = $1 thre:MISSING tree:$2\n",
             sub_item.leaf_mask, bitmap_representation, sub_item.tree_idx);
       }
     }

@@ -1226,7 +1226,7 @@ absl::Status ExportOOBPredictions(
 
     case model::proto::Task::CATEGORICAL_UPLIFT: {
       num_label_classes = label_spec.categorical().number_of_unique_values();
-      for (int i = 2 /*skip the OOV and treatment*/; i < num_label_classes;
+      for (int i = 2 /*skip the OOV and treatement*/; i < num_label_classes;
            i++) {
         auto* col = pred_dataspec.add_columns();
         col->set_name(dataset::CategoricalIdxToRepresentation(label_spec, i));

@@ -215,11 +215,11 @@ struct UpliftLabelDistribution {
 
     // Replacement value for missing output treatment.
     const auto missing_outcome_imputation =
-        [&](const int treatment) -> double {
+        [&](const int treatement) -> double {
       switch (empty_bucket_ordering) {
         case proto::DecisionTreeTrainingConfig::Uplift::
             PARENT_TREATMENT_OUTCOME:
-          return parent.MeanOutcomePerTreatment(treatment);
+          return parent.MeanOutcomePerTreatment(treatement);
         case proto::DecisionTreeTrainingConfig::Uplift::PARENT_OUTCOME:
           return parent.MeanOutcome();
         default:
@@ -237,10 +237,10 @@ struct UpliftLabelDistribution {
     return response_treatment - response_control;
   }
 
-  // Uplift value for leafs. All the treatments should have at least one value.
+  // Uplift value for leafs. All the treatements should have at least one value.
   double UpliftLeaf() const {
     if (!HasUplift()) {
-      // The minimum number of examples per treatment should make this case
+      // The minimum number of examples per treatement should make this case
       // not possible.
       DCHECK(false) << "Uplift leaf not available: " << *this;
       return 0;

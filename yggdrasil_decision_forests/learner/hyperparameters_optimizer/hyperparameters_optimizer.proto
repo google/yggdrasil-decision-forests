@@ -64,7 +64,7 @@ message HyperParametersOptimizerLearnerTrainingConfig {
 
 // Empty message
 message PredefinedHyperParameterSpace {
-  // TODO: Make it possible to tune only a subset of parameters.
+  // TODO: Make it possible to tune only a subset of paramters.
 }
 
 message Evaluation {

@@ -94,7 +94,7 @@ struct NumericalOrCategoricalValue {
   union {
     float numerical_value;
     int categorical_value;
-    // A boolean value is threaded as an alias of numerical.
+    // A boolean value is threated as an alias of numerical.
     // It is stored as a numerical_value with values 0.0 and 1.0.
   };
 

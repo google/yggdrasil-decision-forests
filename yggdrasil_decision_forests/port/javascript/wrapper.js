@@ -216,7 +216,7 @@ class Model {
   }
 
   /**
-   * Create the TF-DF signature of the model.
+   * Create the TF-DF signture of the model.
    */
   createdTFDFSignature_() {
     // Index the input features for the TensorFlow Decision Forests signature.
@@ -356,7 +356,7 @@ class Model {
     // Detect the number of examples.
     //
     // For each type of given feature, extract the number of examples. Ensure
-    // that the feature shapes are consistent.
+    // that the feature shapes are consistant.
     let numExamples = 0;
     if (inputs.numericalFeatures.length != 0) {
       if (numExamples != 0 && numExamples != inputs.numericalFeatures.length) {

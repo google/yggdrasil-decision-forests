@@ -3,7 +3,7 @@
 This page lists the **learners** (i.e. learning algorithms) and their respective
 hyper-parameters. Hyper-parameters can be set in one of two ways:
 
-1.  With a training protobuffer configuration. This option is recommended for
+1.  With a training protobuffer configuration. This option is recommanded for
     the CLI and C++ APIs. For example:
 
 ```
@@ -14,7 +14,7 @@ learner: "RANDOM_FOREST"
 ```
 
 1.  With a list of generic hyper-parameters i.e. a list of key values. This
-    option is recommended for the Python / TF-DF API. In the case of the TF-DF
+    option is recommanded for the Python / TF-DF API. In the case of the TF-DF
     API, the generic hyper-parameters can be feed through the model constructor.
     For example:
 
@@ -452,7 +452,7 @@ reasonable time.
 -   Ratio of the dataset (sampling without replacement) used to train individual
     trees for the random sampling method. If \"subsample\" is set and if
     \"sampling_method\" is NOT set or set to \"NONE\", then \"sampling_method\"
-    is implicitly set to \"RANDOM\". In other words, to enable random
+    is implicitely set to \"RANDOM\". In other words, to enable random
     subsampling, you only need to set "\"subsample\".
 
 #### [uplift_min_examples_in_treatment](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)

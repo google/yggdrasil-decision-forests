@@ -861,7 +861,7 @@ void AbstractModel::AppendDescriptionAndStatistics(
 void AbstractModel::AppendHyperparameterOptimizerLogs(
     std::string* description) const {
   // Converts an hyperparameter set into an inlined human readable
-  // representation of the form: "{<field name>:<value>}+}.
+  // representation of the form: "{<field nam>:<value>}+}.
   const auto hyperparameter_to_string =
       [](const proto::GenericHyperParameters& ps) -> std::string {
     if (ps.fields_size() == 0) {

@@ -189,7 +189,7 @@ absl::StatusOr<double> UpdateWeights(
         *field->mutable_discrete_candidates()->mutable_weights()->Mutable(
             value_idx);
 
-    // Count the number of combination in the children.
+    // Count the number of comination in the children.
     const auto& value = field->discrete_candidates().possible_values(value_idx);
     for (int child_idx = 0; child_idx < field->children_size(); child_idx++) {
       // Check if the child is compatible with this specific value.
