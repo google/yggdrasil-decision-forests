@@ -2555,6 +2555,30 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
       attribute_idx, condition, &cache->cache_v2);
 }
 
+template SplitSearchResult
+FindSplitLabelHessianRegressionFeatureNumericalCart<true>(
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<float>& weights, const std::vector<float>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    float na_replacement, UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
+    double sum_hessian, double sum_weights, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
+template SplitSearchResult
+FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const std::vector<float>& weights, const std::vector<float>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    float na_replacement, UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
+    double sum_hessian, double sum_weights, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
 template <bool weighted>
 SplitSearchResult
 FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(

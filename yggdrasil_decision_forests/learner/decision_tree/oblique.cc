@@ -374,7 +374,7 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
-  const int min_num_obs =
+  const UnsignedExampleIdx min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
 
   // Projection are never missing.
@@ -386,6 +386,7 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
 #endif
 
   // Find a good split in the current_projection.
+  // TODO: Why is internal_config not passed along below?
   SplitSearchResult result;
   if constexpr (is_same<LabelStats, ClassificationLabelStats>::value) {
     result = FindSplitLabelClassificationFeatureNumericalCart(
