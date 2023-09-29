@@ -74,7 +74,7 @@ message LoadBalancerOptions {
 message SplitSharingPlan {
   message RequestItem {
     optional int32 src_worker = 1;
-    repeated int32 features = 2 [packed=true];
+    repeated int32 features = 2 [packed = true];
 
     // Weak models + split idx that use this feature.
     message Split {

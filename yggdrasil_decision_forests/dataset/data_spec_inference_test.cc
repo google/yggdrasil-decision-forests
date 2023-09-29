@@ -77,7 +77,7 @@ std::string ToyDatasetTypedPathTFExampleTFRecord() {
                       file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2"));
 }
 
-// Sort the column in lexial order.
+// Sort the column in lexicographic order.
 void SortColumnByName(proto::DataSpecification* data_spec) {
   std::sort(data_spec->mutable_columns()->begin(),
             data_spec->mutable_columns()->end(),

@@ -211,15 +211,15 @@ class LDACache {
   std::vector<int> feature_to_idx_;
 };
 
-// Computes: output += weight * (a - b) * transpose(a - b), whre "a" and "b" are
-// vectors. "output" should be of the size "a.size() * b.size()".
-void SubstractTransposeMultiplyAdd(double weight, absl::Span<double> a,
-                                   absl::Span<double> b,
-                                   std::vector<double>& output);
+// Computes: output += weight * (a - b) * transpose(a - b), where "a" and "b"
+// are vectors. "output" should be of the size "a.size() * b.size()".
+void SubtractTransposeMultiplyAdd(double weight, absl::Span<double> a,
+                                  absl::Span<double> b,
+                                  std::vector<double>& output);
 
 // Computes: output += weight * (a - b) * transpose(a - b), where a=
 // projection_evaluator[example_idx,:].
-void SubstractTransposeMultiplyAdd(
+void SubtractTransposeMultiplyAdd(
     double weight, std::size_t example_idx,
     const std::vector<int>& selected_features,
     const ProjectionEvaluator& projection_evaluator, absl::Span<double> b,

@@ -53,7 +53,7 @@ TEST_F(CartOnAdult, Base) {
   YDF_LOG(INFO) << description;
 }
 
-// Similar as "CartOnAdult", but use the pre-splitted train and test dataset (
+// Similar as "CartOnAdult", but use the pre-split train and test dataset (
 // instead of generating the splits).
 class CartOnAdultPreSplit : public utils::TrainAndTestTester {
   void SetUp() override {

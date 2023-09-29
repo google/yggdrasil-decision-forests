@@ -1808,7 +1808,7 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
           gbt_config->sampling_methods_case() ==
               proto::GradientBoostedTreesTrainingConfig::
                   kStochasticGradientBoosting) {
-        // Note: Force stocastic gb if the sampling method is "NONE" and the
+        // Note: Force stochastic gb if the sampling method is "NONE" and the
         // "subsampling" parameter is set.
         gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(
             subsample.value().value().real());
@@ -2014,7 +2014,7 @@ GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
     random_cands->add_possible_values()->set_real(0.9);
     random_cands->add_possible_values()->set_real(1.0);
 
-    // Note: GOSS is not part the HP sampling domain as this paramter is only
+    // Note: GOSS is not part the HP sampling domain as this parameter is only
     // expected to speed-up training (and not impact the model in a good way).
 
     // Selective Gradient Boosting sampling method.

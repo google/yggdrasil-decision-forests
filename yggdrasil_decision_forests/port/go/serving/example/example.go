@@ -44,7 +44,7 @@ type Features struct {
 	// ids. Indexed by "CategoricalFeatureID".
 	CategoricalFeatures map[string]CategoricalFeatureID
 
-	// MissingNumericalValues is the representation of a "missing value" for each of the numerial
+	// MissingNumericalValues is the representation of a "missing value" for each of the numerical
 	// features.
 	// Note: Currently, serving only support global imputation of missing values
 	// during inference.

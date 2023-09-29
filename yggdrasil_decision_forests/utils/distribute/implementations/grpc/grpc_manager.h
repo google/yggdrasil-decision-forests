@@ -60,8 +60,8 @@ class GRPCManager : public AbstractManager {
 
   absl::Status SetParallelExecutionPerWorker(int num) override;
 
-  // Changes the address of a worker. The next requests emited by the manager or
-  // the other workers to worke "worker_idx" will use this new address.
+  // Changes the address of a worker. The next requests emitted by the manager
+  // or the other workers to worker "worker_idx" will use this new address.
   absl::Status UpdateWorkerAddress(WorkerIdx worker_idx,
                                    absl::string_view new_address);
 

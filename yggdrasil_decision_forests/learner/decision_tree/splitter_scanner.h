@@ -764,14 +764,14 @@ SplitSearchResult ScanSplits(
     // Enough examples?
     if (num_pos_examples < min_num_obs) {
 #ifdef YDF_DEBUG_PRINT_SPLIT
-      YDF_LOG(INFO) << "\tnot enought examples on positive side";
+      YDF_LOG(INFO) << "\tnot enough examples on positive side";
 #endif
       break;
     }
 
     if (num_neg_examples < min_num_obs) {
 #ifdef YDF_DEBUG_PRINT_SPLIT
-      YDF_LOG(INFO) << "\tnot enought examples on negative side";
+      YDF_LOG(INFO) << "\tnot enough examples on negative side";
 #endif
       continue;
     }

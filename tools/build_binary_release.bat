@@ -14,7 +14,7 @@
 
 :: Pack the CLI binary in an archive.
 
-:: It is recommanded to use Bazelisk: https://github.com/bazelbuild/bazelisk/releases
+:: It is recommended to use Bazelisk: https://github.com/bazelbuild/bazelisk/releases
 set BAZEL=bazel.exe
 %BAZEL% version
 

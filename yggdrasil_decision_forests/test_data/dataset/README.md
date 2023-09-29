@@ -2,7 +2,7 @@
 
 ## Adult
 
-Full name: Adult (also known as Cencus)
+Full name: Adult (also known as Census)
 
 Url: https://archive.ics.uci.edu/ml/datasets/adult
 

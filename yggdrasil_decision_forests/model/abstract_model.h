@@ -216,8 +216,8 @@ class AbstractModel {
   // do not have to be all first loaded into memory.
   // Returns a finalized EvaluationResults.
   // Evaluates the model on a dataset. Returns a finalized EvaluationResults.
-  // The random generator "rnd" is used boostrapping of confidence intervals and
-  // sub-sampling evaluation (if configured in "option").
+  // The random generator "rnd" is used bootstrapping of confidence intervals
+  // and sub-sampling evaluation (if configured in "option").
   absl::StatusOr<metric::proto::EvaluationResults> EvaluateWithStatus(
       const absl::string_view typed_path,
       const metric::proto::EvaluationOptions& option,
@@ -430,7 +430,7 @@ class AbstractModel {
       std::vector<model::proto::Prediction>* predictions,
       metric::proto::EvaluationResults* eval) const;
 
-  // Prints informations about the hyper-parameter optimizer logs.
+  // Prints information about the hyper-parameter optimizer logs.
   void AppendHyperparameterOptimizerLogs(std::string* description) const;
 
   // Checks if the ModelIOOptions are sufficient to load the model.

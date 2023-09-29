@@ -33,7 +33,7 @@
 //   If new_weights_name is set:
 //     Changes the weight name to --new_weights_name. For example, this
 //     operation is useful to set a specific label name in a TensorFlow Decision
-//     Forests model (as in TF-DF, the label name is always "__WEIGTHS").
+//     Forests model (as in TF-DF, the label name is always "__WEIGHTS").
 //
 //   If new_file_prefix is set:
 //     Changes the model filename prefix (i.e. the prefix string added to all

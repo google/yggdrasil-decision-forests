@@ -1,5 +1,5 @@
-load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -336,7 +336,7 @@ cc_library_ydf(
             # When YGG_STD_MUTEX and YGG_STD_BLOCKING_COUNTER_AND_NOTIFICATION are set,
             # this build rule relies on c++17 and c++20 primitives (see the comments in
             # synchronization_primitives.h). However, this rule can effectively be compiled with
-            # c++14 using a modern enought compiler with availabilities disabled (done by defining
+            # c++14 using a modern enough compiler with availabilities disabled (done by defining
             # _LIBCPP_DISABLE_AVAILABILITY).
             #
             # See:

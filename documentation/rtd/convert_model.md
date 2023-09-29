@@ -33,9 +33,9 @@ Models can be "converted" between formats:
 
 ## Convert a a TensorFlow Decision Forests model to a Yggdrasil model
 
-A TensorFlow Decision Forests model directory contains a sub-dirctory containing
-a Yggdrasil model. In the next example, we create a TF-DF model in `/tmp/model`,
-and show the Yggdrasil model in `/tmp/model/assets`.
+A TensorFlow Decision Forests model directory contains a sub-directory
+containing a Yggdrasil model. In the next example, we create a TF-DF model in
+`/tmp/model`, and show the Yggdrasil model in `/tmp/model/assets`.
 
 ```shell
 import tensorflow_decision_forests as tfdf

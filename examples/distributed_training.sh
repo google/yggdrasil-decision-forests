@@ -63,7 +63,7 @@ fi
 #
 # To speed-up distributed training, it is recommended to use a sharded dataset
 # with at least as much shards as workers. If the dataset is not sharded, part
-# of the distributed training could be slowest tha ideal (depending on the
+# of the distributed training could be slower than ideal (depending on the
 # learning algorithm).
 TRAIN_DS="csv:$DATASET_DIR/adult_train.csv"
 TEST_DS="csv:$DATASET_DIR/adult_test.csv"

@@ -34,7 +34,7 @@
 // be added as "deps" AND imported once.
 //
 // Like for the c++ code. Models (in the "/model" directory) and engines (i.e. optimized code to run
-// models on specific hardward (in the "/serving" directory) are independent.
+// models on specific hardware (in the "/serving" directory) are independent.
 package canonical
 
 import (

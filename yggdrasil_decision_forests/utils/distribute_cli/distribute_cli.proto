@@ -40,12 +40,12 @@ message Config {
   // For remote distributed execution, using display_worker_output=true and
   // display_commands_output=false generally works well. For local execution,
   // using display_worker_output=false and display_commands_output=false
-  // generally works well. For local exeuction of a single task at a time (e.g.
+  // generally works well. For local execution of a single task at a time (e.g.
   // for debugging), using display_worker_output=true and
   // display_commands_output=true generally works well.
 
   // If true, the commands are executed in random order when "WaitCompletion"
-  // is called. This can help distributing the charde among the workers is
+  // is called. This can help distributing the shards among the workers is
   // parallel_execution_per_worker>1. If false, the commands are started in
   // order when they are scheduled (with "Schedule").
   optional bool shuffle_commands = 5 [default = true];

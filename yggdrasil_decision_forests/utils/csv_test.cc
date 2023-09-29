@@ -191,7 +191,7 @@ TEST(Csv, WriterWindows) {
   }
   EXPECT_OK(output_handle->Close());
 
-  // Check the writen bytes.
+  // Check the written bytes.
   auto input_handle = file::OpenInputFile(file_path).value();
   auto read_content = input_handle->ReadAll().value();
   EXPECT_OK(input_handle->Close());
@@ -233,7 +233,7 @@ TEST(Csv, WriterUnix) {
   }
   EXPECT_OK(output_handle->Close());
 
-  // Check the writen bytes.
+  // Check the written bytes.
   auto input_handle = file::OpenInputFile(file_path).value();
   auto read_content = input_handle->ReadAll().value();
   EXPECT_OK(input_handle->Close());
