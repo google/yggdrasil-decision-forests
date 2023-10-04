@@ -9,20 +9,8 @@ load("//third_party/boost:workspace.bzl", boost = "deps")
 load("//third_party/grpc:workspace.bzl", grpc = "deps")
 load("//third_party/rapidjson:workspace.bzl", rapidjson = "deps")
 load("//third_party/eigen3:workspace.bzl", eigen = "deps")
-load("//third_party/pybind11:workspace.bzl", pybind11 = "deps")
-load("//third_party/pybind11_abseil:workspace.bzl", pybind11_abseil = "deps")
-load("//third_party/pybind11_protobuf:workspace.bzl", pybind11_protobuf = "deps")
 
 def load_dependencies(repo_name = "", exclude_repo = []):
-    if "pybind11" not in exclude_repo:
-        pybind11()
-
-    if "pybind11_abseil" not in exclude_repo:
-        pybind11_abseil()
-
-    if "pybind11_protobuf" not in exclude_repo:
-        pybind11_protobuf()
-
     if "gtest" not in exclude_repo:
         gtest()
 

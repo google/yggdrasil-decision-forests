@@ -40,12 +40,12 @@ build_and_maybe_test () {
     ${BAZEL} version
 
     local flags="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --repo_env=CC=${1}"
-    local pydf_targets="//yggdrasil_decision_forests/port/python/...:all"
-    # No tensorflow support
-    cp -f WORKSPACE_NO_TF WORKSPACE
+    local pydf_targets="//ydf/...:all"
     # Install PYDF components
     python3 -m pip install -r yggdrasil_decision_forests/port/python/requirements.txt
     python3 -m pip install -r yggdrasil_decision_forests/port/python/dev_requirements.txt
+
+    cd yggdrasil_decision_forests/port/python
 
     time ${BAZEL} build ${flags} -- ${pydf_targets}
     if [[ "$RUN_TESTS" = 1 ]]; then
