@@ -96,6 +96,7 @@ py_test(
     srcs = ["learner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     python_version = "PY3",
+    shard_count = 10,
     deps = [
         ":generic_learner",
         ":specialized_learners",
