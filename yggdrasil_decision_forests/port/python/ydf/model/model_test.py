@@ -132,7 +132,7 @@ class DecisionForestModelTest(absltest.TestCase):
 
     model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
-    analysis = model.analyze(test_df)
+    analysis = model.analyze(test_df, permutation_variable_importance_rounds=5)
 
     self.assertEqual(
         str(analysis),
@@ -146,6 +146,9 @@ class DecisionForestModelTest(absltest.TestCase):
     self.assertIn("Partial Dependence Plot", analysis_html)
     self.assertIn("Conditional Expectation Plot", analysis_html)
     self.assertIn("Permutation Variable Importance", analysis_html)
+
+    # with open("/tmp/analyze.html", "w") as f:
+    #   f.write(analysis_html)
 
   def test_evaluate_bootstrapping_default(self):
     model_path = os.path.join(

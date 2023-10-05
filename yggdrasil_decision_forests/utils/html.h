@@ -61,16 +61,19 @@ class Html {
 // Attribute.
 class Attr {
  public:
-  Attr(absl::string_view key, absl::string_view value)
-      : key_(key), value_(value) {}
+  Attr(absl::string_view key, absl::string_view value, const bool escape = true)
+      : key_(key), value_(value), escape_(escape) {}
 
   absl::string_view key() { return key_; }
 
   absl::string_view value() { return value_; }
 
+  bool escape() { return escape_; }
+
  private:
   std::string key_;
   std::string value_;
+  bool escape_;
 };
 
 // Append tag body.
@@ -115,7 +118,11 @@ void AppendWithAttr(Html* dst, absl::string_view tag_key,
   attr_accumulator->Append(" ");
   attr_accumulator->Append(attr.key());
   attr_accumulator->Append("=\"");
-  attr_accumulator->Append(Escape(attr.value()));
+  if (attr.escape()) {
+    attr_accumulator->Append(Escape(attr.value()));
+  } else {
+    attr_accumulator->Append(attr.value());
+  }
   attr_accumulator->Append("\"");
 
   AppendWithAttr(dst, tag_key, attr_accumulator, remain...);
@@ -241,6 +248,16 @@ Html B(Args... args) {
   return internal::Tag("b", args...);
 }
 
+template <typename... Args>
+Html Select(Args... args) {
+  return internal::Tag("select", args...);
+}
+
+template <typename... Args>
+Html Option(Args... args) {
+  return internal::Tag("option", args...);
+}
+
 inline Html Br() {
   Html content;
   content.AppendRaw("<br>");
@@ -273,7 +290,11 @@ inline internal::Attr Class(absl::string_view value) {
 }
 
 inline internal::Attr OnClick(absl::string_view value) {
-  return internal::Attr("onclick", value);
+  return internal::Attr("onclick", value, false);
+}
+
+inline internal::Attr OnChange(absl::string_view value) {
+  return internal::Attr("onchange", value, false);
 }
 
 inline internal::Attr Id(absl::string_view value) {
@@ -298,6 +319,14 @@ inline internal::Attr Style(Style value) {
 
 inline internal::Attr HRef(absl::string_view value) {
   return internal::Attr("href", value);
+}
+
+inline internal::Attr Value(absl::string_view value) {
+  return internal::Attr("value", value, false);
+}
+
+inline internal::Attr Target(absl::string_view value) {
+  return internal::Attr("target", value);
 }
 
 }  // namespace html

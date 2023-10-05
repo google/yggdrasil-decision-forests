@@ -47,7 +47,14 @@ message Options {
 
   message PermutedVariableImportance {
     optional bool enabled = 1 [default = true];
+
+    // Number of repetitions of the estimation. More repetitions increase the
+    // quality of the variable importance estimates.
+    optional int32 num_rounds = 2 [default = 1];
   }
+
+  optional bool include_model_structural_variable_importances = 17
+      [default = false];
 
   // Size, in pixel, of a figure (possibly composed of multiple plots).
   optional int32 figure_width = 8 [default = 1600];

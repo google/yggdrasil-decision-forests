@@ -729,7 +729,19 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
   if (options.permuted_variable_importance().enabled()) {
     RETURN_IF_ERROR(ComputePermutationFeatureImportance(
         dataset, &model, analysis.mutable_variable_importances(),
-        {options.num_threads()}));
+        {options.num_threads(),
+         options.permuted_variable_importance().num_rounds()}));
+  }
+
+  if (options.include_model_structural_variable_importances()) {
+    auto& dst_map = *analysis.mutable_variable_importances();
+    for (const auto& key : model.AvailableVariableImportances()) {
+      ASSIGN_OR_RETURN(const auto src_values, model.GetVariableImportance(key));
+      model::proto::VariableImportanceSet dst_values;
+      *dst_values.mutable_variable_importances() = {src_values.begin(),
+                                                    src_values.end()};
+      dst_map[absl::StrCat("[In model] ", key)] = dst_values;
+    }
   }
 
   return analysis;
@@ -812,6 +824,21 @@ std::string Header() {
     .tab_block .body .content.selected {
         display: block;
     }
+
+    .variable_importance {
+      padding: 10px;
+    }
+
+    .variable_importance select {
+    }
+
+    .variable_importance .content {
+      display: none;
+    }
+
+    .variable_importance .content.selected {
+      display: block;
+    }
 </style>
 
 <script>
@@ -822,8 +849,76 @@ std::string Header() {
         document.getElementById(block_id + "_" + item).classList.add("selected");
         document.getElementById(block_id + "_body_" + item).classList.add("selected");
     }
+
+    function ydfAnalysisShowVariableImportance(block_id) {
+        const block = document.getElementById(block_id);
+        const item = block.getElementsByTagName("select")[0].value;
+        block.getElementsByClassName("content selected")[0].classList.remove("selected");
+        document.getElementById(block_id + "_body_" + item).classList.add("selected");
+    }
 </script>
   )";
+}
+
+absl::StatusOr<utils::html::Html> CreateHtmlReportPermutationVariableImportance(
+    const proto::StandaloneAnalysisResult& analysis,
+    const proto::Options& options, const absl::string_view block_id) {
+  namespace h = utils::html;
+
+  h::Html select_options;
+  h::Html select_content;
+
+  // Adds a tab to the page.
+  bool first_entry = true;
+  const auto add_entry = [&select_content, &select_options, &block_id,
+                          &first_entry](const absl::string_view key,
+                                        const absl::string_view title,
+                                        const h::Html& content) {
+    const absl::string_view maybe_selected = first_entry ? " selected" : "";
+    select_options.Append(h::Option(h::Value(key), title));
+    select_content.Append(
+        h::Div(h::Id(absl::StrCat(block_id, "_body_", key)),
+               h::Class(absl::StrCat("content", maybe_selected)), content));
+    first_entry = false;
+  };
+
+  const auto& vis = analysis.core_analysis().variable_importances();
+
+  // Sort Variable Importances by key
+  std::vector<std::string> keys;
+  keys.reserve(vis.size());
+  for (const auto& vi : vis) {
+    keys.push_back(vi.first);
+  }
+  std::sort(keys.begin(), keys.end());
+
+  for (const auto& key : keys) {
+    const auto& vi = *vis.find(key);
+    // Export VI plot
+    // TODO: Use an html plot instead of ascii-art.
+    std::string raw;
+    std::vector<model::proto::VariableImportance> variable_importance_values = {
+        vi.second.variable_importances().begin(),
+        vi.second.variable_importances().end()};
+    model::AppendVariableImportanceDescription(variable_importance_values,
+                                               analysis.data_spec(), 4, &raw);
+    add_entry(vi.first, vi.first, h::Pre(raw));
+  }
+
+  h::Html content;
+  const auto onchange =
+      absl::Substitute("ydfAnalysisShowVariableImportance('$0')", block_id);
+
+  const auto help =
+      h::P(h::A(h::Target("_blank"),
+                h::HRef("https://ydf.readthedocs.io/en/latest/"
+                        "cli_user_manual.html#variable-importances"),
+                "Documentation"),
+           " about the variable importances");
+  content.Append(h::Div(
+      h::Id(absl::StrCat(block_id)), h::Class("variable_importance"),
+      h::Select(h::OnChange(onchange), select_options), select_content, help));
+  return content;
 }
 
 absl::StatusOr<std::string> CreateHtmlReport(
@@ -924,23 +1019,11 @@ absl::StatusOr<std::string> CreateHtmlReport(
   // Permutation Variable Importance
   if (options.permuted_variable_importance().enabled() &&
       analysis.core_analysis().variable_importances_size() > 0) {
-    h::Html content;
-
-    std::string raw_variable_importance;
-    for (const auto& variable_importance :
-         analysis.core_analysis().variable_importances()) {
-      absl::StrAppend(&raw_variable_importance, variable_importance.first);
-      absl::StrAppend(&raw_variable_importance, "\n\n");
-      std::vector<model::proto::VariableImportance> variable_importance_values =
-          {variable_importance.second.variable_importances().begin(),
-           variable_importance.second.variable_importances().end()};
-      model::AppendVariableImportanceDescription(variable_importance_values,
-                                                 analysis.data_spec(), 4,
-                                                 &raw_variable_importance);
-      absl::StrAppend(&raw_variable_importance, "\n\n");
-    }
-    content.Append(h::Pre(raw_variable_importance));
-    add_tab("pva", "Permutation Variable Importance", content);
+    ASSIGN_OR_RETURN(
+        const auto content,
+        CreateHtmlReportPermutationVariableImportance(
+            analysis, options, absl::StrCat(block_id, "_variable_importance")));
+    add_tab("pva", "Permutation Variable Importances", content);
   }
 
   // Model Description

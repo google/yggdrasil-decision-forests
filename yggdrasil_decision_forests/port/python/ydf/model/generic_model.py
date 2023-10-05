@@ -185,7 +185,7 @@ class GenericModel:
       num_bins: int = 50,
       partial_depepence_plot: bool = True,
       conditional_expectation_plot: bool = True,
-      permutation_variable_importance: bool = True,
+      permutation_variable_importance_rounds: int = 1,
       num_threads: int = 6,
   ) -> analysis.Analysis:
     """Analyzes a model on a test dataset.
@@ -226,8 +226,12 @@ class GenericModel:
         Expensive to compute.
       conditional_expectation_plot: Compute the conditional expectation plots
         a.k.a. CEP. Cheap to compute.
-      permutation_variable_importance: Computes permutation variable
-        importances.
+      permutation_variable_importance_rounds: If >1, computes permutation
+        variable importances using "permutation_variable_importance_rounds"
+        rounds. The most rounds the more accurate the results. Using a single
+        round is often acceptable i.e. permutation_variable_importance_rounds=1.
+        If permutation_variable_importance_rounds=0, disables the computation of
+        permutation variable importances.
       num_threads: Number of threads to use to compute the analysis.
 
     Returns:
@@ -251,8 +255,10 @@ class GenericModel:
             num_numerical_bins=num_bins,
         ),
         permuted_variable_importance=model_analysis_pb2.Options.PermutedVariableImportance(
-            enabled=permutation_variable_importance
+            enabled=permutation_variable_importance_rounds > 0,
+            num_rounds=permutation_variable_importance_rounds,
         ),
+        include_model_structural_variable_importances=True,
     )
 
     analysis_proto = self._model.Analyze(ds._dataset, options_proto)  # pylint: disable=protected-access

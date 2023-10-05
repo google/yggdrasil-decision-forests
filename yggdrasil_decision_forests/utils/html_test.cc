@@ -48,7 +48,7 @@ TEST(Html, Style) {
 TEST(Html, OnClick) {
   auto page = A(OnClick("f('hello');"), "world");
   // Note: Surprisingly to me, escaping strings this was in js code works fine.
-  EXPECT_EQ(page.content(), "<a onclick=\"f(&#39;hello&#39;);\">world</a>");
+  EXPECT_EQ(page.content(), "<a onclick=\"f('hello');\">world</a>");
 }
 
 }  // namespace
