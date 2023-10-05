@@ -30,7 +30,7 @@ from ydf.learner import specialized_learners as _specialized_learners
 from ydf.model import generic_model as _generic_model
 from ydf.model import model_lib as _model_lib
 
-__version__ = "0.0.0"
+__version__ = "0.0.2"
 
 # Dataset
 create_vertical_dataset = _dataset.create_vertical_dataset

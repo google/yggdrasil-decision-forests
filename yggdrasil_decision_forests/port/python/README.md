@@ -18,6 +18,25 @@ To install YDF, in Python, simply grab the package from pip:
 pip install ydf
 ```
 
+## Usage Example
+
+```python
+import ydf
+import pandas as pd
+
+ds_path = "https://raw.githubusercontent.com/google/yggdrasil-decision-forests/main/yggdrasil_decision_forests/test_data/dataset"
+train_ds = pd.read_csv(f"{ds_path}/adult_train.csv")
+test_ds = pd.read_csv(f"{ds_path}/adult_test.csv")
+
+model = ydf.GradientBoostedTreesLearner(label="income").train(train_ds)
+
+print(model.evaluate(test_ds))
+
+model.save("my_model")
+
+loaded_model = ydf.load_model("my_model")
+```
+
 ## Compiling & Building
 
 To build the Python port of YDF, install GCC-9 and run the following command
@@ -37,6 +56,9 @@ PYTHON_BIN=python3.9
 *   **What is the status of PYDF?** PYDF is currently in Alpha development. Some
     parts still work well (training models and generating predictions), others
     are yet to be added. The API surface may still change without notice.
-*   **How should you pronounce PYDF?** The preferred pronunciation is 
+*   **Where is the documentation for PYDF?** We are still creating the 
+    PYDF-specifc documentation, it will be hosted on https://ydf.readthedocs.org
+    soon.
+*   **How should I pronounce PYDF?** The preferred pronunciation is 
     "Py-dee-eff" / ˈpaɪˈdiˈɛf (IPA)
 
