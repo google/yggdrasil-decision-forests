@@ -14,11 +14,9 @@
 
 """Testing Metrics."""
 
-import logging
 import os
 import textwrap
 
-from absl import flags
 from absl.testing import absltest
 import numpy as np
 from numpy import testing as npt
@@ -26,18 +24,8 @@ from numpy import testing as npt
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from yggdrasil_decision_forests.metric import metric_pb2
 from ydf.metric import metric
+from ydf.utils import test_utils
 from yggdrasil_decision_forests.utils import distribution_pb2
-
-
-def data_root_path() -> str:
-  return ""
-
-
-def pydf_test_data_path() -> str:
-  return os.path.join(
-      data_root_path(),
-      "ydf/test_data",
-  )
 
 
 class EvaluationTest(absltest.TestCase):
@@ -120,17 +108,16 @@ num examples: 50
         """),
     )
 
-    golden_path = os.path.join(
-        pydf_test_data_path(), "golden", "display_metric_to_html.html.expected"
+    test_utils.golden_check_string(
+        self,
+        e._repr_html_(),
+        os.path.join(
+            test_utils.pydf_test_data_path(),
+            "golden",
+            "display_metric_to_html.html.expected",
+        ),
+        postfix=".html",
     )
-    golden_data = open(golden_path).read()
-    effective_data = e._repr_html_()
-    if golden_data != effective_data:
-      effective_path = "/tmp/golden_test_value.html"
-      with open(effective_path, "w") as f:
-        f.write(effective_data)
-      logging.info("Saving effective data to %s", effective_path)
-    self.assertEqual(e._repr_html_(), golden_data)
 
 
 class ConfusionTest(absltest.TestCase):

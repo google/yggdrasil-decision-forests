@@ -23,6 +23,16 @@ py_library(
     srcs = ["documentation.py"],
 )
 
+py_library(
+    name = "test_utils",
+    testonly = True,
+    srcs = ["test_utils.py"],
+    deps = [
+        # absl/flags dep,
+        # absl/testing:absltest dep,
+    ],
+)
+
 # Tests
 # =====
 

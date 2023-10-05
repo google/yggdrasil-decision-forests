@@ -20,6 +20,7 @@ import textwrap
 from typing import Any, Optional, Tuple
 from xml.dom import minidom
 
+# TODO: Add matplotlib as a requirement, or fail.
 import matplotlib.pyplot as plt
 
 from ydf.metric import metric
@@ -488,42 +489,44 @@ def _object_to_html(
 def _plot_roc(characteristic: metric.Characteristic):
   """Plots a ROC curve."""
 
-  fig, ax = plt.subplots(1, figsize=(4, 4))
-  ax.set_xlim(0, 1)
-  ax.set_ylim(0, 1)
-  ax.set_box_aspect(1)
-  ax.plot([0, 1], [0, 1], linestyle="--", color="black", linewidth=0.5)
-  ax.plot(
-      characteristic.false_positive_rates,
-      characteristic.recalls,
-      color="red",
-      linewidth=0.5,
-  )
-  ax.set_xlabel("false positive rate")
-  ax.set_ylabel("true positive rate (recall)")
-  ax.grid()
-  fig.tight_layout()
-  return fig
+  with plt.ioff():
+    fig, ax = plt.subplots(1, figsize=(4, 4))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_box_aspect(1)
+    ax.plot([0, 1], [0, 1], linestyle="--", color="black", linewidth=0.5)
+    ax.plot(
+        characteristic.false_positive_rates,
+        characteristic.recalls,
+        color="red",
+        linewidth=0.5,
+    )
+    ax.set_xlabel("false positive rate")
+    ax.set_ylabel("true positive rate (recall)")
+    ax.grid()
+    fig.tight_layout()
+    return fig
 
 
 def _plot_pr(characteristic: metric.Characteristic):
   """Plots a precision-recall curve."""
 
-  fig, ax = plt.subplots(1, figsize=(4, 4))
-  ax.set_xlim(0, 1)
-  ax.set_ylim(0, 1)
-  ax.set_box_aspect(1)
-  ax.plot(
-      characteristic.recalls,
-      characteristic.precisions,
-      color="red",
-      linewidth=0.5,
-  )
-  ax.set_xlabel("recall")
-  ax.set_ylabel("precision")
-  ax.grid()
-  fig.tight_layout()
-  return fig
+  with plt.ioff():
+    fig, ax = plt.subplots(1, figsize=(4, 4))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_box_aspect(1)
+    ax.plot(
+        characteristic.recalls,
+        characteristic.precisions,
+        color="red",
+        linewidth=0.5,
+    )
+    ax.set_xlabel("recall")
+    ax.set_ylabel("precision")
+    ax.grid()
+    fig.tight_layout()
+    return fig
 
 
 def _fig_to_dom(doc: html.Doc, fig) -> html.Elem:

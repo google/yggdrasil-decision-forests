@@ -35,11 +35,11 @@ py_test(
     python_version = "PY3",
     deps = [
         ":metric",
-        # absl/flags dep,
         # absl/testing:absltest dep,
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
+        "//ydf/utils:test_utils",
         "@ydf_cc//yggdrasil_decision_forests/utils:distribution_py_proto",
     ],
 )
