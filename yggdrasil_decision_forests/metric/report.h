@@ -46,6 +46,7 @@ absl::Status AppendTextReportUplift(const proto::EvaluationResults& eval,
 
 // Add the report in a html format.
 struct HtmlReportOptions {
+  bool include_title = true;
   bool include_text_report = true;
 
   // Size of the plots.

@@ -39,7 +39,6 @@ class ConfusionMatrix:
   See https://developers.google.com/machine-learning/glossary#confusion-matrix
 
 
-
   Attributes:
     classes: The label classes. The number of elements should match the size of
       `matrix`.
@@ -264,26 +263,10 @@ class Evaluation:
   Basic usage example:
 
   ```python
-  evaluation = ydf.metric.Evaluation()
-  evaluation["accuracy"] = 0.6
-  ```
-
-  An evaluation can be constructed with constructor arguments:
-
-  ```python
-  evaluation = ydf.metric.Evaluation(accuracy=0.6, num_examples=10)
-  ```
-
-  An evaluation contains properties to easily access common metrics, as well as
-  checks to make sure metrics are used correctly.
-
-  ```python
-  evaluation = ydf.metric.Evaluation()
-  evaluation.accuracy = 0.6
-
-  evaluation.accuracy = "hello"
-  >> Warning: The "accuracy" is generally expected to be a float. Instead got a
-  str.
+  evaluation = model.evaluate(test_ds)
+  print(evaluation)
+  print(evaluation.accuracy)
+  evaluation  # Html evaluation in notebook
   ```
 
   Attributes:
@@ -296,29 +279,17 @@ class Evaluation:
     rmse: Root Mean Square Error. Only available for regression task.
     rmse_ci95_bootstrap: 95% confidence interval of the RMSE computed using
       bootstrapping. Only available for regression task.
-    ndcg:
-    qini:
-    auuc:
+    ndcg: Normalized Discounted Cumulative Gain. For Ranking.
+    qini: For uplifting.
+    auuc: For uplifting.
     custom_metrics: User custom metrics dictionary.
   """
 
-  # Model generic
-  loss: Optional[float] = None
-  num_examples: Optional[int] = None
-  num_examples_weighted: Optional[float] = None
-  custom_metrics: Dict[str, Any] = dataclasses.field(default_factory=dict)
-  # Classification
-  accuracy: Optional[float] = None
-  confusion_matrix: Optional[ConfusionMatrix] = None
-  characteristics: Optional[List[Characteristic]] = None
-  # Regression
-  rmse: Optional[float] = None
-  rmse_ci95_bootstrap: Optional[ConfidenceInterval] = None
-  # Ranking
-  ndcg: Optional[float] = None
-  # Uplift
-  qini: Optional[float] = None
-  auuc: Optional[float] = None
+  def __init__(
+      self,
+      evaluation_proto: metric_pb2.EvaluationResults,
+  ):
+    self._evaluation_proto = evaluation_proto
 
   def __str__(self) -> str:
     """Returns the string representation of an evaluation."""
@@ -333,6 +304,169 @@ class Evaluation:
     from ydf.metric import display_metric  # pylint: disable=g-import-not-at-top
 
     return display_metric.evaluation_to_html_str(self)
+
+  def _get_proto_field_float(self, key: str) -> Optional[float]:
+    if self._evaluation_proto.HasField(key):
+      return getattr(self._evaluation_proto, key)
+    return None
+
+  def _get_proto_field_int(self, key: str) -> Optional[int]:
+    if self._evaluation_proto.HasField(key):
+      return getattr(self._evaluation_proto, key)
+    return None
+
+  @property
+  def loss(self) -> Optional[float]:
+    if self._evaluation_proto.HasField("loss_value"):
+      return self._evaluation_proto.loss_value
+
+    if self._evaluation_proto.HasField("classification"):
+      clas = self._evaluation_proto.classification
+      if clas.HasField("sum_log_loss"):
+        return clas.sum_log_loss / self._evaluation_proto.count_predictions
+
+    return None
+
+  @property
+  def num_examples(self) -> Optional[float]:
+    return self._get_proto_field_int("count_predictions_no_weight")
+
+  @property
+  def num_examples_weighted(self) -> Optional[float]:
+    return self._get_proto_field_float("count_predictions")
+
+  @property
+  def custom_metrics(self) -> Dict[str, Any]:
+    return {k: v for k, v in self._evaluation_proto.user_metrics.items()}
+
+  @property
+  def accuracy(self) -> Optional[float]:
+    if self._evaluation_proto.HasField("classification"):
+      clas = self._evaluation_proto.classification
+      classes = dataspec.categorical_column_dictionary_to_list(
+          self._evaluation_proto.label_column
+      )
+
+      if clas.HasField("confusion"):
+        confusion = clas.confusion
+        assert confusion.nrow == confusion.ncol, "Invalid confusion matrix"
+        assert confusion.nrow == len(classes), "Invalid confusion matrix"
+        assert confusion.nrow >= 1, "Invalid confusion matrix"
+        raw_confusion = np.array(confusion.counts).reshape(
+            confusion.nrow, confusion.nrow
+        )
+
+        return safe_div(np.trace(raw_confusion), np.sum(raw_confusion))
+    return None
+
+  @property
+  def confusion_matrix(self) -> Optional[ConfusionMatrix]:
+    if self._evaluation_proto.HasField("classification"):
+      clas = self._evaluation_proto.classification
+      classes = dataspec.categorical_column_dictionary_to_list(
+          self._evaluation_proto.label_column
+      )
+      classes_wo_oov = classes[_OUT_OF_DICTIONARY_OFFSET:]
+
+      if clas.HasField("confusion"):
+        confusion = clas.confusion
+        assert confusion.nrow == confusion.ncol, "Invalid confusion matrix"
+        assert confusion.nrow == len(classes), "Invalid confusion matrix"
+        assert confusion.nrow >= 1, "Invalid confusion matrix"
+        raw_confusion = np.array(confusion.counts).reshape(
+            confusion.nrow, confusion.nrow
+        )
+
+        return ConfusionMatrix(
+            classes=tuple(classes_wo_oov),
+            matrix=raw_confusion[
+                _OUT_OF_DICTIONARY_OFFSET:, _OUT_OF_DICTIONARY_OFFSET:
+            ],
+        )
+    return None
+
+  @property
+  def characteristics(self) -> Optional[List[Characteristic]]:
+    if self._evaluation_proto.HasField("classification"):
+      clas = self._evaluation_proto.classification
+      classes = dataspec.categorical_column_dictionary_to_list(
+          self._evaluation_proto.label_column
+      )
+      if clas.rocs:
+        characteristics = []
+        for roc_idx, roc in enumerate(clas.rocs):
+          if roc_idx == 0:
+            # Skip the OOV item
+            continue
+          if roc_idx == 1 and len(clas.rocs) == 3:
+            # In case of binary classification, skip the negative class
+            continue
+          name = f"'{classes[roc_idx]}' vs others"
+          characteristics.append(
+              Characteristic(
+                  name=name,
+                  roc_auc=roc.auc,
+                  pr_auc=roc.pr_auc,
+                  per_threshold=[
+                      CharacteristicPerThreshold(
+                          true_positive=x.tp,
+                          false_positive=x.fp,
+                          true_negative=x.tn,
+                          false_negative=x.fn,
+                          threshold=x.threshold,
+                      )
+                      for x in roc.curve
+                  ],
+              )
+          )
+        return characteristics
+    return None
+
+  @property
+  def rmse(self) -> Optional[float]:
+    if self._evaluation_proto.HasField("regression"):
+      reg = self._evaluation_proto.regression
+      if reg.HasField("sum_square_error"):
+        return math.sqrt(
+            safe_div(
+                reg.sum_square_error, self._evaluation_proto.count_predictions
+            )
+        )
+    return None
+
+  @property
+  def rmse_ci95_bootstrap(self) -> Optional[ConfidenceInterval]:
+    if self._evaluation_proto.HasField("regression"):
+      reg = self._evaluation_proto.regression
+      if reg.HasField("bootstrap_rmse_lower_bounds_95p") and reg.HasField(
+          "bootstrap_rmse_upper_bounds_95p"
+      ):
+        return (
+            reg.bootstrap_rmse_lower_bounds_95p,
+            reg.bootstrap_rmse_upper_bounds_95p,
+        )
+    return None
+
+  @property
+  def ndcg(self) -> Optional[float]:
+    if self._evaluation_proto.HasField("ranking"):
+      rank = self._evaluation_proto.ranking
+      if rank.HasField("ndcg"):
+        return rank.ndcg.value
+
+  @property
+  def qini(self) -> Optional[float]:
+    if self._evaluation_proto.HasField("uplift"):
+      uplift = self._evaluation_proto.uplift
+      if uplift.HasField("qini"):
+        return uplift.qini
+
+  @property
+  def auuc(self) -> Optional[float]:
+    if self._evaluation_proto.HasField("uplift"):
+      uplift = self._evaluation_proto.uplift
+      if uplift.HasField("auuc"):
+        return uplift.auuc
 
   def to_dict(self) -> Dict[str, Any]:
     """Metrics in a dictionary."""
@@ -362,133 +496,6 @@ class Evaluation:
     add_item("qini", self.qini)
     add_item("auuc", self.auuc)
     return output
-
-
-def evaluation_proto_to_evaluation(
-    src: metric_pb2.EvaluationResults,
-) -> Evaluation:
-  """Converts an evaluation from proto to python wrapper format.
-
-  This function does not copy all the fields from the input evaluation proto.
-  Instead, only metrics targeted as PYDF general users are exported. For
-  instance, prediction samples are not exported.
-
-  Currently, this function does not export characteristics (e.g. ROC curve) and
-  confidence bounds.
-
-  Metrics related to the out-of-dictionary (OOD) item in classification label
-  column are not reported.
-
-  Args:
-    src: Evaluation in proto format.
-
-  Returns:
-    Evaluation object.
-  """
-
-  evaluation = Evaluation()
-
-  if src.HasField("count_predictions_no_weight"):
-    evaluation.num_examples = src.count_predictions_no_weight
-
-  if src.HasField("count_predictions"):
-    evaluation.num_examples_weighted = src.count_predictions
-
-  if src.HasField("loss_value"):
-    evaluation.loss = src.loss_value
-
-  if src.HasField("classification"):
-    classes = dataspec.categorical_column_dictionary_to_list(src.label_column)
-    classes_wo_oov = classes[_OUT_OF_DICTIONARY_OFFSET:]
-
-    if src.classification.HasField("confusion"):
-      confusion = src.classification.confusion
-      assert confusion.nrow == confusion.ncol, "Invalid confusion matrix"
-      assert confusion.nrow == len(classes), "Invalid confusion matrix"
-      assert confusion.nrow >= 1, "Invalid confusion matrix"
-      raw_confusion = np.array(confusion.counts).reshape(
-          confusion.nrow, confusion.nrow
-      )
-
-      evaluation.accuracy = safe_div(
-          np.trace(raw_confusion), np.sum(raw_confusion)
-      )
-
-      evaluation.confusion_matrix = ConfusionMatrix(
-          classes=tuple(classes_wo_oov),
-          matrix=raw_confusion[
-              _OUT_OF_DICTIONARY_OFFSET:, _OUT_OF_DICTIONARY_OFFSET:
-          ],
-      )
-
-    if src.classification.rocs:
-      characteristics = []
-      for roc_idx, roc in enumerate(src.classification.rocs):
-        if roc_idx == 0:
-          # Skip the OOV item
-          continue
-        if roc_idx == 1 and len(src.classification.rocs) == 3:
-          # In case of binary classification, skip the negative class
-          continue
-        name = f"'{classes[roc_idx]}' vs others"
-        characteristics.append(
-            Characteristic(
-                name=name,
-                roc_auc=roc.auc,
-                pr_auc=roc.pr_auc,
-                per_threshold=[
-                    CharacteristicPerThreshold(
-                        true_positive=x.tp,
-                        false_positive=x.fp,
-                        true_negative=x.tn,
-                        false_negative=x.fn,
-                        threshold=x.threshold,
-                    )
-                    for x in roc.curve
-                ],
-            )
-        )
-      evaluation.characteristics = characteristics
-
-    if "loss" not in evaluation.to_dict() and src.classification.HasField(
-        "sum_log_loss"
-    ):
-      evaluation.loss = src.classification.sum_log_loss / src.count_predictions
-
-  if src.HasField("regression"):
-    reg = src.regression
-    if reg.HasField("sum_square_error"):
-      # Note: The RMSE is not the empirical variance of the error i.e., there is
-      # not corrective term to the denominator. This implementation is similar
-      # to the ones in sciket-learn, tensorflow and ydf cc.
-      evaluation.rmse = math.sqrt(
-          safe_div(reg.sum_square_error, src.count_predictions)
-      )
-
-    if reg.HasField("bootstrap_rmse_lower_bounds_95p") and reg.HasField(
-        "bootstrap_rmse_upper_bounds_95p"
-    ):
-      evaluation.rmse_ci95_bootstrap = (
-          reg.bootstrap_rmse_lower_bounds_95p,
-          reg.bootstrap_rmse_upper_bounds_95p,
-      )
-
-  if src.HasField("ranking"):
-    rank = src.ranking
-    if rank.HasField("ndcg"):
-      evaluation.ndcg = rank.ndcg.value
-
-  if src.HasField("uplift"):
-    uplift = src.uplift
-    if uplift.HasField("qini"):
-      evaluation.qini = uplift.qini
-    if uplift.HasField("auuc"):
-      evaluation.auuc = uplift.auuc
-
-  for k, v in src.user_metrics.items():
-    evaluation.custom_metrics[k] = v
-
-  return evaluation
 
 
 def safe_div(a: float, b: float) -> float:

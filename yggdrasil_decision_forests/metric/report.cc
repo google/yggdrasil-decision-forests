@@ -578,7 +578,9 @@ absl::Status AppendHtmlReport(const proto::EvaluationResults& eval,
 
   h::Html html;
 
-  html.Append(h::H1("Evaluation report"));
+  if (options.include_title) {
+    html.Append(h::H1("Evaluation report"));
+  }
 
   if (options.include_text_report) {
     ASSIGN_OR_RETURN(const auto text_report, TextReport(eval));

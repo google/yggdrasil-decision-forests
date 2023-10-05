@@ -102,3 +102,16 @@ def GetLearner(
     deployment_config: abstract_learner_pb2.DeploymentConfig,
 ) -> GenericCCLearner: ...
 
+
+# Metric bindings
+# ================
+
+
+def EvaluationToStr(
+    evaluation: metric_pb2.EvaluationResults
+) -> str: ...
+
+def EvaluationPlotToHtml(
+    evaluation: metric_pb2.EvaluationResults
+) -> str: ...
+

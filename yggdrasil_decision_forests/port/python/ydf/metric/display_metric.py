@@ -20,9 +20,7 @@ import textwrap
 from typing import Any, Optional, Tuple
 from xml.dom import minidom
 
-# TODO: Add matplotlib as a requirement, or fail.
-import matplotlib.pyplot as plt
-
+from ydf.cc import ydf
 from ydf.metric import metric
 from ydf.utils import documentation
 from ydf.utils import html
@@ -243,10 +241,6 @@ def evaluation_to_html_str(e: metric.Evaluation, add_style: bool = True) -> str:
       documentation_url=documentation.URL_WEIGHTED_NUM_EXAMPLES,
   )
 
-  # Curves
-
-  # Classification
-
   _object_to_html(
       doc,
       html_metric_box,
@@ -255,27 +249,9 @@ def evaluation_to_html_str(e: metric.Evaluation, add_style: bool = True) -> str:
       documentation_url=documentation.URL_CONFUSION_MATRIX,
   )
 
-  if e.characteristics:
-    for characteristic in e.characteristics:
-      # ROC
-      fig = _plot_roc(characteristic)
-      image = _fig_to_dom(doc, fig)
-      _object_to_html(
-          doc,
-          html_metric_box,
-          f"ROC: {characteristic.name} (AUC:{characteristic.roc_auc:g})",
-          image,
-      )
-
-      # PR
-      fig = _plot_pr(characteristic)
-      image = _fig_to_dom(doc, fig)
-      _object_to_html(
-          doc,
-          html_metric_box,
-          f"PR: {characteristic.name} (AUC:{characteristic.roc_auc:g})",
-          image,
-      )
+  # Curves
+  plot_html = ydf.EvaluationPlotToHtml(e._evaluation_proto)
+  _object_to_html(doc, html_metric_box, None, plot_html, raw_html=True)
 
   return root.toprettyxml(indent="  ")
 
@@ -437,9 +413,10 @@ def _field_to_html(
 def _object_to_html(
     doc: html.Doc,
     parent,
-    key: str,
+    key: Optional[str],
     value: Any,
     documentation_url: Optional[str] = None,
+    raw_html: bool = False,
 ) -> None:
   """Friendly html print a "key" and a complex element.
 
@@ -452,6 +429,7 @@ def _object_to_html(
     key: Name of the field.
     value: Complex object to display.
     documentation_url: Url to the documentation of this field.
+    raw_html: If true, "value" is interpreted as raw html.
   """
 
   if value is None:
@@ -472,7 +450,8 @@ def _object_to_html(
     html_key.appendChild(link)
     html_key = link
 
-  html_key.appendChild(doc.createTextNode(key))
+  if key:
+    html_key.appendChild(doc.createTextNode(key))
 
   html_value = doc.createElement("div")
   html_value.setAttribute("class", "value")
@@ -481,60 +460,25 @@ def _object_to_html(
   if isinstance(value, minidom.Element):
     html_value.appendChild(value)
   else:
-    html_pre_value = doc.createElement("pre")
-    html_value.appendChild(html_pre_value)
-    html_pre_value.appendChild(doc.createTextNode(str_value))
+    if raw_html:
+      node = _RawXMLNode(value, doc)
+      html_value.appendChild(node)
+    else:
+      html_pre_value = doc.createElement("pre")
+      html_value.appendChild(html_pre_value)
+      html_pre_value.appendChild(doc.createTextNode(str_value))
 
 
-def _plot_roc(characteristic: metric.Characteristic):
-  """Plots a ROC curve."""
+class _RawXMLNode(minidom.Node):
+  # Required by Minidom
+  nodeType = 1
 
-  with plt.ioff():
-    fig, ax = plt.subplots(1, figsize=(4, 4))
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.set_box_aspect(1)
-    ax.plot([0, 1], [0, 1], linestyle="--", color="black", linewidth=0.5)
-    ax.plot(
-        characteristic.false_positive_rates,
-        characteristic.recalls,
-        color="red",
-        linewidth=0.5,
-    )
-    ax.set_xlabel("false positive rate")
-    ax.set_ylabel("true positive rate (recall)")
-    ax.grid()
-    fig.tight_layout()
-    return fig
+  def __init__(self, data, parent):
+    self.data = data
+    self.ownerDocument = parent
 
-
-def _plot_pr(characteristic: metric.Characteristic):
-  """Plots a precision-recall curve."""
-
-  with plt.ioff():
-    fig, ax = plt.subplots(1, figsize=(4, 4))
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.set_box_aspect(1)
-    ax.plot(
-        characteristic.recalls,
-        characteristic.precisions,
-        color="red",
-        linewidth=0.5,
-    )
-    ax.set_xlabel("recall")
-    ax.set_ylabel("precision")
-    ax.grid()
-    fig.tight_layout()
-    return fig
-
-
-def _fig_to_dom(doc: html.Doc, fig) -> html.Elem:
-  """Converts a Matplotlib figure into a Dom object."""
-
-  tmpfile = io.BytesIO()
-  fig.savefig(tmpfile, format="png")
-  encoded = base64.b64encode(tmpfile.getvalue()).decode("utf-8")
-  image = doc.createElement("img")
-  image.setAttribute("src", "data:image/png;base64," + encoded)
-  return image
+  def writexml(self, writer, indent, addindent, newl):
+    del indent
+    del addindent
+    del newl
+    writer.write(self.data)

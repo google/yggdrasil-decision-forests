@@ -122,6 +122,9 @@ class DecisionForestModelTest(absltest.TestCase):
         """),
     )
 
+    # with open("/tmp/evaluation.html", "w") as f:
+    #   f.write(evaluation._repr_html_())
+
   def test_analize_adult_gbt(self):
     model_path = os.path.join(
         ydf_test_data_path(), "model", "adult_binary_class_gbdt"

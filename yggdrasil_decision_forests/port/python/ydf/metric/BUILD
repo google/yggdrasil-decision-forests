@@ -1,4 +1,5 @@
 # pytype test and library
+load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -15,13 +16,26 @@ py_library(
         "metric.py",
     ],
     deps = [
-        # matplotlib dep,
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
+        "//ydf/cc:ydf",
         "//ydf/dataset:dataspec",
         "//ydf/utils:documentation",
         "//ydf/utils:html",
         "//ydf/utils:string_lib",
+    ],
+)
+
+pybind_library(
+    name = "metric_cc",
+    srcs = ["metric.cc"],
+    hdrs = ["metric.h"],
+    deps = [
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_pybind11_abseil//pybind11_abseil:status_casters",
+        "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
+        "@ydf_cc//yggdrasil_decision_forests/metric:metric_cc_proto",
+        "@ydf_cc//yggdrasil_decision_forests/metric:report",
     ],
 )
 
@@ -39,7 +53,6 @@ py_test(
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
-        "//ydf/utils:test_utils",
         "@ydf_cc//yggdrasil_decision_forests/utils:distribution_py_proto",
     ],
 )

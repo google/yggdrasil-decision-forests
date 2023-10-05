@@ -14,7 +14,6 @@
 
 """Testing Metrics."""
 
-import os
 import textwrap
 
 from absl.testing import absltest
@@ -24,100 +23,7 @@ from numpy import testing as npt
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from yggdrasil_decision_forests.metric import metric_pb2
 from ydf.metric import metric
-from ydf.utils import test_utils
 from yggdrasil_decision_forests.utils import distribution_pb2
-
-
-class EvaluationTest(absltest.TestCase):
-
-  def test_no_metrics(self):
-    e = metric.Evaluation()
-    self.assertEqual(str(e), "No metrics")
-    self.assertEqual(e.to_dict(), {})
-    self.assertIsNone(e.accuracy)
-
-  def test_set_and_get(self):
-    e = metric.Evaluation()
-    e.accuracy = 0.6
-    self.assertEqual(e.accuracy, 0.6)
-    self.assertEqual(e.to_dict()["accuracy"], 0.6)
-
-    e.num_examples = 50
-    self.assertEqual(e.accuracy, 0.6)
-    self.assertEqual(e.num_examples, 50)
-
-  def test_str(self):
-    e = metric.Evaluation(accuracy=0.6)
-    self.assertEqual(str(e), "accuracy: 0.6\n")
-
-    e.num_examples = 50
-    self.assertEqual(
-        str(e),
-        """accuracy: 0.6
-num examples: 50
-""",
-    )
-
-    e.custom_metrics["my_complex_metric"] = "hello\nworld"
-    self.assertEqual(
-        str(e),
-        """accuracy: 0.6
-my_complex_metric:
-    hello
-    world
-num examples: 50
-""",
-    )
-
-  def test_all_metrics(self):
-    e = metric.Evaluation()
-    e.loss = 0.1
-    e.num_examples = 10
-    e.accuracy = 0.2
-    e.confusion_matrix = metric.ConfusionMatrix(
-        classes=("a",), matrix=np.array([[1]])
-    )
-    e.rmse = 0.3
-    e.rmse_ci95_bootstrap = (0.1, 0.4)
-    e.ndcg = 0.4
-    e.qini = 0.5
-    e.auuc = 0.6
-    e.num_examples_weighted = 0.7
-
-    print(str(e))
-
-    self.assertEqual(
-        str(e),
-        textwrap.dedent("""\
-        accuracy: 0.2
-        confusion matrix:
-            label (row) \\ prediction (col)
-            +---+---+
-            |   | a |
-            +---+---+
-            | a | 1 |
-            +---+---+
-        RMSE: 0.3
-        RMSE 95% CI [B]: (0.1, 0.4)
-        NDCG: 0.4
-        QINI: 0.5
-        AUUC: 0.6
-        loss: 0.1
-        num examples: 10
-        num examples (weighted): 0.7
-        """),
-    )
-
-    test_utils.golden_check_string(
-        self,
-        e._repr_html_(),
-        os.path.join(
-            test_utils.pydf_test_data_path(),
-            "golden",
-            "display_metric_to_html.html.expected",
-        ),
-        postfix=".html",
-    )
 
 
 class ConfusionTest(absltest.TestCase):
@@ -198,15 +104,13 @@ class CharacteristicTest(absltest.TestCase):
     )
 
 
-class EvaluationProtoTest(absltest.TestCase):
+class EvaluationTest(absltest.TestCase):
 
-  def test_convert_empty(self):
+  def test_empty(self):
     proto_eval = metric_pb2.EvaluationResults()
-    self.assertEqual(
-        metric.evaluation_proto_to_evaluation(proto_eval).to_dict(), {}
-    )
+    self.assertEqual(metric.Evaluation(proto_eval).to_dict(), {})
 
-  def test_convert_classification(self):
+  def test_classification(self):
     proto_eval = metric_pb2.EvaluationResults(
         count_predictions_no_weight=1,
         count_predictions=1,
@@ -224,10 +128,28 @@ class EvaluationProtoTest(absltest.TestCase):
                 ncol=3,
             ),
             sum_log_loss=2,
+            rocs=[
+                metric_pb2.Roc(),
+                metric_pb2.Roc(),
+                metric_pb2.Roc(
+                    count_predictions=10,
+                    auc=0.8,
+                    pr_auc=0.7,
+                    curve=[
+                        metric_pb2.Roc.Point(
+                            threshold=1, tp=2, fp=3, tn=4, fn=6
+                        ),
+                        metric_pb2.Roc.Point(
+                            threshold=2, tp=1, fp=2, tn=3, fn=4
+                        ),
+                    ],
+                ),
+            ],
         ),
     )
-    print(metric.evaluation_proto_to_evaluation(proto_eval))
-    dict_eval = metric.evaluation_proto_to_evaluation(proto_eval).to_dict()
+    evaluation = metric.Evaluation(proto_eval)
+    print(evaluation)
+    dict_eval = evaluation.to_dict()
     self.assertDictContainsSubset(
         {"accuracy": (1 + 4) / (1 + 2 + 3 + 4), "loss": 2.0, "num_examples": 1},
         dict_eval,
@@ -238,7 +160,31 @@ class EvaluationProtoTest(absltest.TestCase):
         dict_eval["confusion_matrix"].matrix, [[1, 2], [3, 4]]
     )
 
-  def test_convert_regression(self):
+    self.assertEqual(
+        str(evaluation),
+        textwrap.dedent("""\
+        accuracy: 0.5
+        confusion matrix:
+            label (row) \\ prediction (col)
+            +---+---+---+
+            |   | 1 | 2 |
+            +---+---+---+
+            | 1 | 1 | 2 |
+            +---+---+---+
+            | 2 | 3 | 4 |
+            +---+---+---+
+        characteristics:
+            name: '2' vs others
+            ROC AUC: 0.8
+            PR AUC: 0.7
+            Num thresholds: 2
+        loss: 2
+        num examples: 1
+        num examples (weighted): 1
+        """),
+    )
+
+  def test_regression(self):
     proto_eval = metric_pb2.EvaluationResults(
         count_predictions_no_weight=1,
         loss_value=2,
@@ -250,8 +196,10 @@ class EvaluationProtoTest(absltest.TestCase):
             bootstrap_rmse_upper_bounds_95p=10,
         ),
     )
+    evaluation = metric.Evaluation(proto_eval)
+    print(evaluation)
     self.assertDictEqual(
-        metric.evaluation_proto_to_evaluation(proto_eval).to_dict(),
+        evaluation.to_dict(),
         {
             "loss": 2.0,
             "num_examples": 1,
@@ -261,7 +209,18 @@ class EvaluationProtoTest(absltest.TestCase):
         },
     )
 
-  def test_convert_ranking(self):
+    self.assertEqual(
+        str(evaluation),
+        textwrap.dedent("""\
+        RMSE: 2
+        RMSE 95% CI [B]: (9.0, 10.0)
+        loss: 2
+        num examples: 1
+        num examples (weighted): 2
+        """),
+    )
+
+  def test_ranking(self):
     proto_eval = metric_pb2.EvaluationResults(
         count_predictions_no_weight=1,
         loss_value=2,
@@ -271,8 +230,10 @@ class EvaluationProtoTest(absltest.TestCase):
             ndcg=metric_pb2.MetricEstimate(value=5)
         ),
     )
+    evaluation = metric.Evaluation(proto_eval)
+    print(evaluation)
     self.assertDictEqual(
-        metric.evaluation_proto_to_evaluation(proto_eval).to_dict(),
+        evaluation.to_dict(),
         {
             "loss": 2.0,
             "ndcg": 5.0,
@@ -281,7 +242,17 @@ class EvaluationProtoTest(absltest.TestCase):
         },
     )
 
-  def test_convert_uplift(self):
+    self.assertEqual(
+        str(evaluation),
+        textwrap.dedent("""\
+        NDCG: 5
+        loss: 2
+        num examples: 1
+        num examples (weighted): 3
+        """),
+    )
+
+  def test_uplift(self):
     proto_eval = metric_pb2.EvaluationResults(
         count_predictions_no_weight=1,
         loss_value=2,
@@ -289,8 +260,10 @@ class EvaluationProtoTest(absltest.TestCase):
         label_column=ds_pb.Column(name="my_label"),
         uplift=metric_pb2.EvaluationResults.Uplift(qini=6, auuc=7),
     )
+    evaluation = metric.Evaluation(proto_eval)
+    print(evaluation)
     self.assertDictEqual(
-        metric.evaluation_proto_to_evaluation(proto_eval).to_dict(),
+        evaluation.to_dict(),
         {
             "auuc": 7.0,
             "loss": 2.0,
@@ -298,6 +271,17 @@ class EvaluationProtoTest(absltest.TestCase):
             "qini": 6.0,
             "num_examples_weighted": 3,
         },
+    )
+
+    self.assertEqual(
+        str(evaluation),
+        textwrap.dedent("""\
+        QINI: 6
+        AUUC: 7
+        loss: 2
+        num examples: 1
+        num examples (weighted): 3
+        """),
     )
 
 

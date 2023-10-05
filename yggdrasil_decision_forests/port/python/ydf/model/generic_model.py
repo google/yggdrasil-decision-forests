@@ -176,7 +176,7 @@ class GenericModel:
         task=self._model.task(),
     )
     evaluation_proto = self._model.Evaluate(ds._dataset, options_proto)  # pylint: disable=protected-access
-    return metric.evaluation_proto_to_evaluation(evaluation_proto)
+    return metric.Evaluation(evaluation_proto)
 
   def analyze(
       self,
