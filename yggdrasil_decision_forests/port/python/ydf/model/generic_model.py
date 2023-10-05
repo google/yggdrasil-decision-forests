@@ -25,6 +25,8 @@ from yggdrasil_decision_forests.metric import metric_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.metric import metric
+from ydf.model import analysis
+from yggdrasil_decision_forests.utils import model_analysis_pb2
 
 
 @dataclasses.dataclass(frozen=True)
@@ -101,7 +103,7 @@ class GenericModel:
                   path,
               )
 
-    self._model.save(path, advanced_options.file_prefix)
+    self._model.Save(path, advanced_options.file_prefix)
 
   def predict(self, data: dataset.InputDataset) -> np.ndarray:
     ds = dataset.create_vertical_dataset(
@@ -175,6 +177,86 @@ class GenericModel:
     )
     evaluation_proto = self._model.Evaluate(ds._dataset, options_proto)  # pylint: disable=protected-access
     return metric.evaluation_proto_to_evaluation(evaluation_proto)
+
+  def analyze(
+      self,
+      data: dataset.InputDataset,
+      sampling: float = 1.0,
+      num_bins: int = 50,
+      partial_depepence_plot: bool = True,
+      conditional_expectation_plot: bool = True,
+      permutation_variable_importance: bool = True,
+      num_threads: int = 6,
+  ) -> analysis.Analysis:
+    """Analyzes a model on a test dataset.
+
+    An analysis contains structual information about the model (e.g., variable
+    importance, training logs), the dataset (e.g., column statistics), and the
+    application of the model on the dataset (e.g. partial dependence plots).
+
+    While some information might be valid, it is generatly not recommanded to
+    analyze a model on its training dataset.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.RandomForestLearner(label="label").Train(train_ds)
+
+    test_ds = pd.read_csv("train.csv")
+    analysis = model.analyze(test_ds)
+
+    # Display the analysis in a notebook.
+    analysis
+    ```
+
+    Args:
+      data: Dataset. Can be a dictionary of list or numpy array of values,
+        Pandas DataFrame, or a VerticalDatset.
+      sampling: Ratio of examples to use for the analysis. The analysis can be
+        expensive to compute. On large datasets, use a small sampling value e.g.
+        0.01.
+      num_bins: Number of bins used to accumulate statistics. A large value
+        increase the resolution of the plots but takes more time to compute.
+      partial_depepence_plot: Compute partial dependency plots a.k.a PDPs.
+        Expensive to compute.
+      conditional_expectation_plot: Compute the conditional expectation plots
+        a.k.a. CEP. Cheap to compute.
+      permutation_variable_importance: Computes permutation variable
+        importances.
+      num_threads: Number of threads to use to compute the analysis.
+
+    Returns:
+      Model analysis.
+    """
+
+    ds = dataset.create_vertical_dataset(
+        data, data_spec=self._model.data_spec()
+    )
+
+    options_proto = model_analysis_pb2.Options(
+        num_threads=num_threads,
+        pdp=model_analysis_pb2.Options.PlotConfig(
+            enabled=partial_depepence_plot,
+            example_sampling=sampling,
+            num_numerical_bins=num_bins,
+        ),
+        cep=model_analysis_pb2.Options.PlotConfig(
+            enabled=conditional_expectation_plot,
+            example_sampling=sampling,
+            num_numerical_bins=num_bins,
+        ),
+        permuted_variable_importance=model_analysis_pb2.Options.PermutedVariableImportance(
+            enabled=permutation_variable_importance
+        ),
+    )
+
+    analysis_proto = self._model.Analyze(ds._dataset, options_proto)  # pylint: disable=protected-access
+    return analysis.Analysis(analysis_proto, options_proto)
 
 
 ModelType = TypeVar("ModelType", bound=GenericModel)

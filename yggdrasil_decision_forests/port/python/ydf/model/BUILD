@@ -40,6 +40,8 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/serving:example_set",
         "@ydf_cc//yggdrasil_decision_forests/serving:fast_engine",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
+        "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
+        "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:random",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
     ],
@@ -59,6 +61,8 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/model:model_library",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
+        "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
+        "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
     ],
 )
 
@@ -66,12 +70,14 @@ py_library(
     name = "generic_model",
     srcs = ["generic_model.py"],
     deps = [
+        ":analysis",
         # absl/logging dep,
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset",
         "//ydf/metric",
+        "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
     ],
 )
 
@@ -113,6 +119,16 @@ py_library(
         "//ydf/cc:ydf",
     ],
 )
+
+py_library(
+    name = "analysis",
+    srcs = ["analysis.py"],
+    deps = [
+        "//ydf/cc:ydf",
+        "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
+    ],
+)
+
 # Tests
 # =====
 
@@ -120,16 +136,18 @@ py_test(
     name = "model_test",
     srcs = ["model_test.py"],
     data = [
-        "@ydf_cc//yggdrasil_decision_forests/test_data",
         # absl/flags dep,
         # absl/testing:absltest dep,
         # numpy dep,
         # pandas dep,
+        "//ydf/test_data",
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
     python_version = "PY3",
     deps = [
         ":generic_model",
         ":model_lib",
         ":random_forest_model",
+        "//ydf/utils:test_utils",
     ],
 )

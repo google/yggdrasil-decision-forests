@@ -35,6 +35,7 @@
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace py = ::pybind11;
@@ -69,6 +70,10 @@ class GenericCCModel {
   absl::StatusOr<metric::proto::EvaluationResults> Evaluate(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& options);
+
+  absl::StatusOr<utils::model_analysis::proto::StandaloneAnalysisResult>
+  Analyze(const dataset::VerticalDataset& dataset,
+          const utils::model_analysis::proto::Options& options);
 
   const dataset::proto::DataSpecification& data_spec() const {
     return model_->data_spec();

@@ -9,7 +9,10 @@ package(
 # TODO: Make public when fully available.
 package_group(
     name = "users",
-    packages = ["//ydf/..."],
+    packages = [
+        "//third_party/py/ydf/...",
+        "//ydf/...",
+    ],
 )
 
 # Internal to the library

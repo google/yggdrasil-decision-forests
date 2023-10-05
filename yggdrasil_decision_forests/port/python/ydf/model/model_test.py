@@ -27,6 +27,7 @@ from pybind11_abseil import status
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model import random_forest_model
+from ydf.utils import test_utils
 
 
 def data_root_path() -> str:
@@ -120,6 +121,31 @@ class DecisionForestModelTest(absltest.TestCase):
         num examples (weighted): 9769
         """),
     )
+
+  def test_analize_adult_gbt(self):
+    model_path = os.path.join(
+        ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    dataset_path = os.path.join(
+        ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+
+    model = model_lib.load_model(model_path)
+    test_df = pd.read_csv(dataset_path)
+    analysis = model.analyze(test_df)
+
+    self.assertEqual(
+        str(analysis),
+        "A model analysis. Use a notebook cell to display the analysis."
+        " Alternatively, export the analysis with"
+        ' `analysis.to_html("analysis.html")`.',
+    )
+
+    # Note: The analysis computation is not deterministic.
+    analysis_html = analysis._repr_html_()
+    self.assertIn("Partial Dependence Plot", analysis_html)
+    self.assertIn("Conditional Expectation Plot", analysis_html)
+    self.assertIn("Permutation Variable Importance", analysis_html)
 
   def test_evaluate_bootstrapping_default(self):
     model_path = os.path.join(

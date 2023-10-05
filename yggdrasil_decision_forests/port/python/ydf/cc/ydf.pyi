@@ -10,6 +10,7 @@ from google3.third_party.yggdrasil_decision_forests.learner import abstract_lear
 from google3.third_party.yggdrasil_decision_forests.metric import metric_pb2
 from google3.third_party.yggdrasil_decision_forests.model import hyperparameter_pb2
 from google3.third_party.yggdrasil_decision_forests.model import abstract_model_pb2
+from google3.third_party.yggdrasil_decision_forests.utils import model_analysis_pb2
 
 # Dataset bindings
 # ================
@@ -57,10 +58,15 @@ class GenericCCModel:
       dataset: VerticalDataset,
       options: metric_pb2.EvaluationOptions,
   ) -> metric_pb2.EvaluationResults: ...
+  def Analyze(
+      self,
+      dataset: VerticalDataset,
+      options: model_analysis_pb2.Options,
+  ) -> model_analysis_pb2.StandaloneAnalysisResult: ...
   def name(self) -> str: ...
   def task(self) -> abstract_model_pb2.Task: ...
   def data_spec(self) -> data_spec_pb2.DataSpecification: ...
-  def save(self, directory: str, file_prefix: Optional[str]): ...
+  def Save(self, directory: str, file_prefix: Optional[str]): ...
 
 class DecisionForestCCModel(GenericCCModel):
   def num_trees(self) -> int: ...
@@ -77,6 +83,11 @@ class GradientBoostedTreesCCModel(DecisionForestCCModel):
 ModelCCType = TypeVar('ModelCCType', bound=GenericCCModel)
 
 def LoadModel(directory: str, file_prefix: Optional[str]) -> ModelCCType: ...
+
+def ModelAnalysisCreateHtmlReport(
+    analysis: model_analysis_pb2.StandaloneAnalysisResult,
+    options: model_analysis_pb2.Options,
+) -> str: ...
 
 
 # Learner bindings

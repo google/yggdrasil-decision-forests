@@ -35,6 +35,8 @@
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
+#include "yggdrasil_decision_forests/utils/model_analysis.h"
+#include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -118,6 +120,15 @@ absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
   ASSIGN_OR_RETURN(const auto evaluation,
                    model_->EvaluateWithEngine(*engine, dataset, options, &rnd));
   return evaluation;
+}
+
+absl::StatusOr<utils::model_analysis::proto::StandaloneAnalysisResult>
+GenericCCModel::Analyze(const dataset::VerticalDataset& dataset,
+                        const utils::model_analysis::proto::Options& options) {
+  ASSIGN_OR_RETURN(const auto analysis,
+                   utils::model_analysis::Analyse(*model_, dataset, options));
+  return utils::model_analysis::CreateStandaloneAnalysis(*model_, dataset, "",
+                                                         "", analysis);
 }
 
 absl::Status GenericCCModel::Save(

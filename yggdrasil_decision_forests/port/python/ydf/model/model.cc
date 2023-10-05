@@ -32,6 +32,8 @@
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "ydf/model/model_wrapper.h"
+#include "yggdrasil_decision_forests/utils/model_analysis.h"
+#include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 
 namespace py = ::pybind11;
 
@@ -45,10 +47,19 @@ absl::StatusOr<std::unique_ptr<GenericCCModel>> LoadModel(
   RETURN_IF_ERROR(model::LoadModel(directory, &model_ptr, {file_prefix}));
   return CreateCCModel(std::move(model_ptr));
 }
+
+absl::StatusOr<std::string> ModelAnalysisCreateHtmlReport(
+    const utils::model_analysis::proto::StandaloneAnalysisResult& analysis,
+    const utils::model_analysis::proto::Options& options = {}) {
+  return utils::model_analysis::CreateHtmlReport(analysis, options);
+}
+
 }  // namespace
 
 void init_model(py::module_& m) {
   m.def("LoadModel", LoadModel, py::arg("directory"), py::arg("file_prefix"));
+  m.def("ModelAnalysisCreateHtmlReport", ModelAnalysisCreateHtmlReport,
+        py::arg("analysis"), py::arg("options"));
   py::class_<GenericCCModel>(m, "GenericCCModel")
       .def("__repr__",
            [](const GenericCCModel& a) {
@@ -58,7 +69,9 @@ void init_model(py::module_& m) {
       .def("Predict", &GenericCCModel::Predict, py::arg("dataset"))
       .def("Evaluate", &GenericCCModel::Evaluate, py::arg("dataset"),
            py::arg("options"))
-      .def("save", &GenericCCModel::Save, py::arg("directory"),
+      .def("Analyze", &GenericCCModel::Analyze, py::arg("dataset"),
+           py::arg("options"))
+      .def("Save", &GenericCCModel::Save, py::arg("directory"),
            py::arg("file_prefix"))
       .def("name", &GenericCCModel::name)
       .def("task", &GenericCCModel::task)
