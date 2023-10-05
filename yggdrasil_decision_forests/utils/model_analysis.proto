@@ -17,6 +17,7 @@ syntax = "proto2";
 
 package yggdrasil_decision_forests.utils.model_analysis.proto;
 
+import "yggdrasil_decision_forests/dataset/data_spec.proto";
 import "yggdrasil_decision_forests/model/abstract_model.proto";
 import "yggdrasil_decision_forests/utils/partial_dependence_plot.proto";
 
@@ -91,4 +92,15 @@ message AnalysisResult {
   optional utils.proto.PartialDependencePlotSet pdp_set = 1;
   optional utils.proto.PartialDependencePlotSet cep_set = 2;
   map<string, model.proto.VariableImportanceSet> variable_importances = 3;
+}
+
+// An analysis result that does not need a model or a dataset to be displayed.
+message StandaloneAnalysisResult {
+  optional AnalysisResult core_analysis = 1;
+  optional string dataset_path = 2;
+  optional string model_path = 3;
+  optional dataset.proto.DataSpecification data_spec = 4;
+  optional int32 label_col_idx = 5;
+  optional model.proto.Task task = 6;
+  optional string model_description = 7;
 }

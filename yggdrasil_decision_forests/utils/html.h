@@ -272,6 +272,10 @@ inline internal::Attr Class(absl::string_view value) {
   return internal::Attr("class", value);
 }
 
+inline internal::Attr OnClick(absl::string_view value) {
+  return internal::Attr("onclick", value);
+}
+
 inline internal::Attr Id(absl::string_view value) {
   return internal::Attr("id", value);
 }

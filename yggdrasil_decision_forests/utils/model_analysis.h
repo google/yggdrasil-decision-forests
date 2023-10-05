@@ -16,9 +16,13 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_MODEL_ANALYSIS_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_MODEL_ANALYSIS_H_
 
+#include <string>
+
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/partial_dependence_plot.h"
@@ -49,6 +53,17 @@ absl::StatusOr<std::string> CreateHtmlReport(
     const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
     absl::string_view model_path, absl::string_view dataset_path,
     const proto::AnalysisResult& analysis, const proto::Options& options = {});
+
+// Same as "CreateHtmlReport" from a standalone analysis.
+absl::StatusOr<std::string> CreateHtmlReport(
+    const proto::StandaloneAnalysisResult& analysis,
+    const proto::Options& options = {});
+
+// Assemble an analysis into a standalone analysis.
+proto::StandaloneAnalysisResult CreateStandaloneAnalysis(
+    const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
+    absl::string_view model_path, absl::string_view dataset_path,
+    const proto::AnalysisResult& analysis);
 
 // Combines the model analysis and html creation i.e. Analyse +
 // CreateHtmlReport.
