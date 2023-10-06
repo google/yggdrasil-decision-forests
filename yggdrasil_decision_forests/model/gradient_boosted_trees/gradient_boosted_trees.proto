@@ -66,6 +66,8 @@ enum Loss {
   BINARY_FOCAL_LOSS = 6;
   // Poisson log likelihood. Only valid for regression.
   POISSON = 7;
+  // Mean average error (MAE).
+  MEAN_AVERAGE_ERROR = 8;
 }
 
 // Log of the training. This proto is generated during the training of the

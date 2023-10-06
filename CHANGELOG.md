@@ -1,6 +1,14 @@
 # Changelog
 
-## Breaking changes
+## Head
+
+### Feature
+
+-   Mean average error loss for GBT.
+
+## 1.6.0 - 2023-09-28
+
+### Breaking changes
 
 -   The dependency to the distributed gradient boosted trees learner is renamed
     from
@@ -14,7 +22,6 @@
     longer interpreted as the label being the input feature "".
 
 ### Feature
-
 
 -   Add support for monotonic constraints for gradient boosted trees.
 -   Improve speed of dataset reading and writing.

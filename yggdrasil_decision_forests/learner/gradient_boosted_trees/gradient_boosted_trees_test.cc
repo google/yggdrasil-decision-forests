@@ -1273,6 +1273,15 @@ TEST_F(GradientBoostedTreesOnAbalone, PoissonLoss) {
   YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1563, 0.0852, 2.1491);
 }
 
+TEST_F(GradientBoostedTreesOnAbalone, MAELoss) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::Loss::MEAN_AVERAGE_ERROR);
+  TrainAndEvaluateModel();
+  YDF_TEST_METRIC(metric::MAE(evaluation_), 1.5155, 0.0599, 1.4994);
+  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.2608, 0.1464, 2.2136);
+}
+
 class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {
   void SetUp() override {
     train_config_.set_learner(GradientBoostedTreesLearner::kRegisteredName);

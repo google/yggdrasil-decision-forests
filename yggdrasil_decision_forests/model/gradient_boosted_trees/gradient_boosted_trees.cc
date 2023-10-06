@@ -330,6 +330,7 @@ void GradientBoostedTreesModel::Predict(
         dist->set_sum(1.f);
       }
     } break;
+    case proto::Loss::MEAN_AVERAGE_ERROR:
     case proto::Loss::SQUARED_ERROR: {
       double accumulator = initial_predictions_[0];
       CallOnAllLeafs(dataset, row_idx,
