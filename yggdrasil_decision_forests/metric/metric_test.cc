@@ -15,8 +15,11 @@
 
 #include "yggdrasil_decision_forests/metric/metric.h"
 
+#include <cmath>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -28,13 +31,15 @@
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace metric {
 namespace {
 
 using test::EqualsProto;
-using testing::ElementsAre;
+using ::testing::Bool;
+using ::testing::IsNan;
 
 TEST(Metric, EvaluationOfClassification) {
   // Create a fake column specification.
@@ -243,6 +248,7 @@ TEST(Metric, EvaluationOfRegression) {
   EXPECT_EQ(eval.count_sampled_predictions(), 4);
   EXPECT_EQ(eval.task(), model::proto::Task::REGRESSION);
   EXPECT_NEAR(RMSE(eval), sqrt(0.5), 0.0001);
+  EXPECT_NEAR(MAE(eval), (0. + 1. + 0. + 1.) / 4, 0.0001);
   EXPECT_NEAR(DefaultRMSE(eval), 0.5, 0.0001);
 
   // Create reports.
@@ -762,18 +768,28 @@ TEST(Metric, RMSEConfidenceIntervals) {
       0.03);
 }
 
-TEST(Metric, GetMetric) {
+TEST(Metric, GetMetricRegression) {
   const proto::EvaluationResults results_regression = PARSE_TEST_PROTO(R"pb(
     task: REGRESSION
     label_column { type: NUMERICAL }
-    regression { sum_square_error: 10 }
+    regression { sum_square_error: 10 sum_abs_error: 5 }
     count_predictions: 10
   )pb");
-  EXPECT_NEAR(
-      GetMetric(results_regression, PARSE_TEST_PROTO("regression { rmse {}}"))
-          .value(),
-      RMSE(results_regression), 0.0001);
 
+  ASSERT_OK_AND_ASSIGN(
+      const auto rmse,
+      GetMetric(results_regression,
+                PARSE_TEST_PROTO(R"pb(regression { rmse {} })pb")));
+  EXPECT_NEAR(rmse, RMSE(results_regression), 0.0001);
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto mae,
+      GetMetric(results_regression,
+                PARSE_TEST_PROTO(R"pb(regression { mae {} })pb")));
+  EXPECT_NEAR(mae, MAE(results_regression), 0.0001);
+}
+
+TEST(Metric, GetMetricClassification) {
   const proto::EvaluationResults results_classification = PARSE_TEST_PROTO(R"pb(
     task: CLASSIFICATION
     label_column {
@@ -930,6 +946,46 @@ TEST(Metric, GetMetric) {
                   .false_positive_rate_at_recall(0)
                   .x_metric_value(),
               0.0001);
+}
+
+TEST(Metric, GetMetricCustomMetric) {
+  const proto::EvaluationResults evaluation = PARSE_TEST_PROTO(R"pb(
+    user_metrics { key: "my_custom_metric" value: 2 }
+  )pb");
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto custom,
+      GetMetric(evaluation, PARSE_TEST_PROTO(R"pb(
+                  user_metric { metrics_name: "my_custom_metric" })pb")));
+  EXPECT_NEAR(custom, 2, 0.0001);
+
+  EXPECT_THAT(
+      GetMetric(evaluation, PARSE_TEST_PROTO(R"pb(
+                  user_metric { metrics_name: "non_existing_metric" })pb"))
+          .status(),
+      test::StatusIs(absl::StatusCode::kInvalidArgument,
+                     "Cannot find metric: non_existing_metric"));
+}
+
+TEST(Metric, GetMetricEmpty) {
+  const proto::EvaluationResults results_regression = PARSE_TEST_PROTO(R"pb(
+    task: REGRESSION
+    label_column { type: NUMERICAL }
+    regression { sum_square_error: 0 sum_abs_error: 0 }
+    count_predictions: 0
+  )pb");
+
+  EXPECT_THAT(GetMetric(results_regression,
+                        PARSE_TEST_PROTO(R"pb(regression { rmse {} })pb"))
+                  .value(),
+              IsNan());
+  EXPECT_THAT(RMSE(results_regression), IsNan());
+
+  EXPECT_THAT(GetMetric(results_regression,
+                        PARSE_TEST_PROTO(R"pb(regression { mae {} })pb"))
+                  .value(),
+              IsNan());
+  EXPECT_THAT(MAE(results_regression), IsNan());
 }
 
 TEST(Metric, MinMaxStream) {
@@ -1425,6 +1481,42 @@ TEST(Metric, RMSEThreaded) {
                   .value(),
               0.8164966, 0.0001);
 }
+
+class MAETest : public testing::TestWithParam<bool> {};
+
+TEST_P(MAETest, MAE) {
+  const bool threaded = GetParam();
+  const double test_precision = 0.0001;
+
+  utils::concurrency::ThreadPool thread_pool("", 4);
+  if (threaded) {
+    thread_pool.StartWorkers();
+  }
+  auto* effective_threadpool = threaded ? &thread_pool : nullptr;
+
+  {
+    ASSERT_OK_AND_ASSIGN(const auto mae,
+                         MAE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
+                             /*weights=*/{1, 1, 1}, effective_threadpool));
+    EXPECT_NEAR(mae, (0. + 1. + 1.) / 3, test_precision);
+  }
+
+  {
+    ASSERT_OK_AND_ASSIGN(const auto mae,
+                         MAE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
+                             /*weights=*/{1, 2, 3}, effective_threadpool));
+    EXPECT_NEAR(mae, (0. * 1 + 1. * 2 + 1. * 3) / (1 + 2 + 3), test_precision);
+  }
+
+  {
+    ASSERT_OK_AND_ASSIGN(const auto mae,
+                         MAE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
+                             /*weights=*/{}, effective_threadpool));
+    EXPECT_NEAR(mae, (0. + 1. + 1.) / 3, test_precision);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(WithAndWithoutThreading, MAETest, Bool());
 
 TEST(DefaultMetrics, Classification) {
   const dataset::proto::Column label = PARSE_TEST_PROTO(

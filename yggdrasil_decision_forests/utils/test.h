@@ -23,6 +23,7 @@
 #include "src/google/protobuf/text_format.h"
 #include "src/google/protobuf/util/message_differencer.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "absl/strings/match.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 

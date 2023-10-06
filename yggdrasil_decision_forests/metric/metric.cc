@@ -15,12 +15,14 @@
 
 #include "yggdrasil_decision_forests/metric/metric.h"
 
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <limits>
 #include <random>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -375,6 +377,7 @@ void MergeEvaluationClassification(
 void MergeEvaluationRegression(const proto::EvaluationResults::Regression& src,
                                proto::EvaluationResults::Regression* dst) {
   dst->set_sum_square_error(dst->sum_square_error() + src.sum_square_error());
+  dst->set_sum_abs_error(dst->sum_abs_error() + src.sum_abs_error());
   dst->set_sum_label(dst->sum_label() + src.sum_label());
   dst->set_sum_square_label(dst->sum_square_label() + src.sum_square_label());
 }
@@ -884,6 +887,8 @@ absl::Status AddPrediction(const proto::EvaluationOptions& option,
       const float error = pred_reg.value() - pred_reg.ground_truth();
       eval_reg->set_sum_square_error(eval_reg->sum_square_error() +
                                      error * error * pred.weight());
+      eval_reg->set_sum_abs_error(eval_reg->sum_abs_error() +
+                                  std::abs(error) * pred.weight());
       eval_reg->set_sum_label(eval_reg->sum_label() +
                               pred_reg.ground_truth() * pred.weight());
       eval_reg->set_sum_square_label(
@@ -1010,6 +1015,13 @@ float RMSE(const proto::EvaluationResults& eval) {
     return std::numeric_limits<float>::quiet_NaN();
   }
   return sqrt(eval.regression().sum_square_error() / eval.count_predictions());
+}
+
+float MAE(const proto::EvaluationResults& eval) {
+  if (eval.count_predictions() == 0) {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+  return eval.regression().sum_abs_error() / eval.count_predictions();
 }
 
 float NDCG(const proto::EvaluationResults& eval) {
@@ -1605,6 +1617,8 @@ absl::StatusOr<double> GetMetricRegression(
   switch (metric.Type_case()) {
     case proto::MetricAccessor::Regression::kRmse:
       return RMSE(evaluation);
+    case proto::MetricAccessor::Regression::kMae:
+      return MAE(evaluation);
     default:
       return absl::InvalidArgumentError("Not implemented");
   }
@@ -1639,8 +1653,13 @@ absl::StatusOr<double> GetMetricUplift(
 absl::StatusOr<double> GetUserCustomizedMetrics(
     const proto::EvaluationResults& evaluation,
     const proto::MetricAccessor::UserMetric& metric) {
-    // user_metrics is a mapping from metrics name to metrics value.
-    return evaluation.user_metrics().find(metric.metrics_name())->second;
+  // user_metrics is a mapping from metrics name to metrics value.
+  const auto it = evaluation.user_metrics().find(metric.metrics_name());
+  if (it == evaluation.user_metrics().end()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Cannot find metric: ", metric.metrics_name()));
+  }
+  return it->second;
 }
 
 // Returns an absl invalid status with an error message about the
@@ -1814,6 +1833,95 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
   // Note: Temporary okay CHECK_OK.
   CHECK_OK(FinalizeEvaluation(option, label_column, &eval));
   return eval;
+}
+
+// Value returned by "MAEImp".
+struct MAEImpResult {
+  // Sum of errors
+  double sum_err = 0;
+  // Sum of weights
+  double sum_weights = 0;
+};
+
+// Implementation of the mean-average-error metric. Returns the sum of weights
+// and weighted sum of absolute error. If "use_weights" is false, "weights" is
+// ignored.
+//
+// The use of weights is templated to improve the execution speed.
+template <bool use_weights>
+MAEImpResult MAEImp(const absl::Span<const float> labels,
+                    const absl::Span<const float> predictions,
+                    const absl::Span<const float> weights) {
+  DCHECK_EQ(labels.size(), predictions.size());
+
+  MAEImpResult accumulator;
+
+  // Note: "example_idx" is not the global example index.
+  for (size_t example_idx = 0; example_idx < labels.size(); ++example_idx) {
+    const float label = labels[example_idx];
+    const float prediction = predictions[example_idx];
+    if constexpr (use_weights) {
+      const float weight = weights[example_idx];
+      accumulator.sum_weights += weight;
+      accumulator.sum_err += weight * std::abs(label - prediction);
+    } else {
+      accumulator.sum_err += std::abs(label - prediction);
+    }
+  }
+  if constexpr (!use_weights) {
+    accumulator.sum_weights = labels.size();
+  }
+  return accumulator;
+}
+
+absl::StatusOr<double> MAE(const std::vector<float>& labels,
+                           const std::vector<float>& predictions,
+                           const std::vector<float>& weights,
+                           utils::concurrency::ThreadPool* thread_pool) {
+  MAEImpResult global;
+  if (thread_pool == nullptr) {
+    if (weights.empty()) {
+      global = MAEImp<false>(labels, predictions, weights);
+    } else {
+      global = MAEImp<true>(labels, predictions, weights);
+    }
+  } else {
+    const auto num_threads = thread_pool->num_threads();
+
+    std::vector<MAEImpResult> per_threads(num_threads);
+
+    utils::concurrency::ConcurrentForLoop(
+        num_threads, thread_pool, labels.size(),
+        [&labels, &predictions, &per_threads, &weights](
+            size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
+          auto& block = per_threads[block_idx];
+          if (weights.empty()) {
+            block = MAEImp<false>(absl::Span<const float>(labels).subspan(
+                                      begin_idx, end_idx - begin_idx),
+                                  absl::Span<const float>(predictions)
+                                      .subspan(begin_idx, end_idx - begin_idx),
+                                  weights);
+          } else {
+            block = MAEImp<true>(absl::Span<const float>(labels).subspan(
+                                     begin_idx, end_idx - begin_idx),
+                                 absl::Span<const float>(predictions)
+                                     .subspan(begin_idx, end_idx - begin_idx),
+                                 absl::Span<const float>(weights).subspan(
+                                     begin_idx, end_idx - begin_idx));
+          }
+        });
+
+    for (const auto& block : per_threads) {
+      global.sum_err += block.sum_err;
+      global.sum_weights += block.sum_weights;
+    }
+  }
+
+  if (global.sum_weights > 0) {
+    return global.sum_err / global.sum_weights;
+  } else {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
 }
 
 template <bool use_weights>

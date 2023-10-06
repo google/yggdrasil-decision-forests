@@ -143,7 +143,9 @@ message EvaluationResults {
     // bootstrapping.
     optional double bootstrap_rmse_lower_bounds_95p = 4;
     optional double bootstrap_rmse_upper_bounds_95p = 5;
-    // Next ID: 6
+    // Sum of absolute value of the error.
+    optional double sum_abs_error = 6 [default = 0];
+    // Next ID: 7
   }
 
   message Ranking {
@@ -306,8 +308,10 @@ message MetricAccessor {
   message Regression {
     oneof Type {
       Rmse rmse = 1;
+      Mae mae = 2;
     }
     message Rmse {}
+    message Mae {}
   }
 
   message Loss {}

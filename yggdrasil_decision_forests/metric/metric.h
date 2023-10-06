@@ -116,6 +116,7 @@ void ComputeXAtYMetrics(
 float Accuracy(const proto::EvaluationResults& eval);
 float LogLoss(const proto::EvaluationResults& eval);
 float RMSE(const proto::EvaluationResults& eval);
+float MAE(const proto::EvaluationResults& eval);
 float ErrorRate(const proto::EvaluationResults& eval);
 
 // Loss of the model. Can have different semantic for different models.
@@ -288,6 +289,17 @@ static void RMSEImp(const std::vector<float>& labels,
 // Computes the RMSE of a set of predictions. If `weights` is empty, unit
 // weights are assumed.
 absl::StatusOr<double> RMSE(
+    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const std::vector<float>& weights,
+    utils::concurrency::ThreadPool* thread_pool = nullptr);
+
+// Computes the mean average error (MAE) of a set of predictions.
+//
+// The size of "labels" and "predictions" should be equal. If "weights" is not
+// empty, the size of all "labels", "predictions", and "weights" should be
+// equal. Returns NaN if the weighted sum of examples is zero (including if
+// "labels" is empty).
+absl::StatusOr<double> MAE(
     const std::vector<float>& labels, const std::vector<float>& predictions,
     const std::vector<float>& weights,
     utils::concurrency::ThreadPool* thread_pool = nullptr);
