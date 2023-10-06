@@ -702,7 +702,12 @@ cc_library_ydf(
 
 cc_library_ydf(
     name = "math",
+    srcs = ["math.cc"],
     hdrs = ["math.h"],
+    deps = [
+        ":logging",
+        "@com_google_absl//absl/types:span",
+    ],
 )
 
 cc_library_ydf(
@@ -1126,6 +1131,8 @@ cc_test(
     srcs = ["math_test.cc"],
     deps = [
         ":math",
+        ":test",
+        "@com_google_absl//absl/random",
         "@com_google_googletest//:gtest_main",
     ],
 )

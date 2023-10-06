@@ -20,6 +20,8 @@
 
 #include <type_traits>
 
+#include "absl/types/span.h"
+
 namespace yggdrasil_decision_forests {
 namespace utils {
 
@@ -30,6 +32,14 @@ T CeilDiV(T x, T y) {
   static_assert(std::is_integral<T>::value, "Integral required.");
   return (x + y - 1) / y;
 }
+
+// Computes the median of "values".
+//
+// Uses the Quick Select algorithm: The average time and space complexity is
+// linear. If the number of values is event, return the average of the two
+// median values. If empty, returns NaN. "values" should not contain NaNs or
+// Infs.
+float Median(absl::Span<const float> values);
 
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
