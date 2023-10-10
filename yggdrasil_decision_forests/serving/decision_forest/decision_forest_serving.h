@@ -156,7 +156,7 @@ struct GenericNode {
   // Simple one dimension output leaf constructor.
   static GenericNode<NodeOffsetRep> Leaf(NodeOffset right_idx,
                                          FeatureIdx feature_idx, float label) {
-    static GenericNode<NodeOffsetRep> node;
+    GenericNode<NodeOffsetRep> node;
     node.right_idx = right_idx;
     node.feature_idx = feature_idx;
     node.label = label;
