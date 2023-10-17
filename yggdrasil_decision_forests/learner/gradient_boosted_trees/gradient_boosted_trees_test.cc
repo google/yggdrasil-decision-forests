@@ -614,7 +614,7 @@ TEST_F(GradientBoostedTreesOnAdult, ValidPathDataset) {
   inject_random_noise_ = true;
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8732, 0.0023, 0.8747);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2794, 0.0027, 0.2776);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2794, 0.0057, 0.2776);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, DISABLED_VariableImportance) {

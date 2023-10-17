@@ -30,6 +30,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/math.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -60,15 +61,7 @@ absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(
 
   float initial_prediction;
   if (weights.empty()) {
-    auto sorted_labels = labels;
-    std::sort(sorted_labels.begin(), sorted_labels.end());
-    if ((labels.size() % 2) == 0) {
-      initial_prediction = (sorted_labels[sorted_labels.size() / 2] +
-                            sorted_labels[(sorted_labels.size() / 2) - 1]) /
-                           2;
-    } else {
-      initial_prediction = sorted_labels[sorted_labels.size() / 2];
-    }
+    initial_prediction = utils::Median(labels);
   } else {
     struct Item {
       float label;

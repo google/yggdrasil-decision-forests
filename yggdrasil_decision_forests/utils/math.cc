@@ -32,12 +32,15 @@ namespace {
 // The content of "values" is reordered during the computation.
 // "values" cannot be empty.
 float QuickSelect(std::vector<float>& values, size_t target_idx) {
+  DCHECK_GT(values.size(), 0);
   // Boundaries of the search window.
   size_t left = 0;
   // Using a "right" instead of an "end" simplifies the code.
   size_t right = values.size() - 1;
 
   while (true) {
+    DCHECK_LE(right, values.size());
+    DCHECK_LE(left, values.size());
     DCHECK_LE(left, right) << "The left index cannot move past the right index";
     DCHECK_GE(target_idx, left) << "target_idx should be in [left, right]";
     DCHECK_LE(target_idx, right) << "target_idx should be in [left, right]";
@@ -68,7 +71,7 @@ float QuickSelect(std::vector<float>& values, size_t target_idx) {
       return values[pivot_idx];
     } else if (target_idx < pivot_idx) {
       right = pivot_idx - 1;
-    } else if (pivot_idx == 0) {
+    } else {
       left = pivot_idx + 1;
     }
   }
