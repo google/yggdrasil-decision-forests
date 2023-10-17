@@ -42,12 +42,12 @@ build_and_maybe_test () {
     local flags="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --repo_env=CC=${1}"
     local pydf_targets="//ydf/...:all"
     # Install PYDF components
-    python3 -m pip install -r requirements.txt
-    python3 -m pip install -r dev_requirements.txt
+    python -m pip install -r requirements.txt
+    python -m pip install -r dev_requirements.txt
 
     time ${BAZEL} build ${flags} -- ${pydf_targets}
     if [[ "$RUN_TESTS" = 1 ]]; then
-      time ${BAZEL} test ${flags} -- ${pydf_targets}
+      time ${BAZEL} test ${flags} --test_output=errors -- ${pydf_targets}
     fi
     echo "PYDF build / test complete."
 } 

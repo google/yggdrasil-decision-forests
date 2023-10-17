@@ -56,17 +56,16 @@ py_library(
 py_test(
     name = "dataset_test",
     srcs = ["dataset_test.py"],
-    data = [
+    python_version = "PY3",
+    deps = [
+        ":dataset",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
-        "@com_google_pybind11_abseil//pybind11_abseil:status.so",
-    ],
-    python_version = "PY3",
-    deps = [
-        ":dataset",
+        # tensorflow dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "//ydf/utils:test_utils",
     ],
 )
 

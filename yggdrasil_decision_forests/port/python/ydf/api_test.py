@@ -12,54 +12,59 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""API test."""
+"""Test the API of YDF."""
 
 
 import math
 import os
-import tempfile
 
-from absl import flags
 from absl import logging
 from absl.testing import absltest
 import pandas as pd
 
-# TODO: Replace with "import ydf"
-import ydf
+import ydf  # In the world, use "import ydf"
+from ydf.utils import test_utils
 
-
-def data_root_path() -> str:
-  return ""
-
-
-def ydf_test_data_path() -> str:
-  return os.path.join(
-      data_root_path(), "external/ydf_cc/yggdrasil_decision_forests/test_data"
-  )
 
 class ApiTest(absltest.TestCase):
 
   def test_create_dataset(self):
-    pd_ds = pd.DataFrame(
-        {
-            "c1": [1.0, 1.1, math.nan],
-            "c2": [1, 2, 3],
-            # "c3": [True, False, True],
-            # "c4": ["x", "y", ""],
-        }
-    )
+    pd_ds = pd.DataFrame({
+        "c1": [1.0, 1.1, math.nan],
+        "c2": [1, 2, 3],
+        "c3": [True, False, True],
+        "c4": ["x", "y", ""],
+    })
     ds = ydf.create_vertical_dataset(pd_ds)
-    logging.info("My dataset:\n%s", ds)
+    logging.info("Dataset:\n%s", ds)
+
+  def test_create_dataset_with_column(self):
+    pd_ds = pd.DataFrame({
+        "c1": [1.0, 1.1, math.nan],
+        "c2": [1, 2, 3],
+        "c3": [True, False, True],
+        "c4": ["x", "y", ""],
+    })
+    ds = ydf.create_vertical_dataset(
+        pd_ds,
+        columns=[
+            "c1",
+            ("c2", ydf.Semantic.NUMERICAL),
+            ydf.Column("c3"),
+            ydf.Column("c4", ydf.Semantic.CATEGORICAL),
+        ],
+    )
+    logging.info("Dataset:\n%s", ds)
 
   def test_load_and_save_model(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "adult_binary_class_rf"
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
     )
     model = ydf.load_model(model_path)
     logging.info(model)
-    with tempfile.TemporaryDirectory() as tempdir:
-      model.save(tempdir, ydf.ModelIOOptions(file_prefix="model_prefix_"))
-      logging.info(os.listdir(tempdir))
+    tempdir = self.create_tempdir().full_path
+    model.save(tempdir, ydf.ModelIOOptions(file_prefix="model_prefix_"))
+    logging.info(os.listdir(tempdir))
 
   def test_train_random_forest(self):
     pd_ds = pd.DataFrame({
@@ -86,6 +91,50 @@ class ApiTest(absltest.TestCase):
     })
     model = ydf.CartLearner(label="label").train(pd_ds)
     logging.info(model)
+
+  def test_evaluate_model(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    model = ydf.load_model(model_path)
+    test_ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+        )
+    )
+    evaluation = model.evaluate(test_ds)
+    logging.info("Evaluation:\n%s", evaluation)
+    self.assertAlmostEqual(evaluation.accuracy, 0.87235, 3)
+
+    tempdir = self.create_tempdir().full_path
+    with open(os.path.join(tempdir, "evaluation.html"), "w") as f:
+      f.write(evaluation.html())
+
+  def test_analyze_model(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    model = ydf.load_model(model_path)
+    test_ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+        )
+    )
+    analysis = model.analyze(test_ds)
+    logging.info("Analysis:\n%s", analysis)
+
+    tempdir = self.create_tempdir().full_path
+    with open(os.path.join(tempdir, "analysis.html"), "w") as f:
+      f.write(analysis.html())
+
+  def test_cross_validation(self):
+    pd_ds = pd.DataFrame({
+        "c1": [1.0, 1.1, 2.0, 3.5, 4.2] + list(range(10)),
+        "label": ["a", "b", "b", "a", "a"] * 3,
+    })
+    learner = ydf.RandomForestLearner(num_trees=3, label="label")
+    evaluation = learner.cross_validation(pd_ds)
+    logging.info(evaluation)
 
 
 if __name__ == "__main__":

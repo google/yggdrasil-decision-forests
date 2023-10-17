@@ -11,6 +11,7 @@ from google3.third_party.yggdrasil_decision_forests.metric import metric_pb2
 from google3.third_party.yggdrasil_decision_forests.model import hyperparameter_pb2
 from google3.third_party.yggdrasil_decision_forests.model import abstract_model_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import model_analysis_pb2
+from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
 
 # Dataset bindings
 # ================
@@ -67,6 +68,7 @@ class GenericCCModel:
   def task(self) -> abstract_model_pb2.Task: ...
   def data_spec(self) -> data_spec_pb2.DataSpecification: ...
   def Save(self, directory: str, file_prefix: Optional[str]): ...
+  def Describe(self, full_details: bool) -> str: ...
 
 class DecisionForestCCModel(GenericCCModel):
   def num_trees(self) -> int: ...
@@ -83,7 +85,6 @@ class GradientBoostedTreesCCModel(DecisionForestCCModel):
 ModelCCType = TypeVar('ModelCCType', bound=GenericCCModel)
 
 def LoadModel(directory: str, file_prefix: Optional[str]) -> ModelCCType: ...
-
 def ModelAnalysisCreateHtmlReport(
     analysis: model_analysis_pb2.StandaloneAnalysisResult,
     options: model_analysis_pb2.Options,
@@ -95,6 +96,13 @@ def ModelAnalysisCreateHtmlReport(
 
 class GenericCCLearner:
   def Train(self, dataset: VerticalDataset) -> ModelCCType: ...
+  def Evaluate(
+      self,
+      dataset: VerticalDataset,
+      fold_generator: fold_generator_pb2.FoldGenerator,
+      evaluation_options: metric_pb2.EvaluationOptions,
+      deployment_evaluation: abstract_learner_pb2.DeploymentConfig,
+  ) -> metric_pb2.EvaluationResults: ...
 
 def GetLearner(
     train_config: abstract_learner_pb2.TrainingConfig,
@@ -106,12 +114,6 @@ def GetLearner(
 # Metric bindings
 # ================
 
-
-def EvaluationToStr(
-    evaluation: metric_pb2.EvaluationResults
-) -> str: ...
-
-def EvaluationPlotToHtml(
-    evaluation: metric_pb2.EvaluationResults
-) -> str: ...
+def EvaluationToStr(evaluation: metric_pb2.EvaluationResults) -> str: ...
+def EvaluationPlotToHtml(evaluation: metric_pb2.EvaluationResults) -> str: ...
 

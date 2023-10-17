@@ -22,11 +22,15 @@ from absl import logging
 import numpy as np
 
 from yggdrasil_decision_forests.metric import metric_pb2
+from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.metric import metric
 from ydf.model import analysis
 from yggdrasil_decision_forests.utils import model_analysis_pb2
+
+# TODO: Allow a simpler input type (e.g. string)
+Task = abstract_model_pb2.Task
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,6 +58,24 @@ class GenericModel:
     """Returns the name of the model type."""
     return self._model.name()
 
+  def task(self) -> Task:
+    """Task solved by the model."""
+
+    return self._model.task()
+
+  def describe(self, full_details: bool = False) -> str:
+    """Description of the model."""
+
+    return self._model.Describe(full_details)
+
+  def __str__(self) -> str:
+    return f"""\
+Model: {self.name()}
+Task: {Task.Name(self.task())}
+Class: ydf.{self.__class__.__name__}
+Use `model.describe()` for more details
+"""
+
   def save(self, path, advanced_options=ModelIOOptions()) -> None:
     """Save the model to disk.
 
@@ -76,12 +98,10 @@ class GenericModel:
 
     # Train a Random Forest model
     df = pd.read_csv("my_dataset.csv")
-    model = ydf.RandomForestLearner().Train(df)
+    model = ydf.RandomForestLearner().train(df)
 
     # Save the model to disk
     model.save("/models/my_model")
-    # Export the model to Tensorflow
-    model.export.to_tensorflow"/models/my_tf_model")
     ```
 
     Args:

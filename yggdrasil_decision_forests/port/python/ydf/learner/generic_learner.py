@@ -16,22 +16,24 @@
 
 import copy
 import os
-from typing import Optional
+from typing import Optional, Union
 
 from absl import logging
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.dataset import weight_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
+from yggdrasil_decision_forests.metric import metric_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.learner import hyperparameters
+from ydf.metric import metric
 from ydf.model import generic_model
 from ydf.model import model_lib
+from yggdrasil_decision_forests.utils import fold_generator_pb2
 
-# TODO: Allow a simpler input type (e.g. string)
-Task = abstract_model_pb2.Task
+Task = generic_model.Task
 
 
 class GenericLearner:
@@ -72,18 +74,22 @@ class GenericLearner:
     if self._ranking_group is not None and task != Task.RANKING:
       raise ValueError(
           "The ranking group should only be specified for ranking tasks."
+          f" Got task={Task.Name(task)}"
       )
     if self._ranking_group is None and task == Task.RANKING:
       raise ValueError("The ranking group must be specified for ranking tasks.")
-    if self._uplift_treatment is not None and (
-        task != Task.NUMERICAL_UPLIFT or task != Task.CATEGORICAL_UPLIFT
-    ):
+    if self._uplift_treatment is not None and task not in [
+        Task.NUMERICAL_UPLIFT,
+        Task.CATEGORICAL_UPLIFT,
+    ]:
       raise ValueError(
           "The uplift treatment should only be specified for uplifting tasks."
+          f" Got task={Task.Name(task)}"
       )
-    if self._uplift_treatment is None and (
-        task == Task.NUMERICAL_UPLIFT or task == Task.CATEGORICAL_UPLIFT
-    ):
+    if self._uplift_treatment is None and task in [
+        Task.NUMERICAL_UPLIFT,
+        Task.CATEGORICAL_UPLIFT,
+    ]:
       raise ValueError(
           "The uplift treatment must be specified for uplifting tasks."
       )
@@ -98,19 +104,12 @@ class GenericLearner:
       ds: dataset.InputDataset,
   ) -> generic_model.GenericModel:
     """Trains a model on the given dataset."""
-    if isinstance(ds, dataset.VerticalDataset):
-      vertical_dataset = ds
-      # TODO: Check that the user has not specified a data spec guide.
-    else:
-      effective_data_spec_args = None
-      if self._data_spec is None:
-        effective_data_spec_args = self._build_data_spec_args()
-      vertical_dataset = dataset.create_vertical_dataset_with_spec_or_args(
-          ds,
-          data_spec=self._data_spec,
-          inference_args=effective_data_spec_args,
-      )
 
+    vertical_dataset = self._get_vertical_dataset(ds)
+    learner = self._get_learner()
+    return model_lib.load_cc_model(learner.Train(vertical_dataset._dataset))  # pylint: disable=protected-access
+
+  def _get_learner(self) -> ydf.GenericCCLearner:
     training_config = abstract_learner_pb2.TrainingConfig(
         learner=self._learner_name,
         label=self._label,
@@ -122,8 +121,106 @@ class GenericLearner:
     hp_proto = hyperparameters.dict_to_generic_hyperparameter(
         self._hyperparameters
     )
-    learner = ydf.GetLearner(training_config, hp_proto, self._deployment_config)
-    return model_lib.load_cc_model(learner.Train(vertical_dataset._dataset))  # pylint: disable=protected-access
+    return ydf.GetLearner(training_config, hp_proto, self._deployment_config)
+
+  def _get_vertical_dataset(
+      self, ds: dataset.InputDataset
+  ) -> dataset.VerticalDataset:
+    if isinstance(ds, dataset.VerticalDataset):
+      return ds
+      # TODO: Check that the user has not specified a data spec guide.
+    else:
+      effective_data_spec_args = None
+      if self._data_spec is None:
+        effective_data_spec_args = self._build_data_spec_args()
+      return dataset.create_vertical_dataset_with_spec_or_args(
+          ds,
+          data_spec=self._data_spec,
+          inference_args=effective_data_spec_args,
+      )
+
+  def cross_validation(
+      self,
+      ds: dataset.InputDataset,
+      folds: int = 10,
+      bootstrapping: Union[bool, int] = False,
+      parallel_evaluations: int = 1,
+  ) -> metric.Evaluation:
+    """Cross-validates the learner and return the evaluation.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    dataset = pd.read_csv("my_dataset.csv")
+    learner = ydf.RandomForestLearner(label="label")
+    evaluation = learner.cross_validation(dataset)
+
+    # In notebook, display an interractive evaluation
+    evaluation
+
+    # Print the evaluation
+    print(evaluation)
+
+    # Look at specific metrics
+    print(evaluation.accuracy)
+    ```
+
+    Args:
+      ds: Dataset for the cross-validation.
+      folds: Number of cross-validation folds.
+      bootstrapping: Controls whether bootstrapping is used to evaluate the
+        confidence intervals and statistical tests (i.e., all the metrics ending
+        with "[B]"). If set to false, bootstrapping is disabled. If set to true,
+        bootstrapping is enabled and 2000 bootstrapping samples are used. If set
+        to an integer, it specifies the number of bootstrapping samples to use.
+        In this case, if the number is less than 100, an error is raised as
+        bootstrapping will not yield useful results.
+      parallel_evaluations: Number of model to train and evaluate in parallel
+        using multi-threading. Note that each model is potentially already
+        trained with multithreading (see `num_threads` argument of Learner
+        constructor).
+
+    Returns:
+      The cross-validation evaluation.
+    """
+
+    fold_generator = fold_generator_pb2.FoldGenerator(
+        cross_validation=fold_generator_pb2.FoldGenerator.CrossValidation(
+            num_folds=folds,
+        )
+    )
+
+    if isinstance(bootstrapping, bool):
+      bootstrapping_samples = 2000 if bootstrapping else -1
+    elif isinstance(bootstrapping, int) and bootstrapping >= 100:
+      bootstrapping_samples = bootstrapping
+    else:
+      raise ValueError(
+          "bootstrapping argument should be boolean or an integer greater than"
+          " 100 as bootstrapping will not yield useful results. Got"
+          f" {bootstrapping!r} instead"
+      )
+    evaluation_options = metric_pb2.EvaluationOptions(
+        bootstrapping_samples=bootstrapping_samples
+    )
+
+    deployment_evaluation = abstract_learner_pb2.DeploymentConfig(
+        num_threads=parallel_evaluations,
+    )
+
+    vertical_dataset = self._get_vertical_dataset(ds)
+    learner = self._get_learner()
+
+    evaluation_proto = learner.Evaluate(
+        vertical_dataset._dataset,  # pylint: disable=protected-access
+        fold_generator,
+        evaluation_options,
+        deployment_evaluation,
+    )
+    return metric.Evaluation(evaluation_proto)
 
   def _build_data_spec_args(self) -> dataset.DataSpecInferenceArgs:
     """Builds DS args with user inputs and guides for labels / special columns.
@@ -254,8 +351,8 @@ class GenericLearner:
         logging.warning(
             "The `num_threads` constructor argument is not set and the "
             "number of CPU is os.cpu_count()=%d > 32. Setting num_threads "
-            "to 32. Set num_threads manually to use more than 32 cpus."
-            % num_threads
+            "to 32. Set num_threads manually to use more than 32 cpus.",
+            num_threads,
         )
         num_threads = 32
       else:

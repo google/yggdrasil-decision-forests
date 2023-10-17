@@ -75,7 +75,8 @@ void init_model(py::module_& m) {
            py::arg("file_prefix"))
       .def("name", &GenericCCModel::name)
       .def("task", &GenericCCModel::task)
-      .def("data_spec", &GenericCCModel::data_spec);
+      .def("data_spec", &GenericCCModel::data_spec)
+      .def("Describe", &GenericCCModel::Describe, py::arg("full_details"));
 
   py::class_<DecisionForestCCModel,
              /*parent class*/ GenericCCModel>(m, "DecisionForestCCModel")

@@ -89,7 +89,7 @@ class CartLearner(generic_learner.GenericLearner):
       CATEGORICAL_SET columns stored as strings. If more unique values exist,
       only the most frequent values are kept, and the remaining values are
       considered as out-of-vocabulary.
-    min_vocab_frequency: Minimum number of occurence of a value for CATEGORICAL
+    min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
       and CATEGORICAL_SET columns. Value observed less than
       `min_vocab_frequency` are considered as out-of-vocabulary.
     discretize_numerical_columns: If true, discretize all the numerical columns
@@ -467,7 +467,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       CATEGORICAL_SET columns stored as strings. If more unique values exist,
       only the most frequent values are kept, and the remaining values are
       considered as out-of-vocabulary.
-    min_vocab_frequency: Minimum number of occurence of a value for CATEGORICAL
+    min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
       and CATEGORICAL_SET columns. Value observed less than
       `min_vocab_frequency` are considered as out-of-vocabulary.
     discretize_numerical_columns: If true, discretize all the numerical columns
@@ -1008,7 +1008,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
       CATEGORICAL_SET columns stored as strings. If more unique values exist,
       only the most frequent values are kept, and the remaining values are
       considered as out-of-vocabulary.
-    min_vocab_frequency: Minimum number of occurence of a value for CATEGORICAL
+    min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
       and CATEGORICAL_SET columns. Value observed less than
       `min_vocab_frequency` are considered as out-of-vocabulary.
     discretize_numerical_columns: If true, discretize all the numerical columns

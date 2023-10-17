@@ -14,11 +14,11 @@
 
 """Tests for basic model inference."""
 
+
 import os
 import tempfile
 import textwrap
 
-from absl import flags
 from absl.testing import absltest
 import numpy as np
 import pandas as pd
@@ -30,27 +30,19 @@ from ydf.model import random_forest_model
 from ydf.utils import test_utils
 
 
-def data_root_path() -> str:
-  return ""
-
-
-def ydf_test_data_path() -> str:
-  return os.path.join(
-      data_root_path(), "external/ydf_cc/yggdrasil_decision_forests/test_data"
-  )
-
-
 class DecisionForestModelTest(absltest.TestCase):
 
   def test_predict_adult_rf(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "adult_binary_class_rf"
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
     )
     dataset_path = os.path.join(
-        ydf_test_data_path(), "dataset", "adult_test.csv"
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
     predictions_path = os.path.join(
-        ydf_test_data_path(), "prediction", "adult_test_binary_class_rf.csv"
+        test_utils.ydf_test_data_path(),
+        "prediction",
+        "adult_test_binary_class_rf.csv",
     )
     model = model_lib.load_model(model_path)
     self.assertIsInstance(model, random_forest_model.RandomForestModel)
@@ -66,13 +58,15 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_predict_adult_gbt(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
     )
     dataset_path = os.path.join(
-        ydf_test_data_path(), "dataset", "adult_test.csv"
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
     predictions_path = os.path.join(
-        ydf_test_data_path(), "prediction", "adult_test_binary_class_gbdt.csv"
+        test_utils.ydf_test_data_path(),
+        "prediction",
+        "adult_test_binary_class_gbdt.csv",
     )
     model = model_lib.load_model(model_path)
     # TODO: Check for GBT once implemented.
@@ -88,10 +82,10 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_evaluate_adult_gbt(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
     )
     dataset_path = os.path.join(
-        ydf_test_data_path(), "dataset", "adult_test.csv"
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
 
     model = model_lib.load_model(model_path)
@@ -127,10 +121,10 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_analize_adult_gbt(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
     )
     dataset_path = os.path.join(
-        ydf_test_data_path(), "dataset", "adult_test.csv"
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
 
     model = model_lib.load_model(model_path)
@@ -155,9 +149,11 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_evaluate_bootstrapping_default(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "abalone_regression_gbdt"
+        test_utils.ydf_test_data_path(), "model", "abalone_regression_gbdt"
     )
-    dataset_path = os.path.join(ydf_test_data_path(), "dataset", "abalone.csv")
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
+    )
     model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
     evaluation = model.evaluate(test_df)
@@ -165,9 +161,11 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_evaluate_bootstrapping_bool(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "abalone_regression_gbdt"
+        test_utils.ydf_test_data_path(), "model", "abalone_regression_gbdt"
     )
-    dataset_path = os.path.join(ydf_test_data_path(), "dataset", "abalone.csv")
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
+    )
     model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
     evaluation = model.evaluate(test_df, bootstrapping=True)
@@ -177,9 +175,11 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_evaluate_bootstrapping_integer(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "abalone_regression_gbdt"
+        test_utils.ydf_test_data_path(), "model", "abalone_regression_gbdt"
     )
-    dataset_path = os.path.join(ydf_test_data_path(), "dataset", "abalone.csv")
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
+    )
     model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
     evaluation = model.evaluate(test_df, bootstrapping=599)
@@ -189,9 +189,11 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_evaluate_bootstrapping_error(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "abalone_regression_gbdt"
+        test_utils.ydf_test_data_path(), "model", "abalone_regression_gbdt"
     )
-    dataset_path = os.path.join(ydf_test_data_path(), "dataset", "abalone.csv")
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
+    )
     model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
     with self.assertRaisesRegex(ValueError, "an integer greater than 100"):
@@ -199,14 +201,18 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_prefixed_model_loading_autodetection(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "prefixed_adult_binary_class_gbdt"
+        test_utils.ydf_test_data_path(),
+        "model",
+        "prefixed_adult_binary_class_gbdt",
     )
     model = model_lib.load_model(model_path)
     self.assertEqual(model.name(), "GRADIENT_BOOSTED_TREES")
 
   def test_prefixed_model_loading_explicit(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "prefixed_adult_binary_class_gbdt"
+        test_utils.ydf_test_data_path(),
+        "model",
+        "prefixed_adult_binary_class_gbdt",
     )
     model = model_lib.load_model(
         model_path, generic_model.ModelIOOptions(file_prefix="prefixed_")
@@ -215,7 +221,9 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_prefixed_model_loading_fails_when_incorrect(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "prefixed_adult_binary_class_gbdt"
+        test_utils.ydf_test_data_path(),
+        "model",
+        "prefixed_adult_binary_class_gbdt",
     )
     with self.assertRaises(status.StatusNotOk):
       model_lib.load_model(
@@ -224,7 +232,9 @@ class DecisionForestModelTest(absltest.TestCase):
 
   def test_model_load_and_save(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "prefixed_adult_binary_class_gbdt"
+        test_utils.ydf_test_data_path(),
+        "model",
+        "prefixed_adult_binary_class_gbdt",
     )
     model = model_lib.load_model(
         model_path, generic_model.ModelIOOptions(file_prefix="prefixed_")
@@ -233,12 +243,38 @@ class DecisionForestModelTest(absltest.TestCase):
       model.save(tempdir, generic_model.ModelIOOptions(file_prefix="my_prefix"))
       self.assertTrue(os.path.exists(os.path.join(tempdir, "my_prefixdone")))
 
+  def test_model_str(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "adult_binary_class_gbdt",
+    )
+    model = model_lib.load_model(model_path)
+    self.assertEqual(
+        str(model),
+        """\
+Model: GRADIENT_BOOSTED_TREES
+Task: CLASSIFICATION
+Class: ydf.GradientBoostedTreesModel
+Use `model.describe()` for more details
+""",
+    )
+
+  def test_model_describe(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "adult_binary_class_gbdt",
+    )
+    model = model_lib.load_model(model_path)
+    self.assertIn('Type: "GRADIENT_BOOSTED_TREES"', model.describe())
+
 
 class RandomForestModelTest(absltest.TestCase):
 
   def test_oob_evaluations(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "adult_binary_class_rf"
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
     )
     model = model_lib.load_model(model_path)
     # TODO: Fill this test when OOB evaluations are exposed.
@@ -250,7 +286,7 @@ class GradientBoostedTreesTest(absltest.TestCase):
 
   def test_validation_loss(self):
     model_path = os.path.join(
-        ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
     )
     model = model_lib.load_model(model_path)
 

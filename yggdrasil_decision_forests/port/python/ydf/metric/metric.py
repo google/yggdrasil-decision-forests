@@ -305,6 +305,11 @@ class Evaluation:
 
     return display_metric.evaluation_to_html_str(self)
 
+  def html(self) -> str:
+    """Html representation of the metrics."""
+
+    return self._repr_html_()
+
   def _get_proto_field_float(self, key: str) -> Optional[float]:
     if self._evaluation_proto.HasField(key):
       return getattr(self._evaluation_proto, key)

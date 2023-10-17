@@ -18,10 +18,11 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
-from pybind11_abseil import status
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataset
+from ydf.utils import test_utils
 
 # Make "assertEqual" print more details.
 unittest.util._MAX_LENGTH = 10000
@@ -37,6 +38,10 @@ class DatasetTest(parameterized.TestCase):
       (np.array([1], np.int16), Semantic.NUMERICAL),
       (np.array([1], np.int32), Semantic.NUMERICAL),
       (np.array([1], np.int64), Semantic.NUMERICAL),
+      (np.array([1], np.uint8), Semantic.NUMERICAL),
+      (np.array([1], np.uint16), Semantic.NUMERICAL),
+      (np.array([1], np.uint32), Semantic.NUMERICAL),
+      (np.array([1], np.uint64), Semantic.NUMERICAL),
       (np.array([1], np.float32), Semantic.NUMERICAL),
       (np.array([1], np.float64), Semantic.NUMERICAL),
       (np.array([1], np.bool_), Semantic.BOOLEAN),
@@ -547,7 +552,9 @@ four entries,4,8,4.4,0
     df = pd.DataFrame({
         "col1": ["A", "B", "C", "D", "D"],
     })
-    with self.assertRaisesRegex(status.StatusNotOk, ".*max_vocab_count.*"):
+    with self.assertRaisesRegex(
+        test_utils.AbslInvalidArgumentError, "max_vocab_count"
+    ):
       dataset.create_vertical_dataset(
           df,
           columns=[
@@ -592,6 +599,29 @@ four entries,4,8,4.4,0
     self.assertFalse(
         dataset.column_defs_contains_column(column_name, column_defs_negative)
     )
+
+  def test_create_tensorflow_batched_dataset(self):
+    ds_tf = tf.data.Dataset.from_tensor_slices({
+        "a": np.array([1, 2, 3]),
+    }).batch(1)
+    ds = dataset.create_vertical_dataset(ds_tf)
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="a",
+                type=ds_pb.ColumnType.NUMERICAL,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2,
+                    standard_deviation=0.8164965809277263,  # ~math.sqrt(2 / 3)
+                    min_value=1,
+                    max_value=3,
+                ),
+            ),
+        ),
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
 
 
 if __name__ == "__main__":

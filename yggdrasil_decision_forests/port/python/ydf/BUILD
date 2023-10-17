@@ -10,7 +10,7 @@ package(
 package_group(
     name = "users",
     packages = [
-        "//third_party/py/ydf/...",
+        # ydf/... dep,
         "//ydf/...",
     ],
 )
@@ -32,7 +32,9 @@ py_library(
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
         "//ydf/model:generic_model",
+        "//ydf/model:gradient_boosted_trees_model",
         "//ydf/model:model_lib",
+        "//ydf/model:random_forest_model",
     ],
 )
 
@@ -44,11 +46,12 @@ py_test(
     srcs = ["api_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     python_version = "PY3",
+    shard_count = 5,
     deps = [
         ":api",
-        # absl/flags dep,
         # absl/logging dep,
         # absl/testing:absltest dep,
         # pandas dep,
+        "//ydf/utils:test_utils",
     ],
 )

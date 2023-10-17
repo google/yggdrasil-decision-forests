@@ -28,7 +28,9 @@ from ydf.dataset import dataset as _dataset
 from ydf.learner import generic_learner as _generic_learner
 from ydf.learner import specialized_learners as _specialized_learners
 from ydf.model import generic_model as _generic_model
+from ydf.model import gradient_boosted_trees_model as _gradient_boosted_trees_model
 from ydf.model import model_lib as _model_lib
+from ydf.model import random_forest_model as _random_forest_model
 
 __version__ = "0.0.2"
 
@@ -38,11 +40,16 @@ Column = _dataset.Column
 # A feature is a column used as input of a model. In practice, users generally
 # use them interchangeably.
 Feature = Column
-Task = _generic_learner.Task
+Task = _generic_model.Task
+Semantic = _dataset.Semantic
 
 # Model
 load_model = _model_lib.load_model
 ModelIOOptions = _generic_model.ModelIOOptions
+RandomForestModel = _random_forest_model.RandomForestModel
+GradientBoostedTreesModel = (
+    _gradient_boosted_trees_model.GradientBoostedTreesModel
+)
 
 # Learner
 CartLearner = _specialized_learners.CartLearner

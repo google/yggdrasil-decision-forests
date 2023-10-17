@@ -16,8 +16,8 @@
 
 import collections
 import os
+import signal
 
-from absl import flags
 from absl import logging
 from absl.testing import absltest
 import numpy as np
@@ -27,6 +27,7 @@ from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.dataset import dataset
 from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
+from ydf.utils import test_utils
 
 DatasetForTesting = collections.namedtuple(
     "Dataset",
@@ -36,16 +37,6 @@ DatasetForTesting = collections.namedtuple(
         "label",
     ],
 )
-
-
-def data_root_path() -> str:
-  return ""
-
-
-def ydf_test_data_path() -> str:
-  return os.path.join(
-      data_root_path(), "external/ydf_cc/yggdrasil_decision_forests/test_data"
-  )
 
 
 def toy_dataset():
@@ -59,11 +50,21 @@ def toy_dataset():
   return df
 
 
+def toy_dataset_uplift():
+  df = pd.DataFrame({
+      "f1": [1, 2, 3, 4] * 10,
+      "treatement": ["A", "A", "B", "B"] * 10,
+      "effect_binary": [0, 1, 1, 1] * 10,
+      "effect_numerical": [0.1, 0.5, 0.6, 0.7] * 10,
+  })
+  return df
+
+
 def adult_dataset() -> DatasetForTesting:
   """Adult/census binary classification dataset."""
 
   # Path to dataset.
-  dataset_directory = os.path.join(ydf_test_data_path(), "dataset")
+  dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
   train_path = os.path.join(dataset_directory, "adult_train.csv")
   test_path = os.path.join(dataset_directory, "adult_test.csv")
 
@@ -138,10 +139,15 @@ class RandomForestLearnerTest(LearnerTest):
   @absltest.skip("predictions do not match")
   def test_adult_golden_predictions(self):
     data_spec_path = os.path.join(
-        ydf_test_data_path(), "model", "adult_binary_class_rf", "data_spec.pb"
+        test_utils.ydf_test_data_path(),
+        "model",
+        "adult_binary_class_rf",
+        "data_spec.pb",
     )
     predictions_path = os.path.join(
-        ydf_test_data_path(), "prediction", "adult_test_binary_class_rf.csv"
+        test_utils.ydf_test_data_path(),
+        "prediction",
+        "adult_test_binary_class_rf.csv",
     )
     predictions_df = pd.read_csv(predictions_path)
     data_spec = data_spec_pb2.DataSpecification()
@@ -176,6 +182,117 @@ class RandomForestLearnerTest(LearnerTest):
 
   # TODO: Add a test for ranking and uplifting.
 
+  def test_toy_regression(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="col2",
+        num_trees=1,
+        task=generic_learner.Task.REGRESSION,
+    )
+    self.assertEqual(
+        learner.train(toy_dataset()).task(), generic_learner.Task.REGRESSION
+    )
+
+  def test_toy_regression_on_categorical(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="col1",
+        num_trees=1,
+        task=generic_learner.Task.REGRESSION,
+    )
+    with self.assertRaises(ValueError):
+      _ = learner.train(toy_dataset())
+
+  def test_toy_classification(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="col1",
+        num_trees=1,
+        task=generic_learner.Task.CLASSIFICATION,
+    )
+    self.assertEqual(
+        learner.train(toy_dataset()).task(), generic_learner.Task.CLASSIFICATION
+    )
+
+  def test_toy_classification_on_ints(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="label",
+        num_trees=1,
+        task=generic_learner.Task.CLASSIFICATION,
+    )
+    self.assertEqual(
+        learner.train(toy_dataset()).task(), generic_learner.Task.CLASSIFICATION
+    )
+
+  def test_toy_classification_on_floats(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="col2",
+        num_trees=1,
+        task=generic_learner.Task.CLASSIFICATION,
+    )
+
+    with self.assertRaises(ValueError):
+      _ = (
+          learner.train(toy_dataset()).task(),
+          generic_learner.Task.CLASSIFICATION,
+      )
+
+  def test_toy_categorical_uplift(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="effect_binary",
+        uplift_treatment="treatement",
+        num_trees=1,
+        task=generic_learner.Task.CATEGORICAL_UPLIFT,
+    )
+    self.assertEqual(
+        learner.train(toy_dataset_uplift()).task(),
+        generic_learner.Task.CATEGORICAL_UPLIFT,
+    )
+
+  def test_toy_numerical_uplift(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="effect_numerical",
+        uplift_treatment="treatement",
+        num_trees=1,
+        task=generic_learner.Task.NUMERICAL_UPLIFT,
+    )
+    self.assertEqual(
+        learner.train(toy_dataset_uplift()).task(),
+        generic_learner.Task.NUMERICAL_UPLIFT,
+    )
+
+  def test_interrupt_training(self):
+    ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_train.csv"
+        )
+    )
+    learner = specialized_learners.RandomForestLearner(
+        label="income",
+        num_trees=1000000,  # Trains for a very long time
+    )
+
+    signal.alarm(3)
+    model = learner.train(ds)
+    self.assertEqual(model.task(), generic_learner.Task.CLASSIFICATION)
+    # Test that the model is functionnal
+    _ = model.evaluate(ds)
+
+  def test_cross_validation(self):
+    ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_train.csv"
+        )
+    )
+    learner = specialized_learners.RandomForestLearner(
+        label="income", num_trees=10
+    )
+    evaluation = learner.cross_validation(ds, folds=10, parallel_evaluations=2)
+    logging.info("evaluation:\n%s", evaluation)
+    self.assertAlmostEqual(evaluation.accuracy, 0.87, 1)
+    # All the examples are used in the evaluation
+    self.assertEqual(evaluation.num_examples, ds.shape[0])
+
+    with open("/tmp/evaluation.html", "w") as f:
+      f.write(evaluation._repr_html_())
+
 
 class CARTLearnerTest(LearnerTest):
 
@@ -201,6 +318,19 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     )
 
     self._check_adult_model(learner=learner, ds=ds, minimum_accuracy=0.869)
+
+  # TODO: Enable when HASH columns are supporterd.
+  def disabled_test_toy_ranking(self):
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="col2",
+        ranking_group="col1",
+        num_trees=1,
+        task=generic_learner.Task.RANKING,
+    )
+    self.assertEqual(
+        learner.train(toy_dataset()).task(),
+        generic_learner.Task.RANKING,
+    )
 
 
 if __name__ == "__main__":

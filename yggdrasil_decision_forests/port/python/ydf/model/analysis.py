@@ -44,6 +44,11 @@ class Analysis:
         ' `analysis.to_html("analysis.html")`.'
     )
 
+  def html(self) -> str:
+    """Html representation of the analysis."""
+
+    return self._repr_html_()
+
   def _repr_html_(self) -> str:
     """Returns the Html representation of the analysis."""
 

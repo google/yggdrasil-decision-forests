@@ -38,6 +38,14 @@ InputValues = Union[np.ndarray, List[Any]]
 # Supported types of datasets (including a YDF Dataset).
 InputDataset = Union[Dict[str, InputValues], "pd.DataFrame", "VerticalDataset"]
 
+SUPPORTED_INPUT_DATA_DESCRIPTION = """\
+A dataset can be one of the following:
+- A Pandas DataFrame
+- A dictionary of column name (str) to values. Values can be lists of int, float, bool, str or bytes. Values can also be Numpy arrays.
+- A YDF VerticalDataset
+- A TensorFlow Batched Dataset
+"""
+
 
 # The different ways a user can specify the columns of VerticalDataset.
 ColumnDefs = Optional[List[Union["Column", str, Tuple[str, "Semantic"]]]]
@@ -143,7 +151,7 @@ class Column(object):
       item. Reducing the value can improve or hurt the model. If max_vocab_count
       = -1, the number of values in the column is not limited.
     min_vocab_frequency: For CATEGORICAL and CATEGORICAL_SET columns only.
-      Minimum number of occurence of a categorical value. Values present less
+      Minimum number of occurrence of a categorical value. Values present less
       than "min_vocab_frequency" times in the training dataset are treated as
       "Out-of-vocabulary".
     num_discretized_numerical_bins: For DISCRETIZED_NUMERICAL columns only.
@@ -227,6 +235,8 @@ class VerticalDataset:
       column_idx: Optional[int],
   ):
     """Adds a column to the dataset and computes the column statistics."""
+    original_column_data = column_data
+
     assert (column_idx is None) != (inference_args is None)
     if column.semantic == Semantic.NUMERICAL:
       if not isinstance(column_data, np.ndarray):
@@ -240,7 +250,17 @@ class VerticalDataset:
             column.name,
             column_data.dtype.name,
         )
-        column_data = column_data.astype(np.float32)
+
+        try:
+          column_data = column_data.astype(np.float32)
+        except ValueError as e:
+          raise ValueError(
+              f"Cannot convert NUMERICAL column {column.name!r} with"
+              f" content={column_data!r} to np.float32 values. If"
+              " the column is a label, make sure the training task is"
+              " compatible. For example, you cannot train a regression model"
+              " (task=ydf.Task.REGRESSION) on a string column."
+          ) from e
 
       self._dataset.PopulateColumnNumericalNPFloat32(
           column.name, column_data, column_idx  # `column_idx` may be None
@@ -266,8 +286,24 @@ class VerticalDataset:
           np.int16,
           np.int32,
           np.int64,
+          np.uint8,
+          np.uint16,
+          np.uint32,
+          np.uint64,
       ]:
         column_data = column_data.astype(np.bytes_)
+      elif column_data.dtype.type in [
+          np.float16,
+          np.float32,
+          np.float64,
+      ]:
+        raise ValueError(
+            f"Column {column.name!r} with semantic={column.semantic} should not"
+            f" contain floating point values. Got {original_column_data!r}. If"
+            " the column is a label, make sure the correct task is selected."
+            " For example, you cannot train a classification model"
+            " (task=ydf.Task.CLASSIFICATION) with floating point labels."
+        )
 
       if column_data.dtype.type == np.bytes_:
         if inference_args is not None:
@@ -281,10 +317,9 @@ class VerticalDataset:
           )
         return
 
-    raise NotImplementedError(
-        f"Importing column with semantic={column.semantic} is not"
-        f" implemented. Cannot import column {column.name!r}. Use a supported"
-        " semantic instead."
+    raise ValueError(
+        f"Column {column.name!r} with semantic={column.semantic} and"
+        f" content={original_column_data!r} is not supported"
     )
 
   def _initialize_from_data_spec(
@@ -346,7 +381,7 @@ def create_vertical_dataset(
       only the most frequent values are kept, and the remaining values are
       considered as out-of-vocabulary.  If max_vocab_count = -1, the number of
       values in the column is not limited (not recommended).
-    min_vocab_frequency: Minimum number of occurence of a value for CATEGORICAL
+    min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
       and CATEGORICAL_SET columns. Value observed less than
       `min_vocab_frequency` are considered as out-of-vocabulary.
     discretize_numerical_columns: If true, discretize all the numerical columns
@@ -430,9 +465,22 @@ def cast_input_dataset_to_dict(data: InputDataset) -> Dict[str, InputValues]:
     # Dictionary of values
     return data
 
+  # TensorFlow dataset.
+  # Note: We only test if the dataset is a TensorFlow dataset if the object name
+  # look like a TensorFlow object. This way, we avoid importing TF is not
+  # necessary.
+  if (
+      "tensorflow" in str(type(data))
+      and data.__class__.__name__ == "_BatchDataset"
+      and hasattr(data, "rebatch")
+  ):
+    # Create a single batch with all the data
+    full_batch = next(iter(data.rebatch(sys.maxsize)))
+    return {k: v.numpy() for k, v in full_batch.items()}
+
   raise ValueError(
-      f"Cannot import dataset from {type(data)}.\nSupported"
-      f" types are: {typing.get_args(InputDataset)}"
+      "Cannot import dataset from"
+      f" {type(data)}.\n{SUPPORTED_INPUT_DATA_DESCRIPTION}"
   )
 
 
@@ -516,6 +564,10 @@ def infer_semantic(name: str, data: Any) -> Semantic:
         np.int16,
         np.int32,
         np.int64,
+        np.uint8,
+        np.uint16,
+        np.uint32,
+        np.uint64,
     ]:
       return Semantic.NUMERICAL
 
@@ -525,11 +577,16 @@ def infer_semantic(name: str, data: Any) -> Semantic:
     if data.dtype.type in [np.bool_]:
       return Semantic.BOOLEAN
 
+    type_str = f"numpy.array of {data.dtype}"
+  else:
+    type_str = str(type(data))
+
   raise ValueError(
       f"Cannot infer automatically the semantic of column {name!r} with"
-      f" type={type(data)} and content={data}. Set the semantic of the column"
-      f" manually using the `features` argument e.g. `features=[{name!r},"
-      " ydf.semantic.numerical]`."
+      f" type={type_str}, and content={data}. Convert the column to a supported"
+      " type, or specify the semantic of the column manually using the"
+      f" `features` argument e.g. `features=[({name!r},"
+      " ydf.Semantic.NUMERICAL)]` if the feature is numerical."
   )
 
 

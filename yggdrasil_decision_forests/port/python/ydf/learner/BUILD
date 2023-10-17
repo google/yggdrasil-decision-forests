@@ -48,6 +48,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
+        "@ydf_cc//yggdrasil_decision_forests/utils:logging",
     ],
 )
 
@@ -60,11 +61,14 @@ py_library(
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/dataset:weight_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset",
+        "//ydf/metric",
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
+        "@ydf_cc//yggdrasil_decision_forests/utils:fold_generator_py_proto",
     ],
 )
 
@@ -100,12 +104,32 @@ py_test(
     deps = [
         ":generic_learner",
         ":specialized_learners",
-        # absl/flags dep,
         # absl/logging dep,
         # absl/testing:absltest dep,
         # numpy dep,
         # pandas dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset",
+        "//ydf/utils:test_utils",
+    ],
+)
+
+# Splits the test with tensorflow so that non-tensorflow tests can be run in debug mode.
+# (TensorFlow does not compile in debug mode)
+py_test(
+    name = "learner_with_tf_test",
+    srcs = ["learner_with_tf_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":generic_learner",
+        ":specialized_learners",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # numpy dep,
+        # pandas dep,
+        # tensorflow:tensorflow_no_contrib dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "//ydf/dataset",
+        "//ydf/utils:test_utils",
     ],
 )

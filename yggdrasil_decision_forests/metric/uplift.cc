@@ -52,7 +52,10 @@ absl::Status InitializeCategoricalUpliftEvaluation(
   }
   if (label_column.categorical().number_of_unique_values() != 3) {
     return absl::InvalidArgumentError(
-        "Uplift categorical response should be binary (i.e. have two values).");
+        absl::StrCat("Uplift categorical response should be binary (i.e. have "
+                     "two values). Found ",
+                     label_column.categorical().number_of_unique_values() - 1,
+                     " unique values (+OOV value)."));
   }
   eval->mutable_uplift();
   return absl::OkStatus();

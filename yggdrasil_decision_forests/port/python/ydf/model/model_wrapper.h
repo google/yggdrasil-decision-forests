@@ -53,6 +53,10 @@ class GenericCCModel {
 
   model::proto::Task task() const { return model_->task(); }
 
+  std::string Describe(const bool full_details) const {
+    return model_->DescriptionAndStatistics(full_details);
+  }
+
   // Gets an engine of the model. If the engine does not exist, create it.
   // This method is not thread safe.
   absl::StatusOr<const serving::FastEngine*> GetEngine();

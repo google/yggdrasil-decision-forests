@@ -27,9 +27,10 @@ py_library(
     name = "test_utils",
     testonly = True,
     srcs = ["test_utils.py"],
-    deps = [
+    data = [
         # absl/flags dep,
         # absl/testing:absltest dep,
+        "@com_google_pybind11_abseil//pybind11_abseil:status.so",
     ],
 )
 
