@@ -136,6 +136,16 @@ class ApiTest(absltest.TestCase):
     evaluation = learner.cross_validation(pd_ds)
     logging.info(evaluation)
 
+  def test_export_to_cc(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    model = ydf.load_model(model_path)
+    logging.info(
+        "Copy the following in a .h file to run the model in C++:\n%s",
+        model.to_cpp(),
+    )
+
 
 if __name__ == "__main__":
   absltest.main()

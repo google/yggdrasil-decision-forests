@@ -1,5 +1,5 @@
 # Model bindings for PYDF
-# pytype test and library
+# pytype binary, test, library
 load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
 load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 
@@ -71,6 +71,7 @@ py_library(
     srcs = ["generic_model.py"],
     deps = [
         ":analysis",
+        ":template_cpp_export",
         # absl/logging dep,
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
@@ -129,6 +130,15 @@ py_library(
     ],
 )
 
+py_library(
+    name = "template_cpp_export",
+    srcs = ["template_cpp_export.py"],
+    deps = [
+        "//ydf:version",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+    ],
+)
+
 # Tests
 # =====
 
@@ -149,5 +159,49 @@ py_test(
         ":model_lib",
         ":random_forest_model",
         "//ydf/utils:test_utils",
+    ],
+)
+
+cc_test(
+    name = "export_cc_run_test",
+    srcs = [
+        "export_cc_generated_lib.h",
+        "export_cc_run_test.cc",
+    ],
+    data = [
+        ":export_cc_generate_lib",
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
+    ],
+    tags = ["manual"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest_main",
+        "@ydf_cc//yggdrasil_decision_forests/api:serving",
+        "@ydf_cc//yggdrasil_decision_forests/utils:filesystem",
+        "@ydf_cc//yggdrasil_decision_forests/utils:logging",
+        "@ydf_cc//yggdrasil_decision_forests/utils:test",
+    ],
+)
+
+genrule(
+    name = "export_cc_generate_lib",
+    srcs = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    outs = ["export_cc_generated_lib.h"],
+    cmd = "$(location export_cc_generator) --input_model=third_party/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt --output_code=$@",
+    tags = ["manual"],
+    tools = [":export_cc_generator"],
+)
+
+py_binary(
+    name = "export_cc_generator",
+    srcs = ["export_cc_generator.py"],
+    python_version = "PY3",
+    deps = [
+        # absl:app dep,
+        # absl/flags dep,
+        # absl/logging dep,
+        "//ydf:api",
     ],
 )

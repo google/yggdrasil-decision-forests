@@ -27,6 +27,7 @@ from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.metric import metric
 from ydf.model import analysis
+from ydf.model import template_cpp_export
 from yggdrasil_decision_forests.utils import model_analysis_pb2
 
 # TODO: Allow a simpler input type (e.g. string)
@@ -283,6 +284,40 @@ Use `model.describe()` for more details
 
     analysis_proto = self._model.Analyze(ds._dataset, options_proto)  # pylint: disable=protected-access
     return analysis.Analysis(analysis_proto, options_proto)
+
+  def to_cpp(self, key: str = "my_model") -> str:
+    """Generates the code of a .h file to run the model in C++.
+
+    How to use this function:
+
+    1. Copy the output of this function in a new .h file.
+      open("model.h", "w").write(model.to_cpp())
+    2. If you use Bazel/Blaze, create a rule with the dependencies:
+      //third_party/absl/status:statusor
+      //third_party/absl/strings
+      //external/ydf_cc/yggdrasil_decision_forests/api:serving
+    3. In your C++ code, include the .h file and call the model with:
+      // Load the model (to do only once).
+      namespace ydf = yggdrasil_decision_forests;
+      const auto model = ydf::exported_model_123::Load(<path to model>);
+      // Run the model
+      predictions = model.Predict();
+    4. The generated "Predict" function takes no inputs. Instead, it fill the
+      input features with placeholder values. Therefore, you will want to add
+      your input as arguments to the "Predict" function, and use it to populate
+      the "examples->Set..." section accordingly.
+    5. (Bonus) To further speed-up inference speed, you can pre-allocate and
+      reuse the "examples" and "predictions" for each model running threads.
+
+    This documentation is also available in the header of the generated content
+    for more details.
+
+    Args:
+      key: Name of the model. Used to define the c++ namespace of the model.
+    """
+    return template_cpp_export.template(
+        key, self._model.data_spec(), self._model.input_features()
+    )
 
 
 ModelType = TypeVar("ModelType", bound=GenericModel)

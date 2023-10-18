@@ -28,6 +28,7 @@ py_library(
     srcs = ["__init__.py"],
     visibility = [":users"],
     deps = [
+        ":version",
         "//ydf/dataset",
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
@@ -36,6 +37,11 @@ py_library(
         "//ydf/model:model_lib",
         "//ydf/model:random_forest_model",
     ],
+)
+
+py_library(
+    name = "version",
+    srcs = ["version.py"],
 )
 
 # Tests

@@ -21,9 +21,10 @@
 # TIP: If you need to import something here that isn't part of the public API,
 # and therefore shouldn't show up in the documentation, import it with a private
 # name:
-# from yggdrasil_decision_forests.port.python import submodule as _submodule
+# from ydf import submodule as _submodule
 
 # Core
+from ydf import version as _version
 from ydf.dataset import dataset as _dataset
 from ydf.learner import generic_learner as _generic_learner
 from ydf.learner import specialized_learners as _specialized_learners
@@ -32,7 +33,7 @@ from ydf.model import gradient_boosted_trees_model as _gradient_boosted_trees_mo
 from ydf.model import model_lib as _model_lib
 from ydf.model import random_forest_model as _random_forest_model
 
-__version__ = "0.0.2"
+__version__ = _version.version
 
 # Dataset
 create_vertical_dataset = _dataset.create_vertical_dataset

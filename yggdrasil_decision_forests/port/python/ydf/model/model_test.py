@@ -14,7 +14,7 @@
 
 """Tests for basic model inference."""
 
-
+import logging
 import os
 import tempfile
 import textwrap
@@ -225,7 +225,7 @@ class DecisionForestModelTest(absltest.TestCase):
         "model",
         "prefixed_adult_binary_class_gbdt",
     )
-    with self.assertRaises(status.StatusNotOk):
+    with self.assertRaises(test_utils.AbslInvalidArgumentError):
       model_lib.load_model(
           model_path, generic_model.ModelIOOptions(file_prefix="wrong_prefix_")
       )
@@ -268,6 +268,16 @@ Use `model.describe()` for more details
     )
     model = model_lib.load_model(model_path)
     self.assertIn('Type: "GRADIENT_BOOSTED_TREES"', model.describe())
+
+  def test_model_to_cpp(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "adult_binary_class_gbdt",
+    )
+    model = model_lib.load_model(model_path)
+    cc = model.to_cpp()
+    logging.info("cc:\n%s", cc)
 
 
 class RandomForestModelTest(absltest.TestCase):
