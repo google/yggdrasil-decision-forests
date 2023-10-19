@@ -231,12 +231,12 @@ class AbstractLoss {
   // This method calls the UpdateGradients defined above depending on the type
   // of the label column in the VerticalDataset (currently, only support float
   // (Numerical) and int32 (Categorical)).
-  absl::Status UpdateGradients(const dataset::VerticalDataset& dataset,
-                               int label_col_idx,
-                               const std::vector<float>& predictions,
-                               const RankingGroupsIndices* ranking_index,
-                               std::vector<GradientData>* gradients,
-                               utils::RandomEngine* random) const;
+  absl::Status UpdateGradients(
+      const dataset::VerticalDataset& dataset, int label_col_idx,
+      const std::vector<float>& predictions,
+      const RankingGroupsIndices* ranking_index,
+      std::vector<GradientData>* gradients, utils::RandomEngine* random,
+      utils::concurrency::ThreadPool* thread_pool = nullptr) const;
 
   // Gets the name of the metrics returned in "secondary_metric" of the "Loss"
   // method.

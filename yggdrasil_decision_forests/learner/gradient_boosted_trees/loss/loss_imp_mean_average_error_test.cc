@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_mean_average_error.h"
 
 #include <cmath>
+#include <memory>
 #include <tuple>
 #include <vector>
 
@@ -26,9 +27,9 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/random.h"
-#include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
@@ -36,7 +37,6 @@ namespace yggdrasil_decision_forests::model::gradient_boosted_trees {
 
 namespace {
 
-using ::testing::Bool;
 using ::testing::Combine;
 using ::testing::ElementsAre;
 using ::testing::FloatNear;
@@ -89,6 +89,19 @@ enum class UseMultithreading : bool {
 
 class MeanAverageErrorLossWeightAndThreadingTest
     : public testing::TestWithParam<std::tuple<UseWeights, UseMultithreading>> {
+ protected:
+  void SetUp() override {
+    const bool threaded = std::get<1>(GetParam()) == UseMultithreading::kYes;
+    if (threaded) {
+      thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>("", 4);
+      thread_pool_->StartWorkers();
+    }
+  }
+
+  void TearDown() override { thread_pool_.reset(); }
+
+  // The thread pool is only set if "UseMultithreading=kYes".
+  std::unique_ptr<utils::concurrency::ThreadPool> thread_pool_;
 };
 
 class MeanAverageErrorLossWeightTest
@@ -125,10 +138,11 @@ TEST(MeanAverageErrorLossTestNonWeighted, InitialPredictionsOdd) {
       ElementsAre(2.f));
 }
 
-TEST_P(MeanAverageErrorLossWeightTest, UpdateGradients) {
+TEST_P(MeanAverageErrorLossWeightAndThreadingTest, UpdateGradients) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam() == UseWeights::kYes;
+  const bool weighted = std::get<0>(GetParam()) == UseWeights::kYes;
+
   const std::vector<float> weights = CreateToyWeights(weighted);
 
   dataset::VerticalDataset gradient_dataset;
@@ -153,7 +167,7 @@ TEST_P(MeanAverageErrorLossWeightTest, UpdateGradients) {
   ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
                                      /* label_col_idx= */ 0, predictions,
                                      /*ranking_index=*/nullptr, &gradients,
-                                     &random));
+                                     &random, thread_pool_.get()));
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
   if (weighted) {
@@ -167,7 +181,6 @@ TEST_P(MeanAverageErrorLossWeightAndThreadingTest, ComputeLoss) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
   const bool weighted = std::get<0>(GetParam()) == UseWeights::kYes;
-  const bool threaded = std::get<1>(GetParam()) == UseMultithreading::kYes;
   const std::vector<float> weights = CreateToyWeights(weighted);
 
   const std::vector<float> predictions(4, 0.f);
@@ -175,19 +188,11 @@ TEST_P(MeanAverageErrorLossWeightAndThreadingTest, ComputeLoss) {
                                       model::proto::Task::REGRESSION,
                                       dataset.data_spec().columns(0));
   LossResults loss_results;
-  if (threaded) {
-    utils::concurrency::ThreadPool thread_pool("", 4);
-    thread_pool.StartWorkers();
-    ASSERT_OK_AND_ASSIGN(loss_results,
-                         loss_imp.Loss(dataset,
-                                       /* label_col_idx= */ 0, predictions,
-                                       weights, nullptr, &thread_pool));
-  } else {
-    ASSERT_OK_AND_ASSIGN(
-        loss_results,
-        loss_imp.Loss(dataset,
-                      /* label_col_idx= */ 0, predictions, weights, nullptr));
-  }
+  ASSERT_OK_AND_ASSIGN(
+      loss_results, loss_imp.Loss(dataset,
+                                  /* label_col_idx= */ 0, predictions, weights,
+                                  nullptr, thread_pool_.get()));
+
   if (weighted) {
     // MAE = \sum (abs(prediction_i - label_i) * weight_i) / \sum weight_i
     const float expected_mae =

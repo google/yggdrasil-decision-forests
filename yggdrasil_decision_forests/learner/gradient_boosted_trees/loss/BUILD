@@ -213,6 +213,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/types:span",
     ],
     alwayslink = 1,
 )

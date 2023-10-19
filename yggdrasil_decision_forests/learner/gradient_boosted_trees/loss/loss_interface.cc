@@ -42,7 +42,8 @@ absl::Status AbstractLoss::UpdateGradients(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     const std::vector<float>& predictions,
     const RankingGroupsIndices* ranking_index,
-    std::vector<GradientData>* gradients, utils::RandomEngine* random) const {
+    std::vector<GradientData>* gradients, utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
   GradientDataRef compact_gradient(gradients->size());
   for (int i = 0; i < gradients->size(); i++) {
     compact_gradient[i] = {&(*gradients)[i].gradient, &(*gradients)[i].hessian};
@@ -53,7 +54,8 @@ absl::Status AbstractLoss::UpdateGradients(
           label_col_idx);
   if (categorical_labels) {
     return UpdateGradients(categorical_labels->values(), predictions,
-                           ranking_index, &compact_gradient, random, nullptr);
+                           ranking_index, &compact_gradient, random,
+                           thread_pool);
   }
 
   const auto* numerical_labels =
@@ -61,7 +63,8 @@ absl::Status AbstractLoss::UpdateGradients(
           label_col_idx);
   if (numerical_labels) {
     return UpdateGradients(numerical_labels->values(), predictions,
-                           ranking_index, &compact_gradient, random, nullptr);
+                           ranking_index, &compact_gradient, random,
+                           thread_pool);
   }
 
   return absl::InternalError(

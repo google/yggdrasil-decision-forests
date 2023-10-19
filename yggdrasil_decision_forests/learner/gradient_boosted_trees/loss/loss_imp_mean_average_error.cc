@@ -15,12 +15,15 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_mean_average_error.h"
 
+#include <stddef.h>
+
 #include <algorithm>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -29,7 +32,7 @@
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"  // IWYU pragma: keep
-#include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/logging.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/math.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -37,6 +40,30 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
+namespace {
+void UpdateGradientsSingleThread(const absl::Span<const float> labels,
+                                 const absl::Span<const float> predictions,
+                                 absl::Span<float> gradient_data,
+                                 absl::Span<float> hessian_data) {
+  DCHECK_EQ(labels.size(), predictions.size());
+  DCHECK_EQ(labels.size(), gradient_data.size());
+  DCHECK_EQ(labels.size(), hessian_data.size());
+
+  // We use "table" to avoid a branch in the following loop.
+  // This optimization was found to improve the code speed. This should be
+  // revisited as new compilers are likely to do this optimization
+  // automatically one day.
+  static float table[] = {-1.f, 1.f};
+
+  for (size_t example_idx = 0; example_idx < labels.size(); ++example_idx) {
+    const float label = labels[example_idx];
+    const float prediction = predictions[example_idx];
+    gradient_data[example_idx] = table[label >= prediction];
+    hessian_data[example_idx] = 1.f;
+  }
+}
+
+}  // namespace
 
 absl::Status MeanAverageErrorLoss::Status() const {
   if (task_ != model::proto::Task::REGRESSION) {
@@ -106,26 +133,33 @@ absl::Status MeanAverageErrorLoss::UpdateGradients(
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
-  // TODO: b/303811729 - Use "thread_pool" if set.
-
   STATUS_CHECK_EQ(gradients->size(), 1);
-  const UnsignedExampleIdx num_examples = labels.size();
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
   std::vector<float>& hessian_data = *(*gradients)[0].hessian;
   STATUS_CHECK_EQ(gradient_data.size(), hessian_data.size());
-  // We use "table" to avoid a branch in the following loop.
-  // This optimization was found to improve the code speed. This should be
-  // revisited as new compilers are likely to do this optimization
-  // automatically one day.
-  static float table[] = {-1.f, 1.f};
 
-  for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
-       example_idx++) {
-    const float label = labels[example_idx];
-    const float prediction = predictions[example_idx];
-    gradient_data[example_idx] = table[label >= prediction];
-    hessian_data[example_idx] = 1.f;
+  if (thread_pool == nullptr) {
+    UpdateGradientsSingleThread(labels, predictions,
+                                absl::Span<float>(gradient_data),
+                                absl::Span<float>(hessian_data));
+  } else {
+    utils::concurrency::ConcurrentForLoop(
+        thread_pool->num_threads(), thread_pool, labels.size(),
+        [&labels, &predictions, &gradient_data, &hessian_data](
+            const size_t block_idx, const size_t begin_idx,
+            const size_t end_idx) -> void {
+          UpdateGradientsSingleThread(
+              absl::Span<const float>(labels).subspan(begin_idx,
+                                                      end_idx - begin_idx),
+              absl::Span<const float>(predictions)
+                  .subspan(begin_idx, end_idx - begin_idx),
+              absl::Span<float>(gradient_data)
+                  .subspan(begin_idx, end_idx - begin_idx),
+              absl::Span<float>(hessian_data)
+                  .subspan(begin_idx, end_idx - begin_idx));
+        });
   }
+
   return absl::OkStatus();
 }
 

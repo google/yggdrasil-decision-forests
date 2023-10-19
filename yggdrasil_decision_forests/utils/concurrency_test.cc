@@ -13,14 +13,19 @@
  * limitations under the License.
  */
 
+#include <stddef.h>
+
+#include <atomic>
+#include <memory>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/types/optional.h"
 
-#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"  // IWYU pragma: keep
 
-namespace yggdrasil_decision_forests {
-namespace utils {
-namespace concurrency {
+namespace yggdrasil_decision_forests::utils::concurrency {
 namespace {
 
 TEST(ThreadPool, Empty) {
@@ -28,8 +33,8 @@ TEST(ThreadPool, Empty) {
 }
 
 TEST(ThreadPool, Simple) {
-  std::atomic<int> counter = {0};
-  int n = 100;
+  std::atomic<int> counter{0};
+  const int n = 100;
   {
     ThreadPool pool("MyPool", 1);
     pool.StartWorkers();
@@ -58,8 +63,9 @@ TEST(StreamProcessor, Simple) {
 
   // Continuously consume a result, and restart a new job.
   for (int i = 0; i < num_jobs; i++) {
-    const auto result = processor.GetResult().value();
-    sum += result;
+    const absl::optional<int> result_or = processor.GetResult();
+    ASSERT_TRUE(result_or.has_value());
+    sum += *result_or;
     if (i < num_jobs - num_initially_planned_jobs) {
       processor.Submit(i + num_initially_planned_jobs);
     }
@@ -77,9 +83,9 @@ TEST(StreamProcessor, NonCopiableData) {
                                               [](Question x) { return x; });
 
   processor.StartWorkers();
-  processor.Submit(absl::make_unique<int>(10));
-  auto result = processor.GetResult().value();
-  CHECK_EQ(*result, 10);
+  processor.Submit(std::make_unique<int>(10));
+  const absl::optional<std::unique_ptr<int>> result_or = processor.GetResult();
+  EXPECT_THAT(result_or, testing::Optional(testing::Pointee(10)));
 }
 
 TEST(StreamProcessor, InOrder) {
@@ -104,10 +110,8 @@ TEST(StreamProcessor, InOrder) {
 
   // Continuously consume a result, and restart a new job.
   for (int i = 0; i < num_jobs; i++) {
-    const auto result = processor.GetResult().value();
-    const auto expected_result = next_expected_result++;
-    EXPECT_EQ(result, expected_result);
-
+    const absl::optional<int> result = processor.GetResult();
+    EXPECT_THAT(result, testing::Optional(next_expected_result++));
     processor.Submit(next_query++);
   }
 }
@@ -122,10 +126,13 @@ TEST(StreamProcessor, EarlyClose) {
   processor.Submit(3);
   processor.CloseSubmits();
 
-  CHECK_EQ(processor.GetResult().value(), 1);
-  CHECK_EQ(processor.GetResult().value(), 2);
-  CHECK_EQ(processor.GetResult().value(), 3);
-  CHECK(!processor.GetResult().has_value());
+  absl::optional<int> result = processor.GetResult();
+  EXPECT_THAT(result, testing::Optional(1));
+  result = processor.GetResult();
+  EXPECT_THAT(result, testing::Optional(2));
+  result = processor.GetResult();
+  EXPECT_THAT(result, testing::Optional(3));
+  EXPECT_FALSE(processor.GetResult().has_value());
 
   processor.JoinAllAndStopThreads();
 }
@@ -150,6 +157,4 @@ TEST(Utils, ConcurrentForLoop) {
 }
 
 }  // namespace
-}  // namespace concurrency
-}  // namespace utils
-}  // namespace yggdrasil_decision_forests
+}  // namespace yggdrasil_decision_forests::utils::concurrency
