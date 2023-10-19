@@ -4,7 +4,7 @@
 
 ### Feature
 
--   Mean average error loss for GBT.
+-   Add support for Mean average error (MAE) loss for GBT.
 
 ## 1.6.0 - 2023-09-28
 

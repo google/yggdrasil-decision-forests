@@ -933,7 +933,8 @@ template <>
 absl::Status GenericToSpecializedModel(
     const model::gradient_boosted_trees::GradientBoostedTreesModel& src,
     GradientBoostedTreesRegressionQuickScorerExtended* dst) {
-  if (src.loss() != Loss::SQUARED_ERROR) {
+  if (src.loss() != Loss::SQUARED_ERROR &&
+      src.loss() != Loss::MEAN_AVERAGE_ERROR) {
     return absl::InvalidArgumentError(
         "The GBDT is not trained for regression with squared error loss.");
   }
