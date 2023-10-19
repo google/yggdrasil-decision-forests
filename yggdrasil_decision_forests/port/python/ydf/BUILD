@@ -32,6 +32,7 @@ py_library(
         "//ydf/dataset",
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
+        "//ydf/learner:tuner",
         "//ydf/model:generic_model",
         "//ydf/model:gradient_boosted_trees_model",
         "//ydf/model:model_lib",

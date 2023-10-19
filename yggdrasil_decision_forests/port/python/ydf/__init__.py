@@ -28,6 +28,7 @@ from ydf import version as _version
 from ydf.dataset import dataset as _dataset
 from ydf.learner import generic_learner as _generic_learner
 from ydf.learner import specialized_learners as _specialized_learners
+from ydf.learner import tuner as _tuner
 from ydf.model import generic_model as _generic_model
 from ydf.model import gradient_boosted_trees_model as _gradient_boosted_trees_model
 from ydf.model import model_lib as _model_lib
@@ -56,3 +57,6 @@ GradientBoostedTreesModel = (
 CartLearner = _specialized_learners.CartLearner
 RandomForestLearner = _specialized_learners.RandomForestLearner
 GradientBoostedTreesLearner = _specialized_learners.GradientBoostedTreesLearner
+
+# Tuner
+RandomSearchTuner = _tuner.RandomSearchTuner

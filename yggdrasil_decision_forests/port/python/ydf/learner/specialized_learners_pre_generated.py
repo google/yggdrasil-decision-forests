@@ -37,6 +37,7 @@ from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2  # pylint: disable=unused-import
 from ydf.dataset import dataset
 from ydf.learner import generic_learner
+from ydf.learner import tuner as tuner_lib
 
 
 class CartLearner(generic_learner.GenericLearner):
@@ -285,6 +286,9 @@ class CartLearner(generic_learner.GenericLearner):
     resume_training_snapshot_interval_seconds: Indicative number of seconds in
       between snapshots when `try_resume_training=True`. Might be ignored by
       some learners.
+    tuner: If set, automatically select the best hyperparameters using the
+      provided tuner. When using distributed training, the tuning is
+      distributed.
   """
 
   def __init__(
@@ -335,6 +339,7 @@ class CartLearner(generic_learner.GenericLearner):
       cache_path: Optional[str] = None,
       try_resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
+      tuner: Optional[tuner_lib.AbstractTuner] = None,
   ):
     hyper_parameters = {
         "allow_na_conditions": allow_na_conditions,
@@ -407,6 +412,7 @@ class CartLearner(generic_learner.GenericLearner):
         data_spec=data_spec,
         hyper_parameters=hyper_parameters,
         deployment_config=deployment_config,
+        tuner=tuner,
     )
 
   @classmethod
@@ -768,6 +774,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
     resume_training_snapshot_interval_seconds: Indicative number of seconds in
       between snapshots when `try_resume_training=True`. Might be ignored by
       some learners.
+    tuner: If set, automatically select the best hyperparameters using the
+      provided tuner. When using distributed training, the tuning is
+      distributed.
   """
 
   def __init__(
@@ -842,6 +851,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       cache_path: Optional[str] = None,
       try_resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
+      tuner: Optional[tuner_lib.AbstractTuner] = None,
   ):
     hyper_parameters = {
         "adapt_subsample_for_maximum_training_duration": (
@@ -944,6 +954,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         data_spec=data_spec,
         hyper_parameters=hyper_parameters,
         deployment_config=deployment_config,
+        tuner=tuner,
     )
 
   @classmethod
@@ -951,6 +962,181 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
     return abstract_learner_pb2.LearnerCapabilities(
         support_partial_cache_dataset_format=False
     )
+
+
+class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
+  r"""Hyperparameter Optimizer learning algorithm.
+
+  Usage example:
+
+  ```python
+  import ydf
+  import pandas as pd
+
+  dataset = pd.read_csv("project/dataset.csv")
+
+  model = ydf.HyperparameterOptimizerLearner().train(dataset)
+
+  print(model.summary())
+  ```
+
+  Attributes:
+    label: Label of the dataset. The label column should not be identified as a
+      feature in the `features` parameter.
+    task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
+      Task.RANKING, Task.CATEGORICAL_UPLIFT, Task.NUMERICAL_UPLIFT).
+    weights: Name of a feature that identifies the weight of each example. If
+      weights are not specified, unit weights are assumed. The weight column
+      should not be identified as a feature in the `features` parameter.
+    ranking_group: Only for `task=Task.RANKING`. Name of a feature that
+      identifies queries in a query/document ranking task. The ranking group
+      should not be identified as a feature in the `features` parameter.
+    uplift_treatment: Only for `task=Task.CATEGORICAL_UPLIFT` and `task=Task`.
+      NUMERICAL_UPLIFT. Name of a numerical feature that identifies the
+      treatment in an uplift problem. The value 0 is reserved for the control
+      treatment. Currently, only 0/1 binary treatments are supported.
+    features: If None, all columns are used as features. The semantic of the
+      features is determined automatically. Otherwise, if
+      include_all_columns=False (default) only the column listed in `features`
+      are imported. If include_all_columns=True, all the columns are imported as
+      features and only the semantic of the columns NOT in `columns` is
+      determined automatically. If specified,  defines the order of the features
+      - any non-listed features are appended in-order after the specified
+      features (if include_all_columns=True). The label, weights, uplift
+      treatment and ranking_group columns should not be specified as features.
+    include_all_columns: See `features`.
+    max_vocab_count: Maximum size of the vocabulary of CATEGORICAL and
+      CATEGORICAL_SET columns stored as strings. If more unique values exist,
+      only the most frequent values are kept, and the remaining values are
+      considered as out-of-vocabulary.
+    min_vocab_frequency: Minimum number of occurence of a value for CATEGORICAL
+      and CATEGORICAL_SET columns. Value observed less than
+      `min_vocab_frequency` are considered as out-of-vocabulary.
+    discretize_numerical_columns: If true, discretize all the numerical columns
+      before training. Discretized numerical columns are faster to train with,
+      but they can have a negative impact on the model quality. Using
+      `discretize_numerical_columns=True` is equivalent as setting the column
+      semantic DISCRETIZED_NUMERICAL in the `column` argument. See the
+      definition of DISCRETIZED_NUMERICAL for more details.
+    num_discretized_numerical_bins: Number of bins used when disretizing
+      numerical columns.
+    data_spec: Dataspec to be used (advanced). If a data spec is given,
+      `columns`, `include_all_columns`, `max_vocab_count`,
+      `min_vocab_frequency`, `discretize_numerical_columns` and
+      `num_discretized_numerical_bins` will be ignored.
+    maximum_model_size_in_memory_in_bytes: Limit the size of the model when
+      stored in ram. Different algorithms can enforce this limit differently.
+      Note that when models are compiled into an inference, the size of the
+      inference engine is generally much smaller than the original model.
+      Default: -1.0.
+    maximum_training_duration_seconds: Maximum training duration of the model
+      expressed in seconds. Each learning algorithm is free to use this
+      parameter at it sees fit. Enabling maximum training duration makes the
+      model training non-deterministic. Default: -1.0.
+    pure_serving_model: Clear the model from any information that is not
+      required for model serving. This includes debugging, model interpretation
+      and other meta-data. The size of the serialized model can be reduced
+      significatively (50% model size reduction is common). This parameter has
+      no impact on the quality, serving speed or RAM usage of model serving.
+      Default: False.
+    random_seed: Random seed for the training of the model. Learners are
+      expected to be deterministic by the random seed. Default: 123456.
+    num_threads: Number of threads used to train the model. Different learning
+      algorithms use multi-threading differently and with different degree of
+      efficiency. If `None`, `num_threads` will be automatically set to the
+      number of processors (up to a maximum of 32; or set to 6 if the number of
+      processors is not available). Making `num_threads` significantly larger
+      than the number of processors can slow-down the training speed. The
+      default value logic might change in the future.
+    try_resume_training: If true, the model training resumes from the checkpoint
+      stored in the `temp_directory` directory. If `temp_directory` does not
+      contain any model checkpoint, the training start from the beginning.
+      Resuming training is useful in the following situations: (1) The training
+      was interrupted by the user (e.g. ctrl+c or "stop" button in a notebook).
+      (2) the training job was interrupted (e.g. rescheduling), ond (3) the
+      hyper-parameter of the model were changed such that an initially completed
+      training is now incomplete (e.g. increasing the number of trees).
+      Note: Training can only be resumed if the training datasets is exactly the
+        same (i.e. no reshuffle in the `tf.data.Dataset`).
+    cache_path: Path to a temporary directory available to the learning
+      algorithm. Currently cache_path is only used (and required) if
+      `try_resume_training=True` for storing the snapshots.
+    resume_training_snapshot_interval_seconds: Indicative number of seconds in
+      between snapshots when `try_resume_training=True`. Might be ignored by
+      some learners.
+    tuner: If set, automatically select the best hyperparameters using the
+      provided tuner. When using distributed training, the tuning is
+      distributed.
+  """
+
+  def __init__(
+      self,
+      label: str,
+      task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
+      weights: Optional[str] = None,
+      ranking_group: Optional[str] = None,
+      uplift_treatment: Optional[str] = None,
+      features: dataset.ColumnDefs = None,
+      include_all_columns: bool = False,
+      max_vocab_count: int = 2000,
+      min_vocab_frequency: int = 5,
+      discretize_numerical_columns: bool = False,
+      num_discretized_numerical_bins: int = 255,
+      data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
+      maximum_training_duration_seconds: Optional[float] = -1.0,
+      pure_serving_model: Optional[bool] = False,
+      random_seed: Optional[int] = 123456,
+      num_threads: Optional[int] = None,
+      cache_path: Optional[str] = None,
+      try_resume_training: bool = False,
+      resume_training_snapshot_interval_seconds: int = 1800,
+      tuner: Optional[tuner_lib.AbstractTuner] = None,
+  ):
+    hyper_parameters = {
+        "maximum_model_size_in_memory_in_bytes": (
+            maximum_model_size_in_memory_in_bytes
+        ),
+        "maximum_training_duration_seconds": maximum_training_duration_seconds,
+        "pure_serving_model": pure_serving_model,
+        "random_seed": random_seed,
+    }
+    data_spec_args = dataset.DataSpecInferenceArgs(
+        columns=features,
+        include_all_columns=include_all_columns,
+        max_vocab_count=max_vocab_count,
+        min_vocab_frequency=min_vocab_frequency,
+        discretize_numerical_columns=discretize_numerical_columns,
+        num_discretized_numerical_bins=num_discretized_numerical_bins,
+    )
+
+    deployment_config = self._build_deployment_config(
+        num_threads=num_threads,
+        try_resume_training=try_resume_training,
+        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
+        cache_path=cache_path,
+    )
+
+    super().__init__(
+        learner_name="HYPERPARAMETER_OPTIMIZER",
+        task=task,
+        label=label,
+        weights=weights,
+        ranking_group=ranking_group,
+        uplift_treatment=uplift_treatment,
+        data_spec_args=data_spec_args,
+        data_spec=data_spec,
+        hyper_parameters=hyper_parameters,
+        deployment_config=deployment_config,
+        tuner=tuner,
+    )
+
+  @classmethod
+  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+    return abstract_learner_pb2.LearnerCapabilities(
+        support_partial_cache_dataset_format=False
+    )
+
 
 class RandomForestLearner(generic_learner.GenericLearner):
   r"""Random Forest learning algorithm.
@@ -1240,6 +1426,9 @@ class RandomForestLearner(generic_learner.GenericLearner):
     resume_training_snapshot_interval_seconds: Indicative number of seconds in
       between snapshots when `try_resume_training=True`. Might be ignored by
       some learners.
+    tuner: If set, automatically select the best hyperparameters using the
+      provided tuner. When using distributed training, the tuning is
+      distributed.
   """
 
   def __init__(
@@ -1300,6 +1489,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
       cache_path: Optional[str] = None,
       try_resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
+      tuner: Optional[tuner_lib.AbstractTuner] = None,
   ):
     hyper_parameters = {
         "adapt_bootstrap_size_ratio_for_maximum_training_duration": (
@@ -1384,6 +1574,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
         data_spec=data_spec,
         hyper_parameters=hyper_parameters,
         deployment_config=deployment_config,
+        tuner=tuner,
     )
 
   @classmethod

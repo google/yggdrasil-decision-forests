@@ -33,6 +33,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:model_library",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",

@@ -28,6 +28,7 @@ from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.learner import hyperparameters
+from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
 from ydf.model import generic_model
 from ydf.model import model_lib
@@ -51,6 +52,7 @@ class GenericLearner:
       data_spec: Optional[data_spec_pb2.DataSpecification],
       hyper_parameters: hyperparameters.HyperParameters,
       deployment_config: abstract_learner_pb2.DeploymentConfig,
+      tuner: Optional[tuner_lib.AbstractTuner],
   ):
     # TODO: Refactor to a single hyperparameter dictionary with edit
     # access to these options.
@@ -64,6 +66,7 @@ class GenericLearner:
     self._data_spec = data_spec
     self._data_spec_args = data_spec_args
     self._deployment_config = deployment_config
+    self._tuner = tuner
 
     if not self._label:
       raise ValueError("Constructing the learner requires a non-empty label.")
@@ -98,6 +101,8 @@ class GenericLearner:
           "Data spec was provided explicitly, so any other dataspec"
           " configuration options will be ignored."
       )
+    if tuner:
+      tuner.set_base_learner(learner_name)
 
   def train(
       self,
@@ -118,6 +123,9 @@ class GenericLearner:
         uplift_treatment=self._uplift_treatment,
         task=self._task,
     )
+    if self._tuner:
+      training_config.MergeFrom(self._tuner.train_config)
+
     hp_proto = hyperparameters.dict_to_generic_hyperparameter(
         self._hyperparameters
     )

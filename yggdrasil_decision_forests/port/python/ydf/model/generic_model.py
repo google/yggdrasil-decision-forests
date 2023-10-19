@@ -319,5 +319,15 @@ Use `model.describe()` for more details
         key, self._model.data_spec(), self._model.input_features()
     )
 
+  def hyperparameter_optimizer_logs(
+      self,
+  ) -> Optional[abstract_model_pb2.HyperparametersOptimizerLogs]:
+    """Returns the logs of the hyper-parameter tuning.
+
+    If the model is not trained with hyper-parameter tuning, returns None.
+    """
+
+    return self._model.hyperparameter_optimizer_logs()
+
 
 ModelType = TypeVar("ModelType", bound=GenericModel)

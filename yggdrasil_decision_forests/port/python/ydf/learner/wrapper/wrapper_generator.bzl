@@ -73,6 +73,7 @@ def py_wrap_yggdrasil_learners(
             "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
             "//ydf/dataset:dataset",
             "//ydf/learner:generic_learner",
+            "//ydf/learner:tuner",
         ],
         data = [":" + run_wrapper_name, ":" + wrapper_name],
     )

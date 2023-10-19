@@ -156,6 +156,9 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
     resume_training_snapshot_interval_seconds: Indicative number of seconds in 
       between snapshots when `try_resume_training=True`. Might be ignored by
       some learners.
+    tuner: If set, automatically select the best hyperparameters using the
+      provided tuner. When using distributed training, the tuning is
+      distributed.
   """
 
   def __init__(self,
@@ -175,7 +178,9 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       num_threads: Optional[int] = None,
       cache_path: Optional[str] = None,
       try_resume_training: bool = False,
-      resume_training_snapshot_interval_seconds: int = 1800):
+      resume_training_snapshot_interval_seconds: int = 1800,
+      tuner: Optional[tuner_lib.AbstractTuner] = None,
+      ):
 
     hyper_parameters = {
                       "a" : a,
@@ -207,6 +212,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       data_spec=data_spec,
       hyper_parameters=hyper_parameters,
       deployment_config=deployment_config,
+      tuner=tuner,
     )
 
   @classmethod

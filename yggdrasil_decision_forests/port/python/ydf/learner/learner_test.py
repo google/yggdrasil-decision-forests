@@ -17,6 +17,7 @@
 import collections
 import os
 import signal
+from typing import Tuple
 
 from absl import logging
 from absl.testing import absltest
@@ -27,6 +28,9 @@ from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.dataset import dataset
 from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
+from ydf.learner import tuner as tuner_lib
+from ydf.metric import metric
+from ydf.model import generic_model
 from ydf.utils import test_utils
 
 DatasetForTesting = collections.namedtuple(
@@ -82,7 +86,7 @@ class LearnerTest(absltest.TestCase):
       learner: generic_learner.GenericLearner,
       ds: DatasetForTesting,
       minimum_accuracy: float,
-  ):
+  ) -> Tuple[generic_model.GenericModel, metric.Evaluation, np.ndarray]:
     """Runs a battery of test on a model compatible with the adult dataset.
 
     The following tests are run:
@@ -292,6 +296,52 @@ class RandomForestLearnerTest(LearnerTest):
 
     with open("/tmp/evaluation.html", "w") as f:
       f.write(evaluation._repr_html_())
+
+  def test_tuner_manual(self):
+    pd_dataset = adult_dataset()
+    vds_train = dataset.create_vertical_dataset(pd_dataset.train)
+    vds_test = dataset.create_vertical_dataset(
+        pd_dataset.test, data_spec=vds_train.data_spec()
+    )
+    vds_dataset = DatasetForTesting(vds_train, vds_test, pd_dataset.label)
+
+    tuner = tuner_lib.RandomSearchTuner(num_trials=5, use_predefined_hps=True)
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label=pd_dataset.label,
+        tuner=tuner,
+        num_trees=30,
+    )
+
+    model, _, _ = self._check_adult_model(
+        learner, ds=vds_dataset, minimum_accuracy=0.864
+    )
+    logs = model.hyperparameter_optimizer_logs()
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.steps, 5)
+
+  def test_tuner_predefined(self):
+    pd_dataset = adult_dataset()
+    vds_train = dataset.create_vertical_dataset(pd_dataset.train)
+    vds_test = dataset.create_vertical_dataset(
+        pd_dataset.test, data_spec=vds_train.data_spec()
+    )
+    vds_dataset = DatasetForTesting(vds_train, vds_test, pd_dataset.label)
+
+    tuner = tuner_lib.RandomSearchTuner(num_trials=5)
+    tuner.choice("max_depth", [3, 4, 5])
+    tuner.choice("shrinkage", [0.1, 0.2, 0.3])
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label=pd_dataset.label,
+        tuner=tuner,
+        num_trees=30,
+    )
+
+    model, _, _ = self._check_adult_model(
+        learner, ds=vds_dataset, minimum_accuracy=0.864
+    )
+    logs = model.hyperparameter_optimizer_logs()
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.steps, 5)
 
 
 class CARTLearnerTest(LearnerTest):

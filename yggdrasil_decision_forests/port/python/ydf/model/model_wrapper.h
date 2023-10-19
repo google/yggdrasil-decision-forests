@@ -31,6 +31,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
@@ -84,6 +85,11 @@ class GenericCCModel {
 
   const dataset::proto::DataSpecification& data_spec() const {
     return model_->data_spec();
+  }
+
+  const std::optional<model::proto::HyperparametersOptimizerLogs>&
+  hyperparameter_optimizer_logs() const {
+    return model_->hyperparameter_optimizer_logs();
   }
 
  protected:
