@@ -18,6 +18,7 @@
 
 #include <pybind11/numpy.h>
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -100,6 +101,9 @@ class GenericCCModel {
 class DecisionForestCCModel : public GenericCCModel {
  public:
   int num_trees() const { return df_model_->num_trees(); }
+
+  absl::StatusOr<py::array_t<int32_t>> PredictLeaves(
+      const dataset::VerticalDataset& dataset);
 
  protected:
   // `model` and `df_model` must correspond to the same object.

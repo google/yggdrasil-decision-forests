@@ -88,7 +88,8 @@ void init_model(py::module_& m) {
              return absl::Substitute(
                  "<model_cc.DecisionForestCCModel of type $0.", a.name());
            })
-      .def("num_trees", &DecisionForestCCModel::num_trees);
+      .def("num_trees", &DecisionForestCCModel::num_trees)
+      .def("PredictLeaves", &DecisionForestCCModel::PredictLeaves);
 
   py::class_<RandomForestCCModel,
              /*parent class*/ DecisionForestCCModel>(m, "RandomForestCCModel")

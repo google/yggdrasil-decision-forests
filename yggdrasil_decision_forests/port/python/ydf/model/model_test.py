@@ -279,6 +279,23 @@ Use `model.describe()` for more details
     cc = model.to_cpp()
     logging.info("cc:\n%s", cc)
 
+  def test_predict_leaves(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "adult_binary_class_gbdt",
+    )
+    model = model_lib.load_model(model_path)
+
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+    dataset = pd.read_csv(dataset_path)
+
+    leaves = model.predict_leaves(dataset)
+    self.assertEqual(leaves.shape, (dataset.shape[0], model.num_trees()))
+    self.assertTrue(np.all(leaves >= 0))
+
 
 class RandomForestModelTest(absltest.TestCase):
 

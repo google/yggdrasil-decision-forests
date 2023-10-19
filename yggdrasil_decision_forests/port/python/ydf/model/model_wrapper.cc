@@ -29,6 +29,8 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -135,6 +137,24 @@ absl::Status GenericCCModel::Save(
     std::string_view directory,
     const std::optional<std::string> file_prefix) const {
   return model::SaveModel(directory, model_.get(), {file_prefix});
+}
+
+absl::StatusOr<py::array_t<int32_t>> DecisionForestCCModel::PredictLeaves(
+    const dataset::VerticalDataset& dataset) {
+  py::array_t<int32_t, py::array::c_style | py::array::forcecast> leaves;
+
+  const size_t num_examples = dataset.nrow();
+  const size_t num_trees = df_model_->num_trees();
+
+  leaves.resize({num_examples, num_trees});
+  auto unchecked_leaves = leaves.mutable_unchecked();
+  for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
+    auto dst = absl::MakeSpan(unchecked_leaves.mutable_data(example_idx, 0),
+                              num_trees);
+    RETURN_IF_ERROR(df_model_->PredictGetLeaves(dataset, example_idx, dst));
+  }
+
+  return leaves;
 }
 
 absl::StatusOr<std::unique_ptr<RandomForestCCModel>>

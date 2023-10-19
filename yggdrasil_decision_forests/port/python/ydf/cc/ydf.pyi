@@ -74,6 +74,10 @@ class GenericCCModel:
 
 class DecisionForestCCModel(GenericCCModel):
   def num_trees(self) -> int: ...
+  def PredictLeaves(
+      self,
+      dataset: VerticalDataset,
+  ) -> npt.NDArray[np.int32]: ...
 
 class RandomForestCCModel(DecisionForestCCModel):
   @property
