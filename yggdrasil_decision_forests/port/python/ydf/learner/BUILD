@@ -92,6 +92,18 @@ py_library(
     ],
 )
 
+py_library(
+    name = "tuner",
+    srcs = ["tuner.py"],
+    srcs_version = "PY3",
+    deps = [
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer:hyperparameters_optimizer_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers:random_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
+    ],
+)
+
 # Tests
 # =====
 
@@ -130,6 +142,23 @@ py_test(
         # tensorflow:tensorflow_no_contrib dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset",
+        "//ydf/utils:test_utils",
+    ],
+)
+
+py_test(
+    name = "tuner_test",
+    srcs = ["tuner_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":tuner",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer:hyperparameters_optimizer_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers:random_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
         "//ydf/utils:test_utils",
     ],
 )

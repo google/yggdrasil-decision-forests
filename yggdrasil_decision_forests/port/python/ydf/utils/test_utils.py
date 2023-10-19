@@ -25,6 +25,10 @@ def data_root_path() -> str:
   """Root directory of the repo."""
   return ""
 
+def assertProto2Equal(self: absltest.TestCase, a, b):
+  """Checks that protos "a" and "b" are equal."""
+  self.assertEqual(a, b)
+
 
 def ydf_test_data_path() -> str:
   return os.path.join(

@@ -32,6 +32,8 @@ py_library(
         # absl/testing:absltest dep,
         "@com_google_pybind11_abseil//pybind11_abseil:status.so",
     ],
+    deps = [
+    ],
 )
 
 # Tests
