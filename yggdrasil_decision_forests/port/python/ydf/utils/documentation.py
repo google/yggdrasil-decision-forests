@@ -15,7 +15,7 @@
 """Documentation URLs."""
 
 # TODO: Update to external documentation.
-URL_DOCUMENTATION = "http://go/pydf_doc/glossary.md"
+URL_DOCUMENTATION = "https://ydf.readthedocs.io"
 
 URL_CONFUSION_MATRIX = f"{URL_DOCUMENTATION}#confusion-matrix"
 URL_NUM_EXAMPLES = f"{URL_DOCUMENTATION}#number-of-examples"

@@ -3,7 +3,7 @@
 This page lists the **learners** (i.e. learning algorithms) and their respective
 hyper-parameters. Hyper-parameters can be set in one of two ways:
 
-1.  With a training protobuffer configuration. This option is recommended for
+1.  With a training protobuffer configuration. This option is recommanded for
     the CLI and C++ APIs. For example:
 
 ```
@@ -14,7 +14,7 @@ learner: "RANDOM_FOREST"
 ```
 
 1.  With a list of generic hyper-parameters i.e. a list of key values. This
-    option is recommended for the Python / TF-DF API. In the case of the TF-DF
+    option is recommanded for the Python / TF-DF API. In the case of the TF-DF
     API, the generic hyper-parameters can be feed through the model constructor.
     For example:
 
@@ -283,7 +283,8 @@ reasonable time.
 
 -   **Type:** Categorical **Default:** DEFAULT **Possible values:** DEFAULT,
     BINOMIAL_LOG_LIKELIHOOD, SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD,
-    LAMBDA_MART_NDCG5, XE_NDCG_MART, BINARY_FOCAL_LOSS, POISSON
+    LAMBDA_MART_NDCG5, XE_NDCG_MART, BINARY_FOCAL_LOSS, POISSON,
+    MEAN_AVERAGE_ERROR
 
 -   The loss optimized by the model. If not specified (DEFAULT) the loss is selected automatically according to the \"task\" and label statistics. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:<br>- `DEFAULT`: Select the loss automatically according to the task and label statistics.<br>- `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.<br>- `SQUARED_ERROR`: Least square loss. Only valid for regression.<br>- `POISSON`: Poisson log likelihood loss. Mainly used for counting problems. Only valid for regression.<br>- `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.<br>- `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5.<br>- `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.<br>
 
@@ -452,7 +453,7 @@ reasonable time.
 -   Ratio of the dataset (sampling without replacement) used to train individual
     trees for the random sampling method. If \"subsample\" is set and if
     \"sampling_method\" is NOT set or set to \"NONE\", then \"sampling_method\"
-    is implicitly set to \"RANDOM\". In other words, to enable random
+    is implicitely set to \"RANDOM\". In other words, to enable random
     subsampling, you only need to set "\"subsample\".
 
 #### [uplift_min_examples_in_treatment](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)

@@ -1,10 +1,15 @@
 # Changelog
 
-## Head
+## 1.7.0 - 2023-10-20
 
 ### Feature
 
 -   Add support for Mean average error (MAE) loss for GBT.
+
+### New interface
+
+-   Check out the new Python interface in port/python! It's still experimental
+    but you can already install it from PyPi with `pip install ydf`.
 
 ## 1.6.0 - 2023-09-28
 
