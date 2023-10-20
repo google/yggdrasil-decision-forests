@@ -32,6 +32,8 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils/benchmark:inference",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 

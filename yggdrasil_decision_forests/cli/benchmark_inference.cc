@@ -55,6 +55,8 @@
 
 #include "absl/flags/flag.h"
 #include "absl/status/status.h"
+#include "absl/time/time.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -92,18 +94,18 @@ std::string ResultsToString(
 
   // Sort the result from the fastest to the slowest.
   std::sort(results.begin(), results.end(), [](const auto& a, const auto& b) {
-    return a.avg_inference_duration < b.avg_inference_duration;
+    return a.duration_per_example < b.duration_per_example;
   });
 
   absl::StrAppendFormat(&report, "batch_size : %d  num_runs : %d\n",
-                        options.batch_size, options.num_runs);
+                        options.batch_size, options.runs->num_runs);
   absl::StrAppendFormat(&report, "time/example(us)  time/batch(us)  method\n");
   absl::StrAppendFormat(&report, "----------------------------------------\n");
   for (const auto& result : results) {
     absl::StrAppendFormat(
         &report, "%16.5g  %14.5g  %s\n",
-        absl::ToDoubleMicroseconds(result.avg_inference_duration),
-        absl::ToDoubleMicroseconds(result.avg_inference_duration *
+        absl::ToDoubleMicroseconds(result.duration_per_example),
+        absl::ToDoubleMicroseconds(result.duration_per_example *
                                    options.batch_size),
         result.name);
   }
@@ -122,12 +124,14 @@ absl::Status Benchmark() {
   if (dataset_path.empty()) {
     return absl::InvalidArgumentError("The --dataset is not specified.");
   }
-
-  const utils::BenchmarkInferenceRunOptions options{
+  const utils::BenchmarkInterfaceNumRunsOptions num_runs_options = {
       /*.num_runs =*/absl::GetFlag(FLAGS_num_runs),
-      /*.batch_size =*/absl::GetFlag(FLAGS_batch_size),
       /*.warmup_runs =*/absl::GetFlag(FLAGS_warmup_runs),
   };
+  const utils::BenchmarkInferenceRunOptions options{
+      /*.batch_size =*/absl::GetFlag(FLAGS_batch_size),
+      /*.runs =*/num_runs_options,
+      /*.time =*/absl::nullopt};
 
   YDF_LOG(INFO) << "Loading model";
   std::unique_ptr<model::AbstractModel> model;
@@ -148,8 +152,10 @@ absl::Status Benchmark() {
                 << " compatible fast engines.";
   for (const auto& engine_factory : engine_factories) {
     YDF_LOG(INFO) << "Running " << engine_factory->name();
-    RETURN_IF_ERROR(utils::BenchmarkFastEngineWithVirtualInterface(
-        options, *engine_factory, *model.get(), dataset, &results));
+    ASSIGN_OR_RETURN(auto engine, engine_factory->CreateEngine(model.get()));
+    RETURN_IF_ERROR(utils::BenchmarkFastEngine(options, *engine.get(),
+                                               *model.get(), dataset, &results,
+                                               engine_factory->name()));
   }
 
   if (absl::GetFlag(FLAGS_generic)) {

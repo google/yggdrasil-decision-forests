@@ -28,6 +28,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -37,6 +38,7 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
+#include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -44,6 +46,24 @@
 namespace py = ::pybind11;
 
 namespace yggdrasil_decision_forests::port::python {
+
+// This class is a pybind-compatible alternative to
+// utils::BenchmarkInferenceResult which does not use absl::Duration objects.
+struct BenchmarkInferenceCCResult {
+  double duration_per_example;
+  double benchmark_duration;
+  int num_runs;
+  int batch_size;
+
+  BenchmarkInferenceCCResult(const utils::BenchmarkInferenceResult& result)
+      : duration_per_example(
+            absl::ToDoubleSeconds(result.duration_per_example)),
+        benchmark_duration(absl::ToDoubleSeconds(result.benchmark_duration)),
+        num_runs(result.num_runs),
+        batch_size(result.batch_size) {}
+
+  std::string ToString() const;
+};
 
 class GenericCCModel {
  public:
@@ -61,6 +81,11 @@ class GenericCCModel {
   }
 
   std::vector<int> input_features() const { return model_->input_features(); }
+
+  // Benchmark the inference speed of the model.
+  absl::StatusOr<BenchmarkInferenceCCResult> Benchmark(
+      const dataset::VerticalDataset& dataset, const double benchmark_duration,
+      const double warmup_duration, const int batch_size);
 
   // Gets an engine of the model. If the engine does not exist, create it.
   // This method is not thread safe.

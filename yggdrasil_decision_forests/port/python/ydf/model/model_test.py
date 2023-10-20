@@ -296,6 +296,18 @@ Use `model.describe()` for more details
     self.assertEqual(leaves.shape, (dataset.shape[0], model.num_trees()))
     self.assertTrue(np.all(leaves >= 0))
 
+  def test_benchmark(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+    model = model_lib.load_model(model_path)
+    test_df = pd.read_csv(dataset_path)
+    benchmark_result = model.benchmark(test_df)
+    print(benchmark_result)
+
 
 class RandomForestModelTest(absltest.TestCase):
 

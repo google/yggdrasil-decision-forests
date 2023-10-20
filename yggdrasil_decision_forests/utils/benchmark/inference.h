@@ -20,24 +20,40 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/string_view.h"
+#include "absl/time/time.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
+#include "yggdrasil_decision_forests/serving/fast_engine.h"
 
 namespace yggdrasil_decision_forests::utils {
 
 // Result from a single run.
 struct BenchmarkInferenceResult {
   std::string name;
-  absl::Duration avg_inference_duration;
+  absl::Duration duration_per_example;
+  absl::Duration benchmark_duration;
+  int num_runs;
+  int batch_size;
+};
+
+struct BenchmarkInterfaceNumRunsOptions {
+  int num_runs;
+  int warmup_runs;
+};
+
+struct BenchmarkInterfaceTimingOptions {
+  double benchmark_duration;
+  double warmup_duration;
 };
 
 // How to run the benchmark.
 struct BenchmarkInferenceRunOptions {
-  int num_runs;
   int batch_size;
-  int warmup_runs;
+  absl::optional<BenchmarkInterfaceNumRunsOptions> runs;
+  absl::optional<BenchmarkInterfaceTimingOptions> time;
 };
 
 // Benchmark the inference time per example using the generic slow engine.
@@ -53,11 +69,12 @@ absl::Status BenchmarkGenericSlowEngine(
 // The benchmark measures one copy of the dataset (from the best possible
 // existing format; a simple memory copy in the best case) and one run of the
 // engine.
-absl::Status BenchmarkFastEngineWithVirtualInterface(
-    const BenchmarkInferenceRunOptions& options,
-    const model::FastEngineFactory& engine_factory,
-    const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
-    std::vector<BenchmarkInferenceResult>* results);
+absl::Status BenchmarkFastEngine(const BenchmarkInferenceRunOptions& options,
+                                 const serving::FastEngine& engine,
+                                 const model::AbstractModel& model,
+                                 const dataset::VerticalDataset& dataset,
+                                 std::vector<BenchmarkInferenceResult>* results,
+                                 absl::string_view engine_name = "");
 
 }  // namespace yggdrasil_decision_forests::utils
 

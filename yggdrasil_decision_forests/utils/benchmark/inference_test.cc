@@ -17,6 +17,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "gmock/gmock.h"
@@ -29,6 +30,7 @@
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests::utils {
 namespace {
@@ -48,28 +50,30 @@ TEST(BenchmarkInference, FastEngine) {
       absl::StrCat("csv:",
                    file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
       model->data_spec(), &dataset));
-  const BenchmarkInferenceRunOptions options{
-      /*.num_runs =*/2,
-      /*.batch_size =*/5,
+  const BenchmarkInterfaceNumRunsOptions num_runs_options = {
+      /*.num_runs =*/5,
       /*.warmup_runs =*/1,
   };
+  const BenchmarkInferenceRunOptions options{/*.batch_size =*/2,
+                                             /*.runs =*/num_runs_options,
+                                             /*.time =*/std::nullopt};
   std::vector<BenchmarkInferenceResult> results;
 
-  const auto engine_factories = model->ListCompatibleFastEngines();
-  ASSERT_THAT(engine_factories, testing::SizeIs(testing::Ge(1)));
-  auto& engine_factory = engine_factories[0];
-  ASSERT_OK(BenchmarkFastEngineWithVirtualInterface(options, *engine_factory,
-                                                    *model, dataset, &results));
+  ASSERT_OK_AND_ASSIGN(auto engine, model->BuildFastEngine());
+  ASSERT_OK(
+      BenchmarkFastEngine(options, *engine.get(), *model, dataset, &results));
   ASSERT_THAT(results, testing::SizeIs(1));
-  EXPECT_GT(absl::ToDoubleSeconds(results[0].avg_inference_duration), 0);
+  EXPECT_GT(absl::ToDoubleSeconds(results[0].duration_per_example), 0);
 }
 
 TEST(BenchmarkInference, GenericEngine) {
-  const BenchmarkInferenceRunOptions options{
-      /*.num_runs =*/2,
-      /*.batch_size =*/5,
+  const BenchmarkInterfaceNumRunsOptions num_runs_options = {
+      /*.num_runs =*/5,
       /*.warmup_runs =*/1,
   };
+  const BenchmarkInferenceRunOptions options{/*.batch_size =*/2,
+                                             /*.runs =*/num_runs_options,
+                                             /*.time =*/std::nullopt};
   std::vector<BenchmarkInferenceResult> results;
 
   std::unique_ptr<model::AbstractModel> model;
@@ -84,7 +88,7 @@ TEST(BenchmarkInference, GenericEngine) {
 
   ASSERT_OK(BenchmarkGenericSlowEngine(options, *model, dataset, &results));
   ASSERT_THAT(results, testing::SizeIs(1));
-  EXPECT_GT(absl::ToDoubleSeconds(results[0].avg_inference_duration), 0);
+  EXPECT_GT(absl::ToDoubleSeconds(results[0].duration_per_example), 0);
 }
 
 }  // namespace

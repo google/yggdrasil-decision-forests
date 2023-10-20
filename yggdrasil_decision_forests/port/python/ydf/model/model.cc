@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "ydf/model/model_wrapper.h"
+#include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 
@@ -79,7 +80,30 @@ void init_model(py::module_& m) {
       .def("Describe", &GenericCCModel::Describe, py::arg("full_details"))
       .def("input_features", &GenericCCModel::input_features)
       .def("hyperparameter_optimizer_logs",
-           &GenericCCModel::hyperparameter_optimizer_logs);
+           &GenericCCModel::hyperparameter_optimizer_logs)
+      .def("Benchmark", &GenericCCModel::Benchmark, py::arg("dataset"),
+           py::arg("benchmark_duration"), py::arg("warmup_duration"),
+           py::arg("batch_size"));
+
+  py::class_<BenchmarkInferenceCCResult>(m, "BenchmarkInferenceCCResult")
+      .def_readwrite("duration_per_example",
+                     &BenchmarkInferenceCCResult::duration_per_example)
+      .def_readwrite("benchmark_duration",
+                     &BenchmarkInferenceCCResult::benchmark_duration)
+      .def_readwrite("num_runs",
+                     &BenchmarkInferenceCCResult::num_runs)
+      .def_readwrite("batch_size", &BenchmarkInferenceCCResult::batch_size)
+      .def("__repr__",
+           [](const BenchmarkInferenceCCResult& a) { return a.ToString(); })
+      .doc() = R"(Results of the inference benchmark.
+
+  Attributes:
+      duration_per_example: Average duration per example in seconds.
+      benchmark_duration: Total duration of the benchmark run without warmup
+        runs in seconds.
+      num_runs: Number of times the benchmark fully ran over all
+        the examples of the dataset. Warmup runs are not included.
+      batch_size: Number of examples per batch used when benchmarking.)";
 
   py::class_<DecisionForestCCModel,
              /*parent class*/ GenericCCModel>(m, "DecisionForestCCModel")

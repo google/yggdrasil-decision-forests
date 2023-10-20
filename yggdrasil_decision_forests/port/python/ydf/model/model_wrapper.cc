@@ -29,6 +29,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_format.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -37,6 +38,7 @@
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
+#include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -157,6 +159,29 @@ absl::StatusOr<py::array_t<int32_t>> DecisionForestCCModel::PredictLeaves(
   return leaves;
 }
 
+// TODO: Pass utils::BenchmarkInferenceRunOptions directly.
+absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
+    const dataset::VerticalDataset& dataset, const double benchmark_duration,
+    const double warmup_duration, const int batch_size) {
+  std::vector<utils::BenchmarkInferenceResult> results;
+  const utils::BenchmarkInterfaceTimingOptions timing_options = {
+      /*.benchmark_duration =*/benchmark_duration,
+      /*.warmup_duration =*/warmup_duration,
+  };
+  const utils::BenchmarkInferenceRunOptions options{/*.batch_size =*/batch_size,
+                                                    /*.runs =*/std::nullopt,
+                                                    /*.time =*/timing_options};
+
+  // Run engines.
+  ASSIGN_OR_RETURN(const auto engine, GetEngine());
+  RETURN_IF_ERROR(
+      utils::BenchmarkFastEngine(options, *engine, *model_, dataset, &results));
+  if (results.empty()) {
+    return absl::InternalError("No benchmark results.");
+  }
+  return BenchmarkInferenceCCResult(results[0]);
+}
+
 absl::StatusOr<std::unique_ptr<RandomForestCCModel>>
 RandomForestCCModel::Create(std::unique_ptr<model::AbstractModel>& model_ptr) {
   auto* rf_model = dynamic_cast<YDFModel*>(model_ptr.get());
@@ -186,6 +211,14 @@ GradientBoostedTreesCCModel::Create(
 
   return std::make_unique<GradientBoostedTreesCCModel>(std::move(new_model_ptr),
                                                        gbt_model);
+}
+
+std::string BenchmarkInferenceCCResult::ToString() const {
+  return absl::StrFormat(
+      "Inference time per example and per cpu core: %.3f us "
+      "(microseconds)\nEstimated over %d runs over %.3f seconds.\n* Measured "
+      "with the C++ serving API. Check model.to_cpp() for details.",
+      duration_per_example * 1000000, num_runs, benchmark_duration);
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

@@ -8,8 +8,8 @@ import numpy.typing as npt
 from google3.third_party.yggdrasil_decision_forests.dataset import data_spec_pb2
 from google3.third_party.yggdrasil_decision_forests.learner import abstract_learner_pb2
 from google3.third_party.yggdrasil_decision_forests.metric import metric_pb2
-from google3.third_party.yggdrasil_decision_forests.model import hyperparameter_pb2
 from google3.third_party.yggdrasil_decision_forests.model import abstract_model_pb2
+from google3.third_party.yggdrasil_decision_forests.model import hyperparameter_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import model_analysis_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
 
@@ -49,6 +49,23 @@ class VerticalDataset:
 # Model bindings
 # ================
 
+class BenchmarkInferenceCCResult:
+  """Results of the inference benchmark.
+
+  Attributes:
+      duration_per_example: Average duration per example in seconds.
+      benchmark_duration: Total duration of the benchmark run without warmup
+        runs in seconds.
+      num_runs: Number of times the benchmark fully ran over all the examples of
+        the dataset. Warmup runs are not included.
+      batch_size: Number of examples per batch used when benchmarking.
+  """
+
+  duration_per_example: float
+  benchmark_duration: float
+  num_runs: int
+  batch_size: int
+
 class GenericCCModel:
   def Predict(
       self,
@@ -71,6 +88,13 @@ class GenericCCModel:
   def Describe(self, full_details: bool) -> str: ...
   def input_features(self) -> List[int]: ...
   def hyperparameter_optimizer_logs(self) -> Optional[abstract_model_pb2.HyperparametersOptimizerLogs]: ...
+  def Benchmark(
+      self,
+      dataset: VerticalDataset,
+      benchmark_duration: float,
+      warmup_duration: float,
+      batch_size: int,
+  ) -> BenchmarkInferenceCCResult: ...
 
 class DecisionForestCCModel(GenericCCModel):
   def num_trees(self) -> int: ...

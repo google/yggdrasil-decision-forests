@@ -14,14 +14,16 @@ cc_library_ydf(
     hdrs = ["inference.h"],
     deps = [
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
-        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/serving:example_set",
+        "//yggdrasil_decision_forests/serving:fast_engine",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -43,6 +45,7 @@ cc_test(
         "//yggdrasil_decision_forests/serving/decision_forest:register_engines",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "@com_google_googletest//:gtest_main",

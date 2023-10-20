@@ -77,6 +77,56 @@ Class: ydf.{self.__class__.__name__}
 Use `model.describe()` for more details
 """
 
+  def benchmark(
+      self,
+      ds: dataset.InputDataset,
+      benchmark_duration: float = 3,
+      warmup_duration: float = 1,
+      batch_size: int = 100,
+  ) -> ydf.BenchmarkInferenceCCResult:
+    """Benchmark the inference speed of the model on the given dataset.
+
+    This benchmark creates batched predictions on the given dataset using the
+    C++ API of Yggdrasil Decision Forests. Note that inference times using other
+    APIs or on different machines will be different. A serving template for the
+    C++ API can be generated with `to_cpp()`.
+
+    Args:
+      ds: Dataset to perform the benchmark on.
+      benchmark_duration: Total duration of the benchmark in seconds. Note that
+        this number is only indicative and the actual duration of the benchmark
+        may be shorter or longer. This parameter must be > 0.
+      warmup_duration: Total duration of the warmup runs before the benchmark in
+        seconds. During the warmup phase, the benchmark is run without being
+        timed. This allows warming up caches. The benchmark will always run at
+        least one batch for warmup. This parameter must be > 0.
+       batch_size: Size of batches when feeding examples to the inference
+         engines. The impact of this parameter on the results depends on the
+         architecture running the benchmark (notably, cache sizes).
+
+    Returns:
+      Benchmark results.
+    """
+    if benchmark_duration <= 0:
+      raise ValueError(
+          "The duration of the benchmark must be positive, got"
+          f" {benchmark_duration}"
+      )
+    if warmup_duration <= 0:
+      raise ValueError(
+          "The duration of the warmup phase must be positive, got"
+          f" {warmup_duration}."
+      )
+    if batch_size <= 0:
+      raise ValueError(
+          f"The batch size of the benchmark must be positive, got {batch_size}."
+      )
+    vds = dataset.create_vertical_dataset(ds, data_spec=self._model.data_spec())
+    result = self._model.Benchmark(
+        vds._dataset, benchmark_duration, warmup_duration, batch_size
+    )
+    return result
+
   def save(self, path, advanced_options=ModelIOOptions()) -> None:
     """Save the model to disk.
 

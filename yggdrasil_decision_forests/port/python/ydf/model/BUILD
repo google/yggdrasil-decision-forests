@@ -29,6 +29,8 @@ pybind_library(
         ":pydf_models",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/dataset:types",
@@ -47,6 +49,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:random",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
+        "@ydf_cc//yggdrasil_decision_forests/utils/benchmark:inference",
     ],
 )
 
@@ -66,6 +69,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
+        "@ydf_cc//yggdrasil_decision_forests/utils/benchmark:inference",
     ],
 )
 
@@ -78,6 +82,7 @@ py_library(
         # absl/logging dep,
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset",
         "//ydf/metric",
@@ -151,7 +156,6 @@ py_test(
     name = "model_test",
     srcs = ["model_test.py"],
     data = [
-        # absl/flags dep,
         # absl/testing:absltest dep,
         # numpy dep,
         # pandas dep,
