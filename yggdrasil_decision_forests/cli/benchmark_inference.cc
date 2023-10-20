@@ -50,11 +50,16 @@
 //   21.547          2154.8  Generic slow engine
 //   ----------------------------------------
 //
+#include <string>
+#include <vector>
+
 #include "absl/flags/flag.h"
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
+#include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 ABSL_FLAG(std::string, model, "", "Path to model.");
@@ -80,21 +85,9 @@ constexpr char kUsageMessage[] =
 
 namespace yggdrasil_decision_forests {
 
-// Result from a single run.
-struct Result {
-  std::string name;
-  absl::Duration avg_inference_duration;
-};
-
-// How to run the benchmark.
-struct RunOptions {
-  int num_runs;
-  int batch_size;
-  int warmup_runs;
-};
-
-std::string ResultsToString(const RunOptions& options,
-                            std::vector<Result> results) {
+std::string ResultsToString(
+    const utils::BenchmarkInferenceRunOptions& options,
+    std::vector<utils::BenchmarkInferenceResult> results) {
   std::string report;
 
   // Sort the result from the fastest to the slowest.
@@ -118,112 +111,6 @@ std::string ResultsToString(const RunOptions& options,
   return report;
 }
 
-absl::Status BenchmarkGenericSlowEngine(const RunOptions& options,
-                                        const model::AbstractModel& model,
-                                        const dataset::VerticalDataset& dataset,
-                                        std::vector<Result>* results) {
-  std::vector<float> predictions(dataset.nrow());
-
-  auto run_once = [&]() {
-    model::proto::Prediction prediction;
-    for (dataset::VerticalDataset::row_t example_idx = 0;
-         example_idx < dataset.nrow(); example_idx++) {
-      model.Predict(dataset, example_idx, &prediction);
-      switch (prediction.type_case()) {
-        case model::proto::Prediction::kClassification:
-          predictions[example_idx] =
-              prediction.classification().distribution().counts(2) /
-              prediction.classification().distribution().sum();
-          break;
-        case model::proto::Prediction::kRegression:
-          predictions[example_idx] = prediction.regression().value();
-          break;
-        case model::proto::Prediction::kRanking:
-          predictions[example_idx] = prediction.ranking().relevance();
-          break;
-        default:
-          YDF_LOG(INFO) << "Non supported task";
-      }
-    }
-  };
-
-  // Warming up.
-  for (int run_idx = 0; run_idx < options.warmup_runs; run_idx++) {
-    run_once();
-  }
-
-  // Run benchmark.
-  const auto start_time = absl::Now();
-  for (int run_idx = 0; run_idx < options.num_runs; run_idx++) {
-    run_once();
-  }
-  const auto end_time = absl::Now();
-
-  // Save results.
-  results->push_back(
-      {/*.name =*/"Generic slow engine",
-       /*.avg_inference_duration =*/
-       (end_time - start_time) / (options.num_runs * dataset.nrow())});
-  return absl::OkStatus();
-}
-
-absl::Status BenchmarkFastEngineWithVirtualInterface(
-    const RunOptions& options, const model::FastEngineFactory& engine_factory,
-    const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
-    std::vector<Result>* results) {
-  // Compile the model.
-  ASSIGN_OR_RETURN(const auto engine, engine_factory.CreateEngine(&model));
-  const auto& engine_features = engine->features();
-
-  // Convert dataset into the format expected by the engine.
-  const int64_t total_num_examples = dataset.nrow();
-  auto examples = engine->AllocateExamples(total_num_examples);
-  CHECK_OK(CopyVerticalDatasetToAbstractExampleSet(
-      dataset,
-      /*begin_example_idx=*/0,
-      /*end_example_idx=*/total_num_examples, engine_features, examples.get()));
-
-  // Allocate a batch of examples.
-  auto batch_of_examples = engine->AllocateExamples(options.batch_size);
-  const int64_t num_batches =
-      (total_num_examples + options.batch_size - 1) / options.batch_size;
-
-  std::vector<float> predictions(dataset.nrow());
-
-  auto run_once = [&]() {
-    for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
-      const int64_t begin_example_idx = batch_idx * options.batch_size;
-      const int64_t end_example_idx =
-          std::min(begin_example_idx + options.batch_size, total_num_examples);
-      // Copy the examples.
-      CHECK_OK(examples->Copy(begin_example_idx, end_example_idx,
-                              engine_features, batch_of_examples.get()));
-      // Runs the engine.
-      engine->Predict(*batch_of_examples, end_example_idx - begin_example_idx,
-                      &predictions);
-    }
-  };
-
-  // Warming up.
-  for (int run_idx = 0; run_idx < options.warmup_runs; run_idx++) {
-    run_once();
-  }
-
-  // Run benchmark.
-  const auto start_time = absl::Now();
-  for (int run_idx = 0; run_idx < options.num_runs; run_idx++) {
-    run_once();
-  }
-  const auto end_time = absl::Now();
-
-  // Save results.
-  results->push_back(
-      {/*.name =*/absl::StrCat(engine_factory.name(), " [virtual interface]"),
-       /*.avg_inference_duration =*/
-       (end_time - start_time) / (options.num_runs * dataset.nrow())});
-  return absl::OkStatus();
-}
-
 absl::Status Benchmark() {
   // Parse flags.
   const auto model_path = absl::GetFlag(FLAGS_model);
@@ -236,7 +123,7 @@ absl::Status Benchmark() {
     return absl::InvalidArgumentError("The --dataset is not specified.");
   }
 
-  const RunOptions options{
+  const utils::BenchmarkInferenceRunOptions options{
       /*.num_runs =*/absl::GetFlag(FLAGS_num_runs),
       /*.batch_size =*/absl::GetFlag(FLAGS_batch_size),
       /*.warmup_runs =*/absl::GetFlag(FLAGS_warmup_runs),
@@ -253,7 +140,7 @@ absl::Status Benchmark() {
       LoadVerticalDataset(dataset_path, model->data_spec(), &dataset,
                           /*ensure_non_missing=*/model->input_features()));
 
-  std::vector<Result> results;
+  std::vector<utils::BenchmarkInferenceResult> results;
 
   // Run engines.
   const auto engine_factories = model->ListCompatibleFastEngines();
@@ -261,14 +148,14 @@ absl::Status Benchmark() {
                 << " compatible fast engines.";
   for (const auto& engine_factory : engine_factories) {
     YDF_LOG(INFO) << "Running " << engine_factory->name();
-    RETURN_IF_ERROR(BenchmarkFastEngineWithVirtualInterface(
+    RETURN_IF_ERROR(utils::BenchmarkFastEngineWithVirtualInterface(
         options, *engine_factory, *model.get(), dataset, &results));
   }
 
   if (absl::GetFlag(FLAGS_generic)) {
     YDF_LOG(INFO) << "Running the slow generic engine";
     RETURN_IF_ERROR(
-        BenchmarkGenericSlowEngine(options, *model, dataset, &results));
+        utils::BenchmarkGenericSlowEngine(options, *model, dataset, &results));
   }
 
   // Show results.
