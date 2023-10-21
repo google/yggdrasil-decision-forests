@@ -20,6 +20,7 @@
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include <algorithm>
 #include <cmath>
@@ -43,6 +44,11 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+
+#ifdef _WIN32
+#include <cstddef>
+typedef std::ptrdiff_t ssize_t;
+#endif
 
 namespace py = ::pybind11;
 
