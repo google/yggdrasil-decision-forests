@@ -25,8 +25,8 @@ set BAZEL_SH=C:\msys64\usr\bin\bash.exe
 set BAZEL_FLAGS=--config=windows_cpp20 --config=windows_avx2
 %BAZEL% version
 
-@REM CALL :End2End 39 || goto :error
-@REM CALL :End2End 310 || goto :error
+CALL :End2End 39 || goto :error
+CALL :End2End 310 || goto :error
 CALL :End2End 311 || goto :error
 
 :: In case of error
