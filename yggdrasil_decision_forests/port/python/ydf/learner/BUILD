@@ -113,22 +113,27 @@ py_library(
 py_test(
     name = "learner_test",
     srcs = ["learner_test.py"],
-    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    data = [
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # numpy dep,
+        # pandas dep,
+        "@com_google_pybind11_abseil//pybind11_abseil:status.so",
+    ],
     python_version = "PY3",
     shard_count = 10,
     deps = [
         ":generic_learner",
         ":specialized_learners",
         ":tuner",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # numpy dep,
-        # pandas dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset",
         "//ydf/metric",
         "//ydf/model:generic_model",
         "//ydf/utils:test_utils",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )
 

@@ -29,6 +29,8 @@ unittest.util._MAX_LENGTH = 10000
 
 Semantic = dataset.Semantic
 VocabValue = ds_pb.CategoricalSpec.VocabValue
+Column = dataset.Column
+Monotonic = dataset.Monotonic
 
 
 class DatasetTest(parameterized.TestCase):
@@ -155,7 +157,7 @@ class DatasetTest(parameterized.TestCase):
         df,
         min_vocab_frequency=2,
         columns=[
-            dataset.Column(
+            Column(
                 "col2",
                 dataset.Semantic.CATEGORICAL,
                 min_vocab_frequency=1,
@@ -207,7 +209,7 @@ class DatasetTest(parameterized.TestCase):
         df,
         min_vocab_frequency=1,
         columns=[
-            dataset.Column(
+            Column(
                 "col1",
                 dataset.Semantic.CATEGORICAL,
             )
@@ -259,7 +261,7 @@ class DatasetTest(parameterized.TestCase):
 
   @parameterized.parameters(
       (["col_numerical"],),
-      ([dataset.Column("col_numerical")],),
+      ([Column("col_numerical")],),
       ([("col_numerical", dataset.Semantic.NUMERICAL)],),
   )
   def test_create_vds_exclude_columns(self, column_definition):
@@ -336,15 +338,53 @@ class DatasetTest(parameterized.TestCase):
 
   def test_normalize_column_defs(self):
     self.assertEqual(
-        dataset.normalize_column_defs(
-            ["a", "b", "c", "d", "e"],
+        dataset.normalize_column_defs([
+            "a",
+            ("b", Semantic.NUMERICAL),
+            Column("c"),
+            Column("d", Semantic.CATEGORICAL),
+        ]),
+        [
+            Column("a"),
+            Column("b", Semantic.NUMERICAL),
+            Column("c"),
+            Column("d", Semantic.CATEGORICAL),
+        ],
+    )
+
+  def test_normalize_column_defs_none(self):
+    self.assertIsNone(dataset.normalize_column_defs(None))
+
+  def test_get_all_columns(self):
+    self.assertEqual(
+        dataset.get_all_columns(
+            ["a", "b", "c", "d"],
             dataset.DataSpecInferenceArgs(
                 columns=[
-                    "a",
-                    ("b", Semantic.NUMERICAL),
-                    dataset.Column("c"),
-                    dataset.Column("d", Semantic.CATEGORICAL),
+                    Column("a"),
+                    Column("b", Semantic.NUMERICAL),
+                    Column("c", Semantic.CATEGORICAL),
                 ],
+                include_all_columns=False,
+                max_vocab_count=1,
+                min_vocab_frequency=1,
+                discretize_numerical_columns=False,
+                num_discretized_numerical_bins=1,
+            ),
+        ),
+        [
+            Column("a"),
+            Column("b", Semantic.NUMERICAL),
+            Column("c", Semantic.CATEGORICAL),
+        ],
+    )
+
+  def test_get_all_columns_include_all_columns(self):
+    self.assertEqual(
+        dataset.get_all_columns(
+            ["a", "b"],
+            dataset.DataSpecInferenceArgs(
+                columns=[Column("a")],
                 include_all_columns=True,
                 max_vocab_count=1,
                 min_vocab_frequency=1,
@@ -353,13 +393,24 @@ class DatasetTest(parameterized.TestCase):
             ),
         ),
         [
-            dataset.Column("a"),
-            dataset.Column("b", Semantic.NUMERICAL),
-            dataset.Column("c"),
-            dataset.Column("d", Semantic.CATEGORICAL),
-            dataset.Column("e"),
+            Column("a"),
+            Column("b"),
         ],
     )
+
+  def test_get_all_columns_missing(self):
+    with self.assertRaisesRegex(ValueError, "Column 'b' no found"):
+      dataset.get_all_columns(
+          ["a"],
+          dataset.DataSpecInferenceArgs(
+              columns=[Column("b")],
+              include_all_columns=True,
+              max_vocab_count=1,
+              min_vocab_frequency=1,
+              discretize_numerical_columns=False,
+              num_discretized_numerical_bins=1,
+          ),
+      )
 
   def test_priority(self):
     self.assertEqual(dataset.priority(1, 2), 1)
@@ -369,7 +420,7 @@ class DatasetTest(parameterized.TestCase):
   def test_categorical_column_guide(self):
     self.assertEqual(
         dataset.categorical_column_guide(
-            dataset.Column("a", Semantic.CATEGORICAL, max_vocab_count=3),
+            Column("a", Semantic.CATEGORICAL, max_vocab_count=3),
             dataset.DataSpecInferenceArgs(
                 columns=[],
                 include_all_columns=False,
@@ -487,10 +538,8 @@ class DatasetTest(parameterized.TestCase):
         "col_bool": [True, True, False, False],
     })
     feature_definitions = [
-        dataset.Column(
-            "col_str", dataset.Semantic.CATEGORICAL, min_vocab_frequency=1
-        ),
-        dataset.Column(
+        Column("col_str", dataset.Semantic.CATEGORICAL, min_vocab_frequency=1),
+        Column(
             "col_int_cat", dataset.Semantic.CATEGORICAL, min_vocab_frequency=1
         ),
     ]
@@ -518,7 +567,7 @@ four entries,4,8,4.4,0
     ds = dataset.create_vertical_dataset(
         df,
         columns=[
-            dataset.Column(
+            Column(
                 "col1",
                 dataset.Semantic.CATEGORICAL,
                 min_vocab_frequency=1,
@@ -558,7 +607,7 @@ four entries,4,8,4.4,0
       dataset.create_vertical_dataset(
           df,
           columns=[
-              dataset.Column(
+              Column(
                   "col1",
                   dataset.Semantic.CATEGORICAL,
                   max_vocab_count=-2,
@@ -591,11 +640,11 @@ four entries,4,8,4.4,0
     self.assertFalse(
         dataset.column_defs_contains_column(column_name, tuple_defs_negative)
     )
-    column_defs_positive = [dataset.Column("foo"), dataset.Column("target")]
+    column_defs_positive = [Column("foo"), Column("target")]
     self.assertTrue(
         dataset.column_defs_contains_column(column_name, column_defs_positive)
     )
-    column_defs_negative = [dataset.Column("foo"), dataset.Column("tar")]
+    column_defs_negative = [Column("foo"), Column("tar")]
     self.assertFalse(
         dataset.column_defs_contains_column(column_name, column_defs_negative)
     )
@@ -622,6 +671,42 @@ four entries,4,8,4.4,0
         ),
     )
     self.assertEqual(ds.data_spec(), expected_data_spec)
+
+
+class MonotonicTest(parameterized.TestCase):
+
+  @parameterized.parameters(
+      Monotonic.INCREASING,
+      Monotonic.DECREASING,
+  )
+  def test_already_normalized_value(self, value):
+    self.assertEqual(Column("f", monotonic=value).normalized_monotonic, value)
+
+  def test_already_normalized_value_none(self):
+    self.assertIsNone(Column("f", monotonic=None).normalized_monotonic)
+
+  @parameterized.parameters(
+      (+1, Monotonic.INCREASING),
+      (-1, Monotonic.DECREASING),
+  )
+  def test_normalize_value(self, non_normalized_value, normalized_value):
+    self.assertEqual(
+        Column("f", monotonic=non_normalized_value).normalized_monotonic,
+        normalized_value,
+    )
+
+  def test_normalize_value_none(self):
+    self.assertIsNone(Column("f", monotonic=0).normalized_monotonic)
+
+  def test_good_semantic(self):
+    _ = Column("f", monotonic=+1)
+    _ = Column("f", semantic=dataset.Semantic.NUMERICAL, monotonic=+1)
+
+  def test_bad_semantic(self):
+    with self.assertRaisesRegex(
+        ValueError, "with monotonic constraint is expected to have"
+    ):
+      _ = Column("feature", semantic=dataset.Semantic.CATEGORICAL, monotonic=+1)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@
 
 import copy
 import os
+import re
 from typing import Optional, Union
 
 from absl import logging
@@ -114,7 +115,9 @@ class GenericLearner:
     learner = self._get_learner()
     return model_lib.load_cc_model(learner.Train(vertical_dataset._dataset))  # pylint: disable=protected-access
 
-  def _get_learner(self) -> ydf.GenericCCLearner:
+  def _get_training_config(self) -> abstract_learner_pb2.TrainingConfig:
+    """Gets the training config proto."""
+
     training_config = abstract_learner_pb2.TrainingConfig(
         learner=self._learner_name,
         label=self._label,
@@ -123,8 +126,33 @@ class GenericLearner:
         uplift_treatment=self._uplift_treatment,
         task=self._task,
     )
+
+    # Apply monotonic constraints.
+    if self._data_spec_args.columns:
+      for feature in self._data_spec_args.columns:
+        if not feature.normalized_monotonic:
+          continue
+
+        proto_direction = (
+            abstract_learner_pb2.MonotonicConstraint.INCREASING
+            if feature.normalized_monotonic == dataset.Monotonic.INCREASING
+            else abstract_learner_pb2.MonotonicConstraint.DECREASING
+        )
+        training_config.monotonic_constraints.append(
+            abstract_learner_pb2.MonotonicConstraint(
+                feature=_feature_name_to_regex(feature.name),
+                direction=proto_direction,
+            )
+        )
+
     if self._tuner:
       training_config.MergeFrom(self._tuner.train_config)
+    return training_config
+
+  def _get_learner(self) -> ydf.GenericCCLearner:
+    """Gets a ready-to-train learner."""
+
+    training_config = self._get_training_config()
 
     hp_proto = hyperparameters.dict_to_generic_hyperparameter(
         self._hyperparameters
@@ -366,3 +394,9 @@ class GenericLearner:
       else:
         logging.info("Use %d thread(s) for training", num_threads)
     return num_threads
+
+
+def _feature_name_to_regex(name: str) -> str:
+  """Generates a regular expression capturing a feature by name."""
+
+  return "^" + re.escape(name) + "$"

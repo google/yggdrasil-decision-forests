@@ -261,9 +261,9 @@ from $1learner import tuner as tuner_lib
       absl::Substitute(R"(r"""Wrappers around the YDF learners.
 
 This file is generated automatically by running the following commands:
-  bazel build -c opt //ydf/learner:specialized_learners
-  bazel-bin/ydf/learner/specialized_learners_generator \
-    > ydf/learner/specialized_learners_pre_generated.py
+  bazel build //ydf/learner:specialized_learners\
+  && bazel-bin/ydf/learner/specialized_learners_generator\
+  > ydf/learner/specialized_learners_pre_generated.py
 
 Please don't change this file directly. Instead, changes the source. The
 documentation source is contained in the "GetGenericHyperParameterSpecification"
@@ -543,7 +543,7 @@ $3,
 $4
       }
     data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=features,
+        columns=dataset.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,

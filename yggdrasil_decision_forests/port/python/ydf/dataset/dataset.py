@@ -19,7 +19,7 @@ from dataclasses import dataclass  # pylint: disable=g-importing-member
 import enum
 import sys
 import typing
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 from absl import logging
 import numpy as np
@@ -45,10 +45,6 @@ A dataset can be one of the following:
 - A YDF VerticalDataset
 - A TensorFlow Batched Dataset
 """
-
-
-# The different ways a user can specify the columns of VerticalDataset.
-ColumnDefs = Optional[List[Union["Column", str, Tuple[str, "Semantic"]]]]
 
 
 class Semantic(enum.Enum):
@@ -130,6 +126,36 @@ SEMANTIC_TO_PROTO = {
 PROTO_TO_SEMANTIC = {v: k for k, v in SEMANTIC_TO_PROTO.items()}
 
 
+class Monotonic(enum.Enum):
+  """Monotonic constraint between a feature and the model output."""
+
+  INCREASING = 1
+  DECREASING = 2
+
+
+# Map between integer monotonic constraints (as commonly used by decision
+# forests libraries) and Monotonic enum value.
+_INTEGER_MONOTONIC_TUPLES = (
+    (0, None),
+    (1, Monotonic.INCREASING),
+    (-1, Monotonic.DECREASING),
+)
+
+
+def _build_integer_monotonic_map() -> Dict[int, Optional[Monotonic]]:
+  """Returns a mapping between integer monotonic constraints and enum value.
+
+  The returned value is always the same. So, when possible, create and reuse
+  the result instead of calling "_build_integer_monotonic_map" multiple times.
+  """
+
+  return {key: value for key, value in _INTEGER_MONOTONIC_TUPLES}
+
+
+# Various ways for a user to specify a monotonic constraint.
+MonotonicConstraint = Optional[Union[Monotonic, Literal[-1, 0, +1]]]
+
+
 @dataclass
 class Column(object):
   """Semantic and parameters for a single column.
@@ -156,6 +182,11 @@ class Column(object):
       "Out-of-vocabulary".
     num_discretized_numerical_bins: For DISCRETIZED_NUMERICAL columns only.
       Number of bins used to discretize DISCRETIZED_NUMERICAL columns.
+    monotonic: Monotonic constraints between the feature and the model output.
+      Use `None` (default; or 0) for an unconstrained feature. Use
+      `Monotonic.INCREASING` (or +1) to ensure the model is monotonically
+      increasing with the features. Use `Monotonic.DECREASING` (or -1) to ensure
+      the model is monotonically decreasing with the features.
   """
 
   name: str
@@ -163,6 +194,7 @@ class Column(object):
   max_vocab_count: Optional[int] = None
   min_vocab_frequency: Optional[int] = None
   num_discretized_numerical_bins: Optional[int] = None
+  monotonic: MonotonicConstraint = None
 
   def __post_init__(self):
     # Check matching between hyper-parameters and semantic.
@@ -188,12 +220,34 @@ class Column(object):
             " or semantic=CATEGORICAL_SET."
         )
 
+    self._normalized_monotonic = _normalize_monotonic_constraint(self.monotonic)
+
+    if self.monotonic and self.semantic and self.semantic != Semantic.NUMERICAL:
+      raise ValueError(
+          f"Feature {self.name!r} with monotonic constraint is expected to have"
+          " semantic=NUMERICAL or semantic=None (default). Got"
+          f" semantic={self.semantic!r} instead."
+      )
+
+  @property
+  def normalized_monotonic(self) -> Optional[Monotonic]:
+    """Returns the normalized version of the "monotonic" attribute."""
+
+    return self._normalized_monotonic
+
+
+# The different ways a user can specify the columns of VerticalDataset.
+ColumnDefs = Optional[List[Union[Column, str, Tuple[str, Semantic]]]]
+
+# Normalized version of "ColumnDefs".
+NormalizedColumnDefs = Optional[List[Column]]
+
 
 @dataclass
 class DataSpecInferenceArgs:
   """Arguments for the construction of a dataset."""
 
-  columns: ColumnDefs
+  columns: NormalizedColumnDefs
   include_all_columns: bool
   max_vocab_count: int
   min_vocab_frequency: int
@@ -415,7 +469,7 @@ def create_vertical_dataset(
     )
   else:
     inference_args = DataSpecInferenceArgs(
-        columns=columns,
+        columns=normalize_column_defs(columns),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
@@ -524,7 +578,7 @@ def create_vertical_dataset_from_dict_of_values(
   assert (data_spec is None) != (inference_args is None)
   dataset = VerticalDataset()
   if data_spec is None:
-    normalized_columns = normalize_column_defs(
+    normalized_columns = get_all_columns(
         available_columns=list(data.keys()),
         inference_args=inference_args,
     )
@@ -590,66 +644,93 @@ def infer_semantic(name: str, data: Any) -> Semantic:
   )
 
 
-def normalize_column_defs(
-    available_columns: List[str], inference_args: DataSpecInferenceArgs
-) -> List[Column]:
-  """Converts a user column set into a list of columns."""
+def get_all_columns(
+    available_columns: Sequence[str], inference_args: DataSpecInferenceArgs
+) -> Sequence[Column]:
+  """Gets all the columns to use by the model / learner.
 
-  columns = inference_args.columns
+  Args:
+    available_columns: All the available column names in the dataset.
+    inference_args: User configurations for the consuptions of columns.
+
+  Returns:
+    The list of model input columns.
+  """
+
+  if inference_args.columns is None:
+    # Select all the available columns and set an unknown semantic.
+    return [Column(f) for f in available_columns]
+
+  columns = copy.deepcopy(inference_args.columns)
+
+  # Check that the user specified columns exist.
+  available_columns_set = frozenset(available_columns)
+  for f in columns:
+    if f.name not in available_columns_set:
+      raise ValueError(
+          f"Column {f.name!r} no found. The available columns are:"
+          f" {available_columns}"
+      )
+
+  if inference_args.include_all_columns:
+    # Add the remaining columns. Set the semantic as "unknown".
+    existing_columns = {f.name for f in columns}
+    for f in available_columns:
+      if f in existing_columns:
+        # Skip columns already specified by the user.
+        continue
+      columns.append(Column(f))
+
+  return columns
+
+
+def normalize_column_defs(columns: ColumnDefs) -> NormalizedColumnDefs:
+  """Converts a user column set into a normalized list of columns.
+
+  Args:
+    columns: Columns as defined by the user.
+
+  Returns:
+    Normalized column definitions.
+  """
+
   if columns is None:
-    # Select all the available columns with an unknown semantic.
-    normalized_columns = [Column(f) for f in available_columns]
+    return None
 
   elif isinstance(columns, list):
-
-    def normalized_item(item) -> Column:
-      if isinstance(item, str):
-        # Raw column names
-        return Column(item)
-      elif isinstance(item, tuple):
-        # Tuples of column names and semantics
-        if (
-            len(item) != 2
-            or not isinstance(item[0], str)
-            or not isinstance(item[1], Semantic)
-        ):
-          raise ValueError(
-              "Column definition tuple should be a (name:str,"
-              f" semantic:Semantic). Instead, got {item}"
-          )
-        return Column(item[0], item[1])
-      elif isinstance(item, Column):
-        # An already normalized column
-        return item
-      else:
-        raise ValueError(f"Unsupported column item with type: {type(columns)}")
-
-    normalized_columns = [normalized_item(f) for f in columns]
-
-    # Check that the user specified columns exist
-    available_columns_set = set(available_columns)
-    for f in normalized_columns:
-      if f.name not in available_columns_set:
-        raise ValueError(
-            f"Column {f.name} no found. The available columns are:"
-            f" {available_columns}"
-        )
-
-    if inference_args.include_all_columns:
-      # Add the remaining columns with an unknown semantic.
-      existing_columns = {f.name for f in normalized_columns}
-      for f in available_columns:
-        if f in existing_columns:
-          # Skip columns already specified by the user
-          continue
-        normalized_columns.append(Column(f))
+    return [_normalized_column(column) for column in columns]
 
   else:
     raise ValueError(
         f"Unsupported column definition with type: {type(columns)}"
     )
 
-  return normalized_columns
+
+def _normalized_column(
+    column: Union[Column, str, Tuple[str, Semantic]]
+) -> Column:
+  """Normalizes a single column."""
+
+  if isinstance(column, str):
+    # Raw column names
+    return Column(column)
+  elif isinstance(column, tuple):
+    # Tuples of column names and semantics
+    if (
+        len(column) != 2
+        or not isinstance(column[0], str)
+        or not isinstance(column[1], Semantic)
+    ):
+      raise ValueError(
+          "Column definition tuple should be a (name:str,"
+          f" semantic:Semantic). Instead, got {column}"
+      )
+    return Column(column[0], column[1])
+  elif isinstance(column, Column):
+    # An already normalized column
+    return column
+  else:
+    raise ValueError(f"Unsupported column item with type: {type(column)}")
 
 
 def priority(a: Any, b: Any) -> Any:
@@ -711,3 +792,37 @@ def column_defs_contains_column(column_name: str, columns: ColumnDefs) -> bool:
     raise ValueError(
         f"Unsupported column definition with type: {type(columns)}"
     )
+
+
+def _normalize_monotonic_constraint(
+    constraint: MonotonicConstraint,
+) -> Optional[Monotonic]:
+  """Normalizes monotonic constraints provided by the user.
+
+  Args:
+    constraint: User monotonic constraints.
+
+  Returns:
+    Normalized monotonic constraint.
+
+  Raises:
+    ValueError: If the user input is not a valid monotonic constraint.
+  """
+
+  if isinstance(constraint, int):
+    monotonic_map = _build_integer_monotonic_map()
+    if constraint not in monotonic_map:
+      raise ValueError(
+          "monotonic argument provided as integer should be one of"
+          f" {list(monotonic_map)!r}. Got {constraint!r} instead"
+      )
+    constraint = monotonic_map[constraint]
+
+  if constraint is None or isinstance(constraint, Monotonic):
+    return constraint
+
+  raise ValueError(
+      "Unexpected monotonic value. monotonic value can be 0, +1, -1, None,"
+      " Monotonic.INCREASING, or Monotonic.DECREASING. Got"
+      f" {constraint!r} instead"
+  )

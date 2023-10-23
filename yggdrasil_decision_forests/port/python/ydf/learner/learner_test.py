@@ -24,7 +24,10 @@ from absl.testing import absltest
 import numpy as np
 import pandas as pd
 
+from pybind11_abseil import status
 from yggdrasil_decision_forests.dataset import data_spec_pb2
+from yggdrasil_decision_forests.learner import abstract_learner_pb2
+from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.dataset import dataset
 from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
@@ -32,6 +35,8 @@ from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
 from ydf.model import generic_model
 from ydf.utils import test_utils
+
+ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
 
 DatasetForTesting = collections.namedtuple(
     "Dataset",
@@ -352,6 +357,17 @@ class CARTLearnerTest(LearnerTest):
 
     self._check_adult_model(learner=learner, ds=ds, minimum_accuracy=0.853)
 
+  def test_monotonic_non_compatible_learner(self):
+    learner = specialized_learners.CartLearner(
+        label="label", features=[dataset.Column("feature", monotonic=+1)]
+    )
+    ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
+    with self.assertRaisesRegex(
+        status.StatusNotOk,
+        "The learner CART does not support monotonic constraints",
+    ):
+      _ = learner.train(ds)
+
 
 class GradientBoostedTreesLearnerTest(LearnerTest):
 
@@ -380,6 +396,71 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     self.assertEqual(
         learner.train(toy_dataset()).task(),
         generic_learner.Task.RANKING,
+    )
+
+  def test_monotonic_non_compatible_options(self):
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="label", features=[dataset.Column("feature", monotonic=+1)]
+    )
+    ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
+    with self.assertRaisesRegex(
+        status.StatusNotOk,
+        "Gradient Boosted Trees does not support monotonic constraints with"
+        " use_hessian_gain=false",
+    ):
+      _ = learner.train(ds)
+
+  def test_monotonic_training(self):
+    vds_dataset = adult_dataset()
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label=vds_dataset.label,
+        num_trees=70,
+        use_hessian_gain=True,
+        features=[
+            dataset.Column("age", monotonic=+1),
+            dataset.Column("hours_per_week", monotonic=-1),
+            dataset.Column("education_num", monotonic=+1),
+        ],
+        include_all_columns=True,
+    )
+
+    test_utils.assertProto2Equal(
+        self,
+        learner._get_training_config(),
+        abstract_learner_pb2.TrainingConfig(
+            learner="GRADIENT_BOOSTED_TREES",
+            label="income",
+            task=abstract_model_pb2.Task.CLASSIFICATION,
+            monotonic_constraints=[
+                ProtoMonotonicConstraint(
+                    feature="^age$",
+                    direction=ProtoMonotonicConstraint.INCREASING,
+                ),
+                ProtoMonotonicConstraint(
+                    feature="^hours_per_week$",
+                    direction=ProtoMonotonicConstraint.DECREASING,
+                ),
+                ProtoMonotonicConstraint(
+                    feature="^education_num$",
+                    direction=ProtoMonotonicConstraint.INCREASING,
+                ),
+            ],
+        ),
+    )
+
+    model, _, _ = self._check_adult_model(
+        learner, ds=vds_dataset, minimum_accuracy=0.864
+    )
+
+    _ = model.analyze(vds_dataset.test)
+
+
+class UtilityTest(LearnerTest):
+
+  def test_feature_name_to_regex(self):
+    self.assertEqual(
+        generic_learner._feature_name_to_regex("a(z)e"), r"^a\(z\)e$"
     )
 
 

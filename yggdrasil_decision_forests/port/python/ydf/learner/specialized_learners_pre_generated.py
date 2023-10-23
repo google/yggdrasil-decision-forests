@@ -15,9 +15,9 @@
 r"""Wrappers around the YDF learners.
 
 This file is generated automatically by running the following commands:
-  bazel build -c opt //ydf/learner:specialized_learners
-  bazel-bin/ydf/learner/specialized_learners_generator \
-    > ydf/learner/specialized_learners_pre_generated.py
+  bazel build //ydf/learner:specialized_learners\
+  && bazel-bin/ydf/learner/specialized_learners_generator\
+  > ydf/learner/specialized_learners_pre_generated.py
 
 Please don't change this file directly. Instead, changes the source. The
 documentation source is contained in the "GetGenericHyperParameterSpecification"
@@ -386,7 +386,7 @@ class CartLearner(generic_learner.GenericLearner):
         "validation_ratio": validation_ratio,
     }
     data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=features,
+        columns=dataset.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
@@ -420,6 +420,7 @@ class CartLearner(generic_learner.GenericLearner):
     return abstract_learner_pb2.LearnerCapabilities(
         support_partial_cache_dataset_format=False
     )
+
 
 class GradientBoostedTreesLearner(generic_learner.GenericLearner):
   r"""Gradient Boosted Trees learning algorithm.
@@ -928,7 +929,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         "validation_ratio": validation_ratio,
     }
     data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=features,
+        columns=dataset.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
@@ -1009,7 +1010,7 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
       CATEGORICAL_SET columns stored as strings. If more unique values exist,
       only the most frequent values are kept, and the remaining values are
       considered as out-of-vocabulary.
-    min_vocab_frequency: Minimum number of occurence of a value for CATEGORICAL
+    min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
       and CATEGORICAL_SET columns. Value observed less than
       `min_vocab_frequency` are considered as out-of-vocabulary.
     discretize_numerical_columns: If true, discretize all the numerical columns
@@ -1102,7 +1103,7 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
         "random_seed": random_seed,
     }
     data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=features,
+        columns=dataset.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
@@ -1548,7 +1549,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
         "winner_take_all": winner_take_all,
     }
     data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=features,
+        columns=dataset.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,

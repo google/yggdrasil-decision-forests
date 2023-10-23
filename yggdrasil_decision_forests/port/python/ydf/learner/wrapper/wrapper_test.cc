@@ -187,7 +187,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
 
       }
     data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=features,
+        columns=dataset.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
