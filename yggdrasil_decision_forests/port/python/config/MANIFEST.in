@@ -4,3 +4,4 @@ include CHANGELOG.md
 recursive-include * *.so
 recursive-include * *.dylib
 recursive-include * *.dll
+recursive-include * *.pyd

@@ -1,39 +1,13 @@
 # Bazel configuration for Yggdrasil Decision Forests
-#
-# OPTIONS
-#
-# Linux
-#   linux_cpp17: Linux build. Uses C++17.
-#
-# Linux options:
-#
-#   linux_avx2: AVX2.
-#
-# Windows
-#
-#  On Windows, uncomment the output_user_root option to avoid long path issues.
-#
-#   windows_cpp17: Windows build. Uses C++17.
-#
-# Windows options:
-#
-#   windows_avx2: AVX2.
-#
 
 # Common flags.
 common --experimental_repo_remote_exec
 
-# Avoid long path issues on Windows
+# On Windows, uncomment the next line to solve long path issues:
 # startup --output_user_root=C:/tmpbld
-
-# Flags to compile with or without recent version of Bazel.
-
-# Required for bazel <=4, fails with bazel >= 5.
-# common --incompatible_restrict_string_escapes=false
 
 build -c opt
 build --announce_rc
-build --noincompatible_strict_action_env
 
 # Enable after adding python headers to protobuf.
 build --define=use_fast_cpp_protos=true
@@ -58,10 +32,6 @@ build:linux_cpp17 --config=linux
 build:macos --cxxopt=-std=c++17
 build:macos --host_cxxopt=-std=c++17
 
-build:windows_cpp17 --cxxopt=/std:c++17
-build:windows_cpp17 --host_cxxopt=/std:c++17
-build:windows_cpp17 --config=windows
-
 build:windows_cpp20 --cxxopt=/std:c++20
 build:windows_cpp20 --host_cxxopt=/std:c++20
 build:windows_cpp20 --config=windows
@@ -71,6 +41,8 @@ build:linux_avx2 --copt=-mavx2
 build:windows_avx2 --copt=/arch:AVX2
 
 # Misc build options we need for windows.
+build:windows --copt=/Zc:__cplusplus
+build:windows --host_copt=/Zc:__cplusplus
 build:windows --copt=/D_USE_MATH_DEFINES
 build:windows --host_copt=/D_USE_MATH_DEFINES
 build:windows --copt=-DWIN32_LEAN_AND_MEAN
@@ -79,17 +51,24 @@ build:windows --copt=-DNOGDI
 build:windows --host_copt=-DNOGDI
 build:windows --linkopt=/NDEBUG
 build:windows --host_linkopt=/NDEBUG
+# Eliminates functions never referenced
 build:windows --linkopt=/OPT:REF
 build:windows --host_linkopt=/OPT:REF
+# Redundant COMDATs
 build:windows --linkopt=/OPT:ICF
 build:windows --host_linkopt=/OPT:ICF
-build:windows --experimental_strict_action_env=true
+# Enable preprocessor conformance mode
 build:windows --copt=/Zc:preprocessor
 build:windows --host_copt=/Zc:preprocessor
+ # Generate Intrinsic Functions
+build:windows --copt=/Oi
+build:windows --host_copt=/Oi
+ # Whole program optimization (not for tooling)
+build:windows --copt=/GL
+# Enable Function-Level Linking
+build:windows --copt=/Gy
+build:windows --host_copt=/Gy
 build:windows --materialize_param_files
 build:windows --features=compiler_param_file
 build:windows --verbose_failures
-build:windows --copt=/Oi
-build:windows --host_copt=/Oi
-build:windows --copt=/GL
-build:windows --host_copt=/GL
+build:windows --experimental_strict_action_env=true

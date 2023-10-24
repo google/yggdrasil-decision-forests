@@ -50,7 +50,10 @@ std::atomic<bool> stop_training = false;
 
 // Existing interruption signal handler (if any).
 void (*existing_signal_handler_int)(int) = nullptr;
+
+#ifndef _WIN32
 void (*existing_signal_handler_alarm)(int) = nullptr;
+#endif
 
 void ReceiveSigna(int signal) {
   if (!stop_training) {
@@ -61,9 +64,12 @@ void ReceiveSigna(int signal) {
     if (signal == SIGINT && existing_signal_handler_int) {
       existing_signal_handler_int(signal);
     }
+    // SIGALRM does not exist on Windows.
+#ifndef _WIN32
     if (signal == SIGALRM && existing_signal_handler_alarm) {
       existing_signal_handler_alarm(signal);
     }
+#endif
   }
 }
 
@@ -74,10 +80,12 @@ void EnableUserInterruption() {
     if (existing_signal_handler_int == SIG_ERR) {
       YDF_LOG(WARNING) << "Cannot set SIGINT handler";
     }
+#ifndef _WIN32
     existing_signal_handler_alarm = std::signal(SIGALRM, ReceiveSigna);
     if (existing_signal_handler_alarm == SIG_ERR) {
       YDF_LOG(WARNING) << "Cannot set SIGALRM handler";
     }
+#endif
   }
 }
 
@@ -93,10 +101,12 @@ void DisableUserInterruption() {
       std::signal(SIGINT, existing_signal_handler_int) == SIG_ERR) {
     YDF_LOG(WARNING) << "Cannot unset SIGINT handler";
   }
+#ifndef _WIN32
   if (existing_signal_handler_alarm &&
       std::signal(SIGALRM, existing_signal_handler_alarm) == SIG_ERR) {
     YDF_LOG(WARNING) << "Cannot unset SIGALRM handler";
   }
+#endif
 }
 
 class GenericCCLearner {
