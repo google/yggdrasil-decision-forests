@@ -37,7 +37,7 @@ Decision forests are not well natively suited images, texts, time series data or
 graph data. On such type of data, neural networks generally perform better.
 
 For advanced users, training a decision forest **on top** of a pre-trained
-neural networks is a gread path for combining the strengths of decision forests
+neural networks is a great path for combining the strengths of decision forests
 and neural networks on non-tabular data. For more information check out 
 [this tutorial on Google Colab](https://www.tensorflow.org/decision_forests/tutorials/intermediate_colab).
 
