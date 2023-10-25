@@ -113,7 +113,9 @@ void init_model(py::module_& m) {
                  "<model_cc.DecisionForestCCModel of type $0.", a.name());
            })
       .def("num_trees", &DecisionForestCCModel::num_trees)
-      .def("PredictLeaves", &DecisionForestCCModel::PredictLeaves);
+      .def("PredictLeaves", &DecisionForestCCModel::PredictLeaves)
+      .def("Distance", &DecisionForestCCModel::Distance, py::arg("dataset1"),
+           py::arg("dataset2"));
 
   py::class_<RandomForestCCModel,
              /*parent class*/ DecisionForestCCModel>(m, "RandomForestCCModel")

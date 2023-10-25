@@ -1,5 +1,11 @@
 # Changelog
 
+## Head
+
+### Features
+
+-   Add `model.distance(...)` to compute pairwise distance between examples.
+
 ## 0.0.3 - 2023-10-20
 
 ### Features

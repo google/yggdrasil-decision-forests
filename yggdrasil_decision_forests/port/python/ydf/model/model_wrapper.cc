@@ -159,6 +159,18 @@ absl::StatusOr<py::array_t<int32_t>> DecisionForestCCModel::PredictLeaves(
   return leaves;
 }
 
+absl::StatusOr<py::array_t<float>> DecisionForestCCModel::Distance(
+    const dataset::VerticalDataset& dataset1,
+    const dataset::VerticalDataset& dataset2) {
+  py::array_t<float, py::array::c_style | py::array::forcecast> distances;
+  const size_t n1 = dataset1.nrow();
+  const size_t n2 = dataset2.nrow();
+  distances.resize({n1, n2});
+  auto dst = absl::MakeSpan(distances.mutable_data(), n1 * n2);
+  RETURN_IF_ERROR(df_model_->Distance(dataset1, dataset2, dst));
+  return distances;
+}
+
 // TODO: Pass utils::BenchmarkInferenceRunOptions directly.
 absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
     const dataset::VerticalDataset& dataset, const double benchmark_duration,

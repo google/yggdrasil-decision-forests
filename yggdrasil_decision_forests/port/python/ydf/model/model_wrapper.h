@@ -130,6 +130,10 @@ class DecisionForestCCModel : public GenericCCModel {
   absl::StatusOr<py::array_t<int32_t>> PredictLeaves(
       const dataset::VerticalDataset& dataset);
 
+  absl::StatusOr<py::array_t<float>> Distance(
+      const dataset::VerticalDataset& dataset1,
+      const dataset::VerticalDataset& dataset2);
+
  protected:
   // `model` and `df_model` must correspond to the same object.
   DecisionForestCCModel(std::unique_ptr<model::AbstractModel>&& model,
