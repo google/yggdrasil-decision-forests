@@ -299,7 +299,7 @@ class VerticalDataset:
       if column_data.dtype != np.float32:
         # TODO: Add control for warning (flag or count).
         logging.info(
-            "Column '%s' with numerical semantic has dtype %s. Casting value to"
+            "Column '%s' with NUMERICAL semantic has dtype %s. Casting value to"
             " float32.",
             column.name,
             column_data.dtype.name,
@@ -309,11 +309,12 @@ class VerticalDataset:
           column_data = column_data.astype(np.float32)
         except ValueError as e:
           raise ValueError(
-              f"Cannot convert NUMERICAL column {column.name!r} with"
-              f" content={column_data!r} to np.float32 values. If"
-              " the column is a label, make sure the training task is"
-              " compatible. For example, you cannot train a regression model"
-              " (task=ydf.Task.REGRESSION) on a string column."
+              f"Cannot convert NUMERICAL column {column.name!r} of type"
+              f" {_type(column_data)} and with content={column_data!r} to"
+              " np.float32 values.\nNote: If the column is a label, make sure"
+              " the training task is compatible. For example, you cannot train"
+              " a regression model (task=ydf.Task.REGRESSION) on a string"
+              " column."
           ) from e
 
       self._dataset.PopulateColumnNumericalNPFloat32(
@@ -336,6 +337,7 @@ class VerticalDataset:
       elif column_data.dtype.type in [
           np.object_,
           np.string_,
+          np.bool_,
           np.int8,
           np.int16,
           np.int32,
@@ -352,11 +354,12 @@ class VerticalDataset:
           np.float64,
       ]:
         raise ValueError(
-            f"Column {column.name!r} with semantic={column.semantic} should not"
-            f" contain floating point values. Got {original_column_data!r}. If"
-            " the column is a label, make sure the correct task is selected."
-            " For example, you cannot train a classification model"
-            " (task=ydf.Task.CLASSIFICATION) with floating point labels."
+            f"Cannot import column {column.name!r} with"
+            f" semantic={column.semantic} as it contains floating point values."
+            f" Got {original_column_data!r}.\nNote: If the column is a label,"
+            " make sure the correct task is selected. For example, you cannot"
+            " train a classification model (task=ydf.Task.CLASSIFICATION) with"
+            " floating point labels."
         )
 
       if column_data.dtype.type == np.bytes_:
@@ -372,8 +375,13 @@ class VerticalDataset:
         return
 
     raise ValueError(
-        f"Column {column.name!r} with semantic={column.semantic} and"
-        f" content={original_column_data!r} is not supported"
+        f"Cannot import column {column.name!r} with semantic={column.semantic},"
+        f" type={_type(original_column_data)} and"
+        f" content={original_column_data!r}.\nNote: If the column is a label,"
+        " the semantic was selected based on the task. For example,"
+        " task=ydf.Task.CLASSIFICATION requires a CATEGORICAL compatible label"
+        " column, and task=ydf.Task.REGRESSION requires a NUMERICAL compatible"
+        " label column."
     )
 
   def _initialize_from_data_spec(
@@ -826,3 +834,12 @@ def _normalize_monotonic_constraint(
       " Monotonic.INCREASING, or Monotonic.DECREASING. Got"
       f" {constraint!r} instead"
   )
+
+
+def _type(value: Any) -> str:
+  """Returns a string representation of the type of value."""
+
+  if isinstance(value, np.ndarray):
+    return f"numpy's array of '{value.dtype.name}'"
+  else:
+    return str(type(value))

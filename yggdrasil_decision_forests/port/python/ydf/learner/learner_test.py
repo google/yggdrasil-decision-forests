@@ -348,6 +348,24 @@ class RandomForestLearnerTest(LearnerTest):
     self.assertIsNotNone(logs)
     self.assertLen(logs.steps, 5)
 
+  def test_label_type_error_message(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'l' with semantic=Semantic.CATEGORICAL",
+    ):
+      _ = specialized_learners.GradientBoostedTreesLearner(
+          label="l", task=generic_learner.Task.CLASSIFICATION
+      ).train(pd.DataFrame({"l": [1.0, 2.0], "f": [0, 1]}))
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot convert NUMERICAL column 'l' of type numpy's array of 'object'"
+        " and with content=",
+    ):
+      _ = specialized_learners.GradientBoostedTreesLearner(
+          label="l", task=generic_learner.Task.REGRESSION
+      ).train(pd.DataFrame({"l": ["A", "B"], "f": [0, 1]}))
+
 
 class CARTLearnerTest(LearnerTest):
 
