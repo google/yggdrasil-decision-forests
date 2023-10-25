@@ -366,6 +366,26 @@ class RandomForestLearnerTest(LearnerTest):
           label="l", task=generic_learner.Task.REGRESSION
       ).train(pd.DataFrame({"l": ["A", "B"], "f": [0, 1]}))
 
+  def test_with_validation(self):
+    train_ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_train.csv"
+        )
+    )
+    test_ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+        )
+    )
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "The learner 'RandomForestLearner' does not use a validation dataset",
+    ):
+      _ = specialized_learners.RandomForestLearner(
+          label="income", num_trees=50
+      ).train(train_ds, valid=test_ds)
+
 
 class CARTLearnerTest(LearnerTest):
 
@@ -472,6 +492,28 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     )
 
     _ = model.analyze(vds_dataset.test)
+
+  def test_with_validation(self):
+    train_ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_train.csv"
+        )
+    )
+    test_ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+        )
+    )
+    evaluation = (
+        specialized_learners.GradientBoostedTreesLearner(
+            label="income", num_trees=50
+        )
+        .train(train_ds, valid=test_ds)
+        .evaluate(test_ds)
+    )
+
+    logging.info("evaluation:\n%s", evaluation)
+    self.assertAlmostEqual(evaluation.accuracy, 0.87, 1)
 
 
 class UtilityTest(LearnerTest):

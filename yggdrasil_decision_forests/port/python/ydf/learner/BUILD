@@ -38,6 +38,7 @@ pybind_library(
         "//ydf/model:model_wrapper",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/types:optional",
         "@com_google_pybind11_abseil//pybind11_abseil:status_casters",
         "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",

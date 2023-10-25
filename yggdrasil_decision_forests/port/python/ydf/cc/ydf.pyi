@@ -130,7 +130,11 @@ def ModelAnalysisCreateHtmlReport(
 # ================
 
 class GenericCCLearner:
-  def Train(self, dataset: VerticalDataset) -> ModelCCType: ...
+  def Train(
+      self,
+      dataset: VerticalDataset,
+      validation_dataset: Optional[VerticalDataset] = None,
+  ) -> ModelCCType: ...
   def Evaluate(
       self,
       dataset: VerticalDataset,

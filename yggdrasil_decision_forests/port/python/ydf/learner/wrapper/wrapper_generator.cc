@@ -425,8 +425,7 @@ $0
     const auto nice_learner_name = LearnerKeyToNiceLearnerName(learner_key);
 
     // TODO: Add support for hyperparameter templates.
-    absl::SubstituteAndAppend(
-        &wrapper, R"(
+    absl::SubstituteAndAppend(&wrapper, R"(
 class $0(generic_learner.GenericLearner):
   r"""$6 learning algorithm.
 
@@ -570,21 +569,38 @@ $4
       deployment_config=deployment_config,
       tuner=tuner,
     )
+)",
+                              /*$0*/ class_name, /*$1*/ learner_key,
+                              /*$2*/ fields_documentation,
+                              /*$3*/ fields_constructor, /*$4*/ fields_dict,
+                              /*$5*/ free_text_documentation,
+                              /*$6*/ nice_learner_name,
+                              /*$7*/ predefined_hp_list);
 
+    const auto bool_rep = [](const bool value) -> std::string {
+      return value ? "True" : "False";
+    };
+
+    const auto capabilities = learner->Capabilities();
+    absl::SubstituteAndAppend(
+        &wrapper, R"(
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
-      support_partial_cache_dataset_format=$8)
+      support_max_training_duration=$0,
+      resume_training=$1,
+      support_validation_dataset=$2,
+      support_partial_cache_dataset_format=$3,
+      support_max_model_size_in_memory=$4,
+      support_monotonic_constraints=$5,
+    )
 )",
-        /*$0*/ class_name, /*$1*/ learner_key,
-        /*$2*/ fields_documentation,
-        /*$3*/ fields_constructor, /*$4*/ fields_dict,
-        /*$5*/ free_text_documentation,
-        /*$6*/ nice_learner_name,
-        /*$7*/ predefined_hp_list,
-        /*$8*/ learner->Capabilities().support_partial_cache_dataset_format()
-            ? "True"
-            : "False");
+        /*$0*/ bool_rep(capabilities.support_max_training_duration()),
+        /*$1*/ bool_rep(capabilities.resume_training()),
+        /*$2*/ bool_rep(capabilities.support_validation_dataset()),
+        /*$3*/ bool_rep(capabilities.support_partial_cache_dataset_format()),
+        /*$4*/ bool_rep(capabilities.support_max_model_size_in_memory()),
+        /*$5*/ bool_rep(capabilities.support_monotonic_constraints()));
   }
 
   return wrapper;

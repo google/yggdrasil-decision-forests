@@ -40,13 +40,19 @@ from ydf.learner import generic_learner
 from ydf.learner import tuner as tuner_lib
 
 
-class CartLearner(generic_learner.GenericLearner):
-  r"""Cart learning algorithm.
+class RandomForestLearner(generic_learner.GenericLearner):
+  r"""Random Forest learning algorithm.
 
-  A CART (Classification and Regression Trees) a decision tree. The non-leaf
-  nodes contains conditions (also known as splits) while the leaf nodes contain
-  prediction values. The training dataset is divided in two parts. The first is
-  used to grow the tree while the second is used to prune the tree.
+  A Random Forest (https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf)
+  is a collection of deep CART decision trees trained independently and without
+  pruning. Each tree is trained on a random subset of the original training
+  dataset (sampled with replacement).
+
+  The algorithm is unique in that it is robust to overfitting, even in extreme
+  cases e.g. when there are more features than training examples.
+
+  It is probably the most well-known of the Decision Forest training
+  algorithms.
 
   Usage example:
 
@@ -56,7 +62,7 @@ class CartLearner(generic_learner.GenericLearner):
 
   dataset = pd.read_csv("project/dataset.csv")
 
-  model = ydf.CartLearner().train(dataset)
+  model = ydf.RandomForestLearner().train(dataset)
 
   print(model.summary())
   ```
@@ -105,8 +111,23 @@ class CartLearner(generic_learner.GenericLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
       `num_discretized_numerical_bins` will be ignored.
+    adapt_bootstrap_size_ratio_for_maximum_training_duration: Control how the
+      maximum training duration (if set) is applied. If false, the training stop
+      when the time is used. If true, adapts the size of the sampled dataset
+      used to train each tree such that `num_trees` will train within
+      `maximum_training_duration`. Has no effect if there is no maximum training
+      duration specified. Default: False.
     allow_na_conditions: If true, the tree training evaluates conditions of the
       type `X is NA` i.e. `X is missing`. Default: False.
+    bootstrap_size_ratio: Number of examples used to train each trees; expressed
+      as a ratio of the training dataset size. Default: 1.0.
+    bootstrap_training_dataset: If true (default), each tree is trained on a
+      separate dataset sampled with replacement from the original dataset. If
+      false, all the trees are trained on the entire same dataset. If
+      bootstrap_training_dataset:false, OOB metrics are not available.
+        bootstrap_training_dataset=false is used in "Extremely randomized trees"
+        (https://link.springer.com/content/pdf/10.1007%2Fs10994-006-6226-1.pdf).
+      Default: True.
     categorical_algorithm: How to learn splits on categorical attributes. -
       `CART`: CART algorithm. Find categorical splits of the form "value \\in
       mask". The solution is exact for binary classification, regression and
@@ -138,6 +159,12 @@ class CartLearner(generic_learner.GenericLearner):
     categorical_set_split_min_item_frequency: For categorical set splits e.g.
       texts. Minimum number of occurrences of an item to be considered.
       Default: 1.
+    compute_oob_performances: If true, compute the Out-of-bag evaluation (then
+      available in the summary and model inspector). This evaluation is a cheap
+      alternative to cross-validation evaluation. Default: True.
+    compute_oob_variable_importances: If true, compute the Out-of-bag feature
+      importance (then available in the summary and model inspector). Note that
+      the OOB feature importance can be expensive to compute. Default: False.
     growing_strategy: How to grow the tree. - `LOCAL`: Each node is split
       independently of the other nodes. In other words, as long as a node
       satisfy the splits "constraints (e.g. maximum depth, minimum number of
@@ -211,6 +238,14 @@ class CartLearner(generic_learner.GenericLearner):
       number_of_input_features x num_candidate_attributes_ratio`. The possible
       values are between ]0, and 1] as well as -1. If not set or equal to -1,
       the `num_candidate_attributes` is used. Default: -1.0.
+    num_oob_variable_importances_permutations: Number of time the dataset is
+      re-shuffled to compute the permutation variable importances. Increasing
+      this value increase the training time (if
+      "compute_oob_variable_importances:true") as well as the stability of the
+      oob variable importance metrics. Default: 1.
+    num_trees: Number of individual decision trees. Increasing the number of
+      trees can increase the quality of the model at the expense of size,
+      training speed, and inference latency. Default: 300.
     pure_serving_model: Clear the model from any information that is not
       required for model serving. This includes debugging, model interpretation
       and other meta-data. The size of the serialized model can be reduced
@@ -219,6 +254,12 @@ class CartLearner(generic_learner.GenericLearner):
       Default: False.
     random_seed: Random seed for the training of the model. Learners are
       expected to be deterministic by the random seed. Default: 123456.
+    sampling_with_replacement: If true, the training examples are sampled with
+      replacement. If false, the training samples are sampled without
+      replacement. Only used when "bootstrap_training_dataset=true". If false
+      (sampling without replacement) and if "bootstrap_size_ratio=1" (default),
+      all the examples are used to train all the trees (you probably do not want
+      that). Default: True.
     sorting_strategy: How are sorted the numerical features in order to find the
       splits - PRESORT: The features are pre-sorted at the start of the
       training. This solution is faster but consumes much more memory than
@@ -260,9 +301,10 @@ class CartLearner(generic_learner.GenericLearner):
       `KL`: - p log (p/q) - `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2 -
       `CHI_SQUARED` or `CS`: (p-q)^2/q
         Default: "KULLBACK_LEIBLER".
-    validation_ratio: Ratio of the training dataset used to create the
-      validation dataset for pruning the tree. If set to 0, the entire dataset
-      is used for training, and the tree is not pruned. Default: 0.1.
+    winner_take_all: Control how classification trees vote. If true, each tree
+      votes for one class. If false, each tree vote for a distribution of
+      classes. winner_take_all_inference=false is often preferable. Default:
+      True.
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
@@ -305,11 +347,18 @@ class CartLearner(generic_learner.GenericLearner):
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      adapt_bootstrap_size_ratio_for_maximum_training_duration: Optional[
+          bool
+      ] = False,
       allow_na_conditions: Optional[bool] = False,
+      bootstrap_size_ratio: Optional[float] = 1.0,
+      bootstrap_training_dataset: Optional[bool] = True,
       categorical_algorithm: Optional[str] = "CART",
       categorical_set_split_greedy_sampling: Optional[float] = 0.1,
       categorical_set_split_max_num_items: Optional[int] = -1,
       categorical_set_split_min_item_frequency: Optional[int] = 1,
+      compute_oob_performances: Optional[bool] = True,
+      compute_oob_variable_importances: Optional[bool] = False,
       growing_strategy: Optional[str] = "LOCAL",
       honest: Optional[bool] = False,
       honest_fixed_separation: Optional[bool] = False,
@@ -324,8 +373,11 @@ class CartLearner(generic_learner.GenericLearner):
       missing_value_policy: Optional[str] = "GLOBAL_IMPUTATION",
       num_candidate_attributes: Optional[int] = 0,
       num_candidate_attributes_ratio: Optional[float] = -1.0,
+      num_oob_variable_importances_permutations: Optional[int] = 1,
+      num_trees: Optional[int] = 300,
       pure_serving_model: Optional[bool] = False,
       random_seed: Optional[int] = 123456,
+      sampling_with_replacement: Optional[bool] = True,
       sorting_strategy: Optional[str] = "PRESORT",
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_num_projections_exponent: Optional[float] = None,
@@ -334,7 +386,7 @@ class CartLearner(generic_learner.GenericLearner):
       split_axis: Optional[str] = "AXIS_ALIGNED",
       uplift_min_examples_in_treatment: Optional[int] = 5,
       uplift_split_score: Optional[str] = "KULLBACK_LEIBLER",
-      validation_ratio: Optional[float] = 0.1,
+      winner_take_all: Optional[bool] = True,
       num_threads: Optional[int] = None,
       cache_path: Optional[str] = None,
       try_resume_training: bool = False,
@@ -342,7 +394,12 @@ class CartLearner(generic_learner.GenericLearner):
       tuner: Optional[tuner_lib.AbstractTuner] = None,
   ):
     hyper_parameters = {
+        "adapt_bootstrap_size_ratio_for_maximum_training_duration": (
+            adapt_bootstrap_size_ratio_for_maximum_training_duration
+        ),
         "allow_na_conditions": allow_na_conditions,
+        "bootstrap_size_ratio": bootstrap_size_ratio,
+        "bootstrap_training_dataset": bootstrap_training_dataset,
         "categorical_algorithm": categorical_algorithm,
         "categorical_set_split_greedy_sampling": (
             categorical_set_split_greedy_sampling
@@ -353,6 +410,8 @@ class CartLearner(generic_learner.GenericLearner):
         "categorical_set_split_min_item_frequency": (
             categorical_set_split_min_item_frequency
         ),
+        "compute_oob_performances": compute_oob_performances,
+        "compute_oob_variable_importances": compute_oob_variable_importances,
         "growing_strategy": growing_strategy,
         "honest": honest,
         "honest_fixed_separation": honest_fixed_separation,
@@ -369,8 +428,13 @@ class CartLearner(generic_learner.GenericLearner):
         "missing_value_policy": missing_value_policy,
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
+        "num_oob_variable_importances_permutations": (
+            num_oob_variable_importances_permutations
+        ),
+        "num_trees": num_trees,
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
+        "sampling_with_replacement": sampling_with_replacement,
         "sorting_strategy": sorting_strategy,
         "sparse_oblique_normalization": sparse_oblique_normalization,
         "sparse_oblique_num_projections_exponent": (
@@ -383,7 +447,7 @@ class CartLearner(generic_learner.GenericLearner):
         "split_axis": split_axis,
         "uplift_min_examples_in_treatment": uplift_min_examples_in_treatment,
         "uplift_split_score": uplift_split_score,
-        "validation_ratio": validation_ratio,
+        "winner_take_all": winner_take_all,
     }
     data_spec_args = dataset.DataSpecInferenceArgs(
         columns=dataset.normalize_column_defs(features),
@@ -402,7 +466,7 @@ class CartLearner(generic_learner.GenericLearner):
     )
 
     super().__init__(
-        learner_name="CART",
+        learner_name="RANDOM_FOREST",
         task=task,
         label=label,
         weights=weights,
@@ -418,7 +482,191 @@ class CartLearner(generic_learner.GenericLearner):
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
-        support_partial_cache_dataset_format=False
+        support_max_training_duration=True,
+        resume_training=False,
+        support_validation_dataset=False,
+        support_partial_cache_dataset_format=False,
+        support_max_model_size_in_memory=True,
+        support_monotonic_constraints=False,
+    )
+
+
+class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
+  r"""Hyperparameter Optimizer learning algorithm.
+
+  Usage example:
+
+  ```python
+  import ydf
+  import pandas as pd
+
+  dataset = pd.read_csv("project/dataset.csv")
+
+  model = ydf.HyperparameterOptimizerLearner().train(dataset)
+
+  print(model.summary())
+  ```
+
+  Attributes:
+    label: Label of the dataset. The label column should not be identified as a
+      feature in the `features` parameter.
+    task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
+      Task.RANKING, Task.CATEGORICAL_UPLIFT, Task.NUMERICAL_UPLIFT).
+    weights: Name of a feature that identifies the weight of each example. If
+      weights are not specified, unit weights are assumed. The weight column
+      should not be identified as a feature in the `features` parameter.
+    ranking_group: Only for `task=Task.RANKING`. Name of a feature that
+      identifies queries in a query/document ranking task. The ranking group
+      should not be identified as a feature in the `features` parameter.
+    uplift_treatment: Only for `task=Task.CATEGORICAL_UPLIFT` and `task=Task`.
+      NUMERICAL_UPLIFT. Name of a numerical feature that identifies the
+      treatment in an uplift problem. The value 0 is reserved for the control
+      treatment. Currently, only 0/1 binary treatments are supported.
+    features: If None, all columns are used as features. The semantic of the
+      features is determined automatically. Otherwise, if
+      include_all_columns=False (default) only the column listed in `features`
+      are imported. If include_all_columns=True, all the columns are imported as
+      features and only the semantic of the columns NOT in `columns` is
+      determined automatically. If specified,  defines the order of the features
+      - any non-listed features are appended in-order after the specified
+      features (if include_all_columns=True). The label, weights, uplift
+      treatment and ranking_group columns should not be specified as features.
+    include_all_columns: See `features`.
+    max_vocab_count: Maximum size of the vocabulary of CATEGORICAL and
+      CATEGORICAL_SET columns stored as strings. If more unique values exist,
+      only the most frequent values are kept, and the remaining values are
+      considered as out-of-vocabulary.
+    min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
+      and CATEGORICAL_SET columns. Value observed less than
+      `min_vocab_frequency` are considered as out-of-vocabulary.
+    discretize_numerical_columns: If true, discretize all the numerical columns
+      before training. Discretized numerical columns are faster to train with,
+      but they can have a negative impact on the model quality. Using
+      `discretize_numerical_columns=True` is equivalent as setting the column
+      semantic DISCRETIZED_NUMERICAL in the `column` argument. See the
+      definition of DISCRETIZED_NUMERICAL for more details.
+    num_discretized_numerical_bins: Number of bins used when disretizing
+      numerical columns.
+    data_spec: Dataspec to be used (advanced). If a data spec is given,
+      `columns`, `include_all_columns`, `max_vocab_count`,
+      `min_vocab_frequency`, `discretize_numerical_columns` and
+      `num_discretized_numerical_bins` will be ignored.
+    maximum_model_size_in_memory_in_bytes: Limit the size of the model when
+      stored in ram. Different algorithms can enforce this limit differently.
+      Note that when models are compiled into an inference, the size of the
+      inference engine is generally much smaller than the original model.
+      Default: -1.0.
+    maximum_training_duration_seconds: Maximum training duration of the model
+      expressed in seconds. Each learning algorithm is free to use this
+      parameter at it sees fit. Enabling maximum training duration makes the
+      model training non-deterministic. Default: -1.0.
+    pure_serving_model: Clear the model from any information that is not
+      required for model serving. This includes debugging, model interpretation
+      and other meta-data. The size of the serialized model can be reduced
+      significatively (50% model size reduction is common). This parameter has
+      no impact on the quality, serving speed or RAM usage of model serving.
+      Default: False.
+    random_seed: Random seed for the training of the model. Learners are
+      expected to be deterministic by the random seed. Default: 123456.
+    num_threads: Number of threads used to train the model. Different learning
+      algorithms use multi-threading differently and with different degree of
+      efficiency. If `None`, `num_threads` will be automatically set to the
+      number of processors (up to a maximum of 32; or set to 6 if the number of
+      processors is not available). Making `num_threads` significantly larger
+      than the number of processors can slow-down the training speed. The
+      default value logic might change in the future.
+    try_resume_training: If true, the model training resumes from the checkpoint
+      stored in the `temp_directory` directory. If `temp_directory` does not
+      contain any model checkpoint, the training start from the beginning.
+      Resuming training is useful in the following situations: (1) The training
+      was interrupted by the user (e.g. ctrl+c or "stop" button in a notebook).
+      (2) the training job was interrupted (e.g. rescheduling), ond (3) the
+      hyper-parameter of the model were changed such that an initially completed
+      training is now incomplete (e.g. increasing the number of trees).
+      Note: Training can only be resumed if the training datasets is exactly the
+        same (i.e. no reshuffle in the `tf.data.Dataset`).
+    cache_path: Path to a temporary directory available to the learning
+      algorithm. Currently cache_path is only used (and required) if
+      `try_resume_training=True` for storing the snapshots.
+    resume_training_snapshot_interval_seconds: Indicative number of seconds in
+      between snapshots when `try_resume_training=True`. Might be ignored by
+      some learners.
+    tuner: If set, automatically select the best hyperparameters using the
+      provided tuner. When using distributed training, the tuning is
+      distributed.
+  """
+
+  def __init__(
+      self,
+      label: str,
+      task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
+      weights: Optional[str] = None,
+      ranking_group: Optional[str] = None,
+      uplift_treatment: Optional[str] = None,
+      features: dataset.ColumnDefs = None,
+      include_all_columns: bool = False,
+      max_vocab_count: int = 2000,
+      min_vocab_frequency: int = 5,
+      discretize_numerical_columns: bool = False,
+      num_discretized_numerical_bins: int = 255,
+      data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
+      maximum_training_duration_seconds: Optional[float] = -1.0,
+      pure_serving_model: Optional[bool] = False,
+      random_seed: Optional[int] = 123456,
+      num_threads: Optional[int] = None,
+      cache_path: Optional[str] = None,
+      try_resume_training: bool = False,
+      resume_training_snapshot_interval_seconds: int = 1800,
+      tuner: Optional[tuner_lib.AbstractTuner] = None,
+  ):
+    hyper_parameters = {
+        "maximum_model_size_in_memory_in_bytes": (
+            maximum_model_size_in_memory_in_bytes
+        ),
+        "maximum_training_duration_seconds": maximum_training_duration_seconds,
+        "pure_serving_model": pure_serving_model,
+        "random_seed": random_seed,
+    }
+    data_spec_args = dataset.DataSpecInferenceArgs(
+        columns=dataset.normalize_column_defs(features),
+        include_all_columns=include_all_columns,
+        max_vocab_count=max_vocab_count,
+        min_vocab_frequency=min_vocab_frequency,
+        discretize_numerical_columns=discretize_numerical_columns,
+        num_discretized_numerical_bins=num_discretized_numerical_bins,
+    )
+
+    deployment_config = self._build_deployment_config(
+        num_threads=num_threads,
+        try_resume_training=try_resume_training,
+        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
+        cache_path=cache_path,
+    )
+
+    super().__init__(
+        learner_name="HYPERPARAMETER_OPTIMIZER",
+        task=task,
+        label=label,
+        weights=weights,
+        ranking_group=ranking_group,
+        uplift_treatment=uplift_treatment,
+        data_spec_args=data_spec_args,
+        data_spec=data_spec,
+        hyper_parameters=hyper_parameters,
+        deployment_config=deployment_config,
+        tuner=tuner,
+    )
+
+  @classmethod
+  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+    return abstract_learner_pb2.LearnerCapabilities(
+        support_max_training_duration=True,
+        resume_training=False,
+        support_validation_dataset=False,
+        support_partial_cache_dataset_format=False,
+        support_max_model_size_in_memory=False,
+        support_monotonic_constraints=False,
     )
 
 
@@ -961,12 +1209,22 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
-        support_partial_cache_dataset_format=False
+        support_max_training_duration=True,
+        resume_training=True,
+        support_validation_dataset=True,
+        support_partial_cache_dataset_format=False,
+        support_max_model_size_in_memory=False,
+        support_monotonic_constraints=True,
     )
 
 
-class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
-  r"""Hyperparameter Optimizer learning algorithm.
+class CartLearner(generic_learner.GenericLearner):
+  r"""Cart learning algorithm.
+
+  A CART (Classification and Regression Trees) a decision tree. The non-leaf
+  nodes contains conditions (also known as splits) while the leaf nodes contain
+  prediction values. The training dataset is divided in two parts. The first is
+  used to grow the tree while the second is used to prune the tree.
 
   Usage example:
 
@@ -976,7 +1234,7 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
 
   dataset = pd.read_csv("project/dataset.csv")
 
-  model = ydf.HyperparameterOptimizerLearner().train(dataset)
+  model = ydf.CartLearner().train(dataset)
 
   print(model.summary())
   ```
@@ -1025,208 +1283,8 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
       `num_discretized_numerical_bins` will be ignored.
-    maximum_model_size_in_memory_in_bytes: Limit the size of the model when
-      stored in ram. Different algorithms can enforce this limit differently.
-      Note that when models are compiled into an inference, the size of the
-      inference engine is generally much smaller than the original model.
-      Default: -1.0.
-    maximum_training_duration_seconds: Maximum training duration of the model
-      expressed in seconds. Each learning algorithm is free to use this
-      parameter at it sees fit. Enabling maximum training duration makes the
-      model training non-deterministic. Default: -1.0.
-    pure_serving_model: Clear the model from any information that is not
-      required for model serving. This includes debugging, model interpretation
-      and other meta-data. The size of the serialized model can be reduced
-      significatively (50% model size reduction is common). This parameter has
-      no impact on the quality, serving speed or RAM usage of model serving.
-      Default: False.
-    random_seed: Random seed for the training of the model. Learners are
-      expected to be deterministic by the random seed. Default: 123456.
-    num_threads: Number of threads used to train the model. Different learning
-      algorithms use multi-threading differently and with different degree of
-      efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
-      default value logic might change in the future.
-    try_resume_training: If true, the model training resumes from the checkpoint
-      stored in the `temp_directory` directory. If `temp_directory` does not
-      contain any model checkpoint, the training start from the beginning.
-      Resuming training is useful in the following situations: (1) The training
-      was interrupted by the user (e.g. ctrl+c or "stop" button in a notebook).
-      (2) the training job was interrupted (e.g. rescheduling), ond (3) the
-      hyper-parameter of the model were changed such that an initially completed
-      training is now incomplete (e.g. increasing the number of trees).
-      Note: Training can only be resumed if the training datasets is exactly the
-        same (i.e. no reshuffle in the `tf.data.Dataset`).
-    cache_path: Path to a temporary directory available to the learning
-      algorithm. Currently cache_path is only used (and required) if
-      `try_resume_training=True` for storing the snapshots.
-    resume_training_snapshot_interval_seconds: Indicative number of seconds in
-      between snapshots when `try_resume_training=True`. Might be ignored by
-      some learners.
-    tuner: If set, automatically select the best hyperparameters using the
-      provided tuner. When using distributed training, the tuning is
-      distributed.
-  """
-
-  def __init__(
-      self,
-      label: str,
-      task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
-      weights: Optional[str] = None,
-      ranking_group: Optional[str] = None,
-      uplift_treatment: Optional[str] = None,
-      features: dataset.ColumnDefs = None,
-      include_all_columns: bool = False,
-      max_vocab_count: int = 2000,
-      min_vocab_frequency: int = 5,
-      discretize_numerical_columns: bool = False,
-      num_discretized_numerical_bins: int = 255,
-      data_spec: Optional[data_spec_pb2.DataSpecification] = None,
-      maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
-      maximum_training_duration_seconds: Optional[float] = -1.0,
-      pure_serving_model: Optional[bool] = False,
-      random_seed: Optional[int] = 123456,
-      num_threads: Optional[int] = None,
-      cache_path: Optional[str] = None,
-      try_resume_training: bool = False,
-      resume_training_snapshot_interval_seconds: int = 1800,
-      tuner: Optional[tuner_lib.AbstractTuner] = None,
-  ):
-    hyper_parameters = {
-        "maximum_model_size_in_memory_in_bytes": (
-            maximum_model_size_in_memory_in_bytes
-        ),
-        "maximum_training_duration_seconds": maximum_training_duration_seconds,
-        "pure_serving_model": pure_serving_model,
-        "random_seed": random_seed,
-    }
-    data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=dataset.normalize_column_defs(features),
-        include_all_columns=include_all_columns,
-        max_vocab_count=max_vocab_count,
-        min_vocab_frequency=min_vocab_frequency,
-        discretize_numerical_columns=discretize_numerical_columns,
-        num_discretized_numerical_bins=num_discretized_numerical_bins,
-    )
-
-    deployment_config = self._build_deployment_config(
-        num_threads=num_threads,
-        try_resume_training=try_resume_training,
-        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
-        cache_path=cache_path,
-    )
-
-    super().__init__(
-        learner_name="HYPERPARAMETER_OPTIMIZER",
-        task=task,
-        label=label,
-        weights=weights,
-        ranking_group=ranking_group,
-        uplift_treatment=uplift_treatment,
-        data_spec_args=data_spec_args,
-        data_spec=data_spec,
-        hyper_parameters=hyper_parameters,
-        deployment_config=deployment_config,
-        tuner=tuner,
-    )
-
-  @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
-    return abstract_learner_pb2.LearnerCapabilities(
-        support_partial_cache_dataset_format=False
-    )
-
-
-class RandomForestLearner(generic_learner.GenericLearner):
-  r"""Random Forest learning algorithm.
-
-  A Random Forest (https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf)
-  is a collection of deep CART decision trees trained independently and without
-  pruning. Each tree is trained on a random subset of the original training
-  dataset (sampled with replacement).
-
-  The algorithm is unique in that it is robust to overfitting, even in extreme
-  cases e.g. when there are more features than training examples.
-
-  It is probably the most well-known of the Decision Forest training
-  algorithms.
-
-  Usage example:
-
-  ```python
-  import ydf
-  import pandas as pd
-
-  dataset = pd.read_csv("project/dataset.csv")
-
-  model = ydf.RandomForestLearner().train(dataset)
-
-  print(model.summary())
-  ```
-
-  Attributes:
-    label: Label of the dataset. The label column should not be identified as a
-      feature in the `features` parameter.
-    task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
-      Task.RANKING, Task.CATEGORICAL_UPLIFT, Task.NUMERICAL_UPLIFT).
-    weights: Name of a feature that identifies the weight of each example. If
-      weights are not specified, unit weights are assumed. The weight column
-      should not be identified as a feature in the `features` parameter.
-    ranking_group: Only for `task=Task.RANKING`. Name of a feature that
-      identifies queries in a query/document ranking task. The ranking group
-      should not be identified as a feature in the `features` parameter.
-    uplift_treatment: Only for `task=Task.CATEGORICAL_UPLIFT` and `task=Task`.
-      NUMERICAL_UPLIFT. Name of a numerical feature that identifies the
-      treatment in an uplift problem. The value 0 is reserved for the control
-      treatment. Currently, only 0/1 binary treatments are supported.
-    features: If None, all columns are used as features. The semantic of the
-      features is determined automatically. Otherwise, if
-      include_all_columns=False (default) only the column listed in `features`
-      are imported. If include_all_columns=True, all the columns are imported as
-      features and only the semantic of the columns NOT in `columns` is
-      determined automatically. If specified,  defines the order of the features
-      - any non-listed features are appended in-order after the specified
-      features (if include_all_columns=True). The label, weights, uplift
-      treatment and ranking_group columns should not be specified as features.
-    include_all_columns: See `features`.
-    max_vocab_count: Maximum size of the vocabulary of CATEGORICAL and
-      CATEGORICAL_SET columns stored as strings. If more unique values exist,
-      only the most frequent values are kept, and the remaining values are
-      considered as out-of-vocabulary.
-    min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
-      and CATEGORICAL_SET columns. Value observed less than
-      `min_vocab_frequency` are considered as out-of-vocabulary.
-    discretize_numerical_columns: If true, discretize all the numerical columns
-      before training. Discretized numerical columns are faster to train with,
-      but they can have a negative impact on the model quality. Using
-      `discretize_numerical_columns=True` is equivalent as setting the column
-      semantic DISCRETIZED_NUMERICAL in the `column` argument. See the
-      definition of DISCRETIZED_NUMERICAL for more details.
-    num_discretized_numerical_bins: Number of bins used when disretizing
-      numerical columns.
-    data_spec: Dataspec to be used (advanced). If a data spec is given,
-      `columns`, `include_all_columns`, `max_vocab_count`,
-      `min_vocab_frequency`, `discretize_numerical_columns` and
-      `num_discretized_numerical_bins` will be ignored.
-    adapt_bootstrap_size_ratio_for_maximum_training_duration: Control how the
-      maximum training duration (if set) is applied. If false, the training stop
-      when the time is used. If true, adapts the size of the sampled dataset
-      used to train each tree such that `num_trees` will train within
-      `maximum_training_duration`. Has no effect if there is no maximum training
-      duration specified. Default: False.
     allow_na_conditions: If true, the tree training evaluates conditions of the
       type `X is NA` i.e. `X is missing`. Default: False.
-    bootstrap_size_ratio: Number of examples used to train each trees; expressed
-      as a ratio of the training dataset size. Default: 1.0.
-    bootstrap_training_dataset: If true (default), each tree is trained on a
-      separate dataset sampled with replacement from the original dataset. If
-      false, all the trees are trained on the entire same dataset. If
-      bootstrap_training_dataset:false, OOB metrics are not available.
-        bootstrap_training_dataset=false is used in "Extremely randomized trees"
-        (https://link.springer.com/content/pdf/10.1007%2Fs10994-006-6226-1.pdf).
-      Default: True.
     categorical_algorithm: How to learn splits on categorical attributes. -
       `CART`: CART algorithm. Find categorical splits of the form "value \\in
       mask". The solution is exact for binary classification, regression and
@@ -1258,12 +1316,6 @@ class RandomForestLearner(generic_learner.GenericLearner):
     categorical_set_split_min_item_frequency: For categorical set splits e.g.
       texts. Minimum number of occurrences of an item to be considered.
       Default: 1.
-    compute_oob_performances: If true, compute the Out-of-bag evaluation (then
-      available in the summary and model inspector). This evaluation is a cheap
-      alternative to cross-validation evaluation. Default: True.
-    compute_oob_variable_importances: If true, compute the Out-of-bag feature
-      importance (then available in the summary and model inspector). Note that
-      the OOB feature importance can be expensive to compute. Default: False.
     growing_strategy: How to grow the tree. - `LOCAL`: Each node is split
       independently of the other nodes. In other words, as long as a node
       satisfy the splits "constraints (e.g. maximum depth, minimum number of
@@ -1337,14 +1389,6 @@ class RandomForestLearner(generic_learner.GenericLearner):
       number_of_input_features x num_candidate_attributes_ratio`. The possible
       values are between ]0, and 1] as well as -1. If not set or equal to -1,
       the `num_candidate_attributes` is used. Default: -1.0.
-    num_oob_variable_importances_permutations: Number of time the dataset is
-      re-shuffled to compute the permutation variable importances. Increasing
-      this value increase the training time (if
-      "compute_oob_variable_importances:true") as well as the stability of the
-      oob variable importance metrics. Default: 1.
-    num_trees: Number of individual decision trees. Increasing the number of
-      trees can increase the quality of the model at the expense of size,
-      training speed, and inference latency. Default: 300.
     pure_serving_model: Clear the model from any information that is not
       required for model serving. This includes debugging, model interpretation
       and other meta-data. The size of the serialized model can be reduced
@@ -1353,12 +1397,6 @@ class RandomForestLearner(generic_learner.GenericLearner):
       Default: False.
     random_seed: Random seed for the training of the model. Learners are
       expected to be deterministic by the random seed. Default: 123456.
-    sampling_with_replacement: If true, the training examples are sampled with
-      replacement. If false, the training samples are sampled without
-      replacement. Only used when "bootstrap_training_dataset=true". If false
-      (sampling without replacement) and if "bootstrap_size_ratio=1" (default),
-      all the examples are used to train all the trees (you probably do not want
-      that). Default: True.
     sorting_strategy: How are sorted the numerical features in order to find the
       splits - PRESORT: The features are pre-sorted at the start of the
       training. This solution is faster but consumes much more memory than
@@ -1400,10 +1438,9 @@ class RandomForestLearner(generic_learner.GenericLearner):
       `KL`: - p log (p/q) - `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2 -
       `CHI_SQUARED` or `CS`: (p-q)^2/q
         Default: "KULLBACK_LEIBLER".
-    winner_take_all: Control how classification trees vote. If true, each tree
-      votes for one class. If false, each tree vote for a distribution of
-      classes. winner_take_all_inference=false is often preferable. Default:
-      True.
+    validation_ratio: Ratio of the training dataset used to create the
+      validation dataset for pruning the tree. If set to 0, the entire dataset
+      is used for training, and the tree is not pruned. Default: 0.1.
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
@@ -1446,18 +1483,11 @@ class RandomForestLearner(generic_learner.GenericLearner):
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
-      adapt_bootstrap_size_ratio_for_maximum_training_duration: Optional[
-          bool
-      ] = False,
       allow_na_conditions: Optional[bool] = False,
-      bootstrap_size_ratio: Optional[float] = 1.0,
-      bootstrap_training_dataset: Optional[bool] = True,
       categorical_algorithm: Optional[str] = "CART",
       categorical_set_split_greedy_sampling: Optional[float] = 0.1,
       categorical_set_split_max_num_items: Optional[int] = -1,
       categorical_set_split_min_item_frequency: Optional[int] = 1,
-      compute_oob_performances: Optional[bool] = True,
-      compute_oob_variable_importances: Optional[bool] = False,
       growing_strategy: Optional[str] = "LOCAL",
       honest: Optional[bool] = False,
       honest_fixed_separation: Optional[bool] = False,
@@ -1472,11 +1502,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
       missing_value_policy: Optional[str] = "GLOBAL_IMPUTATION",
       num_candidate_attributes: Optional[int] = 0,
       num_candidate_attributes_ratio: Optional[float] = -1.0,
-      num_oob_variable_importances_permutations: Optional[int] = 1,
-      num_trees: Optional[int] = 300,
       pure_serving_model: Optional[bool] = False,
       random_seed: Optional[int] = 123456,
-      sampling_with_replacement: Optional[bool] = True,
       sorting_strategy: Optional[str] = "PRESORT",
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_num_projections_exponent: Optional[float] = None,
@@ -1485,7 +1512,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
       split_axis: Optional[str] = "AXIS_ALIGNED",
       uplift_min_examples_in_treatment: Optional[int] = 5,
       uplift_split_score: Optional[str] = "KULLBACK_LEIBLER",
-      winner_take_all: Optional[bool] = True,
+      validation_ratio: Optional[float] = 0.1,
       num_threads: Optional[int] = None,
       cache_path: Optional[str] = None,
       try_resume_training: bool = False,
@@ -1493,12 +1520,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
       tuner: Optional[tuner_lib.AbstractTuner] = None,
   ):
     hyper_parameters = {
-        "adapt_bootstrap_size_ratio_for_maximum_training_duration": (
-            adapt_bootstrap_size_ratio_for_maximum_training_duration
-        ),
         "allow_na_conditions": allow_na_conditions,
-        "bootstrap_size_ratio": bootstrap_size_ratio,
-        "bootstrap_training_dataset": bootstrap_training_dataset,
         "categorical_algorithm": categorical_algorithm,
         "categorical_set_split_greedy_sampling": (
             categorical_set_split_greedy_sampling
@@ -1509,8 +1531,6 @@ class RandomForestLearner(generic_learner.GenericLearner):
         "categorical_set_split_min_item_frequency": (
             categorical_set_split_min_item_frequency
         ),
-        "compute_oob_performances": compute_oob_performances,
-        "compute_oob_variable_importances": compute_oob_variable_importances,
         "growing_strategy": growing_strategy,
         "honest": honest,
         "honest_fixed_separation": honest_fixed_separation,
@@ -1527,13 +1547,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
         "missing_value_policy": missing_value_policy,
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
-        "num_oob_variable_importances_permutations": (
-            num_oob_variable_importances_permutations
-        ),
-        "num_trees": num_trees,
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
-        "sampling_with_replacement": sampling_with_replacement,
         "sorting_strategy": sorting_strategy,
         "sparse_oblique_normalization": sparse_oblique_normalization,
         "sparse_oblique_num_projections_exponent": (
@@ -1546,7 +1561,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
         "split_axis": split_axis,
         "uplift_min_examples_in_treatment": uplift_min_examples_in_treatment,
         "uplift_split_score": uplift_split_score,
-        "winner_take_all": winner_take_all,
+        "validation_ratio": validation_ratio,
     }
     data_spec_args = dataset.DataSpecInferenceArgs(
         columns=dataset.normalize_column_defs(features),
@@ -1565,7 +1580,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
     )
 
     super().__init__(
-        learner_name="RANDOM_FOREST",
+        learner_name="CART",
         task=task,
         label=label,
         weights=weights,
@@ -1581,5 +1596,10 @@ class RandomForestLearner(generic_learner.GenericLearner):
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
-        support_partial_cache_dataset_format=False
+        support_max_training_duration=True,
+        resume_training=False,
+        support_validation_dataset=False,
+        support_partial_cache_dataset_format=False,
+        support_max_model_size_in_memory=False,
+        support_monotonic_constraints=False,
     )

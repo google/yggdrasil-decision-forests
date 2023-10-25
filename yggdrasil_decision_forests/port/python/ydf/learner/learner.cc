@@ -18,6 +18,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
+#include <pybind11/stl.h>
 
 #include <atomic>
 #include <csignal>
@@ -26,6 +27,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/optional.h"
 #include "pybind11_abseil/status_casters.h"
 #include "pybind11_protobuf/native_proto_caster.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -117,9 +119,13 @@ class GenericCCLearner {
   virtual ~GenericCCLearner() {}
 
   absl::StatusOr<std::unique_ptr<GenericCCModel>> Train(
-      const dataset::VerticalDataset& dataset) const {
+      const dataset::VerticalDataset& dataset,
+      const absl::optional<
+          std::reference_wrapper<const dataset::VerticalDataset>>
+          validation_dataset = {}) const {
     EnableUserInterruption();
-    ASSIGN_OR_RETURN(auto model, learner_->TrainWithStatus(dataset));
+    ASSIGN_OR_RETURN(auto model,
+                     learner_->TrainWithStatus(dataset, validation_dataset));
     DisableUserInterruption();
     return CreateCCModel(std::move(model));
   }
@@ -169,7 +175,8 @@ void init_learner(py::module_& m) {
            [](const GenericCCLearner& a) {
              return "<learner_cc.GenericCCLearner";
            })
-      .def("Train", &GenericCCLearner::Train, py::arg("dataset"))
+      .def("Train", &GenericCCLearner::Train, py::arg("dataset"),
+           py::arg("validation_dataset") = py::none())
       .def("Evaluate", &GenericCCLearner::Evaluate, py::arg("dataset"),
            py::arg("fold_generator"), py::arg("evaluation_options"),
            py::arg("deployment_evaluation"));

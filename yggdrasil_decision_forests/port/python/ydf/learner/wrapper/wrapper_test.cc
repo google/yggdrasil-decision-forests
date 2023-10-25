@@ -66,6 +66,7 @@ TEST(LearnerWrappers, LearnerKeyToClassName) {
 
 TEST(LearnerWrappers, Base) {
   ASSERT_OK_AND_ASSIGN(const auto content, GenLearnerWrapper());
+  YDF_LOG(INFO) << "content:\n" << content;
 
   EXPECT_THAT(content, HasSubstr(R"(
 class FakeAlgorithmLearner(generic_learner.GenericLearner):
@@ -218,7 +219,13 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
-      support_partial_cache_dataset_format=False)
+      support_max_training_duration=False,
+      resume_training=False,
+      support_validation_dataset=False,
+      support_partial_cache_dataset_format=False,
+      support_max_model_size_in_memory=False,
+      support_monotonic_constraints=False,
+    )
 )"));
 }
 

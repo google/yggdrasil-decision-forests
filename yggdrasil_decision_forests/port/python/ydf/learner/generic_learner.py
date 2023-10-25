@@ -108,12 +108,72 @@ class GenericLearner:
   def train(
       self,
       ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset] = None,
   ) -> generic_model.GenericModel:
-    """Trains a model on the given dataset."""
+    """Trains a model on the given dataset.
 
-    vertical_dataset = self._get_vertical_dataset(ds)
-    learner = self._get_learner()
-    return model_lib.load_cc_model(learner.Train(vertical_dataset._dataset))  # pylint: disable=protected-access
+    Usage example:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+    test_ds = pd.read_csv(...)
+
+    learner = ydf.GradientBoostedTreesLearner(label="label")
+    model = learner.train(train_ds)
+    evaluation = model.evaluate(test_ds)
+    ```
+
+    Usage example with a validation dataset:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+    valid_ds = pd.read_csv(...)
+    test_ds = pd.read_csv(...)
+
+    learner = ydf.GradientBoostedTreesLearner(label="label")
+    model = learner.train(train_ds, valid=valid_ds)
+    evaluation = model.evaluate(test_ds)
+    ```
+
+    If training is interrupted (for example, by interrupting the cell execution
+    in Colab), the model will be returned to the state it was in at the moment
+    of interruption.
+
+    Args:
+      ds: Training dataset.
+      valid: Optional validation dataset. Some learners, such as Random Forest,
+        do not need validation dataset. Some learners, such as
+        GradientBoostdTrees, automatically extract a validation from the
+        training dataset if the validation dataset is not provided.
+
+    Returns:
+      A trained model.
+    """
+
+    train_args = {
+        "dataset": self._get_vertical_dataset(ds)._dataset  # pylint: disable=protected-access
+    }
+
+    if valid is not None:
+      if not self.__class__.capabilities().support_validation_dataset:
+        raise ValueError(
+            f"The learner {self.__class__.__name__!r} does not use a validation"
+            " dataset. If you can, add the validation examples to the training"
+            " dataset."
+        )
+
+      train_args["validation_dataset"] = self._get_vertical_dataset(
+          valid
+      )._dataset  # pylint: disable=protected-access
+
+    cc_model = self._get_learner().Train(**train_args)
+    return model_lib.load_cc_model(cc_model)
 
   def _get_training_config(self) -> abstract_learner_pb2.TrainingConfig:
     """Gets the training config proto."""
@@ -394,6 +454,10 @@ class GenericLearner:
       else:
         logging.info("Use %d thread(s) for training", num_threads)
     return num_threads
+
+  @classmethod
+  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+    raise NotImplementedError("Not implemented")
 
 
 def _feature_name_to_regex(name: str) -> str:
