@@ -31,6 +31,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -656,6 +657,14 @@ absl::Status RandomForestModel::MakePureServing() {
         });
   }
   return AbstractModel::MakePureServing();
+}
+
+absl::Status RandomForestModel::Proximity(
+    const dataset::VerticalDataset& dataset1,
+    const dataset::VerticalDataset& dataset2,
+    absl::Span<float> proximities) const {
+  return decision_tree::Distance(decision_trees(), dataset1, dataset2,
+                                 proximities);
 }
 
 namespace internal {

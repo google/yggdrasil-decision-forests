@@ -31,6 +31,7 @@
 
 #include "absl/status/status.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -378,6 +379,19 @@ bool DoSortedRangesIntersect(Iter1 begin1, Iter1 end1, Iter2 begin2,
 // Extracts the list of positive elements from a "contains" type conditions.
 std::vector<int32_t> ExactElementsFromContainsCondition(
     int vocab_size, const proto::Condition& condition);
+
+// Computes the pairwise distance between examples in "dataset1" and
+// "dataset2".
+//
+// The distance is computed as one minus the ratio of common active leaves
+// between two examples.
+//
+// "distances[i * dataset2.nrows() +j]" will be the distance between the i-th
+// example of "dataset1" and the j-th example of "dataset2".
+absl::Status Distance(
+    absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees,
+    const dataset::VerticalDataset& dataset1,
+    const dataset::VerticalDataset& dataset2, absl::Span<float> distances);
 
 }  // namespace decision_tree
 }  // namespace model

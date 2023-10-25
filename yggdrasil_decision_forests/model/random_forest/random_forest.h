@@ -29,6 +29,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -208,6 +209,22 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   void set_num_pruned_nodes(int64_t value) { num_pruned_nodes_ = value; }
 
   absl::Status MakePureServing() override;
+
+  // The proximity between examples is one minus the ratio of shared leaves
+  // between the examples. This metric distance is defined by Breiman:
+  // https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#prox
+  //
+  // TODO - b/306591749 - Understand, validate and possibly document the
+  // definition of Breiman's proximity as a metric distance.
+  absl::Status Proximity(const dataset::VerticalDataset& dataset1,
+                         const dataset::VerticalDataset& dataset2,
+                         absl::Span<float> proximities) const;
+
+  absl::Status Distance(const dataset::VerticalDataset& dataset1,
+                        const dataset::VerticalDataset& dataset2,
+                        absl::Span<float> distances) const override {
+    return Proximity(dataset1, dataset2, distances);
+  }
 
   // Fields related to unit testing.
   struct Testing {

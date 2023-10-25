@@ -44,6 +44,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
     ] + select({
         "//conditions:default": [
         ],
@@ -126,6 +127,7 @@ cc_test(
         ":decision_tree",
         ":decision_tree_cc_proto",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
+        "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
@@ -133,9 +135,12 @@ cc_test(
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:test",
-        "@com_google_absl//absl/status",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
         "@com_google_googletest//:gtest_main",
     ],
 )

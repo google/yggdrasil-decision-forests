@@ -43,6 +43,24 @@ class DecisionForestInterface {
                                         dataset::VerticalDataset::row_t row_idx,
                                         absl::Span<int32_t> leaves) const = 0;
 
+  // Computes the pairwise distance between examples in "dataset1" and
+  // "dataset2".
+  //
+  // "distances[i * dataset2.nrows() +j]" will be the distance between the i-th
+  // example of "dataset1" and the j-th example of "dataset2".
+  //
+  // Different models are free to implement different distances with different
+  // definitions. For this reason, unless indicated in the model documentation,
+  // distances from different models cannot be compared.
+  //
+  // The distance is not guaranteed to satisfy the triangular inequality
+  // property of metric distances.
+  virtual absl::Status Distance(const dataset::VerticalDataset& dataset1,
+                                const dataset::VerticalDataset& dataset2,
+                                absl::Span<float> distances) const {
+    return absl::UnimplementedError("Distance is not implemented");
+  }
+
   // Tests if the model satisfy the condition defined in
   // "CheckStructureOptions".
   virtual bool CheckStructure(

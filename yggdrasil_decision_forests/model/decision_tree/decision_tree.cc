@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include <algorithm>
 #include <cmath>
@@ -35,6 +36,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -1347,6 +1349,67 @@ std::vector<model::proto::VariableImportance> StructureSumScore(
         });
   }
   return VariableImportanceMapToSortedVector(importance);
+}
+
+namespace {
+
+// Gets the leaf index for each example and each tree.
+//
+// The returned values "leaves" is defined as follow: "leaves[i+j *
+// trees.size()]" is the leaf index of the j-th example in "dataset" for the
+// i-th tree.
+absl::StatusOr<std::vector<int32_t>> GetLeavesIdxs(
+    const absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees,
+    const dataset::VerticalDataset& dataset) {
+  const size_t num_trees = trees.size();
+  const size_t num_rows = dataset.nrow();
+  std::vector<int32_t> leaves(num_rows * num_trees);
+  for (size_t example_idx = 0; example_idx < num_rows; example_idx++) {
+    for (size_t tree_idx = 0; tree_idx < num_trees; tree_idx++) {
+      const NodeWithChildren& leaf =
+          trees[tree_idx]->GetLeafAlt(dataset, example_idx);
+      STATUS_CHECK_GE(leaf.leaf_idx(), 0);
+      leaves[tree_idx + example_idx * num_trees] = leaf.leaf_idx();
+    }
+  }
+  return leaves;
+}
+
+}  // namespace
+
+absl::Status Distance(
+    const absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees,
+    const dataset::VerticalDataset& dataset1,
+    const dataset::VerticalDataset& dataset2,
+    const absl::Span<float> distances) {
+  const size_t num_trees = trees.size();
+  if (num_trees == 0) {
+    return absl::InvalidArgumentError("No tree was provided");
+  }
+
+  const size_t num_example1 = dataset1.nrow();
+  const size_t num_example2 = dataset2.nrow();
+
+  STATUS_CHECK_EQ(distances.size(), num_example1 * num_example2);
+  ASSIGN_OR_RETURN(const std::vector<int32_t> leaves1,
+                   GetLeavesIdxs(trees, dataset1));
+  ASSIGN_OR_RETURN(const std::vector<int32_t> leaves2,
+                   GetLeavesIdxs(trees, dataset2));
+
+  for (size_t example1_idx = 0; example1_idx < num_example1; example1_idx++) {
+    for (size_t example2_idx = 0; example2_idx < num_example2; example2_idx++) {
+      int32_t count_similar = 0;
+      for (size_t tree_idx = 0; tree_idx < num_trees; tree_idx++) {
+        count_similar += leaves1[tree_idx + example1_idx * num_trees] ==
+                         leaves2[tree_idx + example2_idx * num_trees];
+      }
+      DCHECK_GT(num_trees, 0);
+      distances[example1_idx * num_example2 + example2_idx] =
+          1.f - static_cast<float>(count_similar) / num_trees;
+    }
+  }
+
+  return absl::OkStatus();
 }
 
 }  // namespace decision_tree

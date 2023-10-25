@@ -5,6 +5,7 @@
 ### Feature
 
 -   Add support for Mean average error (MAE) loss for GBT.
+-   Add pairwise distance between examples.
 
 ### New interface
 

@@ -17,12 +17,16 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -31,7 +35,9 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -39,6 +45,9 @@ namespace decision_tree {
 namespace {
 
 using row_t = dataset::VerticalDataset::row_t;
+using ::testing::ElementsAre;
+using ::yggdrasil_decision_forests::dataset::proto::ColumnType;
+using ::yggdrasil_decision_forests::dataset::proto::DataSpecification;
 
 std::string DatasetDir() {
   return file::JoinPath(test::DataRootDirectory(),
@@ -58,10 +67,10 @@ TEST(DecisionTree, GetLeafAndGetPath) {
       ->mutable_higher_condition()
       ->set_threshold(1);
 
-  dataset::proto::DataSpecification dataspec;
+  DataSpecification dataspec;
   auto* col_spec = dataspec.add_columns();
   col_spec->set_name("a");
-  col_spec->set_type(dataset::proto::ColumnType::NUMERICAL);
+  col_spec->set_type(ColumnType::NUMERICAL);
 
   dataset::VerticalDataset dataset;
   dataset.set_data_spec(dataspec);
@@ -122,7 +131,7 @@ class EvalConditions : public ::testing::Test {
     guide.mutable_default_column_guide()
         ->mutable_categorial()
         ->set_min_vocab_frequency(1);
-    dataset::proto::DataSpecification data_spec;
+    DataSpecification data_spec;
     dataset::CreateDataSpec(toy_dataset_path, false, guide, &data_spec);
     CHECK_OK(LoadVerticalDataset(toy_dataset_path, data_spec, &dataset_));
   }
@@ -535,6 +544,62 @@ TEST(DecisionTree, StructureMeanMinDepth) {
   EXPECT_EQ(vi[2].attribute_idx(), 3);
   EXPECT_NEAR(vi[2].importance(),
               1. / (1. + (1. + 1. + 1. + 2. + 2. + 1.) / 6.), kMargin);
+}
+
+TEST(DecisionTree, Distance) {
+  // Builds a decision tree with a single condition and two leaf nodes.
+  //
+  // attribute >= threshold
+  //     ├─(neg)─ leaf #0
+  //     └─(pos)─ leaf #1
+  const auto make_tree = [](const float threshold)
+      -> absl::StatusOr<std::unique_ptr<DecisionTree>> {
+    auto tree = std::make_unique<DecisionTree>();
+    tree->CreateRoot();
+    NodeWithChildren* root = tree->mutable_root();
+    STATUS_CHECK(root);
+    tree->mutable_root()->CreateChildren();
+    tree->mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree->mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_higher_condition()
+        ->set_threshold(threshold);
+    tree->SetLeafIndices();
+    return tree;
+  };
+
+  // Build a forest with two trees.
+  std::vector<std::unique_ptr<DecisionTree>> trees;
+  {
+    ASSERT_OK_AND_ASSIGN(std::unique_ptr<DecisionTree> tree, make_tree(0.5));
+    trees.push_back(std::move(tree));
+  }
+  {
+    ASSERT_OK_AND_ASSIGN(std::unique_ptr<DecisionTree> tree, make_tree(1.5));
+    trees.push_back(std::move(tree));
+  }
+
+  DataSpecification dataspec;
+  dataset::AddColumn("a", ColumnType::NUMERICAL, &dataspec);
+
+  dataset::VerticalDataset dataset1;
+  dataset1.set_data_spec(dataspec);
+  ASSERT_OK(dataset1.CreateColumnsFromDataspec());
+  dataset1.AppendExample({{"a", "0"}});  // Leaves #0 (tree #0) and #0 (tree #1)
+  dataset1.AppendExample({{"a", "2"}});  // Leaves #1 and #1
+
+  dataset::VerticalDataset dataset2;
+  dataset2.set_data_spec(dataspec);
+  ASSERT_OK(dataset2.CreateColumnsFromDataspec());
+  dataset2.AppendExample({{"a", "1"}});   // Leaves #1 and #0
+  dataset2.AppendExample({{"a", "-1"}});  // Leaves #0 and #0
+
+  std::vector<float> distances(2 * 2);
+  EXPECT_OK(Distance(trees, dataset1, dataset2, absl::MakeSpan(distances)));
+
+  EXPECT_THAT(distances, ElementsAre(0.5f, 0.f, 0.5f, 1.f));
 }
 
 }  // namespace
