@@ -373,7 +373,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
             number_of_unique_values: 1
             items {
               key: "<OOD>"
-              value { index: 0 count: 3 }
+              value { index: 0 count: 4 }
             }
           }
         }
@@ -400,7 +400,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
             number_of_unique_values: 1
             items {
               key: "<OOD>"
-              value { index: 0 count: 3 }
+              value { index: 0 count: 9 }
             }
           }
         }
@@ -413,7 +413,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
             number_of_unique_values: 1
             items {
               key: "<OOD>"
-              value { index: 0 count: 3 }
+              value { index: 0 count: 6 }
             }
           }
           count_nas: 1

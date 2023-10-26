@@ -284,7 +284,7 @@ absl::Status FinalizeComputeSpecColumnCategorical(
     while (!item_frequency_vector.empty() &&
            item_frequency_vector.back().first <
                col->categorical().min_value_count()) {
-      count_ood_items++;
+      count_ood_items += item_frequency_vector.back().first;
       item_frequency_vector.pop_back();
     }
   }
