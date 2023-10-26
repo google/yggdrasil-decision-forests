@@ -21,6 +21,7 @@ from typing import Optional, TypeVar, Union
 from absl import logging
 import numpy as np
 
+from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.metric import metric_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
@@ -68,6 +69,10 @@ class GenericModel:
     """Description of the model."""
 
     return self._model.Describe(full_details)
+
+  def data_spec(self) -> data_spec_pb2.DataSpecification:
+    """Returns the data spec used for train the model."""
+    return self._model.data_spec()
 
   def __str__(self) -> str:
     return f"""\
