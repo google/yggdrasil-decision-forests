@@ -672,6 +672,36 @@ four entries,4,8,4.4,0
     )
     self.assertEqual(ds.data_spec(), expected_data_spec)
 
+  @parameterized.parameters(
+      ([True, True, True], (0, 0, 3), 0),
+      ([False, False, False], (0, 3, 0), 0),
+      ([True, False, False], (0, 2, 1), 0),
+  )
+  def test_order_boolean(self, values, expected_counts, count_nas):
+    ds = dataset.create_vertical_dataset(
+        {"col": np.array(values)},
+        columns=[Column("col", dataset.Semantic.CATEGORICAL)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="col",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                count_nas=count_nas,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOV>": VocabValue(index=0, count=expected_counts[0]),
+                        "false": VocabValue(index=1, count=expected_counts[1]),
+                        "true": VocabValue(index=2, count=expected_counts[2]),
+                    },
+                    number_of_unique_values=3,
+                ),
+            ),
+        ),
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
+
 
 class MonotonicTest(parameterized.TestCase):
 

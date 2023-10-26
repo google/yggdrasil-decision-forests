@@ -259,7 +259,7 @@ std::string_view remove_tailing_zeros(std::string_view src) {
 // Non owning accessor to a np bytes array.
 struct NPByteArray {
   // Wraps a single dimensional np::array of bytes.
-  static absl::StatusOr<NPByteArray> Create(py::array& data) {
+  static absl::StatusOr<NPByteArray> Create(const py::array& data) {
     if (data.dtype().kind() != 'S') {
       return absl::InternalError(
           absl::StrCat("Expecting a np.bytes (i.e. |S) array. Got |",
@@ -285,16 +285,144 @@ struct NPByteArray {
     return remove_tailing_zeros({_data + i * _stride, _itemsize});
   }
 
+  // Extracts the content of the numpy array into a string vector.
+  std::vector<std::string> ToVector() const {
+    std::vector<std::string> dst(_size);
+    for (size_t i = 0; i < _size; i++) {
+      dst[i] = (*this)[i];
+    }
+    return dst;
+  }
+
   const char* _data;
   const size_t _stride;
   const size_t _itemsize;
   const size_t _size;
 };
 
+// A dictionary.
+// This structure holds the dictionary before it gets copied to the dataspec.
+struct Dictionary {
+  struct Item {
+    size_t count = 0;
+    std::string key;
+  };
+
+  std::vector<Item> items;
+  size_t num_valid_values = 0;
+};
+
+// Computes a dictionary from a set of observed values.
+Dictionary DictionaryFromValues(const NPByteArray& values,
+                                const int max_vocab_count,
+                                const int min_vocab_frequency) {
+  // Count unique values.
+  // Warning: "dict_map" does not own its keys.
+  absl::flat_hash_map<absl::string_view, size_t> dict_map;
+  for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {
+    const std::string_view value = values[value_idx];
+    if (value.empty()) {
+      continue;  // Value is missing
+    }
+    dict_map[value]++;
+  }
+
+  Dictionary dictionary;
+  dictionary.items.reserve(dict_map.size());
+  size_t num_oov_values = 0;
+  for (const auto& src_value : dict_map) {
+    dictionary.num_valid_values += src_value.second;
+    if (src_value.second < min_vocab_frequency) {
+      num_oov_values += src_value.second;
+      continue;
+    }
+    dictionary.items.push_back(
+        {/*count=*/src_value.second, /*key=*/std::string(src_value.first)});
+  }
+  std::sort(dictionary.items.begin(), dictionary.items.end(),
+            [](const Dictionary::Item& a, const Dictionary::Item& b) {
+              // Sort by count
+              if (a.count != b.count) {
+                return a.count > b.count;  // Large counts first
+              }
+              // Sort by key
+              return a.key < b.key;  // First keys first
+            });
+
+  // Apply maximum vocab constraint.
+  if (max_vocab_count >= 0 && dictionary.items.size() > max_vocab_count) {
+    for (int item_idx = max_vocab_count; item_idx < dictionary.items.size();
+         item_idx++) {
+      num_oov_values += dictionary.items[item_idx].count;
+    }
+    dictionary.items.resize(max_vocab_count);
+  }
+
+  // Create the OOV item
+  dictionary.items.insert(dictionary.items.begin(),
+                          Dictionary::Item{
+                              .count = num_oov_values,
+                              .key = dataset::kOutOfDictionaryItemKey,
+                          });
+
+  return dictionary;
+}
+
+// Computes a dictionary from a user provided dictionary.
+//
+// The index of the items in the output dictionary match the index of the items
+// in the input dictionary.
+//
+// Args:
+//   values: Value of each example in the dataset.
+//   force_dictionary: The dictionary wanted by the user.
+//
+// Returns:
+//   A dictionary.
+//
+absl::StatusOr<Dictionary> DictionaryFromUserDictionary(
+    const NPByteArray& values, const py::array& force_dictionary) {
+  ASSIGN_OR_RETURN(const auto wrapper, NPByteArray::Create(force_dictionary));
+  const auto src_items = wrapper.ToVector();
+
+  // Count the number of occurrences for the items in the user dictionary.
+  // Warning: "count_map" does not own its keys.
+  absl::flat_hash_map<absl::string_view, size_t> count_map;
+  for (const auto& item : src_items) {
+    count_map[item] = 0;
+  }
+  size_t num_oov_value = 0;
+  for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {
+    const std::string_view value = values[value_idx];
+    if (value.empty()) {
+      continue;  // Value is missing
+    }
+    const auto it = count_map.find(value);
+    if (it == count_map.end()) {
+      num_oov_value++;
+    } else {
+      it->second++;
+    }
+  }
+
+  Dictionary dictionary;
+  dictionary.num_valid_values = num_oov_value;
+  for (const auto& src_value : count_map) {
+    dictionary.num_valid_values += src_value.second;
+  }
+
+  dictionary.items.reserve(src_items.size());
+  for (const auto& item : src_items) {
+    dictionary.items.push_back({.count = count_map[item], .key = item});
+  }
+  return dictionary;
+}
+
 // Creates a column spec for a categorical column.
 absl::StatusOr<dataset::proto::Column> CreateCategoricalColumnSpec(
     const std::string& name, const NPByteArray& values,
-    const int max_vocab_count, const int min_vocab_frequency) {
+    const int max_vocab_count, const int min_vocab_frequency,
+    const std::optional<py::array>& force_dictionary) {
   if (max_vocab_count < -1) {
     return absl::InvalidArgumentError(
         absl::Substitute("Column $0 received invalid dataspec inference "
@@ -315,76 +443,33 @@ absl::StatusOr<dataset::proto::Column> CreateCategoricalColumnSpec(
                          "argument min_vocab_frequency: $1",
                          name, min_vocab_frequency));
   }
-  absl::flat_hash_map<absl::string_view, int> dict_map;
 
-  // Count unique values.
-  for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {
-    const auto value = values[value_idx];
-    if (value.empty()) {
-      continue;  // Value is missing
-    }
-    dict_map[value]++;
-  }
-
-  // Reduce dictionary
-  struct Item {
-    int count;
-    absl::string_view key;
-  };
-  std::vector<Item> dict_list;
-  dict_list.reserve(dict_map.size());
-  size_t num_valid_values = 0;
-  size_t num_oov_values = 0;
-  for (const auto& src_value : dict_map) {
-    num_valid_values += src_value.second;
-    if (src_value.second < min_vocab_frequency) {
-      num_oov_values += src_value.second;
-      continue;
-    }
-    dict_list.push_back({/*count=*/src_value.second, /*key=*/src_value.first});
-  }
-  std::sort(dict_list.begin(), dict_list.end(),
-            [](const Item& a, const Item& b) {
-              // Sort by count
-              if (a.count != b.count) {
-                return a.count > b.count;  // Large counts first
-              }
-              // Sort by key
-              return a.key < b.key;  // First keys first
-            });
-
-  if (max_vocab_count >= 0 && dict_list.size() > max_vocab_count) {
-    for (int item_idx = max_vocab_count; item_idx < dict_list.size();
-         item_idx++) {
-      num_oov_values += dict_list[item_idx].count;
-    }
-    dict_list.resize(max_vocab_count);
+  Dictionary dictionary;
+  if (force_dictionary.has_value()) {
+    ASSIGN_OR_RETURN(dictionary,
+                     DictionaryFromUserDictionary(values, *force_dictionary));
+  } else {
+    dictionary =
+        DictionaryFromValues(values, max_vocab_count, min_vocab_frequency);
   }
 
   // Create column spec
   dataset::proto::Column column;
   column.set_name(name);
   column.set_type(dataset::proto::ColumnType::CATEGORICAL);
-  column.set_count_nas(values.size() - num_valid_values);
+  column.set_count_nas(values.size() - dictionary.num_valid_values);
 
   // Copy dictionary in proto
   auto* column_cat = column.mutable_categorical();
   auto& dst_items = *column_cat->mutable_items();
-  for (size_t item_idx = 0; item_idx < dict_list.size(); item_idx++) {
-    const auto& item = dict_list[item_idx];
+  for (size_t item_idx = 0; item_idx < dictionary.items.size(); item_idx++) {
+    const auto& item = dictionary.items[item_idx];
     auto& dst_item = dst_items[item.key];
     dst_item.set_count(item.count);
     // Index counting starts with the OOD item.
-    dst_item.set_index(dataset::kOutOfDictionaryItemIndex + 1 + item_idx);
+    dst_item.set_index(item_idx);
   }
-
-  // Create OOV item
-  auto& dst_oov_item = dst_items[dataset::kOutOfDictionaryItemKey];
-  dst_oov_item.set_count(num_oov_values);
-  dst_oov_item.set_index(dataset::kOutOfDictionaryItemIndex);
-
-  // Set number of unique values. One value is the OOV item.
-  column_cat->set_number_of_unique_values(dict_list.size() + 1);
+  column_cat->set_number_of_unique_values(dictionary.items.size());
 
   return column;
 }
@@ -395,21 +480,20 @@ absl::StatusOr<dataset::proto::Column> CreateCategoricalColumnSpec(
 // Note that this function only creates the columns and copies the data, but it
 // does not set `num_rows` on the dataset. Before using the dataset, `num_rows
 // has to be set (e.g. using SetAndCheckNumRows).
-absl::Status PopulateColumnCategoricalNPBytes(dataset::VerticalDataset& self,
-                                              const std::string& name,
-                                              py::array& data,
-                                              const int max_vocab_count,
-                                              const int min_vocab_frequency,
-                                              std::optional<int> column_idx) {
+absl::Status PopulateColumnCategoricalNPBytes(
+    dataset::VerticalDataset& self, const std::string& name, py::array& data,
+    const int max_vocab_count, const int min_vocab_frequency,
+    std::optional<int> column_idx, const std::optional<py::array> dictionary) {
   ASSIGN_OR_RETURN(const auto values, NPByteArray::Create(data));
 
   CategoricalColumn* column;
   ssize_t offset = 0;
   if (!column_idx.has_value()) {
     // Create column spec
-    ASSIGN_OR_RETURN(const auto& column_spec,
-                     CreateCategoricalColumnSpec(name, values, max_vocab_count,
-                                                 min_vocab_frequency));
+    ASSIGN_OR_RETURN(
+        const auto& column_spec,
+        CreateCategoricalColumnSpec(name, values, max_vocab_count,
+                                    min_vocab_frequency, dictionary));
 
     // Import column data
     ASSIGN_OR_RETURN(auto* abstract_column, self.AddColumn(column_spec));
@@ -515,7 +599,8 @@ void init_dataset(py::module_& m) {
            &PopulateColumnCategoricalNPBytes, py::arg("name"),
            py::arg("data").noconvert(), py::arg("max_vocab_count") = -1,
            py::arg("min_vocab_frequency") = -1,
-           py::arg("column_idx") = std::nullopt)
+           py::arg("column_idx") = std::nullopt,
+           py::arg("dictionary") = std::nullopt)
       .def("PopulateColumnNumericalNPFloat32",
            &PopulateColumnNumericalNPFloat32, py::arg("name"),
            py::arg("data").noconvert(), py::arg("column_idx") = std::nullopt)

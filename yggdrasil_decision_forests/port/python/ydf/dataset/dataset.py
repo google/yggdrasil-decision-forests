@@ -332,12 +332,17 @@ class VerticalDataset:
       return
 
     elif column.semantic == Semantic.CATEGORICAL:
+      from_boolean = False
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, dtype=np.bytes_)
+      elif column_data.dtype.type in [np.bool_]:
+        bool_column_data = column_data
+        column_data = np.full_like(bool_column_data, b"false", "|S5")
+        column_data[bool_column_data] = b"true"
+        from_boolean = True
       elif column_data.dtype.type in [
           np.object_,
           np.string_,
-          np.bool_,
           np.int8,
           np.int16,
           np.int32,
@@ -365,6 +370,10 @@ class VerticalDataset:
       if column_data.dtype.type == np.bytes_:
         if inference_args is not None:
           guide = categorical_column_guide(column, inference_args)
+          if from_boolean:
+            guide["dictionary"] = np.array(
+                [b"<OOV>", b"false", b"true"], dtype=np.bytes_
+            )
           self._dataset.PopulateColumnCategoricalNPBytes(
               column.name, column_data, **guide
           )
