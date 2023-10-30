@@ -260,6 +260,25 @@ class DatasetTest(parameterized.TestCase):
     )
     self.assertEqual(ds.data_spec(), expected_data_spec)
 
+  def test_create_vds_pd_hash(self):
+    df = pd.DataFrame(
+        {"col_hash": ["a", "b", "abc"]},
+    )
+
+    ds = dataset.create_vertical_dataset(
+        df, columns=[("col_hash", Semantic.HASH)]
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="col_hash",
+                type=ds_pb.ColumnType.HASH,
+            ),
+        ),
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
+
   @parameterized.parameters(
       (["col_numerical"],),
       ([Column("col_numerical")],),

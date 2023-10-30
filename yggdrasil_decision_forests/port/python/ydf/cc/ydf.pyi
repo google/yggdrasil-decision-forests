@@ -45,6 +45,12 @@ class VerticalDataset:
       data: npt.NDArray[np.bool_],
       column_idx: Optional[int],
   ) -> None: ...
+  def PopulateColumnHashNPBytes(
+      self,
+      name: str,
+      data: npt.NDArray[np.bytes_],
+      column_idx: Optional[int] = None,
+  ) -> None: ...
   def CreateFromPathWithDataSpec(
       self, path: str, data_spec: data_spec_pb2.DataSpecification
   ) -> None: ...
