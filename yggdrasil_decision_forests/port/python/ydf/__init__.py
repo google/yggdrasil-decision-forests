@@ -34,6 +34,7 @@ from ydf.model import generic_model as _generic_model
 from ydf.model import gradient_boosted_trees_model as _gradient_boosted_trees_model
 from ydf.model import model_lib as _model_lib
 from ydf.model import random_forest_model as _random_forest_model
+from ydf.utils import log as _log
 
 __version__ = _version.version
 
@@ -61,3 +62,6 @@ GradientBoostedTreesLearner = _specialized_learners.GradientBoostedTreesLearner
 
 # Tuner
 RandomSearchTuner = _tuner.RandomSearchTuner
+
+# Logs
+verbose = _log.verbose

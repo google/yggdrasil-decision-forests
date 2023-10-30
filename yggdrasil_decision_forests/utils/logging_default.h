@@ -61,7 +61,7 @@ inline void SetLoggingLevel(int level) { logging_level = level; }
 
 // If true, logging messages include the timestamp, filename and line. True by
 // default.
-inline void SetDetails(bool value) { value = show_details; }
+inline void SetDetails(bool value) { show_details = value; }
 
 // Tests if a given logging level should be visible.
 inline bool IsLoggingEnabled(Severity severity) {
@@ -212,6 +212,11 @@ class LogMessage {
       std::clog << absl::FormatTime(" %y-%m-%d %H:%M:%E4S %Z ", absl::Now(),
                                     absl::LocalTimeZone())
                 << ExtractFilename(file) << ":" << line << "] ";
+    } else {
+      std::clog << "["
+                << absl::FormatTime("%y-%m-%d %H:%M:%E4S %Z", absl::Now(),
+                                    absl::LocalTimeZone())
+                << "] ";
     }
   }
 

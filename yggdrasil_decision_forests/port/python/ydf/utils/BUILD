@@ -1,4 +1,5 @@
 # pytype test and library
+load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -34,6 +35,22 @@ py_library(
     ],
     deps = [
     ],
+)
+
+py_library(
+    name = "log",
+    srcs = ["log.py"],
+    deps = [
+        # absl/logging dep,
+        "//ydf/cc:ydf",
+    ],
+)
+
+pybind_library(
+    name = "log_cc",
+    srcs = ["log.cc"],
+    hdrs = ["log.h"],
+    deps = ["@ydf_cc//yggdrasil_decision_forests/utils:logging"],
 )
 
 # Tests

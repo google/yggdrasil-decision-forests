@@ -29,6 +29,7 @@ from ydf.dataset import dataset
 from ydf.metric import metric
 from ydf.model import analysis
 from ydf.model import template_cpp_export
+from ydf.utils import log
 from yggdrasil_decision_forests.utils import model_analysis_pb2
 
 # TODO: Allow a simpler input type (e.g. string)
@@ -68,7 +69,8 @@ class GenericModel:
   def describe(self, full_details: bool = False) -> str:
     """Description of the model."""
 
-    return self._model.Describe(full_details)
+    with log.cc_log_context():
+      return self._model.Describe(full_details)
 
   def data_spec(self) -> data_spec_pb2.DataSpecification:
     """Returns the data spec used for train the model."""
@@ -126,10 +128,14 @@ Use `model.describe()` for more details
       raise ValueError(
           f"The batch size of the benchmark must be positive, got {batch_size}."
       )
-    vds = dataset.create_vertical_dataset(ds, data_spec=self._model.data_spec())
-    result = self._model.Benchmark(
-        vds._dataset, benchmark_duration, warmup_duration, batch_size
-    )
+
+    with log.cc_log_context():
+      vds = dataset.create_vertical_dataset(
+          ds, data_spec=self._model.data_spec()
+      )
+      result = self._model.Benchmark(
+          vds._dataset, benchmark_duration, warmup_duration, batch_size
+      )
     return result
 
   def save(self, path, advanced_options=ModelIOOptions()) -> None:
@@ -179,13 +185,15 @@ Use `model.describe()` for more details
                   path,
               )
 
-    self._model.Save(path, advanced_options.file_prefix)
+    with log.cc_log_context():
+      self._model.Save(path, advanced_options.file_prefix)
 
   def predict(self, data: dataset.InputDataset) -> np.ndarray:
-    ds = dataset.create_vertical_dataset(
-        data, data_spec=self._model.data_spec()
-    )
-    result = self._model.Predict(ds._dataset)  # pylint: disable=protected-access
+    with log.cc_log_context():
+      ds = dataset.create_vertical_dataset(
+          data, data_spec=self._model.data_spec()
+      )
+      result = self._model.Predict(ds._dataset)  # pylint: disable=protected-access
     return result
 
   def evaluate(
@@ -232,26 +240,28 @@ Use `model.describe()` for more details
       Model evaluation.
     """
 
-    ds = dataset.create_vertical_dataset(
-        data, data_spec=self._model.data_spec()
-    )
-
-    if isinstance(bootstrapping, bool):
-      bootstrapping_samples = 2000 if bootstrapping else -1
-    elif isinstance(bootstrapping, int) and bootstrapping >= 100:
-      bootstrapping_samples = bootstrapping
-    else:
-      raise ValueError(
-          "bootstrapping argument should be boolean or an integer greater than"
-          " 100 as bootstrapping will not yield useful results. Got"
-          f" {bootstrapping!r} instead"
+    with log.cc_log_context():
+      ds = dataset.create_vertical_dataset(
+          data, data_spec=self._model.data_spec()
       )
 
-    options_proto = metric_pb2.EvaluationOptions(
-        bootstrapping_samples=bootstrapping_samples,
-        task=self._model.task(),
-    )
-    evaluation_proto = self._model.Evaluate(ds._dataset, options_proto)  # pylint: disable=protected-access
+      if isinstance(bootstrapping, bool):
+        bootstrapping_samples = 2000 if bootstrapping else -1
+      elif isinstance(bootstrapping, int) and bootstrapping >= 100:
+        bootstrapping_samples = bootstrapping
+      else:
+        raise ValueError(
+            "bootstrapping argument should be boolean or an integer greater"
+            " than 100 as bootstrapping will not yield useful results. Got"
+            f" {bootstrapping!r} instead"
+        )
+
+      options_proto = metric_pb2.EvaluationOptions(
+          bootstrapping_samples=bootstrapping_samples,
+          task=self._model.task(),
+      )
+
+      evaluation_proto = self._model.Evaluate(ds._dataset, options_proto)  # pylint: disable=protected-access
     return metric.Evaluation(evaluation_proto)
 
   def analyze(
@@ -314,31 +324,32 @@ Use `model.describe()` for more details
       Model analysis.
     """
 
-    ds = dataset.create_vertical_dataset(
-        data, data_spec=self._model.data_spec()
-    )
+    with log.cc_log_context():
+      ds = dataset.create_vertical_dataset(
+          data, data_spec=self._model.data_spec()
+      )
 
-    options_proto = model_analysis_pb2.Options(
-        num_threads=num_threads,
-        pdp=model_analysis_pb2.Options.PlotConfig(
-            enabled=partial_depepence_plot,
-            example_sampling=sampling,
-            num_numerical_bins=num_bins,
-        ),
-        cep=model_analysis_pb2.Options.PlotConfig(
-            enabled=conditional_expectation_plot,
-            example_sampling=sampling,
-            num_numerical_bins=num_bins,
-        ),
-        permuted_variable_importance=model_analysis_pb2.Options.PermutedVariableImportance(
-            enabled=permutation_variable_importance_rounds > 0,
-            num_rounds=permutation_variable_importance_rounds,
-        ),
-        include_model_structural_variable_importances=True,
-    )
+      options_proto = model_analysis_pb2.Options(
+          num_threads=num_threads,
+          pdp=model_analysis_pb2.Options.PlotConfig(
+              enabled=partial_depepence_plot,
+              example_sampling=sampling,
+              num_numerical_bins=num_bins,
+          ),
+          cep=model_analysis_pb2.Options.PlotConfig(
+              enabled=conditional_expectation_plot,
+              example_sampling=sampling,
+              num_numerical_bins=num_bins,
+          ),
+          permuted_variable_importance=model_analysis_pb2.Options.PermutedVariableImportance(
+              enabled=permutation_variable_importance_rounds > 0,
+              num_rounds=permutation_variable_importance_rounds,
+          ),
+          include_model_structural_variable_importances=True,
+      )
 
-    analysis_proto = self._model.Analyze(ds._dataset, options_proto)  # pylint: disable=protected-access
-    return analysis.Analysis(analysis_proto, options_proto)
+      analysis_proto = self._model.Analyze(ds._dataset, options_proto)  # pylint: disable=protected-access
+      return analysis.Analysis(analysis_proto, options_proto)
 
   def to_cpp(self, key: str = "my_model") -> str:
     """Generates the code of a .h file to run the model in C++.

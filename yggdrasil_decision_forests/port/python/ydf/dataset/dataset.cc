@@ -660,6 +660,7 @@ void init_dataset(py::module_& m) {
   py::class_<dataset::VerticalDataset>(m, "VerticalDataset")
       .def(py::init<>())
       .def("data_spec", &dataset::VerticalDataset::data_spec)
+      .def("nrow", &dataset::VerticalDataset::nrow)
       .def("MemoryUsage", &dataset::VerticalDataset::MemoryUsage)
       .def("__repr__",
            [](const dataset::VerticalDataset& a) {

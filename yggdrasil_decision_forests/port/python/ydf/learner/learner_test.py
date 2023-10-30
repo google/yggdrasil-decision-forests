@@ -21,6 +21,7 @@ from typing import Tuple
 
 from absl import logging
 from absl.testing import absltest
+from absl.testing import parameterized
 import numpy as np
 import pandas as pd
 
@@ -35,6 +36,7 @@ from ydf.learner import specialized_learners
 from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
 from ydf.model import generic_model
+from ydf.utils import log
 from ydf.utils import test_utils
 
 ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
@@ -554,6 +556,17 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     model = learner.train(train_path)
     evaluation = model.evaluate(test_path)
     self.assertAlmostEqual(evaluation.ndcg, 0.71, places=1)
+
+
+class LoggingTest(parameterized.TestCase):
+
+  @parameterized.parameters(0, 1, 2)
+  def test_logging(self, verbose):
+    save_verbose = log.verbose(verbose)
+    learner = specialized_learners.RandomForestLearner(label="label")
+    ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
+    _ = learner.train(ds)
+    log.verbose(save_verbose)
 
 
 class UtilityTest(LearnerTest):

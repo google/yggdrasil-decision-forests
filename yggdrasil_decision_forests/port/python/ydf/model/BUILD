@@ -87,6 +87,7 @@ py_library(
         "//ydf/cc:ydf",
         "//ydf/dataset",
         "//ydf/metric",
+        "//ydf/utils:log",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
     ],
 )

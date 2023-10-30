@@ -146,6 +146,22 @@ class ApiTest(absltest.TestCase):
         model.to_cpp(),
     )
 
+  def test_verbose_full(self):
+    save_verbose = ydf.verbose(2)
+    learner = ydf.RandomForestLearner(label="label")
+    _ = learner.train(pd.DataFrame({"feature": [0, 1], "label": [0, 1]}))
+    ydf.verbose(save_verbose)
+
+  def test_verbose_default(self):
+    learner = ydf.RandomForestLearner(label="label")
+    _ = learner.train(pd.DataFrame({"feature": [0, 1], "label": [0, 1]}))
+
+  def test_verbose_none(self):
+    save_verbose = ydf.verbose(0)
+    learner = ydf.RandomForestLearner(label="label")
+    _ = learner.train(pd.DataFrame({"feature": [0, 1], "label": [0, 1]}))
+    ydf.verbose(save_verbose)
+
 
 if __name__ == "__main__":
   absltest.main()

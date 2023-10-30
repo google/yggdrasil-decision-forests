@@ -75,6 +75,7 @@ py_library(
         "//ydf/metric",
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
+        "//ydf/utils:log",
         "@ydf_cc//yggdrasil_decision_forests/utils:fold_generator_py_proto",
     ],
 )
@@ -123,6 +124,7 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/test_data",
         # absl/logging dep,
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
         "@com_google_pybind11_abseil//pybind11_abseil:status.so",
@@ -137,6 +139,7 @@ py_test(
         "//ydf/dataset:dataspec",
         "//ydf/metric",
         "//ydf/model:generic_model",
+        "//ydf/utils:log",
         "//ydf/utils:test_utils",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",

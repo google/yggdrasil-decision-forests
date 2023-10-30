@@ -14,31 +14,15 @@
  */
 
 
+#ifndef YGGDRASIL_DECISION_FORESTS_PORT_PYTHON_UTILS_LOG_H_
+#define YGGDRASIL_DECISION_FORESTS_PORT_PYTHON_UTILS_LOG_H_
+
 #include <pybind11/pybind11.h>
-
-#include "pybind11_abseil/import_status_module.h"
-#include "pybind11_protobuf/native_proto_caster.h"
-#include "ydf/dataset/dataset.h"
-#include "ydf/learner/learner.h"
-#include "ydf/metric/metric.h"
-#include "ydf/model/model.h"
-#include "ydf/utils/log.h"
-
-namespace py = ::pybind11;
 
 namespace yggdrasil_decision_forests::port::python {
 
-PYBIND11_MODULE(ydf, m) {
-  pybind11_protobuf::ImportNativeProtoCasters();
-  py::google::ImportStatusModule();
-  m.doc() =
-      "Wrappers for Yggdrasil Decision Forests, a library for training, "
-      "serving, analyzing and evaluating decision forest models.";
-  init_dataset(m);
-  init_model(m);
-  init_learner(m);
-  init_metric(m);
-  init_log(m);
-}
+void init_log(pybind11::module_ &m);
 
 }  // namespace yggdrasil_decision_forests::port::python
+
+#endif  // YGGDRASIL_DECISION_FORESTS_PORT_PYTHON_UTILS_LOG_H_
