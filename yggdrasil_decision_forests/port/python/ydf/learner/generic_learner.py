@@ -108,6 +108,10 @@ class GenericLearner:
     if tuner:
       tuner.set_base_learner(learner_name)
 
+  @property
+  def hyperparameters(self) -> hyperparameters.HyperParameters:
+    return self._hyperparameters
+
   def train(
       self,
       ds: dataset.InputDataset,

@@ -411,6 +411,19 @@ class RandomForestLearnerTest(LearnerTest):
 
     self.assertAlmostEqual(accuracy_from_path, accuracy_from_pd)
 
+  def test_hp_dictionary(self):
+    learner = specialized_learners.RandomForestLearner(label="l", num_trees=50)
+    self.assertDictContainsSubset(
+        {
+            "num_trees": 50,
+            "categorical_algorithm": "CART",
+            "categorical_set_split_greedy_sampling": 0.1,
+            "compute_oob_performances": True,
+            "compute_oob_variable_importances": False,
+        },
+        learner.hyperparameters,
+    )
+
 
 class CARTLearnerTest(LearnerTest):
 
