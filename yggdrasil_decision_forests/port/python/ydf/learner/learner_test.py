@@ -388,6 +388,27 @@ class RandomForestLearnerTest(LearnerTest):
           label="income", num_trees=50
       ).train(train_ds, valid=test_ds)
 
+  def test_compare_pandas_and_path(self):
+    dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
+    train_path = os.path.join(dataset_directory, "adult_train.csv")
+    test_path = os.path.join(dataset_directory, "adult_test.csv")
+    label = "income"
+
+    pd_train = pd.read_csv(train_path)
+    pd_test = pd.read_csv(test_path)
+
+    learner = specialized_learners.RandomForestLearner(label=label)
+    model_from_pd = learner.train(pd_train)
+    accuracy_from_pd = model_from_pd.evaluate(pd_test).accuracy
+
+    learner_from_path = specialized_learners.RandomForestLearner(
+        label=label, data_spec=model_from_pd.data_spec()
+    )
+    model_from_path = learner_from_path.train(train_path)
+    accuracy_from_path = model_from_path.evaluate(pd_test).accuracy
+
+    self.assertAlmostEqual(accuracy_from_path, accuracy_from_pd)
+
 
 class CARTLearnerTest(LearnerTest):
 
@@ -517,38 +538,22 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     logging.info("evaluation:\n%s", evaluation)
     self.assertAlmostEqual(evaluation.accuracy, 0.87, 1)
 
-  def test_adult_from_csv(self):
+  def test_ranking(self):
     dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
-    train_path = os.path.join(dataset_directory, "adult_train.csv")
-    test_path = os.path.join(dataset_directory, "adult_test.csv")
-    label = "income"
+    train_path = os.path.join(dataset_directory, "synthetic_ranking_train.csv")
+    test_path = os.path.join(dataset_directory, "synthetic_ranking_test.csv")
+    label = "LABEL"
+    ranking_group = "GROUP"
 
-    learner = specialized_learners.RandomForestLearner(label=label)
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label=label,
+        ranking_group=ranking_group,
+        task=generic_learner.Task.RANKING,
+    )
 
     model = learner.train(train_path)
-    accuracy = model.evaluate(test_path).accuracy
-    self.assertGreaterEqual(accuracy, 0.864)
-
-  def test_compare_pandas_and_path(self):
-    dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
-    train_path = os.path.join(dataset_directory, "adult_train.csv")
-    test_path = os.path.join(dataset_directory, "adult_test.csv")
-    label = "income"
-
-    pd_train = pd.read_csv(train_path)
-    pd_test = pd.read_csv(test_path)
-
-    learner = specialized_learners.RandomForestLearner(label=label)
-    model_from_pd = learner.train(pd_train)
-    accuracy_from_pd = model_from_pd.evaluate(pd_test).accuracy
-
-    learner_from_path = specialized_learners.RandomForestLearner(
-        label=label, data_spec=model_from_pd.data_spec()
-    )
-    model_from_path = learner_from_path.train(train_path)
-    accuracy_from_path = model_from_path.evaluate(pd_test).accuracy
-
-    self.assertAlmostEqual(accuracy_from_path, accuracy_from_pd)
+    evaluation = model.evaluate(test_path)
+    self.assertAlmostEqual(evaluation.ndcg, 0.71, places=1)
 
 
 class UtilityTest(LearnerTest):

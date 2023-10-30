@@ -4,6 +4,16 @@
 
 ### Features
 
+-   Add support for ranking tasks
+-   Add support for reading from path, supporting multiple data types (csv, 
+    tfrecord, ...)
+
+#### Release music
+
+Rhapsody in Blue. George Gershwin
+
+### Features
+
 -   Add `model.distance(...)` to compute pairwise distance between examples.
 
 ## 0.0.3 - 2023-10-20
@@ -16,7 +26,7 @@
 -   Tree leaves retrieval
 -   C++ base updated to 1.7.0
 
-### Release music
+#### Release music
 
 Schweigt stille, plaudert nicht (BWV 211). Johann Sebastian Bach
 
