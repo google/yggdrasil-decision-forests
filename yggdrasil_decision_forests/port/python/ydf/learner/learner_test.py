@@ -29,6 +29,7 @@ from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.dataset import dataset
+from ydf.dataset import dataspec
 from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
 from ydf.learner import tuner as tuner_lib
@@ -38,6 +39,7 @@ from ydf.utils import test_utils
 
 ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
 
+# TODO: Convert to dataclass.
 DatasetForTesting = collections.namedtuple(
     "Dataset",
     [
@@ -397,7 +399,7 @@ class CARTLearnerTest(LearnerTest):
 
   def test_monotonic_non_compatible_learner(self):
     learner = specialized_learners.CartLearner(
-        label="label", features=[dataset.Column("feature", monotonic=+1)]
+        label="label", features=[dataspec.Column("feature", monotonic=+1)]
     )
     ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
     with self.assertRaisesRegex(
@@ -438,7 +440,7 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
 
   def test_monotonic_non_compatible_options(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
-        label="label", features=[dataset.Column("feature", monotonic=+1)]
+        label="label", features=[dataspec.Column("feature", monotonic=+1)]
     )
     ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
     with self.assertRaisesRegex(
@@ -456,9 +458,9 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         num_trees=70,
         use_hessian_gain=True,
         features=[
-            dataset.Column("age", monotonic=+1),
-            dataset.Column("hours_per_week", monotonic=-1),
-            dataset.Column("education_num", monotonic=+1),
+            dataspec.Column("age", monotonic=+1),
+            dataspec.Column("hours_per_week", monotonic=-1),
+            dataspec.Column("education_num", monotonic=+1),
         ],
         include_all_columns=True,
     )
@@ -514,6 +516,39 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
 
     logging.info("evaluation:\n%s", evaluation)
     self.assertAlmostEqual(evaluation.accuracy, 0.87, 1)
+
+  def test_adult_from_csv(self):
+    dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
+    train_path = os.path.join(dataset_directory, "adult_train.csv")
+    test_path = os.path.join(dataset_directory, "adult_test.csv")
+    label = "income"
+
+    learner = specialized_learners.RandomForestLearner(label=label)
+
+    model = learner.train(train_path)
+    accuracy = model.evaluate(test_path).accuracy
+    self.assertGreaterEqual(accuracy, 0.864)
+
+  def test_compare_pandas_and_path(self):
+    dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
+    train_path = os.path.join(dataset_directory, "adult_train.csv")
+    test_path = os.path.join(dataset_directory, "adult_test.csv")
+    label = "income"
+
+    pd_train = pd.read_csv(train_path)
+    pd_test = pd.read_csv(test_path)
+
+    learner = specialized_learners.RandomForestLearner(label=label)
+    model_from_pd = learner.train(pd_train)
+    accuracy_from_pd = model_from_pd.evaluate(pd_test).accuracy
+
+    learner_from_path = specialized_learners.RandomForestLearner(
+        label=label, data_spec=model_from_pd.data_spec()
+    )
+    model_from_path = learner_from_path.train(train_path)
+    accuracy_from_path = model_from_path.evaluate(pd_test).accuracy
+
+    self.assertAlmostEqual(accuracy_from_path, accuracy_from_pd)
 
 
 class UtilityTest(LearnerTest):

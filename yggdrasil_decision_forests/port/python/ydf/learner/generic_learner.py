@@ -28,6 +28,7 @@ from yggdrasil_decision_forests.metric import metric_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
+from ydf.dataset import dataspec
 from ydf.learner import hyperparameters
 from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
@@ -49,7 +50,7 @@ class GenericLearner:
       weights: Optional[str],
       ranking_group: Optional[str],
       uplift_treatment: Optional[str],
-      data_spec_args: dataset.DataSpecInferenceArgs,
+      data_spec_args: dataspec.DataSpecInferenceArgs,
       data_spec: Optional[data_spec_pb2.DataSpecification],
       hyper_parameters: hyperparameters.HyperParameters,
       deployment_config: abstract_learner_pb2.DeploymentConfig,
@@ -156,6 +157,39 @@ class GenericLearner:
       A trained model.
     """
 
+    if isinstance(ds, str):
+      if valid is not None and not isinstance(valid, str):
+        raise ValueError(
+            "If the training dataset is a path, the validation dataset must"
+            " also be a path."
+        )
+      return self.train_from_path(ds, valid)
+    if valid is not None and isinstance(valid, str):
+      raise ValueError(
+          "The validation dataset may only be a path if the training dataset is"
+          " a path."
+      )
+    return self.train_from_dataset(ds, valid)
+
+  def train_from_path(
+      self, ds: str, valid: Optional[str]
+  ) -> generic_model.GenericModel:
+    """Trains a model from a file path (dataset reading in YDF C++)."""
+    if self._data_spec is not None:
+      cc_model = self._get_learner().TrainFromPathWithDataSpec(
+          ds, self._data_spec, valid
+      )
+    else:
+      guide = self._build_data_spec_args().to_proto_guide()
+      cc_model = self._get_learner().TrainFromPathWithGuide(ds, guide, valid)
+    return model_lib.load_cc_model(cc_model)
+
+  def train_from_dataset(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset] = None,
+  ) -> generic_model.GenericModel:
+    """Trains a model from in-memory data."""
     train_args = {
         "dataset": self._get_vertical_dataset(ds)._dataset  # pylint: disable=protected-access
     }
@@ -195,7 +229,7 @@ class GenericLearner:
 
         proto_direction = (
             abstract_learner_pb2.MonotonicConstraint.INCREASING
-            if feature.normalized_monotonic == dataset.Monotonic.INCREASING
+            if feature.normalized_monotonic == dataspec.Monotonic.INCREASING
             else abstract_learner_pb2.MonotonicConstraint.DECREASING
         )
         training_config.monotonic_constraints.append(
@@ -318,7 +352,7 @@ class GenericLearner:
     )
     return metric.Evaluation(evaluation_proto)
 
-  def _build_data_spec_args(self) -> dataset.DataSpecInferenceArgs:
+  def _build_data_spec_args(self) -> dataspec.DataSpecInferenceArgs:
     """Builds DS args with user inputs and guides for labels / special columns.
 
     Create a copy of self._data_spec_args and adds column definitions for the
@@ -334,16 +368,16 @@ class GenericLearner:
       column are specified as features.
     """
 
-    def create_label_column(name: str, task: Task) -> dataset.Column:
+    def create_label_column(name: str, task: Task) -> dataspec.Column:
       if task in [Task.CLASSIFICATION, Task.CATEGORICAL_UPLIFT]:
-        return dataset.Column(
+        return dataspec.Column(
             name=name,
-            semantic=dataset.Semantic.CATEGORICAL,
+            semantic=dataspec.Semantic.CATEGORICAL,
             max_vocab_count=-1,
             min_vocab_frequency=1,
         )
       elif task in [Task.REGRESSION, Task.RANKING, Task.NUMERICAL_UPLIFT]:
-        return dataset.Column(name=name, semantic=dataset.Semantic.NUMERICAL)
+        return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
       else:
         raise ValueError(
             f"Unsupported task {abstract_model_pb2.Task(task)} for label column"
@@ -359,50 +393,50 @@ class GenericLearner:
       data_spec_args.include_all_columns = True
       data_spec_args.columns = []
     column_defs = data_spec_args.columns
-    if dataset.column_defs_contains_column(self._label, column_defs):
+    if dataspec.column_defs_contains_column(self._label, column_defs):
       raise ValueError(
           f"Label column {self._label} is also an input feature. A column"
           " cannot be both a label and input feature."
       )
     column_defs.append(create_label_column(self._label, self._task))
     if self._weights is not None:
-      if dataset.column_defs_contains_column(self._weights, column_defs):
+      if dataspec.column_defs_contains_column(self._weights, column_defs):
         raise ValueError(
             f"Weights column {self._weights} is also an input feature. A column"
             " cannot be both a weights and input feature."
         )
       column_defs.append(
-          dataset.Column(
-              name=self._weights, semantic=dataset.Semantic.NUMERICAL
+          dataspec.Column(
+              name=self._weights, semantic=dataspec.Semantic.NUMERICAL
           )
       )
     if self._ranking_group is not None:
       assert self._task == Task.RANKING
 
-      if dataset.column_defs_contains_column(self._ranking_group, column_defs):
+      if dataspec.column_defs_contains_column(self._ranking_group, column_defs):
         raise ValueError(
             f"Ranking group column {self._ranking_group} is also an input"
             " feature. A column cannot be both a ranking group and input"
             " feature."
         )
       column_defs.append(
-          dataset.Column(
-              name=self._ranking_group, semantic=dataset.Semantic.HASH
+          dataspec.Column(
+              name=self._ranking_group, semantic=dataspec.Semantic.HASH
           )
       )
     if self._uplift_treatment is not None:
       assert self._task in [Task.NUMERICAL_UPLIFT, Task.CATEGORICAL_UPLIFT]
 
-      if dataset.column_defs_contains_column(
+      if dataspec.column_defs_contains_column(
           self._uplift_treatment, column_defs
       ):
         raise ValueError(
             "The uplift_treatment column should not be specified as a feature"
         )
       column_defs.append(
-          dataset.Column(
+          dataspec.Column(
               name=self._uplift_treatment,
-              semantic=dataset.Semantic.CATEGORICAL,
+              semantic=dataspec.Semantic.CATEGORICAL,
               max_vocab_count=-1,
               min_vocab_frequency=1,
           )

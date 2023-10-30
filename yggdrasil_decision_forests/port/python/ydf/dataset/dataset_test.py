@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import unittest
 
 from absl.testing import absltest
@@ -22,15 +23,15 @@ import tensorflow as tf
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataset
+from ydf.dataset import dataspec
 from ydf.utils import test_utils
 
 # Make "assertEqual" print more details.
 unittest.util._MAX_LENGTH = 10000
 
-Semantic = dataset.Semantic
+Semantic = dataspec.Semantic
 VocabValue = ds_pb.CategoricalSpec.VocabValue
-Column = dataset.Column
-Monotonic = dataset.Monotonic
+Column = dataspec.Column
 
 
 class DatasetTest(parameterized.TestCase):
@@ -159,7 +160,7 @@ class DatasetTest(parameterized.TestCase):
         columns=[
             Column(
                 "col2",
-                dataset.Semantic.CATEGORICAL,
+                Semantic.CATEGORICAL,
                 min_vocab_frequency=1,
                 max_vocab_count=3,
             )
@@ -211,7 +212,7 @@ class DatasetTest(parameterized.TestCase):
         columns=[
             Column(
                 "col1",
-                dataset.Semantic.CATEGORICAL,
+                Semantic.CATEGORICAL,
             )
         ],
         include_all_columns=True,
@@ -262,7 +263,7 @@ class DatasetTest(parameterized.TestCase):
   @parameterized.parameters(
       (["col_numerical"],),
       ([Column("col_numerical")],),
-      ([("col_numerical", dataset.Semantic.NUMERICAL)],),
+      ([("col_numerical", Semantic.NUMERICAL)],),
   )
   def test_create_vds_exclude_columns(self, column_definition):
     df = pd.DataFrame({
@@ -331,107 +332,6 @@ class DatasetTest(parameterized.TestCase):
     ds = dataset.create_vertical_dataset(df)
     # 2 columns * 3 rows * 4 bytes per values
     self.assertEqual(ds.memory_usage(), 2 * 3 * 4)
-
-  def test_is_pandas(self):
-    self.assertTrue(dataset.is_pandas_dataframe(pd.DataFrame()))
-    self.assertFalse(dataset.is_pandas_dataframe({}))
-
-  def test_normalize_column_defs(self):
-    self.assertEqual(
-        dataset.normalize_column_defs([
-            "a",
-            ("b", Semantic.NUMERICAL),
-            Column("c"),
-            Column("d", Semantic.CATEGORICAL),
-        ]),
-        [
-            Column("a"),
-            Column("b", Semantic.NUMERICAL),
-            Column("c"),
-            Column("d", Semantic.CATEGORICAL),
-        ],
-    )
-
-  def test_normalize_column_defs_none(self):
-    self.assertIsNone(dataset.normalize_column_defs(None))
-
-  def test_get_all_columns(self):
-    self.assertEqual(
-        dataset.get_all_columns(
-            ["a", "b", "c", "d"],
-            dataset.DataSpecInferenceArgs(
-                columns=[
-                    Column("a"),
-                    Column("b", Semantic.NUMERICAL),
-                    Column("c", Semantic.CATEGORICAL),
-                ],
-                include_all_columns=False,
-                max_vocab_count=1,
-                min_vocab_frequency=1,
-                discretize_numerical_columns=False,
-                num_discretized_numerical_bins=1,
-            ),
-        ),
-        [
-            Column("a"),
-            Column("b", Semantic.NUMERICAL),
-            Column("c", Semantic.CATEGORICAL),
-        ],
-    )
-
-  def test_get_all_columns_include_all_columns(self):
-    self.assertEqual(
-        dataset.get_all_columns(
-            ["a", "b"],
-            dataset.DataSpecInferenceArgs(
-                columns=[Column("a")],
-                include_all_columns=True,
-                max_vocab_count=1,
-                min_vocab_frequency=1,
-                discretize_numerical_columns=False,
-                num_discretized_numerical_bins=1,
-            ),
-        ),
-        [
-            Column("a"),
-            Column("b"),
-        ],
-    )
-
-  def test_get_all_columns_missing(self):
-    with self.assertRaisesRegex(ValueError, "Column 'b' no found"):
-      dataset.get_all_columns(
-          ["a"],
-          dataset.DataSpecInferenceArgs(
-              columns=[Column("b")],
-              include_all_columns=True,
-              max_vocab_count=1,
-              min_vocab_frequency=1,
-              discretize_numerical_columns=False,
-              num_discretized_numerical_bins=1,
-          ),
-      )
-
-  def test_priority(self):
-    self.assertEqual(dataset.priority(1, 2), 1)
-    self.assertEqual(dataset.priority(None, 2), 2)
-    self.assertIsNone(dataset.priority(None, None), None)
-
-  def test_categorical_column_guide(self):
-    self.assertEqual(
-        dataset.categorical_column_guide(
-            Column("a", Semantic.CATEGORICAL, max_vocab_count=3),
-            dataset.DataSpecInferenceArgs(
-                columns=[],
-                include_all_columns=False,
-                max_vocab_count=1,
-                min_vocab_frequency=2,
-                discretize_numerical_columns=False,
-                num_discretized_numerical_bins=1,
-            ),
-        ),
-        {"max_vocab_count": 3, "min_vocab_frequency": 2},
-    )
 
   def test_create_vds_pd_with_spec(self):
     data_spec = ds_pb.DataSpecification(
@@ -538,10 +438,8 @@ class DatasetTest(parameterized.TestCase):
         "col_bool": [True, True, False, False],
     })
     feature_definitions = [
-        Column("col_str", dataset.Semantic.CATEGORICAL, min_vocab_frequency=1),
-        Column(
-            "col_int_cat", dataset.Semantic.CATEGORICAL, min_vocab_frequency=1
-        ),
+        Column("col_str", Semantic.CATEGORICAL, min_vocab_frequency=1),
+        Column("col_int_cat", Semantic.CATEGORICAL, min_vocab_frequency=1),
     ]
     ds = dataset.create_vertical_dataset(
         df, columns=feature_definitions, include_all_columns=True
@@ -569,7 +467,7 @@ four entries,4,8,4.4,0
         columns=[
             Column(
                 "col1",
-                dataset.Semantic.CATEGORICAL,
+                Semantic.CATEGORICAL,
                 min_vocab_frequency=1,
                 max_vocab_count=-1,
             )
@@ -609,45 +507,11 @@ four entries,4,8,4.4,0
           columns=[
               Column(
                   "col1",
-                  dataset.Semantic.CATEGORICAL,
+                  Semantic.CATEGORICAL,
                   max_vocab_count=-2,
               )
           ],
       )
-
-  def test_column_defs_contains_column(self):
-    column_name = "target"
-    self.assertFalse(dataset.column_defs_contains_column(column_name, None))
-    str_defs_positive = ["foo", "target", "bar", "", "*"]
-    self.assertTrue(
-        dataset.column_defs_contains_column(column_name, str_defs_positive)
-    )
-    str_defs_negative = ["foo", "tar", "bar", "", "*"]
-    self.assertFalse(
-        dataset.column_defs_contains_column(column_name, str_defs_negative)
-    )
-    tuple_defs_positive = [
-        ("foo", Semantic.NUMERICAL),
-        ("target", Semantic.CATEGORICAL),
-    ]
-    self.assertTrue(
-        dataset.column_defs_contains_column(column_name, tuple_defs_positive)
-    )
-    tuple_defs_negative = [
-        ("foo", Semantic.NUMERICAL),
-        ("tar", Semantic.CATEGORICAL),
-    ]
-    self.assertFalse(
-        dataset.column_defs_contains_column(column_name, tuple_defs_negative)
-    )
-    column_defs_positive = [Column("foo"), Column("target")]
-    self.assertTrue(
-        dataset.column_defs_contains_column(column_name, column_defs_positive)
-    )
-    column_defs_negative = [Column("foo"), Column("tar")]
-    self.assertFalse(
-        dataset.column_defs_contains_column(column_name, column_defs_negative)
-    )
 
   def test_create_tensorflow_batched_dataset(self):
     ds_tf = tf.data.Dataset.from_tensor_slices({
@@ -680,7 +544,7 @@ four entries,4,8,4.4,0
   def test_order_boolean(self, values, expected_counts, count_nas):
     ds = dataset.create_vertical_dataset(
         {"col": np.array(values)},
-        columns=[Column("col", dataset.Semantic.CATEGORICAL)],
+        columns=[Column("col", dataspec.Semantic.CATEGORICAL)],
     )
     expected_data_spec = ds_pb.DataSpecification(
         created_num_rows=3,
@@ -702,41 +566,147 @@ four entries,4,8,4.4,0
     )
     self.assertEqual(ds.data_spec(), expected_data_spec)
 
-
-class MonotonicTest(parameterized.TestCase):
-
   @parameterized.parameters(
-      Monotonic.INCREASING,
-      Monotonic.DECREASING,
+      ([True, True, True], (0, 0, 3), 0),
+      ([False, False, False], (0, 3, 0), 0),
+      ([True, False, False], (0, 2, 1), 0),
   )
-  def test_already_normalized_value(self, value):
-    self.assertEqual(Column("f", monotonic=value).normalized_monotonic, value)
-
-  def test_already_normalized_value_none(self):
-    self.assertIsNone(Column("f", monotonic=None).normalized_monotonic)
-
-  @parameterized.parameters(
-      (+1, Monotonic.INCREASING),
-      (-1, Monotonic.DECREASING),
-  )
-  def test_normalize_value(self, non_normalized_value, normalized_value):
-    self.assertEqual(
-        Column("f", monotonic=non_normalized_value).normalized_monotonic,
-        normalized_value,
+  def test_order_boolean(self, values, expected_counts, count_nas):
+    ds = dataset.create_vertical_dataset(
+        {"col": np.array(values)},
+        columns=[Column("col", dataspec.Semantic.CATEGORICAL)],
     )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="col",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                count_nas=count_nas,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOV>": VocabValue(index=0, count=expected_counts[0]),
+                        "false": VocabValue(index=1, count=expected_counts[1]),
+                        "true": VocabValue(index=2, count=expected_counts[2]),
+                    },
+                    number_of_unique_values=3,
+                ),
+            ),
+        ),
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
 
-  def test_normalize_value_none(self):
-    self.assertIsNone(Column("f", monotonic=0).normalized_monotonic)
+  @parameterized.parameters("", "csv:")
+  def test_read_csv(self, path_prefix):
+    tmp_dir = self.create_tempdir()
+    csv_file = self.create_tempfile(
+        content="""col_cat,col_num
+A,1
+B,2
+B,3""",
+        file_path=os.path.join(tmp_dir.full_path, "file.csv"),
+    )
+    ds = dataset.create_vertical_dataset(
+        path_prefix + csv_file.full_path, min_vocab_frequency=1
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="col_cat",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                is_manual_type=False,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "A": VocabValue(index=2, count=1),
+                        "B": VocabValue(index=1, count=2),
+                    },
+                    number_of_unique_values=3,
+                    most_frequent_value=1,
+                    min_value_count=1,
+                    max_number_of_unique_values=2000,
+                    is_already_integerized=False,
+                ),
+            ),
+            ds_pb.Column(
+                name="col_num",
+                type=ds_pb.ColumnType.NUMERICAL,
+                is_manual_type=False,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2,
+                    standard_deviation=0.8164965809277263,  # ~math.sqrt(2 / 3)
+                    min_value=1,
+                    max_value=3,
+                ),
+            ),
+        ),
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
 
-  def test_good_semantic(self):
-    _ = Column("f", monotonic=+1)
-    _ = Column("f", semantic=dataset.Semantic.NUMERICAL, monotonic=+1)
+  def test_read_from_path(self):
+    csv_file = self.create_tempfile(content="""col_cat,col_num
+A,1
+B,2
+B,3""")
+    ds = dataset.create_vertical_dataset(
+        "csv:" + csv_file.full_path, min_vocab_frequency=1
+    )
+    df_pd = pd.read_csv(csv_file)
+    ds_pd = dataset.create_vertical_dataset(df_pd, data_spec=ds.data_spec())
+    self.assertEqual(ds._dataset.DebugString(), ds_pd._dataset.DebugString())
 
-  def test_bad_semantic(self):
-    with self.assertRaisesRegex(
-        ValueError, "with monotonic constraint is expected to have"
-    ):
-      _ = Column("feature", semantic=dataset.Semantic.CATEGORICAL, monotonic=+1)
+  @unittest.skip("Requires building YDF with tensorflow io")
+  def test_read_from_sharded_tfe(self):
+    sharded_path = "tfrecord+tfe:" + os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "toy.tfe-tfrecord@2"
+    )
+    ds = dataset.create_vertical_dataset(
+        sharded_path,
+        min_vocab_frequency=1,
+        columns=["Bool_1", "Cat_2", "Num_1"],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        columns=(
+            ds_pb.Column(
+                name="Bool_1",
+                type=ds_pb.BOOLEAN,
+                is_manual_type=False,
+                boolean=ds_pb.BooleanSpec(count_true=2, count_false=2),
+            ),
+            ds_pb.Column(
+                name="Cat_2",
+                type=ds_pb.CATEGORICAL,
+                is_manual_type=False,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
+                    most_frequent_value=1,
+                    min_value_count=1,
+                    max_number_of_unique_values=2000,
+                    is_already_integerized=False,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "A": VocabValue(index=2, count=1),
+                        "B": VocabValue(index=1, count=1),
+                    },
+                ),
+                count_nas=2,
+            ),
+            ds_pb.Column(
+                name="Num_1",
+                type=ds_pb.NUMERICAL,
+                is_manual_type=False,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2.5,
+                    min_value=1.0,
+                    max_value=4.0,
+                    standard_deviation=1.118033988749895,
+                ),
+            ),
+        ),
+        created_num_rows=4,
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
 
 
 if __name__ == "__main__":

@@ -18,11 +18,14 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
@@ -47,6 +50,21 @@ absl::StatusOr<std::pair<std::string, std::string>> SplitTypeAndPath(
 
 bool IsTypedPath(const absl::string_view maybe_typed_path) {
   return SplitTypeAndPath(maybe_typed_path).ok();
+}
+
+absl::StatusOr<std::string> GetTypedPath(const std::string& path) {
+  if (dataset::IsTypedPath(path)) {
+    return path;
+  }
+  if (absl::EndsWith(path, ".csv")) {
+    return absl::StrCat("csv:", path);
+  } else {
+    return absl::InvalidArgumentError(
+        absl::Substitute("Could not determine file type of $0. Please "
+                         "provide a typed path, e.g. csv:/path/to/my/file \n"
+                         "Supported formats: $1",
+                         path, ListSupportedFormats()));
+  }
 }
 
 std::pair<std::string, proto::DatasetFormat> GetDatasetPathAndType(
@@ -102,6 +120,20 @@ std::string DatasetFormatToPrefix(proto::DatasetFormat format) {
     case proto::FORMAT_PARTIAL_DATASET_CACHE:
       return FORMAT_PARTIAL_DATASET_CACHE;
   }
+}
+
+std::string ListSupportedFormats() {
+  std::vector<std::string> supported_prefixes;
+  static const google::protobuf::EnumDescriptor* enum_descriptor =
+      google::protobuf::GetEnumDescriptor<DatasetFormat>();
+  for (int i = 0; i < enum_descriptor->value_count(); i++) {
+    const google::protobuf::EnumValueDescriptor* format_idx = enum_descriptor->value(i);
+    const auto format = static_cast<DatasetFormat>(format_idx->number());
+    if (format != proto::INVALID) {
+      supported_prefixes.push_back(DatasetFormatToPrefix(format));
+    }
+  }
+  return absl::StrJoin(supported_prefixes, ", ");
 }
 
 }  // namespace dataset

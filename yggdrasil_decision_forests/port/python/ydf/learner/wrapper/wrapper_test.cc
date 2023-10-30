@@ -168,7 +168,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
-      features: dataset.ColumnDefs = None,
+      features: dataspec.ColumnDefs = None,
       include_all_columns: bool = False,
       max_vocab_count: int = 2000,
       min_vocab_frequency: int = 5,
@@ -187,8 +187,8 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
                       "a" : a,
 
       }
-    data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=dataset.normalize_column_defs(features),
+    data_spec_args = dataspec.DataSpecInferenceArgs(
+        columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,

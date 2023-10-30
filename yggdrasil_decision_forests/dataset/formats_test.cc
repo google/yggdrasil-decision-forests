@@ -41,6 +41,11 @@ TEST(Dataset, GetDatasetPathAndType) {
                 "/tmp/dataset.csv", proto::DatasetFormat::FORMAT_CSV)));
 }
 
+TEST(Dataset, ListSupportedFormats) {
+  std::string expected_formats = "csv, tfrecord+tfe, partial_dataset_cache";
+  EXPECT_EQ(ListSupportedFormats(), expected_formats);
+}
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

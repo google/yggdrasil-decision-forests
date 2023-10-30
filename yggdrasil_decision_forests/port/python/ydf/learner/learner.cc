@@ -22,7 +22,10 @@
 
 #include <atomic>
 #include <csignal>
+#include <functional>
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
 
 #include "absl/status/status.h"
@@ -30,6 +33,9 @@
 #include "absl/types/optional.h"
 #include "pybind11_abseil/status_casters.h"
 #include "pybind11_protobuf/native_proto_caster.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
+#include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -122,12 +128,46 @@ class GenericCCLearner {
       const dataset::VerticalDataset& dataset,
       const absl::optional<
           std::reference_wrapper<const dataset::VerticalDataset>>
-          validation_dataset = {}) const {
+          validation_dataset = std::nullopt) const {
     EnableUserInterruption();
     ASSIGN_OR_RETURN(auto model,
                      learner_->TrainWithStatus(dataset, validation_dataset));
     DisableUserInterruption();
     return CreateCCModel(std::move(model));
+  }
+
+  absl::StatusOr<std::unique_ptr<GenericCCModel>> TrainFromPathWithDataSpec(
+      const std::string& dataset_path,
+      const dataset::proto::DataSpecification& data_spec,
+      const absl::optional<std::reference_wrapper<const std::string>>
+          validation_dataset_path = std::nullopt) const {
+    ASSIGN_OR_RETURN(const std::string typed_dataset_path,
+                     dataset::GetTypedPath(dataset_path));
+    std::optional<std::string> typed_valid_path;
+    if (validation_dataset_path.has_value()) {
+      ASSIGN_OR_RETURN(typed_valid_path,
+                       dataset::GetTypedPath(validation_dataset_path.value()));
+    }
+    EnableUserInterruption();
+    ASSIGN_OR_RETURN(auto model,
+                     learner_->TrainWithStatus(typed_dataset_path, data_spec,
+                                               typed_valid_path));
+    DisableUserInterruption();
+    return CreateCCModel(std::move(model));
+  }
+
+  absl::StatusOr<std::unique_ptr<GenericCCModel>> TrainFromPathWithGuide(
+      const std::string& dataset_path,
+      const dataset::proto::DataSpecificationGuide& data_spec_guide,
+      const absl::optional<std::reference_wrapper<const std::string>>
+          validation_dataset_path = std::nullopt) const {
+    ASSIGN_OR_RETURN(const std::string typed_dataset_path,
+                     dataset::GetTypedPath(dataset_path));
+    dataset::proto::DataSpecification generated_data_spec;
+    RETURN_IF_ERROR(dataset::CreateDataSpecWithStatus(
+        typed_dataset_path, false, data_spec_guide, &generated_data_spec));
+    return TrainFromPathWithDataSpec(typed_dataset_path, generated_data_spec,
+                                     validation_dataset_path);
   }
 
   absl::Status SetHyperParameters(
@@ -153,7 +193,8 @@ class GenericCCLearner {
   std::unique_ptr<model::AbstractLearner> learner_;
 };
 
-// Create a learner just from the training config and the
+// Create a learner just from the training config, hyperparameters and
+// deployment config.
 absl::StatusOr<std::unique_ptr<GenericCCLearner>> GetLearner(
     const model::proto::TrainingConfig& train_config,
     const model::proto::GenericHyperParameters& hyperparameters,
@@ -177,6 +218,13 @@ void init_learner(py::module_& m) {
            })
       .def("Train", &GenericCCLearner::Train, py::arg("dataset"),
            py::arg("validation_dataset") = py::none())
+      .def("TrainFromPathWithDataSpec",
+           &GenericCCLearner::TrainFromPathWithDataSpec,
+           py::arg("dataset_path"), py::arg("data_spec"),
+           py::arg("validation_dataset_path"))
+      .def("TrainFromPathWithGuide", &GenericCCLearner::TrainFromPathWithGuide,
+           py::arg("dataset_path"), py::arg("data_spec_guide"),
+           py::arg("validation_dataset_path"))
       .def("Evaluate", &GenericCCLearner::Evaluate, py::arg("dataset"),
            py::arg("fold_generator"), py::arg("evaluation_options"),
            py::arg("deployment_evaluation"));

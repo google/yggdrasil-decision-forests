@@ -15,10 +15,16 @@
 """Test dataspec utilities."""
 
 from absl.testing import absltest
+from absl.testing import parameterized
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
 
+Semantic = dataspec_lib.Semantic
+VocabValue = ds_pb.CategoricalSpec.VocabValue
+Column = dataspec_lib.Column
+Monotonic = dataspec_lib.Monotonic
+DataSpecInferenceArgs = dataspec_lib.DataSpecInferenceArgs
 
 def toy_dataspec():
   return ds_pb.DataSpecification(
@@ -102,6 +108,183 @@ class DataspecTest(absltest.TestCase):
       dataspec_lib.categorical_column_dictionary_to_list(dataspec.columns[4])
     with self.assertRaisesRegex(ValueError, "No value for index"):
       dataspec_lib.categorical_column_dictionary_to_list(dataspec.columns[5])
+
+  def test_column_defs_contains_column(self):
+    column_name = "target"
+    self.assertFalse(
+        dataspec_lib.column_defs_contains_column(column_name, None)
+    )
+    str_defs_positive = ["foo", "target", "bar", "", "*"]
+    self.assertTrue(
+        dataspec_lib.column_defs_contains_column(column_name, str_defs_positive)
+    )
+    str_defs_negative = ["foo", "tar", "bar", "", "*"]
+    self.assertFalse(
+        dataspec_lib.column_defs_contains_column(column_name, str_defs_negative)
+    )
+    tuple_defs_positive = [
+        ("foo", Semantic.NUMERICAL),
+        ("target", Semantic.CATEGORICAL),
+    ]
+    self.assertTrue(
+        dataspec_lib.column_defs_contains_column(
+            column_name, tuple_defs_positive
+        )
+    )
+    tuple_defs_negative = [
+        ("foo", Semantic.NUMERICAL),
+        ("tar", Semantic.CATEGORICAL),
+    ]
+    self.assertFalse(
+        dataspec_lib.column_defs_contains_column(
+            column_name, tuple_defs_negative
+        )
+    )
+    column_defs_positive = [Column("foo"), Column("target")]
+    self.assertTrue(
+        dataspec_lib.column_defs_contains_column(
+            column_name, column_defs_positive
+        )
+    )
+    column_defs_negative = [Column("foo"), Column("tar")]
+    self.assertFalse(
+        dataspec_lib.column_defs_contains_column(
+            column_name, column_defs_negative
+        )
+    )
+
+  def test_categorical_column_guide(self):
+    self.assertEqual(
+        dataspec_lib.categorical_column_guide(
+            Column("a", Semantic.CATEGORICAL, max_vocab_count=3),
+            DataSpecInferenceArgs(
+                columns=[],
+                include_all_columns=False,
+                max_vocab_count=1,
+                min_vocab_frequency=2,
+                discretize_numerical_columns=False,
+                num_discretized_numerical_bins=1,
+            ),
+        ),
+        {"max_vocab_count": 3, "min_vocab_frequency": 2},
+    )
+
+  def test_priority(self):
+    self.assertEqual(dataspec_lib.priority(1, 2), 1)
+    self.assertEqual(dataspec_lib.priority(None, 2), 2)
+    self.assertIsNone(dataspec_lib.priority(None, None), None)
+
+  def test_get_all_columns(self):
+    self.assertEqual(
+        dataspec_lib.get_all_columns(
+            ["a", "b", "c", "d"],
+            DataSpecInferenceArgs(
+                columns=[
+                    Column("a"),
+                    Column("b", Semantic.NUMERICAL),
+                    Column("c", Semantic.CATEGORICAL),
+                ],
+                include_all_columns=False,
+                max_vocab_count=1,
+                min_vocab_frequency=1,
+                discretize_numerical_columns=False,
+                num_discretized_numerical_bins=1,
+            ),
+        ),
+        [
+            Column("a"),
+            Column("b", Semantic.NUMERICAL),
+            Column("c", Semantic.CATEGORICAL),
+        ],
+    )
+
+  def test_get_all_columns_include_all_columns(self):
+    self.assertEqual(
+        dataspec_lib.get_all_columns(
+            ["a", "b"],
+            DataSpecInferenceArgs(
+                columns=[Column("a")],
+                include_all_columns=True,
+                max_vocab_count=1,
+                min_vocab_frequency=1,
+                discretize_numerical_columns=False,
+                num_discretized_numerical_bins=1,
+            ),
+        ),
+        [
+            Column("a"),
+            Column("b"),
+        ],
+    )
+
+  def test_get_all_columns_missing(self):
+    with self.assertRaisesRegex(ValueError, "Column 'b' no found"):
+      dataspec_lib.get_all_columns(
+          ["a"],
+          DataSpecInferenceArgs(
+              columns=[Column("b")],
+              include_all_columns=True,
+              max_vocab_count=1,
+              min_vocab_frequency=1,
+              discretize_numerical_columns=False,
+              num_discretized_numerical_bins=1,
+          ),
+      )
+
+  def test_normalize_column_defs(self):
+    self.assertEqual(
+        dataspec_lib.normalize_column_defs([
+            "a",
+            ("b", Semantic.NUMERICAL),
+            Column("c"),
+            Column("d", Semantic.CATEGORICAL),
+        ]),
+        [
+            Column("a"),
+            Column("b", Semantic.NUMERICAL),
+            Column("c"),
+            Column("d", Semantic.CATEGORICAL),
+        ],
+    )
+
+  def test_normalize_column_defs_none(self):
+    self.assertIsNone(dataspec_lib.normalize_column_defs(None))
+
+
+class MonotonicTest(parameterized.TestCase):
+
+  @parameterized.parameters(
+      Monotonic.INCREASING,
+      Monotonic.DECREASING,
+  )
+  def test_already_normalized_value(self, value):
+    self.assertEqual(Column("f", monotonic=value).normalized_monotonic, value)
+
+  def test_already_normalized_value_none(self):
+    self.assertIsNone(Column("f", monotonic=None).normalized_monotonic)
+
+  @parameterized.parameters(
+      (+1, Monotonic.INCREASING),
+      (-1, Monotonic.DECREASING),
+  )
+  def test_normalize_value(self, non_normalized_value, normalized_value):
+    self.assertEqual(
+        Column("f", monotonic=non_normalized_value).normalized_monotonic,
+        normalized_value,
+    )
+
+  def test_normalize_value_none(self):
+    self.assertIsNone(Column("f", monotonic=0).normalized_monotonic)
+
+  def test_good_semantic(self):
+    _ = Column("f", monotonic=+1)
+    _ = Column("f", semantic=Semantic.NUMERICAL, monotonic=+1)
+
+  def test_bad_semantic(self):
+    with self.assertRaisesRegex(
+        ValueError, "with monotonic constraint is expected to have"
+    ):
+      _ = Column("feature", semantic=Semantic.CATEGORICAL, monotonic=+1)
 
 
 if __name__ == "__main__":

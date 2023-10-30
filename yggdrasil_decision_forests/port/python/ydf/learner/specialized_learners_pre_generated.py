@@ -35,6 +35,7 @@ from typing import Optional
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2  # pylint: disable=unused-import
+from ydf.dataset import dataspec
 from ydf.dataset import dataset
 from ydf.learner import generic_learner
 from ydf.learner import tuner as tuner_lib
@@ -340,7 +341,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
-      features: dataset.ColumnDefs = None,
+      features: dataspec.ColumnDefs = None,
       include_all_columns: bool = False,
       max_vocab_count: int = 2000,
       min_vocab_frequency: int = 5,
@@ -449,8 +450,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
         "uplift_split_score": uplift_split_score,
         "winner_take_all": winner_take_all,
     }
-    data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=dataset.normalize_column_defs(features),
+    data_spec_args = dataspec.DataSpecInferenceArgs(
+        columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
@@ -489,7 +490,6 @@ class RandomForestLearner(generic_learner.GenericLearner):
         support_max_model_size_in_memory=True,
         support_monotonic_constraints=False,
     )
-
 
 class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
   r"""Hyperparameter Optimizer learning algorithm.
@@ -603,7 +603,7 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
-      features: dataset.ColumnDefs = None,
+      features: dataspec.ColumnDefs = None,
       include_all_columns: bool = False,
       max_vocab_count: int = 2000,
       min_vocab_frequency: int = 5,
@@ -628,8 +628,8 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
     }
-    data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=dataset.normalize_column_defs(features),
+    data_spec_args = dataspec.DataSpecInferenceArgs(
+        columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
@@ -668,7 +668,6 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
         support_max_model_size_in_memory=False,
         support_monotonic_constraints=False,
     )
-
 
 class GradientBoostedTreesLearner(generic_learner.GenericLearner):
   r"""Gradient Boosted Trees learning algorithm.
@@ -1035,7 +1034,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
-      features: dataset.ColumnDefs = None,
+      features: dataspec.ColumnDefs = None,
       include_all_columns: bool = False,
       max_vocab_count: int = 2000,
       min_vocab_frequency: int = 5,
@@ -1176,8 +1175,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         "validation_interval_in_trees": validation_interval_in_trees,
         "validation_ratio": validation_ratio,
     }
-    data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=dataset.normalize_column_defs(features),
+    data_spec_args = dataspec.DataSpecInferenceArgs(
+        columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
@@ -1216,7 +1215,6 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         support_max_model_size_in_memory=False,
         support_monotonic_constraints=True,
     )
-
 
 class CartLearner(generic_learner.GenericLearner):
   r"""Cart learning algorithm.
@@ -1476,7 +1474,7 @@ class CartLearner(generic_learner.GenericLearner):
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
-      features: dataset.ColumnDefs = None,
+      features: dataspec.ColumnDefs = None,
       include_all_columns: bool = False,
       max_vocab_count: int = 2000,
       min_vocab_frequency: int = 5,
@@ -1563,8 +1561,8 @@ class CartLearner(generic_learner.GenericLearner):
         "uplift_split_score": uplift_split_score,
         "validation_ratio": validation_ratio,
     }
-    data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=dataset.normalize_column_defs(features),
+    data_spec_args = dataspec.DataSpecInferenceArgs(
+        columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,

@@ -30,6 +30,7 @@ py_library(
     deps = [
         ":version",
         "//ydf/dataset",
+        "//ydf/dataset:dataspec",
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
         "//ydf/learner:tuner",

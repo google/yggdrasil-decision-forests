@@ -26,6 +26,7 @@
 # Core
 from ydf import version as _version
 from ydf.dataset import dataset as _dataset
+from ydf.dataset import dataspec as _dataspec
 from ydf.learner import generic_learner as _generic_learner
 from ydf.learner import specialized_learners as _specialized_learners
 from ydf.learner import tuner as _tuner
@@ -38,12 +39,12 @@ __version__ = _version.version
 
 # Dataset
 create_vertical_dataset = _dataset.create_vertical_dataset
-Column = _dataset.Column
+Column = _dataspec.Column
 # A feature is a column used as input of a model. In practice, users generally
 # use them interchangeably.
 Feature = Column
 Task = _generic_model.Task
-Semantic = _dataset.Semantic
+Semantic = _dataspec.Semantic
 
 # Model
 load_model = _model_lib.load_model

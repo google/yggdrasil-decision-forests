@@ -33,15 +33,20 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "pybind11_abseil/status_casters.h"  // IWYU pargma : keep
 #include "pybind11_protobuf/native_proto_caster.h"  // IWYU pargma : keep
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
+#include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -574,6 +579,33 @@ std::string DebugString(const dataset::VerticalDataset& self) {
   return ds_as_string;
 }
 
+absl::Status CreateFromPathWithDataSpec(
+    dataset::VerticalDataset& self, const std::string& path,
+    const dataset::proto::DataSpecification& data_spec) {
+  dataset::LoadConfig dataset_loading_config;
+  // TODO: Should all columns be listed in the required columns?
+
+  ASSIGN_OR_RETURN(const auto typed_path, dataset::GetTypedPath(path));
+
+  RETURN_IF_ERROR(dataset::LoadVerticalDataset(
+      typed_path, data_spec, &self,
+      /*required_columns=*/absl::nullopt, dataset_loading_config));
+  return absl::OkStatus();
+}
+
+absl::Status CreateFromPathWithDataSpecGuide(
+    dataset::VerticalDataset& self, std::string path,
+    const dataset::proto::DataSpecificationGuide& data_spec_guide) {
+  dataset::LoadConfig dataset_loading_config;
+  // TODO: Should all columns be listed in the required columns?
+
+  ASSIGN_OR_RETURN(const std::string typed_path, dataset::GetTypedPath(path));
+  dataset::proto::DataSpecification data_spec;
+  RETURN_IF_ERROR(dataset::CreateDataSpecWithStatus(
+      typed_path, false, data_spec_guide, &data_spec));
+
+  return CreateFromPathWithDataSpec(self, path, data_spec);
+}
 }  // namespace
 
 void init_dataset(py::module_& m) {
@@ -591,6 +623,16 @@ void init_dataset(py::module_& m) {
       .def("DebugString", &DebugString,
            "Converts a dataset's contents to a CSV-like string. To be used for "
            "debugging / testing only.")
+      .def("CreateFromPathWithDataSpec", &CreateFromPathWithDataSpec,
+           py::arg("path"), py::arg("data_spec"),
+           "Creates a dataset from a path, supports sharding. If the path is "
+           "typed, use the type, the given type is used. Otherwise, YDF will "
+           "try to determine the path and fail if this is not possible.")
+      .def("CreateFromPathWithDataSpecGuide", &CreateFromPathWithDataSpecGuide,
+           py::arg("path"), py::arg("data_spec_guide"),
+           "Creates a dataset from a path, supports sharding. If the path is "
+           "typed, use the type, the given type is used. Otherwise, YDF will "
+           "try to determine the path and fail if this is not possible.")
       .def("CreateColumnsFromDataSpec", &CreateColumnsFromDataSpec,
            py::arg("data_spec"))
       .def("SetAndCheckNumRows", &SetAndCheckNumRows, py::arg("set_data_spec"))

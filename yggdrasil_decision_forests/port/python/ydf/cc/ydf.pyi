@@ -1,4 +1,4 @@
-from typing import Optional, TypeVar, List
+from typing import Optional, TypeVar, List, Union
 
 # pylint: disable=g-wrong-blank-lines
 
@@ -44,6 +44,12 @@ class VerticalDataset:
       name: str,
       data: npt.NDArray[np.bool_],
       column_idx: Optional[int],
+  ) -> None: ...
+  def CreateFromPathWithDataSpec(
+      self, path: str, data_spec: data_spec_pb2.DataSpecification
+  ) -> None: ...
+  def CreateFromPathWithDataSpecGuide(
+      self, path: str, data_spec_guide: data_spec_pb2.DataSpecificationGuide
   ) -> None: ...
 
 
@@ -138,9 +144,21 @@ class GenericCCLearner:
       dataset: VerticalDataset,
       validation_dataset: Optional[VerticalDataset] = None,
   ) -> ModelCCType: ...
+  def TrainFromPathWithDataSpec(
+      self,
+      dataset_path: str,
+      data_spec: data_spec_pb2.DataSpecification,
+      validation_dataset_path: str = None,
+  ) -> ModelCCType: ...
+  def TrainFromPathWithGuide(
+      self,
+      dataset_path: str,
+      data_spec_guide: data_spec_pb2.DataSpecificationGuide,
+      validation_dataset_path: str = None,
+  ) -> ModelCCType: ...
   def Evaluate(
       self,
-      dataset: VerticalDataset,
+      dataset: Union[VerticalDataset, str],
       fold_generator: fold_generator_pb2.FoldGenerator,
       evaluation_options: metric_pb2.EvaluationOptions,
       deployment_evaluation: abstract_learner_pb2.DeploymentConfig,

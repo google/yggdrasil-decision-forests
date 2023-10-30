@@ -15,6 +15,7 @@ bzl_library(
     name = "wrapper_generator_bzl",
     srcs = ["wrapper_generator.bzl"],
     deps = [
+        "@ydf_cc//yggdrasil_decision_forests/utils:compile_bzl",
     ],
 )
 

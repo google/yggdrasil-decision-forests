@@ -251,6 +251,7 @@ absl::StatusOr<std::string> GenLearnerWrapper() {
 from $0yggdrasil_decision_forests.dataset import data_spec_pb2
 from $0yggdrasil_decision_forests.learner import abstract_learner_pb2
 from $0yggdrasil_decision_forests.model import abstract_model_pb2  # pylint: disable=unused-import
+from $1dataset import dataspec
 from $1dataset import dataset
 from $1learner import generic_learner
 from $1learner import tuner as tuner_lib
@@ -523,7 +524,7 @@ $2
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
-      features: dataset.ColumnDefs = None,
+      features: dataspec.ColumnDefs = None,
       include_all_columns: bool = False,
       max_vocab_count: int = 2000,
       min_vocab_frequency: int = 5,
@@ -541,8 +542,8 @@ $3,
     hyper_parameters = {
 $4
       }
-    data_spec_args = dataset.DataSpecInferenceArgs(
-        columns=dataset.normalize_column_defs(features),
+    data_spec_args = dataspec.DataSpecInferenceArgs(
+        columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,

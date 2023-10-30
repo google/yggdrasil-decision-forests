@@ -53,6 +53,10 @@ GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path);
 // Tests if a string is a typed path.
 bool IsTypedPath(absl::string_view maybe_typed_path);
 
+// If the given path is already typed, return it. Otherwise, try to convert it
+// into a typed path or fail if this does not work.
+absl::StatusOr<std::string> GetTypedPath(const std::string& path);
+
 // Splits a "[type]:[path]" into a pair of strings "type" and "path". Do not
 // check that "type" is a valid type of "path" a valid path.
 absl::StatusOr<std::pair<std::string, std::string>> SplitTypeAndPath(
@@ -63,6 +67,9 @@ std::string FormatToRecommendedExtension(proto::DatasetFormat format);
 
 // Formats to type prefix.
 std::string DatasetFormatToPrefix(proto::DatasetFormat format);
+
+// Returns comma-separated supported formats.
+std::string ListSupportedFormats();
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
