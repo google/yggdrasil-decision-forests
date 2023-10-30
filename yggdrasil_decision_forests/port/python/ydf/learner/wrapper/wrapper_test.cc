@@ -141,21 +141,21 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       processors is not available). Making `num_threads` significantly larger
       than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
-    try_resume_training: If true, the model training resumes from the checkpoint
-      stored in the `temp_directory` directory. If `temp_directory` does not
-      contain any model checkpoint, the training start from the beginning.
+    resume_training: If true, the model training resumes from the checkpoint
+      stored in the `working_dir` directory. If `working_dir` does not
+      contain any model checkpoint, the training starts from the beginning.
       Resuming training is useful in the following situations: (1) The training
-      was interrupted by the user (e.g. ctrl+c or "stop" button in a notebook).
-      (2) the training job was interrupted (e.g. rescheduling), ond (3) the
-      hyper-parameter of the model were changed such that an initially completed
-      training is now incomplete (e.g. increasing the number of trees).
-      Note: Training can only be resumed if the training datasets is exactly the
-        same (i.e. no reshuffle in the `tf.data.Dataset`).
-    cache_path: Path to a temporary directory available to the learning 
-      algorithm. Currently cache_path is only used (and required) if 
-      `try_resume_training=True` for storing the snapshots.
+      was interrupted by the user (e.g. ctrl+c or "stop" button in a notebook)
+      or rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
+      increasing the number of trees.
+    working_dir: Path to a directory available for the learning algorithm to
+      store intermediate computation results. Depending on the learning
+      algorithm and parameters, the working_dir might be optional, required, or
+      ignored. For instance, distributed training algorithm always need a
+      "working_dir", and the gradient boosted tree and hyper-parameter tuners
+      will export artefacts to the "working_dir" if provided.
     resume_training_snapshot_interval_seconds: Indicative number of seconds in 
-      between snapshots when `try_resume_training=True`. Might be ignored by
+      between snapshots when `resume_training=True`. Might be ignored by
       some learners.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -177,8 +177,8 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       a: Optional[float] = 1.0,
       num_threads: Optional[int] = None,
-      cache_path: Optional[str] = None,
-      try_resume_training: bool = False,
+      working_dir: Optional[str] = None,
+      resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
       ):
@@ -198,9 +198,9 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
 
     deployment_config = self._build_deployment_config(
         num_threads=num_threads,
-        try_resume_training=try_resume_training,
+        resume_training=resume_training,
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
-        cache_path=cache_path,
+        working_dir=working_dir,
     )
 
     super().__init__(learner_name="FAKE_ALGORITHM",

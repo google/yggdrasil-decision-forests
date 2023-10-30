@@ -138,6 +138,7 @@ py_test(
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
         "//ydf/metric",
+        "//ydf/model:decision_forest_model",
         "//ydf/model:generic_model",
         "//ydf/utils:log",
         "//ydf/utils:test_utils",

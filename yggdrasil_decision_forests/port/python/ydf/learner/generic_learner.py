@@ -481,16 +481,16 @@ class GenericLearner:
   def _build_deployment_config(
       self,
       num_threads: Optional[int],
-      try_resume_training: bool,
+      resume_training: bool,
       resume_training_snapshot_interval_seconds: int,
-      cache_path: Optional[str],
+      working_dir: Optional[str],
   ):
     if num_threads is None:
       num_threads = self.determine_optimal_num_threads()
     return abstract_learner_pb2.DeploymentConfig(
         num_threads=num_threads,
-        try_resume_training=try_resume_training,
-        cache_path=cache_path,
+        try_resume_training=resume_training,
+        cache_path=working_dir,
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
     )
 

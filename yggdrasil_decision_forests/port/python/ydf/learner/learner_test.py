@@ -35,6 +35,7 @@ from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
 from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
+from ydf.model import decision_forest_model
 from ydf.model import generic_model
 from ydf.utils import log
 from ydf.utils import test_utils
@@ -552,6 +553,22 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
 
     logging.info("evaluation:\n%s", evaluation)
     self.assertAlmostEqual(evaluation.accuracy, 0.87, 1)
+
+  def test_resume_training(self):
+    ds = adult_dataset()
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label=ds.label,
+        num_trees=10,
+        resume_training=True,
+        working_dir=self.create_tempdir().full_path,
+    )
+    model_1 = learner.train(ds.train)
+    assert isinstance(model_1, decision_forest_model.DecisionForestModel)
+    self.assertEqual(model_1.num_trees(), 10)
+    learner.hyperparameters["num_trees"] = 50
+    model_2 = learner.train(ds.train)
+    assert isinstance(model_2, decision_forest_model.DecisionForestModel)
+    self.assertEqual(model_2.num_trees(), 50)
 
   def test_ranking(self):
     dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
