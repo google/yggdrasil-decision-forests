@@ -86,6 +86,10 @@ struct ExportOptions {
 
   // Show a menu in the plot. Disable it when creating small plots.
   bool show_interactive_menu = false;
+
+  // Prefix added to the id of the generated html elements. If not set,
+  // generates ids randomly.
+  std::string html_id_prefix;
 };
 
 // A plot item is the base class for plot content.

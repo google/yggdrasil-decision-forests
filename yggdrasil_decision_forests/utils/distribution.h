@@ -395,12 +395,14 @@ class IntegersConfusionMatrix {
 
   // Create a text table representing the confusion matrix.
   absl::Status AppendTextReport(const dataset::proto::Column& column_spec,
-                                std::string* result) const;
+                                std::string* result, int begin_col_idx = 0,
+                                int begin_row_idx = 0) const;
 
   // Create a text table representing the confusion matrix.
   absl::Status AppendTextReport(const std::vector<std::string>& column_labels,
                                 const std::vector<std::string>& row_labels,
-                                std::string* result) const;
+                                std::string* result, int begin_col_idx = 0,
+                                int begin_row_idx = 0) const;
 
   // Create a html table representing the confusion matrix.
   absl::Status AppendHtmlReport(const dataset::proto::Column& column_spec,
@@ -517,7 +519,8 @@ void IntegersConfusionMatrix<T>::SetSize(const int32_t nrow,
 template <typename T>
 absl::Status IntegersConfusionMatrix<T>::AppendTextReport(
     const std::vector<std::string>& column_labels,
-    const std::vector<std::string>& row_labels, std::string* result) const {
+    const std::vector<std::string>& row_labels, std::string* result,
+    int begin_col_idx, int begin_row_idx) const {
   STATUS_CHECK_EQ(column_labels.size(), ncol());
   STATUS_CHECK_EQ(row_labels.size(), nrow());
 
@@ -535,10 +538,10 @@ absl::Status IntegersConfusionMatrix<T>::AppendTextReport(
 
   // Maximum string length of the elements in each column.
   std::vector<int> max_length_per_col(ncol_);
-  for (int col = 0; col < ncol_; col++) {
+  for (int col = begin_col_idx; col < ncol_; col++) {
     // Counts.
     T max_value = 1;
-    for (int row = 0; row < nrow_; row++) {
+    for (int row = begin_row_idx; row < nrow_; row++) {
       const auto value = at(row, col);
       if (value > max_value) {
         max_value = value;
@@ -563,15 +566,15 @@ absl::Status IntegersConfusionMatrix<T>::AppendTextReport(
 
   // Print header.
   print_string(max_row_label_length, "");
-  for (int col = 0; col < ncol_; col++) {
+  for (int col = begin_col_idx; col < ncol_; col++) {
     print_string(max_length_per_col[col] + margin, column_labels[col]);
   }
   absl::StrAppend(result, "\n");
 
   // Print body.
-  for (int row = 0; row < nrow_; row++) {
+  for (int row = begin_row_idx; row < nrow_; row++) {
     print_string(max_row_label_length, row_labels[row]);
-    for (int col = 0; col < ncol_; col++) {
+    for (int col = begin_col_idx; col < ncol_; col++) {
       print_value(max_length_per_col[col] + margin, at(row, col));
     }
     absl::StrAppend(result, "\n");
@@ -582,7 +585,8 @@ absl::Status IntegersConfusionMatrix<T>::AppendTextReport(
 
 template <typename T>
 absl::Status IntegersConfusionMatrix<T>::AppendTextReport(
-    const dataset::proto::Column& column_spec, std::string* result) const {
+    const dataset::proto::Column& column_spec, std::string* result,
+    int begin_col_idx, int begin_row_idx) const {
   STATUS_CHECK_EQ(column_spec.categorical().number_of_unique_values(), ncol());
   STATUS_CHECK_EQ(column_spec.categorical().number_of_unique_values(), nrow());
 
@@ -592,7 +596,7 @@ absl::Status IntegersConfusionMatrix<T>::AppendTextReport(
     labels[value] = dataset::CategoricalIdxToRepresentation(column_spec, value);
   }
   absl::StrAppend(result, "truth\\prediction\n");
-  return AppendTextReport(labels, labels, result);
+  return AppendTextReport(labels, labels, result, begin_col_idx, begin_row_idx);
 }
 
 template <typename T>

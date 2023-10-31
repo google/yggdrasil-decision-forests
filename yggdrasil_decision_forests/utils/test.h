@@ -25,6 +25,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/strings/match.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
@@ -109,6 +110,11 @@ class ParseProtoHelper {
 
 // Returns a free TCP port.
 int PickUnusedPortOrDie();
+
+// Checks if "content" is equal to the content of "path".
+// The content is exported to a temporary file in case of failure. This function
+// is suited for large content. For small content, use "EXPECT_EQ" instead.
+void ExpectEqualGolden(absl::string_view content, absl::string_view path);
 
 }  // namespace test
 }  // namespace yggdrasil_decision_forests

@@ -27,6 +27,7 @@
 #  TF_SUPPORT: Whether or not to build with Tensorflow support. Can be "ON",
 #              "OFF" (default) or "BOTH" (for building both variants)
 #  COMPILERS: Compilers to build, separated by semicolon. Defaults to gcc-9
+#  INSTALL_DEPENDENCIES: Installs required dependencies.
 #
 # Usage example:
 #
@@ -105,5 +106,34 @@ main () {
     done
   done
 }
+
+# Install the build dependencies
+if [[ ! -z ${INSTALL_DEPENDENCIES+z} ]]; then
+
+  # If the script is running as root (e.g. in the build docker), don't use sudo.
+  if [ $(id -u) -eq 0 ]
+  then
+    SUDO=""
+  else
+    SUDO=sudo
+  fi
+
+  $SUDO apt-get update
+  $SUDO apt-get -y --no-install-recommends install \
+    ca-certificates \
+    build-essential \
+    g++-10 \
+    clang-12 \
+    git \
+    python3 \
+    python3-pip \
+    python3-dev
+
+  python3 -m pip install numpy
+
+  wget -O bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.14.0/bazelisk-linux-amd64
+  chmod +x bazel
+  PATH="$(pwd):$PATH"
+fi
 
 main

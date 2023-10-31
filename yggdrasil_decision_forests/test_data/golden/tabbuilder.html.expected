@@ -1,0 +1,1 @@
+<div class="tab_block" id="123"><div class="header"><a id="123_k1" class="tab selected" onclick="ydfShowTab('123', 'k1')">t1</a><a id="123_k2" class="tab" onclick="ydfShowTab('123', 'k2')">t2</a></div><div class="body"><div id="123_body_k1" class="tab_content selected"><p>c1</p></div><div id="123_body_k2" class="tab_content"><p>c2</p></div></div></div>

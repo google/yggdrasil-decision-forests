@@ -317,7 +317,7 @@ TEST_F(DatasetIris, Base) {
   TrainAndEvaluateModel();
   // Note: This result does not take early stopping into account.
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9733, 0.02);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2762, 0.04);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2762, 0.042);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 

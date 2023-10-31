@@ -402,7 +402,8 @@ absl::Status AppendTextReportClassification(
     absl::StrAppend(report, "Confusion Table:\n");
     utils::IntegersConfusionMatrixDouble confusion;
     confusion.Load(eval.classification().confusion());
-    RETURN_IF_ERROR(confusion.AppendTextReport(eval.label_column(), report));
+    RETURN_IF_ERROR(
+        confusion.AppendTextReport(eval.label_column(), report, 1, 1));
     absl::StrAppend(report, "\n");
   }
 
@@ -442,7 +443,6 @@ absl::Status AppendTextReportClassification(
         }
       };
 
-  absl::StrAppend(report, "One vs other classes:\n");
   for (int roc_idx = 0; roc_idx < eval.classification().rocs_size();
        roc_idx++) {
     const auto& roc = eval.classification().rocs(roc_idx);

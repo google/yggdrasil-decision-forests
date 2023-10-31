@@ -1,0 +1,378 @@
+
+<style>
+
+.tab_block .header {
+    flex-direction: row;
+    display: flex;
+}
+
+.tab_block .header .tab {
+    cursor: pointer;
+    background-color: #F6F5F5;
+    text-decoration: none;
+    text-align: center;
+    padding: 4px 12px;
+    color: black;
+}
+
+.tab_block .header .tab.selected {
+    border-bottom: 2px solid #2F80ED;
+}
+
+.tab_block .header .tab:hover {
+    text-decoration: none;
+    background-color: #DCDCDC;
+}
+
+.tab_block .body .tab_content {
+    display: none;
+    padding: 5px;
+}
+
+.tab_block .body .tab_content.selected {
+    display: block;
+}
+
+.ydf_pre {
+    font-size: medium;
+}
+
+
+
+.variable_importance {
+}
+
+.variable_importance select {
+}
+
+.variable_importance .content {
+  display: none;
+}
+
+.variable_importance .content.selected {
+  display: block;
+}
+
+.ydf_tuning_table {
+  border-collapse: collapse;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table th {
+  background-color: #ededed;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table td {
+  text-align: right;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table .best {
+  background-color: khaki;
+}
+
+</style>
+
+<script>
+
+function ydfShowTab(block_id, item) {
+    const block = document.getElementById(block_id);
+    
+    
+    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
+    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
+    
+    block.getElementsByClassName("tab selected")[0].classList.remove("selected");
+    block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_" + item).classList.add("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+  
+
+function ydfShowVariableImportance(block_id) {
+    const block = document.getElementById(block_id);
+    const item = block.getElementsByTagName("select")[0].value;
+    block.getElementsByClassName("content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+
+</script>
+  <div class="tab_block" id="123"><div class="header"><a id="123_model" class="tab selected" onclick="ydfShowTab('123', 'model')">Model</a><a id="123_dataspec" class="tab" onclick="ydfShowTab('123', 'dataspec')">Dataspec</a><a id="123_training" class="tab" onclick="ydfShowTab('123', 'training')">Training</a><a id="123_variable_importance" class="tab" onclick="ydfShowTab('123', 'variable_importance')">Variable importances</a><a id="123_structure" class="tab" onclick="ydfShowTab('123', 'structure')">Structure</a></div><div class="body"><div id="123_body_model" class="tab_content selected"><b>Name</b> : GRADIENT_BOOSTED_TREES<br><b>Task</b> : CLASSIFICATION<br><b>Label</b> : income<br><b>Features (14)</b> : age workclass fnlwgt education education_num marital_status occupation relationship race sex capital_gain capital_loss hours_per_week native_country<br><b>Weights</b> : None<br><b>Trained with tuner</b> : No<br><b>Model size</b> : 1694 kB<br></div><div id="123_body_dataspec" class="tab_content"><pre class="ydf_pre">Number of records: 22792
+Number of columns: 15
+
+Number of columns by type:
+	CATEGORICAL: 10 (66.6667%)
+	NUMERICAL: 5 (33.3333%)
+
+Columns:
+
+CATEGORICAL: 10 (66.6667%)
+	1: &quot;workclass&quot; CATEGORICAL manually-defined num-nas:1257 (5.51509%) has-dict vocab-size:8 num-oods:1 (0.0046436%) most-frequent:&quot;Private&quot; 15879 (73.7358%)
+	3: &quot;education&quot; CATEGORICAL manually-defined has-dict vocab-size:17 zero-ood-items most-frequent:&quot;HS-grad&quot; 7340 (32.2043%)
+	4: &quot;education_num&quot; CATEGORICAL manually-defined has-dict vocab-size:17 zero-ood-items most-frequent:&quot;9&quot; 7340 (32.2043%)
+	5: &quot;marital_status&quot; CATEGORICAL manually-defined has-dict vocab-size:8 zero-ood-items most-frequent:&quot;Married-civ-spouse&quot; 10431 (45.7661%)
+	6: &quot;occupation&quot; CATEGORICAL manually-defined num-nas:1260 (5.52826%) has-dict vocab-size:14 num-oods:1 (0.00464425%) most-frequent:&quot;Prof-specialty&quot; 2870 (13.329%)
+	7: &quot;relationship&quot; CATEGORICAL manually-defined has-dict vocab-size:7 zero-ood-items most-frequent:&quot;Husband&quot; 9191 (40.3256%)
+	8: &quot;race&quot; CATEGORICAL manually-defined has-dict vocab-size:6 zero-ood-items most-frequent:&quot;White&quot; 19467 (85.4115%)
+	9: &quot;sex&quot; CATEGORICAL manually-defined has-dict vocab-size:3 zero-ood-items most-frequent:&quot;Male&quot; 15165 (66.5365%)
+	13: &quot;native_country&quot; CATEGORICAL manually-defined num-nas:407 (1.78571%) has-dict vocab-size:41 num-oods:1 (0.00446728%) most-frequent:&quot;United-States&quot; 20436 (91.2933%)
+	14: &quot;income&quot; CATEGORICAL manually-defined has-dict vocab-size:3 zero-ood-items most-frequent:&quot;&lt;=50K&quot; 17308 (75.9389%)
+
+NUMERICAL: 5 (33.3333%)
+	0: &quot;age&quot; NUMERICAL manually-defined mean:38.6153 min:17 max:90 sd:13.661
+	2: &quot;fnlwgt&quot; NUMERICAL manually-defined mean:189879 min:12285 max:1.4847e+06 sd:106423
+	10: &quot;capital_gain&quot; NUMERICAL manually-defined mean:1081.9 min:0 max:99999 sd:7509.48
+	11: &quot;capital_loss&quot; NUMERICAL manually-defined mean:87.2806 min:0 max:4356 sd:403.01
+	12: &quot;hours_per_week&quot; NUMERICAL manually-defined mean:40.3955 min:1 max:99 sd:12.249
+
+Terminology:
+	nas: Number of non-available (i.e. missing) values.
+	ood: Out of dictionary.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
+	tokenized: The attribute value is obtained through tokenization.
+	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
+	vocab-size: Number of unique values.
+</pre></div><div id="123_body_training" class="tab_content"><p>The following evaluation is computed on the validation or out-of-bag dataset.</p><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chart_123self_eval" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_123self_eval',
+    [{
+y: [],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'training',
+},
+{
+y: [],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'validation',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'iteration',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'loss',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div></div></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="http://go/ydf_doc_internal/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.348634 ################
+    2.            &quot;age&quot;  0.285433 ############
+    3.   &quot;capital_loss&quot;  0.131911 ###
+    4. &quot;marital_status&quot;  0.117577 ##
+    5. &quot;hours_per_week&quot;  0.102857 #
+    6.     &quot;occupation&quot;  0.096636 #
+    7.         &quot;fnlwgt&quot;  0.095548 #
+    8.      &quot;education&quot;  0.093344 #
+    9.  &quot;education_num&quot;  0.092694 #
+   10.   &quot;relationship&quot;  0.085777 
+   11.           &quot;race&quot;  0.080496 
+   12. &quot;native_country&quot;  0.076829 
+   13.      &quot;workclass&quot;  0.076388 
+   14.            &quot;sex&quot;  0.075220 
+</pre></div><div id="123_vi_body_NUM_AS_ROOT" class="content"><pre class="ydf_pre">    1.            &quot;age&quot; 31.000000 ################
+    2. &quot;marital_status&quot; 22.000000 ###########
+    3.   &quot;capital_gain&quot;  8.000000 ###
+    4.     &quot;occupation&quot;  3.000000 #
+    5.  &quot;education_num&quot;  2.000000 
+    6.      &quot;education&quot;  1.000000 
+    7.   &quot;capital_loss&quot;  1.000000 
+</pre></div><div id="123_vi_body_NUM_NODES" class="content"><pre class="ydf_pre">    1.         &quot;fnlwgt&quot; 1038.000000 ################
+    2.            &quot;age&quot; 716.000000 ##########
+    3. &quot;hours_per_week&quot; 538.000000 #######
+    4.   &quot;capital_gain&quot; 496.000000 #######
+    5.   &quot;capital_loss&quot; 396.000000 #####
+    6.     &quot;occupation&quot; 267.000000 ###
+    7.      &quot;education&quot; 167.000000 ##
+    8.  &quot;education_num&quot; 160.000000 #
+    9. &quot;marital_status&quot; 126.000000 #
+   10.      &quot;workclass&quot; 118.000000 #
+   11. &quot;native_country&quot; 99.000000 
+   12.   &quot;relationship&quot; 81.000000 
+   13.            &quot;sex&quot; 42.000000 
+   14.           &quot;race&quot; 40.000000 
+</pre></div><div id="123_vi_body_SUM_SCORE" class="content"><pre class="ydf_pre">    1. &quot;marital_status&quot; 530956984.119748 ################
+    2.   &quot;capital_gain&quot; 411123634.345114 ############
+    3.            &quot;age&quot; 354664186.766705 ##########
+    4. &quot;hours_per_week&quot; 240233774.133519 #######
+    5.   &quot;capital_loss&quot; 172591458.733243 #####
+    6.     &quot;occupation&quot; 112809328.090070 ###
+    7.         &quot;fnlwgt&quot; 104373733.635293 ###
+    8.      &quot;education&quot; 38044579.052098 #
+    9.  &quot;education_num&quot; 29986295.822112 
+   10.            &quot;sex&quot; 11084945.032449 
+   11.      &quot;workclass&quot; 9233258.450864 
+   12.   &quot;relationship&quot; 4745657.076093 
+   13.           &quot;race&quot; 3349279.550052 
+   14. &quot;native_country&quot; 3231785.561941 
+</pre></div></div><p>Those variable importances are computed during training. More, and possibly more informative, variable importances are available when analyzing a model on a test dataset.</p></div><div id="123_body_structure" class="tab_content"><b>Num trees</b> : 68<br><p>Only printing the first tree.</p><pre class="ydf_pre">Tree #0:
+    &quot;marital_status&quot; is in [BITMAP] {Never-married, Divorced, Widowed, Separated, Married-spouse-absent, Married-AF-spouse} [s:4081.99 n:20533 np:11174 miss:0] ; pred:-4.15883e-09
+        ├─(pos)─ &quot;capital_gain&quot;&gt;=7669.5 [s:2728.1 n:11174 np:185 miss:0] ; pred:-0.0958313
+        |        ├─(pos)─ pred:0.408065
+        |        └─(neg)─ &quot;hours_per_week&quot;&gt;=44.5 [s:2271.35 n:10989 np:2100 miss:0] ; pred:-0.104314
+        |                 ├─(pos)─ &quot;age&quot;&gt;=32.5 [s:183.374 n:2100 np:1172 miss:1] ; pred:-0.0577536
+        |                 |        ├─(pos)─ pred:-0.0235444
+        |                 |        └─(neg)─ pred:-0.100957
+        |                 └─(neg)─ &quot;capital_loss&quot;&gt;=2218.5 [s:2180.05 n:8889 np:39 miss:0] ; pred:-0.115314
+        |                          ├─(pos)─ pred:0.10903
+        |                          └─(neg)─ &quot;age&quot;&gt;=32.5 [s:2194.06 n:8850 np:3969 miss:1] ; pred:-0.116303
+        |                                   ├─(pos)─ &quot;occupation&quot; is in [BITMAP] {Craft-repair, Adm-clerical, Sales, Other-service, Machine-op-inspct, Transport-moving, Handlers-cleaners, Farming-fishing, Tech-support, Protective-serv, ...[1 left]} [s:793.156 n:3969 np:2880 miss:0] ; pred:-0.103197
+        |                                   |        ├─(pos)─ &quot;capital_gain&quot;&gt;=4668.5 [s:699.22 n:2880 np:26 miss:0] ; pred:-0.115365
+        |                                   |        |        ├─(pos)─ pred:-0.0252448
+        |                                   |        |        └─(neg)─ &quot;hours_per_week&quot;&gt;=41.5 [s:700.769 n:2854 np:75 miss:0] ; pred:-0.116186
+        |                                   |        |                 ├─(pos)─ pred:-0.079803
+        |                                   |        |                 └─(neg)─ &quot;hours_per_week&quot;&gt;=34.5 [s:693.266 n:2779 np:2198 miss:1] ; pred:-0.117168
+        |                                   |        |                          ├─(pos)─ &quot;occupation&quot; is in [BITMAP] {Protective-serv, Priv-house-serv} [s:526.25 n:2198 np:63 miss:0] ; pred:-0.114699
+        |                                   |        |                          |        ├─(pos)─ pred:-0.0612535
+        |                                   |        |                          |        └─(neg)─ &quot;age&quot;&gt;=65.5 [s:524.729 n:2135 np:60 miss:0] ; pred:-0.116277
+        |                                   |        |                          |                 ├─(pos)─ pred:-0.0853153
+        |                                   |        |                          |                 └─(neg)─ &quot;age&quot;&gt;=46.5 [s:517.385 n:2075 np:705 miss:0] ; pred:-0.117172
+        |                                   |        |                          |                          ├─(pos)─ pred:-0.111704
+        |                                   |        |                          |                          └─(neg)─ &quot;fnlwgt&quot;&gt;=166345 [s:358.541 n:1370 np:798 miss:1] ; pred:-0.119985
+        |                                   |        |                          |                                   ├─(pos)─ pred:-0.115364
+        |                                   |        |                          |                                   └─(neg)─ pred:-0.126433
+        |                                   |        |                          └─(neg)─ pred:-0.126508
+        |                                   |        └─(neg)─ pred:-0.0710156
+        |                                   └─(neg)─ &quot;marital_status&quot; is in [BITMAP] {Married-AF-spouse} [s:1437.68 n:4881 np:10 miss:0] ; pred:-0.12696
+        |                                            ├─(pos)─ pred:0.144366
+        |                                            └─(neg)─ &quot;age&quot;&gt;=26.5 [s:1438.42 n:4871 np:1377 miss:1] ; pred:-0.127517
+        |                                                     ├─(pos)─ &quot;hours_per_week&quot;&gt;=40.5 [s:365.505 n:1377 np:40 miss:0] ; pred:-0.120843
+        |                                                     |        ├─(pos)─ pred:-0.089909
+        |                                                     |        └─(neg)─ &quot;fnlwgt&quot;&gt;=23759 [s:360.155 n:1337 np:1329 miss:1] ; pred:-0.121769
+        |                                                     |                 ├─(pos)─ &quot;capital_loss&quot;&gt;=1534 [s:360.065 n:1329 np:28 miss:0] ; pred:-0.122127
+        |                                                     |                 |        ├─(pos)─ pred:-0.0918777
+        |                                                     |                 |        └─(neg)─ &quot;hours_per_week&quot;&gt;=34.5 [s:356.115 n:1301 np:1085 miss:1] ; pred:-0.122778
+        |                                                     |                 |                 ├─(pos)─ &quot;fnlwgt&quot;&gt;=244484 [s:288.882 n:1085 np:282 miss:0] ; pred:-0.121091
+        |                                                     |                 |                 |        ├─(pos)─ pred:-0.127342
+        |                                                     |                 |                 |        └─(neg)─ pred:-0.118895
+        |                                                     |                 |                 └─(neg)─ pred:-0.131252
+        |                                                     |                 └─(neg)─ pred:-0.0623472
+        |                                                     └─(neg)─ &quot;fnlwgt&quot;&gt;=23723 [s:1074.16 n:3494 np:3484 miss:1] ; pred:-0.130147
+        |                                                              ├─(pos)─ &quot;age&quot;&gt;=24.5 [s:1073.21 n:3484 np:606 miss:1] ; pred:-0.130302
+        |                                                              |        ├─(pos)─ pred:-0.127613
+        |                                                              |        └─(neg)─ &quot;fnlwgt&quot;&gt;=146116 [s:894.195 n:2878 np:1961 miss:1] ; pred:-0.130869
+        |                                                              |                 ├─(pos)─ &quot;age&quot;&gt;=17.5 [s:612.844 n:1961 np:1810 miss:1] ; pred:-0.131252
+        |                                                              |                 |        ├─(pos)─ &quot;fnlwgt&quot;&gt;=149492 [s:565.654 n:1810 np:1781 miss:1] ; pred:-0.131252
+        |                                                              |                 |        |        ├─(pos)─ &quot;fnlwgt&quot;&gt;=150508 [s:556.591 n:1781 np:1775 miss:1] ; pred:-0.131252
+        |                                                              |                 |        |        |        ├─(pos)─ &quot;age&quot;&gt;=20.5 [s:554.716 n:1775 np:1019 miss:1] ; pred:-0.131252
+        |                                                              |                 |        |        |        |        ├─(pos)─ &quot;age&quot;&gt;=21.5 [s:318.454 n:1019 np:752 miss:1] ; pred:-0.131252
+        |                                                              |                 |        |        |        |        |        ├─(pos)─ pred:-0.131252
+        |                                                              |                 |        |        |        |        |        └─(neg)─ pred:-0.131252
+        |                                                              |                 |        |        |        |        └─(neg)─ pred:-0.131252
+        |                                                              |                 |        |        |        └─(neg)─ pred:-0.131252
+        |                                                              |                 |        |        └─(neg)─ pred:-0.131252
+        |                                                              |                 |        └─(neg)─ pred:-0.131252
+        |                                                              |                 └─(neg)─ &quot;fnlwgt&quot;&gt;=145902 [s:282.436 n:917 np:5 miss:1] ; pred:-0.130049
+        |                                                              |                          ├─(pos)─ pred:-0.0210046
+        |                                                              |                          └─(neg)─ pred:-0.130647
+        |                                                              └─(neg)─ pred:-0.0761281
+        └─(neg)─ &quot;capital_gain&quot;&gt;=5095.5 [s:3523.61 n:9359 np:746 miss:0] ; pred:0.114416
+                 ├─(pos)─ &quot;age&quot;&gt;=60.5 [s:2302.01 n:746 np:91 miss:0] ; pred:0.411855
+                 |        ├─(pos)─ pred:0.353351
+                 |        └─(neg)─ &quot;fnlwgt&quot;&gt;=151582 [s:2095.89 n:655 np:408 miss:1] ; pred:0.419984
+                 |                 ├─(pos)─ &quot;age&quot;&gt;=28.5 [s:1305.53 n:408 np:390 miss:1] ; pred:0.419984
+                 |                 |        ├─(pos)─ &quot;age&quot;&gt;=30.5 [s:1247.94 n:390 np:377 miss:1] ; pred:0.419984
+                 |                 |        |        ├─(pos)─ &quot;hours_per_week&quot;&gt;=25 [s:1206.34 n:377 np:370 miss:1] ; pred:0.419984
+                 |                 |        |        |        ├─(pos)─ &quot;age&quot;&gt;=55.5 [s:1183.94 n:370 np:31 miss:0] ; pred:0.419984
+                 |                 |        |        |        |        ├─(pos)─ pred:0.419984
+                 |                 |        |        |        |        └─(neg)─ &quot;hours_per_week&quot;&gt;=42.5 [s:1084.74 n:339 np:184 miss:0] ; pred:0.419984
+                 |                 |        |        |        |                 ├─(pos)─ pred:0.419984
+                 |                 |        |        |        |                 └─(neg)─ pred:0.419984
+                 |                 |        |        |        └─(neg)─ pred:0.419984
+                 |                 |        |        └─(neg)─ pred:0.419984
+                 |                 |        └─(neg)─ pred:0.419984
+                 |                 └─(neg)─ pred:0.419984
+                 └─(neg)─ &quot;occupation&quot; is in [BITMAP] {Craft-repair, Adm-clerical, Sales, Other-service, Machine-op-inspct, Transport-moving, Handlers-cleaners, Farming-fishing, Tech-support, Protective-serv, ...[1 left]} [s:2033.65 n:8613 np:5817 miss:0] ; pred:0.0886537
+                          ├─(pos)─ &quot;capital_loss&quot;&gt;=1782.5 [s:384.557 n:5817 np:218 miss:0] ; pred:0.0387529
+                          |        ├─(pos)─ pred:0.273325
+                          |        └─(neg)─ &quot;education&quot; is in [BITMAP] {11th, Assoc-acdm, 10th, 7th-8th, Prof-school, 9th, 12th, Doctorate, 5th-6th, 1st-4th, ...[1 left]} [s:254.816 n:5599 np:1101 miss:0] ; pred:0.0296197
+                          |                 ├─(pos)─ pred:-0.0521461
+                          |                 └─(neg)─ &quot;education_num&quot; is in [BITMAP] {13, 14, 11, 7, 12, 6, 4, 15, 5, 8, ...[4 left]} [s:374.7 n:4498 np:970 miss:0] ; pred:0.0496339
+                          |                          ├─(pos)─ &quot;education&quot; is in [BITMAP] {Assoc-voc, 11th, Assoc-acdm, 10th, 7th-8th, Prof-school, 9th, 12th, Doctorate, 5th-6th, ...[2 left]} [s:388.985 n:970 np:299 miss:0] ; pred:0.138115
+                          |                          |        ├─(pos)─ pred:0.053108
+                          |                          |        └─(neg)─ &quot;native_country&quot; is in [BITMAP] {Puerto-Rico, India, El-Salvador, Cuba, England, Jamaica, Dominican-Republic, South, China, Italy, ...[25 left]} [s:390.41 n:671 np:41 miss:0] ; pred:0.175994
+                          |                          |                 ├─(pos)─ pred:0.0300855
+                          |                          |                 └─(neg)─ pred:0.18549
+                          |                          └─(neg)─ &quot;age&quot;&gt;=35.5 [s:164.943 n:3528 np:2283 miss:1] ; pred:0.0253067
+                          |                                   ├─(pos)─ &quot;hours_per_week&quot;&gt;=37.5 [s:198.316 n:2283 np:1993 miss:1] ; pred:0.0578054
+                          |                                   |        ├─(pos)─ &quot;occupation&quot; is in [BITMAP] {Tech-support, Protective-serv, Priv-house-serv} [s:222.609 n:1993 np:150 miss:0] ; pred:0.0723154
+                          |                                   |        |        ├─(pos)─ pred:0.18479
+                          |                                   |        |        └─(neg)─ &quot;occupation&quot; is in [BITMAP] {Other-service, Machine-op-inspct, Transport-moving, Handlers-cleaners, Farming-fishing, Tech-support, Protective-serv, Priv-house-serv} [s:192.812 n:1843 np:742 miss:0] ; pred:0.0631613
+                          |                                   |        |                 ├─(pos)─ pred:0.0113861
+                          |                                   |        |                 └─(neg)─ pred:0.0980542
+                          |                                   |        └─(neg)─ pred:-0.0419135
+                          |                                   └─(neg)─ pred:-0.0342873
+                          └─(neg)─ &quot;hours_per_week&quot;&gt;=32.5 [s:2089.71 n:2796 np:2449 miss:1] ; pred:0.192471
+                                   ├─(pos)─ &quot;education&quot; is in [BITMAP] {Bachelors, Masters, Assoc-voc, 11th, Assoc-acdm, 10th, 7th-8th, Prof-school, 9th, 12th, ...[4 left]} [s:2228.37 n:2449 np:1712 miss:0] ; pred:0.216731
+                                   |        ├─(pos)─ &quot;capital_loss&quot;&gt;=1794 [s:2090.84 n:1712 np:189 miss:0] ; pred:0.254806
+                                   |        |        ├─(pos)─ pred:0.393734
+                                   |        |        └─(neg)─ &quot;age&quot;&gt;=28.5 [s:1611.67 n:1523 np:1427 miss:1] ; pred:0.237566
+                                   |        |                 ├─(pos)─ &quot;capital_gain&quot;&gt;=3120 [s:1641.21 n:1427 np:29 miss:0] ; pred:0.248857
+                                   |        |                 |        ├─(pos)─ pred:-0.0172029
+                                   |        |                 |        └─(neg)─ &quot;age&quot;&gt;=61.5 [s:1668.33 n:1398 np:84 miss:0] ; pred:0.254376
+                                   |        |                 |                 ├─(pos)─ pred:0.124679
+                                   |        |                 |                 └─(neg)─ &quot;capital_loss&quot;&gt;=742.5 [s:1664.69 n:1314 np:12 miss:0] ; pred:0.262668
+                                   |        |                 |                          ├─(pos)─ pred:-0.0393791
+                                   |        |                 |                          └─(neg)─ &quot;age&quot;&gt;=44.5 [s:1676.07 n:1302 np:520 miss:0] ; pred:0.265451
+                                   |        |                 |                                   ├─(pos)─ &quot;hours_per_week&quot;&gt;=37.5 [s:823.442 n:520 np:497 miss:1] ; pred:0.292776
+                                   |        |                 |                                   |        ├─(pos)─ &quot;hours_per_week&quot;&gt;=82.5 [s:828.056 n:497 np:5 miss:0] ; pred:0.301307
+                                   |        |                 |                                   |        |        ├─(pos)─ pred:-0.0210046
+                                   |        |                 |                                   |        |        └─(neg)─ &quot;education_num&quot; is in [BITMAP] {3, 2, 1} [s:831.541 n:492 np:6 miss:0] ; pred:0.304583
+                                   |        |                 |                                   |        |                 ├─(pos)─ pred:-0.0393791
+                                   |        |                 |                                   |        |                 └─(neg)─ &quot;age&quot;&gt;=56.5 [s:843.361 n:486 np:73 miss:0] ; pred:0.308829
+                                   |        |                 |                                   |        |                          ├─(pos)─ pred:0.26896
+                                   |        |                 |                                   |        |                          └─(neg)─ &quot;hours_per_week&quot;&gt;=63 [s:749.33 n:413 np:19 miss:0] ; pred:0.315876
+                                   |        |                 |                                   |        |                                   ├─(pos)─ pred:0.245909
+                                   |        |                 |                                   |        |                                   └─(neg)─ &quot;age&quot;&gt;=47.5 [s:731.54 n:394 np:257 miss:0] ; pred:0.31925
+                                   |        |                 |                                   |        |                                            ├─(pos)─ pred:0.30416
+                                   |        |                 |                                   |        |                                            └─(neg)─ pred:0.347559
+                                   |        |                 |                                   |        └─(neg)─ pred:0.108416
+                                   |        |                 |                                   └─(neg)─ &quot;hours_per_week&quot;&gt;=41 [s:874.424 n:782 np:436 miss:0] ; pred:0.247282
+                                   |        |                 |                                            ├─(pos)─ pred:0.267003
+                                   |        |                 |                                            └─(neg)─ pred:0.222431
+                                   |        |                 └─(neg)─ pred:0.0697196
+                                   |        └─(neg)─ pred:0.128285
+                                   └─(neg)─ pred:0.0212515
+</pre></div></div></div>

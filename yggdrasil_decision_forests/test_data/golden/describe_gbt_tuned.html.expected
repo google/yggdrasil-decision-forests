@@ -1,0 +1,475 @@
+
+<style>
+
+.tab_block .header {
+    flex-direction: row;
+    display: flex;
+}
+
+.tab_block .header .tab {
+    cursor: pointer;
+    background-color: #F6F5F5;
+    text-decoration: none;
+    text-align: center;
+    padding: 4px 12px;
+    color: black;
+}
+
+.tab_block .header .tab.selected {
+    border-bottom: 2px solid #2F80ED;
+}
+
+.tab_block .header .tab:hover {
+    text-decoration: none;
+    background-color: #DCDCDC;
+}
+
+.tab_block .body .tab_content {
+    display: none;
+    padding: 5px;
+}
+
+.tab_block .body .tab_content.selected {
+    display: block;
+}
+
+.ydf_pre {
+    font-size: medium;
+}
+
+
+
+.variable_importance {
+}
+
+.variable_importance select {
+}
+
+.variable_importance .content {
+  display: none;
+}
+
+.variable_importance .content.selected {
+  display: block;
+}
+
+.ydf_tuning_table {
+  border-collapse: collapse;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table th {
+  background-color: #ededed;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table td {
+  text-align: right;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table .best {
+  background-color: khaki;
+}
+
+</style>
+
+<script>
+
+function ydfShowTab(block_id, item) {
+    const block = document.getElementById(block_id);
+    
+    
+    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
+    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
+    
+    block.getElementsByClassName("tab selected")[0].classList.remove("selected");
+    block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_" + item).classList.add("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+  
+
+function ydfShowVariableImportance(block_id) {
+    const block = document.getElementById(block_id);
+    const item = block.getElementsByTagName("select")[0].value;
+    block.getElementsByClassName("content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+
+</script>
+  <div class="tab_block" id="123"><div class="header"><a id="123_model" class="tab selected" onclick="ydfShowTab('123', 'model')">Model</a><a id="123_dataspec" class="tab" onclick="ydfShowTab('123', 'dataspec')">Dataspec</a><a id="123_tuning" class="tab" onclick="ydfShowTab('123', 'tuning')">Tuning</a><a id="123_training" class="tab" onclick="ydfShowTab('123', 'training')">Training</a><a id="123_variable_importance" class="tab" onclick="ydfShowTab('123', 'variable_importance')">Variable importances</a><a id="123_structure" class="tab" onclick="ydfShowTab('123', 'structure')">Structure</a></div><div class="body"><div id="123_body_model" class="tab_content selected"><b>Name</b> : GRADIENT_BOOSTED_TREES<br><b>Task</b> : CLASSIFICATION<br><b>Label</b> : income<br><b>Features (14)</b> : age workclass fnlwgt education education_num marital_status occupation relationship race sex capital_gain capital_loss hours_per_week native_country<br><b>Weights</b> : None<br><b>Trained with tuner</b> : Yes<br><b>Model size</b> : 2293 kB<br></div><div id="123_body_dataspec" class="tab_content"><pre class="ydf_pre">Number of records: 22792
+Number of columns: 15
+
+Number of columns by type:
+	CATEGORICAL: 9 (60%)
+	NUMERICAL: 6 (40%)
+
+Columns:
+
+CATEGORICAL: 9 (60%)
+	0: &quot;income&quot; CATEGORICAL has-dict vocab-size:3 zero-ood-items most-frequent:&quot;&lt;=50K&quot; 17308 (75.9389%)
+	2: &quot;workclass&quot; CATEGORICAL num-nas:1257 (5.51509%) has-dict vocab-size:8 num-oods:3 (0.0139308%) most-frequent:&quot;Private&quot; 15879 (73.7358%)
+	4: &quot;education&quot; CATEGORICAL has-dict vocab-size:17 zero-ood-items most-frequent:&quot;HS-grad&quot; 7340 (32.2043%)
+	6: &quot;marital_status&quot; CATEGORICAL has-dict vocab-size:8 zero-ood-items most-frequent:&quot;Married-civ-spouse&quot; 10431 (45.7661%)
+	7: &quot;occupation&quot; CATEGORICAL num-nas:1260 (5.52826%) has-dict vocab-size:14 num-oods:4 (0.018577%) most-frequent:&quot;Prof-specialty&quot; 2870 (13.329%)
+	8: &quot;relationship&quot; CATEGORICAL has-dict vocab-size:7 zero-ood-items most-frequent:&quot;Husband&quot; 9191 (40.3256%)
+	9: &quot;race&quot; CATEGORICAL has-dict vocab-size:6 zero-ood-items most-frequent:&quot;White&quot; 19467 (85.4115%)
+	10: &quot;sex&quot; CATEGORICAL has-dict vocab-size:3 zero-ood-items most-frequent:&quot;Male&quot; 15165 (66.5365%)
+	14: &quot;native_country&quot; CATEGORICAL num-nas:407 (1.78571%) has-dict vocab-size:41 num-oods:1 (0.00446728%) most-frequent:&quot;United-States&quot; 20436 (91.2933%)
+
+NUMERICAL: 6 (40%)
+	1: &quot;age&quot; NUMERICAL mean:38.6153 min:17 max:90 sd:13.661
+	3: &quot;fnlwgt&quot; NUMERICAL mean:189879 min:12285 max:1.4847e+06 sd:106423
+	5: &quot;education_num&quot; NUMERICAL mean:10.0927 min:1 max:16 sd:2.56427
+	11: &quot;capital_gain&quot; NUMERICAL mean:1081.9 min:0 max:99999 sd:7509.48
+	12: &quot;capital_loss&quot; NUMERICAL mean:87.2806 min:0 max:4356 sd:403.01
+	13: &quot;hours_per_week&quot; NUMERICAL mean:40.3955 min:1 max:99 sd:12.249
+
+Terminology:
+	nas: Number of non-available (i.e. missing) values.
+	ood: Out of dictionary.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
+	tokenized: The attribute value is obtained through tokenization.
+	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
+	vocab-size: Number of unique values.
+</pre></div><div id="123_body_tuning" class="tab_content"><p>A <a target="_blank" href="http://go/ydf_doc_internal/glossary#tuner">tuner</a> automatically selects the hyper-parameters of a learner.</p><table class="ydf_tuning_table"><tr><th>trial</th><th>score</th><th>duration</th><th>split_axis</th><th>sparse_oblique_projection_density_factor</th><th>sparse_oblique_normalization</th><th>sparse_oblique_weights</th><th>categorical_algorithm</th><th>growing_strategy</th><th>max_depth</th><th>sampling_method</th><th>subsample</th><th>shrinkage</th><th>min_examples</th><th>use_hessian_gain</th><th>num_candidate_attributes_ratio</th><th>max_num_nodes</th></tr><tr class="best"><td>8</td><td>-0.581716</td><td>6.76799</td><td>SPARSE_OBLIQUE</td><td>3</td><td>NONE</td><td>BINARY</td><td>RANDOM</td><td>LOCAL</td><td>8</td><td>RANDOM</td><td>1</td><td>0.1</td><td>5</td><td>false</td><td>0.5</td><td> </td></tr><tr><td>2</td><td>-0.588162</td><td>4.96939</td><td>SPARSE_OBLIQUE</td><td>1</td><td>NONE</td><td>BINARY</td><td>CART</td><td>BEST_FIRST_GLOBAL</td><td> </td><td>RANDOM</td><td>1</td><td>0.1</td><td>20</td><td>false</td><td>0.2</td><td>64</td></tr><tr><td>7</td><td>-0.601989</td><td>6.39031</td><td>SPARSE_OBLIQUE</td><td>4</td><td>STANDARD_DEVIATION</td><td>CONTINUOUS</td><td>RANDOM</td><td>BEST_FIRST_GLOBAL</td><td> </td><td>RANDOM</td><td>1</td><td>0.1</td><td>20</td><td>true</td><td>0.5</td><td>256</td></tr><tr><td>4</td><td>-0.608831</td><td>5.78389</td><td>SPARSE_OBLIQUE</td><td>5</td><td>NONE</td><td>CONTINUOUS</td><td>RANDOM</td><td>BEST_FIRST_GLOBAL</td><td> </td><td>RANDOM</td><td>0.8</td><td>0.05</td><td>5</td><td>false</td><td>0.5</td><td>256</td></tr><tr><td>6</td><td>-0.621427</td><td>5.90486</td><td>SPARSE_OBLIQUE</td><td>3</td><td>STANDARD_DEVIATION</td><td>CONTINUOUS</td><td>RANDOM</td><td>BEST_FIRST_GLOBAL</td><td> </td><td>RANDOM</td><td>0.9</td><td>0.05</td><td>10</td><td>true</td><td>0.9</td><td>256</td></tr><tr><td>0</td><td>-0.62872</td><td>2.90191</td><td>SPARSE_OBLIQUE</td><td>3</td><td>STANDARD_DEVIATION</td><td>CONTINUOUS</td><td>CART</td><td>LOCAL</td><td>4</td><td>RANDOM</td><td>0.8</td><td>0.1</td><td>7</td><td>false</td><td>0.9</td><td> </td></tr><tr><td>5</td><td>-0.642083</td><td>5.79126</td><td>SPARSE_OBLIQUE</td><td>5</td><td>MIN_MAX</td><td>BINARY</td><td>CART</td><td>BEST_FIRST_GLOBAL</td><td> </td><td>RANDOM</td><td>1</td><td>0.1</td><td>10</td><td>false</td><td>0.2</td><td>32</td></tr><tr><td>9</td><td>-0.650731</td><td>7.32653</td><td>SPARSE_OBLIQUE</td><td>5</td><td>STANDARD_DEVIATION</td><td>BINARY</td><td>RANDOM</td><td>LOCAL</td><td>8</td><td>RANDOM</td><td>0.9</td><td>0.05</td><td>20</td><td>true</td><td>0.9</td><td> </td></tr><tr><td>3</td><td>-0.735387</td><td>5.21913</td><td>SPARSE_OBLIQUE</td><td>2</td><td>NONE</td><td>BINARY</td><td>RANDOM</td><td>BEST_FIRST_GLOBAL</td><td> </td><td>RANDOM</td><td>0.8</td><td>0.02</td><td>10</td><td>true</td><td>0.9</td><td>128</td></tr><tr><td>1</td><td>-0.747901</td><td>4.09538</td><td>SPARSE_OBLIQUE</td><td>1</td><td>MIN_MAX</td><td>BINARY</td><td>RANDOM</td><td>BEST_FIRST_GLOBAL</td><td> </td><td>RANDOM</td><td>0.6</td><td>0.02</td><td>20</td><td>false</td><td>1</td><td>32</td></tr></table></div><div id="123_body_training" class="tab_content"><p>The following evaluation is computed on the validation or out-of-bag dataset.</p><pre class="ydf_pre">Task: CLASSIFICATION
+Label: income
+Loss (BINOMIAL_LOG_LIKELIHOOD): 0.581716
+
+Accuracy: 0.867198  CI95[W][0 1]
+ErrorRate: : 0.132802
+
+
+Confusion Table:
+truth\prediction
+       &lt;=50K  &gt;50K
+&lt;=50K   1571    93
+ &gt;50K    207   388
+Total: 2259
+
+</pre><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chart_123self_eval" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_123self_eval',
+    [{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50],
+y: [1.00772,0.939503,0.883834,0.836745,0.798522,0.76714,0.738106,0.713224,0.691759,0.671901,0.654885,0.640161,0.627232,0.614423,0.603137,0.59346,0.584291,0.575874,0.568029,0.560956,0.554474,0.548833,0.542955,0.537448,0.532442,0.527909,0.52269,0.517831,0.513537,0.510027,0.506464,0.50357,0.50064,0.49745,0.49555,0.492865,0.489546,0.487887,0.485549,0.482406,0.48027,0.478463,0.476551,0.474909,0.472479,0.470845,0.469753,0.467186,0.464659,0.462304],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'training',
+},
+{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50],
+y: [1.06153,0.991108,0.933812,0.88597,0.847746,0.816395,0.787597,0.762953,0.741997,0.72267,0.707003,0.693371,0.681071,0.671219,0.662785,0.654388,0.64558,0.638627,0.633039,0.627467,0.622389,0.618466,0.616435,0.613203,0.609029,0.607005,0.604218,0.602962,0.600258,0.597553,0.596293,0.59489,0.593384,0.592307,0.59051,0.589282,0.588493,0.587217,0.58689,0.586136,0.586177,0.585935,0.585117,0.584112,0.583626,0.582788,0.581716,0.582294,0.582194,0.582185],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'validation',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'iteration',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'loss',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:2 / span 1; grid-column:1 / span 1;'>
+<div id="chart_123self_eval" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_123self_eval',
+    [{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50],
+y: [0.761895,0.761895,0.761895,0.813715,0.822237,0.823796,0.850777,0.85667,0.860956,0.863732,0.865972,0.867774,0.870793,0.872839,0.876004,0.878586,0.880631,0.881849,0.884284,0.885014,0.88555,0.886475,0.88779,0.888764,0.890225,0.890323,0.890712,0.891833,0.892514,0.892563,0.893635,0.893489,0.894316,0.895339,0.895534,0.89568,0.896167,0.896167,0.896995,0.897726,0.897726,0.898261,0.898407,0.898894,0.899625,0.900112,0.899966,0.900502,0.901573,0.902304],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'training',
+},
+{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50],
+y: [0.736609,0.736609,0.736609,0.791058,0.798141,0.799911,0.828243,0.835768,0.841523,0.847278,0.849491,0.849491,0.854803,0.857016,0.860558,0.860115,0.861443,0.862771,0.861886,0.862771,0.862771,0.864099,0.861443,0.862328,0.864099,0.862328,0.862771,0.864542,0.864985,0.866313,0.865427,0.864099,0.865427,0.864542,0.865427,0.866313,0.86587,0.86587,0.865427,0.86587,0.866313,0.86587,0.866755,0.86587,0.867198,0.866313,0.867198,0.866313,0.86587,0.865427],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'validation',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'iteration',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'accuracy',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div></div></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="http://go/ydf_doc_internal/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1.            &quot;age&quot;  0.330045 ################
+    2.  &quot;education_num&quot;  0.267094 ##########
+    3. &quot;marital_status&quot;  0.195952 #####
+    4.   &quot;relationship&quot;  0.195614 #####
+    5.     &quot;occupation&quot;  0.188586 ####
+    6.   &quot;capital_gain&quot;  0.159192 ##
+    7.      &quot;workclass&quot;  0.140012 
+    8.      &quot;education&quot;  0.138419 
+    9.         &quot;fnlwgt&quot;  0.138128 
+   10. &quot;native_country&quot;  0.135941 
+   11.   &quot;capital_loss&quot;  0.135242 
+   12.            &quot;sex&quot;  0.133855 
+   13. &quot;hours_per_week&quot;  0.130827 
+   14.           &quot;race&quot;  0.130463 
+</pre></div><div id="123_vi_body_NUM_AS_ROOT" class="content"><pre class="ydf_pre">    1. &quot;marital_status&quot; 14.000000 ################
+    2.            &quot;age&quot; 11.000000 ############
+    3.   &quot;relationship&quot; 11.000000 ############
+    4.  &quot;education_num&quot;  7.000000 ######
+    5.     &quot;occupation&quot;  2.000000 
+    6.   &quot;capital_gain&quot;  2.000000 
+</pre></div><div id="123_vi_body_NUM_NODES" class="content"><pre class="ydf_pre">    1.            &quot;age&quot; 1676.000000 ################
+    2.  &quot;education_num&quot; 584.000000 #####
+    3.     &quot;occupation&quot; 406.000000 ###
+    4.         &quot;fnlwgt&quot; 198.000000 #
+    5.      &quot;workclass&quot; 186.000000 #
+    6.      &quot;education&quot; 177.000000 #
+    7. &quot;native_country&quot; 151.000000 #
+    8.   &quot;capital_gain&quot; 149.000000 #
+    9.   &quot;relationship&quot; 136.000000 #
+   10. &quot;marital_status&quot; 95.000000 
+   11.   &quot;capital_loss&quot; 56.000000 
+   12.            &quot;sex&quot; 48.000000 
+   13.           &quot;race&quot; 24.000000 
+   14. &quot;hours_per_week&quot; 20.000000 
+</pre></div><div id="123_vi_body_SUM_SCORE" class="content"><pre class="ydf_pre">    1.            &quot;age&quot; 2747.860942 ################
+    2.  &quot;education_num&quot; 2729.170327 ###############
+    3.   &quot;relationship&quot; 2460.249641 ##############
+    4. &quot;marital_status&quot; 1380.402122 ########
+    5.     &quot;occupation&quot; 912.795740 #####
+    6.   &quot;capital_gain&quot; 565.007246 ###
+    7.      &quot;workclass&quot; 202.681975 #
+    8. &quot;native_country&quot; 169.200590 
+    9.      &quot;education&quot; 153.804128 
+   10.         &quot;fnlwgt&quot; 129.923453 
+   11.   &quot;capital_loss&quot; 99.886689 
+   12.            &quot;sex&quot; 46.141988 
+   13.           &quot;race&quot; 17.084685 
+   14. &quot;hours_per_week&quot;  9.012740 
+</pre></div></div><p>Those variable importances are computed during training. More, and possibly more informative, variable importances are available when analyzing a model on a test dataset.</p></div><div id="123_body_structure" class="tab_content"><b>Num trees</b> : 47<br><p>Only printing the first tree.</p><pre class="ydf_pre">Tree #0:
+    &quot;age&quot;x-1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-5167 [s:0.0248946 n:20533 np:19560 miss:0] ; pred:-4.15883e-09
+        ├─(pos)─ &quot;relationship&quot; is in [BITMAP] {Not-in-family, Own-child, Unmarried, Other-relative} [s:0.0308378 n:19560 np:11084 miss:0] ; pred:-0.0193982
+        |        ├─(pos)─ &quot;education_num&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-52.5 [s:0.00254457 n:11084 np:7929 miss:0] ; pred:-0.104048
+        |        |        ├─(pos)─ &quot;age&quot;x-1+&quot;education_num&quot;x1+&quot;capital_loss&quot;x1+&quot;hours_per_week&quot;x1&gt;=2225 [s:0.000500639 n:7929 np:33 miss:0] ; pred:-0.121588
+        |        |        |        ├─(pos)─ &quot;fnlwgt&quot;x-1+&quot;capital_gain&quot;x1+&quot;hours_per_week&quot;x1&gt;=-125413 [s:0.0702161 n:33 np:13 miss:0] ; pred:0.0691976
+        |        |        |        |        ├─(pos)─ &quot;fnlwgt&quot;x-1+&quot;capital_gain&quot;x1+&quot;capital_loss&quot;x1+&quot;hours_per_week&quot;x1&gt;=-79574 [s:0.151479 n:13 np:5 miss:0] ; pred:0.250373
+        |        |        |        |        |        ├─(pos)─ pred:-0.0210046
+        |        |        |        |        |        └─(neg)─ pred:0.419984
+        |        |        |        |        └─(neg)─ &quot;age&quot;x-1+&quot;fnlwgt&quot;x1+&quot;education_num&quot;x-1+&quot;capital_gain&quot;x1+&quot;hours_per_week&quot;x-1&gt;=175538 [s:0.0225 n:20 np:10 miss:0] ; pred:-0.0485663
+        |        |        |        |                 ├─(pos)─ pred:-0.131252
+        |        |        |        |                 └─(neg)─ &quot;age&quot;x1+&quot;fnlwgt&quot;x1+&quot;capital_gain&quot;x1+&quot;capital_loss&quot;x-1&gt;=152476 [s:0.09 n:10 np:5 miss:0] ; pred:0.034119
+        |        |        |        |                          ├─(pos)─ pred:0.19949
+        |        |        |        |                          └─(neg)─ pred:-0.131252
+        |        |        |        └─(neg)─ &quot;age&quot;x-1+&quot;capital_gain&quot;x1+&quot;capital_loss&quot;x1&gt;=4633.5 [s:0.000280532 n:7896 np:15 miss:0] ; pred:-0.122385
+        |        |        |                 ├─(pos)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=16 [s:0.106667 n:15 np:9 miss:0] ; pred:0.0892425
+        |        |        |                 |        ├─(pos)─ pred:0.236239
+        |        |        |                 |        └─(neg)─ pred:-0.131252
+        |        |        |                 └─(neg)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x-1+&quot;hours_per_week&quot;x1&gt;=79.5 [s:0.00022513 n:7881 np:3244 miss:0] ; pred:-0.122788
+        |        |        |                          ├─(pos)─ &quot;occupation&quot; is in [BITMAP] {&lt;OOD&gt;, Craft-repair, Adm-clerical, Other-service, Machine-op-inspct, Transport-moving, Handlers-cleaners, Farming-fishing} [s:0.000499498 n:3244 np:2331 miss:1] ; pred:-0.1129
+        |        |        |                          |        ├─(pos)─ pred:-0.12061
+        |        |        |                          |        └─(neg)─ pred:-0.0932146
+        |        |        |                          └─(neg)─ &quot;age&quot;x-1+&quot;fnlwgt&quot;x-1+&quot;capital_gain&quot;x-1&gt;=-23787.5 [s:4.85311e-05 n:4637 np:17 miss:0] ; pred:-0.129706
+        |        |        |                                   ├─(pos)─ pred:-0.0664004
+        |        |        |                                   └─(neg)─ pred:-0.129939
+        |        |        └─(neg)─ &quot;education_num&quot;x-1+&quot;capital_gain&quot;x1&gt;=-14.5 [s:0.00547361 n:3155 np:3029 miss:0] ; pred:-0.0599667
+        |        |                 ├─(pos)─ &quot;age&quot;x-1+&quot;capital_loss&quot;x-1&gt;=-38.5 [s:0.00368959 n:3029 np:1853 miss:0] ; pred:-0.0682845
+        |        |                 |        ├─(pos)─ &quot;age&quot;x-1+&quot;education_num&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-86.5 [s:0.00156616 n:1853 np:875 miss:0] ; pred:-0.0949587
+        |        |                 |        |        ├─(pos)─ &quot;marital_status&quot; is in [BITMAP] {Married-civ-spouse} [s:0.00047129 n:875 np:8 miss:0] ; pred:-0.118022
+        |        |                 |        |        |        ├─(pos)─ pred:0.00655721
+        |        |                 |        |        |        └─(neg)─ pred:-0.119171
+        |        |                 |        |        └─(neg)─ &quot;education_num&quot;x1&gt;=12.5 [s:0.00287609 n:978 np:426 miss:0] ; pred:-0.0743244
+        |        |                 |        |                 ├─(pos)─ pred:-0.040673
+        |        |                 |        |                 └─(neg)─ pred:-0.100295
+        |        |                 |        └─(neg)─ &quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x1&gt;=2391.5 [s:0.00487595 n:1176 np:11 miss:0] ; pred:-0.0262544
+        |        |                 |                 ├─(pos)─ &quot;age&quot;x-1+&quot;fnlwgt&quot;x1+&quot;education_num&quot;x-1+&quot;capital_loss&quot;x1&gt;=198092 [s:0.00991736 n:11 np:5 miss:0] ; pred:0.369871
+        |        |                 |                 |        ├─(pos)─ pred:0.309737
+        |        |                 |                 |        └─(neg)─ pred:0.419984
+        |        |                 |                 └─(neg)─ &quot;age&quot;x-1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x-1&gt;=-4707.5 [s:0.00444241 n:1165 np:1155 miss:0] ; pred:-0.0299947
+        |        |                 |                          ├─(pos)─ pred:-0.0334133
+        |        |                 |                          └─(neg)─ pred:0.36486
+        |        |                 └─(neg)─ &quot;age&quot;x1+&quot;education_num&quot;x-1&gt;=15.5 [s:0.0429944 n:126 np:107 miss:0] ; pred:0.139991
+        |        |                          ├─(pos)─ &quot;age&quot;x-1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x1+&quot;hours_per_week&quot;x1&gt;=3.5 [s:0.0236971 n:107 np:97 miss:0] ; pred:0.188156
+        |        |                          |        ├─(pos)─ &quot;workclass&quot; is in [BITMAP] {Private, Local-gov, State-gov, Self-emp-inc} [s:0.0272315 n:97 np:73 miss:0] ; pred:0.215401
+        |        |                          |        |        ├─(pos)─ pred:0.163244
+        |        |                          |        |        └─(neg)─ pred:0.374047
+        |        |                          |        └─(neg)─ &quot;age&quot;x1+&quot;education_num&quot;x-1+&quot;capital_gain&quot;x1&gt;=45.5 [s:0.01 n:10 np:5 miss:0] ; pred:-0.0761281
+        |        |                          |                 ├─(pos)─ pred:-0.131252
+        |        |                          |                 └─(neg)─ pred:-0.0210046
+        |        |                          └─(neg)─ pred:-0.131252
+        |        └─(neg)─ &quot;occupation&quot; is in [BITMAP] {Prof-specialty, Exec-managerial, Sales, Tech-support, Protective-serv} [s:0.026953 n:8476 np:3790 miss:0] ; pred:0.0912976
+        |                 ├─(pos)─ &quot;education_num&quot;x1&gt;=12.5 [s:0.0214758 n:3790 np:1916 miss:0] ; pred:0.191926
+        |                 |        ├─(pos)─ &quot;age&quot;x-1+&quot;education_num&quot;x-1+&quot;capital_loss&quot;x-1&gt;=-1841 [s:0.00823117 n:1916 np:1688 miss:0] ; pred:0.271818
+        |                 |        |        ├─(pos)─ &quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x1&gt;=31 [s:0.00760802 n:1688 np:1510 miss:0] ; pred:0.253437
+        |                 |        |        |        ├─(pos)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;hours_per_week&quot;x1&gt;=92.5 [s:0.00457239 n:1510 np:1142 miss:0] ; pred:0.269945
+        |                 |        |        |        |        ├─(pos)─ pred:0.291105
+        |                 |        |        |        |        └─(neg)─ pred:0.204283
+        |                 |        |        |        └─(neg)─ &quot;capital_gain&quot;x1&gt;=3120 [s:0.0182113 n:178 np:29 miss:0] ; pred:0.113398
+        |                 |        |        |                 ├─(pos)─ pred:-0.0552192
+        |                 |        |        |                 └─(neg)─ pred:0.146216
+        |                 |        |        └─(neg)─ &quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x1&gt;=1989.5 [s:0.00149124 n:228 np:36 miss:0] ; pred:0.407895
+        |                 |        |                 ├─(pos)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;capital_loss&quot;x1+&quot;hours_per_week&quot;x-1&gt;=2300.5 [s:0.0617284 n:36 np:30 miss:0] ; pred:0.358735
+        |                 |        |                 |        ├─(pos)─ pred:0.419984
+        |                 |        |                 |        └─(neg)─ pred:0.0524935
+        |                 |        |                 └─(neg)─ &quot;age&quot;x1+&quot;capital_gain&quot;x1&gt;=28.5 [s:0.000840929 n:192 np:186 miss:0] ; pred:0.417113
+        |                 |        |                          ├─(pos)─ pred:0.419984
+        |                 |        |                          └─(neg)─ pred:0.328111
+        |                 |        └─(neg)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x-1&gt;=43.5 [s:0.0105669 n:1874 np:1371 miss:0] ; pred:0.110245
+        |                 |                 ├─(pos)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=27.5 [s:0.00980262 n:1371 np:212 miss:0] ; pred:0.144567
+        |                 |                 |        ├─(pos)─ &quot;occupation&quot; is in [BITMAP] {Prof-specialty, Sales, Protective-serv} [s:0.0133099 n:212 np:123 miss:0] ; pred:0.0169579
+        |                 |                 |        |        ├─(pos)─ pred:-0.0371383
+        |                 |                 |        |        └─(neg)─ pred:0.09172
+        |                 |                 |        └─(neg)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-1749 [s:0.00751112 n:1159 np:1073 miss:0] ; pred:0.167909
+        |                 |                 |                 ├─(pos)─ pred:0.154384
+        |                 |                 |                 └─(neg)─ pred:0.336657
+        |                 |                 └─(neg)─ &quot;age&quot;x1+&quot;capital_gain&quot;x1&gt;=26.5 [s:0.00655628 n:503 np:401 miss:0] ; pred:0.0166942
+        |                 |                          ├─(pos)─ &quot;age&quot;x1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-1807.5 [s:0.00847365 n:401 np:389 miss:0] ; pred:0.0392052
+        |                 |                          |        ├─(pos)─ pred:0.0302929
+        |                 |                          |        └─(neg)─ pred:0.328111
+        |                 |                          └─(neg)─ &quot;age&quot;x1+&quot;education_num&quot;x-1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x1&gt;=54.5 [s:0.00581507 n:102 np:68 miss:0] ; pred:-0.0718047
+        |                 |                                   ├─(pos)─ pred:-0.0420812
+        |                 |                                   └─(neg)─ pred:-0.131252
+        |                 └─(neg)─ &quot;education_num&quot;x1&gt;=8.5 [s:0.00640854 n:4686 np:3800 miss:0] ; pred:0.00990979
+        |                          ├─(pos)─ &quot;age&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-83.5 [s:0.00628578 n:3800 np:1936 miss:0] ; pred:0.0312177
+        |                          |        ├─(pos)─ &quot;education_num&quot;x1+&quot;capital_loss&quot;x1&gt;=12.5 [s:0.00394839 n:1936 np:271 miss:0] ; pred:-0.0116654
+        |                          |        |        ├─(pos)─ &quot;education&quot; is in [BITMAP] {Bachelors, Assoc-voc, Doctorate} [s:0.0118362 n:271 np:177 miss:0] ; pred:0.0741903
+        |                          |        |        |        ├─(pos)─ pred:0.117894
+        |                          |        |        |        └─(neg)─ pred:-0.0081033
+        |                          |        |        └─(neg)─ &quot;occupation&quot; is in [BITMAP] {&lt;OOD&gt;, Craft-repair, Other-service, Machine-op-inspct, Transport-moving, Handlers-cleaners, Farming-fishing, Priv-house-serv} [s:0.00263946 n:1665 np:1421 miss:1] ; pred:-0.0256396
+        |                          |        |                 ├─(pos)─ pred:-0.0373748
+        |                          |        |                 └─(neg)─ pred:0.0427038
+        |                          |        └─(neg)─ &quot;capital_loss&quot;x1+&quot;hours_per_week&quot;x1&gt;=1844 [s:0.00682742 n:1864 np:76 miss:0] ; pred:0.0757573
+        |                          |                 ├─(pos)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;capital_loss&quot;x-1&gt;=-1934 [s:0.079677 n:76 np:53 miss:0] ; pred:0.296681
+        |                          |                 |        ├─(pos)─ pred:0.399182
+        |                          |                 |        └─(neg)─ pred:0.0604824
+        |                          |                 └─(neg)─ &quot;occupation&quot; is in [BITMAP] {Other-service, Handlers-cleaners, Farming-fishing, Priv-house-serv} [s:0.00862641 n:1788 np:379 miss:0] ; pred:0.0663668
+        |                          |                          ├─(pos)─ pred:-0.0323492
+        |                          |                          └─(neg)─ pred:0.09292
+        |                          └─(neg)─ &quot;occupation&quot; is in [BITMAP] {Craft-repair, Adm-clerical, Machine-op-inspct, Transport-moving} [s:0.00159104 n:886 np:540 miss:0] ; pred:-0.0814787
+        |                                   ├─(pos)─ &quot;education_num&quot;x1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-45.5 [s:0.00303739 n:540 np:473 miss:0] ; pred:-0.0638784
+        |                                   |        ├─(pos)─ &quot;fnlwgt&quot;x1+&quot;education_num&quot;x-1+&quot;capital_loss&quot;x-1&gt;=185879 [s:0.00206478 n:473 np:224 miss:0] ; pred:-0.0753123
+        |                                   |        |        ├─(pos)─ pred:-0.101721
+        |                                   |        |        └─(neg)─ pred:-0.0515549
+        |                                   |        └─(neg)─ &quot;fnlwgt&quot;x-1+&quot;education_num&quot;x-1&gt;=-318474 [s:0.0231683 n:67 np:60 miss:0] ; pred:0.0168414
+        |                                   |                 ├─(pos)─ pred:-0.0118173
+        |                                   |                 └─(neg)─ pred:0.262488
+        |                                   └─(neg)─ &quot;age&quot;x-1+&quot;education_num&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-84.5 [s:0.000858272 n:346 np:119 miss:0] ; pred:-0.108947
+        |                                            ├─(pos)─ &quot;age&quot;x1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-1666.5 [s:7.46368e-18 n:119 np:107 miss:0] ; pred:-0.131252
+        |                                            |        ├─(pos)─ pred:-0.131252
+        |                                            |        └─(neg)─ pred:-0.131252
+        |                                            └─(neg)─ &quot;age&quot;x-1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x1+&quot;hours_per_week&quot;x-1&gt;=-81.5 [s:0.00297325 n:227 np:15 miss:0] ; pred:-0.0972547
+        |                                                     ├─(pos)─ pred:0.0157445
+        |                                                     └─(neg)─ pred:-0.10525
+        └─(neg)─ &quot;age&quot;x-1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x-1&gt;=-7113 [s:0.0114773 n:973 np:110 miss:0] ; pred:0.389957
+                 ├─(pos)─ &quot;age&quot;x1+&quot;capital_gain&quot;x-1+&quot;hours_per_week&quot;x1&gt;=-5237.5 [s:0.140207 n:110 np:58 miss:0] ; pred:0.224546
+                 |        ├─(pos)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x-1&gt;=-5135.5 [s:6.12537e-17 n:58 np:46 miss:0] ; pred:0.419984
+                 |        |        ├─(pos)─ pred:0.419984
+                 |        |        └─(neg)─ pred:0.419984
+                 |        └─(neg)─ &quot;age&quot;x1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x1+&quot;hours_per_week&quot;x-1&gt;=-6479.5 [s:0.0788044 n:52 np:23 miss:0] ; pred:0.00655721
+                 |                 ├─(pos)─ &quot;relationship&quot; is in [BITMAP] {Not-in-family, Unmarried} [s:0.206221 n:23 np:11 miss:0] ; pred:0.180316
+                 |                 |        ├─(pos)─ &quot;age&quot;x1+&quot;fnlwgt&quot;x1+&quot;capital_loss&quot;x1+&quot;hours_per_week&quot;x-1&gt;=192697 [s:0.00991736 n:11 np:5 miss:0] ; pred:-0.0811393
+                 |                 |        |        ├─(pos)─ pred:-0.0210046
+                 |                 |        |        └─(neg)─ pred:-0.131252
+                 |                 |        └─(neg)─ pred:0.419984
+                 |                 └─(neg)─ &quot;capital_gain&quot;x-1+&quot;hours_per_week&quot;x1&gt;=-6807.5 [s:7.65671e-18 n:29 np:20 miss:0] ; pred:-0.131252
+                 |                          ├─(pos)─ pred:-0.131252
+                 |                          └─(neg)─ pred:-0.131252
+                 └─(neg)─ &quot;age&quot;x1+&quot;education_num&quot;x-1&gt;=11.5 [s:0.00105976 n:863 np:854 miss:0] ; pred:0.411041
+                          ├─(pos)─ &quot;age&quot;x1+&quot;fnlwgt&quot;x-1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x-1+&quot;hours_per_week&quot;x1&gt;=-32479 [s:0.000615192 n:854 np:7 miss:0] ; pred:0.412883
+                          |        ├─(pos)─ pred:0.262488
+                          |        └─(neg)─ &quot;age&quot;x1&gt;=60.5 [s:0.000353364 n:847 np:94 miss:0] ; pred:0.414126
+                          |                 ├─(pos)─ &quot;age&quot;x-1+&quot;education_num&quot;x-1&gt;=-74.5 [s:0.00501144 n:94 np:20 miss:0] ; pred:0.384798
+                          |                 |        ├─(pos)─ &quot;age&quot;x1+&quot;capital_gain&quot;x1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x1&gt;=10087.5 [s:0.04 n:20 np:10 miss:0] ; pred:0.309737
+                          |                 |        |        ├─(pos)─ pred:0.19949
+                          |                 |        |        └─(neg)─ pred:0.419984
+                          |                 |        └─(neg)─ &quot;workclass&quot; is in [BITMAP] {&lt;OOD&gt;, Private, Local-gov, State-gov, Self-emp-inc, Federal-gov} [s:0.00313054 n:74 np:60 miss:1] ; pred:0.405085
+                          |                 |                 ├─(pos)─ pred:0.419984
+                          |                 |                 └─(neg)─ pred:0.341236
+                          |                 └─(neg)─ &quot;relationship&quot; is in [BITMAP] {Unmarried} [s:0.000157324 n:753 np:31 miss:0] ; pred:0.417787
+                          |                          ├─(pos)─ &quot;education_num&quot;x-1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-46.5 [s:0.0216441 n:31 np:5 miss:0] ; pred:0.38442
+                          |                          |        ├─(pos)─ pred:0.19949
+                          |                          |        └─(neg)─ pred:0.419984
+                          |                          └─(neg)─ &quot;age&quot;x1+&quot;education_num&quot;x-1&gt;=45.5 [s:3.6555e-05 n:722 np:36 miss:0] ; pred:0.41922
+                          |                                   ├─(pos)─ pred:0.404672
+                          |                                   └─(neg)─ pred:0.419984
+                          └─(neg)─ pred:0.236239
+</pre></div></div></div>

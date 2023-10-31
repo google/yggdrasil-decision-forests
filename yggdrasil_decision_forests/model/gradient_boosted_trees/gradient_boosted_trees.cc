@@ -53,6 +53,7 @@
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/plot.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
@@ -703,6 +704,64 @@ absl::Status GradientBoostedTreesModel::MakePureServing() {
         });
   }
   return AbstractModel::MakePureServing();
+}
+
+absl::StatusOr<utils::plot::MultiPlot>
+GradientBoostedTreesModel::PlotTrainingLogs() const {
+  utils::plot::MultiPlot multiplot;
+
+  // One plot for the loss, and one plot for each metric.
+  ASSIGN_OR_RETURN(
+      auto placer,
+      utils::plot::PlotPlacer::Create(
+          1 + training_logs_.secondary_metric_names_size(), 1, &multiplot));
+
+  // Setup loss plot
+  ASSIGN_OR_RETURN(auto* loss_plot, placer.NewPlot());
+  loss_plot->x_axis.label = "iteration";
+  loss_plot->y_axis.label = "loss";
+  auto* training_loss = loss_plot->AddCurve();
+  auto* validation_loss = loss_plot->AddCurve();
+  training_loss->label = "training";
+  validation_loss->label = "validation";
+
+  // Fill loss plot
+  for (const auto& entry : training_logs_.entries()) {
+    training_loss->xs.push_back(entry.number_of_trees());
+    validation_loss->xs.push_back(entry.number_of_trees());
+    training_loss->ys.push_back(entry.training_loss());
+    validation_loss->ys.push_back(entry.validation_loss());
+  }
+
+  // Metric plots
+  for (int metric_idx = 0;
+       metric_idx < training_logs_.secondary_metric_names().size();
+       metric_idx++) {
+    ASSIGN_OR_RETURN(auto* metric_plot, placer.NewPlot());
+    metric_plot->x_axis.label = "iteration";
+    metric_plot->y_axis.label =
+        training_logs_.secondary_metric_names(metric_idx);
+
+    auto* training_metric = metric_plot->AddCurve();
+    auto* validation_metric = metric_plot->AddCurve();
+    training_metric->label = "training";
+    validation_metric->label = "validation";
+
+    for (const auto& entry : training_logs_.entries()) {
+      // X axis
+      training_metric->xs.push_back(entry.number_of_trees());
+      validation_metric->xs.push_back(entry.number_of_trees());
+
+      // Y axis
+      training_metric->ys.push_back(
+          entry.training_secondary_metrics(metric_idx));
+      validation_metric->ys.push_back(
+          entry.validation_secondary_metrics(metric_idx));
+    }
+  }
+
+  RETURN_IF_ERROR(placer.Finalize());
+  return multiplot;
 }
 
 REGISTER_AbstractModel(GradientBoostedTreesModel,

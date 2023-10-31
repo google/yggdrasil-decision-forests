@@ -41,6 +41,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
+#include "yggdrasil_decision_forests/utils/plot.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -166,6 +167,8 @@ class GradientBoostedTreesModel : public AbstractModel,
     bool force_fail_check_structure_global_imputation_is_higher = false;
   };
   Testing* Testing() { return &testing_; }
+
+  absl::StatusOr<utils::plot::MultiPlot> PlotTrainingLogs() const override;
 
  private:
   void PredictClassification(const dataset::VerticalDataset& dataset,

@@ -87,7 +87,7 @@ NUMERICAL: 6 (40%)
 Terminology:
 	nas: Number of non-available (i.e. missing) values.
 	ood: Out of dictionary.
-	manually-defined: Attribute which type is manually defined by the user i.e. the type was not automatically inferred.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
 	tokenized: The attribute value is obtained through tokenization.
 	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
 	vocab-size: Number of unique values.
@@ -132,7 +132,7 @@ DISCRETIZED_NUMERICAL: 2 (100%)
 Terminology:
 	nas: Number of non-available (i.e. missing) values.
 	ood: Out of dictionary.
-	manually-defined: Attribute which type is manually defined by the user i.e. the type was not automatically inferred.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
 	tokenized: The attribute value is obtained through tokenization.
 	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
 	vocab-size: Number of unique values.
@@ -184,7 +184,7 @@ DISCRETIZED_NUMERICAL: 6 (40%)
 Terminology:
 	nas: Number of non-available (i.e. missing) values.
 	ood: Out of dictionary.
-	manually-defined: Attribute which type is manually defined by the user i.e. the type was not automatically inferred.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
 	tokenized: The attribute value is obtained through tokenization.
 	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
 	vocab-size: Number of unique values.

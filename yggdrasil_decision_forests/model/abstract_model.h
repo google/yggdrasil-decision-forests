@@ -42,6 +42,7 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/plot.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
 
@@ -418,6 +419,13 @@ class AbstractModel {
   // Warning: Sub implementation of this methods are expected to call the parent
   // implementation.
   virtual absl::Status MakePureServing();
+
+  // Creates a plot showing the training logs e.g. quality of the model during
+  // training.
+  virtual absl::StatusOr<utils::plot::MultiPlot> PlotTrainingLogs() const {
+    return absl::UnimplementedError(
+        "PlotTrainingLogs not implemented for this model");
+  }
 
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}

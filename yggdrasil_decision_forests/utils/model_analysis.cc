@@ -18,7 +18,9 @@
 #include <string>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
@@ -27,11 +29,13 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/describe.h"
 #include "yggdrasil_decision_forests/model/model_engine_wrapper.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/feature_importance.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/html.h"
+#include "yggdrasil_decision_forests/utils/html_content.h"
 #include "yggdrasil_decision_forests/utils/partial_dependence_plot.h"
 #include "yggdrasil_decision_forests/utils/partial_dependence_plot.pb.h"
 #include "yggdrasil_decision_forests/utils/plot.h"
@@ -792,133 +796,31 @@ proto::StandaloneAnalysisResult CreateStandaloneAnalysis(
 }
 
 std::string Header() {
-  return R"(
+  return absl::Substitute(R"(
 <style>
-    .tab_block .header {
-        flex-direction: row;
-        display: flex;
-    }
-
-    .tab_block .header .tab {
-        cursor: pointer;
-        background-color: #F6F5F5;
-        text-decoration: none;
-        text-align: center;
-        padding: 4px 12px;
-        color: black;
-    }
-
-    .tab_block .header .tab.selected {
-        border-bottom: 2px solid #2F80ED;
-    }
-
-    .tab_block .header .tab:hover {
-        text-decoration: none;
-        background-color: #DCDCDC;
-    }
-
-    .tab_block .body .content {
-        display: none;
-    }
-
-    .tab_block .body .content.selected {
-        display: block;
-    }
-
-    .variable_importance {
-      padding: 10px;
-    }
-
-    .variable_importance select {
-    }
-
-    .variable_importance .content {
-      display: none;
-    }
-
-    .variable_importance .content.selected {
-      display: block;
-    }
+$0
 </style>
 
 <script>
-    function ydfAnalysisShowTab(block_id, item) {
-        const block = document.getElementById(block_id);
-        block.getElementsByClassName("tab selected")[0].classList.remove("selected");
-        block.getElementsByClassName("content selected")[0].classList.remove("selected");
-        document.getElementById(block_id + "_" + item).classList.add("selected");
-        document.getElementById(block_id + "_body_" + item).classList.add("selected");
-    }
-
-    function ydfAnalysisShowVariableImportance(block_id) {
-        const block = document.getElementById(block_id);
-        const item = block.getElementsByTagName("select")[0].value;
-        block.getElementsByClassName("content selected")[0].classList.remove("selected");
-        document.getElementById(block_id + "_body_" + item).classList.add("selected");
-    }
+$1
 </script>
-  )";
+  )",
+                          CssCommon(), JsCommon());
 }
 
 absl::StatusOr<utils::html::Html> CreateHtmlReportPermutationVariableImportance(
     const proto::StandaloneAnalysisResult& analysis,
     const proto::Options& options, const absl::string_view block_id) {
-  namespace h = utils::html;
-
-  h::Html select_options;
-  h::Html select_content;
-
-  // Adds a tab to the page.
-  bool first_entry = true;
-  const auto add_entry = [&select_content, &select_options, &block_id,
-                          &first_entry](const absl::string_view key,
-                                        const absl::string_view title,
-                                        const h::Html& content) {
-    const absl::string_view maybe_selected = first_entry ? " selected" : "";
-    select_options.Append(h::Option(h::Value(key), title));
-    select_content.Append(
-        h::Div(h::Id(absl::StrCat(block_id, "_body_", key)),
-               h::Class(absl::StrCat("content", maybe_selected)), content));
-    first_entry = false;
-  };
-
+  absl::flat_hash_map<std::string,
+                      std::vector<model::proto::VariableImportance>>
+      variable_importances;
   const auto& vis = analysis.core_analysis().variable_importances();
-
-  // Sort Variable Importances by key
-  std::vector<std::string> keys;
-  keys.reserve(vis.size());
   for (const auto& vi : vis) {
-    keys.push_back(vi.first);
+    variable_importances[vi.first] = {vi.second.variable_importances().begin(),
+                                      vi.second.variable_importances().end()};
   }
-  std::sort(keys.begin(), keys.end());
-
-  for (const auto& key : keys) {
-    const auto& vi = *vis.find(key);
-    // Export VI plot
-    // TODO: Use an html plot instead of ascii-art.
-    std::string raw;
-    std::vector<model::proto::VariableImportance> variable_importance_values = {
-        vi.second.variable_importances().begin(),
-        vi.second.variable_importances().end()};
-    model::AppendVariableImportanceDescription(variable_importance_values,
-                                               analysis.data_spec(), 4, &raw);
-    add_entry(vi.first, vi.first, h::Pre(raw));
-  }
-
-  h::Html content;
-  const auto onchange =
-      absl::Substitute("ydfAnalysisShowVariableImportance('$0')", block_id);
-
-  const auto help =
-      h::P(h::A(h::Target("_blank"),
-                h::HRef("https://ydf.readthedocs.io/en/latest/"
-                        "cli_user_manual.html#variable-importances"),
-                "Documentation"),
-           " about the variable importances");
-  content.Append(h::Div(
-      h::Id(absl::StrCat(block_id)), h::Class("variable_importance"),
-      h::Select(h::OnChange(onchange), select_options), select_content, help));
-  return content;
+  return model::VariableImportance(variable_importances, analysis.data_spec(),
+                                   absl::StrCat(block_id, "_vi"));
 }
 
 absl::StatusOr<std::string> CreateHtmlReport(
@@ -945,31 +847,14 @@ absl::StatusOr<std::string> CreateHtmlReport(
   h::Html tab_content;
 
   // Adds a tab to the page.
-  bool first_tab = true;
-  const auto add_tab = [&tab_header, &tab_content, &block_id, &first_tab](
-                           const absl::string_view key,
-                           const absl::string_view title,
-                           const h::Html& content) {
-    const absl::string_view maybe_selected = first_tab ? " selected" : "";
-    const auto onclick =
-        absl::Substitute("ydfAnalysisShowTab('$0', '$1')", block_id, key);
-
-    tab_header.Append(h::A(h::Id(absl::StrCat(block_id, "_", key)),
-                           h::Class(absl::StrCat("tab", maybe_selected)),
-                           h::OnClick(onclick), title));
-    tab_content.Append(h::Div(h::Id(absl::StrCat(block_id, "_body_", key)),
-                              h::Class(absl::StrCat("content", maybe_selected)),
-                              content));
-
-    first_tab = false;
-  };
+  utils::TabBarBuilder tabbar;
 
   // Setup
   if (options.report_setup().enabled()) {
     h::Html content;
     content.Append(h::P(h::B("Analyse dataset: "), analysis.dataset_path()));
     content.Append(h::P(h::B("Model: "), analysis.model_path()));
-    add_tab("setup", "Setup", content);
+    tabbar.AddTab("setup", "Setup", content);
   }
 
   // Dataset Specification
@@ -977,7 +862,7 @@ absl::StatusOr<std::string> CreateHtmlReport(
     h::Html content;
     content.Append(
         h::Pre(dataset::PrintHumanReadable(analysis.data_spec(), false)));
-    add_tab("dataset", "Dataset", content);
+    tabbar.AddTab("dataset", "Dataset", content);
   }
 
   // Partial Dependence Plot
@@ -995,7 +880,7 @@ absl::StatusOr<std::string> CreateHtmlReport(
 
     h::Html content;
     content.AppendRaw(multiplot_html);
-    add_tab("pdp", "Partial Dependence Plot", content);
+    tabbar.AddTab("pdp", "Partial Dependence Plot", content);
   }
 
   // Conditional Expectation Plot
@@ -1013,7 +898,7 @@ absl::StatusOr<std::string> CreateHtmlReport(
 
     h::Html content;
     content.AppendRaw(multiplot_html);
-    add_tab("cep", "Conditional Expectation Plot", content);
+    tabbar.AddTab("cep", "Conditional Expectation Plot", content);
   }
 
   // Permutation Variable Importance
@@ -1023,7 +908,7 @@ absl::StatusOr<std::string> CreateHtmlReport(
         const auto content,
         CreateHtmlReportPermutationVariableImportance(
             analysis, options, absl::StrCat(block_id, "_variable_importance")));
-    add_tab("pva", "Permutation Variable Importances", content);
+    tabbar.AddTab("pva", "Permutation Variable Importances", content);
   }
 
   // Model Description
@@ -1031,13 +916,10 @@ absl::StatusOr<std::string> CreateHtmlReport(
       analysis.has_model_description()) {
     h::Html content;
     content.Append(h::Pre(analysis.model_description()));
-    add_tab("model", "Model Description", content);
+    tabbar.AddTab("model", "Model Description", content);
   }
 
-  html.Append(h::Div(h::Class("tab_block"), h::Id(block_id),
-                     h::Div(h::Class("header"), tab_header),
-                     h::Div(h::Class("body"), tab_content)));
-
+  html.Append(tabbar.Html());
   return std::string(html.content());
 }
 

@@ -18,6 +18,9 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_MODEL_DECISION_FOREST_INTERFACE_H_
 #define YGGDRASIL_DECISION_FORESTS_MODEL_DECISION_FOREST_INTERFACE_H_
 
+#include <memory>
+#include <vector>
+
 #include "absl/status/status.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -32,6 +35,10 @@ class DecisionForestInterface {
 
   // Number of trees in the models.
   virtual int num_trees() const = 0;
+
+  // List of trees in the model.
+  virtual const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
+  decision_trees() const = 0;
 
   // Apply the model on an example in a VerticalDataset. Instead of the raw
   // prediction (like "AbstractModel::Predict"), this method returns the index

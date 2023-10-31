@@ -49,6 +49,7 @@
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/plot.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
@@ -665,6 +666,46 @@ absl::Status RandomForestModel::Proximity(
     absl::Span<float> proximities) const {
   return decision_tree::Distance(decision_trees(), dataset1, dataset2,
                                  proximities);
+}
+
+absl::StatusOr<utils::plot::MultiPlot> RandomForestModel::PlotTrainingLogs()
+    const {
+  utils::plot::MultiPlot multiplot;
+
+  ASSIGN_OR_RETURN(auto placer,
+                   utils::plot::PlotPlacer::Create(1, 1, &multiplot));
+  ASSIGN_OR_RETURN(auto* plot, placer.NewPlot());
+
+  plot->x_axis.label = "num trees";
+
+  // Select displayed evaluation metric.
+  metric::proto::MetricAccessor accessor;
+  switch (task()) {
+    case model::proto::Task::CLASSIFICATION:
+      plot->y_axis.label = "accuracy";
+      accessor.mutable_classification()->mutable_accuracy();
+      break;
+    case model::proto::Task::REGRESSION:
+      plot->y_axis.label = "rmse";
+      accessor.mutable_regression()->mutable_rmse();
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+      plot->y_axis.label = "qini";
+      accessor.mutable_uplift()->mutable_qini();
+      break;
+    default:
+      return absl::UnimplementedError("Non supported task");
+  }
+
+  auto* curve = plot->AddCurve();
+  for (const auto& eval : out_of_bag_evaluations_) {
+    ASSIGN_OR_RETURN(const auto value,
+                     metric::GetMetric(eval.evaluation(), accessor));
+    curve->xs.push_back(eval.number_of_trees());
+    curve->ys.push_back(value);
+  }
+  RETURN_IF_ERROR(placer.Finalize());
+  return multiplot;
 }
 
 namespace internal {

@@ -41,6 +41,7 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.pb.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
+#include "yggdrasil_decision_forests/utils/plot.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -233,6 +234,8 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
     bool force_fail_check_structure_global_imputation_is_higher = false;
   };
   Testing* Testing() { return &testing_; }
+
+  absl::StatusOr<utils::plot::MultiPlot> PlotTrainingLogs() const override;
 
  private:
   // The decision trees.

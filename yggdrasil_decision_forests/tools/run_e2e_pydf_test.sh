@@ -18,7 +18,7 @@
 # Export the project using copybara locally, and run the pydf tests.
 #
 # Usage example:
-#   third_party/yggdrasil_decision_forests/tools/run_e2e_pydf_bazel_test_locally.sh
+#   third_party/yggdrasil_decision_forests/tools/run_e2e_pydf_test.sh
 
 set -ex
 
@@ -57,6 +57,9 @@ run_test() {
   set -e
 
   CMD='PYTHON=python3.9;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate;COMPILERS="gcc" ./tools/test_pydf.sh;$SHELL'
+
+  # If the compilation fails, you can restart it with: COMPILERS="gcc" ./tools/test_pydf.sh
+
   sudo docker exec -it ${DOCKER_CONTAINER} /bin/bash -c "${CMD}"
 }
 

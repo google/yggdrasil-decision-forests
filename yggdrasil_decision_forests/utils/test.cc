@@ -16,10 +16,15 @@
 #include "yggdrasil_decision_forests/utils/test.h"
 
 #include <random>
+#include <string>
 
 #include "gtest/gtest.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
@@ -39,6 +44,47 @@ std::string TmpDirectory() {
       file::JoinPath(testing::TempDir(), "yggdrasil_unittest", test_name);
   CHECK_OK(file::RecursivelyCreateDir(path, file::Defaults()));
   return path;
+}
+
+void ExpectEqualGolden(absl::string_view content, absl::string_view path) {
+  ASSERT_OK_AND_ASSIGN(
+      const auto expected_content,
+      file::GetContent(file::JoinPath(DataRootDirectory(), path)));
+  if (expected_content != content) {
+    YDF_LOG(INFO) << "The given value does not match the golden value: "
+                  << path;
+
+    const int max_print = 200;
+    if (content.size() < max_print) {
+      YDF_LOG(INFO) << "Given value\n====================\n"
+                    << content << "\n====================";
+    } else {
+      YDF_LOG(INFO) << "The content is too large (" << content.size()
+                    << " characters) to be printed.\nFirst part:\n"
+                    << content.substr(0, max_print);
+    }
+
+    if (expected_content.size() < max_print) {
+      YDF_LOG(INFO) << "Expected value\n====================\n"
+                    << expected_content << "\n====================";
+    } else {
+      YDF_LOG(INFO) << "The expected_content is too large ("
+                    << expected_content.size()
+                    << " characters) to be printed.\nFirst part:\n"
+                    << expected_content.substr(0, max_print);
+    }
+
+    static int actual_idx = 0;
+    const std::string output_dir = file::JoinPath(TmpDirectory(), "golden");
+    ASSERT_OK(file::RecursivelyCreateDir(output_dir, file::Defaults()));
+    const std::string output_path = file::JoinPath(
+        output_dir, absl::StrCat("actual_", actual_idx++, ".html"));
+    YDF_LOG(INFO) << "Content saved to " << output_path;
+    YDF_LOG(INFO) << "Update the golden file with: cp " << output_path << " "
+                  << path;
+    ASSERT_OK(file::SetContent(output_path, content));
+    EXPECT_TRUE(false);
+  }
 }
 
 #ifdef _WIN32

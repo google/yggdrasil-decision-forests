@@ -337,7 +337,10 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
   const auto chart_id =
       plot.chart_id.empty()
           ? absl::StrCat("chart_",
-                         absl::StrReplaceAll(GenUniqueId(), {{"-", "_"}}))
+                         absl::StrReplaceAll(options.html_id_prefix.empty()
+                                                 ? GenUniqueId()
+                                                 : options.html_id_prefix,
+                                             {{"-", "_"}}))
           : plot.chart_id;
 
   // Library header

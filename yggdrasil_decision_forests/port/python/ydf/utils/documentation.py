@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Documentation URLs."""
+"""Documentation URLs for Python code.
+
+See also: external/ydf_cc/yggdrasil_decision_forests/utils/documentation.h
+"""
 
 # TODO: Update to external documentation.
 URL_DOCUMENTATION = "https://ydf.readthedocs.io"
 
-URL_CONFUSION_MATRIX = f"{URL_DOCUMENTATION}#confusion-matrix"
-URL_NUM_EXAMPLES = f"{URL_DOCUMENTATION}#number-of-examples"
-URL_WEIGHTED_NUM_EXAMPLES = f"{URL_DOCUMENTATION}#weighted-number-of-examples"
+URL_GLOSSARY = f"{URL_DOCUMENTATION}/glossary"
+URL_CONFUSION_MATRIX = f"{URL_GLOSSARY}#confusion-matrix"
+URL_NUM_EXAMPLES = f"{URL_GLOSSARY}#number-of-examples"
+URL_WEIGHTED_NUM_EXAMPLES = f"{URL_GLOSSARY}#weighted-number-of-examples"
