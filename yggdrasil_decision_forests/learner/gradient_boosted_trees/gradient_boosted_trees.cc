@@ -2081,13 +2081,16 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
                    AbstractLearner::GetGenericHyperParameterSpecification());
 
   hparam_def.mutable_documentation()->set_description(
-      "A GBT (Gradient Boosted [Decision] Tree; "
-      "https://statweb.stanford.edu/~jhf/ftp/trebst.pdf) is a set of shallow "
-      "decision trees trained sequentially. Each tree is trained to predict "
+      "A [Gradient Boosted "
+      "Trees](https://statweb.stanford.edu/~jhf/ftp/trebst.pdf) (GBT), also "
+      "known as Gradient Boosted Decision "
+      "Trees (GBDT) or Gradient Boosted Machines (GBM), "
+      " is a set of "
+      "shallow decision trees trained sequentially. Each tree is trained to "
+      "predict "
       "and then \"correct\" for the errors of the previously trained trees "
       "(more precisely each tree predict the gradient of the loss relative to "
-      "the model output).\nGBTs use [early stopping](early_stopping.md) to "
-      "avoid overfitting.");
+      "the model output).");
 
   const auto proto_path =
       "learner/gradient_boosted_trees/gradient_boosted_trees.proto";
@@ -2260,7 +2263,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_real()->set_default_value(gbt_config.subsample());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Ratio of the dataset (sampling without replacement) used to train individual trees for the random sampling method. If \"subsample\" is set and if \"sampling_method\" is NOT set or set to \"NONE\", then \"sampling_method\" is implicitely set to \"RANDOM\". In other words, to enable random subsampling, you only need to set "\"subsample\".)");
+        R"(Ratio of the dataset (sampling without replacement) used to train individual trees for the random sampling method. If \"subsample\" is set and if \"sampling_method\" is NOT set or set to \"NONE\", then \"sampling_method\" is implicitly set to \"RANDOM\". In other words, to enable random subsampling, you only need to set "\"subsample\".)");
   }
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamGossAlpha);

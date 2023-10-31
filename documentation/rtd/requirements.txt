@@ -2,6 +2,7 @@ sphinx==4.2.0
 sphinx_rtd_theme==1.0.0
 readthedocs-sphinx-search==0.1.1
 myst-parser
+myst-nb
 sphinx-autoapi
 sphinx-autodoc-typehints
 sphinx-book-theme>=0.3.3

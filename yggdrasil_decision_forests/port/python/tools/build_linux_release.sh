@@ -23,7 +23,7 @@ function build_py() {
   echo "Starting build with " $PYTHON
   $PYTHON -m venv /tmp/venv_$PYTHON
   source /tmp/venv_$PYTHON/bin/activate
-  bazel clean --expunge
+  # bazel clean --expunge  # Probably not needed
   COMPILERS="gcc" ./tools/test_pydf.sh
   ./tools/build_pydf.sh python
 }

@@ -147,7 +147,6 @@ absl::StatusOr<std::string> ExportHParamSpecToMarkdown(
   }
 
   std::string result;
-  absl::StrAppend(&result, "<font size=\"2\">\n\n");
 
   // Introduction to the learner.
   if (hparams.documentation().has_description()) {
@@ -163,10 +162,10 @@ absl::StatusOr<std::string> ExportHParamSpecToMarkdown(
     }
   }
   if (!protos.empty()) {
-    absl::StrAppend(&result,
-                    "### Training configuration\n\nFollowing are the "
-                    "protobuffer definitions used in TrainingConfiguration to "
-                    "set learner hyper-parameters.\n\n");
+    absl::StrAppend(
+        &result,
+        "### Protobuffer training configuration\n\nThe "
+        "hyper-parameter protobuffers are used with the C++ and CLI APIs.\n\n");
     for (const auto& proto : protos) {
       absl::SubstituteAndAppend(&result, "- <a href=\"$0\">$1</a>\n",
                                 gen_doc_url(proto, {}), proto);
@@ -177,13 +176,16 @@ absl::StatusOr<std::string> ExportHParamSpecToMarkdown(
   if (!templates.empty()) {
     absl::StrAppend(&result, "### Hyper-parameter templates\n\n");
 
-    absl::StrAppend(&result,
-                    "Following are the hyper-parameter templates. Those are "
-                    "hyper-parameter configurations that are generally before "
-                    "better than the default hyper-parameter values. You can "
-                    "copy them manually in your training config (CLI and C++ "
-                    "API), or use the `hyperparameter_template` argument "
-                    "(TensorFlow Decision Forests).\n\n");
+    absl::StrAppend(
+        &result,
+        "**Hyper-parameter templates** are pre-configured sets of "
+        "hyperparameters that are updated with the best values that have been "
+        "found. Unlike default values, which never change, hyper-parameter "
+        "templates are updated when new features are available in YDF. "
+        "Hyper-parameter templates can be copied manually using the C++ or CLI "
+        "APIs, or they can be passed to the `hyperparameter_template "
+        "constructor` argument in the Python and TensorFlow Decision Forests "
+        "APIs.\n\n");
 
     for (const auto& template_item : templates) {
       absl::SubstituteAndAppend(&result, "**$0@$1**\n\n", template_item.name(),
@@ -226,7 +228,7 @@ absl::StatusOr<std::string> ExportHParamSpecToMarkdown(
     }
   }
 
-  absl::StrAppend(&result, "### Generic Hyper-parameters\n\n");
+  absl::StrAppend(&result, "### Hyper-parameters\n\n");
 
   // Sort the field alphabetically.
   std::vector<
@@ -296,7 +298,6 @@ absl::StatusOr<std::string> ExportHParamSpecToMarkdown(
         &result, "\n\n - $0\n\n",
         MarkDownInTable(hparam.second.documentation().description()));
   }
-  absl::StrAppend(&result, "</font>\n");
   return result;
 }
 

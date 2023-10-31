@@ -58,7 +58,11 @@ run_test() {
 
   CMD='PYTHON=python3.9;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate;COMPILERS="gcc" ./tools/test_pydf.sh;$SHELL'
 
-  # If the compilation fails, you can restart it with: COMPILERS="gcc" ./tools/test_pydf.sh
+  # If the compilation fails, you can restart it with:
+  # COMPILERS="gcc" ./tools/test_pydf.sh
+  #
+  # To build a pip package, run:
+  # ./tools/build_linux_release.sh
 
   sudo docker exec -it ${DOCKER_CONTAINER} /bin/bash -c "${CMD}"
 }

@@ -175,6 +175,7 @@ cc_test(
 cc_test(
     name = "export_doc_test",
     srcs = ["export_doc_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
     deps = [
         ":abstract_learner",
         ":abstract_learner_cc_proto",

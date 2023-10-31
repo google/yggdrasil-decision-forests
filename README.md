@@ -4,11 +4,10 @@
 
 **Yggdrasil Decision Forests** (YDF) is a production-grade collection of
 algorithms for the training, serving, and interpretation of decision forest
-models. YDF is open-source and is available in C++, command-line interface
-(CLI), TensorFlow (under the name
-[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests);
-TF-DF), JavaScript (inference only), and Go (inference only). YDF is supported
-on Linux, Windows, macOS, Raspberry Pi, and Arduino (experimental).
+models. YDF is open-sourced and available in Python, C++, CLI, in TensorFlow
+under the name
+[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests),
+JavaScript (inference only), and Go (inference only).
 
 To learn more about YDF, check
 [the documentation 📕](https://ydf.readthedocs.org/).

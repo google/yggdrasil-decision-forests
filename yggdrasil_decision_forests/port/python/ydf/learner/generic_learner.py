@@ -486,7 +486,7 @@ class GenericLearner:
       working_dir: Optional[str],
   ):
     if num_threads is None:
-      num_threads = self.determine_optimal_num_threads()
+      num_threads = self._determine_optimal_num_threads()
     return abstract_learner_pb2.DeploymentConfig(
         num_threads=num_threads,
         try_resume_training=resume_training,
@@ -494,7 +494,7 @@ class GenericLearner:
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
     )
 
-  def determine_optimal_num_threads(self):
+  def _determine_optimal_num_threads(self):
     """Sets  number of threads to min(num_cpus, 32) or 6 if num_cpus unclear."""
     num_threads = os.cpu_count()
     if num_threads is None:

@@ -174,7 +174,8 @@ Use `model.describe()` for more details
 
     YDF models can also be exported to other formats, see the methods under
     `export` for details.
-    # TODO: Implement model exports and update this description.
+
+    TODO: Implement model exports and update this description.
 
     Usage example:
 
