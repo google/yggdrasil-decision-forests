@@ -397,8 +397,9 @@ Use `model.describe()` for more details
       input features with placeholder values. Therefore, you will want to add
       your input as arguments to the "Predict" function, and use it to populate
       the "examples->Set..." section accordingly.
-    5. (Bonus) To further speed-up inference speed, you can pre-allocate and
-      reuse the "examples" and "predictions" for each model running threads.
+    5. (Bonus) You can further optimize the inference speed by pre-allocating 
+      and re-using the examples and predictions for each thread running the
+      model.
 
     This documentation is also available in the header of the generated content
     for more details.
