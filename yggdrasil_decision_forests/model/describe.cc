@@ -130,13 +130,13 @@ utils::html::Html Model(const model::AbstractModel& model) {
 
   if (model.ranking_group_col_idx() != -1) {
     AddKeyValue(
-        &content, "Rank group",
+        &content, "Ranking group",
         model.data_spec().columns(model.ranking_group_col_idx()).name());
   }
 
   if (model.uplift_treatment_col_idx() != -1) {
     AddKeyValue(
-        &content, "Uplift treatment",
+        &content, "Uplifting treatment",
         model.data_spec().columns(model.uplift_treatment_col_idx()).name());
   }
 

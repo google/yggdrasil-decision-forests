@@ -16,7 +16,7 @@
 
 import dataclasses
 import os
-from typing import Optional, TypeVar, Union
+from typing import Literal, Optional, TypeVar, Union
 
 from absl import logging
 import numpy as np
@@ -29,6 +29,7 @@ from ydf.dataset import dataset
 from ydf.metric import metric
 from ydf.model import analysis
 from ydf.model import template_cpp_export
+from ydf.utils import html
 from ydf.utils import log
 from yggdrasil_decision_forests.utils import model_analysis_pb2
 
@@ -66,11 +67,34 @@ class GenericModel:
 
     return self._model.task()
 
-  def describe(self, full_details: bool = False) -> str:
-    """Description of the model."""
+  def describe(
+      self,
+      format: Literal["auto", "text", "notebook", "html"] = "auto",
+      full_details: bool = False,
+  ) -> Union[str, html.HtmlNotebookDisplay]:
+    """Description of the model.
+
+    Args:
+      format: Format of the display: - auto: Use the "notebook" format if
+        executed in an IPython notebook. Otherwise, use the "text" format. -
+        text: Text description of the model. - html: Html description of the
+          model. -
+        notebook: Html description of the model displayed in a notebook cell.
+      full_details: Should the full model be printed. This can be large.
+
+    Returns:
+      The model description.
+    """
+
+    if format == "auto":
+      format = "text" if log.is_direct_output() else "notebook"
 
     with log.cc_log_context():
-      return self._model.Describe(full_details)
+      description = self._model.Describe(full_details, format == "text")
+      if format == "notebook":
+        return html.HtmlNotebookDisplay(description)
+      else:
+        return description
 
   def data_spec(self) -> data_spec_pb2.DataSpecification:
     """Returns the data spec used for train the model."""

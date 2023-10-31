@@ -38,6 +38,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:describe",
         "@ydf_cc//yggdrasil_decision_forests/model:model_library",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
@@ -49,6 +50,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:random",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
+        "@ydf_cc//yggdrasil_decision_forests/utils:uid",
         "@ydf_cc//yggdrasil_decision_forests/utils/benchmark:inference",
     ],
 )
@@ -87,6 +89,7 @@ py_library(
         "//ydf/cc:ydf",
         "//ydf/dataset",
         "//ydf/metric",
+        "//ydf/utils:html",
         "//ydf/utils:log",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
     ],

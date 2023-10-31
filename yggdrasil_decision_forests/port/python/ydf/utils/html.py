@@ -21,6 +21,19 @@ Doc = minidom.Document
 Elem = minidom.Element
 
 
+class HtmlNotebookDisplay:
+  """An object printed as html in a notebook."""
+
+  def __init__(self, html: str):
+    self._html = html
+
+  def _repr_html_(self) -> str:
+    return self._html
+
+  def _repr_(self) -> str:
+    return self._html
+
+
 def create_doc() -> Tuple[Doc, Elem]:
   """Creates a html document.
 

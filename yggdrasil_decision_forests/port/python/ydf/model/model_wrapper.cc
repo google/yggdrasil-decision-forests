@@ -35,6 +35,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/describe.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
@@ -43,6 +44,7 @@
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests::port::python {
 
@@ -169,6 +171,15 @@ absl::StatusOr<py::array_t<float>> DecisionForestCCModel::Distance(
   auto dst = absl::MakeSpan(distances.mutable_data(), n1 * n2);
   RETURN_IF_ERROR(df_model_->Distance(dataset1, dataset2, dst));
   return distances;
+}
+
+absl::StatusOr<std::string> GenericCCModel::Describe(
+    const bool full_details, const bool text_format) const {
+  if (text_format) {
+    return model_->DescriptionAndStatistics(full_details);
+  } else {
+    return model::DescribeModelHtml(*model_, utils::GenUniqueId());
+  }
 }
 
 // TODO: Pass utils::BenchmarkInferenceRunOptions directly.

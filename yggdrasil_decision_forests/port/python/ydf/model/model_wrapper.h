@@ -76,9 +76,8 @@ class GenericCCModel {
 
   model::proto::Task task() const { return model_->task(); }
 
-  std::string Describe(const bool full_details) const {
-    return model_->DescriptionAndStatistics(full_details);
-  }
+  absl::StatusOr<std::string> Describe(bool full_details,
+                                       bool text_format) const;
 
   std::vector<int> input_features() const { return model_->input_features(); }
 

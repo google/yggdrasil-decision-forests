@@ -27,8 +27,9 @@
 
 namespace yggdrasil_decision_forests::model {
 
-// Creates a Html report of a model. "block_id" is used to generate unique html
-// id. If not provided, "block_id" is selected randomly.
+// Creates a Html report of a model.
+// "block_id" is a prefix used to generate the unique ID of html elements.
+// If not given, a unique id will be generated.
 absl::StatusOr<std::string> DescribeModelHtml(const model::AbstractModel& model,
                                               absl::string_view block_id = {});
 

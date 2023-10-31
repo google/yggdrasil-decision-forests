@@ -77,7 +77,8 @@ void init_model(py::module_& m) {
       .def("name", &GenericCCModel::name)
       .def("task", &GenericCCModel::task)
       .def("data_spec", &GenericCCModel::data_spec)
-      .def("Describe", &GenericCCModel::Describe, py::arg("full_details"))
+      .def("Describe", &GenericCCModel::Describe, py::arg("full_details"),
+           py::arg("text_format"))
       .def("input_features", &GenericCCModel::input_features)
       .def("hyperparameter_optimizer_logs",
            &GenericCCModel::hyperparameter_optimizer_logs)
@@ -90,8 +91,7 @@ void init_model(py::module_& m) {
                      &BenchmarkInferenceCCResult::duration_per_example)
       .def_readwrite("benchmark_duration",
                      &BenchmarkInferenceCCResult::benchmark_duration)
-      .def_readwrite("num_runs",
-                     &BenchmarkInferenceCCResult::num_runs)
+      .def_readwrite("num_runs", &BenchmarkInferenceCCResult::num_runs)
       .def_readwrite("batch_size", &BenchmarkInferenceCCResult::batch_size)
       .def("__repr__",
            [](const BenchmarkInferenceCCResult& a) { return a.ToString(); })

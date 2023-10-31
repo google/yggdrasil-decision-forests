@@ -337,9 +337,7 @@ class RandomForestLearnerTest(LearnerTest):
     )
     vds_dataset = DatasetForTesting(vds_train, vds_test, pd_dataset.label)
 
-    tuner = tuner_lib.RandomSearchTuner(num_trials=5)
-    tuner.choice("max_depth", [3, 4, 5])
-    tuner.choice("shrinkage", [0.1, 0.2, 0.3])
+    tuner = tuner_lib.RandomSearchTuner(num_trials=5, use_predefined_hps=True)
     learner = specialized_learners.GradientBoostedTreesLearner(
         label=pd_dataset.label,
         tuner=tuner,

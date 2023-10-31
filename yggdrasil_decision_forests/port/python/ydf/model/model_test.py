@@ -260,14 +260,24 @@ Use `model.describe()` for more details
 """,
     )
 
-  def test_model_describe(self):
+  def test_model_describe_text(self):
     model_path = os.path.join(
         test_utils.ydf_test_data_path(),
         "model",
         "adult_binary_class_gbdt",
     )
     model = model_lib.load_model(model_path)
-    self.assertIn('Type: "GRADIENT_BOOSTED_TREES"', model.describe())
+    self.assertIn('Type: "GRADIENT_BOOSTED_TREES"', model.describe("text"))
+
+  def test_model_describe_html(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "adult_binary_class_gbdt",
+    )
+    model = model_lib.load_model(model_path)
+    html_description = model.describe("html")
+    self.assertIn("GRADIENT_BOOSTED_TREES", html_description)
 
   def test_model_to_cpp(self):
     model_path = os.path.join(

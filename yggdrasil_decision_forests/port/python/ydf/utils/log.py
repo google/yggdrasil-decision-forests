@@ -110,15 +110,15 @@ def warning(msg: str, *args: Any, message_id: Optional[int] = None) -> None:
     logging.warning(msg, *args)
 
 
-def _is_direct_output(stream=sys.stdout):
+def is_direct_output(stream=sys.stdout):
   """Checks if output stream redirects to the shell/console directly."""
 
   if stream.isatty():
     return True
   if isinstance(stream, io.TextIOWrapper):
-    return _is_direct_output(stream.buffer)
+    return is_direct_output(stream.buffer)
   if isinstance(stream, io.BufferedWriter):
-    return _is_direct_output(stream.raw)
+    return is_direct_output(stream.raw)
   if isinstance(stream, io.FileIO):
     return stream.fileno() in [1, 2]
   return False
@@ -149,7 +149,7 @@ def cc_log_context():
   elif _VERBOSE_LEVEL == 1:
     # Only show CC logs in the console, but not in colab / notebook cells
 
-    if _is_direct_output():
+    if is_direct_output():
       return _no_op_context()
 
     # Hide logs if in notebook. Logs are already hidden in colabs.
