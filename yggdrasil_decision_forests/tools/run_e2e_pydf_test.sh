@@ -31,7 +31,8 @@ function run_export () {
   COPYBARA="/google/bin/releases/copybara/public/copybara/copybara"
   bazel test third_party/yggdrasil_decision_forests:copybara_test
 
-  rm -fr "${LOCAL_DIR}"
+  sudo rm -fr "${LOCAL_DIR}"
+
   "${COPYBARA}" third_party/yggdrasil_decision_forests/copy.bara.sky presubmit_piper_to_gerrit "${CL}" \
     --dry-run --init-history --squash --force \
     --git-destination-path "${LOCAL_DIR}" --ignore-noop
@@ -51,18 +52,26 @@ run_test() {
   sudo sudo docker container ls -a --size
 
   set +e  # Ignore error if the container already exist
-  CREATE_DOCKER_FLAGS="-i -t -v ${PWD}/../../../../:/working_dir -w /working_dir/${YDF_DIRNAME}/yggdrasil_decision_forests/port/python"
+  CREATE_DOCKER_FLAGS="-i -t -p 8889:8889 --network host -v ${PWD}/../../../../:/working_dir -w /working_dir/${YDF_DIRNAME}/yggdrasil_decision_forests/port/python"
   sudo docker create ${CREATE_DOCKER_FLAGS} --name ${DOCKER_CONTAINER} ${DOCKER_IMAGE}
   sudo docker start ${DOCKER_CONTAINER}
   set -e
 
   CMD='PYTHON=python3.9;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate;COMPILERS="gcc" ./tools/test_pydf.sh;$SHELL'
 
+  # Only get a shell, uncomment the following line.
+  # CMD='$SHELL'
+
   # If the compilation fails, you can restart it with:
   # COMPILERS="gcc" ./tools/test_pydf.sh
   #
   # To build a pip package, run:
   # ./tools/build_linux_release.sh
+  # To speed-up the process, you might want to only select one version of python
+  # in tools/build_linux_release.sh e.g. py3.11.
+  #
+  # To start a notebook instance, run:
+  # ./tools/start_notebook.sh
 
   sudo docker exec -it ${DOCKER_CONTAINER} /bin/bash -c "${CMD}"
 }

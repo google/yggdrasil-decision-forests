@@ -159,7 +159,7 @@ function test_package() {
   else
     PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*.manylinux2014_x86_64.whl"
   fi
-  ${PIP} install ${PACKAGEPATH}
+  ${PIP} install ${PACKAGEPATH} --force-reinstall
 
 
   ${PIP} list

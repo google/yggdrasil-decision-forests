@@ -14,29 +14,16 @@
 # limitations under the License.
 
 
-# Builds all python versions for release on Pypi
+#
+# Start a notebook instance
+#
+# Usage example:
+#  # Compile PYDF
+#  third_party/yggdrasil_decision_forests/tools/run_e2e_pydf_test.sh
+#  # Start a notebook (this file)
+#  ./tools/start_notebook.sh
+#  # Open your browser to http://localhost:8888/
 
-PYTHON_VERSIONS=( 3.8 3.9 3.10 3.11 )
-
-function build_py() {
-  local PYTHON="python"$1
-  echo "Starting build with " $PYTHON
-  $PYTHON -m venv /tmp/venv_$PYTHON
-  source /tmp/venv_$PYTHON/bin/activate
-  bazel clean --expunge
-  COMPILERS="gcc" ./tools/test_pydf.sh
-  ./tools/build_pydf.sh python
-}
-
-function main() {
-  set -e
-  for ver in ${PYTHON_VERSIONS[*]} 
-  do
-    build_py $ver 
-  done
-  set +e
-}
-
-
-
-main
+pip install notebook -U
+python tools/assembly_pip_files.py
+( cd tmp_package && jupyter-lab --no-browser --allow-root --port 8889 )

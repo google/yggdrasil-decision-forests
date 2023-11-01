@@ -241,13 +241,14 @@ def evaluation_to_html_str(e: metric.Evaluation, add_style: bool = True) -> str:
       documentation_url=documentation.URL_WEIGHTED_NUM_EXAMPLES,
   )
 
-  _object_to_html(
-      doc,
-      html_metric_box,
-      "Confusion matrix",
-      confusion_matrix_to_html_str(doc, e.confusion_matrix),
-      documentation_url=documentation.URL_CONFUSION_MATRIX,
-  )
+  if e.confusion_matrix is not None:
+    _object_to_html(
+        doc,
+        html_metric_box,
+        "Confusion matrix",
+        confusion_matrix_to_html_str(doc, e.confusion_matrix),
+        documentation_url=documentation.URL_CONFUSION_MATRIX,
+    )
 
   # Curves
   plot_html = ydf.EvaluationPlotToHtml(e._evaluation_proto)

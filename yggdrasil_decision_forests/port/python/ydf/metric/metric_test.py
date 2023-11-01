@@ -184,6 +184,8 @@ class EvaluationTest(absltest.TestCase):
         """),
     )
 
+    _ = evaluation.html()
+
   def test_regression(self):
     proto_eval = metric_pb2.EvaluationResults(
         count_predictions_no_weight=1,
@@ -220,6 +222,8 @@ class EvaluationTest(absltest.TestCase):
         """),
     )
 
+    _ = evaluation.html()
+
   def test_ranking(self):
     proto_eval = metric_pb2.EvaluationResults(
         count_predictions_no_weight=1,
@@ -252,6 +256,8 @@ class EvaluationTest(absltest.TestCase):
         """),
     )
 
+    _ = evaluation.html()
+
   def test_uplift(self):
     proto_eval = metric_pb2.EvaluationResults(
         count_predictions_no_weight=1,
@@ -283,6 +289,8 @@ class EvaluationTest(absltest.TestCase):
         num examples (weighted): 3
         """),
     )
+
+    _ = evaluation.html()
 
 
 if __name__ == "__main__":

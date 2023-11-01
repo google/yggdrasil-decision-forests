@@ -17,11 +17,17 @@
 import glob
 import os
 from pathlib import Path
+import platform
 import shutil as s
+
 
 SRC_BIN = "bazel-bin/ydf"
 DST_PK = "tmp_package"
-DST_EXTENSION = "pyd"
+
+if platform.system() == "Windows":
+  DST_EXTENSION = "pyd"
+else:
+  DST_EXTENSION = "so"
 
 
 def rec_glob_copy(src_dir: str, dst_dir: str, pattern: str):

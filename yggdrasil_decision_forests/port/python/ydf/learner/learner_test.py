@@ -460,8 +460,7 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
 
     self._check_adult_model(learner=learner, ds=ds, minimum_accuracy=0.869)
 
-  # TODO: Enable when HASH columns are supporterd.
-  def disabled_test_toy_ranking(self):
+  def test_toy_ranking(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
         label="col2",
         ranking_group="col1",
@@ -569,6 +568,25 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     self.assertEqual(model_2.num_trees(), 50)
 
   def test_ranking(self):
+    dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
+    train_path = os.path.join(dataset_directory, "synthetic_ranking_train.csv")
+    test_path = os.path.join(dataset_directory, "synthetic_ranking_test.csv")
+    train_ds = pd.read_csv(train_path)
+    test_ds = pd.read_csv(test_path)
+    label = "LABEL"
+    ranking_group = "GROUP"
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label=label,
+        ranking_group=ranking_group,
+        task=generic_learner.Task.RANKING,
+    )
+
+    model = learner.train(train_ds)
+    evaluation = model.evaluate(test_ds)
+    self.assertAlmostEqual(evaluation.ndcg, 0.71, places=1)
+
+  def test_ranking_path(self):
     dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
     train_path = os.path.join(dataset_directory, "synthetic_ranking_train.csv")
     test_path = os.path.join(dataset_directory, "synthetic_ranking_test.csv")
