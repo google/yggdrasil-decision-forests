@@ -1,0 +1,10 @@
+ydf
+mkdocs
+mkdocs-material
+mkdocs-autorefs
+mkdocs-jupyter
+mkdocs-glightbox
+mkdocs-macros-plugin
+mkdocs-gen-files
+mkdocstrings[python]
+mkdocstrings-crystal

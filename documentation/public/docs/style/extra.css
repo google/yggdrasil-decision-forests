@@ -1,0 +1,59 @@
+h2 {
+  margin: 0px !important;
+}
+
+h1#_1 {
+  display: none;
+}
+
+.center {
+  display: block;
+  margin: 0 auto;
+}
+
+.md-main__inner {
+  display: flex;
+  margin-top: 0;
+}
+
+.md-nav__title {
+  display: none;
+}
+
+.md-nav__item--section {
+  /*font-size: larger;*/
+}
+
+.md-nav__item {
+  line-height: 1.1em;
+}
+
+.md-nav__link {
+  margin-top: 0.4em;
+}
+
+.md-typeset ol li, .md-typeset ul li {
+  margin-bottom: 0;
+}
+
+.jp-OutputArea-executeResult {
+  font-size: 10pt;
+}
+
+.md-typeset pre {
+  line-height: 1;
+  font-size: 10pt;
+  white-space: pre !important;
+}
+
+.md-typeset code {
+  font-size: 1em;
+}
+
+.md-nav__item--section label.md-nav__link  {
+  text-decoration: underline;
+}
+
+.md-ellipsis {
+  overflow: visible;
+}
