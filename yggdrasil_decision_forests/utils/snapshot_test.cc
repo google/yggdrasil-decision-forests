@@ -15,23 +15,68 @@
 
 #include "yggdrasil_decision_forests/utils/snapshot.h"
 
-#include "gmock/gmock.h"
-#include "yggdrasil_decision_forests/utils/filesystem.h"
-#include "yggdrasil_decision_forests/utils/test.h"
+#include <deque>
+#include <string>
 
-namespace yggdrasil_decision_forests {
-namespace utils {
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "absl/status/status.h"
+#include "yggdrasil_decision_forests/utils/filesystem.h"  // IWYU pragma: keep
+#include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
+
+namespace yggdrasil_decision_forests::utils {
 namespace {
 
-TEST(SnapShot, Base) {
-  const auto snapshot_dir = file::JoinPath(test::TmpDirectory(), "snapshot");
-  EXPECT_FALSE(GetGreatestSnapshot(snapshot_dir).ok());
+using ::testing::ElementsAre;
+using ::testing::IsEmpty;
+using ::yggdrasil_decision_forests::test::StatusIs;
+
+TEST(SnapShot, GetSnapshot) {
+  const std::string snapshot_dir =
+      file::JoinPath(test::TmpDirectory(), "get_snapshot");
+  EXPECT_THAT(GetGreatestSnapshot(snapshot_dir).status(),
+              StatusIs(absl::StatusCode::kNotFound));
+  EXPECT_OK(AddSnapshot(snapshot_dir, 5));
+  EXPECT_OK(AddSnapshot(snapshot_dir, 11));
+  ASSERT_OK_AND_ASSIGN(const int content, GetGreatestSnapshot(snapshot_dir));
+  EXPECT_EQ(content, 11);
+}
+
+TEST(SnapShot, GetSnapshots) {
+  const std::string snapshot_dir =
+      file::JoinPath(test::TmpDirectory(), "get_snapshots");
+  ASSERT_OK_AND_ASSIGN(const std::deque<int> content,
+                       GetSnapshots(snapshot_dir));
+  EXPECT_THAT(content, IsEmpty());
+}
+
+TEST(SnapShot, AddSnapshot) {
+  const std::string snapshot_dir =
+      file::JoinPath(test::TmpDirectory(), "add_snapshot");
   EXPECT_OK(AddSnapshot(snapshot_dir, 5));
   EXPECT_OK(AddSnapshot(snapshot_dir, 11));
   EXPECT_OK(AddSnapshot(snapshot_dir, 6));
-  EXPECT_EQ(GetGreatestSnapshot(snapshot_dir).value(), 11);
+  ASSERT_OK_AND_ASSIGN(const std::deque<int> content,
+                       GetSnapshots(snapshot_dir));
+  EXPECT_THAT(content, ElementsAre(5, 6, 11));
+}
+
+TEST(SnapShot, RemoveOldSnapshots) {
+  const std::string snapshot_dir =
+      file::JoinPath(test::TmpDirectory(), "remove_old_snapshots");
+  EXPECT_OK(AddSnapshot(snapshot_dir, 5));
+  EXPECT_OK(AddSnapshot(snapshot_dir, 11));
+  EXPECT_OK(AddSnapshot(snapshot_dir, 6));
+
+  std::deque<int> snapshots = {5, 6, 11};
+  EXPECT_THAT(RemoveOldSnapshots(snapshot_dir, 2, snapshots), ElementsAre(5));
+
+  EXPECT_THAT(snapshots, ElementsAre(6, 11));
+  ASSERT_OK_AND_ASSIGN(const std::deque<int> content,
+                       GetSnapshots(snapshot_dir));
+  EXPECT_THAT(content, ElementsAre(6, 11));
 }
 
 }  // namespace
-}  // namespace utils
-}  // namespace yggdrasil_decision_forests
+}  // namespace yggdrasil_decision_forests::utils

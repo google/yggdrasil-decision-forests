@@ -67,6 +67,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ] + select({
         "//conditions:default": [
         ],
@@ -130,6 +131,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:model_analysis",
         "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:snapshot",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
         "//yggdrasil_decision_forests/utils:testing_macros",

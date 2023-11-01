@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <deque>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -66,6 +67,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/snapshot.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -78,6 +80,7 @@ namespace {
 using test::EqualsProto;
 using ::testing::ElementsAre;
 using ::testing::Not;
+using ::testing::SizeIs;
 using ::testing::UnorderedElementsAre;
 
 std::string DatasetDir() {
@@ -1639,6 +1642,15 @@ TEST_F(GradientBoostedTreesOnAdult, InterruptAndResumeTraining) {
     return dynamic_cast<const GradientBoostedTreesModel*>(mdl.get());
   };
 
+  // Check snapshots
+  ASSERT_OK_AND_ASSIGN(std::deque<int> snapshots,
+                       utils::GetSnapshots(file::JoinPath(
+                           deployment_config_.cache_path(), "snapshot")));
+  // The training will create 9 or 10 snapshots, but we guarantee that only 3 of
+  // them will be there.
+  ASSERT_THAT(snapshots, SizeIs(3));
+  EXPECT_EQ(snapshots.back(), get_gbt(interrupted_model)->NumTrees());
+
   // Resume the training with 100 extra trees.
   gbt_config->set_num_trees(get_gbt(interrupted_model)->NumTrees() + 100);
   interrupt_training_after = {};
@@ -1650,6 +1662,13 @@ TEST_F(GradientBoostedTreesOnAdult, InterruptAndResumeTraining) {
   // model.
   EXPECT_EQ(get_gbt(interrupted_model)->NumTrees() + 100,
             get_gbt(resumed_model)->NumTrees());
+
+  // Check snapshots again.
+  ASSERT_OK_AND_ASSIGN(snapshots,
+                       utils::GetSnapshots(file::JoinPath(
+                           deployment_config_.cache_path(), "snapshot")));
+  ASSERT_THAT(snapshots, SizeIs(3));
+  EXPECT_EQ(snapshots.back(), get_gbt(resumed_model)->NumTrees());
 }
 
 TEST_F(GradientBoostedTreesOnAdult, EarlyStoppingInitialIteration) {

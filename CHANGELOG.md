@@ -6,6 +6,8 @@
 
 -   Add support for Mean average error (MAE) loss for GBT.
 -   Add pairwise distance between examples.
+-   By default, only keep the last three snapshots when training with a working
+    cache to be resilient to training interruptions.
 
 ### New interface
 

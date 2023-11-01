@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <deque>
 #include <limits>
 #include <memory>
 #include <numeric>
@@ -36,6 +37,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
@@ -149,6 +151,26 @@ std::string GradientColumnName(const int grad_idx) {
 // Name of the hessian column in the gradient dataset.
 std::string HessianColumnName(const int grad_idx) {
   return absl::StrCat(kBaseHessianColumnName, grad_idx);
+}
+
+std::string SnapshotPath(const absl::string_view cache_path,
+                         const int iter_idx) {
+  return file::JoinPath(cache_path, absl::StrCat("model_", iter_idx));
+}
+
+// Removes snapshots if they exist. Do not fail if the snapshot does not exist.
+void RemoveSnapshotsIfExist(const absl::string_view cache_path,
+                            const absl::string_view path,
+                            const absl::Span<const int> indexes) {
+  for (const int index : indexes) {
+    YDF_LOG(INFO) << "Remove snapshot of the model at iteration " << index;
+    const std::string path = SnapshotPath(cache_path, index);
+    const absl::Status status = file::RecursivelyDelete(path, file::Defaults());
+    if (!status.ok()) {
+      YDF_LOG(WARNING) << "Cannot remove file " << path << " : "
+                       << status.message();
+    }
+  }
 }
 
 // Creates the training configurations to "learn the gradients".
@@ -383,6 +405,105 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
   internal_config.duplicated_selected_examples = false;
   internal_config.timeout = timeout;
   return internal_config;
+}
+
+std::string SnapshotDir(const model::proto::DeploymentConfig& deployment) {
+  return file::JoinPath(deployment.cache_path(), "snapshot");
+}
+
+// Restores all training states from the last available snapshot. If no snapshot
+// is available, do nothing. All arguments have the same name to the
+// corresponding variables in the main training loop defined in
+// "TrainWithStatus".
+//
+// A failure occurs only if a snapshot is found but cannot be loaded. In other
+// words, not finding any snapshot does not return a failure.
+absl::Status TryLoadSnapshotFromDisk(
+    const internal::AllTrainingConfiguration& config,
+    const bool has_validation_dataset,
+    const model::proto::DeploymentConfig& deployment,
+    const dataset::VerticalDataset& gradient_sub_train_dataset,
+    const dataset::VerticalDataset& gradient_validation_dataset,
+    std::deque<int>* snapshots_idxs, GradientBoostedTreesModel* model,
+    int* iter_idx, EarlyStopping* early_stopping,
+    std::vector<float>* sub_train_predictions,
+    std::vector<float>* validation_predictions) {
+  // Find the last snapshot, if any.
+  const absl::StatusOr<std::deque<int>> disk_snapshot_idxs =
+      utils::GetSnapshots(SnapshotDir(deployment));
+  if (!disk_snapshot_idxs.ok() || disk_snapshot_idxs->empty()) {
+    return absl::OkStatus();
+  }
+  *snapshots_idxs = *disk_snapshot_idxs;
+  const int snapshot_idx = snapshots_idxs->back();
+
+  // Load the model in the snapshot.
+  YDF_LOG(INFO) << "Resume the GBT training from snapshot #" << snapshot_idx;
+  const std::string model_path = file::JoinPath(
+      deployment.cache_path(), absl::StrCat("model_", snapshot_idx));
+
+  // Load the model structure.
+  RETURN_IF_ERROR(model->Load(model_path, /*io_options=*/{/*file_prefix=*/""}));
+  *iter_idx = model->NumTrees() / model->num_trees_per_iter();
+
+  // Load the state of the early stopping state manager.
+  learner::gradient_boosted_trees::proto::EarlyStoppingSnapshot
+      early_stopping_snapshot;
+  RETURN_IF_ERROR(
+      file::GetBinaryProto(file::JoinPath(model_path, kEarlyStoppingCheckpoint),
+                           &early_stopping_snapshot, file::Defaults()));
+  RETURN_IF_ERROR(early_stopping->Load(early_stopping_snapshot));
+
+  // Recompute the prediction caches.
+  absl::Time time_begin_recompute_accumulators = absl::Now();
+  model->set_output_logits(true);
+  ASSIGN_OR_RETURN(auto engine, model->BuildFastEngine());
+  model->set_output_logits(false);
+
+  RETURN_IF_ERROR(internal::ComputePredictions(model, engine.get(), {}, config,
+                                               gradient_sub_train_dataset,
+                                               sub_train_predictions));
+
+  if (has_validation_dataset) {
+    // Recompute the prediction caches for the validation dataset.
+    RETURN_IF_ERROR(internal::ComputePredictions(
+        model, engine.get(), {}, config, gradient_validation_dataset,
+        validation_predictions));
+  }
+  YDF_LOG(INFO) << "Re-compute the prediction accumulators in "
+                << absl::FormatDuration(absl::Now() -
+                                        time_begin_recompute_accumulators);
+  return absl::OkStatus();
+}
+
+// Creates and record a snapshot.
+absl::Status CreateSnapshot(const model::proto::DeploymentConfig& deployment,
+                            const int iter_idx,
+                            const EarlyStopping& early_stopping,
+                            const GradientBoostedTreesModel& model,
+                            std::deque<int>& snapshots_idxs) {
+  const std::string model_path =
+      SnapshotPath(deployment.cache_path(), iter_idx);
+
+  // Save the model structure.
+  RETURN_IF_ERROR(model.Save(model_path, /*io_options=*/{/*file_prefix=*/""}));
+
+  // Save the early stopping manager state.
+  RETURN_IF_ERROR(
+      file::SetBinaryProto(file::JoinPath(model_path, kEarlyStoppingCheckpoint),
+                           early_stopping.Save(), file::Defaults()));
+
+  // Record the snapshot.
+  const std::string snapshot_directory = SnapshotDir(deployment);
+  RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
+  snapshots_idxs.push_back(iter_idx);
+
+  // Remove old snapshots.
+  const std::vector<int> snapshots_to_remove = utils::RemoveOldSnapshots(
+      snapshot_directory, deployment.max_kept_snapshots(), snapshots_idxs);
+  RemoveSnapshotsIfExist(deployment.cache_path(), snapshot_directory,
+                         snapshots_to_remove);
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -1263,12 +1384,6 @@ GradientBoostedTreesLearner::TrainWithStatus(
       config.gbt_config->early_stopping_initial_iteration());
   early_stopping.set_trees_per_iterations(mdl->num_trees_per_iter_);
 
-  // if (config.gbt_config->use_hessian_gain() &&
-  //     gradients.front().hessian_col_idx == -1) {
-  //   return absl::InvalidArgumentError(
-  //       "Loss does not support hessian optimization");
-  // }
-
   ASSIGN_OR_RETURN(
       const auto preprocessing,
       decision_tree::PreprocessTrainingDataset(
@@ -1285,56 +1400,23 @@ GradientBoostedTreesLearner::TrainWithStatus(
   // Empty if resuming training is disabled.
   std::string snapshot_directory;
 
-  // Try to resume training.
+  // Current training iteration.
   int iter_idx = 0;
+
+  // Sorted deque of the past iterations with snapshots.
+  std::deque<int> snapshots_idxs;
+
+  // Try to resume training.
   if (deployment_.try_resume_training()) {
     if (deployment_.cache_path().empty()) {
       return absl::InvalidArgumentError(
           "\"try_resume_training=True\" requires a \"cache_path\" in the "
           "deployment configuration.");
     }
-    snapshot_directory = file::JoinPath(deployment_.cache_path(), "snapshot");
-
-    const auto snapshot_idx_or = utils::GetGreatestSnapshot(snapshot_directory);
-    if (snapshot_idx_or.ok()) {
-      // Load the snapshot.
-      YDF_LOG(INFO) << "Resume the GBT training from iteration #"
-                    << snapshot_idx_or.value();
-      const auto model_path =
-          file::JoinPath(deployment_.cache_path(),
-                         absl::StrCat("model_", snapshot_idx_or.value()));
-      // Load the model structure.
-      RETURN_IF_ERROR(
-          mdl->Load(model_path, /*io_options=*/{/*file_prefix=*/""}));
-      iter_idx = mdl->NumTrees() / mdl->num_trees_per_iter();
-
-      // Load the state of the early stopping state manager.
-      learner::gradient_boosted_trees::proto::EarlyStoppingSnapshot
-          early_stopping_snapshot;
-      RETURN_IF_ERROR(file::GetBinaryProto(
-          file::JoinPath(model_path, kEarlyStoppingCheckpoint),
-          &early_stopping_snapshot, file::Defaults()));
-      RETURN_IF_ERROR(early_stopping.Load(early_stopping_snapshot));
-
-      // Recompute the prediction caches.
-      auto time_begin_recompute_accumulators = absl::Now();
-      mdl->set_output_logits(true);
-      ASSIGN_OR_RETURN(auto engine, mdl->BuildFastEngine());
-      mdl->set_output_logits(false);
-
-      RETURN_IF_ERROR(internal::ComputePredictions(
-          mdl.get(), engine.get(), {}, config, gradient_sub_train_dataset,
-          &sub_train_predictions));
-
-      if (has_validation_dataset) {
-        RETURN_IF_ERROR(internal::ComputePredictions(
-            mdl.get(), engine.get(), {}, config, gradient_validation_dataset,
-            &validation_predictions));
-      }
-      YDF_LOG(INFO) << "Re-compute the prediction accumulators in "
-                    << absl::FormatDuration(absl::Now() -
-                                            time_begin_recompute_accumulators);
-    }
+    RETURN_IF_ERROR(TryLoadSnapshotFromDisk(
+        config, has_validation_dataset, deployment_, gradient_sub_train_dataset,
+        gradient_validation_dataset, &snapshots_idxs, mdl.get(), &iter_idx,
+        &early_stopping, &sub_train_predictions, &validation_predictions));
   }
 
   // Train the trees one by one.
@@ -1573,25 +1655,13 @@ GradientBoostedTreesLearner::TrainWithStatus(
       RETURN_IF_ERROR(MaybeExportTrainingLogs(log_directory_, mdl.get()));
     }
 
-    // Export a snapshot
-    if (deployment_.try_resume_training() && next_snapshot < absl::Now()) {
+    // Export a snapshot.
+    if (deployment_.try_resume_training() && next_snapshot < absl::Now() &&
+        (snapshots_idxs.empty() || snapshots_idxs.back() < iter_idx)) {
       YDF_LOG(INFO) << "Create a snapshot of the model at iteration "
                     << iter_idx;
-      const auto model_path = file::JoinPath(deployment_.cache_path(),
-                                             absl::StrCat("model_", iter_idx));
-
-      // Save the model structure.
-      RETURN_IF_ERROR(
-          mdl->Save(model_path, /*io_options=*/{/*file_prefix=*/""}));
-
-      // Save the early stopping manager state.
-      RETURN_IF_ERROR(file::SetBinaryProto(
-          file::JoinPath(model_path, kEarlyStoppingCheckpoint),
-          early_stopping.Save(), file::Defaults()));
-
-      // Record the snapshot.
-      RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
-
+      RETURN_IF_ERROR(CreateSnapshot(deployment_, iter_idx, early_stopping,
+                                     *mdl, snapshots_idxs));
       next_snapshot =
           absl::Now() +
           absl::Seconds(
@@ -1599,27 +1669,13 @@ GradientBoostedTreesLearner::TrainWithStatus(
     }
   }  // End of training iteration.
 
-  // Create a final snapshot
-  if (deployment_.try_resume_training()) {
-    const auto last_snapshot = utils::GetGreatestSnapshot(snapshot_directory);
-    if (!last_snapshot.ok() || last_snapshot.value() < iter_idx) {
-      YDF_LOG(INFO) << "Create final snapshot of the model at iteration "
-                    << iter_idx;
-      const auto model_path = file::JoinPath(deployment_.cache_path(),
-                                             absl::StrCat("model_", iter_idx));
-
-      // Save the model structure.
-      RETURN_IF_ERROR(
-          mdl->Save(model_path, /*io_options=*/{/*file_prefix=*/""}));
-
-      // Save the early stopping manager state.
-      RETURN_IF_ERROR(file::SetBinaryProto(
-          file::JoinPath(model_path, kEarlyStoppingCheckpoint),
-          early_stopping.Save(), file::Defaults()));
-
-      // Record the snapshot.
-      RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
-    }
+  // Create a final snapshot.
+  if (deployment_.try_resume_training() &&
+      (snapshots_idxs.empty() || snapshots_idxs.back() < iter_idx)) {
+    YDF_LOG(INFO) << "Create final snapshot of the model at iteration "
+                  << iter_idx;
+    RETURN_IF_ERROR(CreateSnapshot(deployment_, iter_idx, early_stopping, *mdl,
+                                   snapshots_idxs));
   }
 
   if (has_validation_dataset) {

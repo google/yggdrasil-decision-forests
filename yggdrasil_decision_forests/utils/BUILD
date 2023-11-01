@@ -686,6 +686,8 @@ cc_library_ydf(
     hdrs = ["snapshot.h"],
     deps = [
         ":filesystem",
+        ":status_macros",
+        "@com_google_absl//absl/algorithm:container",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -1144,6 +1146,8 @@ cc_test(
         ":filesystem",
         ":snapshot",
         ":test",
+        ":testing_macros",
+        "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
     ],
 )

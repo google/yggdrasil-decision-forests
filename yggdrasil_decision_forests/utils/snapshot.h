@@ -21,25 +21,36 @@
 //   AddSnapshot("/tmp/snap",11);
 //   AddSnapshot("/tmp/snap",6);
 //   GetGreatestSnapshot("/tmp/snap") // Returns 11.
+//   GetSnapshots("/tmp/snap") // Returns {5,6,11}.
 //
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_SNAPSHOT_IO_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_SNAPSHOT_IO_H_
 
+#include <deque>
+#include <vector>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
-namespace yggdrasil_decision_forests {
-namespace utils {
+namespace yggdrasil_decision_forests::utils {
 
 // Adds a snapshot record. The content of the directory is used to manage
 // snapshot tracking.
 absl::Status AddSnapshot(absl::string_view directory, int index);
 
+// Retrieves the sorted list of snapshot indexes.
+absl::StatusOr<std::deque<int>> GetSnapshots(absl::string_view directory);
+
 // Retrieves the largest snapshot index. Returns an error if not snapshot
 // records are available.
 absl::StatusOr<int> GetGreatestSnapshot(absl::string_view directory);
 
-}  // namespace utils
-}  // namespace yggdrasil_decision_forests
+// Removes snapshots until there is only "keep" snapshots left. Returns the list
+// of removed snapshots.
+std::vector<int> RemoveOldSnapshots(absl::string_view directory, int keep,
+                                    std::deque<int>& snapshots);
+
+}  // namespace yggdrasil_decision_forests::utils
 
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_SNAPSHOT_IO_H_
