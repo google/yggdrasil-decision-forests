@@ -14,54 +14,37 @@
 
 """(P)YDF - Yggdrasil Decision Forests in Python."""
 
-# WARNING: The API (TODO) reference documentation reads this file and expects a
-# single import per line. Do not import several symbols from the same module in
-# a single line.
+# pylint: disable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported
 
-# TIP: If you need to import something here that isn't part of the public API,
-# and therefore shouldn't show up in the documentation, import it with a private
-# name:
-# from ydf import submodule as _submodule
-
-# Core
-from ydf import version as _version
-from ydf.dataset import dataset as _dataset
-from ydf.dataset import dataspec as _dataspec
-from ydf.learner import generic_learner as _generic_learner
-from ydf.learner import specialized_learners as _specialized_learners
-from ydf.learner import tuner as _tuner
-from ydf.model import generic_model as _generic_model
-from ydf.model import gradient_boosted_trees_model as _gradient_boosted_trees_model
-from ydf.model import model_lib as _model_lib
-from ydf.model import random_forest_model as _random_forest_model
-from ydf.utils import log as _log
-
-__version__ = _version.version
+# Version
+from ydf.version import version as __version__
 
 # Dataset
-create_vertical_dataset = _dataset.create_vertical_dataset
-Column = _dataspec.Column
+from yggdrasil_decision_forests.model.abstract_model_pb2 import Task
+from ydf.dataset.dataset import create_vertical_dataset
+from ydf.dataset.dataspec import Column
+from ydf.dataset.dataspec import Semantic
 # A feature is a column used as input of a model. In practice, users generally
 # use them interchangeably.
-Feature = Column
-Task = _generic_model.Task
-Semantic = _dataspec.Semantic
+from ydf.dataset.dataspec import Column as Feature
 
 # Model
-load_model = _model_lib.load_model
-ModelIOOptions = _generic_model.ModelIOOptions
-RandomForestModel = _random_forest_model.RandomForestModel
-GradientBoostedTreesModel = (
-    _gradient_boosted_trees_model.GradientBoostedTreesModel
-)
+from ydf.model.model_lib import load_model
+from ydf.model.generic_model import ModelIOOptions
+from ydf.model.generic_model import GenericModel
+from ydf.model.random_forest_model import RandomForestModel
+from ydf.model.gradient_boosted_trees_model import GradientBoostedTreesModel
 
 # Learner
-CartLearner = _specialized_learners.CartLearner
-RandomForestLearner = _specialized_learners.RandomForestLearner
-GradientBoostedTreesLearner = _specialized_learners.GradientBoostedTreesLearner
+from ydf.learner.generic_learner import GenericLearner
+from ydf.learner.specialized_learners import CartLearner
+from ydf.learner.specialized_learners import RandomForestLearner
+from ydf.learner.specialized_learners import GradientBoostedTreesLearner
 
 # Tuner
-RandomSearchTuner = _tuner.RandomSearchTuner
+from ydf.learner.tuner import RandomSearchTuner
 
 # Logs
-verbose = _log.verbose
+from ydf.utils.log import verbose
+
+# pylint: enable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported

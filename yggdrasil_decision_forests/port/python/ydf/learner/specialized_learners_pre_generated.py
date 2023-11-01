@@ -15,9 +15,9 @@
 r"""Wrappers around the YDF learners.
 
 This file is generated automatically by running the following commands:
-  bazel build //ydf/learner:specialized_learners\
-  && bazel-bin/ydf/learner/specialized_learners_generator\
-  > ydf/learner/specialized_learners_pre_generated.py
+  bazel build //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/learner:specialized_learners\
+  && bazel-bin/external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/learner/specialized_learners_generator\
+  > external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/learner/specialized_learners_pre_generated.py
 
 Please don't change this file directly. Instead, changes the source. The
 documentation source is contained in the "GetGenericHyperParameterSpecification"

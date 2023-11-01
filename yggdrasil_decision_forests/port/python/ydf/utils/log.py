@@ -54,6 +54,17 @@ def verbose(level: int) -> int:
         console. This is the default verbose level.
     2: Prints all the logs on all surfaces.
 
+  Usage example:
+
+  ```python
+  import ydf
+
+  save_verbose = ydf.verbose(0)  # Hide all logs
+  learner = ydf.RandomForestLearner(label="label")
+  model = learner.train(pd.DataFrame({"feature": [0, 1], "label": [0, 1]}))
+  ydf.verbose(save_verbose)  # Restore verbose level
+  ```
+
   Args:
     level: New verbose level.
 

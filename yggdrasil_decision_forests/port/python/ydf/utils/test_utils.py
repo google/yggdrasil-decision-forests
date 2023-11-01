@@ -40,7 +40,7 @@ def ydf_test_data_path() -> str:
 def pydf_test_data_path() -> str:
   return os.path.join(
       data_root_path(),
-      "ydf/test_data",
+      "external/ydf_cc/yggdrasil_decision_forests/port/python/test_data",
   )
 
 

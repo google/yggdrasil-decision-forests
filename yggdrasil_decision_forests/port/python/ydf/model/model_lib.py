@@ -34,11 +34,20 @@ def load_model(
   import pandas as pd
   import ydf
 
-  model = ydf.load_model("/path/to/my/model/")
+  # Create a model
+  dataset = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
+  learner = ydf.RandomForestLearner(label="label")
+  model = learner.train(dataset)
 
-  df = pd.read_csv("my_dataset.csv")
-  # Predict on the dataset
-  model.predict(df)
+  # Save model
+  model.save("/tmp/my_model")
+
+  # Load model
+  loaded_model = ydf.load_model("/tmp/my_model")
+
+  # Make predictions
+  model.predict(dataset)
+  loaded_model.predict(dataset)
   ```
 
   If a directory contains multiple YDF models, the models are uniquely

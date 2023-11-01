@@ -161,11 +161,11 @@ py_test(
     name = "model_test",
     srcs = ["model_test.py"],
     data = [
+        "//test_data",
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
         # absl/testing:absltest dep,
         # numpy dep,
         # pandas dep,
-        "//ydf/test_data",
-        "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
     python_version = "PY3",
     deps = [

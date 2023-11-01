@@ -6,7 +6,7 @@ name = "ydf_cc",
 path = "../../../",
 )
 
-load("//ydf:library.bzl", ydf_load_deps = "load_dependencies")
+load("//:library.bzl", ydf_load_deps = "load_dependencies")
 ydf_load_deps()
 
 # Load the dependencies of YDF.

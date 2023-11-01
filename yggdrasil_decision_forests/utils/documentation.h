@@ -16,7 +16,7 @@
 // Documentation URLs for C++ code.
 //
 // See also:
-// ydf/utils/documentation.py
+// yggdrasil_decision_forests/port/python/utils/documentation.py
 //
 
 #include <string>

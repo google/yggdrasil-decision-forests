@@ -1,3 +1,5 @@
+# TODO: describe this package.
+
 # pytype test and library
 
 package(
@@ -5,28 +7,12 @@ package(
     licenses = ["notice"],
 )
 
-# Users of the library
-# TODO: Make public when fully available.
-package_group(
-    name = "users",
-    packages = [
-        # ydf/... dep,
-        "//ydf/...",
-    ],
-)
-
-# Internal to the library
-package_group(
-    name = "internal",
-    packages = ["//ydf/..."],
-)
-
 # User facing API of pydf.
 # TODO: Create alias for the library to be imported with "import ydf".
 py_library(
     name = "api",
     srcs = ["__init__.py"],
-    visibility = [":users"],
+    visibility = ["//visibility:public"],
     deps = [
         ":version",
         "//ydf/dataset",
@@ -39,6 +25,7 @@ py_library(
         "//ydf/model:model_lib",
         "//ydf/model:random_forest_model",
         "//ydf/utils:log",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )
 

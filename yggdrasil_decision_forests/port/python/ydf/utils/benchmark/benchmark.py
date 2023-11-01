@@ -18,7 +18,7 @@ Usage example:
 sudo apt install linux-cpupower
 sudo cpupower frequency-set --governor performance
 bazel run -c opt <fastest possible flags> \
-//ydf/utils/benchmark:benchmark
+//external/ydf_cc/yggdrasil_decision_forests/port/python/utils/benchmark:benchmark
 """
 
 import functools
@@ -32,7 +32,9 @@ from absl import flags
 import pandas as pd
 import tensorflow_decision_forests as tfdf
 
-import ydf
+from yggdrasil_decision_forests.model import abstract_model_pb2
+from ydf.dataset import dataset
+from ydf.learner import specialized_learners
 
 AVAILABLE_APPLICATIONS = ["tfdf", "pydf"]
 AVAILABLE_DATASETS = ["adult", "abalone", "iris", "dna"]
@@ -162,10 +164,10 @@ def get_pd_dataset(name: str):
       "dna": "LABEL",
   }
   tasks = {
-      "adult": ydf.Task.CLASSIFICATION,
-      "iris": ydf.Task.CLASSIFICATION,
-      "abalone": ydf.Task.REGRESSION,
-      "dna": ydf.Task.CLASSIFICATION,
+      "adult": abstract_model_pb2.Task.CLASSIFICATION,
+      "iris": abstract_model_pb2.Task.CLASSIFICATION,
+      "abalone": abstract_model_pb2.Task.REGRESSION,
+      "dna": abstract_model_pb2.Task.CLASSIFICATION,
   }
   return df, labels[name], tasks[name]
 
@@ -184,22 +186,31 @@ def build_learning_params(configuration: str):
 
 
 def bench_train_pydf(
-    df: pd.DataFrame, label: str, task: ydf.Task, hp_dict: dict, algo: str
+    df: pd.DataFrame,
+    label: str,
+    task: abstract_model_pb2.Task,
+    hp_dict: dict,
+    algo: str,
 ):
   algo_to_function = {
-      "rf": ydf.RandomForestLearner,
+      "rf": specialized_learners.RandomForestLearner,
       "gbt": functools.partial(
-          ydf.GradientBoostedTreesLearner, early_stopping="NONE"
+          specialized_learners.GradientBoostedTreesLearner,
+          early_stopping="NONE",
       ),
-      "cart": ydf.CartLearner,
+      "cart": specialized_learners.CartLearner,
   }
-  ds = ydf.create_vertical_dataset(df)
+  ds = dataset.create_vertical_dataset(df)
   train_func = algo_to_function[algo]
   train_func(label=label, task=task, **hp_dict).train(ds)
 
 
 def bench_train_tfdf(
-    df: pd.DataFrame, label: str, task: ydf.Task, hp_dict: dict, algo: str
+    df: pd.DataFrame,
+    label: str,
+    task: abstract_model_pb2.Task,
+    hp_dict: dict,
+    algo: str,
 ):
   algo_to_function = {
       "rf": tfdf.keras.RandomForestModel,

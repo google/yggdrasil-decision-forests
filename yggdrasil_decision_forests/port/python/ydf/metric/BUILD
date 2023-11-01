@@ -45,7 +45,7 @@ pybind_library(
 py_test(
     name = "metric_test",
     srcs = ["metric_test.py"],
-    data = ["//ydf/test_data"],
+    data = ["//test_data"],
     python_version = "PY3",
     deps = [
         ":metric",

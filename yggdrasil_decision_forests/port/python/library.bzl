@@ -1,8 +1,8 @@
 """Helpers to initialize third-party dependencies."""
 
-load("//third_party/pybind11:workspace.bzl", pybind11 = "deps")
-load("//third_party/pybind11_abseil:workspace.bzl", pybind11_abseil = "deps")
-load("//third_party/pybind11_protobuf:workspace.bzl", pybind11_protobuf = "deps")
+load("//oss_third_party/pybind11:workspace.bzl", pybind11 = "deps")
+load("//oss_third_party/pybind11_abseil:workspace.bzl", pybind11_abseil = "deps")
+load("//oss_third_party/pybind11_protobuf:workspace.bzl", pybind11_protobuf = "deps")
 
 def load_dependencies(exclude_repo = []):
     """Initialize our third-party dependencies of PYDF.
