@@ -5,9 +5,6 @@ build:
   tools:
     python: "3.10"
 
-sphinx:
-  configuration: documentation/rtd/conf.py
-
 python:
   install:
     - requirements: documentation/public/requirements.txt
