@@ -180,6 +180,9 @@ def cc_log_context():
       # This is a Google Colab
       return Capture()
     except ImportError:
+      # Wurlitzer hangs when logs are shown directly.
+      if is_direct_output():
+        return _no_op_context()
       try:
         from wurlitzer import sys_pipes  # pytype: disable=import-error
 
