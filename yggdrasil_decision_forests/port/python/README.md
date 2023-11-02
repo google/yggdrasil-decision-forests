@@ -56,9 +56,8 @@ PYTHON_BIN=python3.9
 *   **What is the status of PYDF?** PYDF is currently in Alpha development. Some
     parts still work well (training models and generating predictions), others
     are yet to be added. The API surface may still change without notice.
-*   **Where is the documentation for PYDF?** We are still creating the 
-    PYDF-specifc documentation, it will be hosted on https://ydf.readthedocs.org
-    soon.
+*   **Where is the documentation for PYDF?** The documentation is
+    available on https://ydf.readthedocs.org.
 *   **How should I pronounce PYDF?** The preferred pronunciation is 
     "Py-dee-eff" / ˈpaɪˈdiˈɛf (IPA)
 
