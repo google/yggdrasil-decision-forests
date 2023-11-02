@@ -5,7 +5,7 @@ load("//third_party/protobuf:workspace.bzl", protobuf = "deps")
 load("//third_party/zlib:workspace.bzl", zlib = "deps")
 load("//third_party/tensorflow:workspace.bzl", tensorflow = "deps")
 load("//third_party/farmhash:workspace.bzl", farmhash = "deps")
-load("//third_party/boost:workspace.bzl", boost = "deps")
+load("//third_party/boost_math:workspace.bzl", boost_math = "deps")
 load("//third_party/grpc:workspace.bzl", grpc = "deps")
 load("//third_party/rapidjson:workspace.bzl", rapidjson = "deps")
 load("//third_party/eigen3:workspace.bzl", eigen = "deps")
@@ -29,8 +29,8 @@ def load_dependencies(repo_name = "", exclude_repo = []):
     if "farmhash" not in exclude_repo:
         farmhash(prefix = repo_name)
 
-    if "boost" not in exclude_repo:
-        boost(prefix = repo_name)
+    if "boost_math" not in exclude_repo:
+        boost_math()
 
     if "grpc" not in exclude_repo:
         grpc()
