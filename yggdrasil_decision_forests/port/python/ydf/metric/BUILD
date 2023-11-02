@@ -31,8 +31,8 @@ pybind_library(
     srcs = ["metric.cc"],
     hdrs = ["metric.h"],
     deps = [
+        "//ydf/utils:status_casters",
         "@com_google_absl//absl/status:statusor",
-        "@com_google_pybind11_abseil//pybind11_abseil:status_casters",
         "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/metric:report",

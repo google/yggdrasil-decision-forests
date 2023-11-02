@@ -25,13 +25,13 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
-#include "pybind11_abseil/status_casters.h"
 #include "pybind11_protobuf/native_proto_caster.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "ydf/model/model_wrapper.h"
+#include "ydf/utils/status_casters.h"
 #include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
@@ -58,33 +58,36 @@ absl::StatusOr<std::string> ModelAnalysisCreateHtmlReport(
 }  // namespace
 
 void init_model(py::module_& m) {
-  m.def("LoadModel", LoadModel, py::arg("directory"), py::arg("file_prefix"));
-  m.def("ModelAnalysisCreateHtmlReport", ModelAnalysisCreateHtmlReport,
-        py::arg("analysis"), py::arg("options"));
+  m.def("LoadModel", WithStatusOr(LoadModel), py::arg("directory"),
+        py::arg("file_prefix"));
+  m.def("ModelAnalysisCreateHtmlReport",
+        WithStatusOr(ModelAnalysisCreateHtmlReport), py::arg("analysis"),
+        py::arg("options"));
   py::class_<GenericCCModel>(m, "GenericCCModel")
       .def("__repr__",
            [](const GenericCCModel& a) {
              return absl::Substitute("<model_cc.GenericCCModel of type $0.",
                                      a.name());
            })
-      .def("Predict", &GenericCCModel::Predict, py::arg("dataset"))
-      .def("Evaluate", &GenericCCModel::Evaluate, py::arg("dataset"),
-           py::arg("options"))
-      .def("Analyze", &GenericCCModel::Analyze, py::arg("dataset"),
-           py::arg("options"))
-      .def("Save", &GenericCCModel::Save, py::arg("directory"),
-           py::arg("file_prefix"))
+      .def("Predict", WithStatusOr(&GenericCCModel::Predict),
+           py::arg("dataset"))
+      .def("Evaluate", WithStatusOr(&GenericCCModel::Evaluate),
+           py::arg("dataset"), py::arg("options"))
+      .def("Analyze", WithStatusOr(&GenericCCModel::Analyze),
+           py::arg("dataset"), py::arg("options"))
+      .def("Save", WithStatus(&GenericCCModel::Save),
+           py::arg("directory"), py::arg("file_prefix"))
       .def("name", &GenericCCModel::name)
       .def("task", &GenericCCModel::task)
       .def("data_spec", &GenericCCModel::data_spec)
-      .def("Describe", &GenericCCModel::Describe, py::arg("full_details"),
-           py::arg("text_format"))
+      .def("Describe", WithStatusOr(&GenericCCModel::Describe),
+           py::arg("full_details"), py::arg("text_format"))
       .def("input_features", &GenericCCModel::input_features)
       .def("hyperparameter_optimizer_logs",
            &GenericCCModel::hyperparameter_optimizer_logs)
-      .def("Benchmark", &GenericCCModel::Benchmark, py::arg("dataset"),
-           py::arg("benchmark_duration"), py::arg("warmup_duration"),
-           py::arg("batch_size"));
+      .def("Benchmark", WithStatusOr(&GenericCCModel::Benchmark),
+           py::arg("dataset"), py::arg("benchmark_duration"),
+           py::arg("warmup_duration"), py::arg("batch_size"));
 
   py::class_<BenchmarkInferenceCCResult>(m, "BenchmarkInferenceCCResult")
       .def_readwrite("duration_per_example",
@@ -113,9 +116,11 @@ void init_model(py::module_& m) {
                  "<model_cc.DecisionForestCCModel of type $0.", a.name());
            })
       .def("num_trees", &DecisionForestCCModel::num_trees)
-      .def("PredictLeaves", &DecisionForestCCModel::PredictLeaves)
-      .def("Distance", &DecisionForestCCModel::Distance, py::arg("dataset1"),
-           py::arg("dataset2"));
+      .def("PredictLeaves",
+           WithStatusOr(&DecisionForestCCModel::PredictLeaves),
+           py::arg("dataset"))
+      .def("Distance", WithStatusOr(&DecisionForestCCModel::Distance),
+           py::arg("dataset1"), py::arg("dataset2"));
 
   py::class_<RandomForestCCModel,
              /*parent class*/ DecisionForestCCModel>(m, "RandomForestCCModel")

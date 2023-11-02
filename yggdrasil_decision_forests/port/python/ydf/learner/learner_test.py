@@ -25,7 +25,6 @@ from absl.testing import parameterized
 import numpy as np
 import pandas as pd
 
-from pybind11_abseil import status
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
@@ -438,7 +437,7 @@ class CARTLearnerTest(LearnerTest):
     )
     ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
     with self.assertRaisesRegex(
-        status.StatusNotOk,
+        test_utils.AbslInvalidArgumentError,
         "The learner CART does not support monotonic constraints",
     ):
       _ = learner.train(ds)
@@ -478,7 +477,7 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     )
     ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
     with self.assertRaisesRegex(
-        status.StatusNotOk,
+        test_utils.AbslInvalidArgumentError,
         "Gradient Boosted Trees does not support monotonic constraints with"
         " use_hessian_gain=false",
     ):

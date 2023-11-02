@@ -23,7 +23,6 @@ from absl.testing import absltest
 import numpy as np
 import pandas as pd
 
-from pybind11_abseil import status
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model import random_forest_model

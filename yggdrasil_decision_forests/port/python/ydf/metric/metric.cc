@@ -18,10 +18,10 @@
 #include <string>
 
 #include "absl/status/statusor.h"
-#include "pybind11_abseil/status_casters.h"
 #include "pybind11_protobuf/native_proto_caster.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/report.h"
+#include "ydf/utils/status_casters.h"
 
 namespace py = ::pybind11;
 
@@ -49,8 +49,10 @@ absl::StatusOr<std::string> EvaluationPlotToHtml(
 }  // namespace
 
 void init_metric(py::module_& m) {
-  m.def("EvaluationToStr", EvaluationToStr, py::arg("evaluation"));
-  m.def("EvaluationPlotToHtml", EvaluationPlotToHtml, py::arg("evaluation"));
+  m.def("EvaluationToStr", WithStatusOr(EvaluationToStr),
+        py::arg("evaluation"));
+  m.def("EvaluationPlotToHtml", WithStatusOr(EvaluationPlotToHtml),
+        py::arg("evaluation"));
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

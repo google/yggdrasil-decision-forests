@@ -121,12 +121,6 @@ function assemble_files() {
 
   # Add __init__.py to all exported Yggdrasil sub-directories.
   find ${SRCPK}/yggdrasil_decision_forests -type d -exec touch {}/__init__.py \;
-
-  # Absl status wrapper
-  ABSLSRCBIN="bazel-bin/external/com_google_pybind11_abseil/pybind11_abseil"
-  mkdir -p ${SRCPK}/pybind11_abseil
-  touch ${SRCPK}/pybind11_abseil/__init__.py
-  cp ${ABSLSRCBIN}/status.so ${SRCPK}/pybind11_abseil
 }
 
 # Build a pip package.

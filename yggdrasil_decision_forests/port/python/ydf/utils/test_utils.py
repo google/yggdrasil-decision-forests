@@ -18,7 +18,6 @@ import logging
 import os
 from absl import flags
 from absl.testing import absltest
-from pybind11_abseil import status
 
 
 def data_root_path() -> str:
@@ -45,7 +44,7 @@ def pydf_test_data_path() -> str:
 
 
 # Exception raised in python when the c++ raises an invalid argument error
-AbslInvalidArgumentError = (status.StatusNotOk, RuntimeError)
+AbslInvalidArgumentError = (ValueError, RuntimeError)
 
 
 def golden_check_string(

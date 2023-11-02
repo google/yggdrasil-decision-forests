@@ -16,7 +16,6 @@
 
 #include <pybind11/pybind11.h>
 
-#include "pybind11_abseil/import_status_module.h"
 #include "pybind11_protobuf/native_proto_caster.h"
 #include "ydf/dataset/dataset.h"
 #include "ydf/learner/learner.h"
@@ -30,7 +29,6 @@ namespace yggdrasil_decision_forests::port::python {
 
 PYBIND11_MODULE(ydf, m) {
   pybind11_protobuf::ImportNativeProtoCasters();
-  py::google::ImportStatusModule();
   m.doc() =
       "Wrappers for Yggdrasil Decision Forests, a library for training, "
       "serving, analyzing and evaluating decision forest models.";

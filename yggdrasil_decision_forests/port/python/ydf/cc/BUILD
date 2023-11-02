@@ -17,8 +17,6 @@ pybind_extension(
         "//ydf/metric:metric_cc",
         "//ydf/model:model_cc",
         "//ydf/utils:log_cc",
-        "@com_google_pybind11_abseil//pybind11_abseil:import_status_module",
-        "@com_google_pybind11_abseil//pybind11_abseil:status_casters",
         "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
     ],
 )

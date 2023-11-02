@@ -28,12 +28,9 @@ py_library(
     name = "test_utils",
     testonly = True,
     srcs = ["test_utils.py"],
-    data = [
+    deps = [
         # absl/flags dep,
         # absl/testing:absltest dep,
-        "@com_google_pybind11_abseil//pybind11_abseil:status.so",
-    ],
-    deps = [
     ],
 )
 
@@ -51,6 +48,15 @@ pybind_library(
     srcs = ["log.cc"],
     hdrs = ["log.h"],
     deps = ["@ydf_cc//yggdrasil_decision_forests/utils:logging"],
+)
+
+pybind_library(
+    name = "status_casters",
+    hdrs = ["status_casters.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+    ],
 )
 
 # Tests

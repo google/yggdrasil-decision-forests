@@ -69,13 +69,6 @@ s.copy(f"{SRC_BIN}/cc/ydf.so", f"{DST_PK}/ydf/cc/ydf.{DST_EXTENSION}")
 os.makedirs(f"{DST_PK}/ydf/learner")
 s.copy(f"{SRC_BIN}/learner/specialized_learners.py", f"{DST_PK}/ydf/learner")
 
-# Absl compiled lib
-os.makedirs(f"{DST_PK}/pybind11_abseil")
-s.copy(
-    "bazel-bin/external/com_google_pybind11_abseil/pybind11_abseil/status.so",
-    f"{DST_PK}/pybind11_abseil/status.{DST_EXTENSION}",
-)
-
 # The YDF protos
 rec_glob_copy(
     "bazel-bin/external/ydf_cc/yggdrasil_decision_forests",

@@ -61,9 +61,9 @@ pybind_library(
     hdrs = ["model.h"],
     deps = [
         ":model_wrapper",
+        "//ydf/utils:status_casters",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_pybind11_abseil//pybind11_abseil:status_casters",
         "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model:model_library",
@@ -163,15 +163,15 @@ py_test(
     data = [
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
-        # absl/testing:absltest dep,
-        # numpy dep,
-        # pandas dep,
     ],
     python_version = "PY3",
     deps = [
         ":generic_model",
         ":model_lib",
         ":random_forest_model",
+        # absl/testing:absltest dep,
+        # numpy dep,
+        # pandas dep,
         "//ydf/utils:test_utils",
     ],
 )
