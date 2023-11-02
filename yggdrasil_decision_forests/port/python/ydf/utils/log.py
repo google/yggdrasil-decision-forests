@@ -21,7 +21,7 @@ For the library developer:
 
 For the user:
 
-  The logs are controled  globally with "ydf.verbose()".
+  The logs are controlled globally with "ydf.verbose()".
 
 Compatibility
 
@@ -75,6 +75,11 @@ def verbose(level: int) -> int:
   old = _VERBOSE_LEVEL
   _VERBOSE_LEVEL = level
   return old
+
+
+def current_log_level() -> int:
+  """Returns the log level currently set."""
+  return _VERBOSE_LEVEL
 
 
 def info(msg: str, *args: Any) -> None:

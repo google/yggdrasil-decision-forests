@@ -83,6 +83,7 @@ py_library(
         ":template_cpp_export",
         # absl/logging dep,
         # numpy dep,
+        # tensorflow_decision_forests dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
@@ -172,6 +173,27 @@ py_test(
         # absl/testing:absltest dep,
         # numpy dep,
         # pandas dep,
+        "//ydf/utils:test_utils",
+    ],
+)
+
+py_test(
+    name = "tf_model_test",
+    srcs = ["tf_model_test.py"],
+    data = [
+        "//test_data",
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
+    ],
+    python_version = "PY3",
+    # TODO: This test fails in OSS due to a package name clash on yggdrasil_decision_forests.
+    tags = ["manual"],
+    deps = [
+        ":model_lib",
+        # absl/testing:absltest dep,
+        # numpy dep,
+        # pandas dep,
+        # tensorflow dep,
+        # tensorflow_decision_forests dep,
         "//ydf/utils:test_utils",
     ],
 )

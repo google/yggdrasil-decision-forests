@@ -21,6 +21,7 @@ import textwrap
 
 from absl.testing import absltest
 import numpy as np
+import numpy.testing as npt
 import pandas as pd
 
 from ydf.model import generic_model
@@ -53,7 +54,7 @@ class DecisionForestModelTest(absltest.TestCase):
     predictions_df = pd.read_csv(predictions_path)
 
     expected_predictions = predictions_df[">50K"].to_numpy()
-    np.testing.assert_almost_equal(predictions, expected_predictions, decimal=5)
+    npt.assert_almost_equal(predictions, expected_predictions, decimal=5)
 
   def test_predict_adult_gbt(self):
     model_path = os.path.join(
@@ -77,7 +78,7 @@ class DecisionForestModelTest(absltest.TestCase):
     predictions_df = pd.read_csv(predictions_path)
 
     expected_predictions = predictions_df[">50K"].to_numpy()
-    np.testing.assert_almost_equal(predictions, expected_predictions, decimal=5)
+    npt.assert_almost_equal(predictions, expected_predictions, decimal=5)
 
   def test_evaluate_adult_gbt(self):
     model_path = os.path.join(

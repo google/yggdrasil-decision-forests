@@ -16,7 +16,8 @@
 
 import dataclasses
 import os
-from typing import Literal, Optional, TypeVar, Union
+import tempfile
+from typing import Any, Literal, Optional, TypeVar, Union
 
 from absl import logging
 import numpy as np
@@ -172,10 +173,8 @@ Use `model.describe()` for more details
     https://ydf.readthedocs.io/en/latest/convert_model.html for more information
     about the YDF model format.
 
-    YDF models can also be exported to other formats, see the methods under
-    `export` for details.
-
-    TODO: Implement model exports and update this description.
+    YDF models can also be exported to other formats, see
+    `to_tensorflow_saved_model()` and `to_cpp()` for details
 
     Usage example:
 
@@ -397,7 +396,7 @@ Use `model.describe()` for more details
       input features with placeholder values. Therefore, you will want to add
       your input as arguments to the "Predict" function, and use it to populate
       the "examples->Set..." section accordingly.
-    5. (Bonus) You can further optimize the inference speed by pre-allocating 
+    5. (Bonus) You can further optimize the inference speed by pre-allocating
       and re-using the examples and predictions for each thread running the
       model.
 
@@ -406,10 +405,81 @@ Use `model.describe()` for more details
 
     Args:
       key: Name of the model. Used to define the c++ namespace of the model.
+
+    Returns:
+      String containing an example header for running the model in C++.
     """
     return template_cpp_export.template(
         key, self._model.data_spec(), self._model.input_features()
     )
+
+  def to_tensorflow_saved_model(
+      self, path: str, input_model_signature_fn: Any = None
+  ) -> None:
+    """Exports the model as a TensorFlow Saved model.
+
+    The generated model is a Tensorflow SavedModel that requires the TensorFlow
+    Decision Forests custom ops. It is compatible with TF Serving and
+    Tensorflow.js, but it may not be compatible with other TensorFlow libraries.
+    The signature of the resulting model is determined automatically based on
+    the dataspec of the model unless given by `input_model_signature_fn`.
+
+    Requires Tensorflow Decision Forests to be installed.
+
+    Usage example:
+
+    ```python
+    !pip install tensorflow_decision_forests
+    import tensorflow as tf
+    import tensorflow_decision_forests as tfdf
+    import ydf
+    import pandas as pd
+
+    path_to_tfdf_model = '/path/to/tfdfmodel'
+    # `model` is a model trained with ydf.
+    model.to_tensorflow_saved_model(path=path_to_tfdf_model)
+
+    # Load the dataset and convert to TensorFlow
+    test_df = pd.read_csv(test_dataset_path)
+    tf_test = tfdf.keras.pd_dataframe_to_tf_dataset(test_df, "Rings")
+
+    # Load the model with TF-DF.
+    tf_model = tf.keras.models.load_model(path_to_tfdf_model)
+    # Run predictions with TF-DF
+    tfdf_predictions = tf_model.predict(tf_test)
+    ```
+
+    Args:
+      path: Path to store the Tensorflow Decision Forests model.
+      input_model_signature_fn: A lambda that returns the
+        (Dense,Sparse,Ragged)TensorSpec (or structure of TensorSpec e.g.
+        dictionary, list) corresponding to input signature of the model. If not
+        specified, the input model signature is created by
+        `tfdf.keras.build_default_input_model_signature`. For example, specify
+        `input_model_signature_fn` if an numerical input feature (which is
+        consumed as DenseTensorSpec(float32) by default) will be feed
+        differently (e.g. RaggedTensor(int64)).
+    """
+    try:
+      import tensorflow_decision_forests as tfdf  # pylint:disable-import-not-at-top
+    except ImportError as exc:
+      raise ValueError(
+          "Exporting to tensorflow requires the tensorflow_decision_forests"
+          " package to be installed. When using pip, run `pip install"
+          " tensorflow_decision_forests`"
+      ) from exc
+    # Do not pass input_model_signature_fn if it is None.
+    not_none_params = {}
+    if input_model_signature_fn is not None:
+      not_none_params["input_model_signature_fn"] = input_model_signature_fn
+    with tempfile.TemporaryDirectory() as tmpdirname:
+      self.save(tmpdirname)
+      tfdf.keras.yggdrasil_model_to_keras_model(
+          src_path=tmpdirname,
+          dst_path=path,
+          verbose=log.current_log_level(),
+          **not_none_params,
+      )
 
   def hyperparameter_optimizer_logs(
       self,
