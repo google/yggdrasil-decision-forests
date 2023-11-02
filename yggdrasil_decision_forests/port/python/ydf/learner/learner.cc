@@ -130,10 +130,10 @@ class GenericCCLearner {
           std::reference_wrapper<const dataset::VerticalDataset>>
           validation_dataset = std::nullopt) const {
     EnableUserInterruption();
-    ASSIGN_OR_RETURN(auto model,
-                     learner_->TrainWithStatus(dataset, validation_dataset));
+    auto model = learner_->TrainWithStatus(dataset, validation_dataset);
     DisableUserInterruption();
-    return CreateCCModel(std::move(model));
+    RETURN_IF_ERROR(model.status());
+    return CreateCCModel(std::move(*model));
   }
 
   absl::StatusOr<std::unique_ptr<GenericCCModel>> TrainFromPathWithDataSpec(
@@ -149,11 +149,11 @@ class GenericCCLearner {
                        dataset::GetTypedPath(validation_dataset_path.value()));
     }
     EnableUserInterruption();
-    ASSIGN_OR_RETURN(auto model,
-                     learner_->TrainWithStatus(typed_dataset_path, data_spec,
-                                               typed_valid_path));
+    auto model = learner_->TrainWithStatus(typed_dataset_path, data_spec,
+                                           typed_valid_path);
     DisableUserInterruption();
-    return CreateCCModel(std::move(model));
+    RETURN_IF_ERROR(model.status());
+    return CreateCCModel(std::move(*model));
   }
 
   absl::StatusOr<std::unique_ptr<GenericCCModel>> TrainFromPathWithGuide(
