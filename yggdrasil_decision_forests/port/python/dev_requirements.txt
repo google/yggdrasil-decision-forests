@@ -1,4 +1,3 @@
 pandas
-matplotlib
-tensorflow
 tensorflow_decision_forests
+tensorflow

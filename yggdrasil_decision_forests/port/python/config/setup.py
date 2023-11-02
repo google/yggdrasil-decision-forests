@@ -32,7 +32,7 @@ REQUIRED_PACKAGES = [
     "protobuf>=3.14",
 ]
 
-OPTIONAL_PACKAGES = {"pandas": ["pandas"], "matplotlib": ["matplotlib"]}
+OPTIONAL_PACKAGES = {"pandas": ["pandas"]}
 
 
 class InstallPlatlib(install):

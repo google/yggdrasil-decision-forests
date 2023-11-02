@@ -1,20 +1,29 @@
 # Changelog
 
-## Head
+## 0.0.4 - 2023-11-01
 
 ### Features
 
+-   New documentation launched!
 -   Add support for ranking tasks
--   Add support for reading from path, supporting multiple data types (csv, 
-    tfrecord, ...)
+-   Add support for reading from path, supporting multiple data types (csv, ...)
+-   Improved model descriptions
+-   Add support for resuming training
+-   Add export to Tensorflow
+-   Control logging verbosity
+-   Add `model.distance(...)` to compute pairwise distance between examples.
+-   Expose data spec on the model
+-   Support for monotonic constraints
+-   Simple training benchmark
+
+### Fix
+
+-   Remove pybind11_abseil to avoid clashes with other libraries such as 
+    Tensorflow.
 
 #### Release music
 
 Rhapsody in Blue. George Gershwin
-
-### Features
-
--   Add `model.distance(...)` to compute pairwise distance between examples.
 
 ## 0.0.3 - 2023-10-20
 

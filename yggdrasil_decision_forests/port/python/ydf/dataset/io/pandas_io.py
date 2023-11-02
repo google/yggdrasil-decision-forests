@@ -30,7 +30,7 @@ def import_pd():
   except ImportError:
     logging.warning(
         "Importing data from pandas dataframes requires pandas to be installed."
-        " Install Pandas with pip using `pip install temporian[pandas]` or"
+        " Install Pandas with pip using `pip install ydf[pandas]` or"
         " `pip install pandas`."
     )
     raise
