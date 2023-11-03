@@ -28,7 +28,7 @@ For more information on the design of YDF, please see our paper in KDD 2023:
 
 -   A simple API for training, evaluation and serving of decision forests
     models.
--   Support Random Forest, Gradient Boosted Trees and Carts, and advanced
+-   Supports Random Forest, Gradient Boosted Trees and Carts, and advanced
     learning algorithm such as oblique splits, honest trees, hessian and
     non-hessian scores, and global tree optimizations.
 -   Train classification, regression, ranking, and uplifting models.
@@ -88,8 +88,9 @@ model.save("/tmp/my_model")
 Check the
 [Getting Started tutorial 🧭](tutorial/getting_started.ipynb).
 Then, explore the other tutorials on the left depending on your interests. For
-example, if you are going to rank things, check the [ranking]() tutorial.
+example, if you are going to rank things, check the
+[ranking](tutorial/ranking.ipynb) tutorial.
 
 ## License
 
-[Apache License 2.0](../../LICENSE)
+[Apache License 2.0](LICENSE)

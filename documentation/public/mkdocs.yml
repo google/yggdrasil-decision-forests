@@ -1,7 +1,7 @@
 site_name: Yggdrasil Decision Forests
 site_url: https://ydf.readthedocs.io/
 site_description: "Yggdrasil Decision Forests is a production-grade collection of algorithms for the training, serving, and interpretation of decision forest models available in python, c++, go, and javascript."
-repo_url: https://https://github.com/google/yggdrasil-decision-forests
+repo_url: https://github.com/google/yggdrasil-decision-forests
 repo_name: google/yggdrasil-decision-forests
 
 theme:
@@ -42,7 +42,7 @@ nav:
   - API Reference 🐜: py_api/index.md
   - FAQ 🗨️: faq.md
   - Glossary 📙: glossary.md
-  - Guide:
+  - Guides:
     - Decision Forest class 🔗: https://developers.google.com/machine-learning/decision-forests
     - How to improve a model 🃏: guide_how_to_improve_model.md 
   - Task:
@@ -54,7 +54,7 @@ nav:
     - numerical: tutorial/numerical_feature.ipynb
     - categorical: tutorial/categorical_feature.ipynb
     - monotonic: tutorial/monotonic_feature.ipynb
-    # TODO: Add numerical, categorical, boolean, and text
+    # TODO: Add boolean, and text
   - Dataset:
     - Pandas: tutorial/pandas.ipynb
     # TODO: Add Dictionary, CSV, TF Dataset, TFRecord

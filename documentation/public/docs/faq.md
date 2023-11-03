@@ -22,6 +22,7 @@ code should use YDF.
 YDF was created and continues to be developed by Google engineers in Switzerland.
 
 Some milestones of YDF's development:
+
 -   2017: Creation as an experimental library in Google Research
 -   2018: Move to production as C++ API and CLI interface. YDF models are called
     tens of millions of times every second.
@@ -44,26 +45,32 @@ internally. As a consequence, TF-DF is slower, bigger and less flexible than
 YDF's Python API.
 
 Note that the YDF Python API may still see minor changes while in development.
-The model format and Serving APIs have been stable since 2018
+The model format and Serving APIs have been stable since 2018, see 
+[Long term support](lts.md).
 
-### Can I still use TF-DF?
+### What is the status of TF-DF?  Can I still use TF-DF?
 
-Yes. TF-DF is a production-grade library, supported and deployed in many 
-products.
+TF-DF is a production-grade library, supported and deployed in many products.
+It can still be used and it is actively maintained by the YDF team. However, we
+believe that the pure Python API is a better fit for the majority of use cases
+(see comparison below).
 
 ### Is it PYDF or YDF?
+
 The name of the library is simply ydf, and so is the
 name of the corresponding Pip package. Internally, the team sometimes uses
 the name *PYDF* because it fits so well.
 
-### What is the status of PYDF? 
-PYDF is currently in active development. Some parts still work well (training
-models, generating predictions, model analysis and evaluation, model loading, 
-saving and exporting), others (distributed training, model editing) are yet to 
-be added. 
+### What is the status of the Python API?
+
+YDF's Python API is currently in active development. Some parts work well
+(training models, generating predictions, model analysis and evaluation, model
+loading, saving and exporting), others (distributed training, model editing) are
+yet to be added. 
 
 Note that the YDF Python API may still see minor changes while in development.
-The model format and Serving APIs have been stable since 2018
+The model format and Serving APIs have been stable since 2018, see 
+[Long term support](lts.md).
 
 ### How are YDF and TF-DF different?
 
@@ -118,6 +125,13 @@ in KDD 2023 for a comparison of model performances trained with different
 libraries.
 
 ### How should I pronounce PYDF?
+
 The preferred pronunciation is "Py-dee-eff" / ˈpaɪˈdiˈɛf (IPA). But since it
 is an internal name, you really don't have to pronounce it at all.
+
+### I have an important question that has not been answered by this FAQ!
+
+You can raise issues with YDF on
+[Github](https://github.com/google/yggdrasil-decision-forests/issues). 
+You can also contact the core development team at [decision-forests-contact@google.com](mailto:decision-forests-contact@google.com).
 

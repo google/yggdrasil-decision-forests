@@ -84,5 +84,3 @@ INIT_FILENAME = "__init__.py"
 for path, _, files in os.walk(f"{DST_PK}/yggdrasil_decision_forests"):
   if INIT_FILENAME not in files:
     Path(f"{path}/{INIT_FILENAME}").touch()
-
-Path(f"{DST_PK}/pybind11_abseil/{INIT_FILENAME}").touch()
