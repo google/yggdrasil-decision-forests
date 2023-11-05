@@ -362,7 +362,7 @@ def create_vertical_dataset_from_dict_of_values(
       if column_spec.name not in data:
         raise ValueError(
             f"The data spec expects columns {column_spec.name} which was not"
-            f" found in the data. Available columns: {data.keys()}"
+            f" found in the data. Available columns: {list(data)}"
         )
       normalized_columns.append(
           dataspec.Column(

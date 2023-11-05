@@ -112,6 +112,10 @@ class GenericCCModel {
     return model_->data_spec();
   }
 
+  void set_data_spec(const dataset::proto::DataSpecification& data_spec) {
+    *model_->mutable_data_spec() = data_spec;
+  }
+
   const std::optional<model::proto::HyperparametersOptimizerLogs>&
   hyperparameter_optimizer_logs() const {
     return model_->hyperparameter_optimizer_logs();

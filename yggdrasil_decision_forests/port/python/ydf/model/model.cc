@@ -80,6 +80,8 @@ void init_model(py::module_& m) {
       .def("name", &GenericCCModel::name)
       .def("task", &GenericCCModel::task)
       .def("data_spec", &GenericCCModel::data_spec)
+      .def("set_data_spec", &GenericCCModel::set_data_spec,
+           py::arg("data_spec"))
       .def("Describe", WithStatusOr(&GenericCCModel::Describe),
            py::arg("full_details"), py::arg("text_format"))
       .def("input_features", &GenericCCModel::input_features)
