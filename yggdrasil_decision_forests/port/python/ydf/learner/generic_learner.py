@@ -501,7 +501,7 @@ class GenericLearner:
       logging.warning("Cannot determine the number of CPUs. Set num_threads=6")
       num_threads = 6
     else:
-      if num_threads >= 32:
+      if num_threads > 32:
         logging.warning(
             "The `num_threads` constructor argument is not set and the "
             "number of CPU is os.cpu_count()=%d > 32. Setting num_threads "
