@@ -23,6 +23,7 @@ from absl import logging
 from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
+import numpy.testing as npt
 import pandas as pd
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
@@ -601,6 +602,23 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     model = learner.train(train_path)
     evaluation = model.evaluate(test_path)
     self.assertAlmostEqual(evaluation.ndcg, 0.71, places=1)
+
+  def test_predict_iris(self):
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "iris.csv"
+    )
+    ds = pd.read_csv(dataset_path)
+    model = specialized_learners.RandomForestLearner(label="class").train(ds)
+
+    predictions = model.predict(ds)
+
+    self.assertEqual(predictions.shape, (ds.shape[0], 3))
+
+    row_sums = np.sum(predictions, axis=1)
+    # Make sure a multi-dimensional prediction always (mostly) sums to 1.
+    npt.assert_array_almost_equal(
+        row_sums, np.ones(predictions.shape[0]), decimal=5
+    )
 
 
 class LoggingTest(parameterized.TestCase):

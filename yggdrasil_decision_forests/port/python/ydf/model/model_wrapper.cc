@@ -75,6 +75,8 @@ absl::StatusOr<const serving::FastEngine*> GenericCCModel::GetEngine() {
 absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
     const dataset::VerticalDataset& dataset) {
   py::array_t<float, py::array::c_style | py::array::forcecast> predictions;
+  static_assert(predictions.itemsize() == sizeof(float),
+                "A C++ float should have the same size as a numpy float");
 
   ASSIGN_OR_RETURN(const auto* engine, GetEngine());
 
@@ -86,12 +88,8 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
   constexpr int64_t kMaxBatchSize = 100;
   const int64_t batch_size = std::min(kMaxBatchSize, total_num_examples);
   auto batch_of_examples = engine->AllocateExamples(batch_size);
+  predictions.resize({total_num_examples * num_prediction_dimensions});
 
-  if (num_prediction_dimensions == 1) {
-    predictions.resize({total_num_examples});
-  } else {
-    predictions.resize({total_num_examples, num_prediction_dimensions});
-  }
   auto unchecked_predictions = predictions.mutable_unchecked();
 
   const int64_t num_batches =
@@ -112,8 +110,12 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
     const int64_t np_array_begin =
         begin_example_idx * num_prediction_dimensions;
     std::memcpy(unchecked_predictions.mutable_data(np_array_begin),
-                &batch_of_predictions[0],
+                batch_of_predictions.data(),
                 batch_of_predictions.size() * sizeof(float));
+  }
+  if (num_prediction_dimensions > 1) {
+    predictions =
+        predictions.reshape({total_num_examples, num_prediction_dimensions});
   }
   return predictions;
 }
