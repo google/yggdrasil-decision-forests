@@ -56,7 +56,7 @@ class DecisionForestModel(generic_model.GenericModel):
   def distance(
       self,
       data1: dataset.InputDataset,
-      data2: Optional[dataset.InputDataset],
+      data2: Optional[dataset.InputDataset] = None,
   ) -> np.ndarray:
     """Computes the pairwise distance between examples in "data1" and "data2".
 
@@ -102,7 +102,7 @@ class DecisionForestModel(generic_model.GenericModel):
     ds1 = dataset.create_vertical_dataset(
         data1, data_spec=self._model.data_spec()
     )
-    if data1 is None:
+    if data2 is None:
       ds2 = ds1
     else:
       ds2 = dataset.create_vertical_dataset(

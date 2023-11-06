@@ -64,8 +64,9 @@ nav:
   - Serving:
     - C++: tutorial/cpp.ipynb
     # TODO: Add Benchmarking, C++, Go, Cli, Python, F Serving, and Js
-  # - Advanced:
-  #   - todo # TODO: Add example proximity, model inspection, manual tree creation, custom loss.
+  - Advanced:
+    - example distance: tutorial/example_distance.ipynb
+    # TODO: model inspection, manual tree creation, custom loss.
   - Other APIs:
     - TensorFlow Decision Forests 🔗: https://www.tensorflow.org/decision_forests
     - cli quickstart: cli_quickstart.md
