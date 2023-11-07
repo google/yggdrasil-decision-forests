@@ -6,6 +6,8 @@
 
 ::: ydf.Column
 
+::: ydf.start_worker
+
 <!-- ::: ydf.Task -->
 
 ::: ydf.Semantic

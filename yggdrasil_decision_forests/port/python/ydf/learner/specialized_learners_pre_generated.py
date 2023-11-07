@@ -30,7 +30,7 @@ included for reference only. The actual wrappers are re-generated during
 compilation.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Sequence
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
@@ -340,6 +340,9 @@ class RandomForestLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    workers: If set, enable distributed training. "workers" is the list of IP
+      addresses of the workers. A worker is a process running
+      `ydf.start_worker(port)`.
   """
 
   def __init__(
@@ -401,6 +404,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      workers: Optional[Sequence[str]] = None,
   ):
     hyper_parameters = {
         "adapt_bootstrap_size_ratio_for_maximum_training_duration": (
@@ -473,6 +477,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
         resume_training=resume_training,
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
+        workers=workers,
     )
 
     super().__init__(
@@ -661,6 +666,9 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    workers: If set, enable distributed training. "workers" is the list of IP
+      addresses of the workers. A worker is a process running
+      `ydf.start_worker(port)`.
   """
 
   def __init__(
@@ -686,6 +694,7 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      workers: Optional[Sequence[str]] = None,
   ):
     hyper_parameters = {
         "maximum_model_size_in_memory_in_bytes": (
@@ -710,6 +719,7 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
         resume_training=resume_training,
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
+        workers=workers,
     )
 
     super().__init__(
@@ -1115,6 +1125,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    workers: If set, enable distributed training. "workers" is the list of IP
+      addresses of the workers. A worker is a process running
+      `ydf.start_worker(port)`.
   """
 
   def __init__(
@@ -1190,6 +1203,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      workers: Optional[Sequence[str]] = None,
   ):
     hyper_parameters = {
         "adapt_subsample_for_maximum_training_duration": (
@@ -1280,6 +1294,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         resume_training=resume_training,
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
+        workers=workers,
     )
 
     super().__init__(
@@ -1356,6 +1371,283 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
             },
         ),
     }
+
+
+class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
+  r"""Distributed Gradient Boosted Trees learning algorithm.
+
+  Exact distributed version of the Gradient Boosted Tree learning algorithm. See
+  the documentation of the non-distributed Gradient Boosted Tree learning
+  algorithm for an introduction to GBTs.
+
+  Usage example:
+
+  ```python
+  import ydf
+  import pandas as pd
+
+  dataset = pd.read_csv("project/dataset.csv")
+
+  model = ydf.DistributedGradientBoostedTreesLearner().train(dataset)
+
+  print(model.summary())
+  ```
+
+  Hyperparameters are configured to give reasonable results for typical
+  datasets. Hyperparameters can also be modified manually (see descriptions)
+  below or by applying the hyperparameter templates available with
+  `DistributedGradientBoostedTreesLearner.hyperparameter_templates()` (see this
+  function's documentation for
+  details).
+
+  Attributes:
+    label: Label of the dataset. The label column should not be identified as a
+      feature in the `features` parameter.
+    task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
+      Task.RANKING, Task.CATEGORICAL_UPLIFT, Task.NUMERICAL_UPLIFT).
+    weights: Name of a feature that identifies the weight of each example. If
+      weights are not specified, unit weights are assumed. The weight column
+      should not be identified as a feature in the `features` parameter.
+    ranking_group: Only for `task=Task.RANKING`. Name of a feature that
+      identifies queries in a query/document ranking task. The ranking group
+      should not be identified as a feature in the `features` parameter.
+    uplift_treatment: Only for `task=Task.CATEGORICAL_UPLIFT` and `task=Task`.
+      NUMERICAL_UPLIFT. Name of a numerical feature that identifies the
+      treatment in an uplift problem. The value 0 is reserved for the control
+      treatment. Currently, only 0/1 binary treatments are supported.
+    features: If None, all columns are used as features. The semantic of the
+      features is determined automatically. Otherwise, if
+      include_all_columns=False (default) only the column listed in `features`
+      are imported. If include_all_columns=True, all the columns are imported as
+      features and only the semantic of the columns NOT in `columns` is
+      determined automatically. If specified,  defines the order of the features
+      - any non-listed features are appended in-order after the specified
+      features (if include_all_columns=True). The label, weights, uplift
+      treatment and ranking_group columns should not be specified as features.
+    include_all_columns: See `features`.
+    max_vocab_count: Maximum size of the vocabulary of CATEGORICAL and
+      CATEGORICAL_SET columns stored as strings. If more unique values exist,
+      only the most frequent values are kept, and the remaining values are
+      considered as out-of-vocabulary.
+    min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
+      and CATEGORICAL_SET columns. Value observed less than
+      `min_vocab_frequency` are considered as out-of-vocabulary.
+    discretize_numerical_columns: If true, discretize all the numerical columns
+      before training. Discretized numerical columns are faster to train with,
+      but they can have a negative impact on the model quality. Using
+      `discretize_numerical_columns=True` is equivalent as setting the column
+      semantic DISCRETIZED_NUMERICAL in the `column` argument. See the
+      definition of DISCRETIZED_NUMERICAL for more details.
+    num_discretized_numerical_bins: Number of bins used when disretizing
+      numerical columns.
+    data_spec: Dataspec to be used (advanced). If a data spec is given,
+      `columns`, `include_all_columns`, `max_vocab_count`,
+      `min_vocab_frequency`, `discretize_numerical_columns` and
+      `num_discretized_numerical_bins` will be ignored.
+    apply_link_function: If true, applies the link function (a.k.a. activation
+      function), if any, before returning the model prediction. If false,
+      returns the pre-link function model output. For example, in the case of
+      binary classification, the pre-link function output is a logic while the
+      post-link function is a probability. Default: True.
+    force_numerical_discretization: If false, only the numerical column
+      safisfying "max_unique_values_for_discretized_numerical" will be
+      discretized. If true, all the numerical columns will be discretized.
+      Columns with more than "max_unique_values_for_discretized_numerical"
+      unique values will be approximated with
+      "max_unique_values_for_discretized_numerical" bins. This parameter will
+      impact the model training. Default: False.
+    max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
+      will be roots. Negative values are ignored. Default: 6.
+    max_unique_values_for_discretized_numerical: Maximum number of unique value
+      of a numerical feature to allow its pre-discretization. In case of large
+      datasets, discretized numerical features with a small number of unique
+      values are more efficient to learn than classical / non-discretized
+      numerical features. This parameter does not impact the final model.
+      However, it can speed-up or slown the training. Default: 16000.
+    maximum_model_size_in_memory_in_bytes: Limit the size of the model when
+      stored in ram. Different algorithms can enforce this limit differently.
+      Note that when models are compiled into an inference, the size of the
+      inference engine is generally much smaller than the original model.
+      Default: -1.0.
+    maximum_training_duration_seconds: Maximum training duration of the model
+      expressed in seconds. Each learning algorithm is free to use this
+      parameter at it sees fit. Enabling maximum training duration makes the
+      model training non-deterministic. Default: -1.0.
+    min_examples: Minimum number of examples in a node. Default: 5.
+    num_candidate_attributes: Number of unique valid attributes tested for each
+      node. An attribute is valid if it has at least a valid split. If
+      `num_candidate_attributes=0`, the value is set to the classical default
+      value for Random Forest: `sqrt(number of input attributes)` in case of
+      classification and `number_of_input_attributes / 3` in case of regression.
+      If `num_candidate_attributes=-1`, all the attributes are tested. Default:
+      -1.
+    num_candidate_attributes_ratio: Ratio of attributes tested at each node. If
+      set, it is equivalent to `num_candidate_attributes =
+      number_of_input_features x num_candidate_attributes_ratio`. The possible
+      values are between ]0, and 1] as well as -1. If not set or equal to -1,
+      the `num_candidate_attributes` is used. Default: -1.0.
+    num_trees: Maximum number of decision trees. The effective number of trained
+      tree can be smaller if early stopping is enabled. Default: 300.
+    pure_serving_model: Clear the model from any information that is not
+      required for model serving. This includes debugging, model interpretation
+      and other meta-data. The size of the serialized model can be reduced
+      significatively (50% model size reduction is common). This parameter has
+      no impact on the quality, serving speed or RAM usage of model serving.
+      Default: False.
+    random_seed: Random seed for the training of the model. Learners are
+      expected to be deterministic by the random seed. Default: 123456.
+    shrinkage: Coefficient applied to each tree prediction. A small value (0.02)
+      tends to give more accurate results (assuming enough trees are trained),
+      but results in larger models. Analogous to neural network learning rate.
+      Default: 0.1.
+    use_hessian_gain: Use true, uses a formulation of split gain with a hessian
+      term i.e. optimizes the splits to minimize the variance of "gradient /
+      hessian. Available for all losses except regression. Default: False.
+    worker_logs: If true, workers will print training logs. Default: True.
+    num_threads: Number of threads used to train the model. Different learning
+      algorithms use multi-threading differently and with different degree of
+      efficiency. If `None`, `num_threads` will be automatically set to the
+      number of processors (up to a maximum of 32; or set to 6 if the number of
+      processors is not available). Making `num_threads` significantly larger
+      than the number of processors can slow-down the training speed. The
+      default value logic might change in the future.
+    resume_training: If true, the model training resumes from the checkpoint
+      stored in the `working_dir` directory. If `working_dir` does not contain
+      any model checkpoint, the training starts from the beginning. Resuming
+      training is useful in the following situations: (1) The training was
+      interrupted by the user (e.g. ctrl+c or "stop" button in a notebook) or
+      rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
+      increasing the number of trees.
+    working_dir: Path to a directory available for the learning algorithm to
+      store intermediate computation results. Depending on the learning
+      algorithm and parameters, the working_dir might be optional, required, or
+      ignored. For instance, distributed training algorithm always need a
+      "working_dir", and the gradient boosted tree and hyper-parameter tuners
+      will export artefacts to the "working_dir" if provided.
+    resume_training_snapshot_interval_seconds: Indicative number of seconds in
+      between snapshots when `resume_training=True`. Might be ignored by some
+      learners.
+    tuner: If set, automatically select the best hyperparameters using the
+      provided tuner. When using distributed training, the tuning is
+      distributed.
+    workers: If set, enable distributed training. "workers" is the list of IP
+      addresses of the workers. A worker is a process running
+      `ydf.start_worker(port)`.
+  """
+
+  def __init__(
+      self,
+      label: str,
+      task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
+      weights: Optional[str] = None,
+      ranking_group: Optional[str] = None,
+      uplift_treatment: Optional[str] = None,
+      features: dataspec.ColumnDefs = None,
+      include_all_columns: bool = False,
+      max_vocab_count: int = 2000,
+      min_vocab_frequency: int = 5,
+      discretize_numerical_columns: bool = False,
+      num_discretized_numerical_bins: int = 255,
+      data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      apply_link_function: Optional[bool] = True,
+      force_numerical_discretization: Optional[bool] = False,
+      max_depth: Optional[int] = 6,
+      max_unique_values_for_discretized_numerical: Optional[int] = 16000,
+      maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
+      maximum_training_duration_seconds: Optional[float] = -1.0,
+      min_examples: Optional[int] = 5,
+      num_candidate_attributes: Optional[int] = -1,
+      num_candidate_attributes_ratio: Optional[float] = -1.0,
+      num_trees: Optional[int] = 300,
+      pure_serving_model: Optional[bool] = False,
+      random_seed: Optional[int] = 123456,
+      shrinkage: Optional[float] = 0.1,
+      use_hessian_gain: Optional[bool] = False,
+      worker_logs: Optional[bool] = True,
+      num_threads: Optional[int] = None,
+      working_dir: Optional[str] = None,
+      resume_training: bool = False,
+      resume_training_snapshot_interval_seconds: int = 1800,
+      tuner: Optional[tuner_lib.AbstractTuner] = None,
+      workers: Optional[Sequence[str]] = None,
+  ):
+    hyper_parameters = {
+        "apply_link_function": apply_link_function,
+        "force_numerical_discretization": force_numerical_discretization,
+        "max_depth": max_depth,
+        "max_unique_values_for_discretized_numerical": (
+            max_unique_values_for_discretized_numerical
+        ),
+        "maximum_model_size_in_memory_in_bytes": (
+            maximum_model_size_in_memory_in_bytes
+        ),
+        "maximum_training_duration_seconds": maximum_training_duration_seconds,
+        "min_examples": min_examples,
+        "num_candidate_attributes": num_candidate_attributes,
+        "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
+        "num_trees": num_trees,
+        "pure_serving_model": pure_serving_model,
+        "random_seed": random_seed,
+        "shrinkage": shrinkage,
+        "use_hessian_gain": use_hessian_gain,
+        "worker_logs": worker_logs,
+    }
+
+    data_spec_args = dataspec.DataSpecInferenceArgs(
+        columns=dataspec.normalize_column_defs(features),
+        include_all_columns=include_all_columns,
+        max_vocab_count=max_vocab_count,
+        min_vocab_frequency=min_vocab_frequency,
+        discretize_numerical_columns=discretize_numerical_columns,
+        num_discretized_numerical_bins=num_discretized_numerical_bins,
+    )
+
+    deployment_config = self._build_deployment_config(
+        num_threads=num_threads,
+        resume_training=resume_training,
+        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
+        working_dir=working_dir,
+        workers=workers,
+    )
+
+    super().__init__(
+        learner_name="DISTRIBUTED_GRADIENT_BOOSTED_TREES",
+        task=task,
+        label=label,
+        weights=weights,
+        ranking_group=ranking_group,
+        uplift_treatment=uplift_treatment,
+        data_spec_args=data_spec_args,
+        data_spec=data_spec,
+        hyper_parameters=hyper_parameters,
+        deployment_config=deployment_config,
+        tuner=tuner,
+    )
+
+  @classmethod
+  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+    return abstract_learner_pb2.LearnerCapabilities(
+        support_max_training_duration=False,
+        resume_training=True,
+        support_validation_dataset=False,
+        support_partial_cache_dataset_format=True,
+        support_max_model_size_in_memory=False,
+        support_monotonic_constraints=False,
+    )
+
+  @classmethod
+  def hyperparameter_templates(
+      cls,
+  ) -> Dict[str, hyperparameters.HyperparameterTemplate]:
+    r"""Hyperparameter templates for this Learner.
+
+    This learner currently does not provide any hyperparameter templates, this
+    method is provided for consistency with other learners.
+
+    Returns:
+      Empty dictionary.
+    """
+    return {}
 
 
 class CartLearner(generic_learner.GenericLearner):
@@ -1614,6 +1906,9 @@ class CartLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    workers: If set, enable distributed training. "workers" is the list of IP
+      addresses of the workers. A worker is a process running
+      `ydf.start_worker(port)`.
   """
 
   def __init__(
@@ -1665,6 +1960,7 @@ class CartLearner(generic_learner.GenericLearner):
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      workers: Optional[Sequence[str]] = None,
   ):
     hyper_parameters = {
         "allow_na_conditions": allow_na_conditions,
@@ -1725,6 +2021,7 @@ class CartLearner(generic_learner.GenericLearner):
         resume_training=resume_training,
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
+        workers=workers,
     )
 
     super().__init__(

@@ -16,6 +16,7 @@
 
 import logging
 import os
+import pathlib
 from absl import flags
 from absl.testing import absltest
 
@@ -33,6 +34,13 @@ def ydf_test_data_path() -> str:
   return os.path.join(
       data_root_path(),
       "external/ydf_cc/yggdrasil_decision_forests/test_data",
+  )
+
+
+def ydf_test_data_pathlib() -> pathlib.Path:
+  return (
+      pathlib.Path(data_root_path())
+      / "external/ydf_cc/yggdrasil_decision_forests/test_data"
   )
 
 

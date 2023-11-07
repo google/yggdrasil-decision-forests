@@ -18,7 +18,7 @@ import copy
 import datetime
 import os
 import re
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 from absl import logging
 
@@ -37,6 +37,7 @@ from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.utils import log
 from yggdrasil_decision_forests.utils import fold_generator_pb2
+from yggdrasil_decision_forests.utils.distribute.implementations.grpc import grpc_pb2
 
 Task = generic_model.Task
 
@@ -197,9 +198,9 @@ class GenericLearner:
       valid: Optional[dataset.InputDataset] = None,
   ) -> generic_model.GenericModel:
     """Trains a model from in-memory data."""
-    
+
     with log.cc_log_context():
-      train_ds = self._get_vertical_dataset(ds)._dataset # pylint: disable=protected-access
+      train_ds = self._get_vertical_dataset(ds)._dataset  # pylint: disable=protected-access
       train_args = {"dataset": train_ds}
 
       if valid is not None:
@@ -484,15 +485,27 @@ class GenericLearner:
       resume_training: bool,
       resume_training_snapshot_interval_seconds: int,
       working_dir: Optional[str],
+      workers: Optional[Sequence[str]],
   ):
+    """Merges constructor arguments into a deployment configuration."""
+
     if num_threads is None:
       num_threads = self._determine_optimal_num_threads()
-    return abstract_learner_pb2.DeploymentConfig(
+    config = abstract_learner_pb2.DeploymentConfig(
         num_threads=num_threads,
         try_resume_training=resume_training,
         cache_path=working_dir,
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
     )
+
+    if workers is not None:
+      if not workers:
+        raise ValueError("At least one worker should be provided")
+      config.distribute.implementation_key = "GRPC"
+      grpc_config = config.distribute.Extensions[grpc_pb2.grpc]
+      grpc_config.grpc_addresses.addresses[:] = workers
+
+    return config
 
   def _determine_optimal_num_threads(self):
     """Sets  number of threads to min(num_cpus, 32) or 6 if num_cpus unclear."""

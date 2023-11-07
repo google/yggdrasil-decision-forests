@@ -8,6 +8,7 @@ the C++ and CLI APIs.
 -   [GradientBoostedTreesLearner](GradientBoostedTreesLearner.md)
 -   [RandomForestLearner](RandomForestLearner.md)
 -   [CartLearner](CartLearner.md)
+-   [DistributedGradientBoostedTreesLearner](DistributedGradientBoostedTreesLearner.md)
 
 ## Models
 

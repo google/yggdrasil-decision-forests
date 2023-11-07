@@ -40,6 +40,10 @@ from ydf.learner.generic_learner import GenericLearner
 from ydf.learner.specialized_learners import CartLearner
 from ydf.learner.specialized_learners import RandomForestLearner
 from ydf.learner.specialized_learners import GradientBoostedTreesLearner
+from ydf.learner.specialized_learners import DistributedGradientBoostedTreesLearner
+
+# Worker
+from ydf.learner.worker import start_worker
 
 # Tuner
 from ydf.learner.tuner import RandomSearchTuner

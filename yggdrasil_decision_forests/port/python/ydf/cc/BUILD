@@ -14,6 +14,7 @@ pybind_extension(
     deps = [
         "//ydf/dataset:dataset_cc",
         "//ydf/learner:learner_cc",
+        "//ydf/learner:worker_cc",
         "//ydf/metric:metric_cc",
         "//ydf/model:model_cc",
         "//ydf/utils:log_cc",

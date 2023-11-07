@@ -1,5 +1,11 @@
 # Changelog
 
+## Head
+
+### Features
+
+-   Add support for distributed training
+
 ## 0.0.4 - 2023-11-01
 
 ### Features
@@ -18,7 +24,7 @@
 
 ### Fix
 
--   Remove pybind11_abseil to avoid clashes with other libraries such as 
+-   Remove pybind11_abseil to avoid clashes with other libraries such as
     Tensorflow.
 
 #### Release music

@@ -187,6 +187,9 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    workers: If set, enable distributed training. "workers" is the list of IP
+      addresses of the workers. A worker is a process running
+      `ydf.start_worker(port)`.
   """
 
   def __init__(self,
@@ -208,6 +211,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      workers: Optional[Sequence[str]] = None,
       ):
 
     hyper_parameters = {
@@ -229,6 +233,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
         resume_training=resume_training,
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
+        workers=workers,
     )
 
     super().__init__(learner_name="FAKE_ALGORITHM",
