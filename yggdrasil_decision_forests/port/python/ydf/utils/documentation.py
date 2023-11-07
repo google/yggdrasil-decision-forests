@@ -17,8 +17,8 @@
 See also: external/ydf_cc/yggdrasil_decision_forests/utils/documentation.h
 """
 
-# TODO: Update to external documentation.
-URL_DOCUMENTATION = "https://ydf.readthedocs.io"
+
+URL_DOCUMENTATION = "https://ydf.readthedocs.io/en/latest/"
 
 URL_GLOSSARY = f"{URL_DOCUMENTATION}/glossary"
 URL_CONFUSION_MATRIX = f"{URL_GLOSSARY}#confusion-matrix"

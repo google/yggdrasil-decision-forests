@@ -198,7 +198,7 @@ name: 'validation',
     }
   );
 </script>
-</div></div></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="http://go/ydf_doc_internal/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.348634 ################
+</div></div></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.348634 ################
     2.            &quot;age&quot;  0.285433 ############
     3.   &quot;capital_loss&quot;  0.131911 ###
     4. &quot;marital_status&quot;  0.117577 ##

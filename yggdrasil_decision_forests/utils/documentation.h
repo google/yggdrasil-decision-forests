@@ -28,8 +28,7 @@
 
 namespace yggdrasil_decision_forests::utils::documentation {
 
-// TODO: Update to external documentation.
-constexpr char URL_DOCUMENTATION[] = "https://ydf.readthedocs.io";
+constexpr char URL_DOCUMENTATION[] = "https://ydf.readthedocs.io/en/latest";
 
 #define DOC(NAME, PATH) \
   inline std::string NAME() { return absl::StrCat(URL_DOCUMENTATION, PATH); }
