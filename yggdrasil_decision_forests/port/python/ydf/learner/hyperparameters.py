@@ -13,6 +13,8 @@
 # limitations under the License.
 
 """Utility functions for YDF Hyperparameters."""
+from collections.abc import Mapping
+import dataclasses
 from typing import Dict, Union
 
 from yggdrasil_decision_forests.model import hyperparameter_pb2
@@ -69,3 +71,39 @@ def dict_to_generic_hyperparameter(
     else:
       raise ValueError(f"Invalid value {value} for parameter {key}")
   return generic_hps
+
+
+@dataclasses.dataclass
+class HyperparameterTemplate(Mapping):
+  """A named and versioned set of hyper-parameters.
+
+  List of hyper-parameter sets that outperforms the default hyper-parameters
+  (either generally or in specific scenarios). A template is also a mapping of
+  hyperparameters and may be used with the double star operator.
+
+  Usage example:
+
+  ```python
+  templates = ydf.GradientBoostedTreesLearner.hyperparameter_templates()
+  better_default = templates["better_defaultv1"]
+  # Apply the parameters of the template on the learner.
+  learner = ydf.GradientBoostedTreesLearner(label, **better_default)
+  ```
+  """
+
+  name: str
+  version: int
+  parameters: HyperParameters
+  description: str
+
+  def __iter__(self):
+    for key in self.parameters.keys():
+      yield key
+
+  def __len__(self):
+    return len(self.parameters)
+
+  def __getitem__(self, item):
+    if isinstance(self.parameters, dict) and item in self.parameters:
+      return self.parameters[item]
+    return None

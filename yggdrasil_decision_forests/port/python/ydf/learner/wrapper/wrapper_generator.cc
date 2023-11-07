@@ -95,47 +95,36 @@ std::string PythonFloat(const float value) {
   return str_value;
 }
 
-// Generates the python documentation and python object for the pre-defined
-// hyper-parameters.
+// Generates the Python object for the pre-defined hyper-parameters and the name
+// of the first template for the documentation.
 absl::StatusOr<std::pair<std::string, std::string>>
-BuildPredefinedHyperParameter(const model::AbstractLearner* learner) {
-  // Documentation about the list of template hyper-parameters.
-  std::string predefined_hp_doc;
-  // Python list of template hyper-parameters.
-  std::string predefined_hp_list = "[";
-  bool first = true;
+BuildHyperparameterTemplates(const model::AbstractLearner* learner) {
+  // Python dictionary of template hyper-parameters.
+  std::string predefined_hp_dict = "{";
+  std::string first_template_name = "";
 
-  const auto predefined_hyper_parameter_sets =
-      learner->PredefinedHyperParameters();
-  for (const auto& predefined : predefined_hyper_parameter_sets) {
-    if (first) {
-      first = false;
-    } else {
-      absl::SubstituteAndAppend(&predefined_hp_doc, "\n");
+  const auto hyperparameter_templates = learner->PredefinedHyperParameters();
+  for (const auto& hp_template : hyperparameter_templates) {
+    if (first_template_name.empty()) {
+      first_template_name =
+          absl::Substitute("$0v$1", hp_template.name(), hp_template.version());
     }
-
     absl::SubstituteAndAppend(
-        &predefined_hp_doc,
-        "- $0@v$1: $2 The parameters are: ", predefined.name(),
-        predefined.version(), predefined.description());
-    absl::SubstituteAndAppend(
-        &predefined_hp_list,
-        "core.HyperParameterTemplate(name=\"$0\", "
+        &predefined_hp_dict,
+        "\"$0v$1\": "
+        "hyperparameters.HyperparameterTemplate(name=\"$0\", "
         "version=$1, description=\"$2\", parameters={",
-        predefined.name(), predefined.version(),
-        absl::StrReplaceAll(predefined.description(), {{"\"", "\\\""}}));
-
+        hp_template.name(), hp_template.version(),
+        absl::StrReplaceAll(hp_template.description(), {{"\"", "\\\""}}));
     // Iterate over the individual parameters.
     bool first_field = true;
-    for (const auto& field : predefined.parameters().fields()) {
+    for (const auto& field : hp_template.parameters().fields()) {
       if (first_field) {
         first_field = false;
       } else {
-        absl::StrAppend(&predefined_hp_doc, ", ");
-        absl::StrAppend(&predefined_hp_list, ", ");
+        absl::StrAppend(&predefined_hp_dict, ", ");
       }
-      absl::StrAppend(&predefined_hp_doc, field.name(), "=");
-      absl::StrAppend(&predefined_hp_list, "\"", field.name(), "\" :");
+      absl::StrAppend(&predefined_hp_dict, "\"", field.name(), "\" :");
       switch (field.value().Type_case()) {
         case model::proto::GenericHyperParameters_Value::TYPE_NOT_SET:
           return absl::InternalError("Non configured value");
@@ -147,37 +136,27 @@ BuildPredefinedHyperParameter(const model::AbstractLearner* learner) {
           } else {
             value = absl::StrCat("\"", value, "\"");
           }
-          absl::StrAppend(&predefined_hp_doc, value);
-          absl::StrAppend(&predefined_hp_list, value);
+          absl::StrAppend(&predefined_hp_dict, value);
         } break;
         case model::proto::GenericHyperParameters_Value::kInteger:
-          absl::StrAppend(&predefined_hp_doc, field.value().integer());
-          absl::StrAppend(&predefined_hp_list, field.value().integer());
+          absl::StrAppend(&predefined_hp_dict, field.value().integer());
           break;
         case model::proto::GenericHyperParameters_Value::kReal:
-          absl::StrAppend(&predefined_hp_doc,
-                          PythonFloat(field.value().real()));
-          absl::StrAppend(&predefined_hp_list,
+          absl::StrAppend(&predefined_hp_dict,
                           PythonFloat(field.value().real()));
           break;
         case model::proto::GenericHyperParameters_Value::kCategoricalList:
           absl::StrAppend(
-              &predefined_hp_doc, "[",
-              absl::StrJoin(field.value().categorical_list().values(), ","),
-              "]");
-          absl::StrAppend(
-              &predefined_hp_list, "[",
+              &predefined_hp_dict, "[",
               absl::StrJoin(field.value().categorical_list().values(), ","),
               "]");
           break;
       }
     }
-    absl::SubstituteAndAppend(&predefined_hp_doc, ".");
-    absl::SubstituteAndAppend(&predefined_hp_list, "}),");
+    absl::SubstituteAndAppend(&predefined_hp_dict, "}), ");
   }
-  absl::StrAppend(&predefined_hp_list, "]");
-  return std::pair<std::string, std::string>(predefined_hp_doc,
-                                             predefined_hp_list);
+  absl::StrAppend(&predefined_hp_dict, "}");
+  return std::make_pair(predefined_hp_dict, first_template_name);
 }
 
 // Formats some documentation.
@@ -254,6 +233,7 @@ from $0yggdrasil_decision_forests.model import abstract_model_pb2  # pylint: dis
 from $1dataset import dataspec
 from $1dataset import dataset
 from $1learner import generic_learner
+from $1learner import hyperparameters
 from $1learner import tuner as tuner_lib
 )",
                                          prefix, pydf_prefix);
@@ -277,7 +257,7 @@ included for reference only. The actual wrappers are re-generated during
 compilation.
 """
 
-from typing import Optional
+from typing import Dict, Optional
 $0
 
 )",
@@ -413,10 +393,10 @@ $0
     }
 
     // Pre-configured hyper-parameters.
-    std::string predefined_hp_doc;
-    std::string predefined_hp_list;
-    ASSIGN_OR_RETURN(std::tie(predefined_hp_doc, predefined_hp_list),
-                     BuildPredefinedHyperParameter(learner.get()));
+    std::string hp_template_dict;
+    std::string first_template_name;
+    ASSIGN_OR_RETURN(std::tie(hp_template_dict, first_template_name),
+                     BuildHyperparameterTemplates(learner.get()));
 
     const auto free_text_documentation =
         FormatDocumentation(specifications.documentation().description(),
@@ -443,6 +423,12 @@ class $0(generic_learner.GenericLearner):
 
   print(model.summary())
   ```
+
+  Hyperparameters are configured to give reasonable results for typical
+  datasets. Hyperparameters can also be modified manually (see descriptions)
+  below or by applying the hyperparameter templates available with
+  `$0.hyperparameter_templates()` (see this function's documentation for
+  details).
 
   Attributes:
     label: Label of the dataset. The label column
@@ -542,6 +528,7 @@ $3,
     hyper_parameters = {
 $4
       }
+
     data_spec_args = dataspec.DataSpecInferenceArgs(
         columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
@@ -575,8 +562,7 @@ $4
                               /*$2*/ fields_documentation,
                               /*$3*/ fields_constructor, /*$4*/ fields_dict,
                               /*$5*/ free_text_documentation,
-                              /*$6*/ nice_learner_name,
-                              /*$7*/ predefined_hp_list);
+                              /*$6*/ nice_learner_name);
 
     const auto bool_rep = [](const bool value) -> std::string {
       return value ? "True" : "False";
@@ -602,6 +588,49 @@ $4
         /*$3*/ bool_rep(capabilities.support_partial_cache_dataset_format()),
         /*$4*/ bool_rep(capabilities.support_max_model_size_in_memory()),
         /*$5*/ bool_rep(capabilities.support_monotonic_constraints()));
+
+    if (hp_template_dict == "{}") {
+      absl::StrAppend(&wrapper, R"(
+  @classmethod
+  def hyperparameter_templates(cls) -> Dict[str, hyperparameters.HyperparameterTemplate]:
+    r"""Hyperparameter templates for this Learner.
+    
+    This learner currently does not provide any hyperparameter templates, this
+    method is provided for consistency with other learners.
+    
+    Returns:
+      Empty dictionary.
+    """
+    return {}
+)");
+    } else {
+      absl::SubstituteAndAppend(&wrapper, R"(
+  @classmethod
+  def hyperparameter_templates(cls) -> Dict[str, hyperparameters.HyperparameterTemplate]:
+    r"""Hyperparameter templates for this Learner.
+    
+    Hyperparameter templates are sets of pre-defined hyperparameters for easy
+    access to different variants of the learner. Each template is a mapping to a
+    set of hyperparameters and can be applied directly on the learner.
+    
+    Usage example:
+    ```python
+    templates = ydf.$1.hyperparameter_templates()
+    $2 = templates["$2"]
+    # Print a description of the template
+    print($2.description)
+    # Apply the template's settings on the learner.
+    learner = ydf.$1(label, **$2)
+    ```
+    
+    Returns:
+      Dictionary of the available templates
+    """
+    return $0
+)",
+                                /*$0*/ hp_template_dict, /*$1*/ class_name,
+                                /*$2*/ first_template_name);
+    }
   }
 
   return wrapper;

@@ -93,6 +93,7 @@ py_library(
     srcs = ["specialized_learners_pre_generated.py"],
     deps = [
         ":generic_learner",
+        ":hyperparameters",
         ":tuner",
         "//ydf/dataset",
         "//ydf/dataset:dataspec",

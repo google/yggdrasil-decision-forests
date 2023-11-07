@@ -16,6 +16,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -58,6 +59,26 @@ class FakeLearner1 : public model::AbstractLearner {
     a.mutable_documentation()->set_proto_field("c");
     return spec;
   }
+
+  std::vector<model::proto::PredefinedHyperParameterTemplate>
+  PredefinedHyperParameters() const override {
+    model::proto::PredefinedHyperParameterTemplate hptemplate;
+    hptemplate.set_name("fake_template_1");
+    hptemplate.set_version(4);
+    hptemplate.set_description("This is a fake template.");
+    auto* field = hptemplate.mutable_parameters()->add_fields();
+    field->set_name("a");
+    field->mutable_value()->set_real(2);
+
+    model::proto::PredefinedHyperParameterTemplate hptemplate2;
+    hptemplate2.set_name("fake_template_2");
+    hptemplate2.set_version(1);
+    hptemplate2.set_description("This is another fake template.");
+    field = hptemplate2.mutable_parameters()->add_fields();
+    field->set_name("a");
+    field->mutable_value()->set_real(3);
+    return {hptemplate, hptemplate2};
+  };
 };
 
 TEST(LearnerWrappers, LearnerKeyToClassName) {
@@ -86,6 +107,12 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
 
   print(model.summary())
   ```
+
+  Hyperparameters are configured to give reasonable results for typical
+  datasets. Hyperparameters can also be modified manually (see descriptions)
+  below or by applying the hyperparameter templates available with
+  `FakeAlgorithmLearner.hyperparameter_templates()` (see this function's documentation for
+  details).
 
   Attributes:
     label: Label of the dataset. The label column
@@ -187,6 +214,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
                       "a" : a,
 
       }
+
     data_spec_args = dataspec.DataSpecInferenceArgs(
         columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
@@ -226,6 +254,29 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       support_max_model_size_in_memory=False,
       support_monotonic_constraints=False,
     )
+
+  @classmethod
+  def hyperparameter_templates(cls) -> Dict[str, hyperparameters.HyperparameterTemplate]:
+    r"""Hyperparameter templates for this Learner.
+    
+    Hyperparameter templates are sets of pre-defined hyperparameters for easy
+    access to different variants of the learner. Each template is a mapping to a
+    set of hyperparameters and can be applied directly on the learner.
+    
+    Usage example:
+    ```python
+    templates = ydf.FakeAlgorithmLearner.hyperparameter_templates()
+    fake_template_1v4 = templates["fake_template_1v4"]
+    # Print a description of the template
+    print(fake_template_1v4.description)
+    # Apply the template's settings on the learner.
+    learner = ydf.FakeAlgorithmLearner(label, **fake_template_1v4)
+    ```
+    
+    Returns:
+      Dictionary of the available templates
+    """
+    return {"fake_template_1v4": hyperparameters.HyperparameterTemplate(name="fake_template_1", version=4, description="This is a fake template.", parameters={"a" :2.0}), "fake_template_2v1": hyperparameters.HyperparameterTemplate(name="fake_template_2", version=1, description="This is another fake template.", parameters={"a" :3.0}), }
 )"));
 }
 

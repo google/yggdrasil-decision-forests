@@ -30,7 +30,7 @@ included for reference only. The actual wrappers are re-generated during
 compilation.
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
@@ -38,6 +38,7 @@ from yggdrasil_decision_forests.model import abstract_model_pb2  # pylint: disab
 from ydf.dataset import dataspec
 from ydf.dataset import dataset
 from ydf.learner import generic_learner
+from ydf.learner import hyperparameters
 from ydf.learner import tuner as tuner_lib
 
 
@@ -67,6 +68,13 @@ class RandomForestLearner(generic_learner.GenericLearner):
 
   print(model.summary())
   ```
+
+  Hyperparameters are configured to give reasonable results for typical
+  datasets. Hyperparameters can also be modified manually (see descriptions)
+  below or by applying the hyperparameter templates available with
+  `RandomForestLearner.hyperparameter_templates()` (see this function's
+  documentation for
+  details).
 
   Attributes:
     label: Label of the dataset. The label column should not be identified as a
@@ -450,6 +458,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
         "uplift_split_score": uplift_split_score,
         "winner_take_all": winner_take_all,
     }
+
     data_spec_args = dataspec.DataSpecInferenceArgs(
         columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
@@ -491,6 +500,57 @@ class RandomForestLearner(generic_learner.GenericLearner):
         support_monotonic_constraints=False,
     )
 
+  @classmethod
+  def hyperparameter_templates(
+      cls,
+  ) -> Dict[str, hyperparameters.HyperparameterTemplate]:
+    r"""Hyperparameter templates for this Learner.
+
+    Hyperparameter templates are sets of pre-defined hyperparameters for easy
+    access to different variants of the learner. Each template is a mapping to a
+    set of hyperparameters and can be applied directly on the learner.
+
+    Usage example:
+    ```python
+    templates = ydf.RandomForestLearner.hyperparameter_templates()
+    better_defaultv1 = templates["better_defaultv1"]
+    # Print a description of the template
+    print(better_defaultv1.description)
+    # Apply the template's settings on the learner.
+    learner = ydf.RandomForestLearner(label, **better_defaultv1)
+    ```
+
+    Returns:
+      Dictionary of the available templates
+    """
+    return {
+        "better_defaultv1": hyperparameters.HyperparameterTemplate(
+            name="better_default",
+            version=1,
+            description=(
+                "A configuration that is generally better than the default"
+                " parameters without being more expensive."
+            ),
+            parameters={"winner_take_all": True},
+        ),
+        "benchmark_rank1v1": hyperparameters.HyperparameterTemplate(
+            name="benchmark_rank1",
+            version=1,
+            description=(
+                "Top ranking hyper-parameters on our benchmark slightly"
+                " modified to run in reasonable time."
+            ),
+            parameters={
+                "winner_take_all": True,
+                "categorical_algorithm": "RANDOM",
+                "split_axis": "SPARSE_OBLIQUE",
+                "sparse_oblique_normalization": "MIN_MAX",
+                "sparse_oblique_num_projections_exponent": 1.0,
+            },
+        ),
+    }
+
+
 class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
   r"""Hyperparameter Optimizer learning algorithm.
 
@@ -506,6 +566,13 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
 
   print(model.summary())
   ```
+
+  Hyperparameters are configured to give reasonable results for typical
+  datasets. Hyperparameters can also be modified manually (see descriptions)
+  below or by applying the hyperparameter templates available with
+  `HyperparameterOptimizerLearner.hyperparameter_templates()` (see this
+  function's documentation for
+  details).
 
   Attributes:
     label: Label of the dataset. The label column should not be identified as a
@@ -628,6 +695,7 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
     }
+
     data_spec_args = dataspec.DataSpecInferenceArgs(
         columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
@@ -669,6 +737,21 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
         support_monotonic_constraints=False,
     )
 
+  @classmethod
+  def hyperparameter_templates(
+      cls,
+  ) -> Dict[str, hyperparameters.HyperparameterTemplate]:
+    r"""Hyperparameter templates for this Learner.
+
+    This learner currently does not provide any hyperparameter templates, this
+    method is provided for consistency with other learners.
+
+    Returns:
+      Empty dictionary.
+    """
+    return {}
+
+
 class GradientBoostedTreesLearner(generic_learner.GenericLearner):
   r"""Gradient Boosted Trees learning algorithm.
 
@@ -691,6 +774,13 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
 
   print(model.summary())
   ```
+
+  Hyperparameters are configured to give reasonable results for typical
+  datasets. Hyperparameters can also be modified manually (see descriptions)
+  below or by applying the hyperparameter templates available with
+  `GradientBoostedTreesLearner.hyperparameter_templates()` (see this function's
+  documentation for
+  details).
 
   Attributes:
     label: Label of the dataset. The label column should not be identified as a
@@ -1175,6 +1265,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         "validation_interval_in_trees": validation_interval_in_trees,
         "validation_ratio": validation_ratio,
     }
+
     data_spec_args = dataspec.DataSpecInferenceArgs(
         columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
@@ -1216,6 +1307,57 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         support_monotonic_constraints=True,
     )
 
+  @classmethod
+  def hyperparameter_templates(
+      cls,
+  ) -> Dict[str, hyperparameters.HyperparameterTemplate]:
+    r"""Hyperparameter templates for this Learner.
+
+    Hyperparameter templates are sets of pre-defined hyperparameters for easy
+    access to different variants of the learner. Each template is a mapping to a
+    set of hyperparameters and can be applied directly on the learner.
+
+    Usage example:
+    ```python
+    templates = ydf.GradientBoostedTreesLearner.hyperparameter_templates()
+    better_defaultv1 = templates["better_defaultv1"]
+    # Print a description of the template
+    print(better_defaultv1.description)
+    # Apply the template's settings on the learner.
+    learner = ydf.GradientBoostedTreesLearner(label, **better_defaultv1)
+    ```
+
+    Returns:
+      Dictionary of the available templates
+    """
+    return {
+        "better_defaultv1": hyperparameters.HyperparameterTemplate(
+            name="better_default",
+            version=1,
+            description=(
+                "A configuration that is generally better than the default"
+                " parameters without being more expensive."
+            ),
+            parameters={"growing_strategy": "BEST_FIRST_GLOBAL"},
+        ),
+        "benchmark_rank1v1": hyperparameters.HyperparameterTemplate(
+            name="benchmark_rank1",
+            version=1,
+            description=(
+                "Top ranking hyper-parameters on our benchmark slightly"
+                " modified to run in reasonable time."
+            ),
+            parameters={
+                "growing_strategy": "BEST_FIRST_GLOBAL",
+                "categorical_algorithm": "RANDOM",
+                "split_axis": "SPARSE_OBLIQUE",
+                "sparse_oblique_normalization": "MIN_MAX",
+                "sparse_oblique_num_projections_exponent": 1.0,
+            },
+        ),
+    }
+
+
 class CartLearner(generic_learner.GenericLearner):
   r"""Cart learning algorithm.
 
@@ -1236,6 +1378,13 @@ class CartLearner(generic_learner.GenericLearner):
 
   print(model.summary())
   ```
+
+  Hyperparameters are configured to give reasonable results for typical
+  datasets. Hyperparameters can also be modified manually (see descriptions)
+  below or by applying the hyperparameter templates available with
+  `CartLearner.hyperparameter_templates()` (see this function's documentation
+  for
+  details).
 
   Attributes:
     label: Label of the dataset. The label column should not be identified as a
@@ -1561,6 +1710,7 @@ class CartLearner(generic_learner.GenericLearner):
         "uplift_split_score": uplift_split_score,
         "validation_ratio": validation_ratio,
     }
+
     data_spec_args = dataspec.DataSpecInferenceArgs(
         columns=dataspec.normalize_column_defs(features),
         include_all_columns=include_all_columns,
@@ -1601,3 +1751,17 @@ class CartLearner(generic_learner.GenericLearner):
         support_max_model_size_in_memory=False,
         support_monotonic_constraints=False,
     )
+
+  @classmethod
+  def hyperparameter_templates(
+      cls,
+  ) -> Dict[str, hyperparameters.HyperparameterTemplate]:
+    r"""Hyperparameter templates for this Learner.
+
+    This learner currently does not provide any hyperparameter templates, this
+    method is provided for consistency with other learners.
+
+    Returns:
+      Empty dictionary.
+    """
+    return {}

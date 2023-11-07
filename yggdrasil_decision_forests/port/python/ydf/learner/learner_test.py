@@ -620,6 +620,22 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         row_sums, np.ones(predictions.shape[0]), decimal=5
     )
 
+  def test_better_default_template(self):
+    ds = toy_dataset()
+    label = "label"
+    templates = (
+        specialized_learners.GradientBoostedTreesLearner.hyperparameter_templates()
+    )
+    self.assertIn("better_defaultv1", templates)
+    better_defaultv1 = templates["better_defaultv1"]
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label=label, **better_defaultv1
+    )
+    self.assertEqual(
+        learner.hyperparameters["growing_strategy"], "BEST_FIRST_GLOBAL"
+    )
+    _ = learner.train(ds)
+
 
 class LoggingTest(parameterized.TestCase):
 
