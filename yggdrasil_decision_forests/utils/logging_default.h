@@ -15,7 +15,7 @@
 
 // Simplified logging library.
 // To replace with absl c++ logging when available.
-
+// IWYU pragma: private, include "yggdrasil_decision_forests/utils/logging.h"
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_LOGGING_DEFAULT_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_LOGGING_DEFAULT_H_
 

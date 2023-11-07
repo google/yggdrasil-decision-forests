@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+// IWYU pragma: private, include "yggdrasil_decision_forests/utils/filesystem.h"
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_TENSORFLOW_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_TENSORFLOW_H_
 

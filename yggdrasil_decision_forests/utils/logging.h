@@ -16,7 +16,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_LOGGING_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_LOGGING_H_
 
-#include "yggdrasil_decision_forests/utils/logging_default.h"
+#include "yggdrasil_decision_forests/utils/logging_default.h"  // IWYU pragma: export
 
 // Prints something every INTERVAL seconds.
 //
