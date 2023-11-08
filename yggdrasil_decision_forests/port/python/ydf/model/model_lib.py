@@ -14,6 +14,8 @@
 
 """Utilities for loading YDF models."""
 
+from typing import Optional
+
 from absl import logging
 
 from ydf.cc import ydf
@@ -62,8 +64,14 @@ def load_model(
   Returns:
     Model to use for inference, evaluation or inspection
   """
-  logging.info("Loading model from %s", directory)
-  # TODO: Add support for model prefixes
+  if advanced_options.file_prefix is not None:
+    logging.info(
+        "Loading model with prefix %s from %s",
+        directory,
+        advanced_options.file_prefix,
+    )
+  else:
+    logging.info("Loading model from %s", directory)
   cc_model: ydf.GenericCCModel = ydf.LoadModel(
       directory, advanced_options.file_prefix
   )
