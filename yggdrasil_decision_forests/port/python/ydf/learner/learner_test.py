@@ -41,6 +41,7 @@ from ydf.utils import log
 from ydf.utils import test_utils
 
 ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
+Column = dataspec.Column
 
 # TODO: Convert to dataclass.
 DatasetForTesting = collections.namedtuple(
@@ -422,6 +423,66 @@ class RandomForestLearnerTest(LearnerTest):
         },
         learner.hyperparameters,
     )
+
+  def test_multidimensional_training_dataset(self):
+    data = {
+        "feature": np.array([[0, 1, 2, 3], [4, 5, 6, 7]]),
+        "label": np.array([0, 1]),
+    }
+    learner = specialized_learners.RandomForestLearner(label="label")
+    model = learner.train(data)
+
+    expected_columns = [
+        data_spec_pb2.Column(
+            name="feature.0_of_4",
+            type=data_spec_pb2.ColumnType.NUMERICAL,
+            count_nas=0,
+            numerical=data_spec_pb2.NumericalSpec(
+                mean=2,
+                standard_deviation=2,
+                min_value=0,
+                max_value=4,
+            ),
+        ),
+        data_spec_pb2.Column(
+            name="feature.1_of_4",
+            type=data_spec_pb2.ColumnType.NUMERICAL,
+            count_nas=0,
+            numerical=data_spec_pb2.NumericalSpec(
+                mean=3,
+                standard_deviation=2,
+                min_value=1,
+                max_value=5,
+            ),
+        ),
+        data_spec_pb2.Column(
+            name="feature.2_of_4",
+            type=data_spec_pb2.ColumnType.NUMERICAL,
+            count_nas=0,
+            numerical=data_spec_pb2.NumericalSpec(
+                mean=4,
+                standard_deviation=2,
+                min_value=2,
+                max_value=6,
+            ),
+        ),
+        data_spec_pb2.Column(
+            name="feature.3_of_4",
+            type=data_spec_pb2.ColumnType.NUMERICAL,
+            count_nas=0,
+            numerical=data_spec_pb2.NumericalSpec(
+                mean=5,
+                standard_deviation=2,
+                min_value=3,
+                max_value=7,
+            ),
+        ),
+    ]
+    # Skip the first column that contains the label.
+    self.assertEqual(model.data_spec().columns[1:], expected_columns)
+
+    predictions = model.predict(data)
+    self.assertEqual(predictions.shape, (2,))
 
 
 class CARTLearnerTest(LearnerTest):

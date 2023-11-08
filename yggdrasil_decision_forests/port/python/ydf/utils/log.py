@@ -29,21 +29,31 @@ Compatibility
 """
 
 import contextlib
+import enum
 import io
 import sys
-from typing import Any, Optional
-from absl import logging
-from ydf.cc import ydf
+from typing import Any, Optional, Set
 
+from absl import logging
+
+from ydf.cc import ydf
 
 _VERBOSE_LEVEL: int = 1
 
-# ID of warning messages
-_WARNING_ID_CANNOT_SHOW_DETAILS_LOGS = 0
+
+@enum.unique
+class WarningMessage(enum.Enum):
+  """All possible warning messages.
+
+  Used to avoid showing warning messages multiple times.
+  """
+
+  CANNOT_SHOW_DETAILS_LOGS = 0
+  CAST_NUMERICAL_TO_FLOAT32 = 1
+
 
 # List of already showed warning message that should not be displayed again.
-_ALREADY_DISPLAYED_WARNING_IDS = set()
-
+_ALREADY_DISPLAYED_WARNING_IDS: Set[WarningMessage] = set()
 
 def verbose(level: int) -> int:
   """Sets the verbose level of YDF.
@@ -98,7 +108,9 @@ def info(msg: str, *args: Any) -> None:
     logging.info(msg, *args)
 
 
-def warning(msg: str, *args: Any, message_id: Optional[int] = None) -> None:
+def warning(
+    msg: str, *args: Any, message_id: Optional[WarningMessage] = None
+) -> None:
   """Print a warning message.
 
   A warning message is similar to an info message, except that:
@@ -191,7 +203,7 @@ def cc_log_context():
         warning(
             "ydf.verbose(2) but logs cannot be displayed in the cell. Check"
             " colab logs or install wurlitzer with 'pip install wurlitzer'",
-            message_id=_WARNING_ID_CANNOT_SHOW_DETAILS_LOGS,
+            message_id=WarningMessage.CANNOT_SHOW_DETAILS_LOGS,
         )
       return _no_op_context()
     # pylint: enable=g-import-not-at-top

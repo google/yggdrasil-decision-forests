@@ -15,9 +15,8 @@
 """Dataset implementations of PYDF."""
 
 import copy
-from typing import Any, Dict, List, Literal, Optional, Sequence, Union
+from typing import Any, Dict, Optional, Union
 
-from absl import logging
 import numpy as np
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
@@ -25,9 +24,10 @@ from ydf.cc import ydf
 from ydf.dataset import dataspec
 from ydf.dataset.io import dataset_io
 from ydf.dataset.io import dataset_io_types
-
+from ydf.utils import log
 
 InputDataset = Union[dataset_io_types.IODataset, "VerticalDataset"]
+
 
 class VerticalDataset:
   """Dataset for fast column-wise iteration."""
@@ -65,12 +65,12 @@ class VerticalDataset:
         column_data = np.array(column_data, np.float32)
 
       if column_data.dtype != np.float32:
-        # TODO: Add control for warning (flag or count).
-        logging.info(
-            "Column '%s' with NUMERICAL semantic has dtype %s. Casting value to"
-            " float32.",
+        log.warning(
+            "Column '%s' with NUMERICAL semantic has dtype %s. Casting value"
+            " to float32.",
             column.name,
             column_data.dtype.name,
+            message_id=log.WarningMessage.CAST_NUMERICAL_TO_FLOAT32,
         )
 
         try:

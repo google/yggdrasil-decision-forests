@@ -22,6 +22,7 @@ py_library(
         ":dataset_io_types",
         ":pandas_io",
         ":tensorflow_io",
+        # numpy dep,
     ],
 )
 

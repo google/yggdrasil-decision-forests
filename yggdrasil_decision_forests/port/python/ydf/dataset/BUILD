@@ -40,12 +40,12 @@ py_library(
     srcs = ["dataset.py"],
     deps = [
         ":dataspec",
-        # absl/logging dep,
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset/io:dataset_io",
         "//ydf/dataset/io:dataset_io_types",
+        "//ydf/utils:log",
     ],
 )
 

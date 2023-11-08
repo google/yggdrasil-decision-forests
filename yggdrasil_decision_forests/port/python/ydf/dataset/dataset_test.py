@@ -727,6 +727,70 @@ B,3""")
     )
     self.assertEqual(ds.data_spec(), expected_data_spec)
 
+  def test_multidimensional_input(self):
+    ds = dataset.create_vertical_dataset(
+        {"feature": np.array([[0, 1, 2], [4, 5, 6]])}
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature.0_of_3",
+                type=ds_pb.ColumnType.NUMERICAL,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2,
+                    standard_deviation=2,
+                    min_value=0,
+                    max_value=4,
+                ),
+            ),
+            ds_pb.Column(
+                name="feature.1_of_3",
+                type=ds_pb.ColumnType.NUMERICAL,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=3,
+                    standard_deviation=2,
+                    min_value=1,
+                    max_value=5,
+                ),
+            ),
+            ds_pb.Column(
+                name="feature.2_of_3",
+                type=ds_pb.ColumnType.NUMERICAL,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=4,
+                    standard_deviation=2,
+                    min_value=2,
+                    max_value=6,
+                ),
+            ),
+        ),
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
+
+  @parameterized.parameters(
+      (1, "feature.0_of_1"),
+      (9, "feature.0_of_9"),
+      (10, "feature.00_of_10"),
+      (9999, "feature.0000_of_9999"),
+      (10000, "feature.00000_of_10000"),
+  )
+  def test_multidimensional_feature_name(
+      self, num_dims: int, expected_first_feature: str
+  ):
+    ds = dataset.create_vertical_dataset({"feature": np.zeros((3, num_dims))})
+    self.assertLen(ds.data_spec().columns, num_dims)
+    self.assertEqual(ds.data_spec().columns[0].name, expected_first_feature)
+
+  def test_multi_dimensions_error_too_many_dims(self):
+    with self.assertRaisesRegex(
+        ValueError, "Input features can only be one or two dimensional"
+    ):
+      _ = dataset.create_vertical_dataset({"feature": np.zeros((3, 3, 3))})
+
 
 if __name__ == "__main__":
   absltest.main()
