@@ -101,6 +101,7 @@ cc_library_ydf(
         ":decision_tree",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
     ],
 )

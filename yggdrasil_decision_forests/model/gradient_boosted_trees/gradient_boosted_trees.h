@@ -31,6 +31,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -150,8 +151,9 @@ class GradientBoostedTreesModel : public AbstractModel,
   void set_output_logits(bool value) { output_logits_ = value; }
 
   // Updates the format used to save the model on disk. If not specified, the
-  // recommended format `RecommendedSerializationFormat` is used.
-  void set_node_format(const absl::optional<std::string>& format) {
+  // recommended format `model::decision_tree::RecommendedSerializationFormat()`
+  // is used.
+  void set_node_format(const absl::optional<std::string>& format) override {
     node_format_ = format;
   }
 
