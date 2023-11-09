@@ -19,7 +19,6 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataset
@@ -531,29 +530,6 @@ four entries,4,8,4.4,0
               )
           ],
       )
-
-  def test_create_tensorflow_batched_dataset(self):
-    ds_tf = tf.data.Dataset.from_tensor_slices({
-        "a": np.array([1, 2, 3]),
-    }).batch(1)
-    ds = dataset.create_vertical_dataset(ds_tf)
-    expected_data_spec = ds_pb.DataSpecification(
-        created_num_rows=3,
-        columns=(
-            ds_pb.Column(
-                name="a",
-                type=ds_pb.ColumnType.NUMERICAL,
-                count_nas=0,
-                numerical=ds_pb.NumericalSpec(
-                    mean=2,
-                    standard_deviation=0.8164965809277263,  # ~math.sqrt(2 / 3)
-                    min_value=1,
-                    max_value=3,
-                ),
-            ),
-        ),
-    )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
 
   @parameterized.parameters(
       ([True, True, True], (0, 0, 3), 0),
