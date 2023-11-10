@@ -1,6 +1,7 @@
 from typing import Optional, TypeVar, List, Union
 
 # pylint: disable=g-wrong-blank-lines
+from typing import Dict
 
 import numpy as np
 import numpy.typing as npt
@@ -114,6 +115,9 @@ class GenericCCModel:
       warmup_duration: float,
       batch_size: int,
   ) -> BenchmarkInferenceCCResult: ...
+  def VariableImportances(
+      self,
+  ) -> Dict[str, abstract_model_pb2.VariableImportanceSet]: ...
 
 class DecisionForestCCModel(GenericCCModel):
   def num_trees(self) -> int: ...

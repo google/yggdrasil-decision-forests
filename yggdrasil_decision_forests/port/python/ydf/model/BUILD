@@ -27,6 +27,7 @@ pybind_library(
     hdrs = ["model_wrapper.h"],
     deps = [
         ":pydf_models",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings:str_format",
@@ -61,6 +62,7 @@ pybind_library(
     hdrs = ["model.h"],
     deps = [
         ":model_wrapper",
+        "//ydf/utils:custom_casters",
         "//ydf/utils:status_casters",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -89,6 +91,7 @@ py_library(
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset",
+        "//ydf/dataset:dataspec",
         "//ydf/metric",
         "//ydf/utils:html",
         "//ydf/utils:log",
@@ -175,6 +178,7 @@ py_test(
         # numpy dep,
         # pandas dep,
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest:random_forest_py_proto",
+        "//ydf/dataset:dataspec",
         "//ydf/utils:test_utils",
     ],
 )

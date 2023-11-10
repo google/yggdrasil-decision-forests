@@ -31,6 +31,7 @@
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "ydf/model/model_wrapper.h"
+#include "ydf/utils/custom_casters.h"
 #include "ydf/utils/status_casters.h"
 #include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
@@ -89,7 +90,8 @@ void init_model(py::module_& m) {
            &GenericCCModel::hyperparameter_optimizer_logs)
       .def("Benchmark", WithStatusOr(&GenericCCModel::Benchmark),
            py::arg("dataset"), py::arg("benchmark_duration"),
-           py::arg("warmup_duration"), py::arg("batch_size"));
+           py::arg("warmup_duration"), py::arg("batch_size"))
+      .def("VariableImportances", &GenericCCModel::VariableImportances);
 
   py::class_<BenchmarkInferenceCCResult>(m, "BenchmarkInferenceCCResult")
       .def_readwrite("duration_per_example",

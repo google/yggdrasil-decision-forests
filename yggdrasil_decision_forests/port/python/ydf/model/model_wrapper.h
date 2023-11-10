@@ -26,6 +26,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
@@ -119,6 +120,11 @@ class GenericCCModel {
   const std::optional<model::proto::HyperparametersOptimizerLogs>&
   hyperparameter_optimizer_logs() const {
     return model_->hyperparameter_optimizer_logs();
+  }
+
+  absl::flat_hash_map<std::string, model::proto::VariableImportanceSet>
+  VariableImportances() const {
+    return model_->precomputed_variable_importances();
   }
 
  protected:

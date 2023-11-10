@@ -26,6 +26,7 @@ import numpy.testing as npt
 import pandas as pd
 
 from yggdrasil_decision_forests.model.random_forest import random_forest_pb2
+from ydf.dataset import dataspec
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model import random_forest_model
@@ -408,6 +409,43 @@ class GradientBoostedTreesTest(absltest.TestCase):
 
     validation_loss = model.validation_loss()
     self.assertAlmostEqual(validation_loss, 0.573842942, places=6)
+
+  def test_variable_importances(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "synthetic_ranking_gbdt_numerical",
+    )
+    model = model_lib.load_model(model_path)
+    variable_importances = model.variable_importances()
+    self.assertEqual(
+        variable_importances,
+        {
+            "NUM_NODES": [
+                (355.0, "num_2"),
+                (326.0, "num_0"),
+                (248.0, "num_1"),
+                (193.0, "num_3"),
+            ],
+            "INV_MEAN_MIN_DEPTH": [
+                (0.54955206094026765, "num_0"),
+                (0.43300866801748344, "num_2"),
+                (0.21987296105251422, "num_1"),
+                (0.20886402442940008, "num_3"),
+            ],
+            "SUM_SCORE": [
+                (331.52462868355724, "num_0"),
+                (297.70595154801595, "num_2"),
+                (103.86176226850876, "num_1"),
+                (52.43193327602421, "num_3"),
+            ],
+            "NUM_AS_ROOT": [
+                (35.0, "num_0"),
+                (12.0, "num_2"),
+                (1.0, "num_3"),
+            ],
+        },
+    )
 
 
 if __name__ == "__main__":

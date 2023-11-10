@@ -44,6 +44,14 @@ py_library(
 )
 
 pybind_library(
+    name = "custom_casters",
+    hdrs = ["custom_casters.h"],
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+pybind_library(
     name = "log_cc",
     srcs = ["log.cc"],
     hdrs = ["log.h"],

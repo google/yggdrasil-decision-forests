@@ -18,7 +18,7 @@ import dataclasses
 import enum
 import os
 import tempfile
-from typing import Any, Literal, Optional, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, TypeVar, Union
 
 from absl import logging
 import numpy as np
@@ -28,6 +28,7 @@ from yggdrasil_decision_forests.metric import metric_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
+from ydf.dataset import dataspec
 from ydf.metric import metric
 from ydf.model import analysis
 from ydf.model import template_cpp_export
@@ -503,6 +504,55 @@ Use `model.describe()` for more details
     """
 
     return self._model.hyperparameter_optimizer_logs()
+
+  def variable_importances(self) -> Dict[str, List[Tuple[float, str]]]:
+    """Variable importances to measure the impact of features on the model.
+
+    Variable importances generally indicates how much a variable (feature)
+    contributes to the model predictions or quality. Different Variable
+    importances have different semantics and are generally not comparable.
+
+    The variable importances returned by `variable_importances()` depends on the
+    learning algorithm and its hyper-parameters. For example, the hyperparameter
+    `compute_oob_variable_importances=True` of the Random Forest learner enables
+    the computation of permutation out-of-bag variable importances.
+
+    # TODO: Add variable importances to documentation.
+
+    Values are sorted by decreasing value/importance.
+
+    Usage example:
+
+    ```python
+    # Train a Random Forest. Enable the computation of OOB (out-of-bag) variable
+    # importances.
+    model = ydf.RandomForestModel(compute_oob_variable_importances=True,
+                                  label=...).train(ds)
+    # List the available variable importances
+    print(model.variable_importances().keys())
+
+    # Show a specific variable importance
+    model.variable_importances()["MEAN_DECREASE_IN_ACCURACY"]
+    >> [("bill_length_mm", 0.0713061951754389),
+        ("island", 0.007298519736842035),
+        ("flipper_length_mm", 0.004505893640351366),
+    ...
+    ```
+
+    Returns:
+      Variable importances.
+    """
+    variable_importances = {}
+    # Collect the variable importances stored in the model.
+    for (
+        name,
+        importance_set,
+    ) in self._model.VariableImportances().items():
+      variable_importances[name] = [
+          (src.importance, self.data_spec().columns[src.attribute_idx].name)
+          for src in importance_set.variable_importances
+      ]
+    return variable_importances
 
 
 ModelType = TypeVar("ModelType", bound=GenericModel)
