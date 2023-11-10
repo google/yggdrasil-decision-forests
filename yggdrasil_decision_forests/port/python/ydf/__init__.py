@@ -20,7 +20,6 @@
 from ydf.version import version as __version__
 
 # Dataset
-from yggdrasil_decision_forests.model.abstract_model_pb2 import Task
 from ydf.dataset.dataset import create_vertical_dataset
 from ydf.dataset.dataspec import Column
 from ydf.dataset.dataspec import Semantic
@@ -30,6 +29,7 @@ from ydf.dataset.dataspec import Column as Feature
 
 # Model
 from ydf.model.model_lib import load_model
+from ydf.model.generic_model import Task
 from ydf.model.generic_model import ModelIOOptions
 from ydf.model.generic_model import GenericModel
 from ydf.model.random_forest_model import RandomForestModel

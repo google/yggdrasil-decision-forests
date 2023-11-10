@@ -36,8 +36,64 @@ from ydf.utils import html
 from ydf.utils import log
 from yggdrasil_decision_forests.utils import model_analysis_pb2
 
-# TODO: Allow a simpler input type (e.g. string)
-Task = abstract_model_pb2.Task
+
+@enum.unique
+class Task(enum.Enum):
+  """Task solved by a model.
+
+  Usage example:
+
+  ```python
+  learner = ydf.RandomForestLearner(label="income",
+  task=ydf.Task.CLASSIFICATION)
+  model = learner.train(dataset)
+  assert model.task() == ydf.Task.CLASSIFICATION
+  ```
+  Not all tasks are compatible with all learners and/or hyperparameters. For
+  more information, please see the documentation for tutorials on the individual
+  tasks.
+
+
+  Attributes:
+    CLASSIFICATION: Predict a categorical label i.e., an item of an enumeration.
+    REGRESSION: Predict a numerical label i.e., a quantity.
+    RANKING: Rank items by label values. The label is expected to be between 0
+      and 4 with NDCG semantic (0: completely unrelated, 4: perfect match).
+    CATEGORICAL_UPLIFT: Predicts the incremental impact of a treatment on a
+      categorical outcome.
+    NUMERICAL_UPLIFT: Predicts the incremental impact of a treatment on a
+      numerical outcome.
+  """
+
+  CLASSIFICATION = "CLASSIFICATION"
+  REGRESSION = "REGRESSION"
+  RANKING = "RANKING"
+  CATEGORICAL_UPLIFT = "CATEGORICAL_UPLIFT"
+  NUMERICAL_UPLIFT = "NUMERICAL_UPLIFT"
+
+  def _to_proto_type(self) -> abstract_model_pb2.Task:
+    if self in TASK_TO_PROTO:
+      return TASK_TO_PROTO[self]
+    else:
+      raise NotImplementedError(f"Unsupported task {self}")
+
+  @classmethod
+  def _from_proto_type(cls, task: abstract_model_pb2.Task):
+    task = PROTO_TO_TASK.get(task)
+    if task is None:
+      raise NotImplementedError(f"Unsupported task {task}")
+    return task
+
+
+# Mappings between task enum in python and in protobuffer and vice versa.
+TASK_TO_PROTO = {
+    Task.CLASSIFICATION: abstract_model_pb2.CLASSIFICATION,
+    Task.REGRESSION: abstract_model_pb2.REGRESSION,
+    Task.RANKING: abstract_model_pb2.RANKING,
+    Task.CATEGORICAL_UPLIFT: abstract_model_pb2.CATEGORICAL_UPLIFT,
+    Task.NUMERICAL_UPLIFT: abstract_model_pb2.NUMERICAL_UPLIFT,
+}
+PROTO_TO_TASK = {v: k for k, v in TASK_TO_PROTO.items()}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -80,7 +136,7 @@ class GenericModel:
   def task(self) -> Task:
     """Task solved by the model."""
 
-    return self._model.task()
+    return Task._from_proto_type(self._model.task())
 
   def describe(
       self,
@@ -118,7 +174,7 @@ class GenericModel:
   def __str__(self) -> str:
     return f"""\
 Model: {self.name()}
-Task: {Task.Name(self.task())}
+Task: {self.task().name}
 Class: ydf.{self.__class__.__name__}
 Use `model.describe()` for more details
 """
@@ -296,7 +352,7 @@ Use `model.describe()` for more details
 
       options_proto = metric_pb2.EvaluationOptions(
           bootstrapping_samples=bootstrapping_samples,
-          task=self._model.task(),
+          task=self.task()._to_proto_type(),
       )
 
       evaluation_proto = self._model.Evaluate(ds._dataset, options_proto)  # pylint: disable=protected-access

@@ -14,8 +14,8 @@ py_binary(
         # absl/flags dep,
         # pandas dep,
         # tensorflow_decision_forests dep,
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/dataset",
+        "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
     ],
 )

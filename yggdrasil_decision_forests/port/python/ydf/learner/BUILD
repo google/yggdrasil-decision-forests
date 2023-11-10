@@ -69,7 +69,6 @@ py_library(
         "@ydf_cc//yggdrasil_decision_forests/dataset:weight_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
@@ -101,7 +100,6 @@ py_library(
         "//ydf/dataset:dataspec",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )
 
@@ -197,7 +195,6 @@ py_test(
         # portpicker dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
         "//ydf/metric",

@@ -26,7 +26,6 @@ from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.dataset import weight_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.metric import metric_pb2
-from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
@@ -75,14 +74,10 @@ class GenericLearner:
 
     if not self._label:
       raise ValueError("Constructing the learner requires a non-empty label.")
-    if not self._task or task == abstract_model_pb2.Task.UNDEFINED:
-      raise ValueError(
-          "Constructing the learner requires a task that is not undefined."
-      )
     if self._ranking_group is not None and task != Task.RANKING:
       raise ValueError(
           "The ranking group should only be specified for ranking tasks."
-          f" Got task={Task.Name(task)}"
+          f" Got task={task.name}"
       )
     if self._ranking_group is None and task == Task.RANKING:
       raise ValueError("The ranking group must be specified for ranking tasks.")
@@ -92,7 +87,7 @@ class GenericLearner:
     ]:
       raise ValueError(
           "The uplift treatment should only be specified for uplifting tasks."
-          f" Got task={Task.Name(task)}"
+          f" Got task={task.name}"
       )
     if self._uplift_treatment is None and task in [
         Task.NUMERICAL_UPLIFT,
@@ -250,7 +245,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
         weight_definition=self._build_weight_definition(),
         ranking_group=self._ranking_group,
         uplift_treatment=self._uplift_treatment,
-        task=self._task,
+        task=self._task._to_proto_type(),
     )
 
     # Apply monotonic constraints.
@@ -412,9 +407,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
       elif task in [Task.REGRESSION, Task.RANKING, Task.NUMERICAL_UPLIFT]:
         return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
       else:
-        raise ValueError(
-            f"Unsupported task {abstract_model_pb2.Task(task)} for label column"
-        )
+        raise ValueError(f"Unsupported task {task.name} for label column")
 
     data_spec_args = copy.deepcopy(self._data_spec_args)
     # If no columns have been specified, make sure that all columns are used,

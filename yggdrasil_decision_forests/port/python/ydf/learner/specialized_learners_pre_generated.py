@@ -34,7 +34,6 @@ from typing import Dict, Optional, Sequence
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
-from yggdrasil_decision_forests.model import abstract_model_pb2  # pylint: disable=unused-import
 from ydf.dataset import dataspec
 from ydf.dataset import dataset
 from ydf.learner import generic_learner

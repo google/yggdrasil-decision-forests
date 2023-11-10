@@ -32,8 +32,8 @@ from absl import flags
 import pandas as pd
 import tensorflow_decision_forests as tfdf
 
-from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.dataset import dataset
+from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
 
 AVAILABLE_APPLICATIONS = ["tfdf", "pydf"]
@@ -164,10 +164,10 @@ def get_pd_dataset(name: str):
       "dna": "LABEL",
   }
   tasks = {
-      "adult": abstract_model_pb2.Task.CLASSIFICATION,
-      "iris": abstract_model_pb2.Task.CLASSIFICATION,
-      "abalone": abstract_model_pb2.Task.REGRESSION,
-      "dna": abstract_model_pb2.Task.CLASSIFICATION,
+      "adult": generic_learner.Task.CLASSIFICATION,
+      "iris": generic_learner.Task.CLASSIFICATION,
+      "abalone": generic_learner.Task.REGRESSION,
+      "dna": generic_learner.Task.CLASSIFICATION,
   }
   return df, labels[name], tasks[name]
 
@@ -188,7 +188,7 @@ def build_learning_params(configuration: str):
 def bench_train_pydf(
     df: pd.DataFrame,
     label: str,
-    task: abstract_model_pb2.Task,
+    task: generic_learner.Task,
     hp_dict: dict,
     algo: str,
 ):
@@ -208,7 +208,7 @@ def bench_train_pydf(
 def bench_train_tfdf(
     df: pd.DataFrame,
     label: str,
-    task: abstract_model_pb2.Task,
+    task: generic_learner.Task,
     hp_dict: dict,
     algo: str,
 ):
@@ -226,7 +226,7 @@ def bench_train_tfdf(
 
 
 def bench_train(
-    dataset: str,
+    ds: str,
     configuration: str,
     algo: str,
     application: str,
@@ -234,7 +234,7 @@ def bench_train(
 ):
   """Train a model and report timing to the runner."""
   runner.add_separator()
-  df, label, task = get_pd_dataset(dataset)
+  df, label, task = get_pd_dataset(ds)
   hp_dict = build_learning_params(configuration)
   bench = None
   if application == "tfdf":
@@ -242,7 +242,7 @@ def bench_train(
   if application == "pydf":
     bench = functools.partial(bench_train_pydf, df, label, task, hp_dict, algo)
   runner.benchmark(
-      f"{application};{dataset};{algo};{configuration}",
+      f"{application};{ds};{algo};{configuration}",
       bench,
       repetitions=_NUM_REPETITIONS.value,
   )
@@ -252,14 +252,14 @@ def main(argv):
   print("Running PYDF benchmark")
   runner = Runner()
 
-  for application, config, dataset, algo in itertools.product(
+  for application, config, ds, algo in itertools.product(
       _APPLICATIONS.value,
       _CONFIGURATIONS.value,
       _DATASETS.value,
       _ALGORITHMS.value,
   ):
     try:
-      bench_train(dataset, config, algo, application, runner)
+      bench_train(ds, config, algo, application, runner)
     except NameError:
       print(f"Application '{application}' not found.")
 

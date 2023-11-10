@@ -229,7 +229,6 @@ absl::StatusOr<std::string> GenLearnerWrapper() {
   std::string imports = absl::Substitute(R"(
 from $0yggdrasil_decision_forests.dataset import data_spec_pb2
 from $0yggdrasil_decision_forests.learner import abstract_learner_pb2
-from $0yggdrasil_decision_forests.model import abstract_model_pb2  # pylint: disable=unused-import
 from $1dataset import dataspec
 from $1dataset import dataset
 from $1learner import generic_learner
