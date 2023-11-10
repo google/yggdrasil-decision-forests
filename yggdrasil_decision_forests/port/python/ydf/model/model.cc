@@ -75,8 +75,8 @@ void init_model(py::module_& m) {
            py::arg("dataset"), py::arg("options"))
       .def("Analyze", WithStatusOr(&GenericCCModel::Analyze),
            py::arg("dataset"), py::arg("options"))
-      .def("Save", WithStatus(&GenericCCModel::Save),
-           py::arg("directory"), py::arg("file_prefix"))
+      .def("Save", WithStatus(&GenericCCModel::Save), py::arg("directory"),
+           py::arg("file_prefix"))
       .def("name", &GenericCCModel::name)
       .def("task", &GenericCCModel::task)
       .def("data_spec", &GenericCCModel::data_spec)
@@ -118,8 +118,9 @@ void init_model(py::module_& m) {
                  "<model_cc.DecisionForestCCModel of type $0.", a.name());
            })
       .def("num_trees", &DecisionForestCCModel::num_trees)
-      .def("PredictLeaves",
-           WithStatusOr(&DecisionForestCCModel::PredictLeaves),
+      .def("set_node_format", &DecisionForestCCModel::set_node_format,
+           py::arg("node_format"))
+      .def("PredictLeaves", WithStatusOr(&DecisionForestCCModel::PredictLeaves),
            py::arg("dataset"))
       .def("Distance", WithStatusOr(&DecisionForestCCModel::Distance),
            py::arg("dataset1"), py::arg("dataset2"));

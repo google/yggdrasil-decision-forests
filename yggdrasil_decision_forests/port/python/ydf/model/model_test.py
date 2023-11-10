@@ -20,17 +20,19 @@ import tempfile
 import textwrap
 
 from absl.testing import absltest
+from absl.testing import parameterized
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
 
+from yggdrasil_decision_forests.model.random_forest import random_forest_pb2
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model import random_forest_model
 from ydf.utils import test_utils
 
 
-class DecisionForestModelTest(absltest.TestCase):
+class DecisionForestModelTest(parameterized.TestCase):
 
   def test_predict_adult_rf(self):
     model_path = os.path.join(
@@ -317,6 +319,32 @@ Use `model.describe()` for more details
     test_df = pd.read_csv(dataset_path)
     benchmark_result = model.benchmark(test_df)
     print(benchmark_result)
+
+  @parameterized.parameters(x for x in generic_model.NodeFormat)
+  def test_node_format(self, node_format: generic_model.NodeFormat):
+    """Test that the node format is saved correctly."""
+    model_load_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "adult_binary_class_rf",
+    )
+    model = model_lib.load_model(model_load_path)
+    model.set_node_format(node_format=node_format)
+    model_save_path = self.create_tempdir().full_path
+    model.save(
+        model_save_path,
+        advanced_options=generic_model.ModelIOOptions(file_prefix=""),
+    )
+    # Read the proto to see if the format is set correctly
+    # TODO: Consider exposing the proto directly in ydf.
+    random_forest_header = random_forest_pb2.Header()
+    random_forest_header_path = os.path.join(
+        model_save_path, "random_forest_header.pb"
+    )
+    self.assertTrue(os.path.exists(random_forest_header_path))
+    with open(random_forest_header_path, "rb") as f:
+      random_forest_header.ParseFromString(f.read())
+    self.assertEqual(random_forest_header.node_format, node_format.name)
 
 
 class RandomForestModelTest(absltest.TestCase):

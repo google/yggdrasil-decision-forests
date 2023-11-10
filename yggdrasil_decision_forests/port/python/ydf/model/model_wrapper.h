@@ -137,6 +137,11 @@ class DecisionForestCCModel : public GenericCCModel {
       const dataset::VerticalDataset& dataset1,
       const dataset::VerticalDataset& dataset2);
 
+  // Sets the format for saving the model's nodes.
+  void set_node_format(const std::string& node_format) {
+    df_model_->set_node_format(node_format);
+  }
+
  protected:
   // `model` and `df_model` must correspond to the same object.
   DecisionForestCCModel(std::unique_ptr<model::AbstractModel>&& model,

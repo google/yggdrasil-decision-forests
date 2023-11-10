@@ -15,6 +15,7 @@
 """Generic YDF model definition."""
 
 import dataclasses
+import enum
 import os
 import tempfile
 from typing import Any, Literal, Optional, TypeVar, Union
@@ -51,6 +52,18 @@ class ModelIOOptions:
   """
 
   file_prefix: Optional[str] = None
+
+@enum.unique
+class NodeFormat(enum.Enum):
+  """Serialization format for a model.
+
+  Determines the storage format for nodes.
+
+  Attributes:
+    BLOB_SEQUENCE: Default format for the public version of YDF.
+  """
+
+  BLOB_SEQUENCE = enum.auto()
 
 
 class GenericModel:
@@ -251,7 +264,7 @@ Use `model.describe()` for more details
 
     Args:
       data: Dataset. Can be a dictionary of list or numpy array of values,
-        Pandas DataFrame, or a VerticalDatset.
+        Pandas DataFrame, or a VerticalDataset.
       bootstrapping: Controls whether bootstrapping is used to evaluate the
         confidence intervals and statistical tests (i.e., all the metrics ending
         with "[B]"). If set to false, bootstrapping is disabled. If set to true,
@@ -304,7 +317,7 @@ Use `model.describe()` for more details
     importance, training logs), the dataset (e.g., column statistics), and the
     application of the model on the dataset (e.g. partial dependence plots).
 
-    While some information might be valid, it is generatly not recommanded to
+    While some information might be valid, it is generatly not recommended to
     analyze a model on its training dataset.
 
     Usage example:
@@ -326,7 +339,7 @@ Use `model.describe()` for more details
 
     Args:
       data: Dataset. Can be a dictionary of list or numpy array of values,
-        Pandas DataFrame, or a VerticalDatset.
+        Pandas DataFrame, or a VerticalDataset.
       sampling: Ratio of examples to use for the analysis. The analysis can be
         expensive to compute. On large datasets, use a small sampling value e.g.
         0.01.

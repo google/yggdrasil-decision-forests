@@ -305,7 +305,7 @@ class RandomForestLearnerTest(LearnerTest):
     # All the examples are used in the evaluation
     self.assertEqual(evaluation.num_examples, ds.shape[0])
 
-    with open("/tmp/evaluation.html", "w") as f:
+    with open(self.create_tempfile(), "w") as f:
       f.write(evaluation._repr_html_())
 
   def test_tuner_manual(self):

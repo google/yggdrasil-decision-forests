@@ -109,3 +109,11 @@ class DecisionForestModel(generic_model.GenericModel):
           data2, data_spec=self._model.data_spec()
       )
     return self._model.Distance(ds1._dataset, ds2._dataset)  # pylint: disable=protected-access
+
+  def set_node_format(self, node_format: generic_model.NodeFormat) -> None:
+    """Set the serialization format for the nodes.
+
+    Args:
+      node_format: Node format to use when saving the model.
+    """
+    self._model.set_node_format(node_format.name)

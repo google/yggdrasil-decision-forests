@@ -126,6 +126,7 @@ class DecisionForestCCModel(GenericCCModel):
       dataset1: VerticalDataset,
       dataset2: VerticalDataset,
   ) -> npt.NDArray[np.float32]: ...
+  def set_node_format(self, node_format: str) -> None: ...
 
 class RandomForestCCModel(DecisionForestCCModel):
   @property

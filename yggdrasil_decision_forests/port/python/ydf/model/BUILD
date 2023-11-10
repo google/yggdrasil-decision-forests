@@ -171,8 +171,10 @@ py_test(
         ":model_lib",
         ":random_forest_model",
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
+        "@ydf_cc//yggdrasil_decision_forests/model/random_forest:random_forest_py_proto",
         "//ydf/utils:test_utils",
     ],
 )
