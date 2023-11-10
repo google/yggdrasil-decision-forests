@@ -170,15 +170,15 @@ class GenericLearner:
             "If the training dataset is a path, the validation dataset must"
             " also be a path."
         )
-      return self.train_from_path(ds, valid)
+      return self._train_from_path(ds, valid)
     if valid is not None and isinstance(valid, str):
       raise ValueError(
           "The validation dataset may only be a path if the training dataset is"
           " a path."
       )
-    return self.train_from_dataset(ds, valid)
+    return self._train_from_dataset(ds, valid)
 
-  def train_from_path(
+  def _train_from_path(
       self, ds: str, valid: Optional[str]
   ) -> generic_model.GenericModel:
     """Trains a model from a file path (dataset reading in YDF C++)."""
@@ -192,7 +192,7 @@ class GenericLearner:
         cc_model = self._get_learner().TrainFromPathWithGuide(ds, guide, valid)
       return model_lib.load_cc_model(cc_model)
 
-  def train_from_dataset(
+  def _train_from_dataset(
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
