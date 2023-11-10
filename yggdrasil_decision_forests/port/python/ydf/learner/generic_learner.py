@@ -178,6 +178,14 @@ class GenericLearner:
       )
     return self._train_from_dataset(ds, valid)
 
+  def __str__(self) -> str:
+    return f"""\
+Learner: {self._learner_name}
+Task: {self._task}
+Class: ydf.{self.__class__.__name__}
+Hyper-parameters: ydf.{self._hyperparameters}
+"""
+
   def _train_from_path(
       self, ds: str, valid: Optional[str]
   ) -> generic_model.GenericModel:
