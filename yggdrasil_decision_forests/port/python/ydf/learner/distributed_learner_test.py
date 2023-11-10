@@ -25,6 +25,7 @@ import pandas as pd
 import portpicker
 
 from ydf.learner import specialized_learners
+from ydf.learner import tuner as tuner_lib
 from ydf.learner import worker
 from ydf.utils import test_utils
 
@@ -133,6 +134,35 @@ class DistributedGradientBoostedTreesLearnerTest(absltest.TestCase):
 
     workers.stop()
     self.assertAlmostEqual(model.evaluate(str(test_ds)).accuracy, 0.850, 1)
+
+
+class HyperParameterTunerTest(absltest.TestCase):
+
+  def test_adult_from_file(self):
+    # Prepare datasets
+    tmp_dir = pathlib.Path(self.create_tempdir().full_path)
+    dataset_directory = test_utils.ydf_test_data_pathlib() / "dataset"
+    train_ds = dataset_directory / "adult_train.csv"
+    test_ds = dataset_directory / "adult_test.csv"
+
+    # Start workers
+    workers = create_in_process_workers(4)
+
+    # Tune model
+    tuner = tuner_lib.RandomSearchTuner(num_trials=10)
+    tuner.choice("shrinkage", [0.2, 0.1, 0.05])
+    tuner.choice("subsample", [1.0, 0.9, 0.8])
+
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        working_dir=os.path.join(tmp_dir, "work_dir"),
+        num_trees=20,
+        workers=workers.ips,
+        tuner=tuner,
+    ).train(str(train_ds))
+
+    workers.stop()
+    self.assertGreater(model.evaluate(str(test_ds)).accuracy, 0.850, 1)
 
 
 if __name__ == "__main__":
