@@ -125,4 +125,23 @@ TEST(TFRecord, ShardedReader) {
   EXPECT_EQ(message_idx, 4);
 }
 
+TEST(TFRecord, Writer) {
+  const std::string path = file::JoinPath(test::TmpDirectory(), "tfrecord");
+  ASSERT_OK_AND_ASSIGN(auto writer, TFRecordWriter::Create(path));
+  ASSERT_OK(writer->Write("HELLO"));
+  ASSERT_OK(writer->Write(""));
+  ASSERT_OK(writer->Write("WORLD"));
+  ASSERT_OK(writer->Close());
+
+  ASSERT_OK_AND_ASSIGN(auto reader, TFRecordReader::Create(path));
+  EXPECT_TRUE(*reader->Next(nullptr));
+  EXPECT_EQ(reader->buffer(), "HELLO");
+  EXPECT_TRUE(*reader->Next(nullptr));
+  EXPECT_EQ(reader->buffer(), "");
+  EXPECT_TRUE(*reader->Next(nullptr));
+  EXPECT_EQ(reader->buffer(), "WORLD");
+  EXPECT_FALSE(*reader->Next(nullptr));
+  ASSERT_OK(reader->Close());
+}
+
 }  // namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep

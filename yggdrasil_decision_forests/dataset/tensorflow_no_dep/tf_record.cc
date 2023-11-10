@@ -101,7 +101,7 @@ absl::StatusOr<bool> TFRecordReader::Next(google::protobuf::MessageLite* message
     return absl::InvalidArgumentError(kInvalidDataMessage);
   }
 
-  if (!message->ParseFromString(buffer_)) {
+  if (message && !message->ParseFromString(buffer_)) {
     return absl::InvalidArgumentError(kInvalidDataMessage);
   }
 
@@ -110,8 +110,60 @@ absl::StatusOr<bool> TFRecordReader::Next(google::protobuf::MessageLite* message
 
 // Closes the stream.
 absl::Status TFRecordReader::Close() {
-  RETURN_IF_ERROR(stream_->Close());
-  stream_.reset();
+  if (stream_) {
+    RETURN_IF_ERROR(stream_->Close());
+    stream_.reset();
+  }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<std::unique_ptr<TFRecordWriter>> TFRecordWriter::Create(
+    absl::string_view path) {
+  ASSIGN_OR_RETURN(auto stream, file::OpenOutputFile(path));
+  return absl::make_unique<TFRecordWriter>(std::move(stream));
+}
+
+TFRecordWriter::~TFRecordWriter() {
+  if (stream_) {
+    YDF_LOG(WARNING) << "Destruction of a non closed TFRecordWriter";
+    Close().IgnoreError();
+  }
+}
+
+absl::Status TFRecordWriter::Write(const google::protobuf::MessageLite& message) {
+  if (!message.SerializeToString(&buffer_)) {
+    return absl::InternalError("Cannot serialize message");
+  }
+  return Write(buffer_);
+}
+
+absl::Status TFRecordWriter::Write(const absl::string_view data) {
+  uint64_t length = data.size();
+  RETURN_IF_ERROR(
+      stream_->Write(absl::string_view((char*)&length, sizeof(uint64_t))));
+
+  const uint64_t net_length = absl::little_endian::FromHost64(length);
+  const uint32_t net_length_checksum =
+      Mask(static_cast<uint32_t>(absl::ComputeCrc32c(
+          absl::string_view((char*)&net_length, sizeof(uint64_t)))));
+  RETURN_IF_ERROR(stream_->Write(
+      absl::string_view((char*)&net_length_checksum, sizeof(uint32_t))));
+
+  RETURN_IF_ERROR(stream_->Write(data));
+
+  const uint32_t net_data_checksum =
+      Mask(static_cast<uint32_t>(absl::ComputeCrc32c(data)));
+  RETURN_IF_ERROR(stream_->Write(
+      absl::string_view((char*)&net_data_checksum, sizeof(uint32_t))));
+
+  return absl::OkStatus();
+}
+
+absl::Status TFRecordWriter::Close() {
+  if (stream_) {
+    RETURN_IF_ERROR(stream_->Close());
+    stream_.reset();
+  }
   return absl::OkStatus();
 }
 

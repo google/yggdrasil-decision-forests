@@ -45,6 +45,8 @@ class TFRecordReader {
   // Gets the next message. Returns true and populate "message" if a new message
   // is available. Return false and do not modify "message" if the end-of-file
   // is reached.
+  //
+  // If message==null, skip the message.
   absl::StatusOr<bool> Next(google::protobuf::MessageLite* message);
 
   // Closes the stream.
@@ -52,6 +54,9 @@ class TFRecordReader {
 
   TFRecordReader(std::unique_ptr<file::FileInputByteStream>&& stream)
       : stream_(std::move(stream)) {}
+
+  // Value of the last read record. Includes skipped messages.
+  const std::string& buffer() const { return buffer_; }
 
  private:
   // Reads a CRC.
@@ -61,6 +66,7 @@ class TFRecordReader {
   std::string buffer_;
 };
 
+// Reads a set of sharded TFRecords.
 template <typename T>
 class ShardedTFRecordReader : public utils::ShardedReader<T> {
  public:
@@ -73,18 +79,89 @@ class ShardedTFRecordReader : public utils::ShardedReader<T> {
   DISALLOW_COPY_AND_ASSIGN(ShardedTFRecordReader);
 };
 
+// Writes a TFRecord container.
+// Currently, only supports non-compressed TFRecords.
+class TFRecordWriter {
+ public:
+  // Opens a TFRecord for reading.
+  static absl::StatusOr<std::unique_ptr<TFRecordWriter>> Create(
+      absl::string_view path);
+
+  ~TFRecordWriter();
+
+  absl::Status Write(const google::protobuf::MessageLite& message);
+  absl::Status Write(absl::string_view data);
+
+  // Closes the stream.
+  absl::Status Close();
+
+  TFRecordWriter(std::unique_ptr<file::FileOutputByteStream>&& stream)
+      : stream_(std::move(stream)) {}
+
+ private:
+  std::unique_ptr<file::FileOutputByteStream> stream_;
+  std::string buffer_;
+};
+
+// Write a set of sharded TFRecords.
+template <typename T>
+class ShardedTFRecordWriter : public utils::ShardedWriter<T> {
+ public:
+  ShardedTFRecordWriter() = default;
+  absl::Status OpenShard(absl::string_view path) final;
+  absl::Status WriteInShard(const T& value) final;
+  absl::Status CloseWithStatus() final;
+
+ private:
+  std::unique_ptr<TFRecordWriter> writer_;
+  DISALLOW_COPY_AND_ASSIGN(ShardedTFRecordWriter);
+};
+
 // Template implementations
 // ========================
 
 template <typename T>
 absl::Status ShardedTFRecordReader<T>::OpenShard(const absl::string_view path) {
+  if (reader_) {
+    RETURN_IF_ERROR(reader_->Close());
+    reader_.reset();
+  }
   ASSIGN_OR_RETURN(reader_, TFRecordReader::Create(path));
   return absl::OkStatus();
 }
 
 template <typename T>
 absl::StatusOr<bool> ShardedTFRecordReader<T>::NextInShard(T* example) {
-  return reader_->Next(example);
+  ASSIGN_OR_RETURN(const bool has_value, reader_->Next(example));
+  if (!has_value) {
+    RETURN_IF_ERROR(reader_->Close());
+    reader_.reset();
+  }
+  return has_value;
+}
+
+template <typename T>
+absl::Status ShardedTFRecordWriter<T>::OpenShard(absl::string_view path) {
+  if (writer_) {
+    RETURN_IF_ERROR(writer_->Close());
+    writer_.reset();
+  }
+  ASSIGN_OR_RETURN(writer_, TFRecordWriter::Create(path));
+  return absl::OkStatus();
+}
+
+template <typename T>
+absl::Status ShardedTFRecordWriter<T>::WriteInShard(const T& value) {
+  return writer_->Write(value);
+}
+
+template <typename T>
+absl::Status ShardedTFRecordWriter<T>::CloseWithStatus() {
+  if (writer_) {
+    RETURN_IF_ERROR(writer_->Close());
+    writer_.reset();
+  }
+  return absl::OkStatus();
 }
 
 }  // namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep

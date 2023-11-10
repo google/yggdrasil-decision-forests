@@ -13,16 +13,6 @@
  * limitations under the License.
  */
 
-syntax = "proto2";
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_record_tf_example.h"
 
-package yggdrasil_decision_forests.dataset.proto;
-
-// Supported dataset formats.
-enum DatasetFormat {
-  INVALID = 0;
-  FORMAT_CSV = 1;
-  reserved 2, 3, 4, 6;
-  FORMAT_TFE_TFRECORD = 5;
-  FORMAT_TFE_TFRECORDV2 = 8;
-  FORMAT_PARTIAL_DATASET_CACHE = 7;
-}
+namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep {}

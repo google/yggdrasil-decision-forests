@@ -38,6 +38,8 @@ const char* const FORMAT_CSV = "csv";
 
 // TFRecord of binary serialized TensorFlow.Example proto. Compressed with GZip.
 const char* const FORMAT_TFE_TFRECORD = "tfrecord+tfe";
+// TFRecord read by YDF directly. Currently, does not support GZip compression.
+const char* const FORMAT_TFE_TFRECORDV2 = "tfrecordv2+tfe";
 
 // Partially computed (e.g. non indexed) dataset cache.
 const char* const FORMAT_PARTIAL_DATASET_CACHE = "partial_dataset_cache";

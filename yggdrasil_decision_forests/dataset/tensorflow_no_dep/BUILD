@@ -26,6 +26,25 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "tf_record_tf_example",
+    srcs = ["tf_record_tf_example.cc"],
+    hdrs = ["tf_record_tf_example.h"],
+    deps = [
+        ":tf_example_cc_proto",
+        ":tf_record",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:data_spec_inference",
+        "//yggdrasil_decision_forests/dataset:example_reader_interface",
+        "//yggdrasil_decision_forests/dataset:example_writer_interface",
+        "//yggdrasil_decision_forests/dataset/tensorflow:tf_example_io_interface",
+        "//yggdrasil_decision_forests/utils:sharded_io_tfrecord",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/types:optional",
+    ],
+    alwayslink = 1,
+)
+
 # Proto
 # ========
 
@@ -39,6 +58,7 @@ all_proto_library(
 
 # Tests
 # =====
+
 cc_test(
     name = "tf_record_test",
     srcs = ["tf_record_test.cc"],
@@ -48,6 +68,25 @@ cc_test(
         ":tf_record",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "tf_record_tf_example_test",
+    srcs = ["tf_record_tf_example_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
+    deps = [
+        ":tf_example_cc_proto",
+        ":tf_record_tf_example",
+        "//yggdrasil_decision_forests/dataset:example_reader",
+        "//yggdrasil_decision_forests/dataset:example_reader_interface",
+        "//yggdrasil_decision_forests/dataset:example_writer",
+        "//yggdrasil_decision_forests/dataset:example_writer_interface",
+        "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/strings",
