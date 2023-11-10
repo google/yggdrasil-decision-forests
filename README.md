@@ -3,69 +3,79 @@
 </p>
 
 **Yggdrasil Decision Forests** (YDF) is a production-grade collection of
-algorithms for the training, serving, and interpretation of decision forest
-models. YDF is open-sourced and available in Python, C++, CLI, in TensorFlow
-under the name
+algorithms developed in Google Switzerland 🏔️ since 2018 for the training,
+serving, and interpretation of decision forest models. YDF is available in
+Python, C++, CLI, in TensorFlow under the name
 [TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests),
 JavaScript (inference only), and Go (inference only).
 
-To learn more about YDF, check
-[the documentation 📕](https://ydf.readthedocs.org/).
+To learn more about YDF, see [the documentation](https://ydf.readthedocs.org/).
 
-For details about YDF design, read our KDD 2023 paper
+For more information on the design of YDF, see our paper at KDD 2023:
 [Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://doi.org/10.1145/3580305.3599933).
 
-## Features
+## Key features
 
--   Random Forest, Gradient Boosted Trees, CART, and variations such as Dart,
-    Extremely randomized trees.
--   Classification, regression, ranking and uplifting.
--   Model evaluation e.g. accuracy, auc, roc, auuc, pr-auc, confidence
-    boundaries, ndgc.
--   Model analysis e.g. pdp, cep, variable importance, model plotting, structure
-    analysis.
--   Native support for numerical, categorical, boolean, categorical-set (e.g.
-    text) features.
--   Native support for missing values.
--   State of the art tree learning features e.g. oblique split, honest tree,
-    hessian score, global tree optimization.
--   Distributed training.
--   Automatic hyper-parameter tuning.
--   Fast model inference e.g. vpred, quick-scorer extended.
--   Cross compatible API and models: C++, CLI, Go, JavaScript and Python.
+-   A simple API for training, evaluation and serving of decision forests
+    models.
+-   Supports Random Forest, Gradient Boosted Trees and Carts, and advanced
+    learning algorithm such as oblique splits, honest trees, hessian and
+    non-hessian scores, and global tree optimizations.
+-   Train classification, regression, ranking, and uplifting models.
+-   Fast model inference in cpu (microseconds / example / cpu-core).
+-   Supports distributed training over billions of examples.
+-   Serving in Python, C++, TensorFlow Serving, Go, JavaScript, and CLI.
+-   Rich report for model description (e.g., training logs, plot trees),
+    analysis (e.g., variable importances, partial dependence plots, conditional
+    dependence plots), evaluation (e.g., accuracy, AUC, ROC plots, RMSE,
+    confidence intervals), tuning (trials configuration and scores), and
+    cross-validation.
+-   Natively consumes numerical, categorical, boolean, text, and missing values.
+-   Backward compatibility for model and learners since 2018.
+-   Consumes Pandas Dataframes, Numpy arrays, TensorFlow Dataset and CSV files.
 
-See the [feature list](https://ydf.readthedocs.io/en/latest/features.html) for
-more details.
+## Installation
+
+To install YDF in Python from [PyPi](https://pypi.org/project/ydf/), run:
+
+```shell
+pip install ydf
+```
 
 ## Usage example
 
-With the **CLI** you can train, evaluate, and benchmark the speed of a model as
-follows:
+Example with the Python API.
 
-```shell
-# Download YDF.
-wget https://github.com/google/yggdrasil-decision-forests/releases/download/1.0.0/cli_linux.zip
-unzip cli_linux.zip
+```python
+import ydf
+import pandas as pd
 
-# Create a training configuration
-echo 'label:"my_label" learner:"RANDOM_FOREST" ' > config.pbtxt
+train_ds = pd.read_csv("adult_train.csv")
+test_ds = pd.read_csv("adult_test.csv")
 
-# List columns in training dataset
-infer_dataspec --dataset="csv:train.csv" --output="spec.pbtxt"
+# Train a model
+model = ydf.GradientBoostedTreesLearner(label="income").train(train_ds)
 
-# Train model
-train --dataset="csv:train.csv" --dataspec="spec.pbtxt" --config="config.pbtxt" --output="my_model"
+# Look at a model (input features, training logs, structure, etc.)
+model.describe()
 
-# Evaluate model
-evaluate --dataset="csv:test.csv" --model="my_model" > evaluation.txt
+# Evaluate a model (e.g. roc, accuracy, confusion matrix, confidence intervals)
+model.evaluate(test_ds)
 
-# Benchmark the speed of the model
-benchmark_inference --dataset="csv:test.csv" --model="my_model" > benchmark.txt
+# Generate predictions
+model.predict(test_ds)
+
+# Analyse a model (e.g. partial dependence plot, variable importance)
+model.analyze(test_ds)
+
+# Benchmark the inference speed of a model
+model.benchmark(test_ds)
+
+# Save the model
+model.save("/tmp/my_model")
 ```
 
-(based on [examples/beginner.sh](examples/beginner.sh))
-
-The same model can be trained in C++ as follows:
+Example with the C++ API.
 
 ```c++
 auto dataset_path = "csv:train.csv";
@@ -112,8 +122,9 @@ model.fit(train_ds)
 model.save("project/model")
 ```
 
-(see
-[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests))
+## Next steps
+
+Check the [Getting Started tutorial 🧭](tutorial/getting_started.ipynb).
 
 ## Google I/O Presentation
 
@@ -124,16 +135,6 @@ Yggdrasil Decision Forests powers TensorFlow Decision Forests.
         <img src="https://img.youtube.com/vi/5qgk9QJ4rdQ/0.jpg"></img>
     </a>
 </div>
-
-## Documentation & Resources
-
-The following resources are available:
-
--   [📕 Documentation](https://ydf.readthedocs.io/en/latest/)
--   [Issue tracker](https://github.com/google/yggdrasil-decision-forests/issues)
--   [Changelog](https://ydf.readthedocs.io/en/latest/ydf_changelog.html)
--   [TensorFlow Decision Forest](https://github.com/tensorflow/decision-forests)
--   [Long time support](https://ydf.readthedocs.io/en/latest/lts.html)
 
 ## Citation
 
