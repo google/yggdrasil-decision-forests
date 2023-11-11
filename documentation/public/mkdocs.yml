@@ -42,6 +42,7 @@ nav:
   - API Reference 🐜: py_api/index.md
   - FAQ 🗨️: faq.md
   - Glossary 📙: glossary.md
+  - For Googlers: http://go/ydf
   - Guides:
     - Decision Forest class 🔗: https://developers.google.com/machine-learning/decision-forests
     - How to improve a model 🃏: guide_how_to_improve_model.md 

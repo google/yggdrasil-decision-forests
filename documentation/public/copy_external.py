@@ -16,17 +16,23 @@
 
 import mkdocs_gen_files
 
-with open("CHANGELOG.md", "r", encoding="utf-8") as f_in:
-  with mkdocs_gen_files.open("changelog.md", "w") as f_out:
-    f_out.write("See also the [PYDF changelogs](changelog_pydf.md).\n\n")
-    f_out.write(f_in.read())
+try:
+  with open("CHANGELOG.md", "r", encoding="utf-8") as f_in:
+    with mkdocs_gen_files.open("changelog.md", "w") as f_out:
+      f_out.write("See also the [PYDF changelogs](changelog_pydf.md).\n\n")
+      f_out.write(f_in.read())
 
-with open("LICENSE", "r", encoding="utf-8") as f_in:
-  with mkdocs_gen_files.open("LICENSE", "w") as f_out:
-    f_out.write(f_in.read())
+  with open("LICENSE", "r", encoding="utf-8") as f_in:
+    with mkdocs_gen_files.open("LICENSE", "w") as f_out:
+      f_out.write(f_in.read())
 
-with open(
-    "yggdrasil_decision_forests/port/python/CHANGELOG.md", "r", encoding="utf-8"
-) as f_in:
-  with mkdocs_gen_files.open("changelog_pydf.md", "w") as f_out:
-    f_out.write(f_in.read())
+  with open(
+      "yggdrasil_decision_forests/port/python/CHANGELOG.md",
+      "r",
+      encoding="utf-8",
+  ) as f_in:
+    with mkdocs_gen_files.open("changelog_pydf.md", "w") as f_out:
+      f_out.write(f_in.read())
+
+except:
+  pass
