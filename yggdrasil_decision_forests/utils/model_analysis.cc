@@ -795,19 +795,6 @@ proto::StandaloneAnalysisResult CreateStandaloneAnalysis(
   return standalone;
 }
 
-std::string Header() {
-  return absl::Substitute(R"(
-<style>
-$0
-</style>
-
-<script>
-$1
-</script>
-  )",
-                          CssCommon(), JsCommon());
-}
-
 absl::StatusOr<utils::html::Html> CreateHtmlReportPermutationVariableImportance(
     const proto::StandaloneAnalysisResult& analysis,
     const proto::Options& options, const absl::string_view block_id) {
@@ -830,7 +817,7 @@ absl::StatusOr<std::string> CreateHtmlReport(
   const auto block_id = utils::GenUniqueId();
 
   h::Html html;
-  html.AppendRaw(Header());
+  html.AppendRaw(model::Header());
 
   // Report header.
   if (options.report_header().enabled()) {
@@ -908,7 +895,7 @@ absl::StatusOr<std::string> CreateHtmlReport(
         const auto content,
         CreateHtmlReportPermutationVariableImportance(
             analysis, options, absl::StrCat(block_id, "_variable_importance")));
-    tabbar.AddTab("pva", "Permutation Variable Importances", content);
+    tabbar.AddTab("pva", "Variable Importances", content);
   }
 
   // Model Description

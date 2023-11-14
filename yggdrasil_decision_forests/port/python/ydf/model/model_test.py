@@ -145,7 +145,7 @@ class DecisionForestModelTest(parameterized.TestCase):
     analysis_html = analysis._repr_html_()
     self.assertIn("Partial Dependence Plot", analysis_html)
     self.assertIn("Conditional Expectation Plot", analysis_html)
-    self.assertIn("Permutation Variable Importance", analysis_html)
+    self.assertIn("Variable Importance", analysis_html)
 
     # with open("/tmp/analyze.html", "w") as f:
     #   f.write(analysis_html)

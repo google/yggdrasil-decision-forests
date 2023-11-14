@@ -42,6 +42,9 @@ absl::StatusOr<utils::html::Html> VariableImportance(
     const dataset::proto::DataSpecification& data_spec,
     absl::string_view block_id);
 
+// Html header for VariableImportance.
+std::string Header();
+
 }  // namespace yggdrasil_decision_forests::model
 
 #endif  // YGGDRASIL_DECISION_FORESTS_MODEL_DESCRIBE_H_

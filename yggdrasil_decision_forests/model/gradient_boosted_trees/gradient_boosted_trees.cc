@@ -708,6 +708,13 @@ absl::Status GradientBoostedTreesModel::MakePureServing() {
 
 absl::StatusOr<utils::plot::MultiPlot>
 GradientBoostedTreesModel::PlotTrainingLogs() const {
+  if (training_logs_.entries_size() == 0) {
+    return absl::InvalidArgumentError(
+        "The Gradient Boosted Trees model does not have training logs. Make "
+        "sure the training logs have not been removed with "
+        "pure_serving_model=True.");
+  }
+
   utils::plot::MultiPlot multiplot;
 
   // One plot for the loss, and one plot for each metric.

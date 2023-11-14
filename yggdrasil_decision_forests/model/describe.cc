@@ -40,65 +40,6 @@
 namespace yggdrasil_decision_forests::model {
 namespace {
 
-std::string Header() {
-  return absl::Substitute(R"(
-<style>
-$0
-
-.variable_importance {
-}
-
-.variable_importance select {
-}
-
-.variable_importance .content {
-  display: none;
-}
-
-.variable_importance .content.selected {
-  display: block;
-}
-
-.ydf_tuning_table {
-  border-collapse: collapse;
-  border: 1px solid lightgray;
-}
-
-.ydf_tuning_table th {
-  background-color: #ededed;
-  font-weight: bold;
-  text-align: left;
-  padding: 3px 4px;
-  border: 1px solid lightgray;
-}
-
-.ydf_tuning_table td {
-  text-align: right;
-  padding: 3px 4px;
-  border: 1px solid lightgray;
-}
-
-.ydf_tuning_table .best {
-  background-color: khaki;
-}
-
-</style>
-
-<script>
-$1
-
-function ydfShowVariableImportance(block_id) {
-    const block = document.getElementById(block_id);
-    const item = block.getElementsByTagName("select")[0].value;
-    block.getElementsByClassName("content selected")[0].classList.remove("selected");
-    document.getElementById(block_id + "_body_" + item).classList.add("selected");
-}
-
-</script>
-  )",
-                          utils::CssCommon(), utils::JsCommon());
-}
-
 void AddKeyValue(utils::html::Html* dst, const absl::string_view key,
                  const absl::string_view value) {
   namespace h = utils::html;
@@ -314,6 +255,8 @@ absl::StatusOr<utils::html::Html> SelfEvaluation(
         utils::plot::ExportToHtml(
             *plot_or, {.html_id_prefix = absl::StrCat(block_id, "self_eval")}));
     content.AppendRaw(html_plot);
+  } else {
+    content.Append(h::P(plot_or.status().message()));
   }
 
   return content;
@@ -352,6 +295,65 @@ absl::StatusOr<utils::html::Html> Structure(const model::AbstractModel& model) {
 }
 
 }  // namespace
+
+std::string Header() {
+  return absl::Substitute(R"(
+<style>
+$0
+
+.variable_importance {
+}
+
+.variable_importance select {
+}
+
+.variable_importance .content {
+  display: none;
+}
+
+.variable_importance .content.selected {
+  display: block;
+}
+
+.ydf_tuning_table {
+  border-collapse: collapse;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table th {
+  background-color: #ededed;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table td {
+  text-align: right;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table .best {
+  background-color: khaki;
+}
+
+</style>
+
+<script>
+$1
+
+function ydfShowVariableImportance(block_id) {
+    const block = document.getElementById(block_id);
+    const item = block.getElementsByTagName("select")[0].value;
+    block.getElementsByClassName("content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+
+</script>
+  )",
+                          utils::CssCommon(), utils::JsCommon());
+}
 
 absl::StatusOr<utils::html::Html> VariableImportance(
     const absl::flat_hash_map<std::string,

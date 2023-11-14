@@ -137,68 +137,7 @@ Terminology:
 	tokenized: The attribute value is obtained through tokenization.
 	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
 	vocab-size: Number of unique values.
-</pre></div><div id="123_body_training" class="tab_content"><p>The following evaluation is computed on the validation or out-of-bag dataset.</p><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
-<div id="chart_123self_eval" style="display: inline-block;" ></div>
-<script>
-  Plotly.newPlot(
-    'chart_123self_eval',
-    [{
-y: [],
-type: 'scatter',
-mode: 'lines',
-line: {
-  dash: 'solid',
-  width: 1
-},
-name: 'training',
-},
-{
-y: [],
-type: 'scatter',
-mode: 'lines',
-line: {
-  dash: 'solid',
-  width: 1
-},
-name: 'validation',
-},
-],
-    {
-      width: 600,
-      height: 400,
-      title: '',
-      showlegend: true,
-      xaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: 'iteration',
-        },
-      font: {
-        size: 10,
-        },
-      yaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: 'loss',
-        },
-      margin: {
-        l: 50,
-        r: 50,
-        b: 50,
-        t: 50,
-      },
-    },
-    {
-      modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,displayModeBar: false,
-    }
-  );
-</script>
-</div></div></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.348634 ################
+</pre></div><div id="123_body_training" class="tab_content"><p>The following evaluation is computed on the validation or out-of-bag dataset.</p><p>The Gradient Boosted Trees model does not have training logs. Make sure the training logs have not been removed with pure_serving_model=True.</p></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.348634 ################
     2.            &quot;age&quot;  0.285433 ############
     3.   &quot;capital_loss&quot;  0.131911 ###
     4. &quot;marital_status&quot;  0.117577 ##

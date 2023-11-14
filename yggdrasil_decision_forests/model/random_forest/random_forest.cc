@@ -670,6 +670,14 @@ absl::Status RandomForestModel::Proximity(
 
 absl::StatusOr<utils::plot::MultiPlot> RandomForestModel::PlotTrainingLogs()
     const {
+  if (out_of_bag_evaluations_.empty()) {
+    return absl::InvalidArgumentError(
+        "The Random Forest does not have out-of-bag evaluation training logs. "
+        "Train the model with compute_oob_performances=True to compute the "
+        "training logs. Make sure the training logs have not been removed with "
+        "pure_serving_model=True.");
+  }
+
   utils::plot::MultiPlot multiplot;
 
   ASSIGN_OR_RETURN(auto placer,
