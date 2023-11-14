@@ -172,6 +172,13 @@ class GradientBoostedTreesModel : public AbstractModel,
 
   absl::StatusOr<utils::plot::MultiPlot> PlotTrainingLogs() const override;
 
+  // The distance between two examples is computed at the ratio of shared
+  // leaves, weighted by the number of training examples in the leaf and the
+  // average absolute value of the leaves in the tree.
+  absl::Status Distance(const dataset::VerticalDataset& dataset1,
+                        const dataset::VerticalDataset& dataset2,
+                        absl::Span<float> distances) const override;
+
  private:
   void PredictClassification(const dataset::VerticalDataset& dataset,
                              dataset::VerticalDataset::row_t row_idx,
@@ -249,6 +256,14 @@ class GradientBoostedTreesModel : public AbstractModel,
 
   friend GradientBoostedTreesLearner;
 };
+
+namespace internal {
+
+// Average of the absolute value of the leafs weighted by the number of training
+// examples.
+float WeightedMeanAbsLeafValue(const decision_tree::DecisionTree& tree);
+
+}  // namespace internal
 
 }  // namespace gradient_boosted_trees
 }  // namespace model

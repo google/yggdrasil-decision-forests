@@ -1380,11 +1380,17 @@ absl::StatusOr<std::vector<int32_t>> GetLeavesIdxs(
 absl::Status Distance(
     const absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees,
     const dataset::VerticalDataset& dataset1,
-    const dataset::VerticalDataset& dataset2,
-    const absl::Span<float> distances) {
+    const dataset::VerticalDataset& dataset2, const absl::Span<float> distances,
+    const absl::optional<std::reference_wrapper<std::vector<float>>>&
+        tree_weights) {
   const size_t num_trees = trees.size();
   if (num_trees == 0) {
     return absl::InvalidArgumentError("No tree was provided");
+  }
+  if (tree_weights.has_value() &&
+      tree_weights.value().get().size() != num_trees) {
+    return absl::InvalidArgumentError(
+        "The number of trees does not match the number of weights");
   }
 
   const size_t num_example1 = dataset1.nrow();
@@ -1398,14 +1404,23 @@ absl::Status Distance(
 
   for (size_t example1_idx = 0; example1_idx < num_example1; example1_idx++) {
     for (size_t example2_idx = 0; example2_idx < num_example2; example2_idx++) {
-      int32_t count_similar = 0;
+      double sum_weighted_similarity = 0;
+      double sum_weights = 0;
       for (size_t tree_idx = 0; tree_idx < num_trees; tree_idx++) {
-        count_similar += leaves1[tree_idx + example1_idx * num_trees] ==
-                         leaves2[tree_idx + example2_idx * num_trees];
+        const bool is_similar = leaves1[tree_idx + example1_idx * num_trees] ==
+                                leaves2[tree_idx + example2_idx * num_trees];
+        const double weight =
+            tree_weights.has_value() ? tree_weights.value().get()[tree_idx] : 1;
+        sum_weighted_similarity += is_similar * weight;
+        sum_weights += weight;
       }
-      DCHECK_GT(num_trees, 0);
-      distances[example1_idx * num_example2 + example2_idx] =
-          1.f - static_cast<float>(count_similar) / num_trees;
+      double distance;
+      if (sum_weights > 0) {
+        distance = 1.f - sum_weighted_similarity / sum_weights;
+      } else {
+        distance = 1;
+      }
+      distances[example1_idx * num_example2 + example2_idx] = distance;
     }
   }
 

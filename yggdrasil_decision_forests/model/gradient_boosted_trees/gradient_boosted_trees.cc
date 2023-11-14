@@ -771,6 +771,59 @@ GradientBoostedTreesModel::PlotTrainingLogs() const {
   return multiplot;
 }
 
+absl::Status GradientBoostedTreesModel::Distance(
+    const dataset::VerticalDataset& dataset1,
+    const dataset::VerticalDataset& dataset2,
+    absl::Span<float> distances) const {
+  std::vector<float> tree_weights;
+  tree_weights.reserve(decision_trees_.size());
+  double sum_values = 0;
+  for (const auto& tree : decision_trees_) {
+    const double value = internal::WeightedMeanAbsLeafValue(*tree);
+    sum_values += value;
+    tree_weights.push_back(value);
+  }
+  // Normalize the tree weights.
+  if (sum_values > 0) {
+    for (auto& v : tree_weights) {
+      v /= sum_values;
+    }
+  }
+  return decision_tree::Distance(decision_trees(), dataset1, dataset2,
+                                 distances, tree_weights);
+}
+
+namespace internal {
+
+float WeightedMeanAbsLeafValue(const decision_tree::DecisionTree& tree) {
+  double sum = 0;
+  double total_weight = 0;
+  tree.IterateOnNodes(
+      [&](const decision_tree::NodeWithChildren& node, const int depth) {
+        if (node.IsLeaf()) {
+          const auto& regressor = node.node().regressor();
+          double leaf_weight;
+          if (regressor.has_sum_weights()) {
+            leaf_weight = regressor.sum_weights();
+          } else if (regressor.distribution().has_count()) {
+            leaf_weight = regressor.distribution().count();
+          } else {
+            leaf_weight = 1;
+          }
+          sum += std::abs(regressor.top_value()) * leaf_weight;
+          total_weight += leaf_weight;
+        }
+      });
+
+  if (total_weight > 0) {
+    return sum / total_weight;
+  } else {
+    return 0;
+  }
+}
+
+}  // namespace internal
+
 REGISTER_AbstractModel(GradientBoostedTreesModel,
                        GradientBoostedTreesModel::kRegisteredName);
 

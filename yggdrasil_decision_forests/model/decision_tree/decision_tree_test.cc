@@ -602,6 +602,64 @@ TEST(DecisionTree, Distance) {
   EXPECT_THAT(distances, ElementsAre(0.5f, 0.f, 0.5f, 1.f));
 }
 
+TEST(DecisionTree, WeightedDistance) {
+  // Builds a decision tree with a single condition and two leaf nodes.
+  //
+  // attribute >= threshold
+  //     ├─(neg)─ leaf #0
+  //     └─(pos)─ leaf #1
+  const auto make_tree = [](const float threshold)
+      -> absl::StatusOr<std::unique_ptr<DecisionTree>> {
+    auto tree = std::make_unique<DecisionTree>();
+    tree->CreateRoot();
+    NodeWithChildren* root = tree->mutable_root();
+    STATUS_CHECK(root);
+    tree->mutable_root()->CreateChildren();
+    tree->mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree->mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_higher_condition()
+        ->set_threshold(threshold);
+    tree->SetLeafIndices();
+    return tree;
+  };
+
+  // Build a forest with two trees.
+  std::vector<std::unique_ptr<DecisionTree>> trees;
+  {
+    ASSERT_OK_AND_ASSIGN(std::unique_ptr<DecisionTree> tree, make_tree(0.5));
+    trees.push_back(std::move(tree));
+  }
+  {
+    ASSERT_OK_AND_ASSIGN(std::unique_ptr<DecisionTree> tree, make_tree(1.5));
+    trees.push_back(std::move(tree));
+  }
+
+  DataSpecification dataspec;
+  dataset::AddColumn("a", ColumnType::NUMERICAL, &dataspec);
+
+  dataset::VerticalDataset dataset1;
+  dataset1.set_data_spec(dataspec);
+  ASSERT_OK(dataset1.CreateColumnsFromDataspec());
+  dataset1.AppendExample({{"a", "0"}});  // Leaves #0 (tree #0) and #0 (tree #1)
+  dataset1.AppendExample({{"a", "2"}});  // Leaves #1 and #1
+
+  dataset::VerticalDataset dataset2;
+  dataset2.set_data_spec(dataspec);
+  ASSERT_OK(dataset2.CreateColumnsFromDataspec());
+  dataset2.AppendExample({{"a", "1"}});   // Leaves #1 and #0
+  dataset2.AppendExample({{"a", "-1"}});  // Leaves #0 and #0
+
+  std::vector<float> distances(2 * 2);
+  std::vector<float> weights{0.2, 0.8};
+  EXPECT_OK(
+      Distance(trees, dataset1, dataset2, absl::MakeSpan(distances), weights));
+
+  EXPECT_THAT(distances, ElementsAre(0.2f, 0.f, 0.8f, 1.f));
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

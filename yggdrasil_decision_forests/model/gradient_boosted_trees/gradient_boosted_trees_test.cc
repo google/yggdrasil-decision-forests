@@ -24,7 +24,7 @@
 
 namespace yggdrasil_decision_forests {
 namespace model {
-namespace random_forest {
+namespace gradient_boosted_trees {
 namespace {
 
 std::string TestDataDir() {
@@ -123,7 +123,35 @@ TEST(GradientBoostedTrees,
                       /*io_options*/ {/*file_prefix=*/"prefix_2_"}));
 }
 
+TEST(GradientBoostedTrees, WeightedMeanAbsLeafValue) {
+  decision_tree::DecisionTree tree;
+  tree.CreateRoot();
+  tree.mutable_root()->CreateChildren();
+  tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+  tree.mutable_root()
+      ->mutable_node()
+      ->mutable_condition()
+      ->mutable_condition()
+      ->mutable_higher_condition()
+      ->set_threshold(1);
+  auto* pos = tree.mutable_root()
+                  ->mutable_pos_child()
+                  ->mutable_node()
+                  ->mutable_regressor();
+  pos->set_top_value(1);
+  pos->set_sum_weights(1);
+  auto* neg = tree.mutable_root()
+                  ->mutable_neg_child()
+                  ->mutable_node()
+                  ->mutable_regressor();
+  neg->set_top_value(-0.5);
+  neg->set_sum_weights(2);
+
+  EXPECT_NEAR(internal::WeightedMeanAbsLeafValue(tree),
+              (1. * 1. + 0.5 * 2.) / 3., 0.000001);
+}
+
 }  // namespace
-}  // namespace random_forest
+}  // namespace gradient_boosted_trees
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

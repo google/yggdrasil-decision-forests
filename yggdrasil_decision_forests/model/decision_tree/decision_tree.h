@@ -388,10 +388,15 @@ std::vector<int32_t> ExactElementsFromContainsCondition(
 //
 // "distances[i * dataset2.nrows() +j]" will be the distance between the i-th
 // example of "dataset1" and the j-th example of "dataset2".
+//
+// "tree_weights" are optional tree weights. If specified, the size of
+// "tree_weights" should be the same as "trees".
 absl::Status Distance(
     absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees,
     const dataset::VerticalDataset& dataset1,
-    const dataset::VerticalDataset& dataset2, absl::Span<float> distances);
+    const dataset::VerticalDataset& dataset2, absl::Span<float> distances,
+    const absl::optional<std::reference_wrapper<std::vector<float>>>&
+        tree_weights = {});
 
 }  // namespace decision_tree
 }  // namespace model
