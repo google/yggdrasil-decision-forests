@@ -18,7 +18,7 @@
 #define YGGDRASIL_DECISION_FORESTS_SERVING_TF_EXAMPLE_H_
 
 #include "absl/status/status.h"
-#include "tensorflow/core/example/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 
 namespace yggdrasil_decision_forests {

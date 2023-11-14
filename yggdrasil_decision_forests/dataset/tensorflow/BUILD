@@ -5,17 +5,28 @@ package(
     licenses = ["notice"],
 )
 
+cc_library_ydf(
+    name = "tensorflow",
+    features = ["-layering_check"],
+    deps = select({
+        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
+            "@tensorflow_pypi//:libtensorflow_framework",
+            "@tensorflow_pypi//:tf_header_lib",
+        ],
+        "//conditions:default": [
+            "@org_tensorflow//tensorflow/core:lib",
+            "@org_tensorflow//tensorflow/core:protos_all_cc",
+        ],
+    }),
+)
+
 # Library
 # =======
 
 cc_library_ydf(
     name = "tf_example_io_interface",
-    srcs = [
-        "tf_example_io_interface.cc",
-    ],
-    hdrs = [
-        "tf_example_io_interface.h",
-    ],
+    srcs = ["tf_example_io_interface.cc"],
+    hdrs = ["tf_example_io_interface.h"],
     deps = [
         ":tf_example",
         "//yggdrasil_decision_forests/dataset:data_spec",
@@ -26,6 +37,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:example_writer_interface",
         "//yggdrasil_decision_forests/dataset:formats",
         "//yggdrasil_decision_forests/dataset:formats_cc_proto",
+        "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:registration",
@@ -37,12 +49,6 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
     ] + select({
-        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@tensorflow_pypi//:libtensorflow_framework",
-            "@tensorflow_pypi//:tf_header_lib",
-        ],
-        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
-    }) + select({
         "//yggdrasil_decision_forests:use_absl_anyinvocable": [
             "@com_google_absl//absl/functional:any_invocable",
         ],
@@ -58,6 +64,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:tf_example",
         "//yggdrasil_decision_forests/utils:compatibility",
@@ -67,12 +74,6 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
     ] + select({
-        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@tensorflow_pypi//:libtensorflow_framework",
-            "@tensorflow_pypi//:tf_header_lib",
-        ],
-        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
-    }) + select({
         "//yggdrasil_decision_forests:use_absl_anyinvocable": [
             "@com_google_absl//absl/functional:any_invocable",
         ],
@@ -89,12 +90,14 @@ cc_library_ydf(
         "tf_example_io_tfrecord.h",
     ],
     deps = [
+        ":tensorflow",
         ":tf_example",
         ":tf_example_io_interface",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",
         "//yggdrasil_decision_forests/dataset:example_reader_interface",
         "//yggdrasil_decision_forests/dataset:example_writer_interface",
+        "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:sharded_io_tfrecord",
         "@com_google_absl//absl/memory",
@@ -102,15 +105,6 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
     ] + select({
-        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@tensorflow_pypi//:libtensorflow_framework",
-            "@tensorflow_pypi//:tf_header_lib",
-        ],
-        "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:lib",
-            "@org_tensorflow//tensorflow/core:protos_all_cc",
-        ],
-    }) + select({
         "//yggdrasil_decision_forests:use_absl_anyinvocable": [
             "@com_google_absl//absl/functional:any_invocable",
         ],
@@ -135,6 +129,7 @@ cc_test(
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_writer",
         "//yggdrasil_decision_forests/dataset:example_writer_interface",
+        "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:tf_example",
         "//yggdrasil_decision_forests/utils:compatibility",
@@ -145,12 +140,6 @@ cc_test(
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ] + select({
-        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@tensorflow_pypi//:libtensorflow_framework",
-            "@tensorflow_pypi//:tf_header_lib",
-        ],
-        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
-    }) + select({
         "//yggdrasil_decision_forests:use_absl_anyinvocable": [
             "@com_google_absl//absl/functional:any_invocable",
         ],
@@ -165,10 +154,9 @@ cc_test(
         ":tf_example",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
-        "@org_tensorflow//tensorflow/core/example:example_protos_cc",
-        "@org_tensorflow//tensorflow/core/example:feature_util",
     ],
 )

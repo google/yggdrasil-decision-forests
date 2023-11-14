@@ -18,27 +18,26 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "tensorflow/core/example/example.pb.h"
-#include "tensorflow/core/example/feature.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
 
 // Converts a tf.Example into an Example.
-absl::Status TfExampleToYdfExample(const ::tensorflow::Example& tf_example,
+absl::Status TfExampleToYdfExample(const tensorflow::Example& tf_example,
                                    const proto::DataSpecification& data_spec,
                                    proto::Example* example);
 
 // Converts a proto::Example into a tensorflow::Example.
 absl::Status YdfExampleToTfExample(const proto::Example& example,
                                    const proto::DataSpecification& data_spec,
-                                   ::tensorflow::Example* tf_example);
+                                   tensorflow::Example* tf_example);
 
 // Copies a tf.Example into a ExampleSet.
-absl::Status TfExampleToExampleSet(const ::tensorflow::Example& src,
+absl::Status TfExampleToExampleSet(const tensorflow::Example& src,
                                    int example_idx,
                                    const serving::FeaturesDefinition& features,
                                    serving::AbstractExampleSet* dst);

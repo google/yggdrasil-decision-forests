@@ -23,10 +23,9 @@
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "tensorflow/core/example/example.pb.h"
-#include "tensorflow/core/example/feature_util.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
@@ -221,9 +220,9 @@ TEST(ExampleSet, FromTensorflowExample) {
 
   tensorflow::Example example;
   tensorflow::SetFeatureValues({3.0f}, "a", &example);
-  tensorflow::SetFeatureValues<int64_t>({1}, "b", &example);
+  tensorflow::SetFeatureValues({1}, "b", &example);
   tensorflow::SetFeatureValues({"y_c"}, "c", &example);
-  tensorflow::SetFeatureValues<int64_t>({2, 3}, "d", &example);
+  tensorflow::SetFeatureValues({2, 3}, "d", &example);
   tensorflow::SetFeatureValues({"y_d", "z_d"}, "e", &example);
   tensorflow::SetFeatureValues({1.9}, "f", &example);
   tensorflow::SetFeatureValues({10.f, 11.f, 12.f}, "g", &example);
@@ -284,7 +283,7 @@ TEST(ExampleSet, FromTensorflowExample) {
                "Too many values for feature: a"));
 
   tensorflow::Example example_3 = example;
-  tensorflow::SetFeatureValues<int64_t>({1, 2}, "b", &example_3);
+  tensorflow::SetFeatureValues({1, 2}, "b", &example_3);
   EXPECT_THAT(
       TfExampleToExampleSet(example_3, 1, model.features(), &example_set),
       StatusIs(absl::StatusCode::kInvalidArgument,

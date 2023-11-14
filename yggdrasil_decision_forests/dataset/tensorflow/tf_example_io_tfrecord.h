@@ -23,19 +23,19 @@
 
 #include "absl/memory/memory.h"
 #include "absl/types/optional.h"
-#include "tensorflow/core/example/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/utils/sharded_io_tfrecord.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
 
 using TFRecordTFExampleReader =
-    utils::TFRecordShardedReader<tensorflow::Example>;
+    utils::TFRecordShardedReader<::tensorflow::Example>;
 REGISTER_AbstractTFExampleReader(TFRecordTFExampleReader,
                                  "FORMAT_TFE_TFRECORD");
 
@@ -66,7 +66,7 @@ REGISTER_AbstractDataSpecCreator(TFRTFExampleReaderToDataSpecCreator,
 
 // Write tf.Examples in TFRecords.
 class TFRecordTFExampleWriter
-    : public utils::TFRecordShardedWriter<tensorflow::Example> {};
+    : public utils::TFRecordShardedWriter<::tensorflow::Example> {};
 
 REGISTER_AbstractTFExampleWriter(TFRecordTFExampleWriter,
                                  "FORMAT_TFE_TFRECORD");

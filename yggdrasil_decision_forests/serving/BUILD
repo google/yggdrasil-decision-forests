@@ -54,6 +54,7 @@ cc_library_ydf(
         ":example_set",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/container:flat_hash_map",
@@ -65,7 +66,7 @@ cc_library_ydf(
             "@tensorflow_pypi//:libtensorflow_framework",
             "@tensorflow_pypi//:tf_header_lib",
         ],
-        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+        "//conditions:default": [],
     }),
 )
 
@@ -131,12 +132,11 @@ cc_test(
         ":tf_example",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_googletest//:gtest_main",
-        "@org_tensorflow//tensorflow/core/example:example_protos_cc",
-        "@org_tensorflow//tensorflow/core/example:feature_util",
     ],
 )
 

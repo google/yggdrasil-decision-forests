@@ -26,9 +26,7 @@
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
-#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_record.h"
-#include "yggdrasil_decision_forests/utils/sharded_io_tfrecord.h"
 
 namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep {
 

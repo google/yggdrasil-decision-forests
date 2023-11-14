@@ -5,6 +5,12 @@ package(
 
 exports_files(["LICENSE"])
 
+# If set, use YDF own copy of TensorFlow proto.
+config_setting(
+    name = "use_ydf_tensorflow_proto",
+    values = {"define": "use_ydf_tensorflow_proto=1"},
+)
+
 # Use the TensorFlow IO library instead of the default one (relying on std).
 # This option is required for < c++17.
 config_setting(

@@ -10,9 +10,11 @@ cc_library_ydf(
     deps = [
         ":csv_example_reader",
         ":csv_example_writer",
+        "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_record_tf_example",
         "//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_reader",
     ] + select({
         "//yggdrasil_decision_forests:use_tensorflow_io": ["//yggdrasil_decision_forests/dataset/tensorflow:tf_example_io_tfrecord"],
+        "//yggdrasil_decision_forests:use_ydf_tensorflow_proto": [],
         "//conditions:default": [
         ],
     }) + select({
@@ -313,6 +315,7 @@ cc_library_ydf(
         ":synthetic_dataset_cc_proto",
         ":vertical_dataset",
         "//yggdrasil_decision_forests/dataset/tensorflow:tf_example_io_interface",
+        "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/utils:csv",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:hash",
@@ -324,7 +327,7 @@ cc_library_ydf(
             "@tensorflow_pypi//:libtensorflow_framework",
             "@tensorflow_pypi//:tf_header_lib",
         ],
-        "//conditions:default": ["@org_tensorflow//tensorflow/core:protos_all_cc"],
+        "//conditions:default": [],
     }),
 )
 

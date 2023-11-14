@@ -28,8 +28,7 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
-#include "tensorflow/core/example/example.pb.h"
-#include "tensorflow/core/example/feature.pb.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -365,7 +364,7 @@ absl::Status YdfExampleToTfExample(const proto::Example& example,
   return absl::OkStatus();
 }
 
-absl::Status TfExampleToExampleSet(const ::tensorflow::Example& src,
+absl::Status TfExampleToExampleSet(const tensorflow::Example& src,
                                    int example_idx,
                                    const serving::FeaturesDefinition& features,
                                    serving::AbstractExampleSet* dst) {

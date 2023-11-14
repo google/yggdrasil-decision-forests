@@ -91,7 +91,10 @@ absl::StatusOr<bool> TFRecordReader::Next(google::protobuf::MessageLite* message
   }
 
   buffer_.resize(length);
-  ASSIGN_OR_RETURN(has_content, stream_->ReadExactly(buffer_.data(), length));
+  // TODO: Use buffer_.data() in c++>=17.
+  if (length > 0) {
+    ASSIGN_OR_RETURN(has_content, stream_->ReadExactly(&buffer_[0], length));
+  }
   if (!has_content) {
     return absl::InvalidArgumentError(kInvalidDataMessage);
   }

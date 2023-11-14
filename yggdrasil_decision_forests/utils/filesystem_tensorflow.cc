@@ -102,11 +102,11 @@ absl::Status RecursivelyDelete(absl::string_view path, int options) {
 }
 
 absl::Status FileInputByteStream::Open(absl::string_view path) {
-  std::unique_ptr<tensorflow::RandomAccessFile> file;
+  std::unique_ptr<::tensorflow::RandomAccessFile> file;
   RETURN_IF_ERROR(ToUtilStatus(tensorflow::Env::Default()->NewRandomAccessFile(
       std::string(path), &file)));
   file_ =
-      absl::make_unique<tensorflow::RandomAccessFileWrapper>(file.release());
+      absl::make_unique<::tensorflow::RandomAccessFileWrapper>(file.release());
   offset_ = 0;
   return absl::OkStatus();
 }
@@ -152,10 +152,10 @@ absl::Status FileInputByteStream::Close() {
 }
 
 absl::Status FileOutputByteStream::Open(absl::string_view path) {
-  std::unique_ptr<tensorflow::WritableFile> file;
+  std::unique_ptr<::tensorflow::WritableFile> file;
   RETURN_IF_ERROR(ToUtilStatus(
       tensorflow::Env::Default()->NewWritableFile(std::string(path), &file)));
-  file_ = absl::make_unique<tensorflow::WritableFileWrapper>(file.release());
+  file_ = absl::make_unique<::tensorflow::WritableFileWrapper>(file.release());
   return absl::OkStatus();
 }
 

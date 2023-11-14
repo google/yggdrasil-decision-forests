@@ -42,9 +42,9 @@ class TFRecordShardedReader : public ShardedReader<T> {
   absl::StatusOr<bool> NextInShard(T* example) override;
 
  private:
-  std::unique_ptr<tensorflow::io::SequentialRecordReader> reader_;
-  std::unique_ptr<tensorflow::RandomAccessFile> file_;
-  tensorflow::tstring buffer_;
+  std::unique_ptr<::tensorflow::io::SequentialRecordReader> reader_;
+  std::unique_ptr<::tensorflow::RandomAccessFile> file_;
+  ::tensorflow::tstring buffer_;
 
   DISALLOW_COPY_AND_ASSIGN(TFRecordShardedReader);
 };
@@ -61,8 +61,8 @@ class TFRecordShardedWriter : public ShardedWriter<T> {
   absl::Status CloseWithStatus() final;
 
  private:
-  std::unique_ptr<tensorflow::io::RecordWriter> writer_;
-  std::unique_ptr<tensorflow::WritableFile> file_;
+  std::unique_ptr<::tensorflow::io::RecordWriter> writer_;
+  std::unique_ptr<::tensorflow::WritableFile> file_;
   std::string buffer_;
 
   DISALLOW_COPY_AND_ASSIGN(TFRecordShardedWriter);
@@ -70,11 +70,12 @@ class TFRecordShardedWriter : public ShardedWriter<T> {
 
 template <typename T>
 absl::Status TFRecordShardedReader<T>::OpenShard(const absl::string_view path) {
-  RETURN_IF_ERROR(ToUtilStatus(tensorflow::Env::Default()->NewRandomAccessFile(
-      std::string(path), &file_)));
-  reader_ = absl::make_unique<tensorflow::io::SequentialRecordReader>(
+  RETURN_IF_ERROR(
+      ToUtilStatus(::tensorflow::Env::Default()->NewRandomAccessFile(
+          std::string(path), &file_)));
+  reader_ = absl::make_unique<::tensorflow::io::SequentialRecordReader>(
       file_.get(),
-      tensorflow::io::RecordReaderOptions::CreateRecordReaderOptions("GZIP"));
+      ::tensorflow::io::RecordReaderOptions::CreateRecordReaderOptions("GZIP"));
 
   return absl::OkStatus();
 }
@@ -86,7 +87,7 @@ absl::StatusOr<bool> TFRecordShardedReader<T>::NextInShard(T* example) {
     // Valid example.
     example->ParseFromArray(buffer_.data(), buffer_.size());
     return true;
-  } else if (tf_status.code() == tensorflow::error::OUT_OF_RANGE) {
+  } else if (tf_status.code() == ::tensorflow::error::OUT_OF_RANGE) {
     // No more examples available.
     return false;
   } else {
@@ -98,11 +99,11 @@ absl::StatusOr<bool> TFRecordShardedReader<T>::NextInShard(T* example) {
 template <typename T>
 absl::Status TFRecordShardedWriter<T>::OpenShard(const absl::string_view path) {
   RETURN_IF_ERROR(CloseWithStatus());
-  RETURN_IF_ERROR(ToUtilStatus(
-      tensorflow::Env::Default()->NewWritableFile(std::string(path), &file_)));
-  writer_ = absl::make_unique<tensorflow::io::RecordWriter>(
+  RETURN_IF_ERROR(ToUtilStatus(::tensorflow::Env::Default()->NewWritableFile(
+      std::string(path), &file_)));
+  writer_ = absl::make_unique<::tensorflow::io::RecordWriter>(
       file_.get(),
-      tensorflow::io::RecordWriterOptions::CreateRecordWriterOptions("GZIP"));
+      ::tensorflow::io::RecordWriterOptions::CreateRecordWriterOptions("GZIP"));
   return absl::OkStatus();
 }
 

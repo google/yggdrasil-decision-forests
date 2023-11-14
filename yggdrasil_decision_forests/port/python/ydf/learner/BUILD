@@ -25,6 +25,16 @@ cc_library_ydf(
     alwayslink = 1,
 )
 
+cc_library_ydf(
+    name = "canonical_workers",
+    deps = [
+        "@ydf_cc//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_worker",
+        "@ydf_cc//yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees:worker",
+        "@ydf_cc//yggdrasil_decision_forests/learner/generic_worker",
+    ],
+    alwayslink = 1,
+)
+
 py_wrap_yggdrasil_learners(
     name = "specialized_learners",
     learner_deps = [":canonical_learners"],
@@ -129,14 +139,12 @@ pybind_library(
     srcs = ["worker.cc"],
     hdrs = ["worker.h"],
     deps = [
+        ":canonical_workers",
         "//ydf/utils:status_casters",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@ydf_cc//yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache:dataset_cache_worker",
-        "@ydf_cc//yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees:worker",
-        "@ydf_cc//yggdrasil_decision_forests/learner/generic_worker",
         "@ydf_cc//yggdrasil_decision_forests/utils:concurrency",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
         "@ydf_cc//yggdrasil_decision_forests/utils:uid",

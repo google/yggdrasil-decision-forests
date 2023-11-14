@@ -60,6 +60,7 @@ build_and_maybe_test () {
     if [ "$3" = 0 ]; then
       # No tensorflow support
       cp -f WORKSPACE_NO_TF WORKSPACE
+      flags="${flags} --define=use_ydf_tensorflow_proto=1"
       buildable_cli_components=":all"
       testable_components="metric/...:all"
     else 

@@ -20,7 +20,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/strings/str_cat.h"
-#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -37,7 +37,7 @@ std::string DatasetDir() {
 }
 
 // Third toy example.
-ydf_tensorflow::Example ThirdExample() {
+tensorflow::Example ThirdExample() {
   return PARSE_TEST_PROTO(
       R"pb(
         features {
@@ -89,7 +89,7 @@ TEST(TFRecord, Reader) {
 
   int message_idx = 0;
   while (true) {
-    ydf_tensorflow::Example message;
+    tensorflow::Example message;
     ASSERT_OK_AND_ASSIGN(const bool has_value, reader->Next(&message));
     if (!has_value) {
       break;
@@ -105,13 +105,13 @@ TEST(TFRecord, Reader) {
 }
 
 TEST(TFRecord, ShardedReader) {
-  ShardedTFRecordReader<ydf_tensorflow::Example> reader;
+  ShardedTFRecordReader<tensorflow::Example> reader;
   ASSERT_OK(reader.Open(
       file::JoinPath(DatasetDir(), "toy.nocompress-tfe-tfrecord@2")));
 
   int message_idx = 0;
   while (true) {
-    ydf_tensorflow::Example message;
+    tensorflow::Example message;
     ASSERT_OK_AND_ASSIGN(const bool has_value, reader.Next(&message));
     if (!has_value) {
       break;

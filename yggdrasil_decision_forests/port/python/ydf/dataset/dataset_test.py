@@ -703,6 +703,59 @@ B,3""")
     )
     self.assertEqual(ds.data_spec(), expected_data_spec)
 
+  def test_read_from_sharded_tfe_nocompress(self):
+    sharded_path = "tfrecordv2+tfe:" + os.path.join(
+        test_utils.ydf_test_data_path(),
+        "dataset",
+        "toy.nocompress-tfe-tfrecord@2",
+    )
+    ds = dataset.create_vertical_dataset(
+        sharded_path,
+        min_vocab_frequency=1,
+        columns=["Bool_1", "Cat_2", "Num_1"],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        columns=(
+            ds_pb.Column(
+                name="Bool_1",
+                type=ds_pb.BOOLEAN,
+                is_manual_type=False,
+                boolean=ds_pb.BooleanSpec(count_true=2, count_false=2),
+            ),
+            ds_pb.Column(
+                name="Cat_2",
+                type=ds_pb.CATEGORICAL,
+                is_manual_type=False,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
+                    most_frequent_value=1,
+                    min_value_count=1,
+                    max_number_of_unique_values=2000,
+                    is_already_integerized=False,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "A": VocabValue(index=2, count=1),
+                        "B": VocabValue(index=1, count=1),
+                    },
+                ),
+                count_nas=2,
+            ),
+            ds_pb.Column(
+                name="Num_1",
+                type=ds_pb.NUMERICAL,
+                is_manual_type=False,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2.5,
+                    min_value=1.0,
+                    max_value=4.0,
+                    standard_deviation=1.118033988749895,
+                ),
+            ),
+        ),
+        created_num_rows=4,
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
+
   def test_multidimensional_input(self):
     ds = dataset.create_vertical_dataset(
         {"feature": np.array([[0, 1, 2], [4, 5, 6]])}

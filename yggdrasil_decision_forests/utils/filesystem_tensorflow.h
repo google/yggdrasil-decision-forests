@@ -129,7 +129,7 @@ class FileInputByteStream
   absl::Status Close();
 
  private:
-  std::unique_ptr<tensorflow::RandomAccessFileWrapper> file_;
+  std::unique_ptr<::tensorflow::RandomAccessFileWrapper> file_;
   uint64_t offset_ = 0;
   std::string scrath_;
 };
@@ -142,7 +142,7 @@ class FileOutputByteStream
   absl::Status Close();
 
  private:
-  std::unique_ptr<tensorflow::WritableFileWrapper> file_;
+  std::unique_ptr<::tensorflow::WritableFileWrapper> file_;
 };
 
 // Exports a proto to disk in binary format.

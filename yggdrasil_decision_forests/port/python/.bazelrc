@@ -14,6 +14,9 @@ build --define=use_fast_cpp_protos=true
 build --define=allow_oversize_protos=true
 build --define=grpc_no_ares=true
 
+# Do not dependent on TF for protobuffers
+build --define=use_ydf_tensorflow_proto=1
+
 # Nice print
 build:linux --copt=-fdiagnostics-color=always
 build --color=yes

@@ -19,7 +19,7 @@
 
 syntax = "proto3";
 
-package ydf_tensorflow;
+package yggdrasil_decision_forests.tensorflow_no_dep;
 
 message BytesList {
   repeated bytes value = 1;

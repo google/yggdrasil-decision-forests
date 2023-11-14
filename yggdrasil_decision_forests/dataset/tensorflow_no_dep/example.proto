@@ -19,7 +19,7 @@
 
 syntax = "proto3";
 
-package ydf_tensorflow;
+package yggdrasil_decision_forests.tensorflow_no_dep;
 
 import "yggdrasil_decision_forests/dataset/tensorflow_no_dep/feature.proto";
 
