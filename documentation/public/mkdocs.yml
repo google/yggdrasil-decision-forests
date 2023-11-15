@@ -55,6 +55,7 @@ nav:
     - numerical: tutorial/numerical_feature.ipynb
     - categorical: tutorial/categorical_feature.ipynb
     - monotonic: tutorial/monotonic_feature.ipynb
+    - pretrained embedding: tutorial/pretrained_embedding.ipynb
     - time sequences: tutorial/time_sequences.ipynb
     # TODO: boolean, and text
   - Dataset:
