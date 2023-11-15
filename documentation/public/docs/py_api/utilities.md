@@ -4,14 +4,18 @@
 
 ::: ydf.load_model
 
+::: ydf.Feature
+
 ::: ydf.Column
 
-::: ydf.start_worker
-
-<!-- ::: ydf.Task -->
+::: ydf.Task
 
 ::: ydf.Semantic
 
-::: ydf.create_vertical_dataset
+::: ydf.start_worker
+
+::: ydf.strict
 
 ::: ydf.ModelIOOptions
+
+::: ydf.create_vertical_dataset

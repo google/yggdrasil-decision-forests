@@ -38,7 +38,11 @@ from absl import logging
 
 from ydf.cc import ydf
 
+# Current verbose level. See "verbose" for details.
 _VERBOSE_LEVEL: int = 1
+
+# The strick mode prints more warning messages.
+_STRICT: bool = False
 
 
 @enum.unique
@@ -55,7 +59,8 @@ class WarningMessage(enum.Enum):
 # List of already showed warning message that should not be displayed again.
 _ALREADY_DISPLAYED_WARNING_IDS: Set[WarningMessage] = set()
 
-def verbose(level: int) -> int:
+
+def verbose(level: int = 2) -> int:
   """Sets the verbose level of YDF.
 
   The verbose levels are:
@@ -109,7 +114,10 @@ def info(msg: str, *args: Any) -> None:
 
 
 def warning(
-    msg: str, *args: Any, message_id: Optional[WarningMessage] = None
+    msg: str,
+    *args: Any,
+    message_id: Optional[WarningMessage] = None,
+    is_strict: bool = False
 ) -> None:
   """Print a warning message.
 
@@ -126,7 +134,12 @@ def warning(
     *args: Placeholder replacement values.
     message_id: Id of the warning message. If set, the message is only displayed
       once.
+    is_strict: If true, the warning message is only disabled if the strict mode
+      is enabled.
   """
+
+  if is_strict and not _STRICT:
+    return
 
   if message_id is not None:
     if message_id in _ALREADY_DISPLAYED_WARNING_IDS:
@@ -136,6 +149,20 @@ def warning(
   if _VERBOSE_LEVEL >= 1:
     print("Warning:", msg % args, flush=True)
     logging.warning(msg, *args)
+
+
+def strict(value: bool = True) -> None:
+  """Sets the strict mode.
+
+  When strict mode is enabled, more warnings are displayed.
+
+
+  Args:
+    value: New value for the strict mode.
+  """
+
+  global _STRICT
+  _STRICT = value
 
 
 def is_direct_output(stream=sys.stdout):

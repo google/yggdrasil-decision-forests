@@ -71,6 +71,7 @@ class VerticalDataset:
             column.name,
             column_data.dtype.name,
             message_id=log.WarningMessage.CAST_NUMERICAL_TO_FLOAT32,
+            is_strict=True,
         )
 
         try:

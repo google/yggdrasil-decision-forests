@@ -42,6 +42,9 @@ and evaluation.
     classification.
 -   [Semantic](utilities.md#Semantic): How an input feature in interpreted e.g.
     numerical, categorical.
+-   [start_worker](utilities.md#start_worker): Start a worker for distributed
+    training.
+-   [strict](utilities.md#strict): Show more logs.
 
 ## Advanced Utilities
 
