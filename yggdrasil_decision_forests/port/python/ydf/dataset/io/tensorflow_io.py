@@ -26,7 +26,7 @@ def is_tensorflow_dataset(data: dataset_io_types.IODataset) -> bool:
   # necessary.
   return (
       "tensorflow" in str(type(data))
-      and data.__class__.__name__ == "_BatchDataset"
+      and data.__class__.__name__ in ("_BatchDataset", "_MapDataset")
       and hasattr(data, "rebatch")
   )
 

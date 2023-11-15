@@ -69,6 +69,41 @@ using CategoricalColumn =
 using HashColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::HashColumn;
 
+// A collection of values, somehow similar to a "Span<const float>", but with a
+// stride (i.e., items are evenly spaced, but possibly with a constant gap).
+// Only support what is needed in this file.
+//
+// "StridedSpanFloat32" does not own the underlying data and relies on the data
+// in "data". The initialization "py::array_t data" object should not be
+// destroyed before "StridedSpanFloat32".
+class StridedSpanFloat32 {
+ public:
+  // Build a "StridedSpanFloat32".
+  //
+  // Args:
+  //   data: A one dimentionnal array of float32 values.
+  StridedSpanFloat32(py::array_t<float>& data)
+      : item_stride_(data.strides(0) / data.itemsize()),
+        size_(static_cast<size_t>(data.shape(0))),
+        values_(data.data()) {
+    DCHECK_EQ(data.strides(0) % data.itemsize(), 0);
+  }
+
+  // Number of values.
+  size_t size() const { return size_; }
+
+  // Accesses to a value. "index" should be in [0, size).
+  float operator[](const size_t index) const {
+    DCHECK_LT(index, size_);
+    return values_[index * item_stride_];
+  }
+
+ private:
+  const size_t item_stride_;
+  const size_t size_;
+  const float* const values_;
+};
+
 // Checks if all columns of the dataset have the same number of rows and sets
 // the dataset's number of rows accordingly. If requested, also modifies the
 // data spec.
@@ -94,7 +129,7 @@ absl::Status SetAndCheckNumRows(dataset::VerticalDataset& self,
 
 // Creates a column spec for a numerical column.
 absl::StatusOr<dataset::proto::Column> CreateNumericalColumnSpec(
-    const std::string& name, absl::Span<const float> values) {
+    const absl::string_view name, const StridedSpanFloat32 values) {
   size_t num_valid_values = 0;
   double sum_values = 0;
   double sum_square_values = 0;
@@ -102,7 +137,8 @@ absl::StatusOr<dataset::proto::Column> CreateNumericalColumnSpec(
   double max_value = 0;
   bool first_value = true;
 
-  for (const float value : values) {
+  for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {
+    const float value = values[value_idx];
     if (std::isnan(value)) {
       continue;
     }
@@ -158,30 +194,31 @@ absl::Status PopulateColumnNumericalNPFloat32(dataset::VerticalDataset& self,
                                               const std::string& name,
                                               py::array_t<float>& data,
                                               std::optional<int> column_idx) {
-  const auto unchecked = data.unchecked<1>();
+  StridedSpanFloat32 src_values(data);
 
-  if (data.strides(0) != data.itemsize()) {
-    return absl::InternalError("Expecting non-strided np.float32 array.");
-  }
-  const auto values = absl::Span<const float>(data.data(), unchecked.shape(0));
-
-  if (!column_idx.has_value()) {
-    // Create column spec
-    ASSIGN_OR_RETURN(const auto column_spec,
-                     CreateNumericalColumnSpec(name, values));
-    ASSIGN_OR_RETURN(auto* abstract_column, self.AddColumn(column_spec));
-    // Import column data
-    ASSIGN_OR_RETURN(auto* column,
-                     abstract_column->MutableCastWithStatus<NumericalColumn>());
-    column->mutable_values()->assign(values.data(),
-                                     values.data() + values.size());
-  } else {
-    ASSIGN_OR_RETURN(auto* column,
-                     self.MutableColumnWithCastWithStatus<NumericalColumn>(
-                         column_idx.value()));
-    column->mutable_values()->insert(column->mutable_values()->end(),
-                                     values.data(),
-                                     values.data() + values.size());
+  const auto get_mutable_column =
+      [column_idx, &self, &name,
+       &src_values]() -> absl::StatusOr<NumericalColumn* const> {
+    if (!column_idx.has_value()) {
+      // Create column spec
+      ASSIGN_OR_RETURN(const auto column_spec,
+                       CreateNumericalColumnSpec(name, src_values));
+      ASSIGN_OR_RETURN(auto* abstract_column, self.AddColumn(column_spec));
+      // Import column data
+      return abstract_column->MutableCastWithStatus<NumericalColumn>();
+    } else {
+      // Note that when populating an existing vertical dataset column, we don't
+      // compute / update the dataspec.
+      return self.MutableColumnWithCastWithStatus<NumericalColumn>(
+          column_idx.value());
+    }
+  };
+  ASSIGN_OR_RETURN(NumericalColumn* const column, get_mutable_column());
+  std::vector<float>& dst_values = *column->mutable_values();
+  const size_t offset = dst_values.size();
+  dst_values.resize(offset + src_values.size());
+  for (size_t i = 0; i < src_values.size(); i++) {
+    dst_values[i + offset] = src_values[i];
   }
 
   return absl::OkStatus();
@@ -657,6 +694,7 @@ absl::Status CreateFromPathWithDataSpecGuide(
 }  // namespace
 
 void init_dataset(py::module_& m) {
+  // TODO: 310919367 - Pass strings with string_view if/when possible.
   py::class_<dataset::VerticalDataset>(m, "VerticalDataset")
       .def(py::init<>())
       .def("data_spec", &dataset::VerticalDataset::data_spec)
@@ -672,39 +710,37 @@ void init_dataset(py::module_& m) {
       .def("DebugString", &DebugString,
            "Converts a dataset's contents to a CSV-like string. To be used for "
            "debugging / testing only.")
-      .def("CreateFromPathWithDataSpec",
-           WithStatus(CreateFromPathWithDataSpec), py::arg("path"),
-           py::arg("data_spec"),
+      .def("CreateFromPathWithDataSpec", WithStatus(CreateFromPathWithDataSpec),
+           py::arg("path"), py::arg("data_spec"),
            "Creates a dataset from a path, supports sharding. If the path is "
            "typed, use the type, the given type is used. Otherwise, YDF will "
            "try to determine the path and fail if this is not possible.")
       .def("CreateFromPathWithDataSpecGuide",
-           WithStatus(CreateFromPathWithDataSpecGuide),
-           py::arg("path"), py::arg("data_spec_guide"),
+           WithStatus(CreateFromPathWithDataSpecGuide), py::arg("path"),
+           py::arg("data_spec_guide"),
            "Creates a dataset from a path, supports sharding. If the path is "
            "typed, use the type, the given type is used. Otherwise, YDF will "
            "try to determine the path and fail if this is not possible.")
-      .def("CreateColumnsFromDataSpec",
-           WithStatus(CreateColumnsFromDataSpec), py::arg("data_spec"))
+      .def("CreateColumnsFromDataSpec", WithStatus(CreateColumnsFromDataSpec),
+           py::arg("data_spec"))
       .def("SetAndCheckNumRows", WithStatus(SetAndCheckNumRows),
            py::arg("set_data_spec"))
       // Data setters
       .def("PopulateColumnCategoricalNPBytes",
-           WithStatus(PopulateColumnCategoricalNPBytes),
-           py::arg("name"), py::arg("data").noconvert(),
-           py::arg("max_vocab_count") = -1, py::arg("min_vocab_frequency") = -1,
+           WithStatus(PopulateColumnCategoricalNPBytes), py::arg("name"),
+           py::arg("data").noconvert(), py::arg("max_vocab_count") = -1,
+           py::arg("min_vocab_frequency") = -1,
            py::arg("column_idx") = std::nullopt,
            py::arg("dictionary") = std::nullopt)
       .def("PopulateColumnNumericalNPFloat32",
-           WithStatus(PopulateColumnNumericalNPFloat32),
-           py::arg("name"), py::arg("data").noconvert(),
-           py::arg("column_idx") = std::nullopt)
+           WithStatus(PopulateColumnNumericalNPFloat32), py::arg("name"),
+           py::arg("data").noconvert(), py::arg("column_idx") = std::nullopt)
       .def("PopulateColumnBooleanNPBool",
            WithStatus(PopulateColumnBooleanNPBool), py::arg("name"),
            py::arg("data").noconvert(), py::arg("column_idx") = std::nullopt)
-      .def("PopulateColumnHashNPBytes",
-           WithStatus(PopulateColumnHashNPBytes), py::arg("name"),
-           py::arg("data").noconvert(), py::arg("column_idx") = std::nullopt);
+      .def("PopulateColumnHashNPBytes", WithStatus(PopulateColumnHashNPBytes),
+           py::arg("name"), py::arg("data").noconvert(),
+           py::arg("column_idx") = std::nullopt);
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

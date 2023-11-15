@@ -820,6 +820,87 @@ B,3""")
     ):
       _ = dataset.create_vertical_dataset({"feature": np.zeros((3, 3, 3))})
 
+  def test_singledimensional_strided(self):
+    data = np.array([[0, 1], [4, 5]], np.float32)
+    feature = data[:, 0]  # "feature" shares the same memory as "data".
+    self.assertEqual(data.strides, (8, 4))
+    self.assertEqual(feature.strides, (8,))
+
+    ds = dataset.create_vertical_dataset({"feature": feature})
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.NUMERICAL,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2,
+                    standard_deviation=2,
+                    min_value=0,
+                    max_value=4,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+    expected_dataset_content = "feature\n0\n4\n"
+    self.assertEqual(expected_dataset_content, ds._dataset.DebugString())
+
+  def test_multidimensional_strided(self):
+    # Note: multidimensional features are unrolled into singledimensional
+    # strided features.
+    ds = dataset.create_vertical_dataset(
+        {"feature": np.array([[0, 1, 2], [4, 5, 6]], np.float32)}
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature.0_of_3",
+                type=ds_pb.ColumnType.NUMERICAL,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2,
+                    standard_deviation=2,
+                    min_value=0,
+                    max_value=4,
+                ),
+            ),
+            ds_pb.Column(
+                name="feature.1_of_3",
+                type=ds_pb.ColumnType.NUMERICAL,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=3,
+                    standard_deviation=2,
+                    min_value=1,
+                    max_value=5,
+                ),
+            ),
+            ds_pb.Column(
+                name="feature.2_of_3",
+                type=ds_pb.ColumnType.NUMERICAL,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=4,
+                    standard_deviation=2,
+                    min_value=2,
+                    max_value=6,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+    expected_dataset_content = """\
+feature.0_of_3,feature.1_of_3,feature.2_of_3
+0,1,2
+4,5,6
+"""
+    self.assertEqual(expected_dataset_content, ds._dataset.DebugString())
+
 
 if __name__ == "__main__":
   absltest.main()
