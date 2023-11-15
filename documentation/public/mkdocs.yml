@@ -63,6 +63,7 @@ nav:
     # TODO: Add Dictionary, CSV, TF Dataset, TFRecord
   - Modeling:
     - Tuning: tutorial/tuning.ipynb
+    - Distributed training: tutorial/distributed_training.ipynb
   - Evaluation:
     - Train & test: tutorial/train_and_test.ipynb
     - Cross-validation: tutorial/cross_validation.ipynb

@@ -158,6 +158,7 @@ pybind_library(
 
 py_test(
     name = "learner_test",
+    size = "large",
     srcs = ["learner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     python_version = "PY3",
