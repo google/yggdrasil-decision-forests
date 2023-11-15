@@ -61,6 +61,8 @@ nav:
   - Dataset:
     - Pandas: tutorial/pandas.ipynb
     # TODO: Add Dictionary, CSV, TF Dataset, TFRecord
+  - Modeling:
+    - Tuning: tutorial/tuning.ipynb
   - Evaluation:
     - Train & test: tutorial/train_and_test.ipynb
     - Cross-validation: tutorial/cross_validation.ipynb

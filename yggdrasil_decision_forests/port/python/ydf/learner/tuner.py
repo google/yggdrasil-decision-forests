@@ -69,7 +69,7 @@ class AbstractTuner:
   def __init__(
       self,
       optimizer_key: str,
-      use_predefined_hps: bool = False,
+      automatic_search_space: bool = False,
       parallel_trials: int = 1,
       max_trial_duration: Optional[float] = None,
   ):
@@ -77,7 +77,7 @@ class AbstractTuner:
 
     Args:
       optimizer_key: Registered identifier of the optimizer.
-      use_predefined_hps: If true, automatically define the search space of
+      automatic_search_space: If true, automatically define the search space of
         hyperparameters. In this case, configuring the hyperparameters manually
         (e.g. calling "choice(...)" on the tuner) is not necessary.
       parallel_trials: Number of trials to evaluate in parallel. In the
@@ -90,7 +90,7 @@ class AbstractTuner:
         limit.
     """
 
-    self._use_predefined_hps = use_predefined_hps
+    self._automatic_search_space = automatic_search_space
     self._parallel_trials = parallel_trials
     self._max_trial_duration = max_trial_duration
 
@@ -99,7 +99,7 @@ class AbstractTuner:
     optimizer_config = self._optimizer_config()
     optimizer_config.optimizer.optimizer_key = optimizer_key
 
-    if use_predefined_hps:
+    if automatic_search_space:
       optimizer_config.predefined_search_space.SetInParent()
 
     if max_trial_duration is not None:
@@ -161,7 +161,7 @@ class RandomSearchTuner(AbstractTuner):
 
   Attributes:
     num_trials: Number of hyperparameter configurations to evaluate.
-    use_predefined_hps: If true, automatically define the search space of
+    automatic_search_space: If true, automatically define the search space of
       hyperparameters. In this case, configuring the hyperparameters manually
       (e.g. calling "choice(...)" on the tuner) is not necessary.
     parallel_trials: Number of trials to evaluate in parallel. In the
@@ -176,13 +176,13 @@ class RandomSearchTuner(AbstractTuner):
   def __init__(
       self,
       num_trials: int = 100,
-      use_predefined_hps: bool = False,
+      automatic_search_space: bool = False,
       parallel_trials: int = 1,
       max_trial_duration: Optional[float] = None,
   ):
     super().__init__(
         optimizer_key="RANDOM",
-        use_predefined_hps=use_predefined_hps,
+        automatic_search_space=automatic_search_space,
         parallel_trials=parallel_trials,
         max_trial_duration=max_trial_duration,
     )

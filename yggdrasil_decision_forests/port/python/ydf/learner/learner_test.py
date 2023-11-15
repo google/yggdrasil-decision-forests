@@ -316,7 +316,9 @@ class RandomForestLearnerTest(LearnerTest):
     )
     vds_dataset = DatasetForTesting(vds_train, vds_test, pd_dataset.label)
 
-    tuner = tuner_lib.RandomSearchTuner(num_trials=5, use_predefined_hps=True)
+    tuner = tuner_lib.RandomSearchTuner(
+        num_trials=5, automatic_search_space=True
+    )
     learner = specialized_learners.GradientBoostedTreesLearner(
         label=pd_dataset.label,
         tuner=tuner,
@@ -338,7 +340,9 @@ class RandomForestLearnerTest(LearnerTest):
     )
     vds_dataset = DatasetForTesting(vds_train, vds_test, pd_dataset.label)
 
-    tuner = tuner_lib.RandomSearchTuner(num_trials=5, use_predefined_hps=True)
+    tuner = tuner_lib.RandomSearchTuner(
+        num_trials=5, automatic_search_space=True
+    )
     learner = specialized_learners.GradientBoostedTreesLearner(
         label=pd_dataset.label,
         tuner=tuner,
