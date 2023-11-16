@@ -273,6 +273,8 @@ class RandomForestLearnerTest(LearnerTest):
         generic_learner.Task.NUMERICAL_UPLIFT,
     )
 
+  # TODO: b/310580458 - Fix this test in OSS.
+  @absltest.skip("Test sometimes times out")
   def test_interrupt_training(self):
     ds = pd.read_csv(
         os.path.join(
