@@ -41,7 +41,6 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:describe",
         "@ydf_cc//yggdrasil_decision_forests/model:model_library",
-        "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
         "@ydf_cc//yggdrasil_decision_forests/serving:example_set",
@@ -62,6 +61,8 @@ pybind_library(
     hdrs = ["model.h"],
     deps = [
         ":model_wrapper",
+        "//ydf/model/gradient_boosted_trees_model:gradient_boosted_trees_wrapper",
+        "//ydf/model/random_forest_model:random_forest_wrapper",
         "//ydf/utils:custom_casters",
         "//ydf/utils:status_casters",
         "@com_google_absl//absl/status:statusor",
@@ -71,6 +72,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/model:model_library",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
+        "@ydf_cc//yggdrasil_decision_forests/utils:logging",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils/benchmark:inference",
@@ -100,43 +102,14 @@ py_library(
 )
 
 py_library(
-    name = "decision_forest_model",
-    srcs = ["decision_forest_model.py"],
-    deps = [
-        ":generic_model",
-        # numpy dep,
-        "//ydf/cc:ydf",
-        "//ydf/dataset",
-    ],
-)
-
-py_library(
-    name = "random_forest_model",
-    srcs = ["random_forest_model.py"],
-    deps = [
-        ":decision_forest_model",
-        "//ydf/cc:ydf",
-    ],
-)
-
-py_library(
-    name = "gradient_boosted_trees_model",
-    srcs = ["gradient_boosted_trees_model.py"],
-    deps = [
-        ":decision_forest_model",
-        "//ydf/cc:ydf",
-    ],
-)
-
-py_library(
     name = "model_lib",
     srcs = ["model_lib.py"],
     deps = [
         ":generic_model",
-        ":gradient_boosted_trees_model",
-        ":random_forest_model",
         # absl/logging dep,
         "//ydf/cc:ydf",
+        "//ydf/model/gradient_boosted_trees_model",
+        "//ydf/model/random_forest_model",
     ],
 )
 
@@ -172,13 +145,12 @@ py_test(
     deps = [
         ":generic_model",
         ":model_lib",
-        ":random_forest_model",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
-        "@ydf_cc//yggdrasil_decision_forests/model/random_forest:random_forest_py_proto",
-        "//ydf/dataset:dataspec",
+        "//ydf/model/gradient_boosted_trees_model",
+        "//ydf/model/random_forest_model",
         "//ydf/utils:test_utils",
     ],
 )

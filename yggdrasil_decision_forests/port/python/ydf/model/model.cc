@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include "ydf/model/model.h"
+
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
@@ -30,10 +32,13 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
+#include "ydf/model/gradient_boosted_trees_model/gradient_boosted_trees_wrapper.h"
 #include "ydf/model/model_wrapper.h"
+#include "ydf/model/random_forest_model/random_forest_wrapper.h"
 #include "ydf/utils/custom_casters.h"
 #include "ydf/utils/status_casters.h"
 #include "yggdrasil_decision_forests/utils/benchmark/inference.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 
@@ -57,6 +62,22 @@ absl::StatusOr<std::string> ModelAnalysisCreateHtmlReport(
 }
 
 }  // namespace
+
+std::unique_ptr<GenericCCModel> CreateCCModel(
+    std::unique_ptr<model::AbstractModel> model_ptr) {
+  auto rf_model = RandomForestCCModel::Create(model_ptr);
+  if (rf_model.ok()) {
+    // `model_ptr` is now invalid.
+    return std::move(rf_model.value());
+  }
+  auto gbt_model = GradientBoostedTreesCCModel::Create(model_ptr);
+  if (gbt_model.ok()) {
+    // `model_ptr` is now invalid.
+    return std::move(gbt_model.value());
+  }
+  // `model_ptr` is still valid.
+  return std::make_unique<GenericCCModel>(std::move(model_ptr));
+}
 
 void init_model(py::module_& m) {
   m.def("LoadModel", WithStatusOr(LoadModel), py::arg("directory"),

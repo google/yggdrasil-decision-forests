@@ -14,8 +14,10 @@
 
 """Definitions for Gradient Boosted Trees models."""
 
+import numpy.typing as npt
+
 from ydf.cc import ydf
-from ydf.model import decision_forest_model
+from ydf.model.decision_forest_model import decision_forest_model
 
 
 class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
@@ -24,5 +26,5 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
   _model: ydf.GradientBoostedTreesCCModel
 
   def validation_loss(self) -> float:
-    """Returns the model's initial predictions (i.e. the model bias)."""
+    """Returns the model's loss on the validation dataset."""
     return self._model.validation_loss()

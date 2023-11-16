@@ -13,23 +13,30 @@
  * limitations under the License.
  */
 
-#ifndef YGGDRASIL_DECISION_FORESTS_PORT_PYTHON_DATASET_MODEL_H_
-#define YGGDRASIL_DECISION_FORESTS_PORT_PYTHON_DATASET_MODEL_H_
-
-#include <pybind11/pybind11.h>
+#include "ydf/model/random_forest_model/random_forest_wrapper.h"
 
 #include <memory>
+#include <utility>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
-#include "ydf/model/model_wrapper.h"
 
 namespace yggdrasil_decision_forests::port::python {
 
-std::unique_ptr<GenericCCModel> CreateCCModel(
-    std::unique_ptr<model::AbstractModel> model_ptr);
+absl::StatusOr<std::unique_ptr<RandomForestCCModel>>
+RandomForestCCModel::Create(std::unique_ptr<model::AbstractModel>& model_ptr) {
+  auto* rf_model = dynamic_cast<YDFModel*>(model_ptr.get());
+  if (rf_model == nullptr) {
+    return absl::InvalidArgumentError(
+        "This model is not a random forest model.");
+  }
+  // Both release and the unique_ptr constructor are noexcept.
+  model_ptr.release();
+  std::unique_ptr<YDFModel> new_model_ptr(rf_model);
 
-void init_model(pybind11::module_ &m);
+  return std::make_unique<RandomForestCCModel>(std::move(new_model_ptr),
+                                               rf_model);
+}
 
 }  // namespace yggdrasil_decision_forests::port::python
-
-#endif  // YGGDRASIL_DECISION_FORESTS_PORT_PYTHON_DATASET_MODEL_H_

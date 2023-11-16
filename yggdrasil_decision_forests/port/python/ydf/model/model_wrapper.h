@@ -18,7 +18,6 @@
 
 #include <pybind11/numpy.h>
 
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -35,14 +34,10 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
-#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
-#include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
-#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace py = ::pybind11;
 
@@ -131,92 +126,6 @@ class GenericCCModel {
   std::unique_ptr<model::AbstractModel> model_;
   std::unique_ptr<serving::FastEngine> engine_;
 };
-
-class DecisionForestCCModel : public GenericCCModel {
- public:
-  int num_trees() const { return df_model_->num_trees(); }
-
-  absl::StatusOr<py::array_t<int32_t>> PredictLeaves(
-      const dataset::VerticalDataset& dataset);
-
-  absl::StatusOr<py::array_t<float>> Distance(
-      const dataset::VerticalDataset& dataset1,
-      const dataset::VerticalDataset& dataset2);
-
-  // Sets the format for saving the model's nodes.
-  void set_node_format(const std::string& node_format) {
-    df_model_->set_node_format(node_format);
-  }
-
- protected:
-  // `model` and `df_model` must correspond to the same object.
-  DecisionForestCCModel(std::unique_ptr<model::AbstractModel>&& model,
-                        model::DecisionForestInterface* df_model)
-      : GenericCCModel(std::move(model)), df_model_(df_model) {}
-
- private:
-  // This is a non-owning pointer to the model held by `model_`.
-  model::DecisionForestInterface* df_model_;
-};
-
-class RandomForestCCModel : public DecisionForestCCModel {
-  using YDFModel =
-      ::yggdrasil_decision_forests::model::random_forest::RandomForestModel;
-
- public:
-  // Creates a RandomForestCCModel if `model_ptr` refers to a RandomForestModel.
-  //
-  // If this method returns an invalid status, "model_ptr" is not modified.
-  // If this method returns an ok status, the content of "model_ptr" is moved
-  // (and "model_ptr" becomes empty).
-  static absl::StatusOr<std::unique_ptr<RandomForestCCModel>> Create(
-      std::unique_ptr<model::AbstractModel>& model_ptr);
-
-  // `model` and `rf_model` must point to the same object. Prefer using
-  // RandomForestCCModel::Compute for construction.
-  RandomForestCCModel(std::unique_ptr<YDFModel> model, YDFModel* rf_model)
-      : DecisionForestCCModel(std::move(model), rf_model), rf_model_(rf_model) {
-    DCHECK_EQ(model_.get(), rf_model_);
-  }
-
- private:
-  // This is a non-owning pointer to the model held by `model_`.
-  YDFModel* rf_model_;
-};
-
-class GradientBoostedTreesCCModel : public DecisionForestCCModel {
-  using YDFModel = ::yggdrasil_decision_forests::model::gradient_boosted_trees::
-      GradientBoostedTreesModel;
-
- public:
-  // Creates a GradientBoostedTreesCCModel if `model_ptr` refers to a
-  // GradientBoostedTreesModel.
-  //
-  // If this method returns an invalid status, "model_ptr" is not modified.
-  // If this method returns an ok status, the content of "model_ptr" is
-  // moved (and "model_ptr" becomes empty).
-  static absl::StatusOr<std::unique_ptr<GradientBoostedTreesCCModel>> Create(
-      std::unique_ptr<model::AbstractModel>& model_ptr);
-
-  // `model` and `rf_model` must point to the same object. Prefer using
-  // GradientBoostedTreesCCModel::Compute for construction.
-  GradientBoostedTreesCCModel(std::unique_ptr<YDFModel> model,
-                              YDFModel* gbt_model)
-      : DecisionForestCCModel(std::move(model), gbt_model),
-        gbt_model_(gbt_model) {
-    DCHECK_EQ(model_.get(), gbt_model_);
-  }
-
-  // Return's the model's validation loss.
-  float validation_loss() const { return gbt_model_->validation_loss(); }
-
- private:
-  // This is a non-owning pointer to the model held by `model_`.
-  YDFModel* gbt_model_;
-};
-
-std::unique_ptr<GenericCCModel> CreateCCModel(
-    std::unique_ptr<model::AbstractModel> model_ptr);
 
 }  // namespace yggdrasil_decision_forests::port::python
 

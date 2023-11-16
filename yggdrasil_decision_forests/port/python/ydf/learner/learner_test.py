@@ -35,8 +35,8 @@ from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
 from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
-from ydf.model import decision_forest_model
 from ydf.model import generic_model
+from ydf.model.decision_forest_model import decision_forest_model
 from ydf.utils import log
 from ydf.utils import test_utils
 

@@ -20,8 +20,8 @@ from absl import logging
 
 from ydf.cc import ydf
 from ydf.model import generic_model
-from ydf.model import gradient_boosted_trees_model
-from ydf.model import random_forest_model
+from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
+from ydf.model.random_forest_model import random_forest_model
 
 
 def load_model(

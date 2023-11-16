@@ -48,22 +48,6 @@
 
 namespace yggdrasil_decision_forests::port::python {
 
-std::unique_ptr<GenericCCModel> CreateCCModel(
-    std::unique_ptr<model::AbstractModel> model_ptr) {
-  auto rf_model = RandomForestCCModel::Create(model_ptr);
-  if (rf_model.ok()) {
-    // `model_ptr` is now invalid.
-    return std::move(rf_model.value());
-  }
-  auto gbt_model = GradientBoostedTreesCCModel::Create(model_ptr);
-  if (gbt_model.ok()) {
-    // `model_ptr` is now invalid.
-    return std::move(gbt_model.value());
-  }
-  // `model_ptr` is still valid.
-  return std::make_unique<GenericCCModel>(std::move(model_ptr));
-}
-
 absl::StatusOr<const serving::FastEngine*> GenericCCModel::GetEngine() {
   if (engine_ == nullptr) {
     // Note: Not thread safe.
@@ -145,36 +129,6 @@ absl::Status GenericCCModel::Save(
   return model::SaveModel(directory, model_.get(), {file_prefix});
 }
 
-absl::StatusOr<py::array_t<int32_t>> DecisionForestCCModel::PredictLeaves(
-    const dataset::VerticalDataset& dataset) {
-  py::array_t<int32_t, py::array::c_style | py::array::forcecast> leaves;
-
-  const size_t num_examples = dataset.nrow();
-  const size_t num_trees = df_model_->num_trees();
-
-  leaves.resize({num_examples, num_trees});
-  auto unchecked_leaves = leaves.mutable_unchecked();
-  for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
-    auto dst = absl::MakeSpan(unchecked_leaves.mutable_data(example_idx, 0),
-                              num_trees);
-    RETURN_IF_ERROR(df_model_->PredictGetLeaves(dataset, example_idx, dst));
-  }
-
-  return leaves;
-}
-
-absl::StatusOr<py::array_t<float>> DecisionForestCCModel::Distance(
-    const dataset::VerticalDataset& dataset1,
-    const dataset::VerticalDataset& dataset2) {
-  py::array_t<float, py::array::c_style | py::array::forcecast> distances;
-  const size_t n1 = dataset1.nrow();
-  const size_t n2 = dataset2.nrow();
-  distances.resize({n1, n2});
-  auto dst = absl::MakeSpan(distances.mutable_data(), n1 * n2);
-  RETURN_IF_ERROR(df_model_->Distance(dataset1, dataset2, dst));
-  return distances;
-}
-
 absl::StatusOr<std::string> GenericCCModel::Describe(
     const bool full_details, const bool text_format) const {
   if (text_format) {
@@ -205,37 +159,6 @@ absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
     return absl::InternalError("No benchmark results.");
   }
   return BenchmarkInferenceCCResult(results[0]);
-}
-
-absl::StatusOr<std::unique_ptr<RandomForestCCModel>>
-RandomForestCCModel::Create(std::unique_ptr<model::AbstractModel>& model_ptr) {
-  auto* rf_model = dynamic_cast<YDFModel*>(model_ptr.get());
-  if (rf_model == nullptr) {
-    return absl::InvalidArgumentError(
-        "This model is not a random forest model.");
-  }
-  // Both release and the unique_ptr constructor are noexcept.
-  model_ptr.release();
-  std::unique_ptr<YDFModel> new_model_ptr(rf_model);
-
-  return std::make_unique<RandomForestCCModel>(std::move(new_model_ptr),
-                                               rf_model);
-}
-
-absl::StatusOr<std::unique_ptr<GradientBoostedTreesCCModel>>
-GradientBoostedTreesCCModel::Create(
-    std::unique_ptr<model::AbstractModel>& model_ptr) {
-  auto* gbt_model = dynamic_cast<YDFModel*>(model_ptr.get());
-  if (gbt_model == nullptr) {
-    return absl::InvalidArgumentError(
-        "This model is not a gradient boosted trees model.");
-  }
-  // Both release and the unique_ptr constructor are noexcept.
-  model_ptr.release();
-  std::unique_ptr<YDFModel> new_model_ptr(gbt_model);
-
-  return std::make_unique<GradientBoostedTreesCCModel>(std::move(new_model_ptr),
-                                                       gbt_model);
 }
 
 std::string BenchmarkInferenceCCResult::ToString() const {

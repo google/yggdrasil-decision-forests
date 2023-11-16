@@ -32,8 +32,8 @@ from ydf.model.model_lib import load_model
 from ydf.model.generic_model import Task
 from ydf.model.generic_model import ModelIOOptions
 from ydf.model.generic_model import GenericModel
-from ydf.model.random_forest_model import RandomForestModel
-from ydf.model.gradient_boosted_trees_model import GradientBoostedTreesModel
+from ydf.model.random_forest_model.random_forest_model import RandomForestModel
+from ydf.model.gradient_boosted_trees_model.gradient_boosted_trees_model import GradientBoostedTreesModel
 
 # Learner
 from ydf.learner.generic_learner import GenericLearner

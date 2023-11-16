@@ -15,11 +15,12 @@
 """Definitions for Random Forest models."""
 
 from ydf.cc import ydf
-from ydf.model import decision_forest_model
+from ydf.model.decision_forest_model import decision_forest_model
 
 
 class RandomForestModel(decision_forest_model.DecisionForestModel):
   """A Random Forest model for prediction and inspection."""
+
   _model: ydf.RandomForestCCModel
 
   def out_of_bag_evaluation(self):

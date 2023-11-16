@@ -41,7 +41,7 @@
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
-#include "ydf/model/model_wrapper.h"
+#include "ydf/model/model.h"
 #include "ydf/utils/status_casters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
