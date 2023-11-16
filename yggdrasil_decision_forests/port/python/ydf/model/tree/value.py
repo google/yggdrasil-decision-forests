@@ -16,6 +16,7 @@
 
 import abc
 import dataclasses
+import functools
 import math
 from typing import Optional, Sequence
 import numpy as np
@@ -111,3 +112,53 @@ def to_value(proto_node: decision_tree_pb2.Node) -> AbstractValue:
     )
 
   raise ValueError("Unsupported value")
+
+
+@functools.singledispatch
+def set_proto_node(value: AbstractValue, proto_node: decision_tree_pb2.Node):
+  """Sets the "value" part in a proto node.
+
+  Note: While public, this logic is not part of the API. This is why this
+  methode's code is not an abstract method in AbstractValue.
+
+  Args:
+    value: Input value.
+    proto_node: Proto node to populate with the input value.
+  """
+  del value
+  del proto_node
+  raise NotImplementedError("Unsupported value type")
+
+
+@set_proto_node.register
+def _set_proto_node_from_probability(
+    value: ProbabilityValue, proto_node: decision_tree_pb2.Node
+):
+  dist = proto_node.classifier.distribution
+  dist.sum = value.num_examples
+  # Add an extra 0 for the out-of-vocabulary item.
+  dist.counts[:] = np.array([0.0, *value.probability]) * dist.sum
+  proto_node.classifier.top_value = np.argmax(dist.counts)
+
+
+@set_proto_node.register
+def _set_proto_node_from_regression(
+    value: RegressionValue, proto_node: decision_tree_pb2.Node
+):
+  proto_node.regressor.top_value = value.value
+  if value.standard_deviation is not None:
+    dist = proto_node.regressor.distribution
+    dist.count = value.num_examples
+    dist.sum = value.value * value.num_examples
+    dist.sum_squares = (
+        value.standard_deviation**2 * value.num_examples
+        + dist.sum**2 / value.num_examples
+    )
+
+
+@set_proto_node.register
+def _set_proto_node_from_uplift(
+    value: UpliftValue, proto_node: decision_tree_pb2.Node
+):
+  proto_node.uplift.treatment_effect[:] = value.treatment_effect
+  proto_node.uplift.sum_weights = value.num_examples
