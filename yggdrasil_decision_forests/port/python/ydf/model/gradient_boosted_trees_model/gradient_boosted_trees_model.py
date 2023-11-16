@@ -28,3 +28,7 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
   def validation_loss(self) -> float:
     """Returns the model's loss on the validation dataset."""
     return self._model.validation_loss()
+
+  def initial_predictions(self) -> npt.NDArray[float]:
+    """Returns the model's initial predictions (i.e. the model bias)."""
+    return self._model.initial_predictions()

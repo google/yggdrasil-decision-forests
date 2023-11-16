@@ -30,7 +30,7 @@ message Header {
   // Loss used to train the model.
   optional Loss loss = 3;
   // Initial predictions of the model (before any tree is applied). The semantic
-  // of the prediction depend on the "loss".
+  // of the prediction depends on the "loss".
   repeated float initial_predictions = 4;
   // Number of trees extracted at each gradient boosting operation.
   optional int32 num_trees_per_iter = 5 [default = 1];

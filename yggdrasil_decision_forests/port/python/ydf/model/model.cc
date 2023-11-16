@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
+#include "ydf/model/decision_forest_model/decision_forest_wrapper.h"
 #include "ydf/model/gradient_boosted_trees_model/gradient_boosted_trees_wrapper.h"
 #include "ydf/model/model_wrapper.h"
 #include "ydf/model/random_forest_model/random_forest_wrapper.h"
@@ -169,6 +170,8 @@ void init_model(py::module_& m) {
                  "<model_cc.GradientBoostedTreesCCModel of type $0.", a.name());
            })
       .def("validation_loss", &GradientBoostedTreesCCModel::validation_loss)
+      .def("initial_predictions",
+           &GradientBoostedTreesCCModel::initial_predictions)
       .def_property_readonly_static(
           "kRegisteredName", [](py::object /* self */) {
             return model::gradient_boosted_trees::GradientBoostedTreesModel::

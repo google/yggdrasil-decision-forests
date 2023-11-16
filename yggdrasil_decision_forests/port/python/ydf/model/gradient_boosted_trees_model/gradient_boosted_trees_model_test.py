@@ -36,6 +36,15 @@ class GradientBoostedTreesTest(absltest.TestCase):
     validation_loss = model.validation_loss()
     self.assertAlmostEqual(validation_loss, 0.573842942, places=6)
 
+  def test_initial_predictions(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    model = model_lib.load_model(model_path)
+
+    initial_predictions = model.initial_predictions()
+    np.testing.assert_allclose(initial_predictions, [-1.1630996])
+
   def test_variable_importances(self):
     model_path = os.path.join(
         test_utils.ydf_test_data_path(),

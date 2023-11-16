@@ -15,6 +15,9 @@
 
 #include "ydf/model/gradient_boosted_trees_model/gradient_boosted_trees_wrapper.h"
 
+#include <pybind11/numpy.h>
+
+#include <cstring>
 #include <memory>
 #include <utility>
 
@@ -38,6 +41,19 @@ GradientBoostedTreesCCModel::Create(
 
   return std::make_unique<GradientBoostedTreesCCModel>(std::move(new_model_ptr),
                                                        gbt_model);
+}
+
+py::array_t<float> GradientBoostedTreesCCModel::initial_predictions() const {
+  py::array_t<float, py::array::c_style | py::array::forcecast>
+      initial_predictions;
+  const auto& gbt_initial_predictions = gbt_model_->initial_predictions();
+  static_assert(initial_predictions.itemsize() == sizeof(float),
+                "A C++ float should have the same size as a numpy float");
+  initial_predictions.resize({gbt_initial_predictions.size()});
+  std::memcpy(initial_predictions.mutable_data(),
+              gbt_initial_predictions.data(),
+              initial_predictions.size() * sizeof(float));
+  return initial_predictions;
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

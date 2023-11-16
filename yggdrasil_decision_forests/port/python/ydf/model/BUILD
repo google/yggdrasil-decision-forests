@@ -61,6 +61,7 @@ pybind_library(
     hdrs = ["model.h"],
     deps = [
         ":model_wrapper",
+        "//ydf/model/decision_forest_model:decision_forest_wrapper",
         "//ydf/model/gradient_boosted_trees_model:gradient_boosted_trees_wrapper",
         "//ydf/model/random_forest_model:random_forest_wrapper",
         "//ydf/utils:custom_casters",

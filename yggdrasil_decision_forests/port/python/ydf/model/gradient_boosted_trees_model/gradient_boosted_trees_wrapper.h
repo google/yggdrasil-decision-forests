@@ -16,6 +16,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_PORT_PYTHON_YDF_MODEL_GRADIENT_BOOSTED_TREES_MODEL_GRADIENT_BOOSTED_TREES_WRAPPER_H_
 #define YGGDRASIL_DECISION_FORESTS_PORT_PYTHON_YDF_MODEL_GRADIENT_BOOSTED_TREES_MODEL_GRADIENT_BOOSTED_TREES_WRAPPER_H_
 
+#include <pybind11/numpy.h>
+
 #include <memory>
 #include <utility>
 
@@ -52,6 +54,8 @@ class GradientBoostedTreesCCModel : public DecisionForestCCModel {
 
   // Return's the model's validation loss.
   float validation_loss() const { return gbt_model_->validation_loss(); }
+
+  py::array_t<float> initial_predictions() const;
 
  private:
   // This is a non-owning pointer to the model held by `model_`.
