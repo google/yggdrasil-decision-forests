@@ -85,6 +85,7 @@ py_library(
     srcs = ["generic_model.py"],
     deps = [
         ":analysis",
+        ":model_metadata",
         ":template_cpp_export",
         # absl/logging dep,
         # numpy dep,
@@ -124,6 +125,14 @@ py_library(
 )
 
 py_library(
+    name = "model_metadata",
+    srcs = ["model_metadata.py"],
+    deps = [
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
+    ],
+)
+
+py_library(
     name = "template_cpp_export",
     srcs = ["template_cpp_export.py"],
     deps = [
@@ -146,6 +155,7 @@ py_test(
     deps = [
         ":generic_model",
         ":model_lib",
+        ":model_metadata",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # numpy dep,

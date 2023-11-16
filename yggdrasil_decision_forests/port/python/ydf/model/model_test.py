@@ -26,6 +26,7 @@ import pandas as pd
 
 from ydf.model import generic_model
 from ydf.model import model_lib
+from ydf.model import model_metadata
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from ydf.model.random_forest_model import random_forest_model
 from ydf.utils import test_utils
@@ -298,6 +299,20 @@ Use `model.describe()` for more details
     test_df = pd.read_csv(dataset_path)
     benchmark_result = model.benchmark(test_df)
     print(benchmark_result)
+
+  def test_model_metadata(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    model = model_lib.load_model(model_path)
+    metadata = model_metadata.ModelMetadata(
+        owner="TestOwner",
+        created_date=31415,
+        uid=271828,
+        framework="TestFramework",
+    )
+    model.set_metadata(metadata)
+    self.assertEqual(metadata, model.metadata())
 
 
 if __name__ == "__main__":

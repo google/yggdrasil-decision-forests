@@ -26,6 +26,7 @@ from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.dataset import weight_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.metric import metric_pb2
+from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
@@ -39,6 +40,8 @@ from yggdrasil_decision_forests.utils import fold_generator_pb2
 from yggdrasil_decision_forests.utils.distribute.implementations.grpc import grpc_pb2
 
 Task = generic_model.Task
+
+_FRAMEWORK_NAME = "Python YDF"
 
 
 class GenericLearner:
@@ -246,6 +249,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
         ranking_group=self._ranking_group,
         uplift_treatment=self._uplift_treatment,
         task=self._task._to_proto_type(),
+        metadata=abstract_model_pb2.Metadata(framework=_FRAMEWORK_NAME),
     )
 
     # Apply monotonic constraints.

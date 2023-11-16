@@ -490,6 +490,20 @@ class RandomForestLearnerTest(LearnerTest):
     predictions = model.predict(data)
     self.assertEqual(predictions.shape, (2,))
 
+  def test_model_metadata_contains_framework(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="label", num_trees=2
+    )
+    model = learner.train(toy_dataset())
+    self.assertEqual(model.metadata().framework, "Python YDF")
+
+  def test_model_metadata_does_not_populate_owner(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="label", num_trees=2
+    )
+    model = learner.train(toy_dataset())
+    self.assertEqual(model.metadata().owner, "")
+
 
 class CARTLearnerTest(LearnerTest):
 
@@ -573,6 +587,7 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
             learner="GRADIENT_BOOSTED_TREES",
             label="income",
             task=abstract_model_pb2.Task.CLASSIFICATION,
+            metadata=abstract_model_pb2.Metadata(framework="Python YDF"),
             monotonic_constraints=[
                 ProtoMonotonicConstraint(
                     feature="^age$",

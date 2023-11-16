@@ -112,6 +112,12 @@ class GenericCCModel {
     *model_->mutable_data_spec() = data_spec;
   }
 
+  model::proto::Metadata metadata() const;
+
+  void set_metadata(const model::proto::Metadata& metadata) {
+    model_->mutable_metadata()->Import(metadata);
+  }
+
   const std::optional<model::proto::HyperparametersOptimizerLogs>&
   hyperparameter_optimizer_logs() const {
     return model_->hyperparameter_optimizer_logs();

@@ -31,6 +31,7 @@ from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.metric import metric
 from ydf.model import analysis
+from ydf.model import model_metadata
 from ydf.model import template_cpp_export
 from ydf.utils import html
 from ydf.utils import log
@@ -135,8 +136,24 @@ class GenericModel:
 
   def task(self) -> Task:
     """Task solved by the model."""
-
     return Task._from_proto_type(self._model.task())
+
+  def metadata(self) -> model_metadata.ModelMetadata:
+    """Metadata associated with the model.
+
+    A model's metadata contains information stored with the model that does not
+    influence the model's predictions (e.g. data created). When distributing a
+    model for wide release, it may be useful to clear / modify the model
+    metadata with `model.set_metadata(ydf.ModelMetadata())`.
+
+    Returns:
+      The model's metadata.
+    """
+    return model_metadata.ModelMetadata._from_proto_type(self._model.metadata())  # pylint:disable=protected-access
+
+  def set_metadata(self, metadata: model_metadata.ModelMetadata):
+    """Sets the model metadata."""
+    self._model.set_metadata(metadata._to_proto_type())  # pylint:disable=protected-access
 
   def describe(
       self,
@@ -244,7 +261,11 @@ Use `model.describe()` for more details
     about the YDF model format.
 
     YDF models can also be exported to other formats, see
-    `to_tensorflow_saved_model()` and `to_cpp()` for details
+    `to_tensorflow_saved_model()` and `to_cpp()` for details.
+
+    YDF saves some metadata inside the model, see `model.metadata()` for
+    details. Before distributing a model to the world, consider removing
+    metadata with `model.set_metadata(ydf.ModelMetadata())`.
 
     Usage example:
 

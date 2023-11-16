@@ -129,6 +129,12 @@ absl::Status GenericCCModel::Save(
   return model::SaveModel(directory, model_.get(), {file_prefix});
 }
 
+model::proto::Metadata GenericCCModel::metadata() const {
+  model::proto::Metadata metadata;
+  model_->metadata().Export(&metadata);
+  return metadata;
+}
+
 absl::StatusOr<std::string> GenericCCModel::Describe(
     const bool full_details, const bool text_format) const {
   if (text_format) {

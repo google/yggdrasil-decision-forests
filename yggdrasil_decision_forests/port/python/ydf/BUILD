@@ -23,6 +23,7 @@ py_library(
         "//ydf/learner:worker",
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
+        "//ydf/model:model_metadata",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/random_forest_model",
         "//ydf/utils:log",
