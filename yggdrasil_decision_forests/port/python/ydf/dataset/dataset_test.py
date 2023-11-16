@@ -820,6 +820,38 @@ B,3""")
     ):
       _ = dataset.create_vertical_dataset({"feature": np.zeros((3, 3, 3))})
 
+  def test_list_of_csv_datasets(self):
+    df = pd.DataFrame({
+        "col_str": ["A", "string", "column with", "four entries"],
+        "col_int": [5, 6, 7, 8],
+        "col_int_cat": [1, 2, 3, 4],
+        "col_float": [1.1, 2.2, 3.3, 4.4],
+    })
+    feature_definitions = [
+        Column("col_str", Semantic.CATEGORICAL, min_vocab_frequency=1),
+        Column("col_int_cat", Semantic.CATEGORICAL, min_vocab_frequency=1),
+    ]
+    dataset_directory = self.create_tempdir()
+    path1 = os.path.join(dataset_directory.full_path, "ds1")
+    path2 = os.path.join(dataset_directory.full_path, "ds2")
+    df.head(3).to_csv(path1, index=False)
+    df.tail(1).to_csv(path2, index=False)
+
+    ds = dataset.create_vertical_dataset(
+        ["csv:" + path1, "csv:" + path2],
+        columns=feature_definitions,
+        include_all_columns=True,
+    )
+
+    expected_dataset_content = """\
+col_str,col_int,col_int_cat,col_float
+A,5,1,1.1
+string,6,2,2.2
+column with,7,3,3.3
+four entries,8,4,4.4
+"""
+    self.assertEqual(expected_dataset_content, ds._dataset.DebugString())
+
   def test_singledimensional_strided(self):
     data = np.array([[0, 1], [4, 5]], np.float32)
     feature = data[:, 0]  # "feature" shares the same memory as "data".

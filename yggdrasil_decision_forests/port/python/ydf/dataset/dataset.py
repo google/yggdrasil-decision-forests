@@ -15,7 +15,7 @@
 """Dataset implementations of PYDF."""
 
 import copy
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
@@ -25,6 +25,7 @@ from ydf.dataset import dataspec
 from ydf.dataset.io import dataset_io
 from ydf.dataset.io import dataset_io_types
 from ydf.utils import log
+from ydf.utils import paths
 
 InputDataset = Union[dataset_io_types.IODataset, "VerticalDataset"]
 
@@ -310,7 +311,9 @@ def create_vertical_dataset_with_spec_or_args(
   assert (data_spec is None) != (inference_args is None)
   # If `data` is a path, try to import from the path directly from C++.
   # Everything else we try to transform into a dictionary with Python.
-  if isinstance(data, str):
+  if isinstance(data, str) or (
+      isinstance(data, list) and data and all(isinstance(s, str) for s in data)
+  ):
     return create_vertical_dataset_from_path(data, inference_args, data_spec)
   else:
     data_dict = dataset_io.cast_input_dataset_to_dict(data)
@@ -320,12 +323,14 @@ def create_vertical_dataset_with_spec_or_args(
 
 
 def create_vertical_dataset_from_path(
-    path: str,
+    path: Union[str, List[str]],
     inference_args: Optional[dataspec.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
 ) -> VerticalDataset:
-  """Creates a Vertical Dataset from path using YDF C++ dataset reading."""
+  """Creates a VerticalDataset from (list of) path using YDF dataset reading."""
   assert (data_spec is None) != (inference_args is None)
+  if not isinstance(path, str):
+    path = paths.normalize_list_of_paths(path)
   dataset = VerticalDataset()
   if data_spec is not None:
     dataset._dataset.CreateFromPathWithDataSpec(path, data_spec)

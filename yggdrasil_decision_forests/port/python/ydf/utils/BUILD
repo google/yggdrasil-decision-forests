@@ -20,6 +20,11 @@ py_library(
 )
 
 py_library(
+    name = "paths",
+    srcs = ["paths.py"],
+)
+
+py_library(
     name = "documentation",
     srcs = ["documentation.py"],
 )
@@ -86,6 +91,16 @@ py_test(
     python_version = "PY3",
     deps = [
         ":html",
+        # absl/testing:absltest dep,
+    ],
+)
+
+py_test(
+    name = "paths_test",
+    srcs = ["paths_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":paths",
         # absl/testing:absltest dep,
     ],
 )

@@ -46,6 +46,7 @@ py_library(
         "//ydf/dataset/io:dataset_io",
         "//ydf/dataset/io:dataset_io_types",
         "//ydf/utils:log",
+        "//ydf/utils:paths",
     ],
 )
 

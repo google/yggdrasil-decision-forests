@@ -26,14 +26,15 @@ if typing.TYPE_CHECKING:
 InputValues = Union[np.ndarray, List[Any]]
 
 # Supported types of datasets.
-IODataset = Union[Dict[str, InputValues], "pd.DataFrame", str]
+IODataset = Union[Dict[str, InputValues], "pd.DataFrame", str, List[str]]
 
 
 SUPPORTED_INPUT_DATA_DESCRIPTION = """\
 A dataset can be one of the following:
-- A Pandas DataFrame
+- A Pandas DataFrame.
 - A dictionary of column names (str) to values. Values can be lists of int, float, bool, str or bytes. Values can also be Numpy arrays.
 - A YDF VerticalDataset
-- A TensorFlow Batched Dataset
+- A TensorFlow Batched Dataset.
 - A typed (possibly sharded) path to a CSV file (e.g. csv:mydata).
+- A list of typed paths (e.g. ["csv:mydata1", "csv:mydata2"]).
 """
