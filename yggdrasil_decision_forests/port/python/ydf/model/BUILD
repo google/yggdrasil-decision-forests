@@ -86,6 +86,7 @@ py_library(
     deps = [
         ":analysis",
         ":model_metadata",
+        ":optimizer_logs",
         ":template_cpp_export",
         # absl/logging dep,
         # numpy dep,
@@ -138,6 +139,15 @@ py_library(
     deps = [
         "//ydf:version",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+    ],
+)
+
+py_library(
+    name = "optimizer_logs",
+    srcs = ["optimizer_logs.py"],
+    deps = [
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
     ],
 )
 
@@ -228,5 +238,18 @@ py_binary(
         # absl/flags dep,
         # absl/logging dep,
         "//ydf:api",
+    ],
+)
+
+py_test(
+    name = "optimizer_logs_test",
+    srcs = ["optimizer_logs_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":optimizer_logs",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
     ],
 )

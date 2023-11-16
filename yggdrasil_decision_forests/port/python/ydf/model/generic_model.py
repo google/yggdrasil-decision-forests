@@ -32,6 +32,7 @@ from ydf.dataset import dataspec
 from ydf.metric import metric
 from ydf.model import analysis
 from ydf.model import model_metadata
+from ydf.model import optimizer_logs
 from ydf.model import template_cpp_export
 from ydf.utils import html
 from ydf.utils import log
@@ -110,6 +111,7 @@ class ModelIOOptions:
   """
 
   file_prefix: Optional[str] = None
+
 
 @enum.unique
 class NodeFormat(enum.Enum):
@@ -574,13 +576,15 @@ Use `model.describe()` for more details
 
   def hyperparameter_optimizer_logs(
       self,
-  ) -> Optional[abstract_model_pb2.HyperparametersOptimizerLogs]:
+  ) -> Optional[optimizer_logs.OptimizerLogs]:
     """Returns the logs of the hyper-parameter tuning.
 
     If the model is not trained with hyper-parameter tuning, returns None.
     """
-
-    return self._model.hyperparameter_optimizer_logs()
+    proto_logs = self._model.hyperparameter_optimizer_logs()
+    if proto_logs is None:
+      return None
+    return optimizer_logs.proto_optimizer_logs_to_optimizer_logs(proto_logs)
 
   def variable_importances(self) -> Dict[str, List[Tuple[float, str]]]:
     """Variable importances to measure the impact of features on the model.

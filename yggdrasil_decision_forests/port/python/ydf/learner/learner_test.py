@@ -332,7 +332,7 @@ class RandomForestLearnerTest(LearnerTest):
     )
     logs = model.hyperparameter_optimizer_logs()
     self.assertIsNotNone(logs)
-    self.assertLen(logs.steps, 5)
+    self.assertLen(logs.trials, 5)
 
   def test_tuner_predefined(self):
     pd_dataset = adult_dataset()
@@ -356,7 +356,7 @@ class RandomForestLearnerTest(LearnerTest):
     )
     logs = model.hyperparameter_optimizer_logs()
     self.assertIsNotNone(logs)
-    self.assertLen(logs.steps, 5)
+    self.assertLen(logs.trials, 5)
 
   def test_label_type_error_message(self):
     with self.assertRaisesRegex(
