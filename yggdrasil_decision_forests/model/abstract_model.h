@@ -355,6 +355,8 @@ class AbstractModel {
 
   // Estimates the memory usage of the model in RAM. The serialized or the
   // compiled version of the model can be much smaller.
+  //
+  // This value should not be relied upon in tests.
   virtual absl::optional<size_t> ModelSizeInBytes() const { return {}; }
 
   // Estimates the memory usage of the attributes defined in the "AbstractModel"

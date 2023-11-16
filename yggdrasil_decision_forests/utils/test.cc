@@ -16,12 +16,16 @@
 #include "yggdrasil_decision_forests/utils/test.h"
 
 #include <random>
+#include <regex>  // NOLINT
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "gtest/gtest.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -46,10 +50,16 @@ std::string TmpDirectory() {
   return path;
 }
 
-void ExpectEqualGolden(absl::string_view content, absl::string_view path) {
-  ASSERT_OK_AND_ASSIGN(
-      const auto expected_content,
-      file::GetContent(file::JoinPath(DataRootDirectory(), path)));
+void ExpectEqualGolden(
+    absl::string_view content, absl::string_view path,
+    const std::vector<std::pair<std::string, std::string>>& tokens_to_replace) {
+  ASSERT_OK_AND_ASSIGN(auto expected_content, file::GetContent(file::JoinPath(
+                                                  DataRootDirectory(), path)));
+  for (const auto& token : tokens_to_replace) {
+    std::regex token_regex(absl::StrCat(R"(\$\{)", token.first, R"(\})"));
+    expected_content =
+        std::regex_replace(expected_content, token_regex, token.second);
+  }
   if (expected_content != content) {
     YDF_LOG(INFO) << "The given value does not match the golden value: "
                   << path;
@@ -78,10 +88,14 @@ void ExpectEqualGolden(absl::string_view content, absl::string_view path) {
     const std::string output_dir = file::JoinPath(TmpDirectory(), "golden");
     ASSERT_OK(file::RecursivelyCreateDir(output_dir, file::Defaults()));
     const std::string output_path = file::JoinPath(
-        output_dir, absl::StrCat("actual_", actual_idx++, ".html"));
+        output_dir, absl::StrCat("actual_", actual_idx, ".html"));
+    const std::string expected_output_path = file::JoinPath(
+        output_dir, absl::StrCat("expected_", actual_idx++, ".html"));
     YDF_LOG(INFO) << "Content saved to " << output_path;
     YDF_LOG(INFO) << "Update the golden file with: cp " << output_path << " "
                   << path;
+    YDF_LOG(INFO) << "Expected: " << expected_output_path;
+    ASSERT_OK(file::SetContent(expected_output_path, expected_content));
     ASSERT_OK(file::SetContent(output_path, content));
     EXPECT_TRUE(false);
   }

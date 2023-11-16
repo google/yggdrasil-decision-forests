@@ -19,6 +19,8 @@
 #define YGGDRASIL_DECISION_FORESTS_UTILS_TEST_H_
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "src/google/protobuf/text_format.h"
 #include "src/google/protobuf/util/message_differencer.h"
@@ -114,7 +116,12 @@ int PickUnusedPortOrDie();
 // Checks if "content" is equal to the content of "path".
 // The content is exported to a temporary file in case of failure. This function
 // is suited for large content. For small content, use "EXPECT_EQ" instead.
-void ExpectEqualGolden(absl::string_view content, absl::string_view path);
+//
+// To reduce flakiness, it is possible to replace substrings of the form
+// ${TOKEN_NAME} in the golden string.
+void ExpectEqualGolden(absl::string_view content, absl::string_view path,
+                       const std::vector<std::pair<std::string, std::string>>&
+                           tokens_to_replace = {});
 
 }  // namespace test
 }  // namespace yggdrasil_decision_forests
