@@ -1845,6 +1845,62 @@ TEST_F(AutotunedGradientBoostedTreesOnAdult,
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
 
+// TODO - b/311636358 Refactor the GBT tests to be more cohesive and
+// comprehensive.
+struct RegressionEnd2EndTestParams {
+  const proto::Loss loss;
+  const float expected_rmse;
+};
+
+using RegressionEnd2EndTest =
+    testing::TestWithParam<RegressionEnd2EndTestParams>;
+
+TEST_P(RegressionEnd2EndTest, LargeValues) {
+  const std::string train_typed_path = absl::StrCat(
+      "csv:", file::JoinPath(DatasetDir(), "two_center_regression_train.csv"));
+  const std::string test_typed_path = absl::StrCat(
+      "csv:", file::JoinPath(DatasetDir(), "two_center_regression_test.csv"));
+  dataset::proto::DataSpecification data_spec;
+  dataset::proto::DataSpecificationGuide guide;
+  dataset::CreateDataSpec(train_typed_path, false, guide, &data_spec);
+  dataset::VerticalDataset train_dataset;
+  CHECK_OK(LoadVerticalDataset(train_typed_path, data_spec, &train_dataset));
+  dataset::VerticalDataset test_dataset;
+  CHECK_OK(LoadVerticalDataset(test_typed_path, data_spec, &test_dataset));
+  utils::RandomEngine random(1234);
+
+  model::proto::DeploymentConfig deployment_config;
+  model::proto::TrainingConfig train_config;
+  train_config.set_label("target");
+  train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::REGRESSION);
+  auto* gbt_config = train_config.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(GetParam().loss);
+  std::unique_ptr<model::AbstractLearner> learner;
+  CHECK_OK(model::GetLearner(train_config, &learner, deployment_config));
+
+  ASSERT_OK_AND_ASSIGN(auto model, learner->TrainWithStatus(train_dataset));
+  metric::proto::EvaluationOptions eval_options;
+  eval_options.set_task(model::proto::Task::REGRESSION);
+  eval_options.mutable_regression()->set_enable_regression_plots(false);
+  ASSERT_OK_AND_ASSIGN(auto eval, model->EvaluateWithStatus(
+                                      test_dataset, eval_options, &random));
+
+  EXPECT_NEAR(metric::RMSE(eval), GetParam().expected_rmse, 1.0);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    RegressionEnd2EndTest, RegressionEnd2EndTest,
+    testing::ValuesIn<RegressionEnd2EndTestParams>({
+        {proto::SQUARED_ERROR, 114.8},
+        {proto::MEAN_AVERAGE_ERROR, 4051.6},
+        {proto::POISSON, 114.8},
+    }),
+    [](const testing::TestParamInfo<RegressionEnd2EndTest::ParamType>& info) {
+      return proto::Loss_Name(info.param.loss);
+    });
+
 }  // namespace
 }  // namespace gradient_boosted_trees
 }  // namespace model

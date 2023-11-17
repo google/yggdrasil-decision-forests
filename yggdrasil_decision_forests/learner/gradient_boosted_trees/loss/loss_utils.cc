@@ -107,8 +107,11 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
   const double denominator =
       sum_weighted_hessian + gbt_config.l2_regularization();
   float value = gbt_config.shrinkage() * numerator / denominator;
-  value = utils::clamp(value, -gbt_config.clamp_leaf_logit(),
-                       gbt_config.clamp_leaf_logit());
+  // TODO - b/311636358: Move this information to the AbstractLoss class.
+  if (gbt_config.loss() != proto::SQUARED_ERROR) {
+    value = utils::clamp(value, -gbt_config.clamp_leaf_logit(),
+                         gbt_config.clamp_leaf_logit());
+  }
   reg->set_top_value(value);
   return absl::OkStatus();
 }
@@ -162,8 +165,10 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
       sum_gradients, gbt_config_.l1_regularization());
   const double denominator = sum_hessians + gbt_config_.l2_regularization();
   float value = gbt_config_.shrinkage() * numerator / denominator;
-  value = utils::clamp(value, -gbt_config_.clamp_leaf_logit(),
-                       gbt_config_.clamp_leaf_logit());
+  if (gbt_config_.loss() != proto::SQUARED_ERROR) {
+    value = utils::clamp(value, -gbt_config_.clamp_leaf_logit(),
+                         gbt_config_.clamp_leaf_logit());
+  }
   node->mutable_regressor()->set_top_value(value);
   return absl::OkStatus();
 }
