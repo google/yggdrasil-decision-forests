@@ -24,7 +24,6 @@ learner: "RANDOM_FOREST"
   num_trees: 1000
 }
 ```
-
 ## GRADIENT_BOOSTED_TREES
 
 A [Gradient Boosted Trees](https://statweb.stanford.edu/~jhf/ftp/trebst.pdf)
@@ -34,9 +33,9 @@ tree is trained to predict and then "correct" for the errors of the previously
 trained trees (more precisely each tree predict the gradient of the loss
 relative to the model output).
 
-### Protobuffer Training configuration
+### Protobuffer training configuration
 
-The hyper-parameter protobuffer are:
+The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
@@ -69,7 +68,7 @@ reasonable time.
 -   `sparse_oblique_normalization`: MIN_MAX
 -   `sparse_oblique_num_projections_exponent`: 1
 
-### Generic Hyper-parameters
+### Hyper-parameters
 
 #### [adapt_subsample_for_maximum_training_duration](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
@@ -513,9 +512,9 @@ cases e.g. when there are more features than training examples.
 
 It is probably the most well-known of the Decision Forest training algorithms.
 
-### Protobuffer Training configuration
+### Protobuffer training configuration
 
-The hyper-parameter protobuffer are:
+The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
@@ -548,7 +547,7 @@ reasonable time.
 -   `sparse_oblique_normalization`: MIN_MAX
 -   `sparse_oblique_num_projections_exponent`: 1
 
-### Generic Hyper-parameters
+### Hyper-parameters
 
 #### [adapt_bootstrap_size_ratio_for_maximum_training_duration](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/random_forest/random_forest.proto)
 
@@ -869,15 +868,15 @@ contains conditions (also known as splits) while the leaf nodes contain
 prediction values. The training dataset is divided in two parts. The first is
 used to grow the tree while the second is used to prune the tree.
 
-### Protobuffer Training configuration
+### Protobuffer training configuration
 
-The hyper-parameter protobuffer are:
+The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/cart/cart.proto">learner/cart/cart.proto</a>
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 
-### Generic Hyper-parameters
+### Hyper-parameters
 
 #### [allow_na_conditions](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1126,16 +1125,16 @@ Exact distributed version of the Gradient Boosted Tree learning algorithm. See
 the documentation of the non-distributed Gradient Boosted Tree learning
 algorithm for an introduction to GBTs.
 
-### Protobuffer Training configuration
+### Protobuffer training configuration
 
-The hyper-parameter protobuffer are:
+The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto">learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto</a>
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto">learner/gradient_boosted_trees/gradient_boosted_trees.proto</a>
 
-### Generic Hyper-parameters
+### Hyper-parameters
 
 #### [apply_link_function](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
@@ -1263,13 +1262,13 @@ The hyper-parameter protobuffer are:
 
 ## HYPERPARAMETER_OPTIMIZER
 
-### Protobuffer Training configuration
+### Protobuffer training configuration
 
-The hyper-parameter protobuffer are:
+The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 -   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
 
-### Generic Hyper-parameters
+### Hyper-parameters
 
 #### [maximum_model_size_in_memory_in_bytes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto)
 

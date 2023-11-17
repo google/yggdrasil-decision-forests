@@ -1,11 +1,17 @@
 # Changelog
 
-## HEAD
+## 1.8.0 - 2023-11-17
+
+### Feature
+
+-   Support for GBT distances.
+-   Remove old snapshots automatically for GBT training.
 
 ### Fix
 
-Regression with Mean Squared Error loss and Mean Average error loss incorrectly
-clamped the gradients, leading to incorrect predictions.
+-   Regression with Mean Squared Error loss and Mean Average error loss 
+    incorrectly clamped the gradients, leading to incorrect predictions.
+-   Change dependency from boost to boost_math for faster builds.
 
 ## 1.7.0 - 2023-10-20
 
