@@ -560,6 +560,13 @@ absl::Status PopulateColumnCategoricalNPBytes(
 
   // TODO: Check if using an absl::flat_map is significantly faster.
   const auto& items = column_spec.categorical().items();
+
+  if (items.empty()) {
+    return absl::InvalidArgumentError(
+        "Empty categorical dictionary. PYDF does not support empty "
+        "dictionaries");
+  }
+
   for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {
     const auto value = values[value_idx];
     int32_t dst_value;
