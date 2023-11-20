@@ -41,10 +41,14 @@ TEST(Describe, GBT) {
   ASSERT_OK(model::LoadModel(
       file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
       &model));
+  const auto model_size = model->ModelSizeInBytes();
+  ASSERT_TRUE(model_size.has_value());
   ASSERT_OK_AND_ASSIGN(const auto html, DescribeModelHtml(*model, "123"));
-  test::ExpectEqualGolden(html,
-                          "yggdrasil_decision_forests/test_data/"
-                          "golden/describe_gbt.html.expected");
+  test::ExpectEqualGolden(
+      html,
+      "yggdrasil_decision_forests/test_data/"
+      "golden/describe_gbt.html.expected",
+      {{"MODEL_SIZE", absl::StrCat(*model_size / 1000, " kB")}});
 }
 
 TEST(Describe, RF) {
@@ -68,10 +72,14 @@ TEST(Describe, TunedGBT) {
   ASSERT_OK(model::LoadModel(
       file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt_tuned"),
       &model));
+  const auto model_size = model->ModelSizeInBytes();
+  ASSERT_TRUE(model_size.has_value());
   ASSERT_OK_AND_ASSIGN(const auto html, DescribeModelHtml(*model, "123"));
-  test::ExpectEqualGolden(html,
-                          "yggdrasil_decision_forests/test_data/"
-                          "golden/describe_gbt_tuned.html.expected");
+  test::ExpectEqualGolden(
+      html,
+      "yggdrasil_decision_forests/test_data/"
+      "golden/describe_gbt_tuned.html.expected",
+      {{"MODEL_SIZE", absl::StrCat(*model_size / 1000, " kB")}});
 }
 
 }  // namespace
