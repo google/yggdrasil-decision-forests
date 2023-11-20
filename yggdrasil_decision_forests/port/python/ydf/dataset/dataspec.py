@@ -373,6 +373,10 @@ class DataSpecInferenceArgs:
       for column_def in self.columns:
         column = Column.from_column_def(column_def)
         guide.column_guides.append(column.to_proto_column_guide())
+
+    # TODO: b/311609910 - Make it possible for the user to configure those.
+    guide.max_num_scanned_rows_to_guess_type = 10000
+    guide.max_num_scanned_rows_to_accumulate_statistics = 100000
     return guide
 
 

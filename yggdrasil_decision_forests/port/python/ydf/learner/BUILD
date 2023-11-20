@@ -1,5 +1,5 @@
 # Learner bindings for PYDF
-# pytype test and library
+# pytype binary, test, library
 load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
 load("//ydf/learner/wrapper:wrapper_generator.bzl", "py_wrap_yggdrasil_learners")
 load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
@@ -7,6 +7,21 @@ load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
+)
+
+# Binary
+# =========
+
+py_binary(
+    name = "worker_main",
+    srcs = ["worker_main.py"],
+    python_version = "PY3",
+    deps = [
+        # absl:app dep,
+        # absl/flags dep,
+        # absl/logging dep,
+        # ydf dep,
+    ],
 )
 
 # Libraries

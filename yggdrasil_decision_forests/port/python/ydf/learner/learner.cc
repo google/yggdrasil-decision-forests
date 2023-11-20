@@ -139,8 +139,8 @@ class GenericCCLearner {
   absl::StatusOr<std::unique_ptr<GenericCCModel>> TrainFromPathWithDataSpec(
       const std::string& dataset_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::reference_wrapper<const std::string>>
-          validation_dataset_path = std::nullopt) const {
+      const absl::optional<std::string> validation_dataset_path =
+          std::nullopt) const {
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,
                      dataset::GetTypedPath(dataset_path));
     std::optional<std::string> typed_valid_path;
@@ -159,8 +159,7 @@ class GenericCCLearner {
   absl::StatusOr<std::unique_ptr<GenericCCModel>> TrainFromPathWithGuide(
       const std::string& dataset_path,
       const dataset::proto::DataSpecificationGuide& data_spec_guide,
-      const absl::optional<std::reference_wrapper<const std::string>>
-          validation_dataset_path = std::nullopt) const {
+      const std::optional<std::string> validation_dataset_path) const {
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,
                      dataset::GetTypedPath(dataset_path));
     dataset::proto::DataSpecification generated_data_spec;
@@ -216,8 +215,8 @@ void init_learner(py::module_& m) {
            [](const GenericCCLearner& a) {
              return "<learner_cc.GenericCCLearner";
            })
-      .def("Train", WithStatusOr(&GenericCCLearner::Train),
-           py::arg("dataset"), py::arg("validation_dataset") = py::none())
+      .def("Train", WithStatusOr(&GenericCCLearner::Train), py::arg("dataset"),
+           py::arg("validation_dataset") = py::none())
       .def("TrainFromPathWithDataSpec",
            WithStatusOr(&GenericCCLearner::TrainFromPathWithDataSpec),
            py::arg("dataset_path"), py::arg("data_spec"),

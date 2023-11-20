@@ -417,6 +417,16 @@ class RandomForestLearnerTest(LearnerTest):
 
     self.assertAlmostEqual(accuracy_from_path, accuracy_from_pd)
 
+  def test_train_with_path_validation_dataset(self):
+    dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
+    train_path = os.path.join(dataset_directory, "adult_train.csv")
+    test_path = os.path.join(dataset_directory, "adult_test.csv")
+    label = "income"
+    learner = specialized_learners.RandomForestLearner(label=label)
+    model = learner.train(train_path, valid=test_path)
+    evaluation = model.evaluate(test_path)
+    self.assertGreaterEqual(evaluation.accuracy, 0.86)
+
   def test_hp_dictionary(self):
     learner = specialized_learners.RandomForestLearner(label="l", num_trees=50)
     self.assertDictContainsSubset(
