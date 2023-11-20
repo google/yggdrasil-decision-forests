@@ -60,6 +60,7 @@ nav:
     # TODO: boolean, and text
   - Dataset:
     - Pandas: tutorial/pandas.ipynb
+    - tf.data.Dataset: tutorial/tf_dataset.ipynb
     # TODO: Add Dictionary, CSV, TF Dataset, TFRecord
   - Modeling:
     - Tuning: tutorial/tuning.ipynb
@@ -69,17 +70,18 @@ nav:
     - Cross-validation: tutorial/cross_validation.ipynb
   - Serving:
     - C++: tutorial/cpp.ipynb
+    - TF Serving: tutorial/tf_serving.ipynb
     # TODO: Add Benchmarking, C++, Go, Cli, Python, F Serving, and Js
   - Advanced:
     - example distance: tutorial/example_distance.ipynb
     # TODO: model inspection, manual tree creation, custom loss.
   - Other APIs:
     - TensorFlow Decision Forests 🔗: https://www.tensorflow.org/decision_forests
-    - cli quickstart: cli_quickstart.md
-    - cli & c++ user manual: cli_user_manual.md
-    - cli commands: cli_commands.md
-    - cli examples: https://github.com/google/yggdrasil-decision-forests/tree/main/examples
-    - c++ examples: https://github.com/google/yggdrasil-decision-forests/tree/main/examples/standalone
+    - CLI quickstart: cli_quickstart.md
+    - CLI & C++ user manual: cli_user_manual.md
+    - CLI commands: cli_commands.md
+    - CLI examples: https://github.com/google/yggdrasil-decision-forests/tree/main/examples
+    - C++ examples: https://github.com/google/yggdrasil-decision-forests/tree/main/examples/standalone
   - Changelog: changelog.md
   - Long-time support: lts.md
   - Contact: contact.md
