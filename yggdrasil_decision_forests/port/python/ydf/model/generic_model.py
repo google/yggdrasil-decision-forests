@@ -554,7 +554,7 @@ Use `model.describe()` for more details
         differently (e.g. RaggedTensor(int64)).
     """
     try:
-      import tensorflow_decision_forests as tfdf  # pylint:disable-import-not-at-top
+      import tensorflow_decision_forests as tfdf  # type:ignore
     except ImportError as exc:
       raise ValueError(
           "Exporting to tensorflow requires the tensorflow_decision_forests"
