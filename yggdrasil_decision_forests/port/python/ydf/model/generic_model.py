@@ -635,5 +635,32 @@ Use `model.describe()` for more details
       ]
     return variable_importances
 
+  def label_col_idx(self) -> int:
+    return self._model.label_col_idx()
+
+  def label_classes(self) -> List[str]:
+    """Returns the label classes for classification tasks, None otherwise."""
+    if self.task() != Task.CLASSIFICATION:
+      raise ValueError(
+          "Label classes are only available for classification models. This"
+          f" model has type {self.task().name}"
+      )
+    label_column = self.data_spec().columns[self._model.label_col_idx()]
+    if label_column.type != data_spec_pb2.CATEGORICAL:
+      semantic = dataspec.Semantic.from_proto_type(label_column.type)
+      raise ValueError(
+          "Categorical type expected for classification label."
+          f" Got {semantic} instead."
+      )
+
+    if label_column.categorical.is_already_integerized:
+      log.info(
+          "The label column is integerized. This is expected for models trained"
+          " with TensorFlow Decision Forests."
+      )
+
+    # The first element is the "out-of-vocabulary" that is not used in labels.
+    return dataspec.categorical_column_dictionary_to_list(label_column)[1:]
+
 
 ModelType = TypeVar("ModelType", bound=GenericModel)

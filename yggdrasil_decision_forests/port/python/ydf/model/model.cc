@@ -105,6 +105,7 @@ void init_model(py::module_& m) {
       .def("data_spec", &GenericCCModel::data_spec)
       .def("set_data_spec", &GenericCCModel::set_data_spec,
            py::arg("data_spec"))
+      .def("label_col_idx", &GenericCCModel::label_col_idx)
       .def("metadata", &GenericCCModel::metadata)
       .def("set_metadata", &GenericCCModel::set_metadata, py::arg("metadata"))
       .def("Describe", WithStatusOr(&GenericCCModel::Describe),

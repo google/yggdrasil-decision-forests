@@ -32,7 +32,7 @@ from ydf.model.random_forest_model import random_forest_model
 from ydf.utils import test_utils
 
 
-class DecisionForestModelTest(parameterized.TestCase):
+class GenericModelTest(parameterized.TestCase):
 
   def test_predict_adult_rf(self):
     model_path = os.path.join(
@@ -313,6 +313,21 @@ Use `model.describe()` for more details
     )
     model.set_metadata(metadata)
     self.assertEqual(metadata, model.metadata())
+
+  def test_label_col_idx(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    model = model_lib.load_model(model_path)
+    self.assertEqual(model.label_col_idx(), 14)
+
+  def test_label_classes(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    model = model_lib.load_model(model_path)
+    label_classes = model.label_classes()
+    self.assertEqual(label_classes, ["<=50K", ">50K"])
 
 
 if __name__ == "__main__":

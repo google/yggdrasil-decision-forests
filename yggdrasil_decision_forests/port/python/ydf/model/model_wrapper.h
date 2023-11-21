@@ -77,6 +77,8 @@ class GenericCCModel {
 
   std::vector<int> input_features() const { return model_->input_features(); }
 
+  int label_col_idx() const { return model_->label_col_idx(); }
+
   // Benchmark the inference speed of the model.
   absl::StatusOr<BenchmarkInferenceCCResult> Benchmark(
       const dataset::VerticalDataset& dataset, const double benchmark_duration,
