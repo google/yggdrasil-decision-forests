@@ -47,6 +47,7 @@ py_test(
     python_version = "PY3",
     deps = [
         ":condition",
+        # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],

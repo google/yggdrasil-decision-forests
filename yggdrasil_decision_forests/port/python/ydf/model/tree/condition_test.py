@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from typing import Sequence
+from absl.testing import absltest
 from absl.testing import parameterized
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.model.tree import condition as condition_lib
@@ -20,15 +21,22 @@ from ydf.model.tree import condition as condition_lib
 
 class ConditionTest(parameterized.TestCase):
 
-  @parameterized.parameters(
-      (b"\x2D\x03", 10, [0, 2, 3, 5, 8, 9]),  # b1100101101 => 0x032D
-      (b"", 0, []),
+  @parameterized.named_parameters(
+      (
+          "two random bytes",
+          b"\x2D\x03",
+          10,
+          [0, 2, 3, 5, 8, 9],
+      ),  # b1100101101 => 0x032D
+      ("empty", b"", 0, []),
+      ("full of 0s", b"\x00\x00", 16, []),
+      ("full of 1s", b"\xFF\xFF", 16, list(range(16))),
   )
   def test_bitmap_to_items(
       self,
       bitmap: bytes,
       number_of_unique_values: int,
-      expected_list: Sequence[int],
+      expected_items: Sequence[int],
   ):
     column_spec = data_spec_pb2.Column(
         categorical=data_spec_pb2.CategoricalSpec(
@@ -37,5 +45,55 @@ class ConditionTest(parameterized.TestCase):
     )
     self.assertEqual(
         condition_lib.bitmap_to_items(column_spec, bitmap),
-        expected_list,
+        expected_items,
     )
+
+  @parameterized.named_parameters(
+      (
+          "two random bytes",
+          [0, 2, 3, 5, 8, 9],
+          10,
+          b"\x2D\x03",
+      ),  # b1100101101 => 0x032D
+      ("empty", [], 0, b""),
+      ("repeated bits", [3, 4, 3], 10, b"\x18\x00"),  # b00011000 => 0x0018
+      ("set high bit in 1 byte", [7], 8, b"\x80"),
+      ("set low bit in 1 byte", [0], 8, b"\x01"),
+      ("set high bit in 4 bytes", [31], 32, b"\x00\x00\x00\x80"),
+      ("set low bit in 4 bytes", [0], 32, b"\x01\x00\x00\x00"),
+      ("full of 0s", [], 32, b"\x00\x00\x00\x00"),
+      ("full of 1s", range(32), 32, b"\xFF\xFF\xFF\xFF"),
+  )
+  def test_items_to_bitmap_with_valid_input(
+      self,
+      items: Sequence[int],
+      number_of_unique_values: int,
+      expected_bitmap: bytes,
+  ):
+    column_spec = data_spec_pb2.Column(
+        categorical=data_spec_pb2.CategoricalSpec(
+            number_of_unique_values=number_of_unique_values
+        )
+    )
+    self.assertEqual(
+        condition_lib.items_to_bitmap(column_spec, items),
+        expected_bitmap,
+    )
+
+  def test_items_to_bitmap_invalid_item_is_negative(self):
+    column_spec = data_spec_pb2.Column(
+        categorical=data_spec_pb2.CategoricalSpec(number_of_unique_values=10)
+    )
+    with self.assertRaisesRegex(ValueError, "-1"):
+      condition_lib.items_to_bitmap(column_spec, [-1])
+
+  def test_items_to_bitmap_invalid_item_is_too_large(self):
+    column_spec = data_spec_pb2.Column(
+        categorical=data_spec_pb2.CategoricalSpec(number_of_unique_values=10)
+    )
+    with self.assertRaisesRegex(ValueError, "10"):
+      condition_lib.items_to_bitmap(column_spec, [10])
+
+
+if __name__ == "__main__":
+  absltest.main()
