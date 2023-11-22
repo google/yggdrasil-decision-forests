@@ -165,4 +165,67 @@ name: 'selected',
     }
   );
 </script>
+<script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chart_my_report_feature_variation_1" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_feature_variation_1',
+    [{
+x: [0,1,2,3,4],
+y: [3,3,2,2,3],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'output',
+},
+{
+x: [2,2],
+y: [2,3],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'selected',
+},
+],
+    {
+      width: 400,
+      height: 300,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'f2',tickvals: [0,1,2,3,4],ticktext: ["0","1","2","3","4",],
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
 </div></div></div>

@@ -236,19 +236,27 @@ TEST(PredictionAnalysis, ToyModel) {
           ->mutable_numerical();
   f1->set_min_value(1);
   f1->set_max_value(5);
+  auto* f2 = dataset::AddColumn("f2", dataset::proto::ColumnType::CATEGORICAL,
+                                &dataspec)
+                 ->mutable_categorical();
+  f2->set_number_of_unique_values(5);
+  f2->set_is_already_integerized(true);
 
   dataset::proto::Example example;
   example.add_attributes()->set_numerical(1);
   example.add_attributes()->set_numerical(2);
+  example.add_attributes()->set_categorical(2);
 
   model::random_forest::RandomForestModel model;
 
   {
     auto tree = absl::make_unique<model::decision_tree::DecisionTree>();
     model::decision_tree::TreeBuilder root(tree.get());
-    auto [l1, l2] = root.ConditionIsGreater(1, 3);
+    auto [l1, neg] = root.ConditionIsGreater(1, 3);
     l1.LeafRegression(1);
+    auto [l2, l3] = neg.ConditionContains(2, {2, 3});
     l2.LeafRegression(2);
+    l3.LeafRegression(3);
     model.AddTree(std::move(tree));
   }
 
@@ -256,6 +264,7 @@ TEST(PredictionAnalysis, ToyModel) {
   model.set_label_col_idx(0);
   model.set_data_spec(dataspec);
   model.mutable_input_features()->push_back(1);
+  model.mutable_input_features()->push_back(2);
 
   proto::PredictionAnalysisOptions options;
   options.set_html_id_prefix("my_report");
@@ -272,6 +281,14 @@ TEST(PredictionAnalysis, ToyModel) {
                         type: NUMERICAL
                         name: "f1"
                         numerical { min_value: 1 max_value: 5 }
+                      }
+                      columns {
+                        type: CATEGORICAL
+                        name: "f2"
+                        categorical {
+                          number_of_unique_values: 5
+                          is_already_integerized: true
+                        }
                       }
                     }
                     label_col_idx: 0
@@ -292,10 +309,22 @@ TEST(PredictionAnalysis, ToyModel) {
                           }
                         }
                       }
+                      items {
+                        bins { prediction { regression { value: 3 } } }
+                        bins { prediction { regression { value: 3 } } }
+                        bins { prediction { regression { value: 2 } } }
+                        bins { prediction { regression { value: 2 } } }
+                        bins { prediction { regression { value: 3 } } }
+                        attributes {
+                          column_idx: 2
+                          categorical { num_values: 5 }
+                        }
+                      }
                     }
                     example {
                       attributes { numerical: 1 }
                       attributes { numerical: 2 }
+                      attributes { categorical: 2 }
                     }
                     prediction { regression { value: 2 } }
                   )pb")));

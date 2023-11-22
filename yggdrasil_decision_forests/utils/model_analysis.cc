@@ -953,6 +953,47 @@ absl::StatusOr<proto::FeatureVariationItem> FeatureVariationNumerical(
   return item;
 }
 
+
+absl::StatusOr<proto::FeatureVariationItem> FeatureVariationBoolean(
+    const model::AbstractModel& model, const int column_idx,
+    const dataset::proto::Example& example,
+    const proto::PredictionAnalysisOptions& options) {
+  // Compute possible values.
+  proto::FeatureVariationItem item;
+  auto& attributes = *item.add_attributes();
+  attributes.set_column_idx(column_idx);
+  attributes.mutable_boolean();
+
+  // Run model.
+  for (const bool value : {false, true}) {
+    auto modified_example = example;
+    modified_example.mutable_attributes(column_idx)->set_boolean(value);
+    model.Predict(modified_example, item.add_bins()->mutable_prediction());
+  }
+  return item;
+}
+
+absl::StatusOr<proto::FeatureVariationItem> FeatureVariationCategorical(
+    const model::AbstractModel& model, const int column_idx,
+    const dataset::proto::Example& example,
+    const proto::PredictionAnalysisOptions& options) {
+  // Compute possible values.
+  proto::FeatureVariationItem item;
+  auto& attributes = *item.add_attributes();
+  attributes.set_column_idx(column_idx);
+  const auto& column = model.data_spec().columns(column_idx);
+  const int num_values = column.categorical().number_of_unique_values();
+  attributes.mutable_categorical()->set_num_values(num_values);
+
+  // Run model.
+  for (int value_idx = 0; value_idx < num_values; value_idx++) {
+    auto modified_example = example;
+    modified_example.mutable_attributes(column_idx)->set_categorical(value_idx);
+    model.Predict(modified_example, item.add_bins()->mutable_prediction());
+  }
+  return item;
+}
+
 absl::StatusOr<proto::PredictionAnalysisResult> AnalyzePrediction(
     const model::AbstractModel& model, const dataset::proto::Example& example,
     const proto::PredictionAnalysisOptions& options) {
@@ -970,6 +1011,16 @@ absl::StatusOr<proto::PredictionAnalysisResult> AnalyzePrediction(
       case dataset::proto::ColumnType::NUMERICAL: {
         ASSIGN_OR_RETURN(auto var, FeatureVariationNumerical(model, feature,
                                                              example, options));
+        *analysis.mutable_feature_variation()->add_items() = std::move(var);
+      } break;
+      case dataset::proto::ColumnType::CATEGORICAL: {
+        ASSIGN_OR_RETURN(auto var, FeatureVariationCategorical(
+                                       model, feature, example, options));
+        *analysis.mutable_feature_variation()->add_items() = std::move(var);
+      } break;
+      case dataset::proto::ColumnType::BOOLEAN: {
+        ASSIGN_OR_RETURN(auto var, FeatureVariationBoolean(model, feature,
+                                                           example, options));
         *analysis.mutable_feature_variation()->add_items() = std::move(var);
       } break;
       default:
@@ -1016,6 +1067,22 @@ absl::StatusOr<std::vector<FeatureVariationOutput>> ListOutputs(
           {.label = "output",
            .compute = [](const model::proto::Prediction& prediction) -> float {
              return prediction.regression().value();
+           }});
+      break;
+    case model::proto::Task::RANKING:
+      outputs.push_back(
+          {.label = "output",
+           .compute = [](const model::proto::Prediction& prediction) -> float {
+             return prediction.ranking().relevance();
+           }});
+      break;
+    case model::proto::Task::CATEGORICAL_UPLIFT:
+    case model::proto::Task::NUMERICAL_UPLIFT:
+      outputs.push_back(
+          {.label = "output",
+           .compute = [](const model::proto::Prediction& prediction) -> float {
+             DCHECK(prediction.uplift().treatment_effect_size() == 1);
+             return prediction.uplift().treatment_effect(0);
            }});
       break;
     default:
@@ -1079,6 +1146,122 @@ absl::StatusOr<utils::plot::Plot> FeatureVariationPlotWithNumericalFeature(
   return plot;
 }
 
+// Plot the feature variation for a categorical feature.
+absl::StatusOr<utils::plot::Plot> FeatureVariationPlotWithCategoricalFeature(
+    const proto::PredictionAnalysisResult& analysis,
+    const proto::PredictionAnalysisOptions& options,
+    const utils::model_analysis::proto::FeatureVariationItem& item,
+    const utils::plot::ExportOptions& plot_options,
+    const std::vector<FeatureVariationOutput>& outputs) {
+  utils::plot::Plot plot;
+
+  if (item.attributes_size() != 1) {
+    return absl::InvalidArgumentError("Non supported attribute size");
+  }
+  const auto& attribute = item.attributes(0);
+  const auto& column_spec =
+      analysis.data_spec().columns(attribute.column_idx());
+
+  plot.x_axis.label =
+      analysis.data_spec().columns(attribute.column_idx()).name();
+  plot.y_axis.label = "prediction";
+
+  plot.x_axis.manual_tick_values = std::vector<double>();
+  plot.x_axis.manual_tick_texts = std::vector<std::string>();
+  for (int bin_idx = 0; bin_idx < item.bins_size(); bin_idx++) {
+    plot.x_axis.manual_tick_values->push_back(bin_idx);
+    plot.x_axis.manual_tick_texts->push_back(
+        dataset::CategoricalIdxToRepresentation(column_spec, bin_idx));
+  }
+
+  bool has_min = false;
+  float min_y = 0;
+  float max_y = 0;
+
+  for (const auto& output : outputs) {
+    auto* curve = plot.AddCurve();
+    curve->label = output.label;
+    for (int bin_idx = 0; bin_idx < item.bins_size(); bin_idx++) {
+      const float prediction = output.compute(item.bins(bin_idx).prediction());
+      curve->xs.push_back(bin_idx);
+      curve->ys.push_back(prediction);
+
+      if (has_min) {
+        min_y = std::min(min_y, prediction);
+        max_y = std::max(max_y, prediction);
+      } else {
+        has_min = true;
+        min_y = max_y = prediction;
+      }
+    }
+  }
+
+  auto* selected = plot.AddCurve();
+  selected->label = "selected";
+  selected->style = utils::plot::LineStyle::DOTTED;
+  const int selected_x =
+      analysis.example().attributes(attribute.column_idx()).categorical();
+  selected->xs.push_back(selected_x);
+  selected->xs.push_back(selected_x);
+  selected->ys.push_back(min_y);
+  selected->ys.push_back(max_y);
+
+  return plot;
+}
+
+// Plot the feature variation for a boolean feature.
+absl::StatusOr<utils::plot::Plot> FeatureVariationPlotWithBooleanFeature(
+    const proto::PredictionAnalysisResult& analysis,
+    const proto::PredictionAnalysisOptions& options,
+    const utils::model_analysis::proto::FeatureVariationItem& item,
+    const utils::plot::ExportOptions& plot_options,
+    const std::vector<FeatureVariationOutput>& outputs) {
+  utils::plot::Plot plot;
+
+  if (item.attributes_size() != 1) {
+    return absl::InvalidArgumentError("Non supported attribute size");
+  }
+  const auto& attribute = item.attributes(0);
+
+  plot.x_axis.label =
+      analysis.data_spec().columns(attribute.column_idx()).name();
+  plot.y_axis.label = "prediction";
+
+  bool has_min = false;
+  float min_y = 0;
+  float max_y = 0;
+
+  for (const auto& output : outputs) {
+    auto* curve = plot.AddCurve();
+    curve->label = output.label;
+    for (int bin_idx = 0; bin_idx < item.bins_size(); bin_idx++) {
+      const float prediction = output.compute(item.bins(bin_idx).prediction());
+      curve->xs.push_back(bin_idx);
+      curve->ys.push_back(prediction);
+
+      if (has_min) {
+        min_y = std::min(min_y, prediction);
+        max_y = std::max(max_y, prediction);
+      } else {
+        has_min = true;
+        min_y = max_y = prediction;
+      }
+    }
+  }
+
+  auto* selected = plot.AddCurve();
+  selected->label = "selected";
+  selected->style = utils::plot::LineStyle::DOTTED;
+  const float selected_x =
+      analysis.example().attributes(attribute.column_idx()).boolean();
+  selected->xs.push_back(selected_x);
+  selected->xs.push_back(selected_x);
+  selected->ys.push_back(min_y);
+  selected->ys.push_back(max_y);
+
+  return plot;
+}
+
 // Create a feature variation plot for each of the features.
 absl::StatusOr<utils::html::Html> CreateHtmlReportFeatureVariation(
     const proto::PredictionAnalysisResult& analysis,
@@ -1111,6 +1294,16 @@ absl::StatusOr<utils::html::Html> CreateHtmlReportFeatureVariation(
       case proto::FeatureVariationItem::Attribute::kNumerical: {
         ASSIGN_OR_RETURN(plot,
                          FeatureVariationPlotWithNumericalFeature(
+                             analysis, options, item, plot_options, outputs));
+      } break;
+      case proto::FeatureVariationItem::Attribute::kCategorical: {
+        ASSIGN_OR_RETURN(plot,
+                         FeatureVariationPlotWithCategoricalFeature(
+                             analysis, options, item, plot_options, outputs));
+      } break;
+      case proto::FeatureVariationItem::Attribute::kBoolean: {
+        ASSIGN_OR_RETURN(plot,
+                         FeatureVariationPlotWithBooleanFeature(
                              analysis, options, item, plot_options, outputs));
       } break;
       default:

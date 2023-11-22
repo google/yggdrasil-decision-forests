@@ -157,9 +157,15 @@ message FeatureVariationItem {
     optional int32 column_idx = 2;
     oneof type {
       Numerical numerical = 3;
+      Categorical categorical = 4;
+      Boolean boolean = 5;
     }
     message Numerical {
       repeated float values = 1 [packed = true];
     }
+    message Categorical {
+      optional int32 num_values = 1;
+    }
+    message Boolean {}
   }
 }
