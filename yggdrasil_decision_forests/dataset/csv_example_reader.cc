@@ -261,12 +261,9 @@ absl::Status CsvDataSpecCreator::ComputeColumnStatistics(
   std::vector<int> col_idx_to_field_idx;
   std::vector<std::string> csv_header;
   uint64_t nrow = 0;
+  const auto max_num_scanned_rows_to_accumulate_statistics =
+      guide.max_num_scanned_rows_to_accumulate_statistics();
   for (const auto& path : paths) {
-    if (guide.max_num_scanned_rows_to_accumulate_statistics() > 0 &&
-        nrow > guide.max_num_scanned_rows_to_accumulate_statistics()) {
-      break;
-    }
-
     // Open the csv file.
     auto csv_file = file::OpenInputFile(path).value();
     yggdrasil_decision_forests::utils::csv::Reader reader(csv_file.get());
@@ -292,7 +289,13 @@ absl::Status CsvDataSpecCreator::ComputeColumnStatistics(
                          " does not match the header of ", paths.front()));
       }
     }
+    bool scan_complete = false;
     while (reader.NextRow(&row).value()) {
+      if (max_num_scanned_rows_to_accumulate_statistics > 0 &&
+          nrow >= max_num_scanned_rows_to_accumulate_statistics) {
+        scan_complete = true;
+        break;
+      }
       LOG_INFO_EVERY_N_SEC(30, _ << nrow << " row(s) processed");
       // Check the number of fields.
       if (row->size() != csv_header.size()) {
@@ -306,6 +309,7 @@ absl::Status CsvDataSpecCreator::ComputeColumnStatistics(
                                                    data_spec, accumulator));
       nrow++;
     }
+    if (scan_complete) break;
   }
   data_spec->set_created_num_rows(nrow);
   return absl::OkStatus();

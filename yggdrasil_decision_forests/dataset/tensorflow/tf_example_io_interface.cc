@@ -382,7 +382,7 @@ absl::Status TFExampleReaderToDataSpecCreator::ComputeColumnStatistics(
   tensorflow::Example example;
   while (reader->Next(&example).value()) {
     if (guide.max_num_scanned_rows_to_accumulate_statistics() > 0 &&
-        nrow > guide.max_num_scanned_rows_to_accumulate_statistics()) {
+        nrow >= guide.max_num_scanned_rows_to_accumulate_statistics()) {
       break;
     }
     LOG_INFO_EVERY_N_SEC(30, _ << nrow << " row(s) processed");

@@ -122,6 +122,17 @@ proto::DataSpecificationGuide ToyDatasetGuide3() {
   return guide;
 }
 
+proto::DataSpecificationGuide ToyDatasetGuide4() {
+  proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
+      R"pb(
+        default_column_guide { categorial { min_vocab_frequency: 1 } }
+        column_guides { column_name_pattern: "Num_2" }
+        column_guides { column_name_pattern: "Cat_1" }
+        ignore_columns_without_guides: true
+      )pb");
+  return guide;
+}
+
 proto::DataSpecificationGuide ToyDatasetGuideIgnoreColumn() {
   proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
       R"pb(
@@ -355,6 +366,46 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide3() {
             original_num_unique_values: 2
             maximum_num_bins: 255
             min_obs_in_bins: 3
+          }
+        }
+      )pb");
+  return data_spec;
+}
+
+proto::DataSpecification ToyDatasetExpectedDataSpecGuide4() {
+  proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+
+      R"pb(
+        created_num_rows: 2
+        columns {
+          type: NUMERICAL
+          name: "Num_2"
+          is_manual_type: false
+          numerical { mean: 2 min_value: 2 max_value: 2 standard_deviation: 0 }
+          count_nas: 1
+        }
+        columns {
+          type: CATEGORICAL
+          name: "Cat_1"
+          is_manual_type: false
+          categorical {
+            most_frequent_value: 1
+            number_of_unique_values: 3
+            min_value_count: 1
+            max_number_of_unique_values: 2000
+            is_already_integerized: false
+            items {
+              key: "<OOD>"
+              value { index: 0 count: 0 }
+            }
+            items {
+              key: "A"
+              value { index: 2 count: 1 }
+            }
+            items {
+              key: "B"
+              value { index: 1 count: 1 }
+            }
           }
         }
       )pb");
@@ -600,6 +651,15 @@ TEST(Dataset, CreateLocalDataSpecFromCsvGuide1) {
   proto::DataSpecification data_spec;
   CreateDataSpec(ToyDatasetTypedPathCsv(), false, guide, &data_spec);
   auto target = ToyDatasetExpectedDataSpecGuide1();
+  EXPECT_THAT(data_spec, ApproximatelyEqualsProto(target));
+}
+
+TEST(Dataset, CreateLocalDataSpecFromCsvGuideWithMaxNumStatistics) {
+  auto guide = ToyDatasetGuide4();
+  guide.set_max_num_scanned_rows_to_accumulate_statistics(2);
+  proto::DataSpecification data_spec;
+  CreateDataSpec(ToyDatasetTypedPathCsv(), false, guide, &data_spec);
+  auto target = ToyDatasetExpectedDataSpecGuide4();
   EXPECT_THAT(data_spec, ApproximatelyEqualsProto(target));
 }
 
