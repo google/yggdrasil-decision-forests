@@ -412,6 +412,44 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide4() {
   return data_spec;
 }
 
+proto::DataSpecification ToyDatasetExpectedDataSpecGuide4FirstRowType() {
+  proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+
+      R"pb(
+        created_num_rows: 4
+        columns { name: "Num_2" is_manual_type: false count_nas: 2 }
+        columns {
+          type: CATEGORICAL
+          name: "Cat_1"
+          is_manual_type: false
+          categorical {
+            most_frequent_value: 1
+            number_of_unique_values: 4
+            min_value_count: 1
+            max_number_of_unique_values: 2000
+            is_already_integerized: false
+            items {
+              key: "<OOD>"
+              value { index: 0 count: 0 }
+            }
+            items {
+              key: "A"
+              value { index: 1 count: 2 }
+            }
+            items {
+              key: "C"
+              value { index: 2 count: 1 }
+            }
+            items {
+              key: "B"
+              value { index: 3 count: 1 }
+            }
+          }
+        }
+      )pb");
+  return data_spec;
+}
+
 proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
   proto::DataSpecification data_spec = PARSE_TEST_PROTO(
       R"pb(
@@ -660,6 +698,15 @@ TEST(Dataset, CreateLocalDataSpecFromCsvGuideWithMaxNumStatistics) {
   proto::DataSpecification data_spec;
   CreateDataSpec(ToyDatasetTypedPathCsv(), false, guide, &data_spec);
   auto target = ToyDatasetExpectedDataSpecGuide4();
+  EXPECT_THAT(data_spec, ApproximatelyEqualsProto(target));
+}
+
+TEST(Dataset, CreateLocalDataSpecFromCsvGuideWithMaxNumType) {
+  auto guide = ToyDatasetGuide4();
+  guide.set_max_num_scanned_rows_to_guess_type(1);
+  proto::DataSpecification data_spec;
+  CreateDataSpec(ToyDatasetTypedPathCsv(), false, guide, &data_spec);
+  auto target = ToyDatasetExpectedDataSpecGuide4FirstRowType();
   EXPECT_THAT(data_spec, ApproximatelyEqualsProto(target));
 }
 
