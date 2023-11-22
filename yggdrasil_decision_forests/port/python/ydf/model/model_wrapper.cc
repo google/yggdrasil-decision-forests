@@ -29,6 +29,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -121,6 +122,22 @@ GenericCCModel::Analyze(const dataset::VerticalDataset& dataset,
                    utils::model_analysis::Analyse(*model_, dataset, options));
   return utils::model_analysis::CreateStandaloneAnalysis(*model_, dataset, "",
                                                          "", analysis);
+}
+
+absl::StatusOr<utils::model_analysis::proto::PredictionAnalysisResult>
+GenericCCModel::AnalyzePrediction(
+    const dataset::VerticalDataset& example,
+    const utils::model_analysis::proto::PredictionAnalysisOptions& options) {
+  if (example.nrow() != 1) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("The dataset should contain exactly one example. Instead "
+                     "the dataset contains ",
+                     example.nrow(), " example(s)"));
+  }
+  dataset::proto::Example example_proto;
+  example.ExtractExample(0, &example_proto);
+  return utils::model_analysis::AnalyzePrediction(*model_, example_proto,
+                                                  options);
 }
 
 absl::Status GenericCCModel::Save(

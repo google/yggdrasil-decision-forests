@@ -134,7 +134,7 @@ class GenericModelTest(parameterized.TestCase):
         str(analysis),
         "A model analysis. Use a notebook cell to display the analysis."
         " Alternatively, export the analysis with"
-        ' `analysis.to_html("analysis.html")`.',
+        ' `analysis.to_file("analysis.html")`.',
     )
 
     # Note: The analysis computation is not deterministic.
@@ -143,8 +143,43 @@ class GenericModelTest(parameterized.TestCase):
     self.assertIn("Conditional Expectation Plot", analysis_html)
     self.assertIn("Variable Importance", analysis_html)
 
-    # with open("/tmp/analyze.html", "w") as f:
-    #   f.write(analysis_html)
+  def test_explain_prediction_adult_gbt(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+
+    model = model_lib.load_model(model_path)
+    test_df = pd.read_csv(dataset_path, nrows=1)
+    analysis = model.analyze_prediction(test_df)
+
+    self.assertEqual(
+        str(analysis),
+        "A prediction analysis. Use a notebook cell to display the analysis."
+        " Alternatively, export the analysis with"
+        ' `analysis.to_file("analysis.html")`.',
+    )
+
+    analysis_html = analysis._repr_html_()
+    with open("/tmp/analysis.html", "w") as f:
+      f.write(analysis_html)
+    self.assertIn("Feature Variation", analysis_html)
+
+  def test_explain_prediction_adult_gbt_with_wrong_selection(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+    model = model_lib.load_model(model_path)
+    test_df = pd.read_csv(dataset_path, nrows=3)
+    with self.assertRaises(ValueError):
+      _ = model.analyze_prediction(test_df)
+    with self.assertRaises(ValueError):
+      _ = model.analyze_prediction(test_df.iloc[:0])
 
   def test_evaluate_bootstrapping_default(self):
     model_path = os.path.join(

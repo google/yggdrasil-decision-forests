@@ -18,7 +18,9 @@ syntax = "proto2";
 package yggdrasil_decision_forests.utils.model_analysis.proto;
 
 import "yggdrasil_decision_forests/dataset/data_spec.proto";
+import "yggdrasil_decision_forests/dataset/example.proto";
 import "yggdrasil_decision_forests/model/abstract_model.proto";
+import "yggdrasil_decision_forests/model/prediction.proto";
 import "yggdrasil_decision_forests/utils/partial_dependence_plot.proto";
 
 // Configuration for the model analysis
@@ -92,6 +94,10 @@ message Options {
   message Plot {
     optional bool show_interactive_menu = 1 [default = false];
   }
+
+  // Prefix used to generate unique html element ids. If not set, use a random
+  // prefix.
+  optional string html_id_prefix = 18;
 }
 
 // Results of a model analysis.
@@ -110,4 +116,50 @@ message StandaloneAnalysisResult {
   optional int32 label_col_idx = 5;
   optional model.proto.Task task = 6;
   optional string model_description = 7;
+}
+
+message PredictionAnalysisOptions {
+  optional int32 numerical_num_bins = 1 [default = 50];
+  // Size in pixel of an individual plot.
+  optional int32 plot_width = 2 [default = 400];
+  optional int32 plot_height = 3 [default = 300];
+  // Prefix used to generate unique html element ids. If not set, use a random
+  // prefix.
+  optional string html_id_prefix = 4;
+}
+
+// Result of a prediction analysis.
+message PredictionAnalysisResult {
+  optional dataset.proto.DataSpecification data_spec = 1;
+  optional int32 label_col_idx = 2;
+  optional model.proto.Task task = 3;
+  optional FeatureVariation feature_variation = 4;
+  optional dataset.proto.Example example = 5;
+  optional model.proto.Prediction prediction = 6;
+}
+
+// Feature variation in a prediction analysis.
+message FeatureVariation {
+  repeated FeatureVariationItem items = 1;
+}
+
+message FeatureVariationItem {
+  // Bins, i.e., model outputs.
+  repeated Bin bins = 1;
+  // Attributes beeing varied.
+  repeated Attribute attributes = 2;
+
+  message Bin {
+    optional model.proto.Prediction prediction = 1;
+  }
+
+  message Attribute {
+    optional int32 column_idx = 2;
+    oneof type {
+      Numerical numerical = 3;
+    }
+    message Numerical {
+      repeated float values = 1 [packed = true];
+    }
+  }
 }

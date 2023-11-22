@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 
+#include <algorithm>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -27,10 +29,13 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/describe.h"
 #include "yggdrasil_decision_forests/model/model_engine_wrapper.h"
+#include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/feature_importance.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -814,7 +819,9 @@ absl::StatusOr<std::string> CreateHtmlReport(
     const proto::StandaloneAnalysisResult& analysis,
     const proto::Options& options) {
   namespace h = utils::html;
-  const auto block_id = utils::GenUniqueId();
+  const std::string block_id = options.has_html_id_prefix()
+                                   ? options.html_id_prefix()
+                                   : utils::GenUniqueId();
 
   h::Html html;
   html.AppendRaw(model::Header());
@@ -834,7 +841,7 @@ absl::StatusOr<std::string> CreateHtmlReport(
   h::Html tab_content;
 
   // Adds a tab to the page.
-  utils::TabBarBuilder tabbar;
+  utils::TabBarBuilder tabbar(block_id);
 
   // Setup
   if (options.report_setup().enabled()) {
@@ -854,8 +861,10 @@ absl::StatusOr<std::string> CreateHtmlReport(
 
   // Partial Dependence Plot
   if (options.pdp().enabled() && analysis.core_analysis().has_pdp_set()) {
-    utils::plot::ExportOptions plot_options;
-    plot_options.show_interactive_menu = options.plot().show_interactive_menu();
+    utils::plot::ExportOptions plot_options{
+        .show_interactive_menu = options.plot().show_interactive_menu(),
+        .html_id_prefix = absl::StrCat(block_id, "_pdp"),
+    };
     ASSIGN_OR_RETURN(
         const auto plot,
         internal::PlotPartialDependencePlotSet(
@@ -872,8 +881,10 @@ absl::StatusOr<std::string> CreateHtmlReport(
 
   // Conditional Expectation Plot
   if (options.cep().enabled() && analysis.core_analysis().has_cep_set()) {
-    utils::plot::ExportOptions plot_options;
-    plot_options.show_interactive_menu = options.plot().show_interactive_menu();
+    utils::plot::ExportOptions plot_options{
+        .show_interactive_menu = options.plot().show_interactive_menu(),
+        .html_id_prefix = absl::StrCat(block_id, "_cep"),
+    };
     ASSIGN_OR_RETURN(
         const auto plot,
         internal::PlotConditionalExpectationPlotSet(
@@ -905,6 +916,234 @@ absl::StatusOr<std::string> CreateHtmlReport(
     content.Append(h::Pre(analysis.model_description()));
     tabbar.AddTab("model", "Model Description", content);
   }
+
+  html.Append(tabbar.Html());
+  return std::string(html.content());
+}
+
+absl::StatusOr<proto::FeatureVariationItem> FeatureVariationNumerical(
+    const model::AbstractModel& model, const int column_idx,
+    const dataset::proto::Example& example,
+    const proto::PredictionAnalysisOptions& options) {
+  // Compute possible values.
+  proto::FeatureVariationItem item;
+  auto& attributes = *item.add_attributes();
+  attributes.set_column_idx(column_idx);
+  const auto& column = model.data_spec().columns(column_idx);
+  const float example_value = example.attributes(column_idx).numerical();
+  float plot_min = std::min(column.numerical().min_value(), example_value);
+  float plot_max = std::max(column.numerical().max_value(), example_value);
+  if (plot_min >= plot_max) {
+    plot_max = plot_min + 0.5;
+    plot_min -= 0.5;
+  }
+  for (int bin_idx = 0; bin_idx < options.numerical_num_bins(); bin_idx++) {
+    const float value = plot_min + (plot_max - plot_min) * bin_idx /
+                                       (options.numerical_num_bins() - 1);
+    attributes.mutable_numerical()->add_values(value);
+  }
+
+  // Run model.
+  for (const auto value : attributes.numerical().values()) {
+    auto modified_example = example;
+    modified_example.mutable_attributes(column_idx)->set_numerical(value);
+    model.Predict(modified_example, item.add_bins()->mutable_prediction());
+  }
+
+  return item;
+}
+
+absl::StatusOr<proto::PredictionAnalysisResult> AnalyzePrediction(
+    const model::AbstractModel& model, const dataset::proto::Example& example,
+    const proto::PredictionAnalysisOptions& options) {
+  // Set the common fields of the analysis.
+  proto::PredictionAnalysisResult analysis;
+  *analysis.mutable_data_spec() = model.data_spec();
+  analysis.set_label_col_idx(model.label_col_idx());
+  analysis.set_task(model.task());
+  *analysis.mutable_example() = example;
+  model.Predict(example, analysis.mutable_prediction());
+
+  // Feature variation
+  for (const auto feature : model.input_features()) {
+    switch (model.data_spec().columns(feature).type()) {
+      case dataset::proto::ColumnType::NUMERICAL: {
+        ASSIGN_OR_RETURN(auto var, FeatureVariationNumerical(model, feature,
+                                                             example, options));
+        *analysis.mutable_feature_variation()->add_items() = std::move(var);
+      } break;
+      default:
+        break;
+    }
+  }
+
+  return analysis;
+}
+
+// The numerical output signals in the feature variation analysis.
+struct FeatureVariationOutput {
+  std::string label;
+  std::function<float(const model::proto::Prediction& prediction)> compute;
+};
+
+// Lists the outputs / predictions to display in the plots.
+absl::StatusOr<std::vector<FeatureVariationOutput>> ListOutputs(
+    const proto::PredictionAnalysisResult& analysis,
+    const proto::PredictionAnalysisOptions& options) {
+  std::vector<FeatureVariationOutput> outputs;
+  const auto& label_column =
+      analysis.data_spec().columns(analysis.label_col_idx());
+  switch (analysis.task()) {
+    case model::proto::Task::CLASSIFICATION: {
+      const int first_class_idx =
+          (label_column.categorical().number_of_unique_values() == 3) ? 2 : 1;
+      for (int class_idx = first_class_idx;
+           class_idx < label_column.categorical().number_of_unique_values();
+           class_idx++) {
+        outputs.push_back(
+            {.label = dataset::CategoricalIdxToRepresentation(label_column,
+                                                              class_idx),
+             .compute = [class_idx](const model::proto::Prediction& prediction)
+                 -> float {
+               return prediction.classification().distribution().counts(
+                          class_idx) /
+                      prediction.classification().distribution().sum();
+             }});
+      }
+    } break;
+    case model::proto::Task::REGRESSION:
+      outputs.push_back(
+          {.label = "output",
+           .compute = [](const model::proto::Prediction& prediction) -> float {
+             return prediction.regression().value();
+           }});
+      break;
+    default:
+      return absl::InvalidArgumentError(
+          "Non supported model task for feature variation");
+  }
+  return outputs;
+}
+
+// Plot the feature variation for a numerical feature.
+absl::StatusOr<utils::plot::Plot> FeatureVariationPlotWithNumericalFeature(
+    const proto::PredictionAnalysisResult& analysis,
+    const proto::PredictionAnalysisOptions& options,
+    const utils::model_analysis::proto::FeatureVariationItem& item,
+    const utils::plot::ExportOptions& plot_options,
+    const std::vector<FeatureVariationOutput>& outputs) {
+  utils::plot::Plot plot;
+
+  if (item.attributes_size() != 1) {
+    return absl::InvalidArgumentError("Non supported attribute size");
+  }
+  const auto& attribute = item.attributes(0);
+
+  plot.x_axis.label =
+      analysis.data_spec().columns(attribute.column_idx()).name();
+  plot.y_axis.label = "prediction";
+
+  bool has_min = false;
+  float min_y = 0;
+  float max_y = 0;
+
+  for (const auto& output : outputs) {
+    auto* curve = plot.AddCurve();
+    curve->label = output.label;
+    for (int bin_idx = 0; bin_idx < item.bins_size(); bin_idx++) {
+      const float prediction = output.compute(item.bins(bin_idx).prediction());
+      const float feature = attribute.numerical().values(bin_idx);
+      curve->xs.push_back(feature);
+      curve->ys.push_back(prediction);
+
+      if (has_min) {
+        min_y = std::min(min_y, prediction);
+        max_y = std::max(max_y, prediction);
+      } else {
+        has_min = true;
+        min_y = max_y = prediction;
+      }
+    }
+  }
+
+  auto* selected = plot.AddCurve();
+  selected->label = "selected";
+  selected->style = utils::plot::LineStyle::DOTTED;
+  const float selected_x =
+      analysis.example().attributes(attribute.column_idx()).numerical();
+  selected->xs.push_back(selected_x);
+  selected->xs.push_back(selected_x);
+  selected->ys.push_back(min_y);
+  selected->ys.push_back(max_y);
+
+  return plot;
+}
+
+// Create a feature variation plot for each of the features.
+absl::StatusOr<utils::html::Html> CreateHtmlReportFeatureVariation(
+    const proto::PredictionAnalysisResult& analysis,
+    const proto::PredictionAnalysisOptions& options,
+    const absl::string_view block_id) {
+  namespace h = utils::html;
+  h::Html html;
+
+  // List the outputs to display.
+  ASSIGN_OR_RETURN(const auto outputs, ListOutputs(analysis, options));
+
+  // Create plots.
+  for (int item_idx = 0; item_idx < analysis.feature_variation().items_size();
+       item_idx++) {
+    const auto& item = analysis.feature_variation().items(item_idx);
+    if (item.attributes_size() != 1) {
+      return absl::InternalError("Non supported attribute size");
+    }
+    const auto& attribute = item.attributes(0);
+
+    // Plotting options
+    utils::plot::ExportOptions plot_options{
+        .width = options.plot_width(),
+        .height = options.plot_height(),
+        .html_id_prefix = absl::StrCat(block_id, "_", item_idx),
+    };
+
+    utils::plot::Plot plot;
+    switch (attribute.type_case()) {
+      case proto::FeatureVariationItem::Attribute::kNumerical: {
+        ASSIGN_OR_RETURN(plot,
+                         FeatureVariationPlotWithNumericalFeature(
+                             analysis, options, item, plot_options, outputs));
+      } break;
+      default:
+        return absl::InvalidArgumentError(
+            absl::StrCat("Plotting of attribute of type ",
+                         attribute.type_case(), " not supported"));
+    }
+    ASSIGN_OR_RETURN(const auto plot_html,
+                     utils::plot::ExportToHtml(plot, plot_options));
+    html.AppendRaw(plot_html);
+  }
+
+  return html;
+}
+
+absl::StatusOr<std::string> CreateHtmlReport(
+    const proto::PredictionAnalysisResult& analysis,
+    const proto::PredictionAnalysisOptions& options) {
+  namespace h = utils::html;
+  const std::string block_id = options.has_html_id_prefix()
+                                   ? options.html_id_prefix()
+                                   : utils::GenUniqueId();
+
+  h::Html html;
+  html.AppendRaw(model::Header());
+  utils::TabBarBuilder tabbar(block_id);
+
+  // Feature Variation
+  ASSIGN_OR_RETURN(
+      const auto content,
+      CreateHtmlReportFeatureVariation(
+          analysis, options, absl::StrCat(block_id, "_feature_variation")));
+  tabbar.AddTab("fvar", "Feature Variation", content);
 
   html.Append(tabbar.Html());
   return std::string(html.content());

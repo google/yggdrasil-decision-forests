@@ -1,0 +1,3731 @@
+
+<style>
+
+.tab_block .header {
+    flex-direction: row;
+    display: flex;
+}
+
+.tab_block .header .tab {
+    cursor: pointer;
+    background-color: #F6F5F5;
+    text-decoration: none;
+    text-align: center;
+    padding: 4px 12px;
+    color: black;
+}
+
+.tab_block .header .tab.selected {
+    border-bottom: 2px solid #2F80ED;
+}
+
+.tab_block .header .tab:hover {
+    text-decoration: none;
+    background-color: #DCDCDC;
+}
+
+.tab_block .body .tab_content {
+    display: none;
+    padding: 5px;
+}
+
+.tab_block .body .tab_content.selected {
+    display: block;
+}
+
+.ydf_pre {
+    font-size: medium;
+}
+
+
+
+.variable_importance {
+}
+
+.variable_importance select {
+}
+
+.variable_importance .content {
+  display: none;
+}
+
+.variable_importance .content.selected {
+  display: block;
+}
+
+.ydf_tuning_table {
+  border-collapse: collapse;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table th {
+  background-color: #ededed;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table td {
+  text-align: right;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table .best {
+  background-color: khaki;
+}
+
+</style>
+
+<script>
+
+function ydfShowTab(block_id, item) {
+    const block = document.getElementById(block_id);
+    
+    
+    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
+    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
+    
+    block.getElementsByClassName("tab selected")[0].classList.remove("selected");
+    block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_" + item).classList.add("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+  
+
+function ydfShowVariableImportance(block_id) {
+    const block = document.getElementById(block_id);
+    const item = block.getElementsByTagName("select")[0].value;
+    block.getElementsByClassName("content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+
+</script>
+  <div class="tab_block" id="my_report"><div class="header"><a id="my_report_setup" class="tab selected" onclick="ydfShowTab('my_report', 'setup')">Setup</a><a id="my_report_dataset" class="tab" onclick="ydfShowTab('my_report', 'dataset')">Dataset</a><a id="my_report_pdp" class="tab" onclick="ydfShowTab('my_report', 'pdp')">Partial Dependence Plot</a><a id="my_report_cep" class="tab" onclick="ydfShowTab('my_report', 'cep')">Conditional Expectation Plot</a><a id="my_report_pva" class="tab" onclick="ydfShowTab('my_report', 'pva')">Variable Importances</a><a id="my_report_model" class="tab" onclick="ydfShowTab('my_report', 'model')">Model Description</a></div><div class="body"><div id="my_report_body_setup" class="tab_content selected"><p><b>Analyse dataset: </b>MODEL_PATH</p><p><b>Model: </b>DATASET_PATH</p></div><div id="my_report_body_dataset" class="tab_content"><pre>Number of records: 22792
+Number of columns: 15
+
+Number of columns by type:
+	CATEGORICAL: 10 (66.6667%)
+	NUMERICAL: 5 (33.3333%)
+
+Columns:
+
+CATEGORICAL: 10 (66.6667%)
+	1: &quot;workclass&quot; CATEGORICAL manually-defined num-nas:1257 (5.51509%) has-dict vocab-size:8 num-oods:1 (0.0046436%) most-frequent:&quot;Private&quot; 15879 (73.7358%)
+	3: &quot;education&quot; CATEGORICAL manually-defined has-dict vocab-size:17 zero-ood-items most-frequent:&quot;HS-grad&quot; 7340 (32.2043%)
+	4: &quot;education_num&quot; CATEGORICAL manually-defined has-dict vocab-size:17 zero-ood-items most-frequent:&quot;9&quot; 7340 (32.2043%)
+	5: &quot;marital_status&quot; CATEGORICAL manually-defined has-dict vocab-size:8 zero-ood-items most-frequent:&quot;Married-civ-spouse&quot; 10431 (45.7661%)
+	6: &quot;occupation&quot; CATEGORICAL manually-defined num-nas:1260 (5.52826%) has-dict vocab-size:14 num-oods:1 (0.00464425%) most-frequent:&quot;Prof-specialty&quot; 2870 (13.329%)
+	7: &quot;relationship&quot; CATEGORICAL manually-defined has-dict vocab-size:7 zero-ood-items most-frequent:&quot;Husband&quot; 9191 (40.3256%)
+	8: &quot;race&quot; CATEGORICAL manually-defined has-dict vocab-size:6 zero-ood-items most-frequent:&quot;White&quot; 19467 (85.4115%)
+	9: &quot;sex&quot; CATEGORICAL manually-defined has-dict vocab-size:3 zero-ood-items most-frequent:&quot;Male&quot; 15165 (66.5365%)
+	13: &quot;native_country&quot; CATEGORICAL manually-defined num-nas:407 (1.78571%) has-dict vocab-size:41 num-oods:1 (0.00446728%) most-frequent:&quot;United-States&quot; 20436 (91.2933%)
+	14: &quot;income&quot; CATEGORICAL manually-defined has-dict vocab-size:3 zero-ood-items most-frequent:&quot;&lt;=50K&quot; 17308 (75.9389%)
+
+NUMERICAL: 5 (33.3333%)
+	0: &quot;age&quot; NUMERICAL manually-defined mean:38.6153 min:17 max:90 sd:13.661
+	2: &quot;fnlwgt&quot; NUMERICAL manually-defined mean:189879 min:12285 max:1.4847e+06 sd:106423
+	10: &quot;capital_gain&quot; NUMERICAL manually-defined mean:1081.9 min:0 max:99999 sd:7509.48
+	11: &quot;capital_loss&quot; NUMERICAL manually-defined mean:87.2806 min:0 max:4356 sd:403.01
+	12: &quot;hours_per_week&quot; NUMERICAL manually-defined mean:40.3955 min:1 max:99 sd:12.249
+
+Terminology:
+	nas: Number of non-available (i.e. missing) values.
+	ood: Out of dictionary.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
+	tokenized: The attribute value is obtained through tokenization.
+	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
+	vocab-size: Number of unique values.
+</pre></div><div id="my_report_body_pdp" class="tab_content"><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [17.75,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55.5,57,58,59,60,61.5,63,64.5,66.5,68.5,71.5,75.5,83.75],
+y: [0.031298,0.031298,0.0312971,0.0386876,0.113553,0.104563,0.128698,0.169731,0.171548,0.175183,0.187771,0.207295,0.213039,0.214184,0.215707,0.222684,0.236367,0.235978,0.248579,0.251801,0.25049,0.25765,0.266566,0.264968,0.267016,0.268916,0.275669,0.286156,0.285167,0.292501,0.291978,0.292963,0.295571,0.295212,0.299702,0.299147,0.297979,0.287484,0.284371,0.285535,0.289136,0.272463,0.263429,0.260908,0.242769,0.225616,0.212271,0.195833,0.20492,0.163155],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'age',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'age',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:2 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [17.75,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55.5,57,58,59,60,61.5,63,64.5,66.5,68.5,71.5,75.5,83.75],
+y: [1,0.5,0.166667,0.666667,0.666667,0.5,0.166667,0,1,0.333333,0.5,0.5,0.166667,0.166667,0.666667,1,0.333333,0,0.5,0.5,0.333333,1,0.333333,0.5,1,0.333333,0.166667,0.166667,0.5,0.166667,0.333333,0.166667,0.666667,0.5,0.166667,0.5,0.5,0.333333,0.166667,0,0,0.166667,0.5,0.166667,0.333333,0,0,0,0.166667,0.166667],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [17.75,17.75,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55.5,57,58,59,60,61.5,63,64.5,66.5,68.5,71.5,75.5,83.75],
+y: [0,0.0535714,0.0803571,0.0892857,0.125,0.160714,0.1875,0.196429,0.196429,0.25,0.267857,0.294643,0.321429,0.330357,0.339286,0.375,0.428571,0.446429,0.446429,0.473214,0.5,0.517857,0.571429,0.589286,0.616071,0.669643,0.6875,0.696429,0.705357,0.732143,0.741071,0.758929,0.767857,0.803571,0.830357,0.839286,0.866071,0.892857,0.910714,0.919643,0.919643,0.919643,0.928571,0.955357,0.964286,0.982143,0.982143,0.982143,0.982143,0.991071,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'age',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'age',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:1 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0.241857,0.241857,0.218572,0.226143,0.229629,0.258531,0.270928,0.270928],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'workclass (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7],ticktext: ["&lt;OOD&gt;","Private","Self-emp-not-inc","Local-gov","State-gov","Self-emp-inc","Federal-gov","Without-pay",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:2 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [2,84,7,5,6,4,4,0],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'workclass',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7],ticktext: ["&lt;OOD&gt;","Private","Self-emp-not-inc","Local-gov","State-gov","Self-emp-inc","Federal-gov","Without-pay",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:1 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [25064,33669.8,41245.5,50517.2,61189.2,72630.8,82273,91237.5,98735.8,104149,109018,113896,118340,122944,128539,134758,140954,146437,151444,156548,161208,165412,169700,173416,176533,180083,183880,187551,191102,194688,198415,202276,206546,211083,216412,222158,228832,236456,244812,254556,264709,275901,288422,302503,318210,335032,354311,380670,424674,775118],
+y: [0.255352,0.218985,0.21931,0.214186,0.215678,0.218321,0.228475,0.235787,0.237682,0.23193,0.231311,0.23374,0.238957,0.240907,0.242744,0.242768,0.239246,0.247755,0.248792,0.250023,0.250501,0.249536,0.236953,0.235074,0.243353,0.241635,0.246999,0.24039,0.251907,0.230284,0.247443,0.236065,0.243134,0.248106,0.242597,0.245722,0.258412,0.246775,0.243121,0.239462,0.239252,0.238072,0.236803,0.233864,0.237708,0.219064,0.256679,0.266843,0.266385,0.239316],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'fnlwgt',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'fnlwgt',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:2 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [25064,33669.8,41245.5,50517.2,61189.2,72630.8,82273,91237.5,98735.8,104149,109018,113896,118340,122944,128539,134758,140954,146437,151444,156548,161208,165412,169700,173416,176533,180083,183880,187551,191102,194688,198415,202276,206546,211083,216412,222158,228832,236456,244812,254556,264709,275901,288422,302503,318210,335032,354311,380670,424674,775118],
+y: [0.285714,0.285714,0.142857,0.428571,0.571429,1,0.285714,0,0,0.714286,0.285714,0.285714,0.285714,0,0.428571,0.571429,0.285714,0.142857,0.428571,0.285714,0.142857,0.428571,0.285714,0.142857,0.285714,0.571429,0.285714,0.285714,0.142857,0.142857,0.142857,0.142857,0,0.285714,0.285714,0.714286,0.285714,0.571429,0.571429,0,0.714286,0.428571,0.142857,0.428571,0.285714,0.142857,0.142857,0.142857,0.571429,0.571429],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [25064,25064,33669.8,41245.5,50517.2,61189.2,72630.8,82273,91237.5,98735.8,104149,109018,113896,118340,122944,128539,134758,140954,146437,151444,156548,161208,165412,169700,173416,176533,180083,183880,187551,191102,194688,198415,202276,206546,211083,216412,222158,228832,236456,244812,254556,264709,275901,288422,302503,318210,335032,354311,380670,424674,775118],
+y: [0,0.0178571,0.0357143,0.0446429,0.0714286,0.107143,0.169643,0.1875,0.1875,0.1875,0.232143,0.25,0.267857,0.285714,0.285714,0.3125,0.348214,0.366071,0.375,0.401786,0.419643,0.428571,0.455357,0.473214,0.482143,0.5,0.535714,0.553571,0.571429,0.580357,0.589286,0.598214,0.607143,0.607143,0.625,0.642857,0.6875,0.705357,0.741071,0.776786,0.776786,0.821429,0.848214,0.857143,0.883929,0.901786,0.910714,0.919643,0.928571,0.964286,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'fnlwgt',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'fnlwgt',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:3 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0.225481,0.225481,0.237806,0.271974,0.277237,0.248155,0.226139,0.232146,0.205822,0.203453,0.235352,0.212941,0.212941,0.257132,0.196019,0.184726,0.184726],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'education (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],ticktext: ["&lt;OOD&gt;","HS-grad","Some-college","Bachelors","Masters","Assoc-voc","11th","Assoc-acdm","10th","7th-8th","Prof-school","9th","12th","Doctorate","5th-6th","1st-4th","Preschool",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:4 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0,26,22,23,5,8,7,5,6,4,2,0,1,0,1,2,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'education',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],ticktext: ["&lt;OOD&gt;","HS-grad","Some-college","Bachelors","Masters","Assoc-voc","11th","Assoc-acdm","10th","7th-8th","Prof-school","9th","12th","Doctorate","5th-6th","1st-4th","Preschool",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:3 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0.225982,0.225982,0.236348,0.263646,0.267602,0.248694,0.232888,0.23689,0.218673,0.214384,0.270415,0.228156,0.228156,0.250482,0.2122,0.189619,0.189619],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'education_num (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],ticktext: ["&lt;OOD&gt;","9","10","13","14","11","7","12","6","4","15","5","8","16","3","2","1",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:4 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0,26,22,23,5,8,7,5,6,4,2,0,1,0,1,2,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'education_num',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],ticktext: ["&lt;OOD&gt;","9","10","13","14","11","7","12","6","4","15","5","8","16","3","2","1",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:3 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0.320582,0.320582,0.131774,0.134259,0.150833,0.12845,0.131075,0.229054],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'marital_status (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7],ticktext: ["&lt;OOD&gt;","Married-civ-spouse","Never-married","Divorced","Widowed","Separated","Married-spouse-absent","Married-AF-spouse",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:4 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0,48,37,15,4,4,4,0],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'marital_status',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7],ticktext: ["&lt;OOD&gt;","Married-civ-spouse","Never-married","Divorced","Widowed","Separated","Married-spouse-absent","Married-AF-spouse",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:5 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0.266937,0.266937,0.291977,0.222704,0.22704,0.231544,0.180005,0.184795,0.187652,0.16576,0.164841,0.262051,0.256004,0.161968],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'occupation (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],ticktext: ["&lt;OOD&gt;","Prof-specialty","Exec-managerial","Craft-repair","Adm-clerical","Sales","Other-service","Machine-op-inspct","Transport-moving","Handlers-cleaners","Farming-fishing","Tech-support","Protective-serv","Priv-house-serv",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:6 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [2,8,19,17,13,15,13,9,3,3,0,7,2,1],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'occupation',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],ticktext: ["&lt;OOD&gt;","Prof-specialty","Exec-managerial","Craft-repair","Adm-clerical","Sales","Other-service","Machine-op-inspct","Transport-moving","Handlers-cleaners","Farming-fishing","Tech-support","Protective-serv","Priv-house-serv",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:5 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0.241141,0.241141,0.242484,0.228018,0.242141,0.254719,0.175186],
+y: [0,1,2,3,4,5,6],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'relationship (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6],ticktext: ["&lt;OOD&gt;","Husband","Not-in-family","Own-child","Unmarried","Wife","Other-relative",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:6 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0,43,29,19,11,5,5],
+y: [0,1,2,3,4,5,6],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'relationship',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6],ticktext: ["&lt;OOD&gt;","Husband","Not-in-family","Own-child","Unmarried","Wife","Other-relative",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:5 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0.240686,0.240686,0.227807,0.226217,0.215747,0.199158],
+y: [0,1,2,3,4,5],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'race (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5],ticktext: ["&lt;OOD&gt;","White","Black","Asian-Pac-Islander","Amer-Indian-Eskimo","Other",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:6 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0,96,10,3,3,0],
+y: [0,1,2,3,4,5],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'race',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5],ticktext: ["&lt;OOD&gt;","White","Black","Asian-Pac-Islander","Amer-Indian-Eskimo","Other",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:7 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0.247796,0.247796,0.231745],
+y: [0,1,2],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'sex (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2],ticktext: ["&lt;OOD&gt;","Male","Female",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:8 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0,74,38],
+y: [0,1,2],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'sex',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2],ticktext: ["&lt;OOD&gt;","Male","Female",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:7 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [28.5,580,1471.25,2007.25,2292.75,2527.25,2770,2972,3084,3244,3417.75,3696.25,4003.75,4241.75,4559.75,4907,5206,5911,6934.75,7578,8396,9771.5,12180,14015.5,14820.8,19007.5,24559.8,28746.8,50808,85326.8],
+y: [0.206948,0.0898329,0.0619719,0.0619709,0.0619709,0.0619706,0.0619703,0.0619694,0.427273,0.0552358,0.0552358,0.0552358,0.0554978,0.0855537,0.121365,0.158908,0.491755,0.482816,0.316837,0.762318,0.873463,0.899423,0.954499,0.954499,0.954499,0.954494,0.90092,0.90092,0.578309,0.942505],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'capital_gain',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'capital_gain', type: 'log',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:8 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [28.5,580,1471.25,2007.25,2292.75,2527.25,2770,2972,3084,3244,3417.75,3696.25,4003.75,4241.75,4559.75,4907,5206,5911,6934.75,7578,8396,9771.5,12180,14015.5,14820.8,19007.5,24559.8,28746.8,50808,85326.8],
+y: [1,0,0,0.00980392,0,0,0,0,0,0.00980392,0,0.00980392,0,0,0,0,0.0196078,0,0,0.00980392,0,0.00980392,0,0.00980392,0.00980392,0,0,0,0,0.00980392],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [28.5,28.5,580,1471.25,2007.25,2292.75,2527.25,2770,2972,3084,3244,3417.75,3696.25,4003.75,4241.75,4559.75,4907,5206,5911,6934.75,7578,8396,9771.5,12180,14015.5,14820.8,19007.5,24559.8,28746.8,50808,85326.8],
+y: [0,0.910714,0.910714,0.910714,0.919643,0.919643,0.919643,0.919643,0.919643,0.919643,0.928571,0.928571,0.9375,0.9375,0.9375,0.9375,0.9375,0.955357,0.955357,0.955357,0.964286,0.964286,0.973214,0.973214,0.982143,0.991071,0.991071,0.991071,0.991071,0.991071,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'capital_gain',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'capital_gain', type: 'log',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:7 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [156.25,713.75,1280.75,1470.5,1531.5,1576.5,1590.25,1602.75,1639,1669.5,1683,1709.5,1732,1764.75,1825.5,1871.75,1888,1916.25,1956.75,1977,1984.5,1996,2011.75,2034.25,2050.25,2079.25,2140.5,2183.25,2197.75,2228.75,2257.25,2286.5,2334.25,2371.25,2394,2416.5,2440,2457.5,2487,2531.25,2567,2647.25,2813.75,3150.5,3578.5],
+y: [0.236141,0.232682,0.20382,0.272559,0.154075,0.102783,0.0884718,0.0884718,0.0884718,0.0884545,0.0884545,0.0884545,0.0884545,0.113674,0.421635,0.412401,0.444992,0.442317,0.434155,0.491187,0.276337,0.118815,0.118815,0.118815,0.118815,0.118794,0.129175,0.225754,0.225754,0.415081,0.426371,0.234764,0.234764,0.36864,0.604624,0.636726,0.623456,0.562525,0.562525,0.562525,0.562525,0.562525,0.562525,0.562525,0.536609],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'capital_loss',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'capital_loss',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:8 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [156.25,713.75,1280.75,1470.5,1531.5,1576.5,1590.25,1602.75,1639,1669.5,1683,1709.5,1732,1764.75,1825.5,1871.75,1888,1916.25,1956.75,1977,1984.5,1996,2011.75,2034.25,2050.25,2079.25,2140.5,2183.25,2197.75,2228.75,2257.25,2286.5,2334.25,2371.25,2394,2416.5,2440,2457.5,2487,2531.25,2567,2647.25,2813.75,3150.5,3578.5],
+y: [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00934579,0.00934579,0.0186916,0,0,0,0,0,0,0.00934579,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [156.25,156.25,713.75,1280.75,1470.5,1531.5,1576.5,1590.25,1602.75,1639,1669.5,1683,1709.5,1732,1764.75,1825.5,1871.75,1888,1916.25,1956.75,1977,1984.5,1996,2011.75,2034.25,2050.25,2079.25,2140.5,2183.25,2197.75,2228.75,2257.25,2286.5,2334.25,2371.25,2394,2416.5,2440,2457.5,2487,2531.25,2567,2647.25,2813.75,3150.5,3578.5],
+y: [0,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.955357,0.964286,0.973214,0.991071,0.991071,0.991071,0.991071,0.991071,0.991071,0.991071,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'capital_loss',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'capital_loss',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:9 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [3.25,7,9.5,11.5,14,16,18,20,22.5,25,27,29.75,31.75,34,36,37,38,39.5,41.5,43,44,45,46.5,48,49.5,51.5,53.5,55,56,58,60.25,63.25,68.25,72.25,74.5,78,82.5,85.5,88.5,93,96,97.5,98.75],
+y: [0.164796,0.155722,0.154323,0.151184,0.150639,0.153998,0.156318,0.162591,0.159787,0.161082,0.161308,0.167093,0.173852,0.192793,0.219046,0.222606,0.230856,0.230929,0.251579,0.253454,0.25562,0.263418,0.264611,0.267492,0.280458,0.283199,0.282205,0.281754,0.281012,0.27234,0.271992,0.270304,0.257335,0.282919,0.290458,0.321144,0.324327,0.320912,0.315472,0.277327,0.273581,0.273581,0.273581],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'hours_per_week',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'hours_per_week',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:10 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [3.25,7,9.5,11.5,14,16,18,20,22.5,25,27,29.75,31.75,34,36,37,38,39.5,41.5,43,44,45,46.5,48,49.5,51.5,53.5,55,56,58,60.25,63.25,68.25,72.25,74.5,78,82.5,85.5,88.5,93,96,97.5,98.75],
+y: [0,0,0,0,0.109091,0,0.0181818,0.127273,0.0181818,0.0181818,0,0.0727273,0.0181818,0.0545455,0,0,0.0181818,1,0.0181818,0,0.0181818,0.0909091,0,0,0.163636,0,0,0.0545455,0,0,0.163636,0.0545455,0,0,0,0,0,0,0.0181818,0,0,0,0],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [3.25,3.25,7,9.5,11.5,14,16,18,20,22.5,25,27,29.75,31.75,34,36,37,38,39.5,41.5,43,44,45,46.5,48,49.5,51.5,53.5,55,56,58,60.25,63.25,68.25,72.25,74.5,78,82.5,85.5,88.5,93,96,97.5,98.75],
+y: [0,0,0,0,0,0.0535714,0.0535714,0.0625,0.125,0.133929,0.142857,0.142857,0.178571,0.1875,0.214286,0.214286,0.214286,0.223214,0.714286,0.723214,0.723214,0.732143,0.776786,0.776786,0.776786,0.857143,0.857143,0.857143,0.883929,0.883929,0.883929,0.964286,0.991071,0.991071,0.991071,0.991071,0.991071,0.991071,0.991071,1,1,1,1,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'hours_per_week',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'hours_per_week',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:9 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0.241329,0.241329,0.228909,0.241933,0.240128,0.245347,0.209499,0.209443,0.209443,0.226674,0.227469,0.220607,0.213437,0.213437,0.211499,0.220336,0.202968,0.203028,0.204893,0.204893,0.212527,0.21529,0.21529,0.21529,0.21529,0.215858,0.203809,0.208767,0.255359,0.255359,0.25954,0.264073,0.264073,0.271882,0.271882,0.260653,0.260653,0.260653,0.260653,0.260653,0.260653],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'native_country (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],ticktext: ["&lt;OOD&gt;","United-States","Mexico","Philippines","Germany","Canada","Puerto-Rico","India","El-Salvador","Cuba","England","Jamaica","Dominican-Republic","South","China","Italy","Columbia","Guatemala","Japan","Vietnam","Taiwan","Poland","Iran","Haiti","Nicaragua","Portugal","Greece","Peru","France","Ecuador","Thailand","Cambodia","Laos","Ireland","Yugoslavia","Trinadad&amp;Tobago","Honduras","Hungary","Hong","Scotland","Outlying-US(Guam-USVI-etc)",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:10 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_pdp" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_pdp',
+    [{
+x: [0,103,2,1,0,0,2,0,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'native_country',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],ticktext: ["&lt;OOD&gt;","United-States","Mexico","Philippines","Germany","Canada","Puerto-Rico","India","El-Salvador","Cuba","England","Jamaica","Dominican-Republic","South","China","Italy","Columbia","Guatemala","Japan","Vietnam","Taiwan","Poland","Iran","Haiti","Nicaragua","Portugal","Greece","Peru","France","Ecuador","Thailand","Cambodia","Laos","Ireland","Yugoslavia","Trinadad&amp;Tobago","Honduras","Hungary","Hong","Scotland","Outlying-US(Guam-USVI-etc)",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div></div></div><div id="my_report_body_cep" class="tab_content"><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [17.75,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55.5,57,58,59,60,61.5,63,64.5,66.5,68.5,71.5,75.5,83.75],
+y: [0.000427026,0.000423263,0.00171818,0.000447698,0.0128005,0.00874309,0.0705079,0.0239395,0.0601322,0.0841482,0.124819,0.11025,0.136663,0.189178,0.244538,0.204847,0.286351,0.15695,0.261975,0.329486,0.355518,0.377055,0.415984,0.363351,0.276808,0.296445,0.390821,0.295392,0.398431,0.434369,0.420297,0.457118,0.473946,0.482341,0.510336,0.381161,0.499085,0.307848,0.52352,0.434307,0.407618,0.384578,0.292126,0.201909,0.189849,0.258563,0.230596,0.345328,0.215099,0.187264],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [17.75,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55.5,57,58,59,60,61.5,63,64.5,66.5,68.5,71.5,75.5,83.75],
+y: [0,0,0,0,0,0,0.0952381,0,0.0769231,0.0625,0.105263,0.0909091,0.16,0.227273,0.269231,0.179487,0.407407,0.2,0.21875,0.363636,0.375,0.352941,0.4,0.321429,0.30303,0.304348,0.277778,0.2,0.444444,0.277778,0.631579,0.5,0.5,0.5,0.4375,0.35,0.521739,0.409091,0.555556,0.4,0.666667,0.666667,0.25,0.2,0.166667,0.125,0.375,0.5,0.2,0.25],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [17.75,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55.5,57,58,59,60,61.5,63,64.5,66.5,68.5,71.5,75.5,83.75],
+y: [0,0,0,0,0,0,0.047619,0,0.0769231,0.0625,0.105263,0.0909091,0.2,0.136364,0.0769231,0.025641,0.333333,0.15,0.09375,0.121212,0.15625,0.117647,0.12,0.178571,0.121212,0.173913,0.166667,0.05,0.111111,0.111111,0.210526,0.166667,0.192308,0.0555556,0.3125,0.1,0.26087,0.136364,0,0.2,0.444444,0.444444,0,0.2,0.0555556,0.125,0.375,0.25,0,0.125],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'Error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'age',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'age',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:2 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [17.75,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55.5,57,58,59,60,61.5,63,64.5,66.5,68.5,71.5,75.5,83.75],
+y: [0.846154,0.435897,0.487179,0.564103,0.487179,0.666667,0.538462,0.25641,0.666667,0.820513,0.487179,0.564103,0.641026,0.564103,0.666667,1,0.692308,0.512821,0.820513,0.846154,0.820513,0.871795,0.641026,0.717949,0.846154,0.589744,0.461538,0.512821,0.461538,0.461538,0.487179,0.461538,0.666667,0.461538,0.410256,0.512821,0.589744,0.564103,0.230769,0.25641,0.230769,0.230769,0.410256,0.25641,0.461538,0.205128,0.205128,0.102564,0.128205,0.205128],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [17.75,17.75,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55.5,57,58,59,60,61.5,63,64.5,66.5,68.5,71.5,75.5,83.75],
+y: [0,0.0325123,0.0492611,0.0679803,0.0896552,0.108374,0.13399,0.15468,0.164532,0.190148,0.221675,0.240394,0.262069,0.2867,0.308374,0.33399,0.372414,0.399015,0.418719,0.450246,0.482759,0.514286,0.547783,0.572414,0.6,0.632512,0.655172,0.672906,0.692611,0.710345,0.728079,0.746798,0.764532,0.790148,0.807882,0.823645,0.84335,0.86601,0.887685,0.896552,0.906404,0.915271,0.924138,0.939901,0.949754,0.967488,0.975369,0.983251,0.987192,0.992118,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'age',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'age',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:1 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0.164722,0.229529,0.238618,0.309734,0.283932,0.606197,0.350458,0.125013],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [0.131148,0.232593,0.302326,0.338028,0.28,0.619048,0.37931,0],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [0.0983607,0.102222,0.197674,0.140845,0.14,0.190476,0.103448,0],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'workclass (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7],ticktext: ["&lt;OOD&gt;","Private","Self-emp-not-inc","Local-gov","State-gov","Self-emp-inc","Federal-gov","Without-pay",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:2 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [61,675,86,71,50,42,29,1],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'workclass',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7],ticktext: ["&lt;OOD&gt;","Private","Self-emp-not-inc","Local-gov","State-gov","Self-emp-inc","Federal-gov","Without-pay",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:1 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [25064,33669.8,41245.5,50517.2,61189.2,72630.8,82273,91237.5,98735.8,104149,109018,113896,118340,122944,128539,134758,140954,146437,151444,156548,161208,165412,169700,173416,176533,180083,183880,187551,191102,194688,198415,202276,206546,211083,216412,222158,228832,236456,244812,254556,264709,275901,288422,302503,318210,335032,354311,380670,424674,775118],
+y: [0.361812,0.264356,0.0577,0.198162,0.219775,0.192472,0.1554,0.258761,0.358879,0.333071,0.312,0.252883,0.233498,0.31153,0.159575,0.208235,0.180755,0.259619,0.270336,0.301853,0.142158,0.15071,0.501261,0.161253,0.311674,0.228746,0.325285,0.358929,0.400932,0.211947,0.379783,0.218546,0.181218,0.282819,0.173152,0.220282,0.342688,0.170061,0.329683,0.272401,0.331259,0.285376,0.278808,0.130189,0.254689,0.281041,0.342428,0.188817,0.200718,0.248952],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [25064,33669.8,41245.5,50517.2,61189.2,72630.8,82273,91237.5,98735.8,104149,109018,113896,118340,122944,128539,134758,140954,146437,151444,156548,161208,165412,169700,173416,176533,180083,183880,187551,191102,194688,198415,202276,206546,211083,216412,222158,228832,236456,244812,254556,264709,275901,288422,302503,318210,335032,354311,380670,424674,775118],
+y: [0.5,0.28,0.111111,0.291667,0.391304,0.166667,0.15,0.214286,0.352941,0.380952,0.333333,0.190476,0.210526,0.409091,0.08,0.264706,0.0909091,0.235294,0.173913,0.269231,0.133333,0.227273,0.4,0.176471,0.391304,0.16,0.25,0.411765,0.315789,0.238095,0.263158,0.2,0.2,0.454545,0.208333,0.142857,0.266667,0.24,0.26087,0.263158,0.272727,0.307692,0.3125,0.217391,0.230769,0.428571,0.428571,0.0952381,0.2,0.25],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [25064,33669.8,41245.5,50517.2,61189.2,72630.8,82273,91237.5,98735.8,104149,109018,113896,118340,122944,128539,134758,140954,146437,151444,156548,161208,165412,169700,173416,176533,180083,183880,187551,191102,194688,198415,202276,206546,211083,216412,222158,228832,236456,244812,254556,264709,275901,288422,302503,318210,335032,354311,380670,424674,775118],
+y: [0.125,0.32,0.111111,0.208333,0.217391,0.133333,0.05,0.142857,0.0588235,0.238095,0.0740741,0,0.105263,0.181818,0.12,0.176471,0,0.0588235,0.130435,0.269231,0.0666667,0.0909091,0.1,0.117647,0.130435,0.04,0,0.0588235,0.210526,0.0952381,0.105263,0.04,0.133333,0.227273,0.0833333,0.047619,0.0666667,0.16,0,0.157895,0.136364,0.153846,0.0625,0.0869565,0,0.238095,0.0952381,0.0952381,0,0.0625],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'Error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'fnlwgt',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'fnlwgt',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:2 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [25064,33669.8,41245.5,50517.2,61189.2,72630.8,82273,91237.5,98735.8,104149,109018,113896,118340,122944,128539,134758,140954,146437,151444,156548,161208,165412,169700,173416,176533,180083,183880,187551,191102,194688,198415,202276,206546,211083,216412,222158,228832,236456,244812,254556,264709,275901,288422,302503,318210,335032,354311,380670,424674,775118],
+y: [0.470588,0.735294,0.264706,0.705882,0.676471,0.882353,0.588235,0.411765,0.5,0.617647,0.794118,0.617647,0.558824,0.647059,0.735294,1,0.323529,0.5,0.676471,0.764706,0.441176,0.647059,0.294118,0.5,0.676471,0.735294,0.352941,0.5,0.558824,0.617647,0.558824,0.735294,0.441176,0.647059,0.705882,0.617647,0.441176,0.735294,0.676471,0.558824,0.647059,0.764706,0.470588,0.676471,0.764706,0.617647,0.617647,0.617647,0.294118,0.470588],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [25064,25064,33669.8,41245.5,50517.2,61189.2,72630.8,82273,91237.5,98735.8,104149,109018,113896,118340,122944,128539,134758,140954,146437,151444,156548,161208,165412,169700,173416,176533,180083,183880,187551,191102,194688,198415,202276,206546,211083,216412,222158,228832,236456,244812,254556,264709,275901,288422,302503,318210,335032,354311,380670,424674,775118],
+y: [0,0.0157635,0.0403941,0.0492611,0.0729064,0.0955665,0.125123,0.144828,0.158621,0.175369,0.196059,0.22266,0.24335,0.262069,0.283744,0.308374,0.341872,0.352709,0.369458,0.392118,0.417734,0.432512,0.454187,0.464039,0.480788,0.503448,0.528079,0.539901,0.55665,0.575369,0.596059,0.614778,0.639409,0.654187,0.675862,0.699507,0.720197,0.734975,0.759606,0.782266,0.800985,0.82266,0.848276,0.864039,0.886699,0.912315,0.933005,0.953695,0.974384,0.984236,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'fnlwgt',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'fnlwgt',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:3 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,0.156101,0.219677,0.427932,0.529819,0.290735,0.0551525,0.27756,0.089765,0.0505617,0.72566,0.0525506,0.188751,0.759569,0.0232092,0.0621731,0.0239212],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [0,0.14658,0.221698,0.434286,0.641509,0.268293,0.0425532,0.342105,0.0909091,0,0.869565,0,0.111111,0.928571,0.0909091,0,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [NaN,0.120521,0.150943,0.12,0.132075,0.097561,0.0425532,0.263158,0.0606061,0,0.0869565,0,0,0.142857,0.0909091,0,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'education (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],ticktext: ["&lt;OOD&gt;","HS-grad","Some-college","Bachelors","Masters","Assoc-voc","11th","Assoc-acdm","10th","7th-8th","Prof-school","9th","12th","Doctorate","5th-6th","1st-4th","Preschool",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:4 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,307,212,175,53,41,47,38,33,20,23,22,9,14,11,7,3],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'education',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],ticktext: ["&lt;OOD&gt;","HS-grad","Some-college","Bachelors","Masters","Assoc-voc","11th","Assoc-acdm","10th","7th-8th","Prof-school","9th","12th","Doctorate","5th-6th","1st-4th","Preschool",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:3 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,0.156101,0.219677,0.427932,0.529819,0.290735,0.0551525,0.27756,0.089765,0.0505617,0.72566,0.0525506,0.188751,0.759569,0.0232092,0.0621731,0.0239212],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [0,0.14658,0.221698,0.434286,0.641509,0.268293,0.0425532,0.342105,0.0909091,0,0.869565,0,0.111111,0.928571,0.0909091,0,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [NaN,0.120521,0.150943,0.12,0.132075,0.097561,0.0425532,0.263158,0.0606061,0,0.0869565,0,0,0.142857,0.0909091,0,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'education_num (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],ticktext: ["&lt;OOD&gt;","9","10","13","14","11","7","12","6","4","15","5","8","16","3","2","1",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:4 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,307,212,175,53,41,47,38,33,20,23,22,9,14,11,7,3],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'education_num',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],ticktext: ["&lt;OOD&gt;","9","10","13","14","11","7","12","6","4","15","5","8","16","3","2","1",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:3 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,0.454113,0.0503399,0.0850982,0.060369,0.0703251,0.126882,0],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [0,0.467611,0.0465116,0.0869565,0.0857143,0.0606061,0.285714,0],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [NaN,0.200405,0.0232558,0.057971,0.0857143,0,0.214286,NaN],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'marital_status (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7],ticktext: ["&lt;OOD&gt;","Married-civ-spouse","Never-married","Divorced","Widowed","Separated","Married-spouse-absent","Married-AF-spouse",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:4 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,494,301,138,35,33,14,0],
+y: [0,1,2,3,4,5,6,7],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'marital_status',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7],ticktext: ["&lt;OOD&gt;","Married-civ-spouse","Never-married","Divorced","Widowed","Separated","Married-spouse-absent","Married-AF-spouse",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:5 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0.164722,0.4854,0.526977,0.231432,0.109523,0.297009,0.0431209,0.111344,0.19487,0.0451614,0.0724847,0.294354,0.393366,0.0284419],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [0.131148,0.584746,0.535433,0.232394,0.102564,0.297521,0.0430108,0.112903,0.212766,0.0487805,0.037037,0.317073,0.214286,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [0.0983607,0.144068,0.133858,0.190141,0.0769231,0.107438,0.0430108,0.0806452,0.148936,0.0487805,0.037037,0.170732,0.357143,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'occupation (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],ticktext: ["&lt;OOD&gt;","Prof-specialty","Exec-managerial","Craft-repair","Adm-clerical","Sales","Other-service","Machine-op-inspct","Transport-moving","Handlers-cleaners","Farming-fishing","Tech-support","Protective-serv","Priv-house-serv",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:6 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [61,118,127,142,117,121,93,62,47,41,27,41,14,4],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'occupation',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],ticktext: ["&lt;OOD&gt;","Prof-specialty","Exec-managerial","Craft-repair","Adm-clerical","Sales","Other-service","Machine-op-inspct","Transport-moving","Handlers-cleaners","Farming-fishing","Tech-support","Protective-serv","Priv-house-serv",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:5 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,0.452501,0.0916711,0.0233773,0.0589808,0.50018,0.038947],
+y: [0,1,2,3,4,5,6],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [0,0.470046,0.0988142,0.020979,0.0515464,0.490909,0.0606061],
+y: [0,1,2,3,4,5,6],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [NaN,0.202765,0.0592885,0.013986,0.0309278,0.2,0.030303],
+y: [0,1,2,3,4,5,6],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'relationship (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6],ticktext: ["&lt;OOD&gt;","Husband","Not-in-family","Own-child","Unmarried","Wife","Other-relative",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:6 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,434,253,143,97,55,33],
+y: [0,1,2,3,4,5,6],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'relationship',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6],ticktext: ["&lt;OOD&gt;","Husband","Not-in-family","Own-child","Unmarried","Wife","Other-relative",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:5 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,0.27101,0.113739,0.212248,0.0933475,0.14011],
+y: [0,1,2,3,4,5],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [0,0.278093,0.114943,0.285714,0,0.2],
+y: [0,1,2,3,4,5],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [NaN,0.119183,0.0689655,0.228571,0,0.2],
+y: [0,1,2,3,4,5],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'race (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5],ticktext: ["&lt;OOD&gt;","White","Black","Asian-Pac-Islander","Amer-Indian-Eskimo","Other",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:6 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,881,87,35,7,5],
+y: [0,1,2,3,4,5],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'race',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5],ticktext: ["&lt;OOD&gt;","White","Black","Asian-Pac-Islander","Amer-Indian-Eskimo","Other",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:7 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,0.320005,0.118908],
+y: [0,1,2],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [0,0.335294,0.113433],
+y: [0,1,2],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [NaN,0.15,0.0537313],
+y: [0,1,2],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'sex (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2],ticktext: ["&lt;OOD&gt;","Male","Female",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:8 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0,680,335],
+y: [0,1,2],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'sex',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2],ticktext: ["&lt;OOD&gt;","Male","Female",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:7 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [28.5,580,1471.25,2007.25,2292.75,2527.25,2770,2972,3084,3244,3417.75,3696.25,4003.75,4241.75,4559.75,4907,5206,5911,6934.75,7578,8396,9771.5,12180,14015.5,14820.8,19007.5,24559.8,28746.8,50808,85326.8],
+y: [0.214111,0,0.0247836,0.0109616,0,0.0131992,0.0234468,0.00144809,0.892357,0.0177804,0.0222899,0.0247591,0.0361259,0.355018,0.0657828,0,0.969095,0.290641,0.8939,0.987997,0.994152,0.966405,0.996398,0.995569,0.995348,0.986545,0.989977,0,0.0253034,0.993491],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [28.5,580,1471.25,2007.25,2292.75,2527.25,2770,2972,3084,3244,3417.75,3696.25,4003.75,4241.75,4559.75,4907,5206,5911,6934.75,7578,8396,9771.5,12180,14015.5,14820.8,19007.5,24559.8,28746.8,50808,85326.8],
+y: [0.22246,0,0,0,0,0,0,0,1,0,0,0,0,0.666667,0,0,1,0,0.888889,1,1,1,1,1,1,1,1,0,0,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [28.5,580,1471.25,2007.25,2292.75,2527.25,2770,2972,3084,3244,3417.75,3696.25,4003.75,4241.75,4559.75,4907,5206,5911,6934.75,7578,8396,9771.5,12180,14015.5,14820.8,19007.5,24559.8,28746.8,50808,85326.8],
+y: [0.127273,NaN,0,0,NaN,0,0,0,0,0,0,0,0,0.333333,0,NaN,0,0,0,0,0,0,0,0,0,0,0,NaN,0,0],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'Error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'capital_gain',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'capital_gain', type: 'log',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:8 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [28.5,580,1471.25,2007.25,2292.75,2527.25,2770,2972,3084,3244,3417.75,3696.25,4003.75,4241.75,4559.75,4907,5206,5911,6934.75,7578,8396,9771.5,12180,14015.5,14820.8,19007.5,24559.8,28746.8,50808,85326.8],
+y: [1,0,0.00213904,0.00213904,0,0.00106952,0.00320856,0.00106952,0.00106952,0.00106952,0.00106952,0.00213904,0.00213904,0.00320856,0.00320856,0,0.00641711,0.00106952,0.00962567,0.0106952,0.00106952,0.00427807,0.00106952,0.00213904,0.0160428,0.00106952,0.00106952,0,0.00106952,0.00641711],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [28.5,28.5,580,1471.25,2007.25,2292.75,2527.25,2770,2972,3084,3244,3417.75,3696.25,4003.75,4241.75,4559.75,4907,5206,5911,6934.75,7578,8396,9771.5,12180,14015.5,14820.8,19007.5,24559.8,28746.8,50808,85326.8],
+y: [0,0.921182,0.921182,0.923153,0.925123,0.925123,0.926108,0.929064,0.930049,0.931035,0.93202,0.933005,0.934975,0.936946,0.939901,0.942857,0.942857,0.948768,0.949754,0.958621,0.968473,0.969458,0.973399,0.974384,0.976355,0.991133,0.992118,0.993103,0.993103,0.994089,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'capital_gain',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'capital_gain', type: 'log',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:7 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [156.25,713.75,1280.75,1470.5,1531.5,1576.5,1590.25,1602.75,1639,1669.5,1683,1709.5,1732,1764.75,1825.5,1871.75,1888,1916.25,1956.75,1977,1984.5,1996,2011.75,2034.25,2050.25,2079.25,2140.5,2183.25,2197.75,2228.75,2257.25,2286.5,2334.25,2371.25,2394,2416.5,2440,2457.5,2487,2531.25,2567,2647.25,2813.75,3150.5,3578.5],
+y: [0.243179,0,0.0830077,0.643652,0.0385011,0.0249787,0.0506109,0.000394624,0.0689694,0.0314293,0.0531317,0.0109514,0,0.0327335,0.938873,0.116501,0.970609,0.953215,0.0144669,0.984841,0.0203443,0,0.263288,0,0.056864,0,0,0.200107,0,0.0678776,0,0,0,0.846924,0.967976,0.911869,0,0.637387,0,0,0.798348,0,0.861413,0,0],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [156.25,713.75,1280.75,1470.5,1531.5,1576.5,1590.25,1602.75,1639,1669.5,1683,1709.5,1732,1764.75,1825.5,1871.75,1888,1916.25,1956.75,1977,1984.5,1996,2011.75,2034.25,2050.25,2079.25,2140.5,2183.25,2197.75,2228.75,2257.25,2286.5,2334.25,2371.25,2394,2416.5,2440,2457.5,2487,2531.25,2567,2647.25,2813.75,3150.5,3578.5],
+y: [0.252599,0,0,1,0.5,0,0,0,0,0,0,0,0,0,1,0,1,0.857143,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,1,0,1,0,0],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [156.25,713.75,1280.75,1470.5,1531.5,1576.5,1590.25,1602.75,1639,1669.5,1683,1709.5,1732,1764.75,1825.5,1871.75,1888,1916.25,1956.75,1977,1984.5,1996,2011.75,2034.25,2050.25,2079.25,2140.5,2183.25,2197.75,2228.75,2257.25,2286.5,2334.25,2371.25,2394,2416.5,2440,2457.5,2487,2531.25,2567,2647.25,2813.75,3150.5,3578.5],
+y: [0.121622,NaN,0,0,0.5,0,0,0,0,0,0,0,NaN,0,0,0,0,0.142857,0,0,0,NaN,0,NaN,0,NaN,NaN,0,NaN,0,NaN,NaN,NaN,0,0,0,NaN,1,NaN,NaN,0,NaN,0,NaN,NaN],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'Error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'capital_loss',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'capital_loss',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:8 / span 1; grid-column:3 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [156.25,713.75,1280.75,1470.5,1531.5,1576.5,1590.25,1602.75,1639,1669.5,1683,1709.5,1732,1764.75,1825.5,1871.75,1888,1916.25,1956.75,1977,1984.5,1996,2011.75,2034.25,2050.25,2079.25,2140.5,2183.25,2197.75,2228.75,2257.25,2286.5,2334.25,2371.25,2394,2416.5,2440,2457.5,2487,2531.25,2567,2647.25,2813.75,3150.5,3578.5],
+y: [1,0,0.002079,0.002079,0.002079,0.0010395,0.0010395,0.0010395,0.0031185,0.0010395,0.0031185,0.0010395,0,0.0031185,0.002079,0.004158,0.002079,0.00727651,0.0010395,0.002079,0.002079,0,0.0010395,0,0.0010395,0,0,0.0010395,0,0.0010395,0,0,0,0.0010395,0.002079,0.0031185,0,0.0010395,0,0,0.0010395,0,0.0010395,0,0],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [156.25,156.25,713.75,1280.75,1470.5,1531.5,1576.5,1590.25,1602.75,1639,1669.5,1683,1709.5,1732,1764.75,1825.5,1871.75,1888,1916.25,1956.75,1977,1984.5,1996,2011.75,2034.25,2050.25,2079.25,2140.5,2183.25,2197.75,2228.75,2257.25,2286.5,2334.25,2371.25,2394,2416.5,2440,2457.5,2487,2531.25,2567,2647.25,2813.75,3150.5,3578.5],
+y: [0,0.947783,0.947783,0.949754,0.951724,0.953695,0.95468,0.955665,0.95665,0.959606,0.960591,0.963547,0.964532,0.964532,0.967488,0.969458,0.973399,0.975369,0.982266,0.983251,0.985222,0.987192,0.987192,0.988177,0.988177,0.989163,0.989163,0.989163,0.990148,0.990148,0.991133,0.991133,0.991133,0.991133,0.992118,0.994089,0.997044,0.997044,0.99803,0.99803,0.99803,0.999015,0.999015,1,1,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'capital_loss',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'capital_loss',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:9 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [3.25,7,9.5,11.5,14,16,18,20,22.5,25,27,29.75,31.75,34,36,37,38,39.5,41.5,43,44,45,46.5,48,49.5,51.5,53.5,55,56,58,60.25,63.25,68.25,72.25,74.5,78,82.5,85.5,88.5,93,96,97.5,98.75],
+y: [0.0871056,0.0654416,0.0947948,0.0147317,0.0784667,0.00722326,0.000376803,0.0853406,0.0363253,0.0684557,0.00961144,0.143028,0.115531,0.133076,0.0243597,0.0247891,0.223815,0.218396,0.11416,0.774157,0.752712,0.390298,0.133393,0.436958,0.519884,0.31307,0.174701,0.547825,0.293819,0,0.416449,0.508402,0.22376,0.0335949,0.465343,0.521609,0.0745303,0,0.389617,0.330539,0,0,0.437274],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [3.25,7,9.5,11.5,14,16,18,20,22.5,25,27,29.75,31.75,34,36,37,38,39.5,41.5,43,44,45,46.5,48,49.5,51.5,53.5,55,56,58,60.25,63.25,68.25,72.25,74.5,78,82.5,85.5,88.5,93,96,97.5,98.75],
+y: [0,0.2,0.0909091,0,0.105263,0,0,0.0652174,0,0,0,0.181818,0.0909091,0.175,0,0,0.230769,0.226804,0.111111,0.5,1,0.423077,0,0.333333,0.542169,0,0,0.6,0.2,0,0.363636,0.6,0.3,0,1,0.6,0,0,0.5,1,0,0,0.5],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [3.25,7,9.5,11.5,14,16,18,20,22.5,25,27,29.75,31.75,34,36,37,38,39.5,41.5,43,44,45,46.5,48,49.5,51.5,53.5,55,56,58,60.25,63.25,68.25,72.25,74.5,78,82.5,85.5,88.5,93,96,97.5,98.75],
+y: [0,0.2,0,0,0.105263,0,0,0.0652174,0,0,0,0.0606061,0,0.1,0,0,0.0769231,0.109278,0.111111,0.5,0.2,0.0961538,0,0,0.192771,0,0,0.233333,0.2,NaN,0.218182,0.3,0.1,0,1,0.6,0,NaN,0.25,1,NaN,NaN,0],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'Error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'hours_per_week',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'hours_per_week',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:10 / span 1; grid-column:1 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [3.25,7,9.5,11.5,14,16,18,20,22.5,25,27,29.75,31.75,34,36,37,38,39.5,41.5,43,44,45,46.5,48,49.5,51.5,53.5,55,56,58,60.25,63.25,68.25,72.25,74.5,78,82.5,85.5,88.5,93,96,97.5,98.75],
+y: [0.0103093,0.0103093,0.0226804,0.0247423,0.0391753,0.00824742,0.00206186,0.0948454,0.0123711,0.0474227,0.00824742,0.0680412,0.0226804,0.0824742,0.00824742,0.00412371,0.0268041,1,0.0185567,0.00412371,0.0103093,0.107216,0.0103093,0.0123711,0.171134,0.00206186,0.00412371,0.0618557,0.0103093,0,0.113402,0.0206186,0.0206186,0.00206186,0.00206186,0.0103093,0.00412371,0,0.00824742,0.00206186,0,0,0.00412371],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'density',
+},
+{
+x: [3.25,3.25,7,9.5,11.5,14,16,18,20,22.5,25,27,29.75,31.75,34,36,37,38,39.5,41.5,43,44,45,46.5,48,49.5,51.5,53.5,55,56,58,60.25,63.25,68.25,72.25,74.5,78,82.5,85.5,88.5,93,96,97.5,98.75],
+y: [0,0.00492611,0.00985222,0.0206897,0.0325123,0.0512315,0.0551724,0.0561576,0.101478,0.107389,0.130049,0.13399,0.166502,0.17734,0.216749,0.22069,0.22266,0.235468,0.7133,0.722167,0.724138,0.729064,0.780296,0.785222,0.791133,0.872906,0.873892,0.875862,0.905419,0.910345,0.910345,0.964532,0.974384,0.984236,0.985222,0.986207,0.991133,0.993103,0.993103,0.997044,0.99803,0.99803,0.99803,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'cdf',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'hours_per_week',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'hours_per_week',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:9 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [0.14901,0.265454,0.0474874,0.381283,0.110425,0.577947,0.0504857,0.327682,0.0265836,0.165937,0.403947,0.000495818,0.0531915,0.223621,0.243862,0.169252,0,0.0120071,0.815394,0.049007,0.0128335,0.249244,0.207054,0,0.000499989,0.0445765,0.987395,0.0777623,0,0.0203401,0,0.00407538,0,0,0,0.108335,0,0,0,0,0.017648],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Pred:>50K',
+},
+{
+x: [0.1875,0.273731,0,0.5,0,0.5,0,1,0,0.333333,0,0,0,0,0.5,0.666667,0,0,1,0,0,0.333333,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'Label:>50K',
+},
+{
+x: [0.125,0.118102,0,0.5,0,0,0,0.666667,0,0.333333,0.5,0,0,0.2,0.5,0.666667,NaN,0,0,0,0,0.166667,0,NaN,0,0,0,0,NaN,0,NaN,0,NaN,NaN,NaN,0,NaN,NaN,NaN,NaN,0],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'error rate',
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'native_country (cat)',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Prediction',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],ticktext: ["&lt;OOD&gt;","United-States","Mexico","Philippines","Germany","Canada","Puerto-Rico","India","El-Salvador","Cuba","England","Jamaica","Dominican-Republic","South","China","Italy","Columbia","Guatemala","Japan","Vietnam","Taiwan","Poland","Iran","Haiti","Nicaragua","Portugal","Greece","Peru","France","Ecuador","Thailand","Cambodia","Laos","Ireland","Yugoslavia","Trinadad&amp;Tobago","Honduras","Hungary","Hong","Scotland","Outlying-US(Guam-USVI-etc)",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div><div style='grid-row:10 / span 1; grid-column:2 / span 1;'>
+<div id="chart_my_report_cep" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_cep',
+    [{
+x: [16,906,22,4,2,4,8,3,4,3,2,1,2,5,2,3,0,2,1,4,1,6,2,0,1,4,1,2,0,1,0,1,0,0,0,1,0,0,0,0,1],
+y: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+},
+],
+    {
+      width: 530,
+      height: 450,
+      title: 'native_country',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'Distribution',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',tickvals: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],ticktext: ["&lt;OOD&gt;","United-States","Mexico","Philippines","Germany","Canada","Puerto-Rico","India","El-Salvador","Cuba","England","Jamaica","Dominican-Republic","South","China","Italy","Columbia","Guatemala","Japan","Vietnam","Taiwan","Poland","Iran","Haiti","Nicaragua","Portugal","Greece","Peru","France","Ecuador","Thailand","Cambodia","Laos","Ireland","Yugoslavia","Trinadad&amp;Tobago","Honduras","Hungary","Hong","Scotland","Outlying-US(Guam-USVI-etc)",],
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div></div></div><div id="my_report_body_pva" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="my_report_variable_importance_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('my_report_variable_importance_vi')"><option value="MEAN_DECREASE_IN_ACCURACY">MEAN_DECREASE_IN_ACCURACY</option><option value="MEAN_DECREASE_IN_AP_>50K_VS_OTHERS">MEAN_DECREASE_IN_AP_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_AUC_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_PRAUC_&gt;50K_VS_OTHERS</option></select><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_ACCURACY" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.051694 ################
+    2. &quot;marital_status&quot;  0.048111 ##############
+    3.            &quot;age&quot;  0.026001 ########
+    4.     &quot;occupation&quot;  0.021599 ######
+    5.   &quot;capital_loss&quot;  0.016481 #####
+    6.      &quot;education&quot;  0.010851 ###
+    7. &quot;hours_per_week&quot;  0.007780 ##
+    8.  &quot;education_num&quot;  0.006040 #
+    9.         &quot;fnlwgt&quot;  0.003276 #
+   10.   &quot;relationship&quot;  0.002047 
+   11.      &quot;workclass&quot;  0.000819 
+   12.           &quot;race&quot;  0.000717 
+   13. &quot;native_country&quot;  0.000614 
+   14.            &quot;sex&quot; -0.000307 
+</pre></div><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_AP_&gt;50K_VS_OTHERS" class="content"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.254861 ################
+    2. &quot;marital_status&quot;  0.134753 ########
+    3.            &quot;age&quot;  0.082474 #####
+    4.   &quot;capital_loss&quot;  0.046534 ##
+    5.     &quot;occupation&quot;  0.034887 ##
+    6. &quot;hours_per_week&quot;  0.023707 #
+    7.      &quot;education&quot;  0.021360 #
+    8.  &quot;education_num&quot;  0.010981 
+    9.   &quot;relationship&quot;  0.006034 
+   10.      &quot;workclass&quot;  0.004566 
+   11.         &quot;fnlwgt&quot;  0.002219 
+   12.            &quot;sex&quot;  0.002180 
+   13. &quot;native_country&quot;  0.000545 
+   14.           &quot;race&quot;  0.000413 
+</pre></div><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_AUC_&gt;50K_VS_OTHERS" class="content"><pre class="ydf_pre">    1. &quot;marital_status&quot;  0.086126 ################
+    2.            &quot;age&quot;  0.079609 ##############
+    3.   &quot;capital_gain&quot;  0.063182 ###########
+    4.     &quot;occupation&quot;  0.016851 ###
+    5.   &quot;capital_loss&quot;  0.015947 ##
+    6. &quot;hours_per_week&quot;  0.015676 ##
+    7.      &quot;education&quot;  0.010585 #
+    8.  &quot;education_num&quot;  0.005066 
+    9.   &quot;relationship&quot;  0.003286 
+   10.      &quot;workclass&quot;  0.002349 
+   11.            &quot;sex&quot;  0.001903 
+   12. &quot;native_country&quot;  0.000435 
+   13.         &quot;fnlwgt&quot;  0.000306 
+   14.           &quot;race&quot;  0.000045 
+</pre></div><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_PRAUC_&gt;50K_VS_OTHERS" class="content"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.254553 ################
+    2. &quot;marital_status&quot;  0.134732 ########
+    3.            &quot;age&quot;  0.082464 #####
+    4.   &quot;capital_loss&quot;  0.046518 ##
+    5.     &quot;occupation&quot;  0.034881 ##
+    6. &quot;hours_per_week&quot;  0.023704 #
+    7.      &quot;education&quot;  0.021356 #
+    8.  &quot;education_num&quot;  0.010979 
+    9.   &quot;relationship&quot;  0.006033 
+   10.      &quot;workclass&quot;  0.004567 
+   11.         &quot;fnlwgt&quot;  0.002219 
+   12.            &quot;sex&quot;  0.002180 
+   13. &quot;native_country&quot;  0.000545 
+   14.           &quot;race&quot;  0.000413 
+</pre></div></div></div><div id="my_report_body_model" class="tab_content"><pre>Type: &quot;GRADIENT_BOOSTED_TREES&quot;
+Task: CLASSIFICATION
+Label: &quot;income&quot;
+
+Input Features (14):
+	age
+	workclass
+	fnlwgt
+	education
+	education_num
+	marital_status
+	occupation
+	relationship
+	race
+	sex
+	capital_gain
+	capital_loss
+	hours_per_week
+	native_country
+
+No weights
+
+Variable Importance: INV_MEAN_MIN_DEPTH:
+    1.   &quot;capital_gain&quot;  0.348634 ################
+    2.            &quot;age&quot;  0.285433 ############
+    3.   &quot;capital_loss&quot;  0.131911 ###
+    4. &quot;marital_status&quot;  0.117577 ##
+    5. &quot;hours_per_week&quot;  0.102857 #
+    6.     &quot;occupation&quot;  0.096636 #
+    7.         &quot;fnlwgt&quot;  0.095548 #
+    8.      &quot;education&quot;  0.093344 #
+    9.  &quot;education_num&quot;  0.092694 #
+   10.   &quot;relationship&quot;  0.085777 
+   11.           &quot;race&quot;  0.080496 
+   12. &quot;native_country&quot;  0.076829 
+   13.      &quot;workclass&quot;  0.076388 
+   14.            &quot;sex&quot;  0.075220 
+
+Variable Importance: NUM_AS_ROOT:
+    1.            &quot;age&quot; 31.000000 ################
+    2. &quot;marital_status&quot; 22.000000 ###########
+    3.   &quot;capital_gain&quot;  8.000000 ###
+    4.     &quot;occupation&quot;  3.000000 #
+    5.  &quot;education_num&quot;  2.000000 
+    6.      &quot;education&quot;  1.000000 
+    7.   &quot;capital_loss&quot;  1.000000 
+
+Variable Importance: NUM_NODES:
+    1.         &quot;fnlwgt&quot; 1038.000000 ################
+    2.            &quot;age&quot; 716.000000 ##########
+    3. &quot;hours_per_week&quot; 538.000000 #######
+    4.   &quot;capital_gain&quot; 496.000000 #######
+    5.   &quot;capital_loss&quot; 396.000000 #####
+    6.     &quot;occupation&quot; 267.000000 ###
+    7.      &quot;education&quot; 167.000000 ##
+    8.  &quot;education_num&quot; 160.000000 #
+    9. &quot;marital_status&quot; 126.000000 #
+   10.      &quot;workclass&quot; 118.000000 #
+   11. &quot;native_country&quot; 99.000000 
+   12.   &quot;relationship&quot; 81.000000 
+   13.            &quot;sex&quot; 42.000000 
+   14.           &quot;race&quot; 40.000000 
+
+Variable Importance: SUM_SCORE:
+    1. &quot;marital_status&quot; 530956984.119748 ################
+    2.   &quot;capital_gain&quot; 411123634.345114 ############
+    3.            &quot;age&quot; 354664186.766705 ##########
+    4. &quot;hours_per_week&quot; 240233774.133519 #######
+    5.   &quot;capital_loss&quot; 172591458.733243 #####
+    6.     &quot;occupation&quot; 112809328.090070 ###
+    7.         &quot;fnlwgt&quot; 104373733.635293 ###
+    8.      &quot;education&quot; 38044579.052098 #
+    9.  &quot;education_num&quot; 29986295.822112 
+   10.            &quot;sex&quot; 11084945.032449 
+   11.      &quot;workclass&quot; 9233258.450864 
+   12.   &quot;relationship&quot; 4745657.076093 
+   13.           &quot;race&quot; 3349279.550052 
+   14. &quot;native_country&quot; 3231785.561941 
+
+
+Cannot compute model self evaluation:This model does not support evaluation reports.
+
+Loss: BINOMIAL_LOG_LIKELIHOOD
+Validation loss value: 0.573843
+Number of trees per iteration: 1
+Node format: BLOB_SEQUENCE
+Number of trees: 68
+Total number of nodes: 8636
+
+Number of nodes by tree:
+Count: 68 Average: 127 StdDev: 0
+Min: 127 Max: 127 Ignored: 0
+----------------------------------------------
+[ 127, 127] 68 100.00% 100.00% ##########
+
+Depth by leafs:
+Count: 4352 Average: 13.3146 StdDev: 8.74848
+Min: 1 Max: 54 Ignored: 0
+----------------------------------------------
+[  1,  3)  79   1.82%   1.82% #
+[  3,  6) 553  12.71%  14.52% ######
+[  6,  9) 881  20.24%  34.77% ##########
+[  9, 11) 578  13.28%  48.05% #######
+[ 11, 14) 669  15.37%  63.42% ########
+[ 14, 17) 427   9.81%  73.23% #####
+[ 17, 19) 204   4.69%  77.92% ##
+[ 19, 22) 242   5.56%  83.48% ###
+[ 22, 25) 203   4.66%  88.14% ##
+[ 25, 28) 137   3.15%  91.29% ##
+[ 28, 30)  92   2.11%  93.41% #
+[ 30, 33)  85   1.95%  95.36% #
+[ 33, 36)  72   1.65%  97.01% #
+[ 36, 38)  37   0.85%  97.86%
+[ 38, 41)  43   0.99%  98.85%
+[ 41, 44)  33   0.76%  99.61%
+[ 44, 46)   7   0.16%  99.77%
+[ 46, 49)   3   0.07%  99.84%
+[ 49, 52)   3   0.07%  99.91%
+[ 52, 54]   4   0.09% 100.00%
+
+Number of training obs by leaf:
+Count: 4352 Average: 0 StdDev: 0
+Min: 0 Max: 0 Ignored: 0
+----------------------------------------------
+[ 0, 0] 4352 100.00% 100.00% ##########
+
+Attribute in nodes:
+	1038 : fnlwgt [NUMERICAL]
+	716 : age [NUMERICAL]
+	538 : hours_per_week [NUMERICAL]
+	496 : capital_gain [NUMERICAL]
+	396 : capital_loss [NUMERICAL]
+	267 : occupation [CATEGORICAL]
+	167 : education [CATEGORICAL]
+	160 : education_num [CATEGORICAL]
+	126 : marital_status [CATEGORICAL]
+	118 : workclass [CATEGORICAL]
+	99 : native_country [CATEGORICAL]
+	81 : relationship [CATEGORICAL]
+	42 : sex [CATEGORICAL]
+	40 : race [CATEGORICAL]
+
+Attribute in nodes with depth &lt;= 0:
+	31 : age [NUMERICAL]
+	22 : marital_status [CATEGORICAL]
+	8 : capital_gain [NUMERICAL]
+	3 : occupation [CATEGORICAL]
+	2 : education_num [CATEGORICAL]
+	1 : capital_loss [NUMERICAL]
+	1 : education [CATEGORICAL]
+
+Attribute in nodes with depth &lt;= 1:
+	97 : capital_gain [NUMERICAL]
+	53 : age [NUMERICAL]
+	23 : marital_status [CATEGORICAL]
+	5 : occupation [CATEGORICAL]
+	3 : capital_loss [NUMERICAL]
+	3 : education_num [CATEGORICAL]
+	1 : hours_per_week [NUMERICAL]
+	1 : education [CATEGORICAL]
+
+Attribute in nodes with depth &lt;= 2:
+	141 : capital_gain [NUMERICAL]
+	98 : age [NUMERICAL]
+	33 : marital_status [CATEGORICAL]
+	32 : capital_loss [NUMERICAL]
+	19 : hours_per_week [NUMERICAL]
+	19 : occupation [CATEGORICAL]
+	8 : education_num [CATEGORICAL]
+	5 : education [CATEGORICAL]
+	3 : race [CATEGORICAL]
+	2 : fnlwgt [NUMERICAL]
+	1 : relationship [CATEGORICAL]
+
+Attribute in nodes with depth &lt;= 3:
+	180 : capital_gain [NUMERICAL]
+	133 : age [NUMERICAL]
+	87 : capital_loss [NUMERICAL]
+	56 : hours_per_week [NUMERICAL]
+	37 : marital_status [CATEGORICAL]
+	33 : occupation [CATEGORICAL]
+	22 : education [CATEGORICAL]
+	17 : education_num [CATEGORICAL]
+	16 : fnlwgt [NUMERICAL]
+	4 : race [CATEGORICAL]
+	2 : sex [CATEGORICAL]
+	2 : relationship [CATEGORICAL]
+	1 : workclass [CATEGORICAL]
+
+Attribute in nodes with depth &lt;= 5:
+	241 : capital_gain [NUMERICAL]
+	234 : age [NUMERICAL]
+	160 : capital_loss [NUMERICAL]
+	151 : hours_per_week [NUMERICAL]
+	80 : occupation [CATEGORICAL]
+	79 : fnlwgt [NUMERICAL]
+	58 : marital_status [CATEGORICAL]
+	56 : education [CATEGORICAL]
+	41 : education_num [CATEGORICAL]
+	21 : sex [CATEGORICAL]
+	14 : relationship [CATEGORICAL]
+	11 : workclass [CATEGORICAL]
+	6 : race [CATEGORICAL]
+	2 : native_country [CATEGORICAL]
+
+Condition type in nodes:
+	3184 : HigherCondition
+	1100 : ContainsBitmapCondition
+Condition type in nodes with depth &lt;= 0:
+	40 : HigherCondition
+	28 : ContainsBitmapCondition
+Condition type in nodes with depth &lt;= 1:
+	154 : HigherCondition
+	32 : ContainsBitmapCondition
+Condition type in nodes with depth &lt;= 2:
+	292 : HigherCondition
+	69 : ContainsBitmapCondition
+Condition type in nodes with depth &lt;= 3:
+	472 : HigherCondition
+	118 : ContainsBitmapCondition
+Condition type in nodes with depth &lt;= 5:
+	865 : HigherCondition
+	289 : ContainsBitmapCondition
+</pre></div></div></div>

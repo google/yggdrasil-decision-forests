@@ -106,6 +106,13 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "builder",
+    srcs = ["builder.cc"],
+    hdrs = ["builder.h"],
+    deps = [":decision_tree"],
+)
+
 # Proto
 # ========
 
@@ -142,6 +149,19 @@ cc_test(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "builder_test",
+    srcs = ["builder_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
+    deps = [
+        ":builder",
+        ":decision_tree",
+        "//yggdrasil_decision_forests/dataset:data_spec",
+        "//yggdrasil_decision_forests/utils:test",
         "@com_google_googletest//:gtest_main",
     ],
 )

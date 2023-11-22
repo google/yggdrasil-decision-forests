@@ -41,7 +41,7 @@ class Analysis:
     return (
         "A model analysis. Use a notebook cell to display the analysis."
         " Alternatively, export the analysis with"
-        ' `analysis.to_html("analysis.html")`.'
+        ' `analysis.to_file("analysis.html")`.'
     )
 
   def html(self) -> str:
@@ -64,7 +64,48 @@ class Analysis:
         self._analysis_proto, effective_options
     )
 
-  def to_html(self, path: str) -> None:
+  def to_file(self, path: str) -> None:
     """Exports the analysis to a html file."""
     with open(path, "w") as f:
-      f.write(self._repr_html_())
+      f.write(self.html())
+
+
+class PredictionAnalysis:
+  """A prediction analysis.
+
+  A prediction analysis explains why a model made a prediction.
+  """
+
+  def __init__(
+      self,
+      analysis_proto: model_analysis_pb2.PredictionAnalysisResult,
+      options_proto: model_analysis_pb2.PredictionAnalysisOptions,
+  ):
+    self._analysis_proto = analysis_proto
+    self._options_proto = options_proto
+
+  def __str__(self) -> str:
+    """Returns the string representation of the analysis."""
+    return (
+        "A prediction analysis. Use a notebook cell to display the analysis."
+        " Alternatively, export the analysis with"
+        ' `analysis.to_file("analysis.html")`.'
+    )
+
+  def html(self) -> str:
+    """Html representation of the analysis."""
+
+    return self._repr_html_()
+
+  def _repr_html_(self) -> str:
+    """Returns the Html representation of the analysis."""
+
+    effective_options = copy.deepcopy(self._options_proto)
+    return ydf.PredictionAnalysisCreateHtmlReport(
+        self._analysis_proto, effective_options
+    )
+
+  def to_file(self, path: str) -> None:
+    """Exports the analysis to a html file."""
+    with open(path, "w") as f:
+      f.write(self.html())

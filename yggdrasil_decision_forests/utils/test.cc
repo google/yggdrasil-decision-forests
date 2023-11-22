@@ -92,8 +92,13 @@ void ExpectEqualGolden(
     const std::string expected_output_path = file::JoinPath(
         output_dir, absl::StrCat("expected_", actual_idx++, ".html"));
     YDF_LOG(INFO) << "Content saved to " << output_path;
-    YDF_LOG(INFO) << "Update the golden file with: cp " << output_path << " "
+    YDF_LOG(INFO) << "";
+    YDF_LOG(INFO) << "Update the golden file with:\ncp " << output_path << " "
                   << path;
+    YDF_LOG(INFO) << "";
+    YDF_LOG(INFO) << "Look at the difference between the fields with:\ndiff "
+                  << output_path << " " << path;
+    YDF_LOG(INFO) << "";
     YDF_LOG(INFO) << "Expected: " << expected_output_path;
     ASSERT_OK(file::SetContent(expected_output_path, expected_content));
     ASSERT_OK(file::SetContent(output_path, content));

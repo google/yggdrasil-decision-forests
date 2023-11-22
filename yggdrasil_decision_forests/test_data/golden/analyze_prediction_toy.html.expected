@@ -1,0 +1,168 @@
+
+<style>
+
+.tab_block .header {
+    flex-direction: row;
+    display: flex;
+}
+
+.tab_block .header .tab {
+    cursor: pointer;
+    background-color: #F6F5F5;
+    text-decoration: none;
+    text-align: center;
+    padding: 4px 12px;
+    color: black;
+}
+
+.tab_block .header .tab.selected {
+    border-bottom: 2px solid #2F80ED;
+}
+
+.tab_block .header .tab:hover {
+    text-decoration: none;
+    background-color: #DCDCDC;
+}
+
+.tab_block .body .tab_content {
+    display: none;
+    padding: 5px;
+}
+
+.tab_block .body .tab_content.selected {
+    display: block;
+}
+
+.ydf_pre {
+    font-size: medium;
+}
+
+
+
+.variable_importance {
+}
+
+.variable_importance select {
+}
+
+.variable_importance .content {
+  display: none;
+}
+
+.variable_importance .content.selected {
+  display: block;
+}
+
+.ydf_tuning_table {
+  border-collapse: collapse;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table th {
+  background-color: #ededed;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table td {
+  text-align: right;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table .best {
+  background-color: khaki;
+}
+
+</style>
+
+<script>
+
+function ydfShowTab(block_id, item) {
+    const block = document.getElementById(block_id);
+    
+    
+    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
+    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
+    
+    block.getElementsByClassName("tab selected")[0].classList.remove("selected");
+    block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_" + item).classList.add("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+  
+
+function ydfShowVariableImportance(block_id) {
+    const block = document.getElementById(block_id);
+    const item = block.getElementsByTagName("select")[0].value;
+    block.getElementsByClassName("content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+
+</script>
+  <div class="tab_block" id="my_report"><div class="header"><a id="my_report_fvar" class="tab selected" onclick="ydfShowTab('my_report', 'fvar')">Feature Variation</a></div><div class="body"><div id="my_report_body_fvar" class="tab_content selected"><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chart_my_report_feature_variation_0" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_report_feature_variation_0',
+    [{
+x: [1,2.33333,3.66667,5],
+y: [2,2,1,1],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'output',
+},
+{
+x: [2,2],
+y: [1,2],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'selected',
+},
+],
+    {
+      width: 400,
+      height: 300,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'f1',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div></div></div>

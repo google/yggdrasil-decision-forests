@@ -62,6 +62,13 @@ absl::StatusOr<std::string> ModelAnalysisCreateHtmlReport(
   return utils::model_analysis::CreateHtmlReport(analysis, options);
 }
 
+absl::StatusOr<std::string> PredictionAnalysisCreateHtmlReport(
+    const utils::model_analysis::proto::PredictionAnalysisResult& analysis,
+    const utils::model_analysis::proto::PredictionAnalysisOptions& options =
+        {}) {
+  return utils::model_analysis::CreateHtmlReport(analysis, options);
+}
+
 }  // namespace
 
 std::unique_ptr<GenericCCModel> CreateCCModel(
@@ -86,6 +93,9 @@ void init_model(py::module_& m) {
   m.def("ModelAnalysisCreateHtmlReport",
         WithStatusOr(ModelAnalysisCreateHtmlReport), py::arg("analysis"),
         py::arg("options"));
+  m.def("PredictionAnalysisCreateHtmlReport",
+        WithStatusOr(PredictionAnalysisCreateHtmlReport), py::arg("analysis"),
+        py::arg("options"));
   py::class_<GenericCCModel>(m, "GenericCCModel")
       .def("__repr__",
            [](const GenericCCModel& a) {
@@ -98,6 +108,9 @@ void init_model(py::module_& m) {
            py::arg("dataset"), py::arg("options"))
       .def("Analyze", WithStatusOr(&GenericCCModel::Analyze),
            py::arg("dataset"), py::arg("options"))
+      .def("AnalyzePrediction",
+           WithStatusOr(&GenericCCModel::AnalyzePrediction), py::arg("dataset"),
+           py::arg("options"))
       .def("Save", WithStatus(&GenericCCModel::Save), py::arg("directory"),
            py::arg("file_prefix"))
       .def("name", &GenericCCModel::name)

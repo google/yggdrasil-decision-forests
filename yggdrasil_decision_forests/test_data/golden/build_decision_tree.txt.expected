@@ -1,0 +1,5 @@
+    "f1">=1 [s:0 n:0 np:0 miss:0]
+        ├─(pos)─ "f2" is in {1, 2, 3} [s:0 n:0 np:0 miss:0]
+        |        ├─(pos)─ pred:2
+        |        └─(neg)─ pred:3
+        └─(neg)─ pred:1

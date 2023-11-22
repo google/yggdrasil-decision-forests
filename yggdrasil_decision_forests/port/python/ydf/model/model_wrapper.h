@@ -106,6 +106,11 @@ class GenericCCModel {
   Analyze(const dataset::VerticalDataset& dataset,
           const utils::model_analysis::proto::Options& options);
 
+  absl::StatusOr<utils::model_analysis::proto::PredictionAnalysisResult>
+  AnalyzePrediction(
+      const dataset::VerticalDataset& example,
+      const utils::model_analysis::proto::PredictionAnalysisOptions& options);
+
   const dataset::proto::DataSpecification& data_spec() const {
     return model_->data_spec();
   }

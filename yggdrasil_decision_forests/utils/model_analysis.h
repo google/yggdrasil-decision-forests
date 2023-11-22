@@ -37,6 +37,16 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
     const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
     const proto::Options& options = {});
 
+// Analyses the prediction of a model.
+absl::StatusOr<proto::PredictionAnalysisResult> AnalyzePrediction(
+    const model::AbstractModel& model, const dataset::proto::Example& example,
+    const proto::PredictionAnalysisOptions& options = {});
+
+// Creates a HTML report of a prediction analysis.
+absl::StatusOr<std::string> CreateHtmlReport(
+    const proto::PredictionAnalysisResult& analysis,
+    const proto::PredictionAnalysisOptions& options = {});
+
 // Creates a HTML report of an analysis. The report also contains the  human
 // model description and dataspec specification. This functions does not run any
 // computation not read files.
