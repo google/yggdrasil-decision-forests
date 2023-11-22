@@ -639,6 +639,98 @@ B,3""",
     )
     self.assertEqual(ds.data_spec(), expected_data_spec)
 
+  def test_max_num_scanned_rows_to_compute_statistics(self):
+    tmp_dir = self.create_tempdir()
+    csv_file = self.create_tempfile(
+        content="""col_cat,col_num
+A,1
+A,2
+B,3""",
+        file_path=os.path.join(tmp_dir.full_path, "file.csv"),
+    )
+    ds = dataset.create_vertical_dataset(
+        "csv:" + csv_file.full_path,
+        min_vocab_frequency=1,
+        max_num_scanned_rows_to_compute_statistics=2,
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="col_cat",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                is_manual_type=False,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "A": VocabValue(index=1, count=2),
+                    },
+                    number_of_unique_values=2,
+                    most_frequent_value=1,
+                    min_value_count=1,
+                    max_number_of_unique_values=2000,
+                    is_already_integerized=False,
+                ),
+            ),
+            ds_pb.Column(
+                name="col_num",
+                type=ds_pb.ColumnType.NUMERICAL,
+                is_manual_type=False,
+                numerical=ds_pb.NumericalSpec(
+                    mean=1.5,
+                    standard_deviation=0.5,
+                    min_value=1,
+                    max_value=2,
+                ),
+            ),
+        ),
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
+
+  def test_max_num_scanned_rows_to_infer_semantic(self):
+    tmp_dir = self.create_tempdir()
+    csv_file = self.create_tempfile(
+        content="""col_cat,col_num
+A,1
+B,2
+B,3""",
+        file_path=os.path.join(tmp_dir.full_path, "file.csv"),
+    )
+    ds = dataset.create_vertical_dataset(
+        "csv:" + csv_file.full_path,
+        min_vocab_frequency=1,
+        max_num_scanned_rows_to_infer_semantic=1,
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="col_cat",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                is_manual_type=False,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
+                    most_frequent_value=1,
+                    min_value_count=1,
+                    max_number_of_unique_values=2000,
+                    is_already_integerized=False,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "A": VocabValue(index=2, count=1),
+                        "B": VocabValue(index=1, count=2),
+                    },
+                ),
+            ),
+            ds_pb.Column(
+                name="col_num",
+                type=ds_pb.ColumnType.BOOLEAN,
+                is_manual_type=False,
+                boolean=ds_pb.BooleanSpec(count_true=3),
+            ),
+        ),
+    )
+    self.assertEqual(ds.data_spec(), expected_data_spec)
+
   def test_read_from_path(self):
     csv_file = self.create_tempfile(content="""col_cat,col_num
 A,1

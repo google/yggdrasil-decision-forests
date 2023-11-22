@@ -350,6 +350,8 @@ class DataSpecInferenceArgs:
   min_vocab_frequency: int
   discretize_numerical_columns: bool
   num_discretized_numerical_bins: int
+  max_num_scanned_rows_to_infer_semantic: int
+  max_num_scanned_rows_to_compute_statistics: int
 
   def to_proto_guide(self) -> ds_pb.DataSpecificationGuide:
     """Creates a proto DataSpecGuide for these arguments."""
@@ -374,9 +376,12 @@ class DataSpecInferenceArgs:
         column = Column.from_column_def(column_def)
         guide.column_guides.append(column.to_proto_column_guide())
 
-    # TODO: b/311609910 - Make it possible for the user to configure those.
-    guide.max_num_scanned_rows_to_guess_type = 10000
-    guide.max_num_scanned_rows_to_accumulate_statistics = 100000
+    guide.max_num_scanned_rows_to_guess_type = (
+        self.max_num_scanned_rows_to_infer_semantic
+    )
+    guide.max_num_scanned_rows_to_accumulate_statistics = (
+        self.max_num_scanned_rows_to_compute_statistics
+    )
     return guide
 
 

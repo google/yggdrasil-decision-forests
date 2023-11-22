@@ -35,7 +35,6 @@ from typing import Dict, Optional, Sequence
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from ydf.dataset import dataspec
-from ydf.dataset import dataset
 from ydf.learner import generic_learner
 from ydf.learner import hyperparameters
 from ydf.learner import tuner as tuner_lib
@@ -115,6 +114,20 @@ class RandomForestLearner(generic_learner.GenericLearner):
       definition of DISCRETIZED_NUMERICAL for more details.
     num_discretized_numerical_bins: Number of bins used when disretizing
       numerical columns.
+    max_num_scanned_rows_to_infer_semantic: Number of rows to scan when
+      inferring the column's semantic if it is not explicitly specified. Only
+      used when reading from file, in-memory datasets are always read in full.
+      Setting this to a lower number will speed up dataset reading, but might
+      result in incorrect column semantics. Set to -1 to scan the entire
+      dataset.
+    max_num_scanned_rows_to_compute_statistics: Number of rows to scan when
+      computing a column's statistics. Only used when reading from file,
+      in-memory datasets are always read in full. A column's statistics include
+      the dictionary for categorical features and the mean / min / max for
+      numerical features. Setting this to a lower number will speed up dataset
+      reading, but skew statistics in the dataspec, which can hurt model quality
+      (e.g. if an important category of a categorical feature is considered
+      OOV). Set to -1 to scan the entire dataset.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -357,6 +370,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
+      max_num_scanned_rows_to_infer_semantic: int = 10000,
+      max_num_scanned_rows_to_compute_statistics: int = 10000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       adapt_bootstrap_size_ratio_for_maximum_training_duration: Optional[
           bool
@@ -469,6 +484,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
         min_vocab_frequency=min_vocab_frequency,
         discretize_numerical_columns=discretize_numerical_columns,
         num_discretized_numerical_bins=num_discretized_numerical_bins,
+        max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
+        max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
     )
 
     deployment_config = self._build_deployment_config(
@@ -618,6 +635,20 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
       definition of DISCRETIZED_NUMERICAL for more details.
     num_discretized_numerical_bins: Number of bins used when disretizing
       numerical columns.
+    max_num_scanned_rows_to_infer_semantic: Number of rows to scan when
+      inferring the column's semantic if it is not explicitly specified. Only
+      used when reading from file, in-memory datasets are always read in full.
+      Setting this to a lower number will speed up dataset reading, but might
+      result in incorrect column semantics. Set to -1 to scan the entire
+      dataset.
+    max_num_scanned_rows_to_compute_statistics: Number of rows to scan when
+      computing a column's statistics. Only used when reading from file,
+      in-memory datasets are always read in full. A column's statistics include
+      the dictionary for categorical features and the mean / min / max for
+      numerical features. Setting this to a lower number will speed up dataset
+      reading, but skew statistics in the dataspec, which can hurt model quality
+      (e.g. if an important category of a categorical feature is considered
+      OOV). Set to -1 to scan the entire dataset.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -683,6 +714,8 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
+      max_num_scanned_rows_to_infer_semantic: int = 10000,
+      max_num_scanned_rows_to_compute_statistics: int = 10000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
       maximum_training_duration_seconds: Optional[float] = -1.0,
@@ -711,6 +744,8 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
         min_vocab_frequency=min_vocab_frequency,
         discretize_numerical_columns=discretize_numerical_columns,
         num_discretized_numerical_bins=num_discretized_numerical_bins,
+        max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
+        max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
     )
 
     deployment_config = self._build_deployment_config(
@@ -831,6 +866,20 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       definition of DISCRETIZED_NUMERICAL for more details.
     num_discretized_numerical_bins: Number of bins used when disretizing
       numerical columns.
+    max_num_scanned_rows_to_infer_semantic: Number of rows to scan when
+      inferring the column's semantic if it is not explicitly specified. Only
+      used when reading from file, in-memory datasets are always read in full.
+      Setting this to a lower number will speed up dataset reading, but might
+      result in incorrect column semantics. Set to -1 to scan the entire
+      dataset.
+    max_num_scanned_rows_to_compute_statistics: Number of rows to scan when
+      computing a column's statistics. Only used when reading from file,
+      in-memory datasets are always read in full. A column's statistics include
+      the dictionary for categorical features and the mean / min / max for
+      numerical features. Setting this to a lower number will speed up dataset
+      reading, but skew statistics in the dataspec, which can hurt model quality
+      (e.g. if an important category of a categorical feature is considered
+      OOV). Set to -1 to scan the entire dataset.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -1142,6 +1191,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
+      max_num_scanned_rows_to_infer_semantic: int = 10000,
+      max_num_scanned_rows_to_compute_statistics: int = 10000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       adapt_subsample_for_maximum_training_duration: Optional[bool] = False,
       allow_na_conditions: Optional[bool] = False,
@@ -1286,6 +1337,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         min_vocab_frequency=min_vocab_frequency,
         discretize_numerical_columns=discretize_numerical_columns,
         num_discretized_numerical_bins=num_discretized_numerical_bins,
+        max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
+        max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
     )
 
     deployment_config = self._build_deployment_config(
@@ -1439,6 +1492,20 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       definition of DISCRETIZED_NUMERICAL for more details.
     num_discretized_numerical_bins: Number of bins used when disretizing
       numerical columns.
+    max_num_scanned_rows_to_infer_semantic: Number of rows to scan when
+      inferring the column's semantic if it is not explicitly specified. Only
+      used when reading from file, in-memory datasets are always read in full.
+      Setting this to a lower number will speed up dataset reading, but might
+      result in incorrect column semantics. Set to -1 to scan the entire
+      dataset.
+    max_num_scanned_rows_to_compute_statistics: Number of rows to scan when
+      computing a column's statistics. Only used when reading from file,
+      in-memory datasets are always read in full. A column's statistics include
+      the dictionary for categorical features and the mean / min / max for
+      numerical features. Setting this to a lower number will speed up dataset
+      reading, but skew statistics in the dataspec, which can hurt model quality
+      (e.g. if an important category of a categorical feature is considered
+      OOV). Set to -1 to scan the entire dataset.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -1547,6 +1614,8 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
+      max_num_scanned_rows_to_infer_semantic: int = 10000,
+      max_num_scanned_rows_to_compute_statistics: int = 10000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       apply_link_function: Optional[bool] = True,
       force_numerical_discretization: Optional[bool] = False,
@@ -1599,6 +1668,8 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
         min_vocab_frequency=min_vocab_frequency,
         discretize_numerical_columns=discretize_numerical_columns,
         num_discretized_numerical_bins=num_discretized_numerical_bins,
+        max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
+        max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
     )
 
     deployment_config = self._build_deployment_config(
@@ -1717,6 +1788,20 @@ class CartLearner(generic_learner.GenericLearner):
       definition of DISCRETIZED_NUMERICAL for more details.
     num_discretized_numerical_bins: Number of bins used when disretizing
       numerical columns.
+    max_num_scanned_rows_to_infer_semantic: Number of rows to scan when
+      inferring the column's semantic if it is not explicitly specified. Only
+      used when reading from file, in-memory datasets are always read in full.
+      Setting this to a lower number will speed up dataset reading, but might
+      result in incorrect column semantics. Set to -1 to scan the entire
+      dataset.
+    max_num_scanned_rows_to_compute_statistics: Number of rows to scan when
+      computing a column's statistics. Only used when reading from file,
+      in-memory datasets are always read in full. A column's statistics include
+      the dictionary for categorical features and the mean / min / max for
+      numerical features. Setting this to a lower number will speed up dataset
+      reading, but skew statistics in the dataspec, which can hurt model quality
+      (e.g. if an important category of a categorical feature is considered
+      OOV). Set to -1 to scan the entire dataset.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -1923,6 +2008,8 @@ class CartLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
+      max_num_scanned_rows_to_infer_semantic: int = 10000,
+      max_num_scanned_rows_to_compute_statistics: int = 10000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       allow_na_conditions: Optional[bool] = False,
       categorical_algorithm: Optional[str] = "CART",
@@ -2013,6 +2100,8 @@ class CartLearner(generic_learner.GenericLearner):
         min_vocab_frequency=min_vocab_frequency,
         discretize_numerical_columns=discretize_numerical_columns,
         num_discretized_numerical_bins=num_discretized_numerical_bins,
+        max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
+        max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
     )
 
     deployment_config = self._build_deployment_config(

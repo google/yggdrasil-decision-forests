@@ -164,6 +164,8 @@ class DataspecTest(absltest.TestCase):
                 min_vocab_frequency=2,
                 discretize_numerical_columns=False,
                 num_discretized_numerical_bins=1,
+                max_num_scanned_rows_to_infer_semantic=10000,
+                max_num_scanned_rows_to_compute_statistics=10000,
             ),
         ),
         {"max_vocab_count": 3, "min_vocab_frequency": 2},
@@ -189,6 +191,8 @@ class DataspecTest(absltest.TestCase):
                 min_vocab_frequency=1,
                 discretize_numerical_columns=False,
                 num_discretized_numerical_bins=1,
+                max_num_scanned_rows_to_infer_semantic=10000,
+                max_num_scanned_rows_to_compute_statistics=10000,
             ),
         ),
         [
@@ -209,6 +213,8 @@ class DataspecTest(absltest.TestCase):
                 min_vocab_frequency=1,
                 discretize_numerical_columns=False,
                 num_discretized_numerical_bins=1,
+                max_num_scanned_rows_to_infer_semantic=10000,
+                max_num_scanned_rows_to_compute_statistics=10000,
             ),
         ),
         [
@@ -228,6 +234,8 @@ class DataspecTest(absltest.TestCase):
               min_vocab_frequency=1,
               discretize_numerical_columns=False,
               num_discretized_numerical_bins=1,
+              max_num_scanned_rows_to_infer_semantic=10000,
+              max_num_scanned_rows_to_compute_statistics=10000,
           ),
       )
 
