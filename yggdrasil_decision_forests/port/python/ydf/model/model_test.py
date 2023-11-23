@@ -364,6 +364,17 @@ Use `model.describe()` for more details
     label_classes = model.label_classes()
     self.assertEqual(label_classes, ["<=50K", ">50K"])
 
+  def test_model_with_catset(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "sst_binary_class_gbdt"
+    )
+    model = model_lib.load_model(model_path)
+    test_ds_path = "csv:" + os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "sst_binary_test.csv"
+    )
+    evaluation = model.evaluate(test_ds_path)
+    self.assertAlmostEqual(evaluation.accuracy, 0.80011, places=5)
+
 
 if __name__ == "__main__":
   absltest.main()
