@@ -220,6 +220,15 @@ def create_vertical_dataset(
 ) -> VerticalDataset:
   """Creates a VerticalDataset from various sources of data.
 
+  Unless given explicitly, the semantic of the features is determined
+  automatically.
+
+  For text features, the semantic CATEGORICAL_SET has to be given explicitly
+  with the `columns` argument. When reading CATEGORICAL_SET features from CSV,
+  YDF will automatically tokenize the feature values. Currently, the tokenizer
+  cannot be customized through the Python API. If a data spec is given, the
+  tokenizer specified in the data spec will be respected.
+
   Usage example:
 
   ```python

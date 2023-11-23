@@ -118,6 +118,10 @@ class GenericLearner:
   ) -> generic_model.GenericModel:
     """Trains a model on the given dataset.
 
+    Options for dataset reading are given on the learner. Consult the
+    documentation of the learner or ydf.create_vertical_dataset() for additional
+    information on dataset reading in YDF.
+
     Usage example:
 
     ```

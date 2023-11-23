@@ -354,7 +354,14 @@ class DataSpecInferenceArgs:
   max_num_scanned_rows_to_compute_statistics: int
 
   def to_proto_guide(self) -> ds_pb.DataSpecificationGuide:
-    """Creates a proto DataSpecGuide for these arguments."""
+    """Creates a proto DataSpecGuide for these arguments.
+
+    For consistency with in-memory datasets, the proto guide deactivates YDF's
+    tokenizer.
+
+    Returns:
+      A guide to be used for dataspec inference by C++ YDF.
+    """
     ignore_columns_without_guides = (
         False if self.columns is None else not self.include_all_columns
     )
@@ -370,6 +377,7 @@ class DataSpecInferenceArgs:
                 maximum_num_bins=self.num_discretized_numerical_bins
             ),
         ),
+        allow_tokenization_for_inference_as_categorical_set=False,
     )
     if self.columns is not None:
       for column_def in self.columns:
