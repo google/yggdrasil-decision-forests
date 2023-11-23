@@ -151,7 +151,6 @@ class TFExampleWriterToExampleWriter : public ExampleWriterInterface {
 // most likely value type and an observed string value.
 proto::ColumnType InferType(const proto::DataSpecificationGuide& guide,
                             const tensorflow::Feature& feature,
-                            const proto::Tokenizer& tokenizer,
                             proto::ColumnType previous_type,
                             int* num_sub_values);
 

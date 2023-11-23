@@ -366,15 +366,17 @@ absl::StatusOr<proto::ColumnType> InferType(
   }
   // One dimension -> Multi dimensions.
   if (!IsMultiDimensional(type)) {
-    ASSIGN_OR_RETURN(const auto look_multi_dim,
-                     LooksMultiDimensional(value, tokenizer));
-    if (look_multi_dim) {
-      if (type == ColumnType::NUMERICAL || type == ColumnType::BOOLEAN ||
-          type == ColumnType::DISCRETIZED_NUMERICAL) {
-        type = ColumnType::NUMERICAL_SET;
-      }
-      if (type == ColumnType::CATEGORICAL) {
-        type = ColumnType::CATEGORICAL_SET;
+    if (guide.allow_tokenization_for_inference_as_categorical_set()) {
+      ASSIGN_OR_RETURN(const auto look_multi_dim,
+                       LooksMultiDimensional(value, tokenizer));
+      if (look_multi_dim) {
+        if (type == ColumnType::NUMERICAL || type == ColumnType::BOOLEAN ||
+            type == ColumnType::DISCRETIZED_NUMERICAL) {
+          type = ColumnType::NUMERICAL_SET;
+        }
+        if (type == ColumnType::CATEGORICAL) {
+          type = ColumnType::CATEGORICAL_SET;
+        }
       }
     }
   }

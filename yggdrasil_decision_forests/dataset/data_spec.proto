@@ -319,6 +319,11 @@ message DataSpecificationGuide {
   // Remove columns of unknown type. For example, if the column has no values
   // (all the values are missing) and its type is not specified by the user.
   optional bool ignore_unknown_type_columns = 9 [default = false];
+  // Allow automatic inference of the CATEGORICAL_SET type by applying
+  // tokenization. If not set, the inference code will still set the type to
+  // CATEGORICAL_SET if the (default) column guide asks for it.
+  optional bool allow_tokenization_for_inference_as_categorical_set = 10
+      [default = true];
 }
 
 message ColumnGuide {

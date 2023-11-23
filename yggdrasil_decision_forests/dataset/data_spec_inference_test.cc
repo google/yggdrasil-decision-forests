@@ -942,6 +942,103 @@ TEST(Dataset, OverrideMostFrequentItemFail2) {
                    .ok());
 }
 
+TEST(Dataset, InferCatSetCSVWithExplicitType) {
+  proto::DataSpecificationGuide guide;
+  guide.set_allow_tokenization_for_inference_as_categorical_set(false);
+  auto* col_guide = guide.add_column_guides();
+  col_guide->set_column_name_pattern("^Cat_set_1$");
+  col_guide->set_type(proto::CATEGORICAL_SET);
+  col_guide->mutable_categorial()->set_min_vocab_frequency(1);
+  guide.set_ignore_columns_without_guides(true);
+  proto::DataSpecification data_spec;
+  CHECK_OK(CreateDataSpecWithStatus(ToyDatasetTypedPathCsv(), false, guide,
+                                    &data_spec));
+
+  EXPECT_THAT(data_spec,
+              EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::DataSpecification,
+                                                     R"(
+            columns {
+              type: CATEGORICAL_SET
+              name: "Cat_set_1"
+              is_manual_type: true
+              categorical {
+                most_frequent_value: 1
+                number_of_unique_values: 4
+                min_value_count: 1
+                max_number_of_unique_values: 2000
+                is_already_integerized: false
+                items {
+                  key: "<OOD>"
+                  value { index: 0 count: 0 }
+                }
+                items {
+                  key: "x"
+                  value { index: 1 count: 4 }
+                }
+                items {
+                  key: "y"
+                  value { index: 2 count: 3 }
+                }
+                items {
+                  key: "z"
+                  value { index: 3 count: 2 }
+                }
+              }
+            }
+            created_num_rows: 4
+          )")));
+}
+
+TEST(Dataset, InferCatSetCSVWithoutTokenization) {
+  proto::DataSpecificationGuide guide;
+  guide.set_allow_tokenization_for_inference_as_categorical_set(false);
+  auto* col_guide = guide.add_column_guides();
+  col_guide->set_column_name_pattern("^Cat_set_1$");
+  col_guide->mutable_categorial()->set_min_vocab_frequency(1);
+  guide.set_ignore_columns_without_guides(true);
+  proto::DataSpecification data_spec;
+  CHECK_OK(CreateDataSpecWithStatus(ToyDatasetTypedPathCsv(), false, guide,
+                                    &data_spec));
+
+  EXPECT_THAT(data_spec,
+              EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::DataSpecification,
+                                                     R"(
+            columns {
+              type: CATEGORICAL
+              name: "Cat_set_1"
+              is_manual_type: false
+              categorical {
+                most_frequent_value: 1
+                number_of_unique_values: 5
+                min_value_count: 1
+                max_number_of_unique_values: 2000
+                is_already_integerized: false
+                items {
+                  key: "<OOD>"
+                  value { index: 0 count: 0 }
+                }
+                items {
+                  key: "X"
+                  value { index: 4 count: 1 }
+                }
+                items {
+                  key: "X Y Z"
+                  value { index: 2 count: 1 }
+                }
+                items {
+                  key: "Y X Z"
+                  value { index: 1 count: 1 }
+                }
+                items {
+                  key: "X Y"
+                  value { index: 3 count: 1}
+                }
+              }
+            }
+            created_num_rows: 4
+          )")));
+}
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
