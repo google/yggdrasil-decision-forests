@@ -34,8 +34,6 @@ import io
 import sys
 from typing import Any, Optional, Set
 
-from absl import logging
-
 from ydf.cc import ydf
 
 # Current verbose level. See "verbose" for details.
@@ -110,7 +108,6 @@ def info(msg: str, *args: Any) -> None:
 
   if _VERBOSE_LEVEL >= 1:
     print(msg % args, flush=True)
-    logging.info(msg, *args)
 
 
 def warning(
@@ -147,8 +144,7 @@ def warning(
     _ALREADY_DISPLAYED_WARNING_IDS.add(message_id)
 
   if _VERBOSE_LEVEL >= 1:
-    print("Warning:", msg % args, flush=True)
-    logging.warning(msg, *args)
+    print("Warning:", msg % args, flush=True, file=sys.stderr)
 
 
 def strict(value: bool = True) -> None:

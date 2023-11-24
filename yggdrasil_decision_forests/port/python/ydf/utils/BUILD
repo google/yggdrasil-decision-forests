@@ -42,10 +42,7 @@ py_library(
 py_library(
     name = "log",
     srcs = ["log.py"],
-    deps = [
-        # absl/logging dep,
-        "//ydf/cc:ydf",
-    ],
+    deps = ["//ydf/cc:ydf"],
 )
 
 pybind_library(

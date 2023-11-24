@@ -14,7 +14,7 @@
 
 ::: ydf.start_worker
 
-::: ydf.strict
+<!-- ::: ydf.strict -->
 
 ::: ydf.ModelIOOptions
 

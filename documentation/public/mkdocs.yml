@@ -57,6 +57,7 @@ nav:
     - monotonic: tutorial/monotonic_feature.ipynb
     - pretrained embedding: tutorial/pretrained_embedding.ipynb
     - time sequences: tutorial/time_sequences.ipynb
+    - multi-dimensional:  tutorial/multidimensional_feature.ipynb
     # TODO: boolean, and text
   - Dataset:
     - Pandas: tutorial/pandas.ipynb
@@ -68,12 +69,16 @@ nav:
   - Evaluation:
     - Train & test: tutorial/train_and_test.ipynb
     - Cross-validation: tutorial/cross_validation.ipynb
+  - Interpretation:
+    - Counterfactual: tutorial/counterfactual.ipynb
+    - Model understanding: tutorial/model_understanding.ipynb
+    - Prediction understanding: tutorial/prediction_understanding.ipynb
   - Serving:
     - C++: tutorial/cpp.ipynb
     - TF Serving: tutorial/tf_serving.ipynb
     # TODO: Add Benchmarking, C++, Go, Cli, Python, F Serving, and Js
-  - Advanced:
-    - example distance: tutorial/example_distance.ipynb
+  #- Advanced:
+  #  - example distance: tutorial/example_distance.ipynb
     # TODO: model inspection, manual tree creation, custom loss.
   - Other APIs:
     - TensorFlow Decision Forests 🔗: https://www.tensorflow.org/decision_forests
