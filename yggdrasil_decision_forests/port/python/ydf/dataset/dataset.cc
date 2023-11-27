@@ -66,6 +66,8 @@ using BooleanColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::BooleanColumn;
 using CategoricalColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::CategoricalColumn;
+using CategoricalSetColumn = ::yggdrasil_decision_forests::dataset::
+    VerticalDataset::CategoricalSetColumn;
 using HashColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::HashColumn;
 
@@ -377,6 +379,7 @@ absl::StatusOr<Dictionary> DictionaryFromUserDictionary(
 absl::StatusOr<dataset::proto::Column> CreateCategoricalColumnSpec(
     const std::string& name, const NPByteArray& values,
     const int max_vocab_count, const int min_vocab_frequency,
+    const dataset::proto::ColumnType& column_type,
     const std::optional<py::array>& force_dictionary) {
   if (max_vocab_count < -1) {
     return absl::InvalidArgumentError(
@@ -410,8 +413,8 @@ absl::StatusOr<dataset::proto::Column> CreateCategoricalColumnSpec(
 
   // Create column spec
   dataset::proto::Column column;
+  column.set_type(column_type);
   column.set_name(name);
-  column.set_type(dataset::proto::ColumnType::CATEGORICAL);
   column.set_count_nas(values.size() - dictionary.num_valid_values);
 
   // Copy dictionary in proto
@@ -445,10 +448,10 @@ absl::Status PopulateColumnCategoricalNPBytes(
   ssize_t offset = 0;
   if (!column_idx.has_value()) {
     // Create column spec
-    ASSIGN_OR_RETURN(
-        const auto& column_spec,
-        CreateCategoricalColumnSpec(name, values, max_vocab_count,
-                                    min_vocab_frequency, dictionary));
+    ASSIGN_OR_RETURN(const auto& column_spec,
+                     CreateCategoricalColumnSpec(
+                         name, values, max_vocab_count, min_vocab_frequency,
+                         dataset::proto::CATEGORICAL, dictionary));
 
     // Import column data
     ASSIGN_OR_RETURN(auto* abstract_column, self.AddColumn(column_spec));
@@ -492,6 +495,81 @@ absl::Status PopulateColumnCategoricalNPBytes(
       }
     }
     dst_values[offset + value_idx] = dst_value;
+  }
+
+  return absl::OkStatus();
+}
+
+// Append contents of `data` to a categorical set column. If no `column_idx` is
+// not given, a new column is created.
+//
+// `data_bank` contains all the tokens. `data_boundaries` contains the left
+// boundaries of the individual sets.
+//
+// Note that this function only creates the columns and copies the data, but it
+// does not set `num_rows` on the dataset. Before using the dataset, `num_rows
+// has to be set (e.g. using SetAndCheckNumRows).
+absl::Status PopulateColumnCategoricalSetNPBytes(
+    dataset::VerticalDataset& self, const std::string& name,
+    py::array& data_bank, py::array_t<int64_t>& data_boundaries,
+    const int max_vocab_count, const int min_vocab_frequency,
+    std::optional<int> column_idx, const std::optional<py::array> dictionary) {
+  ASSIGN_OR_RETURN(const auto bank, NPByteArray::Create(data_bank));
+
+  CategoricalSetColumn* column;
+  if (!column_idx.has_value()) {
+    // Create column spec
+    ASSIGN_OR_RETURN(const auto& column_spec,
+                     CreateCategoricalColumnSpec(
+                         name, bank, max_vocab_count, min_vocab_frequency,
+                         dataset::proto::CATEGORICAL_SET, dictionary));
+
+    // Import column data
+    ASSIGN_OR_RETURN(auto* abstract_column, self.AddColumn(column_spec));
+    ASSIGN_OR_RETURN(
+        column, abstract_column->MutableCastWithStatus<CategoricalSetColumn>());
+    column_idx = self.ncol() - 1;
+  } else {
+    DCHECK_EQ(min_vocab_frequency, -1)
+        << "`min_vocab_frequency` is ignored as column " << name << " exists";
+    DCHECK_EQ(max_vocab_count, -1)
+        << "`max_vocab_count` is ignored as column " << name << " exists";
+    ASSIGN_OR_RETURN(column,
+                     self.MutableColumnWithCastWithStatus<CategoricalSetColumn>(
+                         column_idx.value()));
+  }
+  const auto& column_spec = self.data_spec().columns(column_idx.value());
+
+  // TODO: Check if using an absl::flat_map is significantly faster.
+  const auto& items = column_spec.categorical().items();
+
+  if (items.empty()) {
+    return absl::InvalidArgumentError(
+        "Empty categorical dictionary. PYDF does not support empty "
+        "dictionaries");
+  }
+
+  int bank_size = bank.size();
+  for (size_t boundary_idx = 0; boundary_idx < data_boundaries.size();
+       boundary_idx++) {
+    const auto left_boundary = data_boundaries.at(boundary_idx);
+    int right_boundary = bank_size;
+
+    if (boundary_idx + 1 < data_boundaries.size()) {
+      right_boundary = data_boundaries.at(boundary_idx + 1);
+    }
+    std::vector<int32_t> dst_values;
+    for (size_t value_idx = left_boundary; value_idx < right_boundary;
+         value_idx++) {
+      const auto value = bank[value_idx];
+      const auto it = items.find(value);
+      if (it == items.end()) {
+        dst_values.push_back(dataset::kOutOfDictionaryItemIndex);
+      } else {
+        dst_values.push_back(it->second.index());
+      }
+    }
+    column->Add(dst_values.begin(), dst_values.end());
   }
 
   return absl::OkStatus();
@@ -658,7 +736,14 @@ void init_dataset(py::module_& m) {
            py::arg("data").noconvert(), py::arg("column_idx") = std::nullopt)
       .def("PopulateColumnHashNPBytes", WithStatus(PopulateColumnHashNPBytes),
            py::arg("name"), py::arg("data").noconvert(),
-           py::arg("column_idx") = std::nullopt);
+           py::arg("column_idx") = std::nullopt)
+      .def("PopulateColumnCategoricalSetNPBytes",
+           WithStatus(PopulateColumnCategoricalSetNPBytes), py::arg("name"),
+           py::arg("data_bank").noconvert(),
+           py::arg("data_boundaries").noconvert(),
+           py::arg("max_vocab_count") = -1, py::arg("min_vocab_frequency") = -1,
+           py::arg("column_idx") = std::nullopt,
+           py::arg("dictionary") = std::nullopt);
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

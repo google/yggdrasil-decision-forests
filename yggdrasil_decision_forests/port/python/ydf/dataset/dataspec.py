@@ -60,8 +60,8 @@ class Semantic(enum.Enum):
       is computed with Google's farmhash and stored as an uint64.
     CATEGORICAL_SET: Set of categorical values. Great to represent tokenized
       texts. Can be a string. Unlike CATEGORICAL, the number of items in a
-      CATEGORICAL_SET can change and the order/index of each item doesn"t
-      matter.
+      CATEGORICAL_SET can change between examples. The order of values inside a
+      feature values does not matter.
     BOOLEAN: Boolean value. Can be a float or an integer. Missing values are
       represented by math.nan.  If a numerical tensor contains multiple values,
       its size should be constant, and each dimension isthreaded independently

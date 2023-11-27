@@ -1035,7 +1035,7 @@ class CategoricalSetTest(absltest.TestCase):
         content="""\
 col_cat_set
 first sentence foo bar foo bar
-second sentence foo bar foo foo""",
+second sentence foo bar foo foo foo""",
         file_path=os.path.join(tmp_dir.full_path, "file.csv"),
     )
     return csv_file.full_path
@@ -1055,7 +1055,7 @@ second sentence foo bar foo foo""",
                         "first sentence foo bar foo bar": VocabValue(
                             index=2, count=1
                         ),
-                        "second sentence foo bar foo foo": VocabValue(
+                        "second sentence foo bar foo foo foo": VocabValue(
                             index=1, count=1
                         ),
                     },
@@ -1081,7 +1081,7 @@ second sentence foo bar foo foo""",
                 categorical=ds_pb.CategoricalSpec(
                     items={
                         "<OOD>": VocabValue(index=0, count=0),
-                        "foo": VocabValue(index=1, count=5),
+                        "foo": VocabValue(index=1, count=6),
                         "bar": VocabValue(index=2, count=3),
                         "sentence": VocabValue(index=3, count=2),
                         "second": VocabValue(index=4, count=1),
@@ -1097,7 +1097,7 @@ second sentence foo bar foo foo""",
         ),
     )
 
-  def test_no_automatic_csv_tokenization(self):
+  def test_csv_file_no_automatic_tokenization(self):
     path_to_csv = self.create_toy_csv()
     ds = dataset.create_vertical_dataset(
         "csv:" + path_to_csv, min_vocab_frequency=1
@@ -1115,20 +1115,23 @@ second sentence foo bar foo foo""",
     expected_data_spec = self.toy_csv_dataspec_catset()
     self.assertEqual(ds.data_spec(), expected_data_spec)
 
-  def test_catset_reading_respects_data_spec_categorical(self):
+  def test_csv_file_reading_respects_data_spec_categorical(self):
     path_to_csv = self.create_toy_csv()
     data_spec = self.toy_csv_dataspec_categorical()
     ds = dataset.create_vertical_dataset(
         "csv:" + path_to_csv, data_spec=data_spec
     )
     self.assertEqual(ds.data_spec(), data_spec)
-    self.assertEqual(ds._dataset.DebugString(), """\
+    self.assertEqual(
+        ds._dataset.DebugString(),
+        """\
 col_cat_set
 first sentence foo bar foo bar
-second sentence foo bar foo foo
-""")
+second sentence foo bar foo foo foo
+""",
+    )
 
-  def test_catset_reading_respects_data_spec_catset(self):
+  def test_csv_file_reading_respects_data_spec_catset(self):
     path_to_csv = self.create_toy_csv()
     data_spec = self.toy_csv_dataspec_catset()
     ds = dataset.create_vertical_dataset(
@@ -1140,6 +1143,173 @@ col_cat_set
 foo, bar, sentence, first
 foo, bar, sentence, second
 """)
+
+  def test_pd_list_of_list(self):
+    df = pd.DataFrame(
+        {
+            "feature": [
+                ["single item"],
+                ["two", "words"],
+                ["three", "simple", "words", "words"],
+                [""],
+            ]
+        }
+    )
+    ds = dataset.create_vertical_dataset(
+        df,
+        min_vocab_frequency=1,
+        columns=[("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=4,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "words": VocabValue(index=1, count=2),
+                        "simple": VocabValue(index=2, count=1),
+                        "single item": VocabValue(index=3, count=1),
+                        "three": VocabValue(index=4, count=1),
+                        "two": VocabValue(index=5, count=1),
+                    },
+                    number_of_unique_values=6,
+                ),
+                count_nas=1,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_pd_invalid_type_text(self):
+    df = pd.DataFrame({"feature": ["a", "b c", "d e f g h"]})
+    with self.assertRaisesRegex(
+        ValueError, "Categorical Set columns must be a list of lists."
+    ):
+      _ = dataset.create_vertical_dataset(
+          df,
+          min_vocab_frequency=1,
+          columns=[("feature", Semantic.CATEGORICAL_SET)],
+      )
+
+  def test_pd_np_bytes(self):
+    df = pd.DataFrame(
+        {
+            "feature": [
+                np.array(["single item"], np.bytes_),
+                np.array(["two", "words"], np.bytes_),
+                np.array(["three", "simple", "words", "words"], np.bytes_),
+                np.array([""], np.bytes_),
+            ]
+        }
+    )
+    ds = dataset.create_vertical_dataset(
+        df,
+        min_vocab_frequency=1,
+        columns=[("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=4,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "words": VocabValue(index=1, count=2),
+                        "simple": VocabValue(index=2, count=1),
+                        "single item": VocabValue(index=3, count=1),
+                        "three": VocabValue(index=4, count=1),
+                        "two": VocabValue(index=5, count=1),
+                    },
+                    number_of_unique_values=6,
+                ),
+                count_nas=1,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_pd_with_na(self):
+    df = pd.DataFrame(
+        {
+            "feature": [
+                pd.NA,
+                ["single item"],
+                ["two", "words"],
+                ["three", "simple", "words", "words"],
+            ]
+        }
+    )
+    ds = dataset.create_vertical_dataset(
+        df,
+        min_vocab_frequency=1,
+        columns=[("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=4,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "words": VocabValue(index=1, count=2),
+                        "simple": VocabValue(index=2, count=1),
+                        "single item": VocabValue(index=3, count=1),
+                        "three": VocabValue(index=4, count=1),
+                        "two": VocabValue(index=5, count=1),
+                    },
+                    number_of_unique_values=6,
+                ),
+                count_nas=1,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_pd_with_empty_list(self):
+    df = pd.DataFrame(
+        {
+            "feature": [
+                [],
+                ["single item"],
+                ["two", "words"],
+                ["three", "simple", "words", "words"],
+            ]
+        }
+    )
+    ds = dataset.create_vertical_dataset(
+        df,
+        min_vocab_frequency=1,
+        columns=[("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=4,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "words": VocabValue(index=1, count=2),
+                        "simple": VocabValue(index=2, count=1),
+                        "single item": VocabValue(index=3, count=1),
+                        "three": VocabValue(index=4, count=1),
+                        "two": VocabValue(index=5, count=1),
+                    },
+                    number_of_unique_values=6,
+                ),
+                count_nas=0,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
 
 if __name__ == "__main__":

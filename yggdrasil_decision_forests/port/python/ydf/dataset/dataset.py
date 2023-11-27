@@ -153,6 +153,33 @@ class VerticalDataset:
           )
         return
 
+    elif column.semantic == dataspec.Semantic.CATEGORICAL_SET:
+      if column_data.dtype.type != np.object_:
+        raise ValueError("Categorical Set columns must be a list of lists.")
+      if len(column_data) > 0:
+        if column_data[0] and not isinstance(
+            column_data[0], (list, np.ndarray)
+        ):
+          raise ValueError("Categorical Set columns must be a list of lists.")
+      # TODO: b/313414785 - Consider speeding this up by moving logic to C++.
+      # np.unique also sorts the unique elements, which is expected by YDF.
+      column_data = [np.unique(row).astype(np.bytes_) for row in column_data]
+      boundaries = np.cumsum(
+          [0] + [len(row) for row in column_data[:-1]], dtype=np.int64
+      )
+      bank = np.concatenate(column_data)
+
+      if inference_args is not None:
+        guide = dataspec.categorical_column_guide(column, inference_args)
+        self._dataset.PopulateColumnCategoricalSetNPBytes(
+            column.name, bank, boundaries, **guide
+        )
+      else:
+        self._dataset.PopulateColumnCategoricalSetNPBytes(
+            column.name, bank, boundaries, column_idx=column_idx
+        )
+      return
+
     elif column.semantic == dataspec.Semantic.HASH:
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, dtype=np.bytes_)

@@ -34,7 +34,7 @@ def is_tensorflow_dataset(data: dataset_io_types.IODataset) -> bool:
 def to_dict(
     data: dataset_io_types.IODataset,
 ) -> Dict[str, dataset_io_types.InputValues]:
-  """Converts a Pandas dataframe to a dict of numpy arrays."""
+  """Converts a Tensorflow dataset to a dict of numpy arrays."""
   assert hasattr(data, "rebatch")
   full_batch = next(iter(data.rebatch(sys.maxsize)))
   return {k: v.numpy() for k, v in full_batch.items()}
