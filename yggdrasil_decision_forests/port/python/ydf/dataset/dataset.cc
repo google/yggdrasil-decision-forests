@@ -33,19 +33,19 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "pybind11_protobuf/native_proto_caster.h"  // IWYU pargma : keep
+#include "pybind11_protobuf/native_proto_caster.h"  // IWYU pragma : keep
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "ydf/utils/numpy_data.h"
 #include "ydf/utils/status_casters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -68,41 +68,6 @@ using CategoricalColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::CategoricalColumn;
 using HashColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::HashColumn;
-
-// A collection of values, somehow similar to a "Span<const float>", but with a
-// stride (i.e., items are evenly spaced, but possibly with a constant gap).
-// Only support what is needed in this file.
-//
-// "StridedSpanFloat32" does not own the underlying data and relies on the data
-// in "data". The initialization "py::array_t data" object should not be
-// destroyed before "StridedSpanFloat32".
-class StridedSpanFloat32 {
- public:
-  // Build a "StridedSpanFloat32".
-  //
-  // Args:
-  //   data: A one dimentionnal array of float32 values.
-  StridedSpanFloat32(py::array_t<float>& data)
-      : item_stride_(data.strides(0) / data.itemsize()),
-        size_(static_cast<size_t>(data.shape(0))),
-        values_(data.data()) {
-    DCHECK_EQ(data.strides(0) % data.itemsize(), 0);
-  }
-
-  // Number of values.
-  size_t size() const { return size_; }
-
-  // Accesses to a value. "index" should be in [0, size).
-  float operator[](const size_t index) const {
-    DCHECK_LT(index, size_);
-    return values_[index * item_stride_];
-  }
-
- private:
-  const size_t item_stride_;
-  const size_t size_;
-  const float* const values_;
-};
 
 // Checks if all columns of the dataset have the same number of rows and sets
 // the dataset's number of rows accordingly. If requested, also modifies the
@@ -289,60 +254,6 @@ absl::Status PopulateColumnBooleanNPBool(dataset::VerticalDataset& self,
 
   return absl::OkStatus();
 }
-
-// Removes '\0' at the end of a string_view. Returns a string_view without the
-// zeroes.
-std::string_view remove_tailing_zeros(std::string_view src) {
-  int i = static_cast<int>(src.size()) - 1;
-  while (i >= 0 && src[i] == 0) {
-    i--;
-  }
-  return src.substr(0, i + 1);
-}
-
-// Non owning accessor to a np bytes array.
-struct NPByteArray {
-  // Wraps a single dimensional np::array of bytes.
-  static absl::StatusOr<NPByteArray> Create(const py::array& data) {
-    if (data.dtype().kind() != 'S') {
-      return absl::InternalError(
-          absl::StrCat("Expecting a np.bytes (i.e. |S) array. Got |",
-                       std::string(1, data.dtype().kind()), " instead"));
-    }
-    if (data.ndim() != 1) {
-      return absl::InternalError("Wrong shape");
-    }
-    py::buffer_info info = data.request();
-    return NPByteArray{
-        /*_data=*/(char*)info.ptr,
-        /*_stride=*/(size_t)info.strides[0],
-        /*_itemsize=*/(size_t)info.itemsize,
-        /*_size=*/(size_t)info.shape[0],
-    };
-  }
-
-  // Number of items.
-  size_t size() const { return _size; }
-
-  // Value accessor.
-  std::string_view operator[](size_t i) const {
-    return remove_tailing_zeros({_data + i * _stride, _itemsize});
-  }
-
-  // Extracts the content of the numpy array into a string vector.
-  std::vector<std::string> ToVector() const {
-    std::vector<std::string> dst(_size);
-    for (size_t i = 0; i < _size; i++) {
-      dst[i] = (*this)[i];
-    }
-    return dst;
-  }
-
-  const char* _data;
-  const size_t _stride;
-  const size_t _itemsize;
-  const size_t _size;
-};
 
 // A dictionary.
 // This structure holds the dictionary before it gets copied to the dataspec.

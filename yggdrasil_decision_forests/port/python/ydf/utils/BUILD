@@ -61,6 +61,18 @@ pybind_library(
 )
 
 pybind_library(
+    name = "numpy_data",
+    srcs = ["numpy_data.cc"],
+    hdrs = ["numpy_data.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@ydf_cc//yggdrasil_decision_forests/utils:logging",
+    ],
+)
+
+pybind_library(
     name = "status_casters",
     hdrs = ["status_casters.h"],
     deps = [

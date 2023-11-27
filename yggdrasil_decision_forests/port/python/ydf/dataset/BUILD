@@ -15,6 +15,7 @@ pybind_library(
     srcs = ["dataset.cc"],
     hdrs = ["dataset.h"],
     deps = [
+        "//ydf/utils:numpy_data",
         "//ydf/utils:status_casters",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
