@@ -1,6 +1,6 @@
-site_name: Yggdrasil Decision Forests
+site_name: Yggdrasil Decision Forests' documentation
 site_url: https://ydf.readthedocs.io/
-site_description: "Yggdrasil Decision Forests is a production-grade collection of algorithms for the training, serving, and interpretation of decision forest models available in python, c++, go, and javascript."
+site_description: "Yggdrasil Decision Forests (YDF) is a library to train, evaluate, interpret, and productionize decision forest models such as Random Forest and Gradient Boosted Decision Trees. YDF is available in Python, C++, CLI, JavaScript and Go."
 repo_url: https://github.com/google/yggdrasil-decision-forests
 repo_name: google/yggdrasil-decision-forests
 

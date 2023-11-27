@@ -3,25 +3,32 @@ title: Yggdrasil Decision Forests
 ---
 #
 
-![](image/logo_w_title_width.png){: .center}
+![](image/logo_w_title.png){: .center}
 
-**Yggdrasil Decision Forests** (YDF) is a production-grade collection of
-algorithms developed in Google Switzerland 🏔️ since 2018 for the training,
-serving, and interpretation of decision forest models. YDF is available in
-Python, C++, CLI, in TensorFlow under the name
-[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests),
-JavaScript (inference only), and Go (inference only).
+**Yggdrasil Decision Forests** (**YDF**) is a library to train, evaluate,
+interpret, and productionize decision forest models such as Random Forest and
+Gradient Boosted Decision Trees. YDF is available in Python, C++, CLI,
+JavaScript and Go. YDF is developed by and used by Google since 2018. YDF powers
+the
+[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests)
+library.
 
-!!! note "Why YDF?"
+**New to decision forests?**
 
-    [Decision Forests](https://developers.google.com/machine-learning/decision-forests) are easy to develop, show
-    excellent performance both with and without hyperparameter tuning on a variety
-    of problems, and are fast to train and run. Yggdrasil Decision Forests 🌳 aims to
-    streamline the process of model development 🛠 to production 🚀 by providing a
-    simple, error-proof API 🩹, automated best practices 📘, and a variety of serving
-    options compatible with Google tools.
+Decision Forests are machine learning models which are easy to train and show
+excellent performance on tabular data. For more information on how decision
+forests work, see the
+[Decision Forests Google Machine Learning class](https://developers.google.com/machine-learning/decision-forests).
 
-For more information on the design of YDF, please see our paper in KDD 2023:
+**Why Yggdrasil Decision Forests?**
+
+YDF shines by its concise and modern API that relies on rich default logic and
+values to help users avoid modeling mistakes. It also features a tight
+integration with other ML tools such as Pandas, Numpy or TensorFlow, and
+implements the latest research in decision forest technology, giving its users
+access to state-of-the-art results. For more information about YDF's API design
+and a performance comparison with other decision forest libraries, see our paper
+in KDD 2023:
 [Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://doi.org/10.1145/3580305.3599933).
 
 ## Key features
@@ -85,9 +92,8 @@ model.save("/tmp/my_model")
 
 ## Next steps
 
-Check the
-[Getting Started tutorial 🧭](tutorial/getting_started.ipynb).
-Then, explore the other tutorials on the left depending on your interests. For
+Check the [Getting Started tutorial 🧭](tutorial/getting_started.ipynb). Then,
+explore the other tutorials on the left depending on your interests. For
 example, if you are going to rank things, check the
 [ranking](tutorial/ranking.ipynb) tutorial.
 
