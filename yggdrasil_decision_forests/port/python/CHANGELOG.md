@@ -1,6 +1,31 @@
 # Changelog
 
-## Head
+## 0.0.6 - 2023-11-28
+
+### Features
+
+-   Add support categorical set features
+-   Add support for prediction analysis
+-   Expose max_num_scanned_rows_to_infer_semantic and 
+    max_num_scanned_rows_to_compute_statistics
+-   Expose metadata on the model
+-   Expose initial predictions on the model
+-   Add strict mode for more warnings
+-   Add GBT example distance support
+-   Support strided numerical features
+
+### Documentation
+
+-   Many new tutorials at ydf.readthedocs.io
+
+### Fix
+
+-   Fix a bug in GBT predictions (see YDF changelog for details)
+-   Various small fixes
+
+#### Release music
+
+Die Holzauktion. Franz Meißner
 
 ##  0.0.5 - 2023-11-10
 
