@@ -247,14 +247,15 @@ def create_vertical_dataset(
 ) -> VerticalDataset:
   """Creates a VerticalDataset from various sources of data.
 
-  Unless given explicitly, the semantic of the features is determined
-  automatically.
-
-  For text features, the semantic CATEGORICAL_SET has to be given explicitly
-  with the `columns` argument. When reading CATEGORICAL_SET features from CSV,
-  YDF will automatically tokenize the feature values. Currently, the tokenizer
-  cannot be customized through the Python API. If a data spec is given, the
-  tokenizer specified in the data spec will be respected.
+  The feature semantics are automatically determined and can be explicitly
+  set with the `columns` argument. The semantics of a dataset (or model) are
+  available its data_spec.
+  
+  Note that the CATEGORICAL_SET semantic is not automatically inferred when
+  reading from file. When reading from CSV files, setting the CATEGORICAL_SET
+  semantic for a feature will have YDF tokenize the feature. When reading from
+  in-memory datasets (e.g. pandas), YDF only accepts lists of lists for
+  CATEGORICAL_SET features.
 
   Usage example:
 
@@ -482,7 +483,18 @@ def infer_semantic(name: str, data: Any) -> dataspec.Semantic:
     ]:
       return dataspec.Semantic.NUMERICAL
 
-    if data.dtype.type in [np.string_, np.bytes_, np.object_]:
+    if data.dtype.type in [np.string_, np.bytes_]:
+      return dataspec.Semantic.CATEGORICAL
+
+    if data.dtype.type in [np.object_]:
+      # For performance reasons, only check the type on the first and last item
+      # of the column if it is tokenized.
+      if (
+          len(data) > 0
+          and (isinstance(data[0], list) or isinstance(data[0], np.ndarray))
+          and (isinstance(data[-1], list) or isinstance(data[-1], np.ndarray))
+      ):
+        return dataspec.Semantic.CATEGORICAL_SET
       return dataspec.Semantic.CATEGORICAL
 
     if data.dtype.type in [np.bool_]:

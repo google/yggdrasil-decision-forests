@@ -1311,6 +1311,74 @@ foo, bar, sentence, second
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
+  def test_pd_type_inference_lists(self):
+    df = pd.DataFrame(
+        {
+            "feature": [
+                ["single item"],
+                ["two", "words"],
+            ]
+        }
+    )
+    ds = dataset.create_vertical_dataset(
+        df,
+        min_vocab_frequency=1,
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "single item": VocabValue(index=1, count=1),
+                        "two": VocabValue(index=2, count=1),
+                        "words": VocabValue(index=3, count=1),
+                    },
+                    number_of_unique_values=4,
+                ),
+                count_nas=0,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_pd_type_inference_nparrays(self):
+    df = pd.DataFrame(
+        {
+            "feature": [
+                np.array(["single item"]),
+                np.array(["two", "words"]),
+            ]
+        }
+    )
+    ds = dataset.create_vertical_dataset(
+        df,
+        min_vocab_frequency=1,
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "single item": VocabValue(index=1, count=1),
+                        "two": VocabValue(index=2, count=1),
+                        "words": VocabValue(index=3, count=1),
+                    },
+                    number_of_unique_values=4,
+                ),
+                count_nas=0,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
 
 if __name__ == "__main__":
   absltest.main()
