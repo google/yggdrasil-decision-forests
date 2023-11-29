@@ -32,6 +32,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -196,6 +197,9 @@ VerticalDataset VerticalDataset::ShallowNonOwningClone() const {
 
 absl::StatusOr<VerticalDataset::AbstractColumn*> VerticalDataset::AddColumn(
     const proto::Column& column_spec) {
+  if (ColumnNameToColumnIdx(column_spec.name()) != -1) {
+    return absl::InvalidArgumentError("The column already exists");
+  }
   *data_spec_.add_columns() = column_spec;
   ASSIGN_OR_RETURN(auto new_column,
                    CreateColumn(column_spec.type(), column_spec.name()));
@@ -208,6 +212,9 @@ absl::StatusOr<VerticalDataset::AbstractColumn*> VerticalDataset::AddColumn(
 
 absl::StatusOr<proto::Column*> VerticalDataset::AddColumn(
     const absl::string_view name, const proto::ColumnType type) {
+  if (ColumnNameToColumnIdx(name) != -1) {
+    return absl::InvalidArgumentError("The column already exists");
+  }
   auto* column_spec = data_spec_.add_columns();
   column_spec->set_name(std::string(name));
   column_spec->set_type(type);
@@ -948,6 +955,57 @@ absl::Status VerticalDataset::AppendExampleWithStatus(
 std::string VerticalDataset::ValueToString(const row_t row,
                                            const int col) const {
   return column(col)->ToString(row, data_spec().columns(col));
+}
+
+std::string VerticalDataset::DebugString(
+    const absl::optional<row_t> max_displayed_rows, const bool vertical,
+    const int digit_precision) const {
+  // Maximum number of rows to display.
+  row_t num_displayed_rows = nrow();
+  if (max_displayed_rows.has_value() &&
+      *max_displayed_rows < num_displayed_rows) {
+    num_displayed_rows = *max_displayed_rows;
+  }
+
+  std::string rep;
+  if (vertical) {
+    // Header
+    for (int col_idx = 0; col_idx < ncol(); col_idx++) {
+      if (col_idx > 0) {
+        absl::StrAppend(&rep, ",");
+      }
+      absl::StrAppend(&rep, column(col_idx)->name());
+    }
+    absl::StrAppend(&rep, "\n");
+
+    // Body
+    for (row_t row_idx = 0; row_idx < num_displayed_rows; row_idx++) {
+      for (int col_idx = 0; col_idx < ncol(); col_idx++) {
+        const auto& col_spec = data_spec().columns(col_idx);
+        if (col_idx > 0) {
+          absl::StrAppend(&rep, ",");
+        }
+        absl::StrAppend(&rep, column(col_idx)->ToStringWithDigitPrecision(
+                                  row_idx, col_spec, digit_precision));
+      }
+      absl::StrAppend(&rep, "\n");
+    }
+  } else {
+    for (int col_idx = 0; col_idx < ncol(); col_idx++) {
+      const auto* col = column(col_idx);
+      const auto& col_spec = data_spec().columns(col_idx);
+      absl::StrAppend(&rep, col->name(), ": ");
+      for (row_t row_idx = 0; row_idx < num_displayed_rows; row_idx++) {
+        if (row_idx > 0) {
+          absl::StrAppend(&rep, ",");
+        }
+        absl::StrAppend(&rep, col->ToStringWithDigitPrecision(row_idx, col_spec,
+                                                              digit_precision));
+      }
+      absl::StrAppend(&rep, "\n");
+    }
+  }
+  return rep;
 }
 
 void VerticalDataset::Set(const row_t row, const int col,

@@ -167,12 +167,12 @@ class GradientBoostedTreesLearner : public AbstractLearner {
     return capabilities;
   }
 
- private:
   // Generates, checks and groups all the configuration objects.
   absl::Status BuildAllTrainingConfiguration(
       const dataset::proto::DataSpecification& data_spec,
       internal::AllTrainingConfiguration* all_config) const;
 
+ private:
   // Initializes and returns a model.
   std::unique_ptr<GradientBoostedTreesModel> InitializeModel(
       const internal::AllTrainingConfiguration& config,
@@ -189,6 +189,13 @@ REGISTER_AbstractLearner(GradientBoostedTreesLearner,
                          GradientBoostedTreesLearner::kRegisteredName);
 
 namespace internal {
+
+// Builds the internal (i.e. generally not accessible to user) configuration for
+// the weak learner.
+decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
+    const internal::AllTrainingConfiguration& config, const int num_threads,
+    const int grad_idx, const std::vector<GradientData>& gradients,
+    const std::vector<float>& predictions, const absl::Time& begin_training);
 
 // Divide "dataset" into a training and a validation dataset.
 //
@@ -362,7 +369,7 @@ struct AllTrainingConfiguration {
   model::proto::TrainingConfigLinking train_config_link;
 
   // Configuration specific to the gbt in "train_config_".
-  const proto::GradientBoostedTreesTrainingConfig* gbt_config;
+  proto::GradientBoostedTreesTrainingConfig* gbt_config;
 
   // Implementation of the loss. Have non-owning dependencies to
   // "train_config_"'s content.
@@ -417,6 +424,11 @@ void SetInitialPredictions(const std::vector<float>& initial_predictions,
 absl::Status SetDefaultHyperParameters(
     gradient_boosted_trees::proto::GradientBoostedTreesTrainingConfig*
         gbt_config);
+
+// Returns a non owning vector of tree pointers from a vector of tree
+// unique_ptr.
+std::vector<const decision_tree::DecisionTree*> RemoveUniquePtr(
+    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>& src);
 
 }  // namespace internal
 

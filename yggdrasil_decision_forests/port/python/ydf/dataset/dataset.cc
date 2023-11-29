@@ -632,33 +632,8 @@ absl::Status CreateColumnsFromDataSpec(
 // Returns the raw contents of the dataset. To be used for testing/debugging
 // only.
 std::string DebugString(const dataset::VerticalDataset& self) {
-  std::string ds_as_string = "";
-  {
-    for (int col_idx = 0; col_idx < self.ncol(); col_idx++) {
-      if (col_idx > 0) {
-        absl::StrAppend(&ds_as_string, ",");
-      }
-      absl::StrAppend(&ds_as_string, self.column(col_idx)->name());
-    }
-    absl::StrAppend(&ds_as_string, "\n");
-  }
-  // Body
-  for (dataset::VerticalDataset::row_t example_idx = 0;
-       example_idx < self.nrow(); example_idx++) {
-    for (int col_idx = 0; col_idx < self.ncol(); col_idx++) {
-      const auto& col_spec = self.data_spec().columns(col_idx);
-      if (col_idx > 0) {
-        absl::StrAppend(&ds_as_string, ",");
-      }
-      if (!self.column(col_idx)->IsNa(example_idx)) {
-        absl::StrAppend(&ds_as_string,
-                        self.column(col_idx)->ToStringWithDigitPrecision(
-                            example_idx, col_spec, /*digit_precision=*/6));
-      }
-    }
-    absl::StrAppend(&ds_as_string, "\n");
-  }
-  return ds_as_string;
+  return self.DebugString(/*max_displayed_rows=*/{}, /*vertical=*/true,
+                          /*digit_precision=*/6);
 }
 
 // Print warning messages when reading from path.

@@ -34,6 +34,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -765,6 +766,17 @@ class VerticalDataset {
   // Can be called on a dataset that won't receive new elements.
   // Calls "shrink_to_fit" on the std::vectors.
   void ShrinkToFit();
+
+  // Human readable representation of the dataset to be printed in the terminal
+  // or in a file. The printing format can change and should not be relied on.
+  //
+  // Args:
+  //   max_displayed_examples: The number of examples to display. If set, limits
+  //     the number of printed examples.
+  //   vertical: Controls if the examples are printed horizontally or
+  //    vertically (look like a table or a csv file).
+  std::string DebugString(absl::optional<row_t> max_displayed_rows = 10,
+                          bool vertical = true, int digit_precision = 4) const;
 
  private:
   struct ColumnContainer {

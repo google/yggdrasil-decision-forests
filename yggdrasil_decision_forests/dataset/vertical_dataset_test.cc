@@ -526,6 +526,38 @@ TEST(VerticalDataset, Reset) {
   EXPECT_EQ(dataset.ValueToString(0, 1), "AAA");
 }
 
+TEST(VerticalDataset, DebugString) {
+  VerticalDataset dataset;
+  AddColumn("a", proto::ColumnType::NUMERICAL, dataset.mutable_data_spec());
+  AddColumn("b", proto::ColumnType::STRING, dataset.mutable_data_spec());
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+  EXPECT_OK(dataset.AppendExampleWithStatus({{"a", "0.111"}, {"b", "AAA"}}));
+  EXPECT_OK(dataset.AppendExampleWithStatus({{"a", ""}, {"b", "BBB"}}));
+  EXPECT_OK(dataset.AppendExampleWithStatus({{"a", "0.333"}, {"b", ""}}));
+
+  EXPECT_EQ(dataset.DebugString(),
+            R"(a,b
+0.111,AAA
+nan,BBB
+0.333,
+)");
+  EXPECT_EQ(dataset.DebugString(/*max_displayed_rows=*/1), R"(a,b
+0.111,AAA
+)");
+  EXPECT_EQ(dataset.DebugString(/*max_displayed_rows=*/{},
+                                /*vertical=*/false),
+            R"(a: 0.111,nan,0.333
+b: AAA,BBB,
+)");
+  EXPECT_EQ(dataset.DebugString(/*max_displayed_rows=*/{}, /*vertical=*/true,
+                                /*digit_precision=*/1),
+            R"(a,b
+0.1,AAA
+nan,BBB
+0.3,
+)");
+}
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

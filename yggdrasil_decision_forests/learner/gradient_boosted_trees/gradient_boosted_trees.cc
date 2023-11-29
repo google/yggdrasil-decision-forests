@@ -364,49 +364,6 @@ absl::Status FinalizeModel(const absl::string_view log_directory,
   return MaybeExportTrainingLogs(log_directory, mdl);
 }
 
-// Returns a non owning vector of tree pointers from a vector of tree
-// unique_ptr.
-std::vector<const decision_tree::DecisionTree*> RemoveUniquePtr(
-    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>& src) {
-  std::vector<const decision_tree::DecisionTree*> dst;
-  dst.reserve(src.size());
-  for (const auto& tree : src) {
-    dst.push_back(tree.get());
-  }
-  return dst;
-}
-
-// Builds the internal (i.e. generally not accessible to user) configuration for
-// the weak learner.
-decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
-    const internal::AllTrainingConfiguration& config, const int num_threads,
-    const int grad_idx, const std::vector<GradientData>& gradients,
-    const std::vector<float>& predictions, const absl::Time& begin_training) {
-  // Timeout in the tree training.
-  absl::optional<absl::Time> timeout;
-  if (config.train_config.has_maximum_training_duration_seconds()) {
-    timeout =
-        begin_training +
-        absl::Seconds(config.train_config.maximum_training_duration_seconds());
-  }
-  decision_tree::InternalTrainConfig internal_config;
-  internal_config.set_leaf_value_functor =
-      SetLeafValueWithNewtonRaphsonStepFunctor(*config.gbt_config,
-                                               gradients[grad_idx]);
-  internal_config.hessian_score = config.gbt_config->use_hessian_gain();
-  internal_config.hessian_leaf = true;
-  internal_config.gradient_col_idx = gradients[grad_idx].gradient_col_idx;
-  internal_config.hessian_col_idx = gradients[grad_idx].hessian_col_idx;
-  internal_config.hessian_l1 = config.gbt_config->l1_regularization();
-  internal_config.hessian_l2_numerical = config.gbt_config->l2_regularization();
-  internal_config.hessian_l2_categorical =
-      config.gbt_config->l2_regularization_categorical();
-  internal_config.num_threads = num_threads;
-  internal_config.duplicated_selected_examples = false;
-  internal_config.timeout = timeout;
-  return internal_config;
-}
-
 std::string SnapshotDir(const model::proto::DeploymentConfig& deployment) {
   return file::JoinPath(deployment.cache_path(), "snapshot");
 }
@@ -567,7 +524,7 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
   all_config->train_config = training_config();
   RETURN_IF_ERROR(SetDefaultHyperParameters(&all_config->train_config));
 
-  all_config->gbt_config = &all_config->train_config.GetExtension(
+  all_config->gbt_config = all_config->train_config.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
 
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
@@ -1019,7 +976,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     for (int grad_idx = 0; grad_idx < mdl->num_trees_per_iter(); grad_idx++) {
       auto tree = absl::make_unique<decision_tree::DecisionTree>();
 
-      const auto internal_config = BuildWeakLearnerInternalConfig(
+      const auto internal_config = internal::BuildWeakLearnerInternalConfig(
           config, deployment().num_threads(), grad_idx,
           current_train_dataset->gradients, current_train_dataset->predictions,
           begin_training);
@@ -1036,7 +993,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 
     if (has_validation_dataset) {
       // Update the predictions on the validation dataset.
-      RETURN_IF_ERROR(UpdatePredictions(RemoveUniquePtr(new_trees),
+      RETURN_IF_ERROR(UpdatePredictions(internal::RemoveUniquePtr(new_trees),
                                         validation->gradient_dataset,
                                         &validation->predictions,
                                         /*mean_abs_prediction=*/nullptr));
@@ -1045,7 +1002,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 
     if (recycle_next) {
       // Update the predictions on the sample because it will be recycled.
-      RETURN_IF_ERROR(UpdatePredictions(RemoveUniquePtr(new_trees),
+      RETURN_IF_ERROR(UpdatePredictions(internal::RemoveUniquePtr(new_trees),
                                         current_train_dataset->gradient_dataset,
                                         &current_train_dataset->predictions,
                                         /*mean_abs_prediction=*/nullptr));
@@ -1496,7 +1453,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
     for (int grad_idx = 0; grad_idx < gradients.size(); grad_idx++) {
       auto tree = absl::make_unique<decision_tree::DecisionTree>();
 
-      auto internal_config = BuildWeakLearnerInternalConfig(
+      auto internal_config = internal::BuildWeakLearnerInternalConfig(
           config, deployment().num_threads(), grad_idx, gradients,
           sub_train_predictions, begin_training);
       internal_config.preprocessing = &preprocessing;
@@ -1539,12 +1496,12 @@ GradientBoostedTreesLearner::TrainWithStatus(
     } else {
       // Update the predictions on the training dataset.
       RETURN_IF_ERROR(UpdatePredictions(
-          RemoveUniquePtr(new_trees), gradient_sub_train_dataset,
+          internal::RemoveUniquePtr(new_trees), gradient_sub_train_dataset,
           &sub_train_predictions, &mean_abs_prediction));
 
       if (has_validation_dataset) {
         // Update the predictions on the validation dataset.
-        RETURN_IF_ERROR(UpdatePredictions(RemoveUniquePtr(new_trees),
+        RETURN_IF_ERROR(UpdatePredictions(internal::RemoveUniquePtr(new_trees),
                                           gradient_validation_dataset,
                                           &validation_predictions,
                                           /*mean_abs_prediction=*/nullptr));
@@ -2471,6 +2428,35 @@ For example, in the case of binary classification, the pre-link function output 
 
 namespace internal {
 
+decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
+    const internal::AllTrainingConfiguration& config, const int num_threads,
+    const int grad_idx, const std::vector<GradientData>& gradients,
+    const std::vector<float>& predictions, const absl::Time& begin_training) {
+  // Timeout in the tree training.
+  absl::optional<absl::Time> timeout;
+  if (config.train_config.has_maximum_training_duration_seconds()) {
+    timeout =
+        begin_training +
+        absl::Seconds(config.train_config.maximum_training_duration_seconds());
+  }
+  decision_tree::InternalTrainConfig internal_config;
+  internal_config.set_leaf_value_functor =
+      SetLeafValueWithNewtonRaphsonStepFunctor(*config.gbt_config,
+                                               gradients[grad_idx]);
+  internal_config.hessian_score = config.gbt_config->use_hessian_gain();
+  internal_config.hessian_leaf = true;
+  internal_config.gradient_col_idx = gradients[grad_idx].gradient_col_idx;
+  internal_config.hessian_col_idx = gradients[grad_idx].hessian_col_idx;
+  internal_config.hessian_l1 = config.gbt_config->l1_regularization();
+  internal_config.hessian_l2_numerical = config.gbt_config->l2_regularization();
+  internal_config.hessian_l2_categorical =
+      config.gbt_config->l2_regularization_categorical();
+  internal_config.num_threads = num_threads;
+  internal_config.duplicated_selected_examples = false;
+  internal_config.timeout = timeout;
+  return internal_config;
+}
+
 absl::StatusOr<proto::Loss> DefaultLoss(
     const model::proto::Task task, const dataset::proto::Column& label_spec) {
   if (task == model::proto::Task::CLASSIFICATION &&
@@ -2641,7 +2627,9 @@ absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
                                    std::vector<GradientData>* gradients,
                                    std::vector<float>* predictions) {
   const auto loss_shape = loss_impl.Shape();
-  *gradient_dataset = dataset.ShallowNonOwningClone();
+  if (gradient_dataset) {
+    *gradient_dataset = dataset.ShallowNonOwningClone();
+  }
 
   if (gradients) {
     gradients->reserve(loss_shape.gradient_dim);
@@ -2999,7 +2987,7 @@ absl::Status DartPredictionAccumulator::UpdateWithNewIteration(
   tree_prediction.predictions.assign(predictions_.size(), 0.f);
   tree_prediction.weight = 1.0f / (selected_iter_idxs.size() + 1);
   RETURN_IF_ERROR(
-      UpdatePredictions(RemoveUniquePtr(new_trees), gradient_dataset,
+      UpdatePredictions(internal::RemoveUniquePtr(new_trees), gradient_dataset,
                         &tree_prediction.predictions, mean_abs_prediction));
 
   const float sampled_factor = static_cast<float>(selected_iter_idxs.size()) /
@@ -3153,6 +3141,16 @@ absl::Status SetDefaultHyperParameters(
         proto::GradientBoostedTreesTrainingConfig::NONE);
   }
   return absl::OkStatus();
+}
+
+std::vector<const decision_tree::DecisionTree*> RemoveUniquePtr(
+    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>& src) {
+  std::vector<const decision_tree::DecisionTree*> dst;
+  dst.reserve(src.size());
+  for (const auto& tree : src) {
+    dst.push_back(tree.get());
+  }
+  return dst;
 }
 
 }  // namespace internal
