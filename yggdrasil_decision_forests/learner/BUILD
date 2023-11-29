@@ -126,7 +126,6 @@ all_proto_library(
     srcs = ["abstract_learner.proto"],
     exports = ["//yggdrasil_decision_forests/model:hyperparameter_proto"],
     deps = [
-        "//yggdrasil_decision_forests/dataset:data_spec_proto",
         "//yggdrasil_decision_forests/dataset:weight_proto",
         "//yggdrasil_decision_forests/model:abstract_model_proto",
         "//yggdrasil_decision_forests/model:hyperparameter_proto",
