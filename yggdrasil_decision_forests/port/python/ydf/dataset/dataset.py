@@ -425,6 +425,16 @@ def create_vertical_dataset_from_dict_of_values(
             f"The data spec expects columns {column_spec.name} which was not"
             f" found in the data. Available columns: {list(data)}"
         )
+      if (
+          column_spec.type == data_spec_pb2.CATEGORICAL_SET
+          and column_spec.HasField("tokenizer")
+          and column_spec.tokenizer.splitter
+          != data_spec_pb2.Tokenizer.NO_SPLITTING
+      ):
+        log.warning(
+            f"The dataspec for columns {column_spec.name} specifies a"
+            " tokenizer, but it is ignored when reading in-memory datasets."
+        )
       normalized_columns.append(
           dataspec.Column(
               name=column_spec.name,

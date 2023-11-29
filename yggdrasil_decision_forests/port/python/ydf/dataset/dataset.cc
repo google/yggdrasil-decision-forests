@@ -43,6 +43,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
+#include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "ydf/utils/numpy_data.h"
@@ -660,13 +661,39 @@ std::string DebugString(const dataset::VerticalDataset& self) {
   return ds_as_string;
 }
 
+// Print warning messages when reading from path.
+absl::Status CheckDataSpecForPathReading(
+    absl::string_view typed_path,
+    const dataset::proto::DataSpecification& data_spec) {
+  ASSIGN_OR_RETURN(auto path_and_type,
+                   dataset::GetDatasetPathAndTypeOrStatus(typed_path));
+  if (path_and_type.second == dataset::proto::FORMAT_CSV) {
+    bool tokenizer_warning_shown = false;
+    for (const auto& column : data_spec.columns()) {
+      if (!tokenizer_warning_shown &&
+          column.type() == dataset::proto::CATEGORICAL_SET) {
+        if (column.tokenizer().splitter() !=
+            dataset::proto::Tokenizer::NO_SPLITTING) {
+          YDF_LOG(INFO)
+              << "Column " << column.name()
+              << " has type CATEGORICAL_SET and will be tokenized. Set the "
+                 "column type to CATEGORICAL or deactivate the tokenizer in "
+                 "the data spec to prevent this.";
+        }
+      }
+    }
+  }
+  return absl::OkStatus();
+}
+
 absl::Status CreateFromPathWithDataSpec(
     dataset::VerticalDataset& self, const std::string& path,
     const dataset::proto::DataSpecification& data_spec) {
   dataset::LoadConfig dataset_loading_config;
   // TODO: Should all columns be listed in the required columns?
-
   ASSIGN_OR_RETURN(const auto typed_path, dataset::GetTypedPath(path));
+
+  RETURN_IF_ERROR(CheckDataSpecForPathReading(typed_path, data_spec));
 
   RETURN_IF_ERROR(dataset::LoadVerticalDataset(
       typed_path, data_spec, &self,
