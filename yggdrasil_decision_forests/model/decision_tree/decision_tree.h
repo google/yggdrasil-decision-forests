@@ -77,11 +77,11 @@ bool EvalConditionFromColumn(
 bool EvalCondition(const proto::NodeCondition& condition,
                    const dataset::proto::Example& example);
 
-// Argument to the "CheckStructure" method that test some aspect of the model
-// structure. By default, "CheckStructureOptions" is empty, that is, it does not
-// check anything.
+// Argument to the "CheckStructure" method that tests various aspects of the
+// model structure. By default, "CheckStructureOptions" checks if the model
+// was trained with global imputation.
 struct CheckStructureOptions {
-  // "global_imputation_*" test if the model structure looks as if it was
+  // "global_imputation_*" tests if the model structure looks as if it was
   // trained with global imputation. That is, the "na_value" values of the
   // conditions (i.e. the value of the condition when a value is missing) are
   // equal to the condition applied with global imputation feature replacement
@@ -98,7 +98,7 @@ struct CheckStructureOptions {
   // combined with other options.
   bool check_no_na_conditions = false;
 
-  static CheckStructureOptions GlobalImuptation() {
+  static CheckStructureOptions GlobalImputation() {
     return {
         /*.global_imputation_is_higher =*/true,
         /*.global_imputation_others =*/true,
@@ -118,7 +118,7 @@ struct CheckStructureOptions {
 // A node and its two children (if any).
 class NodeWithChildren {
  public:
-  // Approximate size in memory (expressed in byte) of the node and all its
+  // Approximate size in memory (expressed in bytes) of the node and all its
   // children.
   size_t EstimateSizeInByte() const;
 

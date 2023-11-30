@@ -287,7 +287,7 @@ class AbstractModel {
   // to be generic and the inference code is expected to be slower than the
   // optimized serving code available in "serving:all".
   //
-  // "proto::Example" is the native generic example format for simple ml. This
+  // "proto::Example" is the native generic example format for YDF. This
   // is different from the "tensorflow::Example". Conversion from
   // "tensorflow::Example" to "proto::Example" can be done with the function
   // "TfExampleToExample".

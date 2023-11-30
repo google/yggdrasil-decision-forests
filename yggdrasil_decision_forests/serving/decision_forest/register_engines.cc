@@ -382,7 +382,7 @@ class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
     }
 
     if (!gbt_model->CheckStructure(
-            decision_tree::CheckStructureOptions::GlobalImuptation())) {
+            decision_tree::CheckStructureOptions::GlobalImputation())) {
       return false;
     }
 
@@ -431,7 +431,7 @@ class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
     }
 
     if (!gbt_model->CheckStructure(
-            decision_tree::CheckStructureOptions::GlobalImuptation())) {
+            decision_tree::CheckStructureOptions::GlobalImputation())) {
       return NoGlobalImputationError(
           "GradientBoostedTreesOptPredFastEngineFactory");
     }
@@ -622,7 +622,7 @@ class RandomForestOptPredFastEngineFactory : public model::FastEngineFactory {
       return false;
     }
     if (!rf_model->CheckStructure(
-            decision_tree::CheckStructureOptions::GlobalImuptation())) {
+            decision_tree::CheckStructureOptions::GlobalImputation())) {
       return false;
     }
 
@@ -665,7 +665,7 @@ class RandomForestOptPredFastEngineFactory : public model::FastEngineFactory {
     }
 
     if (!rf_model->CheckStructure(
-            decision_tree::CheckStructureOptions::GlobalImuptation())) {
+            decision_tree::CheckStructureOptions::GlobalImputation())) {
       return NoGlobalImputationError("RandomForestOptPredFastEngineFactory");
     }
 
