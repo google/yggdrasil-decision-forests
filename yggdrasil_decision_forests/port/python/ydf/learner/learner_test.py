@@ -728,20 +728,6 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     )
     _ = learner.train(ds)
 
-  def test_model_with_na_conditions_numerical(self):
-    ds = pd.DataFrame({
-        "feature": [np.nan] * 10 + [1.234] * 10,
-        "label": [0] * 10 + [1] * 10,
-    })
-    learner = specialized_learners.GradientBoostedTreesLearner(
-        label="label",
-        allow_na_conditions=True,
-        num_trees=1,
-    )
-    model = learner.train(ds)
-    evaluation = model.evaluate(ds)
-    self.assertEqual(evaluation.accuracy, 1)
-
 
 class LoggingTest(parameterized.TestCase):
 

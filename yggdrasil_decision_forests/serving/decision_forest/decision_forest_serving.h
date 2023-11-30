@@ -117,8 +117,6 @@ struct GenericNode {
     kCategoricalContainsBufferOffset,
     kCategoricalSetContainsBufferOffset,
     kNumericalObliqueProjectionIsHigher,
-    kNumericalAndCategoricalIsNa,
-    kCategoricalSetIsNa,
   };
   // Type of the node (leaf or condition type).
   Type type;
@@ -219,9 +217,6 @@ struct FlatNodeModel {
   // documentation about these fields.
   std::vector<float> oblique_weights;
   std::vector<typename Node::FeatureIdx> oblique_internal_feature_idxs;
-
-  // True if and only if the model uses N/A conditions.
-  bool uses_na_conditions = false;
 
   model::proto::Metadata metadata;
 };

@@ -380,30 +380,6 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
 }
 
 // Train and test a model on the adult dataset.
-TEST_F(GradientBoostedTreesOnAdult, BaseWithNAConditions) {
-  auto* gbt_config = train_config_.MutableExtension(
-      gradient_boosted_trees::proto::gradient_boosted_trees_config);
-  gbt_config->set_num_trees(100);
-  gbt_config->mutable_decision_tree()->set_max_depth(4);
-  gbt_config->mutable_decision_tree()->set_allow_na_conditions(true);
-  TrainAndEvaluateModel();
-
-  // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
-  // is significantly better (which is expected as, unlike RF,  GBT is
-  // calibrated).
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8644, 0.0099, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2979, 0.0127, 0.294);
-
-  auto* gbt_model =
-      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
-  EXPECT_TRUE(gbt_model->CheckStructure(
-      decision_tree::CheckStructureOptions::GlobalImputation()));
-  // Check that the model indeed uses NA conditions. 
-  EXPECT_FALSE(gbt_model->CheckStructure(
-      decision_tree::CheckStructureOptions::NACondition()));
-}
-
-// Train and test a model on the adult dataset.
 TEST_F(GradientBoostedTreesOnAdult, Base) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
