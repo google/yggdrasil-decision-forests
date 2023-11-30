@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
 
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
@@ -162,6 +163,16 @@ inline bool EvalCondition(const typename Model::NodeType* node,
       }
       return sum >= model.oblique_weights[node->oblique_projection_offset +
                                           num_projection];
+    }
+
+    case GenericNode::Type::kNumericalAndCategoricalIsNa: {
+      return examples.IsMissingCategoricalAndNumerical(
+          example_idx, node->feature_idx, model);
+    }
+
+    case GenericNode::Type::kCategoricalSetIsNa: {
+      return examples.IsMissingCategoricalSet(example_idx, node->feature_idx,
+                                              model);
     }
 
     default:

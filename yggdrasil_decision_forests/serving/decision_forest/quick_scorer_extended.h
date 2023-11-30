@@ -161,6 +161,9 @@ struct QuickScorerExtendedModel {
   // If true, do not apply the activation function of the model (if any).
   bool output_logits = false;
 
+  // Support for N/A conditions has not been implemented.
+  static constexpr bool uses_na_conditions = false;
+
 #ifdef __AVX2__
   // This flag is set during the compilation of the model and indicates if the
   // CPU supports AVX2 instructions

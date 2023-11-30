@@ -94,10 +94,23 @@ struct CheckStructureOptions {
   // For all the other conditions.
   bool global_imputation_others = true;
 
+  // Check if the model does not contain any IsNA condition. Should not be
+  // combined with other options.
+  bool check_no_na_conditions = false;
+
   static CheckStructureOptions GlobalImuptation() {
     return {
         /*.global_imputation_is_higher =*/true,
         /*.global_imputation_others =*/true,
+        /*.check_no_na_conditions =*/false,
+    };
+  }
+
+  static CheckStructureOptions NACondition() {
+    return {
+        /*.global_imputation_is_higher =*/false,
+        /*.global_imputation_others =*/false,
+        /*.check_no_na_conditions =*/true,
     };
   }
 };

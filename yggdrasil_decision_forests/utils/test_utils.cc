@@ -517,14 +517,14 @@ void TestGenericEngine(const model::AbstractModel& model,
   auto engine_or = model.BuildFastEngine();
   if (!engine_or.ok()) {
     YDF_LOG(INFO) << "Model " << model.name()
-                  << " does implement any fast generic engine: "
+                  << " does not implement any fast generic engine: "
                   << engine_or.status().message();
     return;
   }
   YDF_LOG(INFO) << "Testing fast generic engine.";
   auto engine = std::move(engine_or.value());
   ExpectEqualPredictions(dataset, model, *engine);
-  YDF_LOG(INFO) << "Fast generic and generic engine predictions are matching";
+  YDF_LOG(INFO) << "Fast generic and generic engine predictions match";
 
   YDF_LOG(INFO) << "Check engine wrapper";
   const model::EngineWrapperModel wrapper_engine(&model, std::move(engine));

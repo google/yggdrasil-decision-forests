@@ -26,17 +26,14 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -57,6 +54,7 @@
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
 
@@ -222,11 +220,10 @@ TEST_F(RandomForestOnAdult, Base) {
           .value();
 
   // The top and worst variables have been computed using the "randomForest" R
-  // package. This (simple ml) and the R randomForest implementation work
-  // differently for categorical attributes. Since this dataset has a lot of
-  // categorical attributes, the reported orders of variable importance are not
-  // exactly similar among both libraries. However, the overall ranking is still
-  // close.
+  // package. YDF and the R randomForest implementation work differently for
+  // categorical attributes. Since this dataset has a lot of categorical
+  // attributes, the reported orders of variable importance are not exactly the
+  // same for the two libraries. However, the overall ranking is still close.
 
   // Top 3 variables.
   const int rank_capital_gain = utils::GetVariableImportanceRank(
