@@ -16,7 +16,9 @@ from typing import Sequence
 from absl.testing import absltest
 from absl.testing import parameterized
 from yggdrasil_decision_forests.dataset import data_spec_pb2
+from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 from ydf.model.tree import condition as condition_lib
+from ydf.utils import test_utils
 
 
 class ConditionTest(parameterized.TestCase):
@@ -93,6 +95,31 @@ class ConditionTest(parameterized.TestCase):
     )
     with self.assertRaisesRegex(ValueError, "10"):
       condition_lib.items_to_bitmap(column_spec, [10])
+
+  def test_condition_is_missing_with_valid_input(self):
+    condition = condition_lib.IsMissingInCondition(
+        attribute=0, missing=False, score=2
+    )
+    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            na_condition=decision_tree_pb2.Condition.NA(),
+        ),
+    )
+
+    # Condition -> proto condition.
+    test_utils.assertProto2Equal(
+        self,
+        condition_lib.to_proto_condition(condition, dataspec),
+        proto_condition,
+    )
+    # Proto condition to condition.
+    self.assertEqual(
+        condition_lib.to_condition(proto_condition, dataspec), condition
+    )
 
 
 if __name__ == "__main__":

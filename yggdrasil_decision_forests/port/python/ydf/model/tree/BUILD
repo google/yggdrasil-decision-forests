@@ -22,7 +22,10 @@ py_library(
 py_library(
     name = "condition",
     srcs = ["condition.py"],
-    deps = ["@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto"],
+    deps = [
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
+    ],
 )
 
 # Tests
@@ -50,5 +53,7 @@ py_test(
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
+        "//ydf/utils:test_utils",
     ],
 )

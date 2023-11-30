@@ -14,8 +14,98 @@
 
 """Conditions / splits for non-leaf nodes."""
 
-from typing import Sequence
+import abc
+import dataclasses
+import functools
+from typing import Sequence, Union
 from yggdrasil_decision_forests.dataset import data_spec_pb2
+from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
+
+ColumnType = data_spec_pb2.ColumnType
+
+
+# TODO: b/310218604 - Use kw_only with default value score = 0.
+@dataclasses.dataclass
+class AbstractCondition(metaclass=abc.ABCMeta):
+  """Generic condition.
+
+  Attrs:
+    missing: Result of the evaluation of the condition if the input feature is
+      missing.
+    score: Score of a condition. The semantic depends on the learning algorithm.
+  """
+
+  missing: bool
+  score: float
+
+
+@dataclasses.dataclass
+class IsMissingInCondition(AbstractCondition):
+  """Condition of the form "attribute is missing".
+
+  Attrs:
+    attribute: Attribute (or one of the attributes) tested by the condition.
+  """
+
+  attribute: int
+
+
+def to_condition(
+    proto_condition: decision_tree_pb2.NodeCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> AbstractCondition:
+  """Extracts the "condition" part of a proto node."""
+
+  del dataspec  # dataspec will be used in other cases.
+
+  base_args = {
+      "missing": proto_condition.na_value,
+      "score": proto_condition.split_score,
+  }
+  condition_type = proto_condition.condition
+
+  if condition_type.HasField("na_condition"):
+    return IsMissingInCondition(
+        attribute=proto_condition.attribute, **base_args
+    )
+
+  else:
+    raise ValueError(f"Non supported condition type: {proto_condition}")
+
+
+@functools.singledispatch
+def to_proto_condition(
+    condition: AbstractCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> decision_tree_pb2.NodeCondition:
+  """Sets the "condition" part in a proto node.
+
+  Note: While public, this logic is not part of the API. This is why this
+  methode's code is not an abstract method in AbstractValue.
+
+  Args:
+    condition: Input condition.
+    dataspec: Dataspec of the model.
+
+  Returns:
+    Proto condition.
+  """
+  raise NotImplementedError("Unsupported value type")
+
+
+@to_proto_condition.register
+def _to_proto_condition_is_missing(
+    condition: IsMissingInCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> decision_tree_pb2.NodeCondition:
+  return decision_tree_pb2.NodeCondition(
+      na_value=condition.missing,
+      split_score=condition.score,
+      attribute=condition.attribute,
+      condition=decision_tree_pb2.Condition(
+          na_condition=decision_tree_pb2.Condition.NA()
+      ),
+  )
 
 
 def _bitmap_has_item(bitmap: bytes, value: int) -> bool:
