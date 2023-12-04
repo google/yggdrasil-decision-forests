@@ -11,6 +11,10 @@ h1#_1 {
   margin: 0 auto;
 }
 
+.logo {
+  width: 300px;
+}
+
 .md-main__inner {
   display: flex;
   margin-top: 0;
