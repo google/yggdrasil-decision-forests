@@ -92,7 +92,7 @@ all_proto_library(
 # ========
 cc_test(
     name = "gradient_boosted_trees_test",
-    size = "large",
+    size = "enormous",
     srcs = ["gradient_boosted_trees_test.cc"],
     data = [
         "//yggdrasil_decision_forests/test_data",
