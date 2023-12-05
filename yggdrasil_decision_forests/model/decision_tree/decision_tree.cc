@@ -444,8 +444,12 @@ bool NodeWithChildren::CheckStructure(
       }
       break;
 
-    case proto::Condition::TYPE_NOT_SET:
     case proto::Condition::kNaCondition:
+      if (options.check_no_na_conditions) {
+        return false;
+      }
+      break;
+    case proto::Condition::TYPE_NOT_SET:
       break;
   }
 

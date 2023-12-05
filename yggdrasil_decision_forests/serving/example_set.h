@@ -70,9 +70,9 @@
 #include <utility>
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
@@ -80,6 +80,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -439,7 +440,6 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
 
 using FeaturesDefinition = FeaturesDefinitionNumericalOrCategoricalFlat;
 
-// TODO: Remove dependency to TF.
 class AbstractExampleSet;
 
 class AbstractExampleSet {
@@ -612,6 +612,11 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
     return model.features().HasInputFeature(name);
   }
 
+  // Tests if the model uses N/A conditions.
+  static bool UsesNAConditions(const Model& model) {
+    return model.uses_na_conditions;
+  }
+
   // Allocate an example set.
   ExampleSetNumericalOrCategoricalFlat(const int num_examples,
                                        const Model& model)
@@ -620,6 +625,12 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
         num_examples_(num_examples),
         categorical_set_begins_and_ends_(
             num_examples * model.features().categorical_set_features().size()) {
+    if (UsesNAConditions(model)) {
+      store_na_bitmap_ = true;
+      na_bitmap_.assign(
+          num_examples * (model.features().fixed_length_features().size()),
+          false);
+    }
   }
 
   // Empty the content of the example set. The example set still contains
@@ -637,6 +648,10 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
     fixed_length_features_[FixedLengthIndex(example_idx, feature_id.index,
                                             features)]
         .numerical_value = value;
+    if (store_na_bitmap_) {
+      na_bitmap_[FixedLengthIndex(example_idx, feature_id.index, features)] =
+          false;
+    }
   }
   void SetNumerical(const int example_idx, const NumericalFeatureId feature_id,
                     const float value, const Model& model) {
@@ -692,9 +707,13 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
         << value;
 #endif
 
-    fixed_length_features_[FixedLengthIndex(example_idx, feature_id.index,
-                                            features)]
-        .categorical_value = value;
+    const auto index =
+        FixedLengthIndex(example_idx, feature_id.index, features);
+
+    fixed_length_features_[index].categorical_value = value;
+    if (store_na_bitmap_) {
+      na_bitmap_[index] = false;
+    }
   }
   void SetCategorical(const int example_idx,
                       const CategoricalFeatureId feature_id, const int value,
@@ -710,6 +729,23 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
                                                    feature_id.index,
                                                    model.features())]
         .categorical_value;
+  }
+
+  bool IsMissingCategoricalAndNumerical(const int example_idx,
+                                        const int feature_index,
+                                        const Model& model) const {
+    DCHECK(store_na_bitmap_);
+    return na_bitmap_[FixedLengthIndex(example_idx, feature_index,
+                                       model.features())];
+  }
+
+  bool IsMissingCategoricalSet(const int example_idx, const int feature_index,
+                               const Model& model) const {
+    DCHECK(store_na_bitmap_);
+    auto& dst_range = categorical_set_begins_and_ends_[CategoricalSetIndex(
+        example_idx, feature_index, model.features())];
+    return categorical_item_buffer_[dst_range.begin] ==
+           kMissingCategoricalSetValue;
   }
 
   // Set the value of a string categorical feature.
@@ -843,8 +879,12 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   void SetMissingNumerical(const int example_idx,
                            const NumericalFeatureId feature_id,
                            const FeaturesDefinition& features) override {
-    fixed_length_features_[FixedLengthIndex(example_idx, feature_id.index,
-                                            features)] =
+    const auto index =
+        FixedLengthIndex(example_idx, feature_id.index, features);
+    if (store_na_bitmap_) {
+      na_bitmap_[index] = true;
+    }
+    fixed_length_features_[index] =
         features.fixed_length_na_replacement_values()[feature_id.index];
   }
   void SetMissingNumerical(const int example_idx,
@@ -871,8 +911,12 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   void SetMissingCategorical(const int example_idx,
                              const CategoricalFeatureId feature_id,
                              const FeaturesDefinition& features) override {
-    fixed_length_features_[FixedLengthIndex(example_idx, feature_id.index,
-                                            features)] =
+    const auto index =
+        FixedLengthIndex(example_idx, feature_id.index, features);
+    if (store_na_bitmap_) {
+      na_bitmap_[index] = true;
+    }
+    fixed_length_features_[index] =
         features.fixed_length_na_replacement_values()[feature_id.index];
   }
   void SetMissingCategorical(const int example_idx,
@@ -904,10 +948,14 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
     const UnstackedFeature& unstack_def =
         features.unstacked_features()[feature_id.index];
     for (int dim_idx = 0; dim_idx < unstack_def.size; dim_idx++) {
-      fixed_length_features_[FixedLengthIndex(
-          example_idx, unstack_def.begin_internal_idx + dim_idx, features)] =
+      const auto index = FixedLengthIndex(
+          example_idx, unstack_def.begin_internal_idx + dim_idx, features);
+      fixed_length_features_[index] =
           features.fixed_length_na_replacement_values()
               [unstack_def.begin_internal_idx + dim_idx];
+      if (store_na_bitmap_) {
+        na_bitmap_[index] = true;
+      }
     }
   }
 
@@ -1000,7 +1048,8 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
            fixed_length_features_.capacity() *
                sizeof(NumericalOrCategoricalValue) +
            categorical_set_begins_and_ends_.capacity() * sizeof(Rangei32) +
-           categorical_item_buffer_.capacity() * sizeof(int32_t);
+           categorical_item_buffer_.capacity() * sizeof(int32_t) +
+           na_bitmap_.capacity() * sizeof(char);
   }
 
  private:
@@ -1039,6 +1088,20 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
 
   // Buffer of categorical values. Used to store categorical-set values.
   std::vector<int32_t> categorical_item_buffer_;
+
+  // If true, store a bitmap of N/A values in `na_bitmap_`. This allows querying
+  // if a feature is N/A. Imputation values are stored even if N/A the N/A
+  // bitmap is stored. Since CategoricalSet features have a special N/A value,
+  // the bitmap is only required for numerical and categorical features.
+  bool store_na_bitmap_ = false;
+
+  // Bitmap of the N/A values. Populated if and only if `store_na_bitmap_` is
+  // true, see its documentation for more information.
+  // To avoid potential (performance) issues with std::vector<bool> bit packing,
+  // use the (possibly faster but more wasteful) std::vector<char>.
+  //
+  // TODO: b/314117797 - Benchmark std:vector<char> vs. std::vector<bool>
+  std::vector<char> na_bitmap_;
 };  // namespace serving
 
 // Empty model to use for unit testing.
@@ -1061,6 +1124,8 @@ struct EmptyModel {
   }
 
   ExampleSet::FeaturesDefinition intern_features;
+
+  bool uses_na_conditions = false;
 };
 
 // Extracts a set of examples from a vertical dataset.
@@ -1099,6 +1164,8 @@ void ExampleSetNumericalOrCategoricalFlat<Model, format>::FillMissing(
     }
   }
 
+  std::fill(na_bitmap_.begin(), na_bitmap_.end(), true);
+
   // Add the value kMissingCategoricalSetValue (-1) as the first element
   // of the buffer, and set all categorical set ranges to [0,1).
   categorical_item_buffer_.assign(1, kMissingCategoricalSetValue);
@@ -1116,12 +1183,17 @@ absl::Status ExampleSetNumericalOrCategoricalFlat<Model, format>::Copy(
   }
   dst->Clear();
 
-  // Copy of the fixed-length features.
+  // Copy of the fixed-length features and N/A bitmaps.
   if constexpr (format == ExampleFormat::FORMAT_EXAMPLE_MAJOR) {
     const auto num_features = features.fixed_length_features().size();
     std::copy(fixed_length_features_.begin() + begin * num_features,
               fixed_length_features_.begin() + end * num_features,
               dst->fixed_length_features_.begin());
+    if (store_na_bitmap_) {
+      std::copy(na_bitmap_.begin() + begin * num_features,
+                na_bitmap_.begin() + end * num_features,
+                dst->na_bitmap_.begin());
+    }
   } else if constexpr (format == ExampleFormat::FORMAT_FEATURE_MAJOR) {
     for (const auto& feature : features.fixed_length_features()) {
       const auto it_src_feature = fixed_length_features_.begin() +
@@ -1129,6 +1201,13 @@ absl::Status ExampleSetNumericalOrCategoricalFlat<Model, format>::Copy(
       std::copy(it_src_feature + begin, it_src_feature + end,
                 dst->fixed_length_features_.begin() +
                     feature.internal_idx * dst->NumberOfExamples());
+      if (store_na_bitmap_) {
+        const auto it_src_na_bitmap =
+            na_bitmap_.begin() + feature.internal_idx * NumberOfExamples();
+        std::copy(it_src_na_bitmap, it_src_na_bitmap + end,
+                  dst->na_bitmap_.begin() +
+                      feature.internal_idx * dst->NumberOfExamples());
+      }
     }
   } else {
     static_assert(!std::is_same<Model, Model>::value, "Unsupported format.");
@@ -1220,7 +1299,9 @@ ExampleSetNumericalOrCategoricalFlat<Model, format>::FromProtoExample(
         break;
 
       default:
-        return absl::InvalidArgumentError("Non supported feature type.");
+        return absl::InvalidArgumentError(
+            absl::StrCat("Unsupported feature type.",
+                         dataset::proto::ColumnType_Name(feature.type)));
     }
   }
 

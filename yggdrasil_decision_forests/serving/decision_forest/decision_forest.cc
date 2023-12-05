@@ -15,10 +15,20 @@
 
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
 
+#include <algorithm>
+#include <cstring>
+#include <functional>
+#include <limits>
+#include <type_traits>
+#include <vector>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -304,7 +314,8 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
   switch (src_condition.type_case()) {
     case ConditionType::kHigherCondition:
       if (attribute_spec.type() != dataset::proto::NUMERICAL) {
-        return absl::InvalidArgumentError("Non supported condition.");
+        return absl::InvalidArgumentError(
+            "kHigherCondition only supports NUMERICAL attributes.");
       }
       dst_node->type = NumericalIsHigher();
       dst_node->numerical_is_higher_threshold =
@@ -313,7 +324,8 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
 
     case ConditionType::kTrueValueCondition:
       if (attribute_spec.type() != dataset::proto::BOOLEAN) {
-        return absl::InvalidArgumentError("Non supported condition.");
+        return absl::InvalidArgumentError(
+            "kTrueValueCondition only supports BOOLEAN attributes.");
       }
       dst_node->type = NumericalIsHigher();
       dst_node->numerical_is_higher_threshold = 0.5f;
@@ -321,7 +333,9 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
 
     case ConditionType::kDiscretizedHigherCondition: {
       if (attribute_spec.type() != dataset::proto::DISCRETIZED_NUMERICAL) {
-        return absl::InvalidArgumentError("Non supported condition.");
+        return absl::InvalidArgumentError(
+            "kDiscretizedHigherCondition only supports DISCRETIZED_NUMERICAL "
+            "attributes.");
       }
       dst_node->type = NumericalIsHigher();
       const auto discretized_threshold =
@@ -334,7 +348,9 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
     case ConditionType::kContainsCondition: {
       if (attribute_spec.type() != dataset::proto::CATEGORICAL &&
           attribute_spec.type() != dataset::proto::CATEGORICAL_SET) {
-        return absl::InvalidArgumentError("Non supported condition.");
+        return absl::InvalidArgumentError(
+            "kContainsCondition only supports CATEGORICAL and "
+            "CATEGORICAL_SET attributes.");
       }
       const int num_attribute_classes = dst_model->features()
                                             .data_spec()
@@ -353,7 +369,9 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
     case ConditionType::kContainsBitmapCondition: {
       if (attribute_spec.type() != dataset::proto::CATEGORICAL &&
           attribute_spec.type() != dataset::proto::CATEGORICAL_SET) {
-        return absl::InvalidArgumentError("Non supported condition.");
+        return absl::InvalidArgumentError(
+            "kContainsBitmapCondition only supports CATEGORICAL and "
+            "CATEGORICAL_SET attributes.");
       }
       const auto bitmap = src_node.node()
                               .condition()
@@ -378,8 +396,30 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
       RETURN_IF_ERROR(SetObliqueCondition(condition, dst_model, dst_node));
     } break;
 
+    case ConditionType::kNaCondition: {
+      switch (attribute_spec.type()) {
+        case dataset::proto::NUMERICAL:
+        case dataset::proto::DISCRETIZED_NUMERICAL:
+        case dataset::proto::BOOLEAN:
+        case dataset::proto::CATEGORICAL: {
+          dst_node->type = GenericNode::Type::kNumericalAndCategoricalIsNa;
+        } break;
+        case dataset::proto::CATEGORICAL_SET: {
+          dst_node->type = GenericNode::Type::kCategoricalSetIsNa;
+        } break;
+        default:
+          return absl::InvalidArgumentError(absl::StrCat(
+              "NA Conditions are not supported for this engine and attribute "
+              "type ",
+              dataset::proto::ColumnType_Name(attribute_spec.type())));
+      }
+    } break;
+
     default:
-      return absl::InvalidArgumentError("Non supported condition.");
+      return absl::InvalidArgumentError(
+          absl::StrCat("Unsupported condition ", src_condition.type_case(),
+                       " with attribute ",
+                       dataset::proto::ColumnType_Name(attribute_spec.type())));
   }
   return absl::OkStatus();
 }
@@ -692,6 +732,8 @@ absl::Status GenericToSpecializedGenericModelHelper(
     absl::optional<bool> global_imputation_optimization = {}) {
   dst->global_imputation_optimization =
       src.CheckStructure({/*.global_imputation_is_higher =*/true});
+  dst->uses_na_conditions = !src.CheckStructure(
+      model::decision_tree::CheckStructureOptions::NACondition());
 
   return GenericToSpecializedModelHelper(
       src, SetLeafFunctor<GenericModel, SpecializedModel>(set_leaf), dst,

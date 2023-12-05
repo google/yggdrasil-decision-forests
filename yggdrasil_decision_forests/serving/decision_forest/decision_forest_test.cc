@@ -15,8 +15,6 @@
 
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
 
-#include <algorithm>
-#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -24,7 +22,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/numbers.h"
@@ -43,12 +40,11 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
-#include "yggdrasil_decision_forests/model/prediction.pb.h"
+#include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/register_engines.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/csv.h"
-#include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"  // IWYU pragma: keep
@@ -670,6 +666,80 @@ TEST(DecisionForest, NonGlobalImputationEngines) {
                             gradient_boosted_trees::kQuickScorerExtended,
                             gradient_boosted_trees::kGeneric,
                         });
+}
+
+std::unique_ptr<GradientBoostedTreesModel> BuildNAConditionGBT() {
+  auto model = absl::make_unique<GradientBoostedTreesModel>();
+
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "a" }
+    columns { type: NUMERICAL name: "b" }
+  )pb");
+
+  model->set_task(model::proto::Task::REGRESSION);
+  model->set_label_col_idx(0);
+  model->set_data_spec(dataspec);
+  model->set_loss(model::gradient_boosted_trees::proto::Loss::SQUARED_ERROR);
+  model->mutable_initial_predictions()->push_back(0);
+  model->mutable_input_features()->push_back(1);
+
+  // "b" IsNa
+  //     ├─(pos)─ pred:10
+  //     └─(neg)─ pred:-10
+
+  auto tree = absl::make_unique<model::decision_tree::DecisionTree>();
+  tree->CreateRoot();
+  tree->mutable_root()->CreateChildren();
+  tree->mutable_root()->mutable_node()->mutable_condition()->set_attribute(1);
+  tree->mutable_root()
+      ->mutable_node()
+      ->mutable_condition()
+      ->mutable_condition()
+      ->mutable_na_condition();
+  tree->mutable_root()
+      ->mutable_pos_child()
+      ->mutable_node()
+      ->mutable_regressor()
+      ->set_top_value(10.f);
+  tree->mutable_root()
+      ->mutable_neg_child()
+      ->mutable_node()
+      ->mutable_regressor()
+      ->set_top_value(-10.f);
+  model->mutable_decision_trees()->push_back(std::move(tree));
+
+  return model;
+}
+
+TEST(DecisionForest, NAConditionEngines) {
+  auto model = BuildNAConditionGBT();
+  CheckCompatibleEngine(*model, {gradient_boosted_trees::kGeneric});
+}
+
+TEST(DecisionForest, NAConditionGenericPredictions) {
+  // "b" IsNa
+  //     ├─(pos)─ pred:10
+  //     └─(neg)─ pred:-10
+  auto model = BuildNAConditionGBT();
+
+  GradientBoostedTreesRegression engine;
+  ASSERT_OK(GenericToSpecializedModel(*model.get(), &engine));
+
+  auto examples =
+      absl::make_unique<typename GradientBoostedTreesRegression::ExampleSet>(
+          2, engine);
+
+  const auto& fs = engine.features();
+  auto feature_b = engine.features().GetNumericalFeatureId("b").value();
+
+  examples->SetNumerical(/*example_idx=*/0, feature_b, /*value=*/0.0f, fs);
+  examples->SetMissingNumerical(/*example_idx=*/1, feature_b, fs);
+  std::vector<float> predictions;
+  Predict(engine, *examples, examples->NumberOfExamples(), &predictions);
+
+  EXPECT_EQ(predictions.size(), 2);
+  EXPECT_EQ(predictions[0], -10);
+  EXPECT_EQ(predictions[1], 10);
 }
 
 }  // namespace

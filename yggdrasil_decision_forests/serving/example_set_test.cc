@@ -13,12 +13,11 @@
  * limitations under the License.
  */
 
-#include <random>
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 #include "yggdrasil_decision_forests/serving/example_set.h"
 
@@ -28,6 +27,7 @@ namespace {
 
 using test::EqualsProto;
 using test::StatusIs;
+using ::testing::Bool;
 
 dataset::proto::DataSpecification ToyDataSpec() {
   return PARSE_TEST_PROTO(R"pb(
@@ -202,7 +202,8 @@ dataset::proto::DataSpecification ToyDataSpec() {
 
 struct ToyModel : EmptyModel {
   // Skipping columns 7, 10 and 11 on purpose.
-  ToyModel() {
+  ToyModel(const bool enable_na_conditions) {
+    uses_na_conditions = enable_na_conditions;
     CHECK_OK(Initialize({0, 1, 2, 3, 4, 6, 8, 9, 12, 13, 14}, ToyDataSpec()));
   }
 };
@@ -230,7 +231,7 @@ void SetToyValues(const ToyModel& model, ToyModel::ExampleSet* example_set,
   const auto feature_j =
       ToyModel::ExampleSet::GetBooleanFeatureId("j", model).value();
 
-  // Applies some "random" values to make sure the test does not depend on
+  // Applies some arbitrary values to make sure the test does not depend on
   // undefined behavior (i.e. reading without setting first). For the tests to
   // work, these values should be different from the ones set in the
   // "apply_set_values" block.
@@ -277,8 +278,11 @@ void SetToyValues(const ToyModel& model, ToyModel::ExampleSet* example_set,
   }
 }
 
-TEST(ExampleSet, GetValue) {
-  ToyModel model;
+using ExampleSetTest = testing::TestWithParam<bool>;
+
+TEST_P(ExampleSetTest, GetValue) {
+  const bool enable_na_conditions = GetParam();
+  ToyModel model(enable_na_conditions);
   ToyModel::ExampleSet example_set(5, model);
   SetToyValues(model, &example_set);
 
@@ -298,8 +302,156 @@ TEST(ExampleSet, GetValue) {
   EXPECT_EQ(example_set.GetBoolean(1, feature_j, model), true);
 }
 
-TEST(ExampleSet, HasFeature) {
-  ToyModel model;
+TEST(ExampleSetTest, IsMissing) {
+  ToyModel model(/*enable_na_conditions=*/true);
+  ToyModel::ExampleSet example_set(5, model);
+  SetToyValues(model, &example_set, /*apply_fill_missing=*/false,
+               /*apply_set_missing=*/true);
+
+  ASSERT_OK_AND_ASSIGN(auto feature_a,
+                       ToyModel::ExampleSet::GetNumericalFeatureId("a", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_b,
+      ToyModel::ExampleSet::GetCategoricalFeatureId("b", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_c,
+      ToyModel::ExampleSet::GetCategoricalFeatureId("c", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_d,
+      ToyModel::ExampleSet::GetCategoricalSetFeatureId("d", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_g,
+      ToyModel::ExampleSet::GetMultiDimNumericalFeatureId("g", model));
+  ASSERT_OK_AND_ASSIGN(auto feature_j,
+                       ToyModel::ExampleSet::GetBooleanFeatureId("j", model));
+
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_a.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_a.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_b.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_b.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_c.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_c.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_g.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_g.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_j.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_j.index, model));
+
+  EXPECT_TRUE(example_set.IsMissingCategoricalSet(0, feature_d.index, model));
+  EXPECT_FALSE(example_set.IsMissingCategoricalSet(1, feature_d.index, model));
+}
+
+TEST(ExampleSetTest, IsMissingWithFillMissing) {
+  ToyModel model(/*enable_na_conditions=*/true);
+  ToyModel::ExampleSet example_set(5, model);
+  SetToyValues(model, &example_set, /*apply_fill_missing=*/true,
+               /*apply_set_missing=*/false);
+
+  ASSERT_OK_AND_ASSIGN(auto feature_a,
+                       ToyModel::ExampleSet::GetNumericalFeatureId("a", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_b,
+      ToyModel::ExampleSet::GetCategoricalFeatureId("b", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_c,
+      ToyModel::ExampleSet::GetCategoricalFeatureId("c", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_d,
+      ToyModel::ExampleSet::GetCategoricalSetFeatureId("d", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_g,
+      ToyModel::ExampleSet::GetMultiDimNumericalFeatureId("g", model));
+  ASSERT_OK_AND_ASSIGN(auto feature_j,
+                       ToyModel::ExampleSet::GetBooleanFeatureId("j", model));
+
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_a.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_a.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_b.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_b.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_c.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_c.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_g.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_g.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_j.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_j.index, model));
+
+  EXPECT_TRUE(example_set.IsMissingCategoricalSet(0, feature_d.index, model));
+  EXPECT_FALSE(example_set.IsMissingCategoricalSet(1, feature_d.index, model));
+}
+
+TEST(ExampleSetTest, IsMissingWithCopy) {
+  ToyModel model(/*enable_na_conditions=*/true);
+  ToyModel::ExampleSet src_example_set(5, model);
+  SetToyValues(model, &src_example_set);
+  ToyModel::ExampleSet dst_example_set(5, model);
+  ASSERT_OK(src_example_set.Copy(0, 4, model.features(), &dst_example_set));
+
+  ASSERT_OK_AND_ASSIGN(auto feature_a,
+                       ToyModel::ExampleSet::GetNumericalFeatureId("a", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_b,
+      ToyModel::ExampleSet::GetCategoricalFeatureId("b", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_c,
+      ToyModel::ExampleSet::GetCategoricalFeatureId("c", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_d,
+      ToyModel::ExampleSet::GetCategoricalSetFeatureId("d", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_g,
+      ToyModel::ExampleSet::GetMultiDimNumericalFeatureId("g", model));
+  ASSERT_OK_AND_ASSIGN(auto feature_j,
+                       ToyModel::ExampleSet::GetBooleanFeatureId("j", model));
+
+  EXPECT_TRUE(dst_example_set.IsMissingCategoricalAndNumerical(
+      0, feature_a.index, model));
+  EXPECT_FALSE(dst_example_set.IsMissingCategoricalAndNumerical(
+      1, feature_a.index, model));
+  EXPECT_TRUE(dst_example_set.IsMissingCategoricalAndNumerical(
+      0, feature_b.index, model));
+  EXPECT_FALSE(dst_example_set.IsMissingCategoricalAndNumerical(
+      1, feature_b.index, model));
+  EXPECT_TRUE(dst_example_set.IsMissingCategoricalAndNumerical(
+      0, feature_c.index, model));
+  EXPECT_FALSE(dst_example_set.IsMissingCategoricalAndNumerical(
+      1, feature_c.index, model));
+  EXPECT_TRUE(dst_example_set.IsMissingCategoricalAndNumerical(
+      0, feature_g.index, model));
+  EXPECT_FALSE(dst_example_set.IsMissingCategoricalAndNumerical(
+      1, feature_g.index, model));
+  EXPECT_TRUE(dst_example_set.IsMissingCategoricalAndNumerical(
+      0, feature_j.index, model));
+  EXPECT_FALSE(dst_example_set.IsMissingCategoricalAndNumerical(
+      1, feature_j.index, model));
+
+  EXPECT_TRUE(
+      dst_example_set.IsMissingCategoricalSet(0, feature_d.index, model));
+  EXPECT_FALSE(
+      dst_example_set.IsMissingCategoricalSet(1, feature_d.index, model));
+}
+
+TEST_P(ExampleSetTest, HasFeature) {
+  const bool enable_na_conditions = GetParam();
+  ToyModel model(enable_na_conditions);
   ToyModel::ExampleSet example_set(5, model);
 
   EXPECT_TRUE(ToyModel::ExampleSet::HasInputFeature("a", model));
@@ -312,8 +464,9 @@ TEST(ExampleSet, HasFeature) {
   EXPECT_TRUE(ToyModel::ExampleSet::HasInputFeature("j", model));
 }
 
-TEST(ExampleSet, GetValueMissing) {
-  ToyModel model;
+TEST_P(ExampleSetTest, GetValueMissing) {
+  const bool enable_na_conditions = GetParam();
+  ToyModel model(enable_na_conditions);
   ToyModel::ExampleSet example_set(5, model);
   SetToyValues(model, &example_set);
 
@@ -327,8 +480,9 @@ TEST(ExampleSet, GetValueMissing) {
       StatusIs(absl::StatusCode::kInvalidArgument, "Unknown input feature"));
 }
 
-TEST(ExampleSet, ExtractProtoExampleMissing) {
-  ToyModel model;
+TEST_P(ExampleSetTest, ExtractProtoExampleMissing) {
+  const bool enable_na_conditions = GetParam();
+  ToyModel model(enable_na_conditions);
   ToyModel::ExampleSet example_set(5, model);
   example_set.FillMissing(model);
   const dataset::proto::Example expected_example = PARSE_TEST_PROTO(
@@ -357,8 +511,9 @@ TEST(ExampleSet, ExtractProtoExampleMissing) {
               EqualsProto(expected_example));
 }
 
-TEST(ExampleSet, ExtractProtoExampleMissingManually) {
-  ToyModel model;
+TEST_P(ExampleSetTest, ExtractProtoExampleMissingManually) {
+  const bool enable_na_conditions = GetParam();
+  ToyModel model(enable_na_conditions);
   ToyModel::ExampleSet example_set(5, model);
   SetToyValues(model, &example_set, /*apply_fill_missing=*/false,
                /*apply_set_missing=*/true, /*apply_set_values=*/false);
@@ -384,8 +539,9 @@ TEST(ExampleSet, ExtractProtoExampleMissingManually) {
               EqualsProto(expected_example));
 }
 
-TEST(ExampleSet, ExtractProtoManualExample) {
-  ToyModel model;
+TEST_P(ExampleSetTest, ExtractProtoManualExample) {
+  const bool enable_na_conditions = GetParam();
+  ToyModel model(enable_na_conditions);
   ToyModel::ExampleSet example_set(5, model);
   SetToyValues(model, &example_set);
 
@@ -432,8 +588,9 @@ TEST(ExampleSet, ExtractProtoManualExample) {
               EqualsProto(expected_example_1));
 }
 
-TEST(ExampleSet, FromProtoExample) {
-  ToyModel model;
+TEST_P(ExampleSetTest, FromProtoExample) {
+  const bool enable_na_conditions = GetParam();
+  ToyModel model(enable_na_conditions);
   ToyModel::ExampleSet example_set(5, model);
 
   const dataset::proto::Example example_0 = PARSE_TEST_PROTO(
@@ -482,13 +639,17 @@ TEST(ExampleSet, FromProtoExample) {
               EqualsProto(example_1));
 }
 
-TEST(ExampleSet, MemoryUsage) {
-  ToyModel model;
+TEST_P(ExampleSetTest, MemoryUsage) {
+  const bool enable_na_conditions = GetParam();
+  ToyModel model(enable_na_conditions);
   ToyModel::ExampleSet example_set(5, model);
   SetToyValues(model, &example_set);
   const auto usage = example_set.MemoryUsage();
   EXPECT_LE(usage, 2000);
 }
+
+INSTANTIATE_TEST_SUITE_P(ExampleSetTestWithAndWithoutNA, ExampleSetTest,
+                         Bool());
 
 }  // namespace
 }  // namespace serving
