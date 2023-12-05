@@ -45,6 +45,7 @@ class ConditionTest(parameterized.TestCase):
             number_of_unique_values=number_of_unique_values
         )
     )
+
     self.assertEqual(
         condition_lib.bitmap_to_items(column_spec, bitmap),
         expected_items,
@@ -77,6 +78,7 @@ class ConditionTest(parameterized.TestCase):
             number_of_unique_values=number_of_unique_values
         )
     )
+
     self.assertEqual(
         condition_lib.items_to_bitmap(column_spec, items),
         expected_bitmap,
@@ -86,6 +88,7 @@ class ConditionTest(parameterized.TestCase):
     column_spec = data_spec_pb2.Column(
         categorical=data_spec_pb2.CategoricalSpec(number_of_unique_values=10)
     )
+
     with self.assertRaisesRegex(ValueError, "-1"):
       condition_lib.items_to_bitmap(column_spec, [-1])
 
@@ -93,8 +96,29 @@ class ConditionTest(parameterized.TestCase):
     column_spec = data_spec_pb2.Column(
         categorical=data_spec_pb2.CategoricalSpec(number_of_unique_values=10)
     )
+
     with self.assertRaisesRegex(ValueError, "10"):
       condition_lib.items_to_bitmap(column_spec, [10])
+
+  def _assert_conditions_equivalent(
+      self,
+      condition: condition_lib.AbstractCondition,
+      proto_condition: decision_tree_pb2.NodeCondition,
+      dataspec: data_spec_pb2.DataSpecification,
+  ) -> None:
+    """Assets that a condition and a proto condition are equivalent."""
+
+    # Condition to proto condition.
+    test_utils.assertProto2Equal(
+        self,
+        condition_lib.to_proto_condition(condition, dataspec),
+        proto_condition,
+    )
+
+    # Proto condition to condition.
+    self.assertEqual(
+        condition_lib.to_condition(proto_condition, dataspec), condition
+    )
 
   def test_condition_is_missing_with_valid_input(self):
     condition = condition_lib.IsMissingInCondition(
@@ -110,16 +134,225 @@ class ConditionTest(parameterized.TestCase):
         ),
     )
 
-    # Condition -> proto condition.
-    test_utils.assertProto2Equal(
-        self,
-        condition_lib.to_proto_condition(condition, dataspec),
-        proto_condition,
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+  def test_condition_is_true_valid_input(self):
+    condition = condition_lib.IsTrueCondition(
+        attribute=0, missing=False, score=2
     )
-    # Proto condition to condition.
-    self.assertEqual(
-        condition_lib.to_condition(proto_condition, dataspec), condition
+    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            true_value_condition=decision_tree_pb2.Condition.TrueValue(),
+        ),
     )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+  def test_condition_is_higher_valid_input(self):
+    condition = condition_lib.NumericalHigherThanCondition(
+        attribute=0, missing=False, score=2, threshold=3
+    )
+    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            higher_condition=decision_tree_pb2.Condition.Higher(threshold=3),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+  def test_condition_discretized_is_higher_valid_input(self):
+    condition = condition_lib.DiscretizedNumericalHigherThanCondition(
+        attribute=0, missing=False, score=2, threshold_idx=2
+    )
+    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            discretized_higher_condition=decision_tree_pb2.Condition.DiscretizedHigher(
+                threshold=2
+            ),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+  def test_condition_is_in_categorical_valid_input(self):
+    condition = condition_lib.CategoricalIsInCondition(
+        attribute=0,
+        missing=False,
+        score=2,
+        mask=[1, 3],
+    )
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[
+            data_spec_pb2.Column(
+                type=data_spec_pb2.ColumnType.CATEGORICAL,
+                categorical=data_spec_pb2.CategoricalSpec(
+                    number_of_unique_values=1000,
+                ),
+            )
+        ]
+    )
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            contains_condition=decision_tree_pb2.Condition.ContainsVector(
+                elements=[1, 3]
+            ),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+  def test_condition_is_in_categorical_bitmap_valid_input(self):
+    condition = condition_lib.CategoricalIsInCondition(
+        attribute=0,
+        missing=False,
+        score=2,
+        mask=[1, 3],
+    )
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[
+            data_spec_pb2.Column(
+                type=data_spec_pb2.ColumnType.CATEGORICAL,
+                categorical=data_spec_pb2.CategoricalSpec(
+                    number_of_unique_values=4
+                ),
+            )
+        ]
+    )
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            contains_bitmap_condition=decision_tree_pb2.Condition.ContainsBitmap(
+                elements_bitmap=b"\x0A"
+            ),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+  def test_condition_is_in_categorical_set_valid_input(self):
+    condition = condition_lib.CategoricalSetContainsCondition(
+        attribute=0,
+        missing=False,
+        score=2,
+        mask=[1, 3],
+    )
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[
+            data_spec_pb2.Column(
+                type=data_spec_pb2.ColumnType.CATEGORICAL_SET,
+                categorical=data_spec_pb2.CategoricalSpec(
+                    number_of_unique_values=1000
+                ),
+            )
+        ]
+    )
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            contains_condition=decision_tree_pb2.Condition.ContainsVector(
+                elements=[1, 3]
+            ),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+  def test_condition_is_in_categorical_set_bitmap_valid_input(self):
+    condition = condition_lib.CategoricalSetContainsCondition(
+        attribute=0,
+        missing=False,
+        score=2,
+        mask=[1, 3],
+    )
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[
+            data_spec_pb2.Column(
+                type=data_spec_pb2.ColumnType.CATEGORICAL_SET,
+                categorical=data_spec_pb2.CategoricalSpec(
+                    number_of_unique_values=4
+                ),
+            )
+        ]
+    )
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            contains_bitmap_condition=decision_tree_pb2.Condition.ContainsBitmap(
+                elements_bitmap=b"\x0A"
+            ),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+  def test_condition_sparse_oblique_valid_input(self):
+    condition = condition_lib.NumericalSparseObliqueCondition(
+        attributes=[0, 1],
+        missing=False,
+        score=2,
+        weights=[1, 2],
+        threshold=3,
+    )
+    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            oblique_condition=decision_tree_pb2.Condition.Oblique(
+                attributes=[0, 1],
+                weights=[1, 2],
+                threshold=3,
+            ),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+  def test_condition_sparse_oblique_empty_valid_input(self):
+    condition = condition_lib.NumericalSparseObliqueCondition(
+        attributes=[],
+        missing=False,
+        score=2,
+        weights=[],
+        threshold=3,
+    )
+    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=-1,
+        condition=decision_tree_pb2.Condition(
+            oblique_condition=decision_tree_pb2.Condition.Oblique(
+                attributes=[],
+                weights=[],
+                threshold=3,
+            ),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
 
 
 if __name__ == "__main__":

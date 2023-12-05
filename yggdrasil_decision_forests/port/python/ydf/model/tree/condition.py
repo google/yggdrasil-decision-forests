@@ -50,25 +50,162 @@ class IsMissingInCondition(AbstractCondition):
   attribute: int
 
 
+@dataclasses.dataclass
+class IsTrueCondition(AbstractCondition):
+  """Condition of the form "attribute is true".
+
+  Attrs:
+    attribute: Attribute tested by the condition.
+  """
+
+  attribute: int
+
+
+@dataclasses.dataclass
+class NumericalHigherThanCondition(AbstractCondition):
+  """Condition of the form "attribute >= threshold".
+
+  Attrs:
+    attribute: Attribute tested by the condition.
+    threshold: Threshold.
+  """
+
+  attribute: int
+  threshold: float
+
+
+@dataclasses.dataclass
+class DiscretizedNumericalHigherThanCondition(AbstractCondition):
+  """Condition of the form "attribute >= bounds[threshold]".
+
+  Attrs:
+    attribute: Attribute tested by the condition.
+    threshold_idx: Index of threshold in dataspec.
+  """
+
+  attribute: int
+  threshold_idx: int
+
+
+@dataclasses.dataclass
+class CategoricalIsInCondition(AbstractCondition):
+  """Condition of the form "attribute in mask".
+
+  Attrs:
+    attribute: Attribute tested by the condition.
+    mask: Sorted mask values.
+  """
+
+  attribute: int
+  mask: Sequence[int]
+
+
+@dataclasses.dataclass
+class CategoricalSetContainsCondition(AbstractCondition):
+  """Condition of the form "attribute intersect mask != empty".
+
+  Attrs:
+    attribute: Attribute tested by the condition.
+    mask: Sorted mask values.
+  """
+
+  attribute: int
+  mask: Sequence[int]
+
+
+@dataclasses.dataclass
+class NumericalSparseObliqueCondition(AbstractCondition):
+  """Condition of the form "attributes * weights >= threshold".
+
+  Attrs:
+    attributes: Attribute tested by the condition.
+    weights: Weights for each of the attributes.
+    threshold: Threshold value of the condition.
+  """
+
+  attributes: Sequence[int]
+  weights: Sequence[float]
+  threshold: float
+
+
 def to_condition(
     proto_condition: decision_tree_pb2.NodeCondition,
     dataspec: data_spec_pb2.DataSpecification,
 ) -> AbstractCondition:
   """Extracts the "condition" part of a proto node."""
 
-  del dataspec  # dataspec will be used in other cases.
-
-  base_args = {
+  base_kwargs = {
       "missing": proto_condition.na_value,
       "score": proto_condition.split_score,
   }
   condition_type = proto_condition.condition
+  attribute_type = dataspec.columns[proto_condition.attribute].type
 
   if condition_type.HasField("na_condition"):
     return IsMissingInCondition(
-        attribute=proto_condition.attribute, **base_args
+        attribute=proto_condition.attribute, **base_kwargs
     )
 
+  elif condition_type.HasField("true_value_condition"):
+    return IsTrueCondition(attribute=proto_condition.attribute, **base_kwargs)
+
+  elif condition_type.HasField("higher_condition"):
+    return NumericalHigherThanCondition(
+        attribute=proto_condition.attribute,
+        threshold=condition_type.higher_condition.threshold,
+        **base_kwargs,
+    )
+
+  elif condition_type.HasField("contains_bitmap_condition"):
+    items = bitmap_to_items(
+        dataspec.columns[proto_condition.attribute],
+        condition_type.contains_bitmap_condition.elements_bitmap,
+    )
+    if attribute_type == ColumnType.CATEGORICAL:
+      return CategoricalIsInCondition(
+          attribute=proto_condition.attribute,
+          mask=items,
+          **base_kwargs,
+      )
+    elif attribute_type == ColumnType.CATEGORICAL_SET:
+      return CategoricalSetContainsCondition(
+          attribute=proto_condition.attribute,
+          mask=items,
+          **base_kwargs,
+      )
+    else:
+      raise ValueError("Invalid attribute type")
+
+  elif condition_type.HasField("contains_condition"):
+    if attribute_type == ColumnType.CATEGORICAL:
+      return CategoricalIsInCondition(
+          attribute=proto_condition.attribute,
+          mask=condition_type.contains_condition.elements,
+          **base_kwargs,
+      )
+    elif attribute_type == ColumnType.CATEGORICAL_SET:
+      return CategoricalSetContainsCondition(
+          attribute=proto_condition.attribute,
+          mask=condition_type.contains_condition.elements,
+          **base_kwargs,
+      )
+    else:
+      raise ValueError("Invalid attribute type")
+
+  elif condition_type.HasField("discretized_higher_condition"):
+    return DiscretizedNumericalHigherThanCondition(
+        attribute=proto_condition.attribute,
+        threshold_idx=condition_type.discretized_higher_condition.threshold,
+        **base_kwargs,
+    )
+
+  elif condition_type.HasField("oblique_condition"):
+    return NumericalSparseObliqueCondition(
+        attributes=condition_type.oblique_condition.attributes,
+        weights=condition_type.oblique_condition.weights,
+        threshold=condition_type.oblique_condition.threshold,
+        **base_kwargs,
+    )
   else:
     raise ValueError(f"Non supported condition type: {proto_condition}")
 
@@ -104,6 +241,117 @@ def _to_proto_condition_is_missing(
       attribute=condition.attribute,
       condition=decision_tree_pb2.Condition(
           na_condition=decision_tree_pb2.Condition.NA()
+      ),
+  )
+
+
+@to_proto_condition.register
+def _to_proto_condition_is_true(
+    condition: IsTrueCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> decision_tree_pb2.NodeCondition:
+  return decision_tree_pb2.NodeCondition(
+      na_value=condition.missing,
+      split_score=condition.score,
+      attribute=condition.attribute,
+      condition=decision_tree_pb2.Condition(
+          true_value_condition=decision_tree_pb2.Condition.TrueValue()
+      ),
+  )
+
+
+@to_proto_condition.register
+def _to_proto_condition_is_higher(
+    condition: NumericalHigherThanCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> decision_tree_pb2.NodeCondition:
+  return decision_tree_pb2.NodeCondition(
+      na_value=condition.missing,
+      split_score=condition.score,
+      attribute=condition.attribute,
+      condition=decision_tree_pb2.Condition(
+          higher_condition=decision_tree_pb2.Condition.Higher(
+              threshold=condition.threshold
+          ),
+      ),
+  )
+
+
+@to_proto_condition.register
+def _to_proto_condition_discretized_is_higher(
+    condition: DiscretizedNumericalHigherThanCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> decision_tree_pb2.NodeCondition:
+  return decision_tree_pb2.NodeCondition(
+      na_value=condition.missing,
+      split_score=condition.score,
+      attribute=condition.attribute,
+      condition=decision_tree_pb2.Condition(
+          discretized_higher_condition=decision_tree_pb2.Condition.DiscretizedHigher(
+              threshold=condition.threshold_idx
+          ),
+      ),
+  )
+
+
+@to_proto_condition.register(CategoricalIsInCondition)
+@to_proto_condition.register(CategoricalSetContainsCondition)
+def _to_proto_condition_is_in(
+    condition: Union[CategoricalIsInCondition, CategoricalSetContainsCondition],
+    dataspec: data_spec_pb2.DataSpecification,
+) -> decision_tree_pb2.NodeCondition:
+  """Converts a "is in" condition for a categorical or categorical-set feature.
+
+  This function selects the most compact approach (bitmap or list of items) to
+  encode the condition mask.
+
+  Args:
+    condition: "is in" input condition.
+    dataspec: Dataspec of the model.
+
+  Returns:
+    A proto condition.
+  """
+
+  proto_condition = decision_tree_pb2.NodeCondition(
+      na_value=condition.missing,
+      split_score=condition.score,
+  )
+  feature_column = dataspec.columns[proto_condition.attribute]
+  proto_condition.attribute = condition.attribute
+  # Select the most efficient way to represent the mask.
+  #
+  # A list of indices takes 32bits per active item. A bitmap takes 1 bit per
+  # item (active or not).
+  if (
+      len(condition.mask) * 32 * 8
+      > feature_column.categorical.number_of_unique_values
+  ):
+    # A bitmap is more efficient.
+    proto_condition.condition.contains_bitmap_condition.elements_bitmap = (
+        items_to_bitmap(feature_column, condition.mask)
+    )
+  else:
+    # A list of indices is more efficient.
+    proto_condition.condition.contains_condition.elements[:] = condition.mask
+  return proto_condition
+
+
+@to_proto_condition.register
+def _to_proto_condition_oblique(
+    condition: NumericalSparseObliqueCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> decision_tree_pb2.NodeCondition:
+  return decision_tree_pb2.NodeCondition(
+      na_value=condition.missing,
+      split_score=condition.score,
+      attribute=condition.attributes[0] if condition.attributes else -1,
+      condition=decision_tree_pb2.Condition(
+          oblique_condition=decision_tree_pb2.Condition.Oblique(
+              attributes=condition.attributes,
+              weights=condition.weights,
+              threshold=condition.threshold,
+          ),
       ),
   )
 
