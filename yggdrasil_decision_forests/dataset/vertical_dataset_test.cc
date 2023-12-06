@@ -526,6 +526,39 @@ TEST(VerticalDataset, Reset) {
   EXPECT_EQ(dataset.ValueToString(0, 1), "AAA");
 }
 
+TEST(VerticalDataset, ResizeLarger) {
+  VerticalDataset dataset;
+  AddColumn("a", proto::ColumnType::NUMERICAL, dataset.mutable_data_spec());
+  AddColumn("b", proto::ColumnType::STRING, dataset.mutable_data_spec());
+  AddColumn("c", proto::ColumnType::BOOLEAN, dataset.mutable_data_spec());
+  auto* cat_set_1_new_spec = AddColumn("d", proto::ColumnType::CATEGORICAL_SET,
+                                       dataset.mutable_data_spec());
+  (*cat_set_1_new_spec->mutable_categorical()->mutable_items())["OOV"]
+      .set_index(0);
+  (*cat_set_1_new_spec->mutable_categorical()->mutable_items())["a"].set_index(
+      1);
+  (*cat_set_1_new_spec->mutable_categorical()->mutable_items())["b"].set_index(
+      2);
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  ASSERT_OK(dataset.AppendExampleWithStatus(
+      {{"a", "0.1"}, {"b", "AAA"}, {"c", "1"}, {"d", "A A B B"}}));
+  dataset.Resize(2);
+
+  EXPECT_EQ(dataset.nrow(), 2);
+  EXPECT_EQ(dataset.ValueToString(0, 0), "0.1");
+  EXPECT_EQ(dataset.ValueToString(0, 1), "AAA");
+  EXPECT_EQ(dataset.ValueToString(0, 2), "1");
+  EXPECT_EQ(dataset.ValueToString(0, 3), "a, b");
+  EXPECT_FALSE(dataset.column(0)->IsNa(0));
+  EXPECT_FALSE(dataset.column(1)->IsNa(0));
+  EXPECT_FALSE(dataset.column(2)->IsNa(0));
+  EXPECT_FALSE(dataset.column(3)->IsNa(0));
+  EXPECT_TRUE(dataset.column(0)->IsNa(1));
+  EXPECT_TRUE(dataset.column(1)->IsNa(1));
+  EXPECT_TRUE(dataset.column(2)->IsNa(1));
+  EXPECT_TRUE(dataset.column(3)->IsNa(1));
+}
+
 TEST(VerticalDataset, DebugString) {
   VerticalDataset dataset;
   AddColumn("a", proto::ColumnType::NUMERICAL, dataset.mutable_data_spec());

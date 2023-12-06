@@ -82,8 +82,10 @@ class VerticalDataset {
     // Set a missing value.
     virtual void SetNA(const row_t row) = 0;
 
-    // Resize the content of size of the column.
-    virtual void Resize(const row_t row) = 0;
+    // Resize the content of the column to `num_rows`. If the current size is
+    // less than `num_rows`, the column is filled with NA values. If the current
+    // size is more than `num_rows`, the column is truncated.
+    virtual void Resize(const row_t num_rows) = 0;
 
     // Reserve the content of the column for fast insertion.
     virtual void Reserve(const row_t row) = 0;
@@ -169,7 +171,6 @@ class VerticalDataset {
    public:
     using Format = T;
 
-    void Resize(const row_t row) override { values_.resize(row); }
     void Reserve(const row_t row) override { values_.reserve(row); }
     row_t nrows() const override { return values_.size(); };
 
@@ -205,7 +206,6 @@ class VerticalDataset {
     bool IsNa(const row_t row) const override {
       return values_[row].first > values_[row].second;
     }
-    void Resize(const row_t row) override { values_.resize(row); }
     void Reserve(const row_t row) override { values_.reserve(row); }
     row_t nrows() const override { return values_.size(); };
 
@@ -214,6 +214,11 @@ class VerticalDataset {
 
     // Set the value to be missing.
     void SetNA(const row_t row) override { values_[row] = {1, 0}; }
+
+    void Resize(const row_t num_rows) override {
+      const auto na_value = std::make_pair(1, 0);
+      mutable_values().resize(num_rows, na_value);
+    }
 
     // Add a value.
     template <typename Iter>
@@ -300,6 +305,10 @@ class VerticalDataset {
 
     void SetNA(const row_t row) override { Set(row, kNaValue); }
 
+    void Resize(const row_t num_rows) override {
+      mutable_values()->resize(num_rows, kNaValue);
+    }
+
     void AddFromExample(const proto::Example::Attribute& attribute) override;
 
     void Set(row_t example_idx,
@@ -333,6 +342,10 @@ class VerticalDataset {
 
     void SetNA(const row_t row) override {
       (*mutable_values())[row] = kNaValue;
+    }
+
+    void Resize(const row_t num_rows) override {
+      mutable_values()->resize(num_rows, kNaValue);
     }
 
     void AddFromExample(const proto::Example::Attribute& attribute) override;
@@ -376,6 +389,10 @@ class VerticalDataset {
       (*mutable_values())[row] = kNaValue;
     }
 
+    void Resize(const row_t num_rows) override {
+      mutable_values()->resize(num_rows, kNaValue);
+    }
+
     void AddFromExample(const proto::Example::Attribute& attribute) override;
 
     void Set(row_t example_idx,
@@ -408,6 +425,10 @@ class VerticalDataset {
 
     void SetNA(const row_t row) override {
       (*mutable_values())[row] = kNaValue;
+    }
+
+    void Resize(const row_t num_rows) override {
+      mutable_values()->resize(num_rows, kNaValue);
     }
 
     void AddFromExample(const proto::Example::Attribute& attribute) override;
@@ -538,9 +559,9 @@ class VerticalDataset {
       is_na_[row] = true;
     }
 
-    void Resize(const row_t row) override {
-      TemplateScalarStorage::Resize(row);
-      is_na_.resize(row);
+    void Resize(const row_t num_rows) override {
+      mutable_values()->resize(num_rows);
+      is_na_.resize(num_rows, true);
     }
     void Reserve(const row_t row) override {
       TemplateScalarStorage::Reserve(row);
@@ -581,6 +602,10 @@ class VerticalDataset {
 
     void SetNA(const row_t row) override {
       (*mutable_values())[row] = kNaValue;
+    }
+
+    void Resize(const row_t num_rows) override {
+      mutable_values()->resize(num_rows, kNaValue);
     }
 
     void AddFromExample(const proto::Example::Attribute& attribute) override;
