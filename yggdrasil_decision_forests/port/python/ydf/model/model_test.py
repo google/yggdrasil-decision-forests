@@ -82,6 +82,53 @@ class GenericModelTest(parameterized.TestCase):
     expected_predictions = predictions_df[">50K"].to_numpy()
     npt.assert_almost_equal(predictions, expected_predictions, decimal=5)
 
+  def test_predict_without_label_column(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
+    )
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+    predictions_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "prediction",
+        "adult_test_binary_class_rf.csv",
+    )
+    model = model_lib.load_model(model_path)
+
+    test_df = pd.read_csv(dataset_path).drop(columns=["income"])
+    predictions = model.predict(test_df)
+    predictions_df = pd.read_csv(predictions_path)
+
+    expected_predictions = predictions_df[">50K"].to_numpy()
+    npt.assert_almost_equal(predictions, expected_predictions, decimal=5)
+
+  def test_predict_fails_with_missing_feature_columns(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
+    )
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+    model = model_lib.load_model(model_path)
+
+    test_df = pd.read_csv(dataset_path).drop(columns=["age"])
+    with self.assertRaises(ValueError):
+      _ = model.predict(test_df)
+
+  def test_evaluate_fails_with_missing_label_columns(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
+    )
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+    model = model_lib.load_model(model_path)
+
+    test_df = pd.read_csv(dataset_path).drop(columns=["income"])
+    with self.assertRaises(ValueError):
+      _ = model.evaluate(test_df)
+
   def test_evaluate_adult_gbt(self):
     model_path = os.path.join(
         test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"

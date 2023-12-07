@@ -500,6 +500,22 @@ class RandomForestLearnerTest(LearnerTest):
     predictions = model.predict(data)
     self.assertEqual(predictions.shape, (2,))
 
+  def test_learn_and_predict_when_label_is_not_last_column(self):
+    dataset_directory = os.path.join(test_utils.ydf_test_data_path(), "dataset")
+    train_path = os.path.join(dataset_directory, "adult_train.csv")
+    test_path = os.path.join(dataset_directory, "adult_test.csv")
+    label = "age"
+
+    pd_train = pd.read_csv(train_path)
+    pd_test = pd.read_csv(test_path)
+
+    learner = specialized_learners.RandomForestLearner(
+        label=label, num_trees=10
+    )
+    model_from_pd = learner.train(pd_train)
+
+    logging.info(model_from_pd.predict(pd_test))
+
   def test_model_metadata_contains_framework(self):
     learner = specialized_learners.RandomForestLearner(
         label="label", num_trees=2

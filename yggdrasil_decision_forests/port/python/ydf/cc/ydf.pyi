@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, TypeVar, Union
+from typing import Dict, List, Optional, Sequence, TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -24,7 +24,7 @@ class VerticalDataset:
   def CreateColumnsFromDataSpec(
       self, data_spec: data_spec_pb2.DataSpecification
   ) -> None: ...
-  def SetAndCheckNumRows(self, set_data_spec: bool) -> None: ...
+  def SetAndCheckNumRowsAndFillMissing(self, set_data_spec: bool) -> None: ...
   def PopulateColumnCategoricalNPBytes(
       self,
       name: str,
@@ -63,10 +63,16 @@ class VerticalDataset:
       column_idx: Optional[int] = None,
   ) -> None: ...
   def CreateFromPathWithDataSpec(
-      self, path: str, data_spec: data_spec_pb2.DataSpecification
+      self,
+      path: str,
+      data_spec: data_spec_pb2.DataSpecification,
+      required_columns: Optional[Sequence[str]] = None,
   ) -> None: ...
   def CreateFromPathWithDataSpecGuide(
-      self, path: str, data_spec_guide: data_spec_pb2.DataSpecificationGuide
+      self,
+      path: str,
+      data_spec_guide: data_spec_pb2.DataSpecificationGuide,
+      required_columns: Optional[Sequence[str]] = None,
   ) -> None: ...
 
 

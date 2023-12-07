@@ -33,7 +33,7 @@ VocabValue = ds_pb.CategoricalSpec.VocabValue
 Column = dataspec.Column
 
 
-class DatasetTest(parameterized.TestCase):
+class GenericDatasetTest(parameterized.TestCase):
 
   @parameterized.parameters(
       (np.array([1], np.int8), Semantic.NUMERICAL),
@@ -111,7 +111,7 @@ class DatasetTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   @parameterized.parameters(np.float16, np.float32, np.float64)
   def test_create_vds_pd_numerical_with_nan(self, dtype):
@@ -145,7 +145,7 @@ class DatasetTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_create_vds_pd_categorical_string(self):
     df = pd.DataFrame({
@@ -198,7 +198,7 @@ class DatasetTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_create_vds_pd_categorical_int(self):
     df = pd.DataFrame({
@@ -235,7 +235,7 @@ class DatasetTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_create_vds_pd_boolean(self):
     df = pd.DataFrame(
@@ -257,7 +257,7 @@ class DatasetTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_create_vds_pd_hash(self):
     df = pd.DataFrame(
@@ -276,7 +276,7 @@ class DatasetTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   @parameterized.parameters(
       (["col_numerical"],),
@@ -305,7 +305,7 @@ class DatasetTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_create_vds_dict_of_values(self):
     ds_dict = {
@@ -340,7 +340,7 @@ class DatasetTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_memory_usage(self):
     df = pd.DataFrame({
@@ -396,7 +396,7 @@ class DatasetTest(parameterized.TestCase):
         "col_bool": [True, True, False],
     })
     ds = dataset.create_vertical_dataset(df, data_spec=data_spec)
-    self.assertEqual(ds.data_spec(), data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
 
   def test_create_vds_dict_of_values_with_spec(self):
     data_spec = ds_pb.DataSpecification(
@@ -443,7 +443,7 @@ class DatasetTest(parameterized.TestCase):
         "col_bool": [True, False, True],
     }
     ds = dataset.create_vertical_dataset(ds_dict, data_spec=data_spec)
-    self.assertEqual(ds.data_spec(), data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
     # 2 columns * 3 rows * 4 bytes per value + 1 col * 3 rows * 1 byte p.v.
     self.assertEqual(ds.memory_usage(), 2 * 3 * 4 + 1 * 3 * 1)
 
@@ -511,7 +511,7 @@ four entries,4,8,4.4,0
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_invalid_max_vocab_count(self):
     df = pd.DataFrame({
@@ -559,7 +559,7 @@ four entries,4,8,4.4,0
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   @parameterized.parameters(
       ([True, True, True], (0, 0, 3), 0),
@@ -589,7 +589,7 @@ four entries,4,8,4.4,0
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   @parameterized.parameters("", "csv:")
   def test_read_csv(self, path_prefix):
@@ -637,7 +637,7 @@ B,3""",
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_max_num_scanned_rows_to_compute_statistics(self):
     tmp_dir = self.create_tempdir()
@@ -685,7 +685,7 @@ B,3""",
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_max_num_scanned_rows_to_infer_semantic(self):
     tmp_dir = self.create_tempdir()
@@ -729,7 +729,7 @@ B,3""",
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_read_from_path(self):
     csv_file = self.create_tempfile(content="""col_cat,col_num
@@ -793,7 +793,7 @@ B,3""")
         ),
         created_num_rows=4,
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_read_from_sharded_tfe_nocompress(self):
     sharded_path = "tfrecordv2+tfe:" + os.path.join(
@@ -846,7 +846,7 @@ B,3""")
         ),
         created_num_rows=4,
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_multidimensional_input(self):
     ds = dataset.create_vertical_dataset(
@@ -890,7 +890,7 @@ B,3""")
             ),
         ),
     )
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   @parameterized.parameters(
       (1, "feature.0_of_1"),
@@ -1103,7 +1103,7 @@ second sentence foo bar foo foo foo""",
         "csv:" + path_to_csv, min_vocab_frequency=1
     )
     expected_data_spec = self.toy_csv_dataspec_categorical()
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_csv_tokenization_when_semantic_specified(self):
     path_to_csv = self.create_toy_csv()
@@ -1113,7 +1113,7 @@ second sentence foo bar foo foo foo""",
         columns=[("col_cat_set", Semantic.CATEGORICAL_SET)]
     )
     expected_data_spec = self.toy_csv_dataspec_catset()
-    self.assertEqual(ds.data_spec(), expected_data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_csv_file_reading_respects_data_spec_categorical(self):
     path_to_csv = self.create_toy_csv()
@@ -1121,7 +1121,7 @@ second sentence foo bar foo foo foo""",
     ds = dataset.create_vertical_dataset(
         "csv:" + path_to_csv, data_spec=data_spec
     )
-    self.assertEqual(ds.data_spec(), data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
     self.assertEqual(
         ds._dataset.DebugString(),
         """\
@@ -1137,7 +1137,7 @@ second sentence foo bar foo foo foo
     ds = dataset.create_vertical_dataset(
         "csv:" + path_to_csv, data_spec=data_spec
     )
-    self.assertEqual(ds.data_spec(), data_spec)
+    test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
     self.assertEqual(ds._dataset.DebugString(), """\
 col_cat_set
 foo, bar, sentence, first
@@ -1378,6 +1378,366 @@ foo, bar, sentence, second
         ),
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+
+@parameterized.parameters(
+    ds_pb.ColumnType.NUMERICAL, ds_pb.ColumnType.CATEGORICAL
+)
+class MissingColumnsTest(parameterized.TestCase):
+
+  def create_data_spec(self, column_type: ds_pb.ColumnType):
+    if column_type == ds_pb.ColumnType.NUMERICAL:
+      return ds_pb.DataSpecification(
+          created_num_rows=3,
+          columns=(
+              ds_pb.Column(name="f1", type=ds_pb.ColumnType.NUMERICAL),
+              ds_pb.Column(name="f2", type=ds_pb.ColumnType.NUMERICAL),
+          ),
+      )
+    if column_type == ds_pb.ColumnType.CATEGORICAL:
+      return ds_pb.DataSpecification(
+          created_num_rows=3,
+          columns=(
+              ds_pb.Column(
+                  name="f1",
+                  type=ds_pb.ColumnType.CATEGORICAL,
+                  categorical=ds_pb.CategoricalSpec(
+                      items={
+                          "<OOD>": VocabValue(index=0, count=0),
+                          "1": VocabValue(index=1, count=1),
+                          "2": VocabValue(index=2, count=1),
+                          "3": VocabValue(index=3, count=1),
+                      },
+                      number_of_unique_values=4,
+                      min_value_count=1,
+                  ),
+              ),
+              ds_pb.Column(
+                  name="f2",
+                  type=ds_pb.ColumnType.CATEGORICAL,
+                  categorical=ds_pb.CategoricalSpec(
+                      items={
+                          "<OOD>": VocabValue(index=0, count=0),
+                          "1": VocabValue(index=1, count=1),
+                          "2": VocabValue(index=2, count=1),
+                          "3": VocabValue(index=3, count=1),
+                      },
+                      number_of_unique_values=4,
+                      min_value_count=1,
+                  ),
+              ),
+          ),
+      )
+    raise NotImplementedError(f"Errors for type {column_type} not implemented")
+
+  def get_inferred_dataspec_pd_f1only(self, column_type: ds_pb.ColumnType):
+    if column_type == ds_pb.ColumnType.NUMERICAL:
+      return ds_pb.DataSpecification(
+          created_num_rows=3,
+          columns=(
+              ds_pb.Column(
+                  name="f1",
+                  type=ds_pb.ColumnType.NUMERICAL,
+                  numerical=ds_pb.NumericalSpec(
+                      mean=2.0,
+                      min_value=1.0,
+                      max_value=3.0,
+                      standard_deviation=0.8164965809277263,
+                  ),
+                  count_nas=0,
+              ),
+          ),
+      )
+    if column_type == ds_pb.ColumnType.CATEGORICAL:
+      return ds_pb.DataSpecification(
+          created_num_rows=3,
+          columns=(
+              ds_pb.Column(
+                  name="f1",
+                  type=ds_pb.ColumnType.CATEGORICAL,
+                  categorical=ds_pb.CategoricalSpec(
+                      items={
+                          "<OOD>": VocabValue(index=0, count=0),
+                          "1": VocabValue(index=1, count=1),
+                          "2": VocabValue(index=2, count=1),
+                          "3": VocabValue(index=3, count=1),
+                      },
+                      number_of_unique_values=4,
+                  ),
+                  count_nas=0,
+              ),
+          ),
+      )
+    raise NotImplementedError(f"Errors for type {column_type} not implemented")
+
+  def get_inferred_dataspec_file_f1only(self, column_type: ds_pb.ColumnType):
+    if column_type == ds_pb.ColumnType.NUMERICAL:
+      return ds_pb.DataSpecification(
+          created_num_rows=3,
+          columns=(
+              ds_pb.Column(
+                  name="f1",
+                  is_manual_type=True,
+                  type=ds_pb.ColumnType.NUMERICAL,
+                  numerical=ds_pb.NumericalSpec(
+                      mean=2.0,
+                      min_value=1.0,
+                      max_value=3.0,
+                      standard_deviation=0.8164965809277263,
+                  ),
+              ),
+          ),
+      )
+    if column_type == ds_pb.ColumnType.CATEGORICAL:
+      return ds_pb.DataSpecification(
+          created_num_rows=3,
+          columns=(
+              ds_pb.Column(
+                  name="f1",
+                  is_manual_type=True,
+                  type=ds_pb.ColumnType.CATEGORICAL,
+                  categorical=ds_pb.CategoricalSpec(
+                      items={
+                          "<OOD>": VocabValue(index=0, count=0),
+                          "1": VocabValue(index=3, count=1),
+                          "2": VocabValue(index=2, count=1),
+                          "3": VocabValue(index=1, count=1),
+                      },
+                      number_of_unique_values=4,
+                      most_frequent_value=1,
+                      min_value_count=1,
+                      is_already_integerized=False,
+                      max_number_of_unique_values=2000,
+                  ),
+              ),
+          ),
+      )
+    raise NotImplementedError(f"Errors for type {column_type} not implemented")
+
+  def create_csv(self) -> str:
+    tmp_dir = self.create_tempdir()
+    csv_file = self.create_tempfile(
+        content="""f1
+1
+2
+3""",
+        file_path=os.path.join(tmp_dir.full_path, "file.csv"),
+    )
+    return csv_file.full_path
+
+  def get_debug_string(self, column_type: ds_pb.ColumnType):
+    if column_type == ds_pb.ColumnType.NUMERICAL:
+      return "f1,f2\n1,nan\n2,nan\n3,nan\n"
+    if column_type == ds_pb.ColumnType.CATEGORICAL:
+      return "f1,f2\n1,NA\n2,NA\n3,NA\n"
+
+    raise NotImplementedError(f"Errors for type {column_type} not implemented")
+
+  def test_required_columns_pd_data_spec_none(
+      self, column_type: ds_pb.ColumnType
+  ):
+    data_spec = self.create_data_spec(column_type)
+    df = pd.DataFrame({"f1": [1, 2, 3]})
+    with self.assertRaises(ValueError):
+      _ = dataset.create_vertical_dataset(df, data_spec=data_spec)
+
+  def test_required_columns_pd_data_spec_empty(
+      self, column_type: ds_pb.ColumnType
+  ):
+    data_spec = self.create_data_spec(column_type)
+    df = pd.DataFrame({"f1": [1, 2, 3]})
+    ds = dataset.create_vertical_dataset(
+        df, data_spec=data_spec, required_columns=[]
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
+    self.assertEqual(
+        ds._dataset.DebugString(), self.get_debug_string(column_type)
+    )
+
+  def test_required_columns_pd_data_spec_explicit_success(
+      self, column_type: ds_pb.ColumnType
+  ):
+    data_spec = self.create_data_spec(column_type)
+    df = pd.DataFrame({"f1": [1, 2, 3]})
+    ds = dataset.create_vertical_dataset(
+        df, data_spec=data_spec, required_columns=["f1"]
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
+    self.assertEqual(
+        ds._dataset.DebugString(), self.get_debug_string(column_type)
+    )
+
+  def test_required_columns_pd_data_spec_explicit_failure(
+      self, column_type: ds_pb.ColumnType
+  ):
+    data_spec = self.create_data_spec(column_type)
+    df = pd.DataFrame({"f1": [1, 2, 3]})
+    with self.assertRaises(ValueError):
+      _ = dataset.create_vertical_dataset(
+          df, data_spec=data_spec, required_columns=["f2"]
+      )
+
+  def test_required_columns_pd_inference_args_none(
+      self, column_type: ds_pb.ColumnType
+  ):
+    df = pd.DataFrame({"f1": [1, 2, 3]})
+    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    with self.assertRaises(ValueError):
+      _ = dataset.create_vertical_dataset(
+          df, columns=[("f1", column_semantic), ("f2", column_semantic)]
+      )
+
+  def test_required_columns_pd_inference_args_empty(
+      self, column_type: ds_pb.ColumnType
+  ):
+    df = pd.DataFrame({"f1": [1, 2, 3]})
+    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    ds = dataset.create_vertical_dataset(
+        df,
+        columns=[("f1", column_semantic), ("f2", column_semantic)],
+        required_columns=[],
+        min_vocab_frequency=1,
+    )
+    # Note that the dataspec does not contain column f2 since it was not found
+    # in the data.
+    test_utils.assertProto2Equal(
+        self,
+        ds._dataset.data_spec(),
+        self.get_inferred_dataspec_pd_f1only(column_type),
+    )
+    self.assertEqual(ds._dataset.DebugString(), "f1\n1\n2\n3\n")
+
+  def test_required_columns_pd_inference_args_explicit_failure(
+      self, column_type: ds_pb.ColumnType
+  ):
+    df = pd.DataFrame({"f1": [1, 2, 3]})
+    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    with self.assertRaises(ValueError):
+      _ = dataset.create_vertical_dataset(df, columns=[("f2", column_semantic)])
+
+  def test_required_columns_pd_inference_args_explicit_success(
+      self, column_type: ds_pb.ColumnType
+  ):
+    df = pd.DataFrame({"f1": [1, 2, 3]})
+    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    ds = dataset.create_vertical_dataset(
+        df,
+        columns=[("f1", column_semantic), ("f2", column_semantic)],
+        min_vocab_frequency=1,
+        required_columns=["f1"],
+    )
+    # Note that the dataspec does not contain column f2 since it was not found
+    # in the data.
+    test_utils.assertProto2Equal(
+        self,
+        ds._dataset.data_spec(),
+        self.get_inferred_dataspec_pd_f1only(column_type),
+    )
+    self.assertEqual(ds._dataset.DebugString(), "f1\n1\n2\n3\n")
+
+  def test_required_columns_file_data_spec_none(
+      self, column_type: ds_pb.ColumnType
+  ):
+    data_spec = self.create_data_spec(column_type)
+    file_path = self.create_csv()
+    with self.assertRaises(ValueError):
+      _ = dataset.create_vertical_dataset(file_path, data_spec=data_spec)
+
+  def test_required_columns_file_data_spec_empty(
+      self, column_type: ds_pb.ColumnType
+  ):
+    data_spec = self.create_data_spec(column_type)
+    file_path = self.create_csv()
+    ds = dataset.create_vertical_dataset(
+        file_path, data_spec=data_spec, required_columns=[]
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
+    self.assertEqual(
+        ds._dataset.DebugString(), self.get_debug_string(column_type)
+    )
+
+  def test_required_columns_file_data_spec_explicit_success(
+      self, column_type: ds_pb.ColumnType
+  ):
+    data_spec = self.create_data_spec(column_type)
+    file_path = self.create_csv()
+    ds = dataset.create_vertical_dataset(
+        file_path, data_spec=data_spec, required_columns=["f1"]
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
+    self.assertEqual(
+        ds._dataset.DebugString(), self.get_debug_string(column_type)
+    )
+
+  def test_required_columns_file_data_spec_explicit_failure(
+      self, column_type: ds_pb.ColumnType
+  ):
+    data_spec = self.create_data_spec(column_type)
+    file_path = self.create_csv()
+    with self.assertRaises(ValueError):
+      _ = dataset.create_vertical_dataset(
+          file_path, data_spec=data_spec, required_columns=["f2"]
+      )
+
+  def test_required_columns_file_inference_args_none(
+      self, column_type: ds_pb.ColumnType
+  ):
+    file_path = self.create_csv()
+    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    with self.assertRaises(ValueError):
+      _ = dataset.create_vertical_dataset(
+          file_path, columns=[("f1", column_semantic), ("f2", column_semantic)]
+      )
+
+  def test_required_columns_file_inference_args_empty(
+      self, column_type: ds_pb.ColumnType
+  ):
+    file_path = self.create_csv()
+    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    ds = dataset.create_vertical_dataset(
+        file_path,
+        columns=[("f1", column_semantic), ("f2", column_semantic)],
+        required_columns=[],
+        min_vocab_frequency=1,
+    )
+    # Note that the dataspec does not contain column f2 since it was not found
+    # in the data.
+    test_utils.assertProto2Equal(
+        self,
+        ds._dataset.data_spec(),
+        self.get_inferred_dataspec_file_f1only(column_type),
+    )
+    self.assertEqual(ds._dataset.DebugString(), "f1\n1\n2\n3\n")
+
+  def test_required_columns_file_inference_args_explicit_failure(
+      self, column_type: ds_pb.ColumnType
+  ):
+    file_path = self.create_csv()
+    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    with self.assertRaises(ValueError):
+      _ = dataset.create_vertical_dataset(
+          file_path, columns=[("f2", column_semantic)]
+      )
+
+  def test_required_columns_file_inference_args_explicit_success(
+      self, column_type: ds_pb.ColumnType
+  ):
+    file_path = self.create_csv()
+    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    ds = dataset.create_vertical_dataset(
+        file_path,
+        columns=[("f1", column_semantic), ("f2", column_semantic)],
+        required_columns=["f1"],
+        min_vocab_frequency=1,
+    )
+    # Note that the dataspec does not contain column f2 since it was not found
+    # in the data.
+    test_utils.assertProto2Equal(
+        self,
+        ds._dataset.data_spec(),
+        self.get_inferred_dataspec_file_f1only(column_type),
+    )
+    self.assertEqual(ds._dataset.DebugString(), "f1\n1\n2\n3\n")
 
 
 if __name__ == "__main__":

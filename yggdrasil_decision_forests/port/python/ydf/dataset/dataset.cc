@@ -33,7 +33,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/optional.h"
@@ -73,21 +72,30 @@ using HashColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::HashColumn;
 
 // Checks if all columns of the dataset have the same number of rows and sets
-// the dataset's number of rows accordingly. If requested, also modifies the
-// data spec.
-absl::Status SetAndCheckNumRows(dataset::VerticalDataset& self,
-                                const bool set_data_spec) {
+// the dataset's number of rows accordingly. Columns with 0 rows are resized
+// (i.e. filled with N/A values. If requested, also sets the
+// created_num_rows parameter in the dataspec.
+absl::Status SetAndCheckNumRowsAndFillMissing(dataset::VerticalDataset& self,
+                                              const bool set_data_spec) {
   if (self.ncol() == 0) {
     // Nothing to do here.
     return absl::OkStatus();
   }
-  const auto num_rows = self.column(0)->nrows();
-  for (int i = 1; i < self.ncol(); i++) {
-    if (num_rows != self.column(i)->nrows()) {
+  dataset::VerticalDataset::row_t num_rows = 0;
+  for (int col_idx = 0; col_idx < self.ncol(); col_idx++) {
+    const auto col_nrows = self.column(col_idx)->nrows();
+    if (col_nrows == 0) {
+      continue;
+    }
+    if (num_rows == 0) {
+      num_rows = col_nrows;
+    } else if (num_rows != col_nrows) {
       return absl::InvalidArgumentError(
-          "Inconsitent number of rows between the columns.");
+          "Inconsistent number of rows between the columns.");
     }
   }
+  // Resize fills empty rows with N/A values.
+  self.Resize(num_rows);
   self.set_nrow(num_rows);
   if (set_data_spec) {
     self.mutable_data_spec()->set_created_num_rows(num_rows);
@@ -663,31 +671,56 @@ absl::Status CheckDataSpecForPathReading(
 
 absl::Status CreateFromPathWithDataSpec(
     dataset::VerticalDataset& self, const std::string& path,
-    const dataset::proto::DataSpecification& data_spec) {
+    const dataset::proto::DataSpecification& data_spec,
+    const std::optional<std::vector<std::string>>& required_columns =
+        std::nullopt) {
   dataset::LoadConfig dataset_loading_config;
-  // TODO: Should all columns be listed in the required columns?
+
+  // If `required_columns` is not given, all columns are required.
+  std::optional<std::vector<int>> required_column_idxs;
+  if (required_columns.has_value()) {
+    required_column_idxs = std::vector<int>();
+    required_column_idxs->reserve(required_columns->size());
+    for (const auto& column_name : required_columns.value()) {
+      ASSIGN_OR_RETURN(
+          const auto col_idx,
+          dataset::GetColumnIdxFromNameWithStatus(column_name, data_spec));
+      required_column_idxs->push_back(col_idx);
+    }
+  }
   ASSIGN_OR_RETURN(const auto typed_path, dataset::GetTypedPath(path));
 
   RETURN_IF_ERROR(CheckDataSpecForPathReading(typed_path, data_spec));
 
-  RETURN_IF_ERROR(dataset::LoadVerticalDataset(
-      typed_path, data_spec, &self,
-      /*required_columns=*/absl::nullopt, dataset_loading_config));
+  RETURN_IF_ERROR(dataset::LoadVerticalDataset(typed_path, data_spec, &self,
+                                               required_column_idxs,
+                                               dataset_loading_config));
   return absl::OkStatus();
 }
 
 absl::Status CreateFromPathWithDataSpecGuide(
     dataset::VerticalDataset& self, std::string path,
-    const dataset::proto::DataSpecificationGuide& data_spec_guide) {
+    const dataset::proto::DataSpecificationGuide& data_spec_guide,
+    const std::optional<std::vector<std::string>>& required_columns =
+        std::nullopt) {
   dataset::LoadConfig dataset_loading_config;
-  // TODO: Should all columns be listed in the required columns?
 
   ASSIGN_OR_RETURN(const std::string typed_path, dataset::GetTypedPath(path));
   dataset::proto::DataSpecification data_spec;
   RETURN_IF_ERROR(dataset::CreateDataSpecWithStatus(
       typed_path, false, data_spec_guide, &data_spec));
 
-  return CreateFromPathWithDataSpec(self, path, data_spec);
+  // If no required columns are given, check if all the specified columns are
+  // also specified in the dataspec.
+  int unused_column_idx;
+  if (!required_columns.has_value()) {
+    for (const auto& column : data_spec_guide.column_guides()) {
+      RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
+          column.column_name_pattern(), data_spec, &unused_column_idx));
+    }
+  }
+
+  return CreateFromPathWithDataSpec(self, path, data_spec, required_columns);
 }
 }  // namespace
 
@@ -710,18 +743,21 @@ void init_dataset(py::module_& m) {
            "debugging / testing only.")
       .def("CreateFromPathWithDataSpec", WithStatus(CreateFromPathWithDataSpec),
            py::arg("path"), py::arg("data_spec"),
+           py::arg("required_columns") = std::nullopt,
            "Creates a dataset from a path, supports sharding. If the path is "
            "typed, use the type, the given type is used. Otherwise, YDF will "
            "try to determine the path and fail if this is not possible.")
       .def("CreateFromPathWithDataSpecGuide",
            WithStatus(CreateFromPathWithDataSpecGuide), py::arg("path"),
            py::arg("data_spec_guide"),
+           py::arg("required_columns") = std::nullopt,
            "Creates a dataset from a path, supports sharding. If the path is "
            "typed, use the type, the given type is used. Otherwise, YDF will "
            "try to determine the path and fail if this is not possible.")
       .def("CreateColumnsFromDataSpec", WithStatus(CreateColumnsFromDataSpec),
            py::arg("data_spec"))
-      .def("SetAndCheckNumRows", WithStatus(SetAndCheckNumRows),
+      .def("SetAndCheckNumRowsAndFillMissing",
+           WithStatus(SetAndCheckNumRowsAndFillMissing),
            py::arg("set_data_spec"))
       // Data setters
       .def("PopulateColumnCategoricalNPBytes",

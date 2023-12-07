@@ -245,7 +245,9 @@ Use `model.describe()` for more details
 
     with log.cc_log_context():
       vds = dataset.create_vertical_dataset(
-          ds, data_spec=self._model.data_spec()
+          ds,
+          data_spec=self._model.data_spec(),
+          required_columns=self._input_feature_names(),
       )
       result = self._model.Benchmark(
           vds._dataset, benchmark_duration, warmup_duration, batch_size
@@ -307,8 +309,12 @@ Use `model.describe()` for more details
 
   def predict(self, data: dataset.InputDataset) -> np.ndarray:
     with log.cc_log_context():
+      # The data spec contains the label / weights /  ranking group / uplift
+      # treatment column, but those are not required for making predictions.
       ds = dataset.create_vertical_dataset(
-          data, data_spec=self._model.data_spec()
+          data,
+          data_spec=self._model.data_spec(),
+          required_columns=self._input_feature_names(),
       )
       result = self._model.Predict(ds._dataset)  # pylint: disable=protected-access
     return result
@@ -707,6 +713,11 @@ Use `model.describe()` for more details
 
     # The first element is the "out-of-vocabulary" that is not used in labels.
     return dataspec.categorical_column_dictionary_to_list(label_column)[1:]
+
+  def _input_feature_names(self) -> List[str]:
+    """Returns the names of the input features"""
+    dataspec_columns = self.data_spec().columns
+    return [dataspec_columns[idx].name for idx in self._model.input_features()]
 
 
 ModelType = TypeVar("ModelType", bound=GenericModel)

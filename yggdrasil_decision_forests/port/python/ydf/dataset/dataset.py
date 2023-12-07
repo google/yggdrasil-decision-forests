@@ -15,7 +15,7 @@
 """Dataset implementations of PYDF."""
 
 import copy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 
@@ -58,9 +58,10 @@ class VerticalDataset:
       column_idx: Optional[int],
   ):
     """Adds a column to the dataset and computes the column statistics."""
+    assert (column_idx is None) != (inference_args is None)
+
     original_column_data = column_data
 
-    assert (column_idx is None) != (inference_args is None)
     if column.semantic == dataspec.Semantic.NUMERICAL:
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, np.float32)
@@ -230,7 +231,7 @@ class VerticalDataset:
     self._dataset.CreateColumnsFromDataSpec(data_spec)
 
   def _finalize(self, set_num_rows_in_data_spec: bool):
-    self._dataset.SetAndCheckNumRows(set_num_rows_in_data_spec)
+    self._dataset.SetAndCheckNumRowsAndFillMissing(set_num_rows_in_data_spec)
 
 
 def create_vertical_dataset(
@@ -244,6 +245,7 @@ def create_vertical_dataset(
     max_num_scanned_rows_to_infer_semantic: int = 10000,
     max_num_scanned_rows_to_compute_statistics: int = 10000,
     data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+    required_columns: Optional[Sequence[str]] = None,
 ) -> VerticalDataset:
   """Creates a VerticalDataset from various sources of data.
 
@@ -321,7 +323,10 @@ def create_vertical_dataset(
       (e.g. if an important category of a categorical feature is considered
       OOV). Set to -1 to scan the entire dataset.
     data_spec: Dataspec to be used for this dataset. If a data spec is given,
-      all other arguments except `data` should not be provided.
+      all other arguments except `data` and `required_columns` should not be
+      provided.
+    required_columns: List of columns required in the data. If None, all columns
+      mentioned in the data spec or `columns` are required.
 
   Returns:
     Dataset to be ingested by the learner algorithms.
@@ -339,7 +344,7 @@ def create_vertical_dataset(
           " None and all arguments to guide data spec inference are ignored."
       )
     return create_vertical_dataset_with_spec_or_args(
-        data, data_spec=data_spec, inference_args=None
+        data, required_columns, data_spec=data_spec, inference_args=None
     )
   else:
     inference_args = dataspec.DataSpecInferenceArgs(
@@ -353,51 +358,64 @@ def create_vertical_dataset(
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
     )
     return create_vertical_dataset_with_spec_or_args(
-        data, inference_args=inference_args, data_spec=None
+        data,
+        required_columns,
+        inference_args=inference_args,
+        data_spec=None,
     )
 
 
 def create_vertical_dataset_with_spec_or_args(
     data: dataset_io_types.IODataset,
+    required_columns: Optional[Sequence[str]],
     inference_args: Optional[dataspec.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
 ) -> VerticalDataset:
-  """Creates a vertical dataset with inference args or data spec (not both!)."""
+  """Returns a vertical dataset from inference args or data spec (not both!)."""
   assert (data_spec is None) != (inference_args is None)
   # If `data` is a path, try to import from the path directly from C++.
   # Everything else we try to transform into a dictionary with Python.
   if isinstance(data, str) or (
       isinstance(data, list) and data and all(isinstance(s, str) for s in data)
   ):
-    return create_vertical_dataset_from_path(data, inference_args, data_spec)
+    return create_vertical_dataset_from_path(
+        data, required_columns, inference_args, data_spec
+    )
   else:
     data_dict = dataset_io.cast_input_dataset_to_dict(data)
     return create_vertical_dataset_from_dict_of_values(
-        data_dict, inference_args=inference_args, data_spec=data_spec
+        data_dict,
+        required_columns,
+        inference_args=inference_args,
+        data_spec=data_spec,
     )
 
 
 def create_vertical_dataset_from_path(
     path: Union[str, List[str]],
+    required_columns: Optional[Sequence[str]],
     inference_args: Optional[dataspec.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
 ) -> VerticalDataset:
-  """Creates a VerticalDataset from (list of) path using YDF dataset reading."""
+  """Returns a VerticalDataset from (list of) path using YDF dataset reading."""
   assert (data_spec is None) != (inference_args is None)
   if not isinstance(path, str):
     path = paths.normalize_list_of_paths(path)
   dataset = VerticalDataset()
   if data_spec is not None:
-    dataset._dataset.CreateFromPathWithDataSpec(path, data_spec)
+    dataset._dataset.CreateFromPathWithDataSpec(
+        path, data_spec, required_columns
+    )
   if inference_args is not None:
     dataset._dataset.CreateFromPathWithDataSpecGuide(
-        path, inference_args.to_proto_guide()
+        path, inference_args.to_proto_guide(), required_columns
     )
   return dataset
 
 
 def create_vertical_dataset_from_dict_of_values(
     data: Dict[str, dataset_io_types.InputValues],
+    required_columns: Optional[Sequence[str]],
     inference_args: Optional[dataspec.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
 ) -> VerticalDataset:
@@ -408,6 +426,7 @@ def create_vertical_dataset_from_dict_of_values(
 
   Args:
     data: Data to copy to the Vertical Dataset.
+    required_columns: Names of columns that are required in the data.
     inference_args: Arguments for data spec inference. Must be None if data_spec
       is set.
     data_spec: Data spec of the given data. Must be None if inference_args is
@@ -417,13 +436,18 @@ def create_vertical_dataset_from_dict_of_values(
     A Vertical dataset with the given properties.
   """
 
-  def dataspec_to_normalized_columns(data, columns):
+  def dataspec_to_normalized_columns(
+      data: Dict[str, dataset_io_types.InputValues],
+      columns,
+      required_columns: Sequence[str],
+  ):
     normalized_columns = []
     for column_spec in columns:
-      if column_spec.name not in data:
+      if column_spec.name not in data and column_spec.name in required_columns:
         raise ValueError(
             f"The data spec expects columns {column_spec.name} which was not"
-            f" found in the data. Available columns: {list(data)}"
+            f" found in the data. Available columns: {list(data)}. Required"
+            f" columns: {required_columns}"
         )
       if (
           column_spec.type == data_spec_pb2.CATEGORICAL_SET
@@ -435,30 +459,46 @@ def create_vertical_dataset_from_dict_of_values(
             f"The dataspec for columns {column_spec.name} specifies a"
             " tokenizer, but it is ignored when reading in-memory datasets."
         )
-      normalized_columns.append(
-          dataspec.Column(
-              name=column_spec.name,
-              semantic=dataspec.Semantic.from_proto_type(column_spec.type),
-          )
-      )
+      else:
+        normalized_columns.append(
+            dataspec.Column(
+                name=column_spec.name,
+                semantic=dataspec.Semantic.from_proto_type(column_spec.type),
+            )
+        )
     return normalized_columns
 
   assert (data_spec is None) != (inference_args is None)
   dataset = VerticalDataset()
   if data_spec is None:
+    # If `required_columns` is None, only check if the columns mentioned in the
+    # `inference_args` are required. This is checked by
+    # dataspec.get_all_columns()
     normalized_columns = dataspec.get_all_columns(
         available_columns=list(data.keys()),
         inference_args=inference_args,
+        required_columns=required_columns,
     )
   else:
     dataset._initialize_from_data_spec(data_spec)  # pylint: disable=protected-access
-    normalized_columns = dataspec_to_normalized_columns(data, data_spec.columns)
+    required_columns = (
+        required_columns
+        if required_columns is not None
+        else [c.name for c in data_spec.columns]
+    )
+    normalized_columns = dataspec_to_normalized_columns(
+        data, data_spec.columns, required_columns
+    )
 
   for column_idx, column in enumerate(normalized_columns):
-    column_data = data[column.name]
-    effective_column = column
+    effective_column = copy.deepcopy(column)
+    if column.name not in data:
+      # The column is missing, so no data is passed but the column will still be
+      # created.
+      column_data = []
+    else:
+      column_data = data[column.name]
     if column.semantic is None:
-      effective_column = copy.deepcopy(column)
       infered_semantic = infer_semantic(column.name, column_data)
       effective_column.semantic = infered_semantic
 
@@ -475,6 +515,18 @@ def create_vertical_dataset_from_dict_of_values(
 
 def infer_semantic(name: str, data: Any) -> dataspec.Semantic:
   """Infers the semantic of a column from its data."""
+
+  # If a column has no data, we assume it only contains missing values.
+  if len(data) == 0:
+    raise ValueError(
+        f"Cannot infer automatically the semantic of column {name!r} since no"
+        " data for this column was provided. Make sure this column exists in"
+        " the dataset, or exclude the column from the list of required"
+        " columns. If the dataset should contain missing values for the all"
+        " examples of this column, specify the semantic of the column manually"
+        f" using the `features` argument e.g. `features=[({name!r},"
+        " ydf.Semantic.NUMERICAL)]` if the feature is numerical."
+    )
 
   if isinstance(data, np.ndarray):
     # We finely control the supported types.

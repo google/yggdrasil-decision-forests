@@ -194,6 +194,7 @@ class DataspecTest(absltest.TestCase):
                 max_num_scanned_rows_to_infer_semantic=10000,
                 max_num_scanned_rows_to_compute_statistics=10000,
             ),
+            required_columns=None,
         ),
         [
             Column("a"),
@@ -216,6 +217,7 @@ class DataspecTest(absltest.TestCase):
                 max_num_scanned_rows_to_infer_semantic=10000,
                 max_num_scanned_rows_to_compute_statistics=10000,
             ),
+            required_columns=None,
         ),
         [
             Column("a"),
@@ -224,7 +226,9 @@ class DataspecTest(absltest.TestCase):
     )
 
   def test_get_all_columns_missing(self):
-    with self.assertRaisesRegex(ValueError, "Column 'b' no found"):
+    with self.assertRaisesRegex(
+        ValueError, "Column b is required but was not found in the data."
+    ):
       dataspec_lib.get_all_columns(
           ["a"],
           DataSpecInferenceArgs(
@@ -237,7 +241,69 @@ class DataspecTest(absltest.TestCase):
               max_num_scanned_rows_to_infer_semantic=10000,
               max_num_scanned_rows_to_compute_statistics=10000,
           ),
+          required_columns=None,
       )
+
+  def test_get_all_columns_required_missing(self):
+    with self.assertRaisesRegex(
+        ValueError, "One of the required columns was not found in the data."
+    ):
+      dataspec_lib.get_all_columns(
+          ["a"],
+          DataSpecInferenceArgs(
+              columns=[Column("a")],
+              include_all_columns=True,
+              max_vocab_count=1,
+              min_vocab_frequency=1,
+              discretize_numerical_columns=False,
+              num_discretized_numerical_bins=1,
+              max_num_scanned_rows_to_infer_semantic=10000,
+              max_num_scanned_rows_to_compute_statistics=10000,
+          ),
+          required_columns=["b"],
+      )
+
+  def test_get_all_columns_does_not_require_all_specified(self):
+    self.assertEqual(
+        dataspec_lib.get_all_columns(
+            ["a"],
+            DataSpecInferenceArgs(
+                columns=[Column("b")],
+                include_all_columns=True,
+                max_vocab_count=1,
+                min_vocab_frequency=1,
+                discretize_numerical_columns=False,
+                num_discretized_numerical_bins=1,
+                max_num_scanned_rows_to_infer_semantic=10000,
+                max_num_scanned_rows_to_compute_statistics=10000,
+            ),
+            required_columns=[],
+        ),
+        [
+            Column("a"),
+        ],
+    )
+
+  def test_get_all_columns_specified_and_available_always_included(self):
+    self.assertEqual(
+        dataspec_lib.get_all_columns(
+            ["a"],
+            DataSpecInferenceArgs(
+                columns=[Column("a")],
+                include_all_columns=False,
+                max_vocab_count=1,
+                min_vocab_frequency=1,
+                discretize_numerical_columns=False,
+                num_discretized_numerical_bins=1,
+                max_num_scanned_rows_to_infer_semantic=10000,
+                max_num_scanned_rows_to_compute_statistics=10000,
+            ),
+            required_columns=[],
+        ),
+        [
+            Column("a"),
+        ],
+    )
 
   def test_normalize_column_defs(self):
     self.assertEqual(

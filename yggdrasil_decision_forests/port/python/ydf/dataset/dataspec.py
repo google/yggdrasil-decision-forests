@@ -265,8 +265,9 @@ class Column(object):
             maximum_num_bins=self.num_discretized_numerical_bins
         ),
     )
-    if self.semantic is not None:
-      guide.type = self.semantic.to_proto_type()
+    column_semantic = self.semantic
+    if column_semantic is not None:
+      guide.type = column_semantic.to_proto_type()
     return guide
 
   @classmethod
@@ -433,42 +434,67 @@ def categorical_column_dictionary_to_list(
 def get_all_columns(
     available_columns: Sequence[str],
     inference_args: DataSpecInferenceArgs,
+    required_columns: Optional[Sequence[str]],
 ) -> Sequence[Column]:
   """Gets all the columns to use by the model / learner.
 
   Args:
     available_columns: All the available column names in the dataset.
-    inference_args: User configurations for the consuptions of columns.
+    inference_args: User configurations for the consumption of columns.
+    required_columns: List of columns that must be used by the model. If None,
+      defaults the columns specified in `inference_args`.  The order of the
+      columns is important. First should come the columns in
+      `inference_args.columns` in unchanged order, then any remaining columns in
+      the order they appear at in the data.
 
   Returns:
-    The list of model input columns.
+    The list of model input columns. This includes the required columns plus the
+      specified columns in the inference_args that are available
+
+  Raises:
+    ValueError: One of the required columns is not available
   """
+  available_columns_as_set = frozenset(available_columns)
+  required_columns_as_set = frozenset(required_columns or [])
+
+  if not required_columns_as_set.issubset(available_columns_as_set):
+    raise ValueError(
+        "One of the required columns was not found in the data. Required"
+        f" columns: {required_columns}, available columns: {available_columns}"
+    )
 
   if inference_args.columns is None:
-    # Select all the available columns and set an unknown semantic.
-    return [Column(f) for f in available_columns]
+    specified_columns = [Column(col) for col in available_columns]
+  else:
+    specified_columns = []
+    # Add the specified columns in order, but ignore those that do not exist.
+    for col in inference_args.columns:
+      if col.name in available_columns_as_set:
+        specified_columns.append(col)
+      else:
+        if required_columns is None or col.name in required_columns_as_set:
+          raise ValueError(
+              f"Column {col.name} is required but was not found in the data."
+              f" Available columns: {available_columns}"
+          )
 
-  columns = copy.deepcopy(inference_args.columns)
-
-  # Check that the user specified columns exist.
-  available_columns_set = frozenset(available_columns)
-  for f in columns:
-    if f.name not in available_columns_set:
-      raise ValueError(
-          f"Column {f.name!r} no found. The available columns are:"
-          f" {available_columns}"
-      )
-
+  specified_columns_names = set(col.name for col in specified_columns)
   if inference_args.include_all_columns:
-    # Add the remaining columns. Set the semantic as "unknown".
-    existing_columns = {f.name for f in columns}
-    for f in available_columns:
-      if f in existing_columns:
-        # Skip columns already specified by the user.
-        continue
-      columns.append(Column(f))
+    for col_name in available_columns:
+      if col_name not in specified_columns_names:
+        specified_columns.append(Column(col_name))
+        specified_columns_names.add(col_name)
 
-  return columns
+  # Add remaining available columns.
+  for col_name in available_columns:
+    if (
+        col_name in required_columns_as_set
+        and col_name not in specified_columns_names
+    ):
+      specified_columns.append(Column(col_name))
+      specified_columns_names.add(col_name)
+
+  return specified_columns
 
 
 def priority(a: Any, b: Any) -> Any:
