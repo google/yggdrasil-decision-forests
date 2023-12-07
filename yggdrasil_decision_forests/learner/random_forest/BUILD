@@ -77,7 +77,7 @@ all_proto_library(
 
 cc_test(
     name = "random_forest_test",
-    size = "enormous",
+    size = "large",
     srcs = ["random_forest_test.cc"],
     data = [
         "//yggdrasil_decision_forests/test_data",
