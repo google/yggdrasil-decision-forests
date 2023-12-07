@@ -92,7 +92,7 @@ all_proto_library(
 # ========
 cc_test(
     name = "gradient_boosted_trees_test",
-    size = "enormous",
+    size = "large",
     srcs = ["gradient_boosted_trees_test.cc"],
     data = [
         "//yggdrasil_decision_forests/test_data",
@@ -124,8 +124,6 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
-        "//yggdrasil_decision_forests/utils:concurrency",
-        "//yggdrasil_decision_forests/utils:csv",
         "//yggdrasil_decision_forests/utils:distribution_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
@@ -136,11 +134,35 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test_utils",
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/container:btree",
-        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "gradient_boosted_trees_tuner_test",
+    size = "large",
+    srcs = ["gradient_boosted_trees_tuner_test.cc"],
+    data = [
+        "//yggdrasil_decision_forests/test_data",
+    ],
+    deps = [
+        ":gradient_boosted_trees",
+        ":gradient_boosted_trees_cc_proto",
+        "//yggdrasil_decision_forests/learner/decision_tree:training",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping",
+        "//yggdrasil_decision_forests/learner/hyperparameters_optimizer",
+        "//yggdrasil_decision_forests/metric",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:test_utils",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest_main",
     ],
