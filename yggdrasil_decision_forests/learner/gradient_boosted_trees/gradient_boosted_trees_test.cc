@@ -454,6 +454,45 @@ TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraints) {
       file::JoinPath(test::TmpDirectory(), "analysis"), {}));
 }
 
+TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraintsPure) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+
+  gbt_config->set_use_hessian_gain(true);
+  train_config_.set_pure_serving_model(true);
+
+  // Ensures that the tree is monotonic.
+  gbt_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_check_monotonic_constraints(true);
+
+  auto* constrain_1 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_1->set_feature("^age$");
+  constrain_1->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* constrain_2 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_2->set_feature("^hours_per_week$");
+  constrain_2->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* constrain_3 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_3->set_feature("^education_num$");
+  constrain_3->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  TrainAndEvaluateModel();
+
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8641, 0.009, 0.8627);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2972, 0.0181, 0.2902);
+
+  // Show the tree structure.
+  std::string description;
+  model_->AppendDescriptionAndStatistics(true, &description);
+  YDF_LOG(INFO) << description;
+
+  EXPECT_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
+      *model_, test_dataset_, "", "",
+      file::JoinPath(test::TmpDirectory(), "analysis"), {}));
+}
+
 TEST_F(GradientBoostedTreesOnAdult, DecreasingMonotonicConstraints) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1298,6 +1337,39 @@ TEST_F(GradientBoostedTreesOnAbalone, MAELoss) {
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::MAE(evaluation_), 1.5155, 0.0599, 1.4994);
   YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.2608, 0.1464, 2.2136);
+}
+
+TEST_F(GradientBoostedTreesOnAbalone, MonotonicConstraintsPure) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_use_hessian_gain(true);
+  train_config_.set_pure_serving_model(true);
+
+  // Ensures that the tree is monotonic.
+  gbt_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_check_monotonic_constraints(true);
+
+  auto* constrain_1 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_1->set_feature("^LongestShell$");
+  constrain_1->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* constrain_2 = train_config_.mutable_monotonic_constraints()->Add();
+  constrain_2->set_feature("^Diameter$");
+  constrain_2->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  TrainAndEvaluateModel();
+  YDF_TEST_METRIC(metric::MAE(evaluation_), 1.5155, 0.0599, 1.51869);
+  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.2608, 0.1464, 2.14822);
+
+  // Show the tree structure.
+  std::string description;
+  model_->AppendDescriptionAndStatistics(true, &description);
+  YDF_LOG(INFO) << description;
+
+  EXPECT_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
+      *model_, test_dataset_, "", "",
+      file::JoinPath(test::TmpDirectory(), "analysis"), {}));
 }
 
 class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {

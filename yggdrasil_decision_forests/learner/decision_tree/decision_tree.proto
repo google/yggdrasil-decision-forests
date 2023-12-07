@@ -67,11 +67,18 @@ message DecisionTreeTrainingConfig {
   // the model size.
   optional bool store_detailed_label_distribution = 4 [default = true];
 
+  // INFO: Use "pure_serving_model" instead of
+  // "keep_non_leaf_label_distribution". "pure_serving_model" is more general,
+  // works in more situations, and removes more unused data from the model.
+  //
   // Whether to keep the node value (i.e. the distribution of the labels of the
   // training examples) of non-leaf nodes. This information is not used during
   // serving, however it can be used for model interpretation as well as hyper
   // parameter tuning. In the worst case, this can account for half of the model
   // size.
+  //
+  // keep_non_leaf_label_distribution=false is not compatible with monotonic
+  // constraints.
   optional bool keep_non_leaf_label_distribution = 5 [default = true];
 
   // Method used to handle missing attribute values.

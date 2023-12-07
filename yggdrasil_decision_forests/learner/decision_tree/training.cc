@@ -4224,6 +4224,16 @@ absl::Status DecisionTreeTrain(
   std::vector<UnsignedExampleIdx> selected_examples_buffer;
   std::vector<UnsignedExampleIdx> leaf_examples_buffer;
 
+  // Check monotonic constraints
+  if (config.monotonic_constraints_size() > 0 &&
+      !dt_config.keep_non_leaf_label_distribution()) {
+    return absl::InvalidArgumentError(
+        "keep_non_leaf_label_distribution=false is not compatible with "
+        "monotonic constraints. To minimize the size of your serving model "
+        "(with or without monotonic constraints), use "
+        "pure_serving_model=true.");
+  }
+
   if (dt_config.has_honest()) {
     // Split the examples in two parts. One ("selected_examples_buffer") will be
     // used to infer the structure of the trees while the second
