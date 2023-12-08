@@ -13,7 +13,13 @@ package(
 py_library(
     name = "tree",
     srcs = ["tree.py"],
-    deps = [":node"],
+    deps = [
+        ":condition",
+        ":node",
+        ":value",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
+    ],
 )
 
 py_library(
@@ -56,6 +62,8 @@ py_test(
         ":tree",
         ":value",
         # absl/testing:absltest dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
     ],
 )
 

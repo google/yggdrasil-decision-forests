@@ -15,9 +15,57 @@
 """A decision tree."""
 
 import dataclasses
+from typing import Iterator, Sequence
+from yggdrasil_decision_forests.dataset import data_spec_pb2
+from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
+from ydf.model.tree import condition as condition_lib
 from ydf.model.tree import node as node_lib
+from ydf.model.tree import value as value_lib
 
 
 @dataclasses.dataclass
 class Tree:
   root: node_lib.AbstractNode
+
+
+def _recusive_build_node(
+    node_iterator: Iterator[decision_tree_pb2.Node],
+    dataspec: data_spec_pb2.DataSpecification,
+) -> node_lib.AbstractNode:
+  """Creates recursively a node from a node iterator.
+
+  The nodes should be produced as a depth-first, negative-first, transversal
+  order.
+
+  Args:
+    node_iterator: Node iterator.
+    dataspec: Model dataspec.
+
+  Returns:
+    The root node.
+  """
+
+  proto_node = next(node_iterator)
+  if proto_node.HasField("condition"):
+    # If the non-leaf contains a value
+    if proto_node.WhichOneof("output") is not None:
+      value = value_lib.to_value(proto_node)
+    else:
+      value = None
+
+    return node_lib.NonLeaf(
+        value=value,
+        condition=condition_lib.to_condition(proto_node.condition, dataspec),
+        neg_child=_recusive_build_node(node_iterator, dataspec),
+        pos_child=_recusive_build_node(node_iterator, dataspec),
+    )
+  else:
+    return node_lib.Leaf(value=value_lib.to_value(proto_node))
+
+
+def proto_nodes_to_tree(
+    nodes: Sequence[decision_tree_pb2.Node],
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Tree:
+  """Creates a tree from an depth-first, negative-first list of nodes."""
+  return Tree(root=_recusive_build_node(iter(nodes), dataspec))
