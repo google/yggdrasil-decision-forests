@@ -11,6 +11,12 @@ package(
 # =========
 
 py_library(
+    name = "tree",
+    srcs = ["tree.py"],
+    deps = [":node"],
+)
+
+py_library(
     name = "value",
     srcs = ["value.py"],
     deps = [
@@ -28,8 +34,30 @@ py_library(
     ],
 )
 
+py_library(
+    name = "node",
+    srcs = ["node.py"],
+    deps = [
+        ":condition",
+        ":value",
+    ],
+)
+
 # Tests
 # =====
+
+py_test(
+    name = "tree_test",
+    srcs = ["tree_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":condition",
+        ":node",
+        ":tree",
+        ":value",
+        # absl/testing:absltest dep,
+    ],
+)
 
 py_test(
     name = "value_test",
@@ -41,6 +69,18 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
         "//ydf/utils:test_utils",
         "@ydf_cc//yggdrasil_decision_forests/utils:distribution_py_proto",
+    ],
+)
+
+py_test(
+    name = "node_test",
+    srcs = ["node_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":condition",
+        ":node",
+        ":value",
+        # absl/testing:absltest dep,
     ],
 )
 
