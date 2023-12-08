@@ -17,6 +17,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <random>
@@ -796,8 +797,16 @@ absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
             "Classification requires a categorical label.");
       }
       // Allocate and zero the confusion matrix.
-      const int32_t num_classes =
+      const int64_t num_classes =
           label_column.categorical().number_of_unique_values();
+      int64_t sq_num_classes = num_classes * num_classes;
+      if (sq_num_classes > std::numeric_limits<int32_t>::max()) {
+        return absl::InvalidArgumentError(absl::Substitute(
+            "The label column has $0 classes, which is above the limit of $1 "
+            "classes",
+            num_classes,
+            std::floor(std::sqrt(std::numeric_limits<int32_t>::max()))));
+      }
       utils::InitializeConfusionMatrixProto(
           num_classes, num_classes,
           eval->mutable_classification()->mutable_confusion());
