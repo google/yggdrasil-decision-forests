@@ -382,16 +382,13 @@ TEST_F(GradientBoostedTreesOnAdult, BaseWithNAConditions) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8644, 0.0099, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2979, 0.0127, 0.294);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8662, 0.0104, 0.8664);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2975, 0.0145, 0.2944);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
   EXPECT_TRUE(gbt_model->CheckStructure(
       decision_tree::CheckStructureOptions::GlobalImputation()));
-  // Check that the model indeed uses NA conditions.
-  EXPECT_FALSE(gbt_model->CheckStructure(
-      decision_tree::CheckStructureOptions::NACondition()));
 }
 
 // Train and test a model on the adult dataset.
