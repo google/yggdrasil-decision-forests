@@ -2135,6 +2135,9 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
 - `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.
 - `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5.
 - `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.
+- `BINARY_FOCAL_LOSS`: Focal loss. Only valid for binary classification. See https://arxiv.org/pdf/1708.02002.pdf.
+- `POISSON`: Poisson log likelihood. Only valid for regression.
+- `MEAN_AVERAGE_ERROR`: Mean average error a.k.a. MAE.
 )");
   }
 
