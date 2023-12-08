@@ -15,7 +15,7 @@
 """A decision tree."""
 
 import dataclasses
-from typing import Iterator, Sequence
+from typing import Iterator, Optional, Sequence
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 from ydf.model.tree import condition as condition_lib
@@ -26,6 +26,37 @@ from ydf.model.tree import value as value_lib
 @dataclasses.dataclass
 class Tree:
   root: node_lib.AbstractNode
+
+  def pretty(
+      self,
+      dataspec: data_spec_pb2.DataSpecification,
+      max_depth: Optional[int] = 6,
+  ) -> str:
+    """Returns a printable representation of the decision tree.
+
+    Usage example:
+
+    ```python
+    model = ydf.load_model("my_model")
+    tree = model.get_tree(0)
+    print(tree.pretty(model.data_spec()))
+    ```
+
+    Args:
+      dataspec: Dataspec of the tree.
+      max_depth: Maximum printed depth.
+    """
+
+    if self.root:
+      return self.root.pretty(
+          dataspec=dataspec,
+          prefix="",
+          is_pos=None,
+          depth=1,
+          max_depth=max_depth,
+      )
+    else:
+      return "No root\n"
 
 
 def _recusive_build_node(

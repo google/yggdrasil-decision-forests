@@ -124,7 +124,9 @@ class ConditionTest(parameterized.TestCase):
     condition = condition_lib.IsMissingInCondition(
         attribute=0, missing=False, score=2
     )
-    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[data_spec_pb2.Column(name="f")]
+    )
     proto_condition = decision_tree_pb2.NodeCondition(
         na_value=False,
         split_score=2,
@@ -136,11 +138,18 @@ class ConditionTest(parameterized.TestCase):
 
     self._assert_conditions_equivalent(condition, proto_condition, dataspec)
 
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' is missing [score=2 missing=False]",
+    )
+
   def test_condition_is_true_valid_input(self):
     condition = condition_lib.IsTrueCondition(
         attribute=0, missing=False, score=2
     )
-    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[data_spec_pb2.Column(name="f")]
+    )
     proto_condition = decision_tree_pb2.NodeCondition(
         na_value=False,
         split_score=2,
@@ -152,11 +161,18 @@ class ConditionTest(parameterized.TestCase):
 
     self._assert_conditions_equivalent(condition, proto_condition, dataspec)
 
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' is True [score=2 missing=False]",
+    )
+
   def test_condition_is_higher_valid_input(self):
     condition = condition_lib.NumericalHigherThanCondition(
         attribute=0, missing=False, score=2, threshold=3
     )
-    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[data_spec_pb2.Column(name="f")]
+    )
     proto_condition = decision_tree_pb2.NodeCondition(
         na_value=False,
         split_score=2,
@@ -168,11 +184,25 @@ class ConditionTest(parameterized.TestCase):
 
     self._assert_conditions_equivalent(condition, proto_condition, dataspec)
 
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' >= 3 [score=2 missing=False]",
+    )
+
   def test_condition_discretized_is_higher_valid_input(self):
     condition = condition_lib.DiscretizedNumericalHigherThanCondition(
         attribute=0, missing=False, score=2, threshold_idx=2
     )
-    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[
+            data_spec_pb2.Column(
+                name="f",
+                discretized_numerical=data_spec_pb2.DiscretizedNumericalSpec(
+                    boundaries=[10, 20, 30, 40]
+                ),
+            )
+        ]
+    )
     proto_condition = decision_tree_pb2.NodeCondition(
         na_value=False,
         split_score=2,
@@ -186,6 +216,11 @@ class ConditionTest(parameterized.TestCase):
 
     self._assert_conditions_equivalent(condition, proto_condition, dataspec)
 
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' >= 20 [threshold_idx=2 score=2 missing=False]",
+    )
+
   def test_condition_is_in_categorical_valid_input(self):
     condition = condition_lib.CategoricalIsInCondition(
         attribute=0,
@@ -196,9 +231,11 @@ class ConditionTest(parameterized.TestCase):
     dataspec = data_spec_pb2.DataSpecification(
         columns=[
             data_spec_pb2.Column(
+                name="f",
                 type=data_spec_pb2.ColumnType.CATEGORICAL,
                 categorical=data_spec_pb2.CategoricalSpec(
                     number_of_unique_values=1000,
+                    is_already_integerized=True,
                 ),
             )
         ]
@@ -216,6 +253,11 @@ class ConditionTest(parameterized.TestCase):
 
     self._assert_conditions_equivalent(condition, proto_condition, dataspec)
 
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' in [1, 3] [score=2 missing=False]",
+    )
+
   def test_condition_is_in_categorical_bitmap_valid_input(self):
     condition = condition_lib.CategoricalIsInCondition(
         attribute=0,
@@ -226,9 +268,18 @@ class ConditionTest(parameterized.TestCase):
     dataspec = data_spec_pb2.DataSpecification(
         columns=[
             data_spec_pb2.Column(
+                name="f",
                 type=data_spec_pb2.ColumnType.CATEGORICAL,
                 categorical=data_spec_pb2.CategoricalSpec(
-                    number_of_unique_values=4
+                    number_of_unique_values=4,
+                    items={
+                        "OOD": data_spec_pb2.CategoricalSpec.VocabValue(
+                            index=0
+                        ),
+                        "A": data_spec_pb2.CategoricalSpec.VocabValue(index=1),
+                        "B": data_spec_pb2.CategoricalSpec.VocabValue(index=2),
+                        "D": data_spec_pb2.CategoricalSpec.VocabValue(index=3),
+                    },
                 ),
             )
         ]
@@ -246,6 +297,11 @@ class ConditionTest(parameterized.TestCase):
 
     self._assert_conditions_equivalent(condition, proto_condition, dataspec)
 
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' in ['A', 'D'] [score=2 missing=False]",
+    )
+
   def test_condition_is_in_categorical_set_valid_input(self):
     condition = condition_lib.CategoricalSetContainsCondition(
         attribute=0,
@@ -256,9 +312,11 @@ class ConditionTest(parameterized.TestCase):
     dataspec = data_spec_pb2.DataSpecification(
         columns=[
             data_spec_pb2.Column(
+                name="f",
                 type=data_spec_pb2.ColumnType.CATEGORICAL_SET,
                 categorical=data_spec_pb2.CategoricalSpec(
-                    number_of_unique_values=1000
+                    number_of_unique_values=1000,
+                    is_already_integerized=True,
                 ),
             )
         ]
@@ -275,6 +333,11 @@ class ConditionTest(parameterized.TestCase):
     )
 
     self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' intersect [1, 3] [score=2 missing=False]",
+    )
 
   def test_condition_is_in_categorical_set_bitmap_valid_input(self):
     condition = condition_lib.CategoricalSetContainsCondition(
@@ -314,7 +377,9 @@ class ConditionTest(parameterized.TestCase):
         weights=[1, 2],
         threshold=3,
     )
-    dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[data_spec_pb2.Column(name="f"), data_spec_pb2.Column(name="g")]
+    )
     proto_condition = decision_tree_pb2.NodeCondition(
         na_value=False,
         split_score=2,
@@ -329,6 +394,11 @@ class ConditionTest(parameterized.TestCase):
     )
 
     self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' x 1 + 'g' x 2 >= 3 [score=2 missing=False]",
+    )
 
   def test_condition_sparse_oblique_empty_valid_input(self):
     condition = condition_lib.NumericalSparseObliqueCondition(
@@ -353,6 +423,11 @@ class ConditionTest(parameterized.TestCase):
     )
 
     self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "*nothing* >= 3 [score=2 missing=False]",
+    )
 
 
 if __name__ == "__main__":

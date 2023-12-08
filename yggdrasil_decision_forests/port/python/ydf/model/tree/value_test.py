@@ -121,6 +121,30 @@ class ValueTest(absltest.TestCase):
         ),
     )
 
+  def test_pretty_classification(self):
+    self.assertEqual(
+        value_lib.ProbabilityValue(
+            probability=[0.8, 0.2], num_examples=10
+        ).pretty(),
+        "value=[0.8, 0.2]",
+    )
+
+  def test_pretty_regression(self):
+    self.assertEqual(
+        value_lib.RegressionValue(
+            value=1.0, num_examples=10, standard_deviation=1.0
+        ).pretty(),
+        "value=1 sd=1",
+    )
+
+  def test_pretty_uplift(self):
+    self.assertEqual(
+        value_lib.UpliftValue(
+            treatment_effect=[0.0, 8.0, 2.0], num_examples=10.0
+        ).pretty(),
+        "value=[0.0, 8.0, 2.0]",
+    )
+
 
 if __name__ == "__main__":
   absltest.main()

@@ -1,0 +1,5 @@
+'f1' >= 2 [score=3 missing=False]
+    ├─(pos)─ value=8
+    └─(neg)─ 'f1' >= 4 [score=5 missing=False]
+             ├─(pos)─ value=7
+             └─(neg)─ value=6

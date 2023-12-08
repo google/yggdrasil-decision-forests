@@ -23,7 +23,6 @@ import pandas as pd
 
 from ydf.model import model_lib
 from ydf.model.tree import condition as condition_lib
-from ydf.model.tree import tree as tree_lib
 from ydf.model.tree import value as value_lib
 from ydf.utils import test_utils
 
@@ -141,6 +140,14 @@ class GradientBoostedTreesTest(absltest.TestCase):
       _ = self.adult_binary_class_gbdt.get_tree(
           self.adult_binary_class_gbdt.num_trees()
       )
+
+  def test_model_inspector_print_tree(self):
+    tree = self.adult_binary_class_gbdt.get_tree(1)
+    test_utils.golden_check_string(
+        self,
+        tree.pretty(self.adult_binary_class_gbdt.data_spec()),
+        os.path.join(test_utils.pydf_test_data_path(), "adult_gbt_tree_0.txt"),
+    )
 
 
 if __name__ == "__main__":

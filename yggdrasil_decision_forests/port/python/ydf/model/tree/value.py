@@ -20,6 +20,7 @@ import functools
 import math
 from typing import Optional, Sequence
 import numpy as np
+from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 
 
@@ -33,6 +34,13 @@ class AbstractValue(metaclass=abc.ABCMeta):
   """
 
   num_examples: float
+
+  @abc.abstractmethod
+  def pretty(self) -> str:
+    raise NotImplementedError
+
+  def __str__(self):
+    return self.pretty()
 
 
 @dataclasses.dataclass
@@ -52,6 +60,12 @@ class RegressionValue(AbstractValue):
   value: float
   standard_deviation: Optional[float] = None
 
+  def pretty(self) -> str:
+    text = f"value={self.value:.5g}"
+    if self.standard_deviation is not None:
+      text += f" sd={self.standard_deviation:.5g}"
+    return text
+
 
 @dataclasses.dataclass
 class ProbabilityValue(AbstractValue):
@@ -67,6 +81,9 @@ class ProbabilityValue(AbstractValue):
 
   probability: Sequence[float]
 
+  def pretty(self) -> str:
+    return f"value={self.probability}"
+
 
 @dataclasses.dataclass
 class UpliftValue(AbstractValue):
@@ -79,6 +96,9 @@ class UpliftValue(AbstractValue):
   """
 
   treatment_effect: Sequence[float]
+
+  def pretty(self) -> str:
+    return f"value={self.treatment_effect}"
 
 
 def to_value(proto_node: decision_tree_pb2.Node) -> AbstractValue:

@@ -29,6 +29,9 @@ def assertProto2Equal(self: absltest.TestCase, a, b):
   """Checks that protos "a" and "b" are equal."""
   self.assertEqual(a, b)
 
+def pydf_test_data_path() -> str:
+  return os.path.join(data_root_path(), "test_data")
+
 
 def ydf_test_data_path() -> str:
   return os.path.join(
@@ -41,13 +44,6 @@ def ydf_test_data_pathlib() -> pathlib.Path:
   return (
       pathlib.Path(data_root_path())
       / "external/ydf_cc/yggdrasil_decision_forests/test_data"
-  )
-
-
-def pydf_test_data_path() -> str:
-  return os.path.join(
-      data_root_path(),
-      "external/ydf_cc/yggdrasil_decision_forests/port/python/test_data",
   )
 
 

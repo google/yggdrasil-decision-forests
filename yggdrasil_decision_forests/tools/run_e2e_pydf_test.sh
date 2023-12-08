@@ -72,6 +72,11 @@ run_test() {
   #
   # To start a notebook instance, run:
   # ./tools/start_notebook.sh
+  #
+  # To clear all the docker containers run:
+  # sudo sudo docker container ls
+  # sudo sudo docker stop [ID]
+  # sudo docker system prune -a
 
   sudo docker exec -it ${DOCKER_CONTAINER} /bin/bash -c "${CMD}"
 }

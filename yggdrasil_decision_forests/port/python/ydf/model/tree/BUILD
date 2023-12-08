@@ -38,6 +38,7 @@ py_library(
     srcs = ["value.py"],
     deps = [
         # numpy dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
     ],
 )
@@ -46,6 +47,7 @@ py_library(
     name = "condition",
     srcs = ["condition.py"],
     deps = [
+        "//ydf/dataset:dataspec",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
     ],
@@ -57,6 +59,7 @@ py_library(
     deps = [
         ":condition",
         ":value",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
@@ -66,6 +69,9 @@ py_library(
 py_test(
     name = "tree_test",
     srcs = ["tree_test.py"],
+    data = [
+        "//test_data",
+    ],
     python_version = "PY3",
     deps = [
         ":condition",
@@ -75,6 +81,7 @@ py_test(
         # absl/testing:absltest dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
+        "//ydf/utils:test_utils",
     ],
 )
 

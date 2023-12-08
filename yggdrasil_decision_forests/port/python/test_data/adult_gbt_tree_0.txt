@@ -1,0 +1,35 @@
+'marital_status' in ['Never-married', 'Divorced', 'Widowed', 'Separated', 'Married-spouse-absent', 'Married-AF-spouse'] [score=3275 missing=False]
+    ├─(pos)─ 'capital_gain' >= 7139.5 [score=2242.2 missing=False]
+    │        ├─(pos)─ value=0.29702
+    │        └─(neg)─ 'hours_per_week' >= 44.5 [score=1972.8 missing=False]
+    │                 ├─(pos)─ 'age' >= 38.5 [score=158.21 missing=True]
+    │                 │        ├─(pos)─ value=-0.007044
+    │                 │        └─(neg)─ value=-0.083211
+    │                 └─(neg)─ 'capital_loss' >= 2218.5 [score=1896.4 missing=False]
+    │                          ├─(pos)─ value=0.092592
+    │                          └─(neg)─ 'age' >= 32.5 [score=1911.7 missing=True]
+    │                                   ├─(pos)─ 'occupation' in ['Craft-repair', 'Adm-clerical', 'Sales', 'Other-service', 'Machine-op-inspct', 'Transport-moving', 'Handlers-cleaners', 'Farming-fishing', 'Tech-support', 'Protective-serv', 'Priv-house-serv'] [score=688.22 missing=False]
+    │                                   │    ...
+    │                                   └─(neg)─ 'marital_status' in ['Married-AF-spouse'] [score=1257.6 missing=False]
+    │                                        ...
+    └─(neg)─ 'capital_gain' >= 5095.5 [score=2451.4 missing=False]
+             ├─(pos)─ 'age' >= 60.5 [score=1516.4 missing=False]
+             │        ├─(pos)─ value=0.26801
+             │        └─(neg)─ 'capital_gain' >= 5798 [score=1377.1 missing=False]
+             │                 ├─(pos)─ 'capital_gain' >= 8537 [score=1257.3 missing=False]
+             │                 │        ├─(pos)─ value=0.31025
+             │                 │        └─(neg)─ value=0.31025
+             │                 └─(neg)─ value=0.31025
+             └─(neg)─ 'occupation' in ['Craft-repair', 'Adm-clerical', 'Sales', 'Other-service', 'Machine-op-inspct', 'Transport-moving', 'Handlers-cleaners', 'Farming-fishing', 'Tech-support', 'Protective-serv', 'Priv-house-serv'] [score=1488.6 missing=False]
+                      ├─(pos)─ 'capital_loss' >= 1782.5 [score=277.14 missing=False]
+                      │        ├─(pos)─ value=0.21455
+                      │        └─(neg)─ 'age' >= 33.5 [score=203.63 missing=True]
+                      │                 ├─(pos)─ 'education_num' in ['7', '12', '6', '4', '15', '5', '8', '16', '3', '2', '1'] [score=299.2 missing=False]
+                      │                 │    ...
+                      │                 └─(neg)─ value=-0.033804
+                      └─(neg)─ 'hours_per_week' >= 32.5 [score=1503.7 missing=True]
+                               ├─(pos)─ 'capital_loss' >= 1782.5 [score=1587 missing=False]
+                               │        ├─(pos)─ value=0.29913
+                               │        └─(neg)─ 'education' in ['Bachelors', 'Masters', 'Assoc-voc', '11th', 'Assoc-acdm', '10th', '7th-8th', 'Prof-school', '9th', '12th', 'Doctorate', '5th-6th', '1st-4th', 'Preschool'] [score=1224.3 missing=False]
+                               │             ...
+                               └─(neg)─ value=0.018905

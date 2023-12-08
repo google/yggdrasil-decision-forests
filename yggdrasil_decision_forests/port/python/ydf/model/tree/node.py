@@ -17,8 +17,14 @@
 import abc
 import dataclasses
 from typing import Optional
+from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.model.tree import condition as condition_lib
 from ydf.model.tree import value as value_lib
+
+# Number of spaces printed on the left side of nodes with pretty print.
+_PRETTY_MARGIN = 4
+# Length / number of characters (e.g. "-") in an edge with pretty print.
+_PRETTY_EDGE_LENGTH = 4
 
 
 class AbstractNode(metaclass=abc.ABCMeta):
@@ -29,6 +35,17 @@ class AbstractNode(metaclass=abc.ABCMeta):
     """Tells if a node is a leaf."""
     raise NotImplementedError
 
+  @abc.abstractmethod
+  def pretty(
+      self,
+      dataspec: data_spec_pb2.DataSpecification,
+      prefix: str,
+      is_pos: Optional[bool],
+      depth: int,
+      max_depth: Optional[int],
+  ) -> str:
+    raise NotImplementedError
+
 
 @dataclasses.dataclass
 class Leaf(AbstractNode):
@@ -37,6 +54,16 @@ class Leaf(AbstractNode):
   @property
   def is_leaf(self) -> bool:
     return True
+
+  def pretty(
+      self,
+      dataspec: data_spec_pb2.DataSpecification,
+      prefix: str,
+      is_pos: Optional[bool],
+      depth: int,
+      max_depth: Optional[int],
+  ) -> str:
+    return prefix + _pretty_local_prefix(is_pos) + self.value.pretty() + "\n"
 
 
 @dataclasses.dataclass
@@ -49,3 +76,69 @@ class NonLeaf(AbstractNode):
   @property
   def is_leaf(self) -> bool:
     return False
+
+  def pretty(
+      self,
+      dataspec: data_spec_pb2.DataSpecification,
+      prefix: str,
+      is_pos: Optional[bool],
+      depth: int,
+      max_depth: Optional[int],
+  ) -> str:
+
+    # Prefix for the children of this node.
+    children_prefix = prefix
+    if is_pos is None:
+      pass
+    elif is_pos:
+      children_prefix += " " * _PRETTY_MARGIN + "│" + " " * _PRETTY_EDGE_LENGTH
+    elif not is_pos:
+      children_prefix += " " * (_PRETTY_MARGIN + 1 + _PRETTY_EDGE_LENGTH)
+
+    # Node's condition.
+    condition_prefix = prefix + _pretty_local_prefix(is_pos)
+    if self.condition is not None:
+      condition_prefix += self.condition.pretty(dataspec)
+    else:
+      condition_prefix += "No condition"
+    condition_prefix += "\n"
+
+    # Children of the node.
+    if max_depth is not None and depth >= max_depth:
+      return condition_prefix + children_prefix + "...\n"
+    else:
+      children_text = condition_prefix
+      if self.pos_child is not None:
+        children_text += self.pos_child.pretty(
+            dataspec, children_prefix, True, depth + 1, max_depth
+        )
+      else:
+        children_text += "No positive child\n"
+      if self.neg_child is not None:
+        children_text += self.neg_child.pretty(
+            dataspec, children_prefix, False, depth + 1, max_depth
+        )
+      else:
+        children_text += "No negative child\n"
+      return children_text
+
+
+def _pretty_local_prefix(is_pos: Optional[bool]) -> str:
+  """Prefix added in front of a node with pretty print.
+
+  Args:
+    is_pos: True/False if the node is a positive/negative child. None if the
+      node is a root.
+
+  Returns:
+    The node prefix.
+  """
+
+  if is_pos is None:
+    # Root node. No prefix.
+    return ""
+  elif is_pos:
+    # Positive nodes are assumed to be printed before negative ones.
+    return " " * _PRETTY_MARGIN + "├─(pos)─ "
+  else:
+    return " " * _PRETTY_MARGIN + "└─(neg)─ "

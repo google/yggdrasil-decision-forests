@@ -20,6 +20,7 @@ import functools
 from typing import Sequence, Union
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
+from ydf.dataset import dataspec as dataspec_lib
 
 ColumnType = data_spec_pb2.ColumnType
 
@@ -38,6 +39,13 @@ class AbstractCondition(metaclass=abc.ABCMeta):
   missing: bool
   score: float
 
+  @abc.abstractmethod
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    raise NotImplementedError
+
+  def _tag(self) -> str:
+    return f"score={self.score:.5g} missing={self.missing}"
+
 
 @dataclasses.dataclass
 class IsMissingInCondition(AbstractCondition):
@@ -49,6 +57,10 @@ class IsMissingInCondition(AbstractCondition):
 
   attribute: int
 
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    attribute_name = dataspec.columns[self.attribute].name
+    return f"{attribute_name!r} is missing [{self._tag()}]"
+
 
 @dataclasses.dataclass
 class IsTrueCondition(AbstractCondition):
@@ -59,6 +71,10 @@ class IsTrueCondition(AbstractCondition):
   """
 
   attribute: int
+
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    attribute_name = dataspec.columns[self.attribute].name
+    return f"{attribute_name!r} is True [{self._tag()}]"
 
 
 @dataclasses.dataclass
@@ -73,6 +89,10 @@ class NumericalHigherThanCondition(AbstractCondition):
   attribute: int
   threshold: float
 
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    attribute_name = dataspec.columns[self.attribute].name
+    return f"{attribute_name!r} >= {self.threshold:g} [{self._tag()}]"
+
 
 @dataclasses.dataclass
 class DiscretizedNumericalHigherThanCondition(AbstractCondition):
@@ -85,6 +105,16 @@ class DiscretizedNumericalHigherThanCondition(AbstractCondition):
 
   attribute: int
   threshold_idx: int
+
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    column_spec = dataspec.columns[self.attribute]
+    threshold = column_spec.discretized_numerical.boundaries[
+        self.threshold_idx - 1
+    ]
+    return (
+        f"{column_spec.name!r} >="
+        f" {threshold:g} [threshold_idx={self.threshold_idx} {self._tag()}]"
+    )
 
 
 @dataclasses.dataclass
@@ -99,6 +129,15 @@ class CategoricalIsInCondition(AbstractCondition):
   attribute: int
   mask: Sequence[int]
 
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    column_spec = dataspec.columns[self.attribute]
+    if column_spec.categorical.is_already_integerized:
+      mask_repr = list(self.mask)
+    else:
+      vocab = dataspec_lib.categorical_column_dictionary_to_list(column_spec)
+      mask_repr = [vocab[item] for item in self.mask]
+    return f"{column_spec.name!r} in {mask_repr} [{self._tag()}]"
+
 
 @dataclasses.dataclass
 class CategoricalSetContainsCondition(AbstractCondition):
@@ -111,6 +150,15 @@ class CategoricalSetContainsCondition(AbstractCondition):
 
   attribute: int
   mask: Sequence[int]
+
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    column_spec = dataspec.columns[self.attribute]
+    if column_spec.categorical.is_already_integerized:
+      mask_repr = list(self.mask)
+    else:
+      vocab = dataspec_lib.categorical_column_dictionary_to_list(column_spec)
+      mask_repr = [vocab[item] for item in self.mask]
+    return f"{column_spec.name!r} intersect {mask_repr} [{self._tag()}]"
 
 
 @dataclasses.dataclass
@@ -126,6 +174,15 @@ class NumericalSparseObliqueCondition(AbstractCondition):
   attributes: Sequence[int]
   weights: Sequence[float]
   threshold: float
+
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    text = " + ".join(
+        f"{dataspec.columns[attribute].name!r} x {weight:g}"
+        for attribute, weight in zip(self.attributes, self.weights)
+    )
+    if not text:
+      text = "*nothing*"
+    return f"{text} >= {self.threshold:g} [{self._tag()}]"
 
 
 def to_condition(

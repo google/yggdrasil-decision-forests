@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from absl.testing import absltest
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
@@ -19,6 +20,7 @@ from ydf.model.tree import condition as condition_lib
 from ydf.model.tree import node as node_lib
 from ydf.model.tree import tree as tree_lib
 from ydf.model.tree import value as value_lib
+from ydf.utils import test_utils
 
 RegressionValue = value_lib.RegressionValue
 Leaf = node_lib.Leaf
@@ -98,6 +100,11 @@ class TreeTest(absltest.TestCase):
         )
     )
     self.assertEqual(tree, expected_tree)
+    test_utils.golden_check_string(
+        self,
+        tree.pretty(dataspec),
+        os.path.join(test_utils.pydf_test_data_path(), "toy_tree.txt"),
+    )
 
 
 if __name__ == "__main__":
