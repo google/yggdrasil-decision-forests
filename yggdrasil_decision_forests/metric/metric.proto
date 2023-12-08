@@ -117,7 +117,8 @@ message EvaluationOptions {
 // "metrics.h" e.g. "Accuracy()", "LogLoss()", "RMSE()".
 message EvaluationResults {
   message Classification {
-    // Confusion between the label and the predictions.
+    // Confusion between the label and the predictions. Note that confusion
+    // tables are stored column major (which, admittedly, is confusing).
     optional utils.proto.IntegersConfusionMatrixDouble confusion = 1;
     // One-vs-other Receiver operating characteristic curve. Indexed by the
     // categorical label value.

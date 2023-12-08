@@ -157,7 +157,7 @@ class EvaluationTest(absltest.TestCase):
 
     self.assertEqual(dict_eval["confusion_matrix"].classes, ("1", "2"))
     npt.assert_array_almost_equal(
-        dict_eval["confusion_matrix"].matrix, [[1, 2], [3, 4]]
+        dict_eval["confusion_matrix"].matrix, [[1, 3], [2, 4]]
     )
 
     self.assertEqual(
@@ -169,9 +169,9 @@ class EvaluationTest(absltest.TestCase):
             +---+---+---+
             |   | 1 | 2 |
             +---+---+---+
-            | 1 | 1 | 2 |
+            | 1 | 1 | 3 |
             +---+---+---+
-            | 2 | 3 | 4 |
+            | 2 | 2 | 4 |
             +---+---+---+
         characteristics:
             name: '2' vs others

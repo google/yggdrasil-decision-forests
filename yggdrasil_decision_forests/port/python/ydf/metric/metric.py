@@ -357,8 +357,11 @@ class Evaluation:
         assert confusion.nrow == confusion.ncol, "Invalid confusion matrix"
         assert confusion.nrow == len(classes), "Invalid confusion matrix"
         assert confusion.nrow >= 1, "Invalid confusion matrix"
-        raw_confusion = np.array(confusion.counts).reshape(
-            confusion.nrow, confusion.nrow
+        # YDF confusing matrices are stored column major.
+        raw_confusion = (
+            np.array(confusion.counts)
+            .reshape(confusion.nrow, confusion.nrow)
+            .transpose()
         )
 
         return safe_div(np.trace(raw_confusion), np.sum(raw_confusion))
@@ -378,8 +381,10 @@ class Evaluation:
         assert confusion.nrow == confusion.ncol, "Invalid confusion matrix"
         assert confusion.nrow == len(classes), "Invalid confusion matrix"
         assert confusion.nrow >= 1, "Invalid confusion matrix"
-        raw_confusion = np.array(confusion.counts).reshape(
-            confusion.nrow, confusion.nrow
+        raw_confusion = (
+            np.array(confusion.counts)
+            .reshape(confusion.nrow, confusion.nrow)
+            .transpose()
         )
 
         return ConfusionMatrix(
