@@ -10,6 +10,8 @@ from google3.third_party.yggdrasil_decision_forests.model import abstract_model_
 from google3.third_party.yggdrasil_decision_forests.model import hyperparameter_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import model_analysis_pb2
+from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
+from google3.third_party.yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 
 # pylint: disable=g-wrong-blank-lines
 
@@ -154,6 +156,10 @@ class DecisionForestCCModel(GenericCCModel):
       dataset2: VerticalDataset,
   ) -> npt.NDArray[np.float32]: ...
   def set_node_format(self, node_format: str) -> None: ...
+  def GetTree(
+      self,
+      tree_idx: int,
+  ) -> List[decision_tree_pb2.Node]: ...
 
 class RandomForestCCModel(DecisionForestCCModel):
   @property

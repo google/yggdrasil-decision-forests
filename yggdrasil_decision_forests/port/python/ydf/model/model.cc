@@ -163,7 +163,9 @@ void init_model(py::module_& m) {
       .def("PredictLeaves", WithStatusOr(&DecisionForestCCModel::PredictLeaves),
            py::arg("dataset"))
       .def("Distance", WithStatusOr(&DecisionForestCCModel::Distance),
-           py::arg("dataset1"), py::arg("dataset2"));
+           py::arg("dataset1"), py::arg("dataset2"))
+      .def("GetTree", WithStatusOr(&DecisionForestCCModel::GetTree),
+           py::arg("tree_idx"));
 
   py::class_<RandomForestCCModel,
              /*parent class*/ DecisionForestCCModel>(m, "RandomForestCCModel")

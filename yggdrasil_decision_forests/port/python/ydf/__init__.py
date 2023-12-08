@@ -53,4 +53,7 @@ from ydf.learner.tuner import RandomSearchTuner
 from ydf.utils.log import verbose
 from ydf.utils.log import strict
 
+# Tree inspector
+from ydf.model import tree
+
 # pylint: enable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported

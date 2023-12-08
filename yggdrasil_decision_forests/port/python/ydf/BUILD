@@ -27,6 +27,7 @@ py_library(
         "//ydf/model:model_metadata",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/random_forest_model",
+        "//ydf/model/tree:all",
         "//ydf/utils:log",
     ],
 )

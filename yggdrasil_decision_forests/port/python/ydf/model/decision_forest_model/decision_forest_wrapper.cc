@@ -19,10 +19,14 @@
 
 #include <cstdint>
 #include <cstring>
+#include <vector>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace py = ::pybind11;
@@ -57,6 +61,27 @@ absl::StatusOr<py::array_t<float>> DecisionForestCCModel::Distance(
   auto dst = absl::MakeSpan(distances.mutable_data(), n1 * n2);
   RETURN_IF_ERROR(df_model_->Distance(dataset1, dataset2, dst));
   return distances;
+}
+
+absl::StatusOr<std::vector<model::decision_tree::proto::Node>>
+DecisionForestCCModel::GetTree(int tree_idx) const {
+  using Node = model::decision_tree::proto::Node;
+
+  if (tree_idx < 0 || tree_idx >= df_model_->num_trees()) {
+    return absl::InvalidArgumentError("Invalid tree index");
+  }
+
+  struct Writer : utils::ProtoWriterInterface<Node> {
+    virtual ~Writer() = default;
+    absl::Status Write(const Node& value) override {
+      nodes.push_back(value);
+      return absl::OkStatus();
+    }
+    std::vector<Node> nodes;
+  } writer;
+
+  RETURN_IF_ERROR(df_model_->decision_trees()[tree_idx]->WriteNodes(&writer));
+  return writer.nodes;
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

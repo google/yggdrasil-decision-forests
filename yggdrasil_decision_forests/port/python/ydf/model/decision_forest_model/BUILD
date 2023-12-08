@@ -15,13 +15,16 @@ pybind_library(
     hdrs = ["decision_forest_wrapper.h"],
     deps = [
         "//ydf/model:model_wrapper",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
+        "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
+        "@ydf_cc//yggdrasil_decision_forests/utils:protobuf",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
     ],
 )
@@ -34,6 +37,7 @@ py_library(
         "//ydf/cc:ydf",
         "//ydf/dataset",
         "//ydf/model:generic_model",
+        "//ydf/model/tree",
     ],
 )
 

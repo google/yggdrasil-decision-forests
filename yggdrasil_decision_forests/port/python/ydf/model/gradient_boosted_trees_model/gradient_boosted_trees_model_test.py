@@ -22,27 +22,27 @@ import numpy as np
 import pandas as pd
 
 from ydf.model import model_lib
+from ydf.model.tree import condition as condition_lib
+from ydf.model.tree import tree as tree_lib
+from ydf.model.tree import value as value_lib
 from ydf.utils import test_utils
 
 
 class GradientBoostedTreesTest(absltest.TestCase):
 
-  def test_validation_loss(self):
+  def setUp(self):
+    super().setUp()
     model_path = os.path.join(
         test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
     )
-    model = model_lib.load_model(model_path)
+    self.adult_binary_class_gbdt = model_lib.load_model(model_path)
 
-    validation_loss = model.validation_loss()
+  def test_validation_loss(self):
+    validation_loss = self.adult_binary_class_gbdt.validation_loss()
     self.assertAlmostEqual(validation_loss, 0.573842942, places=6)
 
   def test_initial_predictions(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
-    model = model_lib.load_model(model_path)
-
-    initial_predictions = model.initial_predictions()
+    initial_predictions = self.adult_binary_class_gbdt.initial_predictions()
     np.testing.assert_allclose(initial_predictions, [-1.1630996])
 
   def test_variable_importances(self):
@@ -83,13 +83,6 @@ class GradientBoostedTreesTest(absltest.TestCase):
     )
 
   def test_predict_distance(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(),
-        "model",
-        "adult_binary_class_gbdt",
-    )
-    model = model_lib.load_model(model_path)
-
     dataset = pd.read_csv(
         os.path.join(
             test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
@@ -97,7 +90,7 @@ class GradientBoostedTreesTest(absltest.TestCase):
         nrows=500,
     )
 
-    distances = model.distance(dataset)
+    distances = self.adult_binary_class_gbdt.distance(dataset)
     logging.info("distances:\n%s", distances)
     self.assertEqual(distances.shape, (dataset.shape[0], dataset.shape[0]))
 
@@ -114,6 +107,40 @@ class GradientBoostedTreesTest(absltest.TestCase):
         dataset.iloc[most_similar_example_idx]["income"],
         dataset.iloc[0]["income"],
     )
+
+  def test_model_inspector_get_valid_tree(self):
+    self.assertEqual(self.adult_binary_class_gbdt.num_trees(), 68)
+    self.assertLen(
+        list(self.adult_binary_class_gbdt.get_all_trees()),
+        self.adult_binary_class_gbdt.num_trees(),
+    )
+
+    tree = self.adult_binary_class_gbdt.get_tree(1)
+    self.assertFalse(tree.root.is_leaf)
+    # Validated with: external/ydf_cc/yggdrasil_decision_forests/cli:show_model
+    self.assertEqual(
+        tree.root.condition,
+        condition_lib.CategoricalIsInCondition(
+            missing=False,
+            score=3275.003662109375,
+            attribute=5,
+            mask=[2, 3, 4, 5, 6, 7],
+        ),
+    )
+    self.assertEqual(
+        tree.root.value,
+        value_lib.RegressionValue(
+            value=-0.0006140652694739401, num_examples=0.0
+        ),
+    )
+
+  def test_model_inspector_get_wrong_tree(self):
+    with self.assertRaisesRegex(ValueError, "Invalid tree index"):
+      _ = self.adult_binary_class_gbdt.get_tree(-1)
+    with self.assertRaisesRegex(ValueError, "Invalid tree index"):
+      _ = self.adult_binary_class_gbdt.get_tree(
+          self.adult_binary_class_gbdt.num_trees()
+      )
 
 
 if __name__ == "__main__":

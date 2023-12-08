@@ -11,6 +11,17 @@ package(
 # =========
 
 py_library(
+    name = "all",  # TODO: Replace "tree"
+    srcs = ["__init__.py"],
+    deps = [
+        ":condition",
+        ":node",
+        ":tree",
+        ":value",
+    ],
+)
+
+py_library(
     name = "tree",
     srcs = ["tree.py"],
     deps = [

@@ -14,13 +14,14 @@
 
 """Definitions for generic decision forest models."""
 
-from typing import Optional
+from typing import Iterator, Optional
 
 import numpy as np
 
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.model import generic_model
+from ydf.model.tree import tree as tree_lib
 
 
 class DecisionForestModel(generic_model.GenericModel):
@@ -31,6 +32,23 @@ class DecisionForestModel(generic_model.GenericModel):
   def num_trees(self):
     """Returns the number of trees in the decision forest."""
     return self._model.num_trees()
+
+  def get_tree(self, tree_idx: int) -> tree_lib.Tree:
+    """Gets a single model of the model.
+
+    Args:
+      tree_idx: Index of the tree. Should be in [0, num_trees()).
+
+    Returns:
+      The tree.
+    """
+    nodes = self._model.GetTree(tree_idx)
+    return tree_lib.proto_nodes_to_tree(nodes, self.data_spec())
+
+  def get_all_trees(self) -> Iterator[tree_lib.Tree]:
+    """Returns an iterator over all the trees in the model."""
+
+    return (self.get_tree(tree_idx) for tree_idx in range(self.num_trees()))
 
   def predict_leaves(self, data: dataset.InputDataset) -> np.ndarray:
     """Gets the index of the active leaf in each tree.

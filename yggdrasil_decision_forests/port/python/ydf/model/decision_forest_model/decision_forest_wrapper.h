@@ -22,11 +22,13 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "ydf/model/model_wrapper.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -49,6 +51,11 @@ class DecisionForestCCModel : public GenericCCModel {
   void set_node_format(const std::string& node_format) {
     df_model_->set_node_format(node_format);
   }
+
+  // Returns the nodes of the tree in a depth-first, negative-first, transversal
+  // order.
+  absl::StatusOr<std::vector<model::decision_tree::proto::Node>> GetTree(
+      int tree_idx) const;
 
  protected:
   // `model` and `df_model` must correspond to the same object.

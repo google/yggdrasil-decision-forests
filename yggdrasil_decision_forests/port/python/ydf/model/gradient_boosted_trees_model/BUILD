@@ -50,6 +50,9 @@ py_test(
         # numpy dep,
         # pandas dep,
         "//ydf/model:model_lib",
+        "//ydf/model/tree",
+        "//ydf/model/tree:condition",
+        "//ydf/model/tree:value",
         "//ydf/utils:test_utils",
     ],
 )
