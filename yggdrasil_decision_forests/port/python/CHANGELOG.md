@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.0.7 - 2023-11-28
+
+### Features
+
+-   Support for prediction / evaluation for models with N/A conditions.
+-   Support for predicting from datasets without label column
+-   Model inspector
+-   Automatic inference for Categorical set columns
+
+#### Release music
+
+Knecht Ruprecht aus "Album für die Jugend" (Opus 86). Robert Schumann
+
 ## 0.0.6 - 2023-11-28
 
 ### Features

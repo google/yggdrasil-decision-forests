@@ -39,8 +39,8 @@ loaded_model = ydf.load_model("my_model")
 
 ## Compiling & Building
 
-To build the Python port of YDF, install GCC-9 and run the following command
-from the root of the port/python directory in the YDF repository
+To build the Python port of YDF, install Bazel, GCC 9 and run the following
+command from the root of the port/python directory in the YDF repository
 
 ```sh
 PYTHON_BIN=python3.9
@@ -48,14 +48,17 @@ PYTHON_BIN=python3.9
 ./tools/build_pydf.sh $PYTHON_BIN
 ```
 
+Browse the `tools/` directory for more build helpers.
+
 ## Frequently Asked Questions
 
 *   **Is it PYDF or YDF?** The name of the library is simply ydf, and so is the
     name of the corresponding Pip package. Internally, the team sometimes uses
     the name *PYDF* because it fits so well.
-*   **What is the status of PYDF?** PYDF is currently in Alpha development. Some
-    parts still work well (training models and generating predictions), others
-    are yet to be added. The API surface may still change without notice.
+*   **What is the status of PYDF?** PYDF is currently in Alpha development. Most
+    parts already work well (training, evaluation, predicting, export), some new
+    features are yet to come. The API surface is mostly stable but may still 
+    change without notice.
 *   **Where is the documentation for PYDF?** The documentation is
     available on https://ydf.readthedocs.org.
 *   **How should I pronounce PYDF?** The preferred pronunciation is 
