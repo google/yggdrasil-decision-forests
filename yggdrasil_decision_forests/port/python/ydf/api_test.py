@@ -14,7 +14,6 @@
 
 """Test the API of YDF."""
 
-
 import math
 import os
 
@@ -161,6 +160,36 @@ class ApiTest(absltest.TestCase):
     learner = ydf.RandomForestLearner(label="label")
     _ = learner.train(pd.DataFrame({"feature": [0, 1], "label": [0, 1]}))
     ydf.verbose(save_verbose)
+
+  def test_print_a_tree(self):
+    train_ds = pd.DataFrame({
+        "c1": [1.0, 1.1, 2.0, 3.5, 4.2] + list(range(10)),
+        "label": ["a", "b", "b", "a", "a"] * 3,
+    })
+    learner = ydf.CartLearner(label="label")
+    model = learner.train(train_ds)
+    assert isinstance(model, ydf.CARTModel)
+    model.print_tree(tree_idx=0)
+
+  def test_get_a_tree(self):
+    train_ds = pd.DataFrame({
+        "c1": [1.0, 1.1, 2.0, 3.5, 4.2] + list(range(10)),
+        "label": ["a", "b", "b", "a", "a"] * 3,
+    })
+    learner = ydf.RandomForestLearner(label="label")
+    model = learner.train(train_ds)
+    assert isinstance(model, ydf.RandomForestModel)
+    tree = model.get_tree(tree_idx=0)
+    logging.info("Found tree:\n%s", tree)
+
+  def test_list_input_features(self):
+    train_ds = pd.DataFrame({
+        "c1": [1.0, 1.1, 2.0, 3.5, 4.2] + list(range(10)),
+        "label": ["a", "b", "b", "a", "a"] * 3,
+    })
+    learner = ydf.RandomForestLearner(label="label")
+    model = learner.train(train_ds)
+    logging.info("Input features:\n%s", model.input_features())
 
 
 if __name__ == "__main__":

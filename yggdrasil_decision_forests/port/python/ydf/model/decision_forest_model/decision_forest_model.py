@@ -14,7 +14,8 @@
 
 """Definitions for generic decision forest models."""
 
-from typing import Iterator, Optional
+import sys
+from typing import Iterator, Optional, Sequence
 
 import numpy as np
 
@@ -45,10 +46,42 @@ class DecisionForestModel(generic_model.GenericModel):
     nodes = self._model.GetTree(tree_idx)
     return tree_lib.proto_nodes_to_tree(nodes, self.data_spec())
 
-  def get_all_trees(self) -> Iterator[tree_lib.Tree]:
+  def get_all_trees(self) -> Sequence[tree_lib.Tree]:
+    """Returns all the trees in the model."""
+
+    return list(self.iter_trees())
+
+  def iter_trees(self) -> Iterator[tree_lib.Tree]:
     """Returns an iterator over all the trees in the model."""
 
     return (self.get_tree(tree_idx) for tree_idx in range(self.num_trees()))
+
+  def print_tree(self, tree_idx: int = 0, file=sys.stdout) -> None:
+    """Prints a tree in the terminal.
+
+    Usage example:
+
+    ```python
+    # Create a dataset
+    train_ds = pd.DataFrame({
+        "c1": [1.0, 1.1, 2.0, 3.5, 4.2] + list(range(10)),
+        "label": ["a", "b", "b", "a", "a"] * 3,
+    })
+    # Train a CART model
+    learner = ydf.CartLearner(label="label").train(train_ds)
+    # Make sure the model is a CART
+    assert isinstance(model, ydf.CARTModel)
+    # Print the tree
+    model.print_tree()
+    ```
+
+    Args:
+      tree_idx: Index of the tree. Should be in [0, self.num_trees()).
+      file: Where to print the tree. By default, prints on the terminal
+        stanrdard output.
+    """
+
+    file.write(self.get_tree(tree_idx).pretty(self.data_spec()))
 
   def predict_leaves(self, data: dataset.InputDataset) -> np.ndarray:
     """Gets the index of the active leaf in each tree.

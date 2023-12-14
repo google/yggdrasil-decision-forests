@@ -35,6 +35,8 @@ from ydf.model.generic_model import GenericModel
 from ydf.model.random_forest_model.random_forest_model import RandomForestModel
 from ydf.model.gradient_boosted_trees_model.gradient_boosted_trees_model import GradientBoostedTreesModel
 from ydf.model.model_metadata import ModelMetadata
+# A CART model is a Random Forest with a single tree
+CARTModel = RandomForestModel
 
 # Learner
 from ydf.learner.generic_learner import GenericLearner

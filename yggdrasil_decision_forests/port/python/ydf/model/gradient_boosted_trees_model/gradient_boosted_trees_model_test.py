@@ -21,6 +21,8 @@ from absl.testing import absltest
 import numpy as np
 import pandas as pd
 
+from ydf.dataset import dataspec
+from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model.tree import condition as condition_lib
 from ydf.model.tree import value as value_lib
@@ -35,6 +37,64 @@ class GradientBoostedTreesTest(absltest.TestCase):
         test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
     )
     self.adult_binary_class_gbdt = model_lib.load_model(model_path)
+
+  def test_input_feature_names(self):
+    self.assertEqual(
+        self.adult_binary_class_gbdt.input_feature_names(),
+        [
+            "age",
+            "workclass",
+            "fnlwgt",
+            "education",
+            "education_num",
+            "marital_status",
+            "occupation",
+            "relationship",
+            "race",
+            "sex",
+            "capital_gain",
+            "capital_loss",
+            "hours_per_week",
+            "native_country",
+        ],
+    )
+
+  def test_input_features(self):
+    InputFeature = generic_model.InputFeature
+    NUMERICAL = dataspec.Semantic.NUMERICAL
+    CATEGORICAL = dataspec.Semantic.CATEGORICAL
+    self.assertEqual(
+        self.adult_binary_class_gbdt.input_features(),
+        [
+            InputFeature("age", NUMERICAL, 0),
+            InputFeature("workclass", CATEGORICAL, 1),
+            InputFeature("fnlwgt", NUMERICAL, 2),
+            InputFeature("education", CATEGORICAL, 3),
+            InputFeature("education_num", CATEGORICAL, 4),
+            InputFeature("marital_status", CATEGORICAL, 5),
+            InputFeature("occupation", CATEGORICAL, 6),
+            InputFeature("relationship", CATEGORICAL, 7),
+            InputFeature("race", CATEGORICAL, 8),
+            InputFeature("sex", CATEGORICAL, 9),
+            InputFeature("capital_gain", NUMERICAL, 10),
+            InputFeature("capital_loss", NUMERICAL, 11),
+            InputFeature("hours_per_week", NUMERICAL, 12),
+            InputFeature("native_country", CATEGORICAL, 13),
+        ],
+    )
+
+  def test_task(self):
+    self.assertEqual(
+        self.adult_binary_class_gbdt.task(), generic_model.Task.CLASSIFICATION
+    )
+
+  def test_label_classes(self):
+    self.assertEqual(
+        self.adult_binary_class_gbdt.label_classes(), ["<=50K", ">50K"]
+    )
+
+  def test_label(self):
+    self.assertEqual(self.adult_binary_class_gbdt.label(), "income")
 
   def test_validation_loss(self):
     validation_loss = self.adult_binary_class_gbdt.validation_loss()
@@ -110,7 +170,7 @@ class GradientBoostedTreesTest(absltest.TestCase):
   def test_model_inspector_get_valid_tree(self):
     self.assertEqual(self.adult_binary_class_gbdt.num_trees(), 68)
     self.assertLen(
-        list(self.adult_binary_class_gbdt.get_all_trees()),
+        self.adult_binary_class_gbdt.get_all_trees(),
         self.adult_binary_class_gbdt.num_trees(),
     )
 

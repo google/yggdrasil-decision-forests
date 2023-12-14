@@ -14,8 +14,6 @@
 
 """Utilities for loading YDF models."""
 
-from typing import Optional
-
 from absl import logging
 
 from ydf.cc import ydf
