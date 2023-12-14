@@ -14,16 +14,19 @@
 
 """Tests for the YDF models."""
 
+import concurrent.futures
 import logging
 import os
 import tempfile
 import textwrap
+import time
 
 from absl.testing import absltest
 from absl.testing import parameterized
 import numpy.testing as npt
 import pandas as pd
 
+from ydf.dataset import dataset
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model import model_metadata
@@ -421,6 +424,25 @@ Use `model.describe()` for more details
     )
     evaluation = model.evaluate(test_ds_path)
     self.assertAlmostEqual(evaluation.accuracy, 0.80011, places=5)
+
+  def test_multi_thread_predict(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
+    )
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+    model = model_lib.load_model(model_path)
+    test_df = pd.read_csv(dataset_path)
+    test_ds = dataset.create_vertical_dataset(
+        test_df, data_spec=model.data_spec()
+    )
+    for num_workers in range(1, 10 + 1):
+      with concurrent.futures.ThreadPoolExecutor(num_workers) as executor:
+        begin = time.time()
+        _ = list(executor.map(model.predict, [test_ds] * 10))
+        end = time.time()
+        logging.info("Runtime for %s workers: %s", num_workers, end - begin)
 
 
 if __name__ == "__main__":

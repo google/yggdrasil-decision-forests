@@ -51,6 +51,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:random",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
+        "@ydf_cc//yggdrasil_decision_forests/utils:synchronization_primitives",
         "@ydf_cc//yggdrasil_decision_forests/utils:uid",
         "@ydf_cc//yggdrasil_decision_forests/utils/benchmark:inference",
     ],
@@ -170,8 +171,10 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
+        "//ydf/dataset",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/random_forest_model",
+        "//ydf/utils:log",
         "//ydf/utils:test_utils",
     ],
 )

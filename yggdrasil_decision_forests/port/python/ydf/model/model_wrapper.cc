@@ -45,11 +45,13 @@
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests::port::python {
 
 absl::StatusOr<const serving::FastEngine*> GenericCCModel::GetEngine() {
+  utils::concurrency::MutexLock lock(&engine_mutex_);
   if (engine_ == nullptr) {
     // Note: Not thread safe.
     ASSIGN_OR_RETURN(engine_, model_->BuildFastEngine());
@@ -77,27 +79,31 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
 
   auto unchecked_predictions = predictions.mutable_unchecked();
 
-  const int64_t num_batches =
-      (total_num_examples + batch_size - 1) / batch_size;
-  std::vector<float> batch_of_predictions;
-  for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
-    const int64_t begin_example_idx = batch_idx * batch_size;
-    const int64_t end_example_idx =
-        std::min(begin_example_idx + batch_size, total_num_examples);
-    const int effective_batch_size = end_example_idx - begin_example_idx;
-    RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
-        dataset, begin_example_idx, end_example_idx, engine_features,
-        batch_of_examples.get()));
-    engine->Predict(*batch_of_examples, effective_batch_size,
-                    &batch_of_predictions);
+  {
+    py::gil_scoped_release release;
+    const int64_t num_batches =
+        (total_num_examples + batch_size - 1) / batch_size;
+    std::vector<float> batch_of_predictions;
+    for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
+      const int64_t begin_example_idx = batch_idx * batch_size;
+      const int64_t end_example_idx =
+          std::min(begin_example_idx + batch_size, total_num_examples);
+      const int effective_batch_size = end_example_idx - begin_example_idx;
+      RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
+          dataset, begin_example_idx, end_example_idx, engine_features,
+          batch_of_examples.get()));
+      engine->Predict(*batch_of_examples, effective_batch_size,
+                      &batch_of_predictions);
 
-    // Copy this batch to the numpy array.
-    const int64_t np_array_begin =
-        begin_example_idx * num_prediction_dimensions;
-    std::memcpy(unchecked_predictions.mutable_data(np_array_begin),
-                batch_of_predictions.data(),
-                batch_of_predictions.size() * sizeof(float));
+      // Copy this batch to the numpy array.
+      const int64_t np_array_begin =
+          begin_example_idx * num_prediction_dimensions;
+      std::memcpy(unchecked_predictions.mutable_data(np_array_begin),
+                  batch_of_predictions.data(),
+                  batch_of_predictions.size() * sizeof(float));
+    }
   }
+
   if (num_prediction_dimensions > 1) {
     predictions =
         predictions.reshape({total_num_examples, num_prediction_dimensions});
@@ -108,6 +114,7 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
 absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& options) {
+  py::gil_scoped_release release;
   ASSIGN_OR_RETURN(const auto* engine, GetEngine());
   utils::RandomEngine rnd;
   ASSIGN_OR_RETURN(const auto evaluation,
@@ -118,6 +125,7 @@ absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
 absl::StatusOr<utils::model_analysis::proto::StandaloneAnalysisResult>
 GenericCCModel::Analyze(const dataset::VerticalDataset& dataset,
                         const utils::model_analysis::proto::Options& options) {
+  py::gil_scoped_release release;
   ASSIGN_OR_RETURN(const auto analysis,
                    utils::model_analysis::Analyse(*model_, dataset, options));
   return utils::model_analysis::CreateStandaloneAnalysis(*model_, dataset, "",
@@ -128,6 +136,7 @@ absl::StatusOr<utils::model_analysis::proto::PredictionAnalysisResult>
 GenericCCModel::AnalyzePrediction(
     const dataset::VerticalDataset& example,
     const utils::model_analysis::proto::PredictionAnalysisOptions& options) {
+  py::gil_scoped_release release;
   if (example.nrow() != 1) {
     return absl::InvalidArgumentError(
         absl::StrCat("The dataset should contain exactly one example. Instead "
@@ -143,6 +152,7 @@ GenericCCModel::AnalyzePrediction(
 absl::Status GenericCCModel::Save(
     std::string_view directory,
     const std::optional<std::string> file_prefix) const {
+  py::gil_scoped_release release;
   return model::SaveModel(directory, model_.get(), {file_prefix});
 }
 
@@ -165,6 +175,7 @@ absl::StatusOr<std::string> GenericCCModel::Describe(
 absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
     const dataset::VerticalDataset& dataset, const double benchmark_duration,
     const double warmup_duration, const int batch_size) {
+  py::gil_scoped_release release;
   std::vector<utils::BenchmarkInferenceResult> results;
   const utils::BenchmarkInterfaceTimingOptions timing_options = {
       /*.benchmark_duration =*/benchmark_duration,
@@ -175,7 +186,7 @@ absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
                                                     /*.time =*/timing_options};
 
   // Run engines.
-  ASSIGN_OR_RETURN(const auto engine, GetEngine());
+  ASSIGN_OR_RETURN(const auto* engine, GetEngine());
   RETURN_IF_ERROR(
       utils::BenchmarkFastEngine(options, *engine, *model_, dataset, &results));
   if (results.empty()) {

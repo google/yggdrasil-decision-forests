@@ -51,6 +51,7 @@ namespace {
 absl::StatusOr<std::unique_ptr<GenericCCModel>> LoadModel(
     const std::string& directory,
     const std::optional<std::string>& file_prefix) {
+  py::gil_scoped_release release;
   std::unique_ptr<model::AbstractModel> model_ptr;
   RETURN_IF_ERROR(model::LoadModel(directory, &model_ptr, {file_prefix}));
   return CreateCCModel(std::move(model_ptr));
@@ -88,6 +89,7 @@ std::unique_ptr<GenericCCModel> CreateCCModel(
 }
 
 void init_model(py::module_& m) {
+  // WARNING: This method releases the Global Interpreter Lock.
   m.def("LoadModel", WithStatusOr(LoadModel), py::arg("directory"),
         py::arg("file_prefix"));
   m.def("ModelAnalysisCreateHtmlReport",
@@ -102,15 +104,20 @@ void init_model(py::module_& m) {
              return absl::Substitute("<model_cc.GenericCCModel of type $0.",
                                      a.name());
            })
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("Predict", WithStatusOr(&GenericCCModel::Predict),
            py::arg("dataset"))
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("Evaluate", WithStatusOr(&GenericCCModel::Evaluate),
            py::arg("dataset"), py::arg("options"))
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("Analyze", WithStatusOr(&GenericCCModel::Analyze),
            py::arg("dataset"), py::arg("options"))
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("AnalyzePrediction",
            WithStatusOr(&GenericCCModel::AnalyzePrediction), py::arg("dataset"),
            py::arg("options"))
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("Save", WithStatus(&GenericCCModel::Save), py::arg("directory"),
            py::arg("file_prefix"))
       .def("name", &GenericCCModel::name)
@@ -126,6 +133,7 @@ void init_model(py::module_& m) {
       .def("input_features", &GenericCCModel::input_features)
       .def("hyperparameter_optimizer_logs",
            &GenericCCModel::hyperparameter_optimizer_logs)
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("Benchmark", WithStatusOr(&GenericCCModel::Benchmark),
            py::arg("dataset"), py::arg("benchmark_duration"),
            py::arg("warmup_duration"), py::arg("batch_size"))

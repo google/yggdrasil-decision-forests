@@ -130,7 +130,11 @@ class GenericCCLearner {
           std::reference_wrapper<const dataset::VerticalDataset>>
           validation_dataset = std::nullopt) const {
     EnableUserInterruption();
-    auto model = learner_->TrainWithStatus(dataset, validation_dataset);
+    absl::StatusOr<std::unique_ptr<model::AbstractModel>> model;
+    {
+      py::gil_scoped_release release;
+      model = learner_->TrainWithStatus(dataset, validation_dataset);
+    }
     DisableUserInterruption();
     RETURN_IF_ERROR(model.status());
     return CreateCCModel(std::move(*model));
@@ -149,8 +153,12 @@ class GenericCCLearner {
                        dataset::GetTypedPath(validation_dataset_path.value()));
     }
     EnableUserInterruption();
-    auto model = learner_->TrainWithStatus(typed_dataset_path, data_spec,
-                                           typed_valid_path);
+    absl::StatusOr<std::unique_ptr<model::AbstractModel>> model;
+    {
+      py::gil_scoped_release release;
+      model = learner_->TrainWithStatus(typed_dataset_path, data_spec,
+                                        typed_valid_path);
+    }
     DisableUserInterruption();
     RETURN_IF_ERROR(model.status());
     return CreateCCModel(std::move(*model));
@@ -215,12 +223,15 @@ void init_learner(py::module_& m) {
            [](const GenericCCLearner& a) {
              return "<learner_cc.GenericCCLearner";
            })
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("Train", WithStatusOr(&GenericCCLearner::Train), py::arg("dataset"),
            py::arg("validation_dataset") = py::none())
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("TrainFromPathWithDataSpec",
            WithStatusOr(&GenericCCLearner::TrainFromPathWithDataSpec),
            py::arg("dataset_path"), py::arg("data_spec"),
            py::arg("validation_dataset_path"))
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("TrainFromPathWithGuide",
            WithStatusOr(&GenericCCLearner::TrainFromPathWithGuide),
            py::arg("dataset_path"), py::arg("data_spec_guide"),

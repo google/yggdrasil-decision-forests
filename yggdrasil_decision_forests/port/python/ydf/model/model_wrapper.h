@@ -38,6 +38,7 @@
 #include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace py = ::pybind11;
 
@@ -81,8 +82,8 @@ class GenericCCModel {
 
   // Benchmark the inference speed of the model.
   absl::StatusOr<BenchmarkInferenceCCResult> Benchmark(
-      const dataset::VerticalDataset& dataset, const double benchmark_duration,
-      const double warmup_duration, const int batch_size);
+      const dataset::VerticalDataset& dataset, double benchmark_duration,
+      double warmup_duration, int batch_size);
 
   // Gets an engine of the model. If the engine does not exist, create it.
   // This method is not thread safe.
@@ -137,7 +138,8 @@ class GenericCCModel {
 
  protected:
   std::unique_ptr<model::AbstractModel> model_;
-  std::unique_ptr<serving::FastEngine> engine_;
+  utils::concurrency::Mutex engine_mutex_;
+  std::unique_ptr<serving::FastEngine> engine_ GUARDED_BY(engine_mutex_);
 };
 
 }  // namespace yggdrasil_decision_forests::port::python
