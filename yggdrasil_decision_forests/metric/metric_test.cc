@@ -38,6 +38,7 @@ namespace metric {
 namespace {
 
 using test::EqualsProto;
+using test::StatusIs;
 using ::testing::Bool;
 using ::testing::IsNan;
 
@@ -118,6 +119,24 @@ TEST(Metric, EvaluationOfClassification) {
   std::string report;
   CHECK_OK(AppendTextReportWithStatus(eval, &report));
   YDF_LOG(INFO) << "Report :\n " << report;
+}
+
+TEST(Metric, ClassificationSizeBound) {
+  // Create a fake column specification.
+  dataset::proto::Column label_column;
+  label_column.set_type(dataset::proto::ColumnType::CATEGORICAL);
+  label_column.set_name("label");
+  label_column.mutable_categorical()->set_number_of_unique_values(5000);
+  label_column.mutable_categorical()->set_is_already_integerized(true);
+
+  // Initialize.
+  proto::EvaluationResults eval;
+  proto::EvaluationOptions option;
+  EXPECT_OK(InitializeEvaluation(option, label_column, &eval));
+
+  label_column.mutable_categorical()->set_number_of_unique_values(46341);
+  EXPECT_THAT(InitializeEvaluation(option, label_column, &eval),
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(Metric, EvaluationOfClassificationWithNumericalWeights) {
