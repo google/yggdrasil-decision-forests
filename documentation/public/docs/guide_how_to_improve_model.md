@@ -88,7 +88,7 @@ decision_tree {
 ```python
 split_axis = "SPARSE_OBLIQUE"
 sparse_oblique_num_projections_exponent = 2
-sparse_oblique_normalization = 64
+sparse_oblique_normalization = "MIN_MAX"
 ```
 
 ## Random Categorical splits (GBT and RF)
