@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.0.8 - 2023-12-19
+
+### Features
+
+-   Improve training interruption in Jupyter notebooks.
+-   Training and inference is compatible with python threading.
+-   Add the model inspector, which allows to programmatically inspect the
+    structure of trees.
+-   Add a model editor, which allows to programmatically modify the structure of
+    trees.
+
+### Documentation
+
+-   Many new tutorials at ydf.readthedocs.io
+
+### Bug
+
+-   Fix display of plots in the model analysis.
+
+### Release music
+
+Les Anges dans nos campagnes. Traditional
+
 ## 0.0.7 - 2023-11-28
 
 ### Features
@@ -19,7 +42,7 @@ Knecht Ruprecht aus "Album für die Jugend" (Opus 86). Robert Schumann
 
 -   Add support categorical set features
 -   Add support for prediction analysis
--   Expose max_num_scanned_rows_to_infer_semantic and 
+-   Expose max_num_scanned_rows_to_infer_semantic and
     max_num_scanned_rows_to_compute_statistics
 -   Expose metadata on the model
 -   Expose initial predictions on the model
@@ -40,7 +63,7 @@ Knecht Ruprecht aus "Album für die Jugend" (Opus 86). Robert Schumann
 
 Die Holzauktion. Franz Meißner
 
-##  0.0.5 - 2023-11-10
+## 0.0.5 - 2023-11-10
 
 ### Features
 
