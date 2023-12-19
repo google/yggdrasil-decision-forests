@@ -14,8 +14,10 @@
 
 ::: ydf.start_worker
 
-<!-- ::: ydf.strict -->
+::: ydf.strict
 
 ::: ydf.ModelIOOptions
 
 ::: ydf.create_vertical_dataset
+
+::: ydf.ModelMetadata

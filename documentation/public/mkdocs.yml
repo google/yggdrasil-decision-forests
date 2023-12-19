@@ -159,7 +159,7 @@ plugins:
       execute: false
       include: ["*.ipynb"]
       allow_errors: false
-      include_requirejs: true
+      include_requirejs: false
   - gen-files:
       scripts:
         - copy_external.py
