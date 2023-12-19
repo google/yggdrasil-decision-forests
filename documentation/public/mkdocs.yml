@@ -44,8 +44,9 @@ nav:
   - Glossary 📙: glossary.md
   - For Googlers: http://go/ydf
   - Guides:
-    - Decision Forest class 🔗: https://developers.google.com/machine-learning/decision-forests
-    - How to improve a model 🃏: guide_how_to_improve_model.md 
+    - What are decision forests?: https://developers.google.com/machine-learning/decision-forests
+    - Improve model quality: guide_how_to_improve_model.md
+    - Improve training speed: guide_how_to_improve_learner.md
   - Task:
     - Classification: tutorial/classification.ipynb
     - Regression: tutorial/regression.ipynb
@@ -158,6 +159,7 @@ plugins:
       execute: false
       include: ["*.ipynb"]
       allow_errors: false
+      include_requirejs: true
   - gen-files:
       scripts:
         - copy_external.py

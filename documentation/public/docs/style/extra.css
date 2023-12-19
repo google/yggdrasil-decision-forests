@@ -1,5 +1,5 @@
 h2 {
-  margin: 0px !important;
+  margin: 0.6em 0 .64em !important;
 }
 
 h1#_1 {
@@ -24,10 +24,6 @@ h1#_1 {
   display: none;
 }
 
-.md-nav__item--section {
-  /*font-size: larger;*/
-}
-
 .md-nav__item {
   line-height: 1.1em;
 }
@@ -40,8 +36,21 @@ h1#_1 {
   margin-bottom: 0;
 }
 
+.md-nav__item--section label.md-nav__link  {
+  /* text-decoration: underline; */
+  color: #4051b5 !important;
+}
+
 .jp-OutputArea-executeResult {
   font-size: 10pt;
+}
+
+.jp-InputPrompt.jp-InputArea-prompt {
+  display: none !important;
+}
+
+.jp-OutputPrompt.jp-OutputArea-prompt {
+  display: none !important;
 }
 
 .md-typeset pre {
@@ -52,10 +61,6 @@ h1#_1 {
 
 .md-typeset code {
   font-size: 1em;
-}
-
-.md-nav__item--section label.md-nav__link  {
-  text-decoration: underline;
 }
 
 .md-ellipsis {

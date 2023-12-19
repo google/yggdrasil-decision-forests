@@ -1,11 +1,22 @@
-# How to improve a model?
+# Improve model quality
 
-This page lists methods to improve the quality, speed, and size of YDF models.
+This document provides advice on how to improve the quality, speed, and size of
+a YDF model. The amount of improvement will vary depending on the dataset. In
+some cases, the changes will be minor, while in others, they may be significant.
+It is not possible to know in advance how much improvement a given change will
+produce.
 
-**Note:** Understanding how decision forests work helps understanding and using
-those algorithms. Learn more about decision forests algorithms in our
-[Decision Forests class](https://developers.google.com/machine-learning/decision-forests)
-on the Google Developer website.
+This guide is divided in two chapters: **Optimizing model quality** and
+**optimizing model speed**. In most cases, improving the model quality will also
+make it larger and slower, and vice versa. In other words, the predictive
+quality of a model is generally tied to its size.
+
+Having a basic understanding of how decision forests work is useful to optimize
+them. For more information, please refer to
+[Google's Decision Forests class](https://developers.google.com/machine-learning/decision-forests).
+
+The [hyper-parameter page](hyperparameters) lists and explains the available
+hyper-parameters.
 
 ## Random Forest or Gradient Boosted Trees?
 
@@ -14,236 +25,208 @@ algorithms for training decision forests. Each algorithm has its own set of
 strengths and weaknesses. At a high level, RFs are less prone to overfitting
 than GBTs, making them a good choice for small datasets and datasets with a
 large number of input features. On the other hand, GBTs learn more efficiently
-than RFs. On large datasets, GBTs can lead to significantly stronger models.
-Additionally, GBT models are often much smaller and allow for faster inference
-than comparable RF models. **Warning:** Both algorithms have hyperparameters in
-common, such as the number of trees and the maximum tree depth. However, these
-hyperparameters play a different role in each algorithm and should be tuned
-accordingly. For example, the maximum tree depth of a GBT is typically between 3
-and 8, while it is rarely less than 16 in an RF.
+than RFs. Additionally, GBT models are often much smaller and allow for faster
+inference than comparable RF models.
 
-## Automated hyper-parameter tuning
+When optimizing for speed, use GBT. When optimizing for quality, both algorithms
+should be tested.
+
+**Warning:** Both algorithms have hyperparameters in common, such as the number
+of trees and the maximum tree depth. However, these hyperparameters play a
+different role in each algorithm and should be tuned accordingly. For example,
+the maximum tree depth of a GBT is typically between 3 and 8, while it is rarely
+less than 16 in an RF.
+
+## Optimizing model quality
+
+### Automated hyper-parameter tuning
 
 Automated hyperparameter tuning is a simple but expensive solution to improve
 the quality of a model. When full hyper-parameter tuning is too expensive,
-combining hyper-parameter tuning and manual tuning (explained in the next
-sections) is a good solution.
+combining hyper-parameter tuning and manual tuning is a good solution.
+
+See the [Tuning notebook](tutorial/tuning/) for details.
 
 ## Hyper-parameter templates
 
 The default hyperparameters of YDF learners are set to reproduce the originally
-published algorithms. As such, they are not necessarily optimized for
-performance. This can lead to reasonable, but not optimal, results. For the user
-to benefit from the latest YDF algorithm without having understood those
-hyper-parameters and without having to run hyper-parameter tuning, YDF have
-pre-configured hyper-parameter templates.
+published algorithms,a new methods are always disabled by default.
 
-## Number of trees (GBT and RF)
+As such, default parameters are not optimized for performance, which can lead to
+reasonable, but not optimal, results. To benefit from the latest YDF algorithm
+without having understood those hyper-parameters and without having to run
+hyper-parameter tuning, YDF have pre-configured **hyper-parameter templates**.
 
-The size and representational power of a model are controlled by the number of
-trees. In the case of Random Forest, the model quality improves with the
-addition of more trees until a plateau. Increasing the number of trees in Random
-Forest does not lead to overfitting. For the Random Forest algorithm to function
-properly, there should be a large number of trees (200 is the minimum, 1000 is a
-good number) with a high depth (16 is a good default value). For Gradient
-Boosted Trees, the model quality improves with the addition of more trees until
-the model begins to overfit. At this point, the model training will stop
-automatically. Increasing the number of trees while also increasing model
-regularization (such as shrinkage or attribute sampling) typically improves the
-model quality.
+The hyper-parameter templates are available by calling
+[hyperparameter_templates](py_api/GradientBoostedTreesLearner/#ydf.GradientBoostedTreesLearner.hyperparameter_templates)
+on a learner.
 
-## Best first global growth strategy (GBT only)
+```python
+# List the available templates for the GBT learner.
+templates = ydf.GradientBoostedTreesLearner.hyperparameter_templates()
+print(templates)
 
-By default, trees are trained using a greedy divide-and-conquer approach. An
-alternative and more modern method is to train trees globally (called
-growing_strategy=`BEST_FIRST_GLOBAL`). While it does not always perform better,
-it is generally worth trying. When using global tree optimization, the maximum
-number of nodes should be tuned instead of the maximum depth.
+# Use the "better_defaultv1" template:
+learner = ydf.GradientBoostedTreesLearner(**templates["better_defaultv1"], ...)
+```
 
-## Oblique splits (GBT and RF)
+Hyper-parameter templates are also available on the
+[Hyper-parameter page](hyperparameters/#hyper-parameter-templates). Note that
+different learners have different templates.
 
-By default, trees are "orthogonal" i.e. each split/condition tests a single
-feature. By opposition, conditions in oblique trees can use multiple features.
-Oblique splits generally improve performances.
+### Increase the number of trees
+
+The `num_trees` parameter controls the number of trees in the model. Increasing
+the number of trees often improve the quality of the model. By default, YDF
+trains models with 300 trees. For high quality models, using 1000 or even more
+trees is sometimes valuable.
+
+**Note:** When training a gradient boosted trees model with early stopping (the
+default behavior), early stopping may reduce the number of trees in the model to
+a value less than "num_trees".
+
+### Use oblique trees
+
+By default, trees are "orthogonal" or "axis aligned", that is, each
+split/condition tests a single feature. By opposition, conditions in oblique
+trees can use multiple features. Oblique splits generally improve performances
+by are slower to train.
 
 Oblique trees are more expensive to train. The `num_projections_exponent`
 parameter plays an important role in the training time and final model quality
-(1 is cheap, 2 is better but more expensive). See the
-[training configuration](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto#L152)
+(1 is cheap, 2 is better but more expensive). See `SparseObliqueSplit` in the
+[DecisionTreeTrainingConfig](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto#L152)
 for more details.
 
-**Training config:**
-
-```proto
-decision_tree {
-    sparse_oblique_split {
-       num_projections_exponent : 1.5
-       normalization: NONE
-    }
-  }
-```
-
-**Generic hyper-parameter:**
-
 ```python
-split_axis = "SPARSE_OBLIQUE"
-sparse_oblique_num_projections_exponent = 2
-sparse_oblique_normalization = "MIN_MAX"
+learner = ydf.RandomForestLearner(
+  split_axis="SPARSE_OBLIQUE",
+  sparse_oblique_normalization="MIN_MAX",
+  sparse_oblique_num_projections_exponent=1,
+  ...)
 ```
 
 ## Random Categorical splits (GBT and RF)
 
-By default, categorical splits are learned with the CART algorithm. Training
-categorical split with the Random algorithm can improve the model performances
-at the expense of model size.
-
-**Training config:**
-
-```proto
-decision_tree {
-    categorical {
-      random {}
-    }
-  }
-```
-
-**Generic hyper-parameter:**
+By default, categorical splits are learned with the CART categorical algorithm.
+The Random categorical algorithm is another solution that can improve the model
+performances at the expense of model size.
 
 ```python
-categorical_algorithm = "RANDOM"
+learner = ydf.RandomForestLearner(categorical_algorithm="RANDOM", ...)
 ```
 
-## Hessian splits (GBT only)
+## Reduce shrinkage [GBT only]
 
-By default, splits are scored with a first-order approximation of the gradient.
-Using a second-order approximation, also called hessian splots, can improve the
-performance.
+The "shrinkage", sometimes referred to as the "learning rate", determines how
+quickly a GBT model learns. Learning slowly can improve the model quality.
+`shrinkage` defaults to 0.1. You can try 0.05 or 0.02.
 
-**Training config:**
+## Other impactful hyper-parameters for GBT
 
-```proto
-use_hessian_gain: true
-```
+While all hyperparameters and can improve the model's quality, some
+hyperparameters have a greater impact than others. In addition to the parameters
+mentioned above, the following are the most important parameters for GBT:
 
-**Generic hyper-parameter:**
+-   `use_hessian_gain` (default `False`). For example try
+    `use_hessian_gain=True`.
+-   `max_depth` (default `6`). For example try `max_depth=5`.
+-   `num_candidate_attributes_ratio` (default `1`). For example try
+    `num_candidate_attributes_ratio=0.9`.
+-   `min_examples` (default `5`). For example try `min_examples=10`.
+-   `growing_strategy` (default `"LOCAL"`). For example try
+    `growing_strategy="BEST_FIRST_GLOBAL"`.
 
-```python
-use_hessian_gain = "true"
-```
+**Note:** When training a model with `growing_strategy=LOCAL` (default), it is
+often beneficial to tune the `max_depth` parameter (default 6). When training a
+model with `growing_strategy=BEST_FIRST_GLOBAL`, it is best to leave `max_depth`
+unconstrained (default -1) and tune the `max_num_nodes` parameter instead.
 
 ## Disabling the validation dataset (GBT only)
 
-By default, GBT extracts a sample of the training dataset to build a validation
-dataset (default to 10%). For small datasets, it might be good to use all the
-data for training (and therefore disable early-stopping). In this case, the
+By default, if not validation dataset is provided, the Gradient Boosted Trees
+learner extracts 10% of the training dataset to build a validation dataset to
+control early stopping (i.e. stop the training when the model start to overfit).
+
+For both small datasets and large datasets, it might be good to use all the data
+for training (and therefore disable early-stopping). In this case, the
 `num_trees` parameter should be tuned.
 
-**Training config:**
-
-```proto
-validation_set_ratio: 0.0
-early_stopping: NONE
+```python
+learner = ydf.GradientBoostedTreesLearner(validation_set_ratio=0., ...)
 ```
 
-**Generic hyper-parameter:**
+**Warning:** Disabling early stopping may cause the model to overfit. To avoid
+this, first run your training **with early stopping** to determine the optimal
+number of trees. For instance, if early stopping never triggers before the end
+of training, you can probably disable it (and use the extra data for training).
+If early stopping always triggers close to a given number of trees, you might
+also do the same. Keep in mind that changing any other hyperparameter will
+require you to retest the behavior of early stopping.
+
+## Optimizing model speed (and size)
+
+The speed and size of a model is constrained by the number of input features,
+number of trees and average depth of the trees.
+
+You can measure the inference speed of a model with the
+[benchmark](py_api/GradientBoostedTreesModel/#ydf.GradientBoostedTreesModel.benchmark)
+method.
 
 ```python
-validation_ratio = 0.0
-early_stopping = "NONE"
+model.benchmark(dataset)
 ```
 
-## Disabling winner take all (RF only)
+**Example of results**
 
-By default, each tree in an RF is voting for a single class. When disabling
-winner takes all, each tree is voting for the distribution of classes. This
-generally improves the model.
-
-**Training config:**
-
-```proto
-winner_take_all_inference: false
+```
+Inference time per example and per cpu core: 0.702 us (microseconds)
+Estimated over 441 runs over 3.026 seconds.
+* Measured with the C++ serving API. Check model.to_cpp() for details.
 ```
 
-**Generic hyper-parameter:**
+### Switch from a Random Forest to a Gradient Boosted Trees
+
+Random Forest models are much larger and slower than Gradient Boosted trees.
+When speed is important, use Gradient Boosted trees models.
 
 ```python
-winner_take_all = "false"
+# Before
+learner = ydf.RandomForestLearner(...)
+
+# After
+learner = ydf.GradientBoostedTreesLearner(...)
 ```
 
-## Super Learners
+### Reduce the number of trees
 
-Following are examples of GBT and RF training configurations with all the method
-listed above:
+The `num_trees` parameter controls the number of trees in the model. Reducing
+this parameter will decrease the size of the model at the expense of the model
+quality.
 
-```proto
-learner: "GRADIENT_BOOSTED_TREES"
+**Note:** When training a gradient boosted trees model with early stopping (the
+default behavior), early stopping may reduce the number of trees in the model to
+a value less than "num_trees".
 
-[yggdrasil_decision_forests.model.gradient_boosted_trees.proto.gradient_boosted_trees_config] {
-  num_trees: 1000
-  use_hessian_gain: true
-  validation_set_ratio: 0.0
-  early_stopping: NONE
-  decision_tree {
-    growing_strategy_best_first_global { max_num_nodes: 64 }
-    sparse_oblique_split {}
-    categorical { random {} }
-  }
-}
-```
+When training with a `growing_strategy="BEST_FIRST_GLOBAL"`, it is best to not
+limit the maximum number of trees and to optimize `max_num_nodes` instead.
 
-```proto
-learner: "RANDOM_FOREST"
+### Remove model debugging data
 
-[yggdrasil_decision_forests.model.random_forest.proto.random_forest_config] {
-  num_trees: 1000
-  winner_take_all_inference: false
-  decision_tree {
-    sparse_oblique_split {}
-    categorical { random {} }
-  }
-}
-```
+YDF models include metadata for model interpretation and debugging. This
+metadata is not used for model inference and can be discarded to reduce the
+model size. Removing this data will typically reduce the model size by ~50%.
+Removing this data does not improve the model's speed.
 
-## Improving the size of the model
-
-The size of a model is critical in some applications. YDF models range from a
-few KB to a few GB. The following sections list some way you can reduce the size
-of a model.
-
-### 1. Switch from a Random Forest to a Gradient Boosted Trees
-
-Random Forests models are significantly larger and slower than Gradient Boosted
-Trees.
-
-**TensorFlow Decision Forests code**
+To train a model without metadata, set the learner constructor argument
+`pure_serving_model=True`.
 
 ```python
-# learner = ydf.RandomForestLearner()
-learner = ydf.GradientBoostedTreesLearner()
+learner = ydf.GradientBoostedTreesLearner(pure_serving_model=True, ...)
 ```
 
-### 2. Remove model meta-data
-
-YDF models contain meta-data used for model interpretation and debugging. This
-meta-data is not used for model inference and can be discarded to decrease the
-model size.
-
-The meta-data can be removed with the argument `pure_serving_model=True`.
-
-**TensorFlow Decision Forests code**
-
-```python
-learner = ydf.RandomForestLearner(pure_serving_model=True)
-```
-
-**Yggdrasil Decision Forests training configuration**
-
-```python
-pure_serving_model: true
-```
-
-The meta-data of an already existing model can be removed with the the
-`edit_model` CLI tool:
+If using the CLI API, the meta-data can be removed with the `edit_model` CLI
+tool:
 
 ```shell
 # Remove the meta-data from the model
@@ -254,60 +237,40 @@ du -h /tmp/model_with_metadata
 du -h /tmp/model_without_metadata
 ```
 
-Results:
+### Set `winner_take_all_inference=False` with Random Forests
 
-```
-528K /tmp/model_with_metadata
-264K /tmp/model_without_metadata
-```
+The `winner_take_all_inference` parameter of the Random Forest learner is set to
+True by default. This ensures that by default, the YDF Random Forest is
+equivalent to the original random forest by Breiman.
 
-### 3. Ensure that the model is correctly trained
-
-Unique ID-like features (e.g., user id) that cannot be generated about will make
-the model grows without benefit. Make sure to not include such type of input
-features.
-
-ID-like features can be spotted using the variable importance. They generally
-have high "number of nodes" variable importance while all the other variable
-importance measures are low.
-
-### 4. Reduce the number of trees
-
-The `num_trees` parameter controls the number of trees in the model. Reducing
-this parameter will decrease the size of the model at the expense of the model
-quality.
-
-### 5. Disable `winner_take_all_inference` with Random Forests
-
-The `winner_take_all_inference` parameters (true by default) can make Random
-Forest models are large. Try disabling it.
-
-**TensorFlow Decision Forests code**
+However, in many cases `winner_take_all_inference=False` can reduce the size and
+improve the quality of a Random Forest model.
 
 ```python
-model = tfdf.keras.RandomForestModel(winner_take_all=False)
+learner = ydf.RandomForestLearner(winner_take_all=False, ...)
 ```
 
-**Yggdrasil Decision Forests training configuration**
-
-```python
-winner_take_all_inference: false
-```
-
-### 6. Set `maximum_model_size_in_memory_in_bytes`
+### Set `maximum_model_size_in_memory_in_bytes=...`
 
 The `maximum_model_size_in_memory_in_bytes` parameter controls the maximize size
-of the model when loaded in memory. By setting this value, you can control the
-final size of the model.
+of the model in RAM. By setting this value, you can control the final size of
+the model.
 
-**TensorFlow Decision Forests code**
-
-```python
-model = tfdf.keras.RandomForestModel(maximum_model_size_in_memory_in_bytes=10e+9  # 10GB)
-```
-
-**Yggdrasil Decision Forests training configuration**
+The size of the model in RAM can be larger than the size of the model on disk.
+The RAM used to load the model corresponds to the size of the model in RAM.
+Before running model inference, the model is compiled into a generally smaller
+format.
 
 ```python
-maximum_model_size_in_memory_in_bytes: 10e+9  # 10GB
+# Model limited to 10GB
+learner = ydf.RandomForestLearner(maximum_model_size_in_memory_in_bytes=10e+9, ...)
 ```
+
+Different learning algorithms enforce the maximum size differently.
+
+## Increase shrinkage [GBT only]
+
+The "shrinkage", sometimes referred to as the "learning rate", determines how
+quickly a GBT model learns. Learning too quickly typically results in inferior
+results but produces smaller, faster-to-train, and faster-to-run models.
+`shrinkage` defaults to 0.1. You can try 0.15 or event 0.2.
