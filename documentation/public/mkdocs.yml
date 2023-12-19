@@ -77,7 +77,9 @@ nav:
     - C++: tutorial/cpp.ipynb
     - TF Serving: tutorial/tf_serving.ipynb
     # TODO: Add Benchmarking, C++, Go, Cli, Python, F Serving, and Js
-  #- Advanced:
+  - Advanced:
+    - Inspecting trees: tutorial/inspecting_trees.ipynb
+    - Editing trees: tutorial/editing_trees.ipynb
   #  - example distance: tutorial/example_distance.ipynb
     # TODO: model inspection, manual tree creation, custom loss.
   - Other APIs:
