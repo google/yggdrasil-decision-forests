@@ -63,7 +63,7 @@ void (*existing_signal_handler_int)(int) = nullptr;
 void (*existing_signal_handler_alarm)(int) = nullptr;
 #endif
 
-void ReceiveSigna(int signal) {
+void ReceiveSignal(int signal) {
   if (!stop_training) {
     YDF_LOG(INFO) << "Stopping all active trainings";
     stop_training = true;
@@ -84,12 +84,12 @@ void ReceiveSigna(int signal) {
 void EnableUserInterruption() {
   // One more model is training
   if (active_learners.fetch_add(1) == 0) {
-    existing_signal_handler_int = std::signal(SIGINT, ReceiveSigna);
+    existing_signal_handler_int = std::signal(SIGINT, ReceiveSignal);
     if (existing_signal_handler_int == SIG_ERR) {
       YDF_LOG(WARNING) << "Cannot set SIGINT handler";
     }
 #ifndef _WIN32
-    existing_signal_handler_alarm = std::signal(SIGALRM, ReceiveSigna);
+    existing_signal_handler_alarm = std::signal(SIGALRM, ReceiveSignal);
     if (existing_signal_handler_alarm == SIG_ERR) {
       YDF_LOG(WARNING) << "Cannot set SIGALRM handler";
     }
@@ -97,14 +97,13 @@ void EnableUserInterruption() {
   }
 }
 
-void DisableUserInterruption() {
+absl::Status DisableUserInterruption() {
   // Reset the stop training flag and remove the signal handler if all the
   // models are done training
   if (active_learners.fetch_sub(1) != 1) {
-    return;
+    return absl::OkStatus();
   }
 
-  stop_training = false;
   if (existing_signal_handler_int &&
       std::signal(SIGINT, existing_signal_handler_int) == SIG_ERR) {
     YDF_LOG(WARNING) << "Cannot unset SIGINT handler";
@@ -115,6 +114,11 @@ void DisableUserInterruption() {
     YDF_LOG(WARNING) << "Cannot unset SIGALRM handler";
   }
 #endif
+  if (stop_training) {
+    stop_training = false;
+    return absl::InvalidArgumentError("Operation interrupted by user");
+  }
+  return absl::OkStatus();
 }
 
 class GenericCCLearner {
@@ -135,7 +139,7 @@ class GenericCCLearner {
       py::gil_scoped_release release;
       model = learner_->TrainWithStatus(dataset, validation_dataset);
     }
-    DisableUserInterruption();
+    RETURN_IF_ERROR(DisableUserInterruption());
     RETURN_IF_ERROR(model.status());
     return CreateCCModel(std::move(*model));
   }
@@ -159,7 +163,7 @@ class GenericCCLearner {
       model = learner_->TrainWithStatus(typed_dataset_path, data_spec,
                                         typed_valid_path);
     }
-    DisableUserInterruption();
+    RETURN_IF_ERROR(DisableUserInterruption());
     RETURN_IF_ERROR(model.status());
     return CreateCCModel(std::move(*model));
   }
@@ -192,7 +196,7 @@ class GenericCCLearner {
                      model::EvaluateLearnerOrStatus(
                          *learner_, dataset, fold_generator, evaluation_options,
                          deployment_evaluation));
-    DisableUserInterruption();
+    RETURN_IF_ERROR(DisableUserInterruption());
     return evaluation;
   }
 

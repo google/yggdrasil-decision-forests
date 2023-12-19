@@ -286,11 +286,9 @@ class RandomForestLearnerTest(LearnerTest):
         num_trees=1000000,  # Trains for a very long time
     )
 
-    signal.alarm(3)
-    model = learner.train(ds)
-    self.assertEqual(model.task(), generic_learner.Task.CLASSIFICATION)
-    # Test that the model is functionnal
-    _ = model.evaluate(ds)
+    signal.alarm(5)  # Stop the training in 5 seconds
+    with self.assertRaises(ValueError):
+      _ = learner.train(ds)
 
   def test_cross_validation(self):
     ds = pd.read_csv(
