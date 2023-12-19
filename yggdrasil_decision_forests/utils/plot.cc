@@ -127,6 +127,10 @@ absl::StatusOr<std::string> ExportToHtml(const MultiPlot& multiplot,
     const auto& item = multiplot.items[item_idx];
     auto sub_options = options;
 
+    if (!sub_options.html_id_prefix.empty()) {
+      absl::StrAppend(&sub_options.html_id_prefix, "_item", item_idx);
+    }
+
     // The checking is already done above.
     sub_options.run_checks = false;
 
