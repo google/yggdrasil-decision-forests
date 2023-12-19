@@ -57,6 +57,21 @@ class DecisionForestCCModel : public GenericCCModel {
   absl::StatusOr<std::vector<model::decision_tree::proto::Node>> GetTree(
       int tree_idx) const;
 
+  // Sets a tree from a list of nodes in a depth-first, negative-first,
+  // transversal order.
+  absl::Status SetTree(
+      int tree_idx,
+      const std::vector<model::decision_tree::proto::Node>& nodes);
+
+  // Adds a tree from a list of nodes in a depth-first, negative-first,
+  // transversal order.
+  absl::Status AddTree(
+      const std::vector<model::decision_tree::proto::Node>& nodes);
+
+  // Removes a tree from a list of nodes in a depth-first, negative-first,
+  // transversal order.
+  absl::Status RemoveTree(int tree_idx);
+
  protected:
   // `model` and `df_model` must correspond to the same object.
   DecisionForestCCModel(std::unique_ptr<model::AbstractModel>&& model,

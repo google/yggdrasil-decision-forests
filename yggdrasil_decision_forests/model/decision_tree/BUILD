@@ -38,6 +38,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -110,7 +111,10 @@ cc_library_ydf(
     name = "builder",
     srcs = ["builder.cc"],
     hdrs = ["builder.h"],
-    deps = [":decision_tree"],
+    deps = [
+        ":decision_tree",
+        "@com_google_absl//absl/types:span",
+    ],
 )
 
 # Proto
@@ -132,6 +136,7 @@ cc_test(
         "//yggdrasil_decision_forests/test_data",
     ],
     deps = [
+        ":builder",
         ":decision_tree",
         ":decision_tree_cc_proto",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",

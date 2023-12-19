@@ -18,6 +18,8 @@
 #include <utility>
 #include <vector>
 
+#include "absl/types/span.h"
+
 namespace yggdrasil_decision_forests::model::decision_tree {
 
 std::pair<TreeBuilder, TreeBuilder> TreeBuilder::ConditionIsGreater(
@@ -29,6 +31,26 @@ std::pair<TreeBuilder, TreeBuilder> TreeBuilder::ConditionIsGreater(
       ->mutable_condition()
       ->mutable_higher_condition()
       ->set_threshold(threshold);
+  return {TreeBuilder(node_->mutable_pos_child()),
+          TreeBuilder(node_->mutable_neg_child())};
+}
+
+std::pair<TreeBuilder, TreeBuilder> TreeBuilder::ConditionOblique(
+    absl::Span<const int> attributes, absl::Span<const float> weights,
+    float threshold) {
+  DCHECK(!attributes.empty());
+  DCHECK_EQ(weights.size(), attributes.size());
+
+  node_->CreateChildren();
+  node_->mutable_node()->mutable_condition()->set_attribute(attributes.front());
+  auto* oblique_condition = node_->mutable_node()
+                                ->mutable_condition()
+                                ->mutable_condition()
+                                ->mutable_oblique_condition();
+  oblique_condition->set_threshold(threshold);
+  *oblique_condition->mutable_attributes() = {attributes.begin(),
+                                              attributes.end()};
+  *oblique_condition->mutable_weights() = {weights.begin(), weights.end()};
   return {TreeBuilder(node_->mutable_pos_child()),
           TreeBuilder(node_->mutable_neg_child())};
 }

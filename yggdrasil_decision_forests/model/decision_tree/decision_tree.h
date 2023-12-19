@@ -411,6 +411,11 @@ absl::Status Distance(
     const absl::optional<std::reference_wrapper<std::vector<float>>>&
         tree_weights = {});
 
+// Lists the input features used by the trees. The input features are given as
+// sorted column indices.
+std::vector<int> input_features(
+    absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees);
+
 }  // namespace decision_tree
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

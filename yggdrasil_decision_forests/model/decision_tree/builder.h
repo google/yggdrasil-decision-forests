@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 
 namespace yggdrasil_decision_forests::model::decision_tree {
@@ -37,6 +38,13 @@ class TreeBuilder {
   // Creates a condition of the type "attribute >= threshold".
   std::pair<TreeBuilder, TreeBuilder> ConditionIsGreater(int attribute,
                                                          float threshold);
+
+  // Creates a condition of the type "\sum attributes_i * weights_i >=
+  // threshold". "attributes" and "weights" should have the same size.
+  // "attributes" cannot be empty.
+  std::pair<TreeBuilder, TreeBuilder> ConditionOblique(
+      absl::Span<const int> attributes, absl::Span<const float> weights,
+      float threshold);
 
   // Creates a condition of the type "attribute in mask".
   std::pair<TreeBuilder, TreeBuilder> ConditionContains(

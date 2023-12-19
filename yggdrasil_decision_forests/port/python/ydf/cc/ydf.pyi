@@ -8,10 +8,10 @@ from google3.third_party.yggdrasil_decision_forests.learner import abstract_lear
 from google3.third_party.yggdrasil_decision_forests.metric import metric_pb2
 from google3.third_party.yggdrasil_decision_forests.model import abstract_model_pb2
 from google3.third_party.yggdrasil_decision_forests.model import hyperparameter_pb2
+from google3.third_party.yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
+from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import model_analysis_pb2
-from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
-from google3.third_party.yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 
 # pylint: disable=g-wrong-blank-lines
 
@@ -160,6 +160,19 @@ class DecisionForestCCModel(GenericCCModel):
       self,
       tree_idx: int,
   ) -> List[decision_tree_pb2.Node]: ...
+  def SetTree(
+      self,
+      tree_idx: int,
+      nodes: Sequence[decision_tree_pb2.Node],
+  ) -> None: ...
+  def AddTree(
+      self,
+      nodes: Sequence[decision_tree_pb2.Node],
+  ) -> None: ...
+  def RemoveTree(
+      self,
+      tree_idx: int,
+  ) -> None: ...
 
 class RandomForestCCModel(DecisionForestCCModel):
   @property

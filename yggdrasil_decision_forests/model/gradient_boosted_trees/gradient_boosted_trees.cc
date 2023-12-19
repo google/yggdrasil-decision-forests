@@ -151,7 +151,11 @@ absl::Status GradientBoostedTreesModel::Validate() const {
   }
 
   if ((decision_trees_.size() % num_trees_per_iter_) != 0) {
-    return absl::InvalidArgumentError("Invalid number of trees in GBDT");
+    return absl::InvalidArgumentError(
+        absl::StrCat("Invalid number of trees in the gradient boosted tree "
+                     "models. The number of trees should be a multiple of ",
+                     num_trees_per_iter_, ". Instead, got ",
+                     decision_trees_.size(), " trees."));
   }
 
   int expected_initial_predictions_size = -1;

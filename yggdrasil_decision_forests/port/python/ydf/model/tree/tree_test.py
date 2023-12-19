@@ -36,24 +36,17 @@ ProtoNodeRegressorOutput = decision_tree_pb2.NodeRegressorOutput
 
 class TreeTest(absltest.TestCase):
 
-  def test_valid_input(self):
-    Tree(
-        root=NonLeaf(
-            condition=IsMissingInCondition(missing=True, score=3, attribute=0),
-            pos_child=Leaf(value=RegressionValue(value=1, num_examples=1)),
-            neg_child=Leaf(value=RegressionValue(value=2, num_examples=1)),
-        )
-    )
+  def setUp(self):
+    super().setUp()
 
-  def test_proto_nodes_to_tree_with_valid_input(self):
-    dataspec = data_spec_pb2.DataSpecification(
+    self.dataspec = data_spec_pb2.DataSpecification(
         columns=[
             data_spec_pb2.Column(
                 name="f1", type=data_spec_pb2.ColumnType.NUMERICAL
             )
         ]
     )
-    nodes = [
+    self.nodes = [
         ProtoNode(
             condition=ProtoNodeCondition(
                 attribute=0,
@@ -61,6 +54,7 @@ class TreeTest(absltest.TestCase):
                     higher_condition=ProtoCondition.Higher(threshold=2)
                 ),
                 split_score=3.0,
+                na_value=False,
             ),
         ),
         ProtoNode(
@@ -70,6 +64,7 @@ class TreeTest(absltest.TestCase):
                     higher_condition=ProtoCondition.Higher(threshold=4)
                 ),
                 split_score=5.0,
+                na_value=False,
             ),
             # Non leaf with a value
             regressor=ProtoNodeRegressorOutput(top_value=9.0),
@@ -78,8 +73,7 @@ class TreeTest(absltest.TestCase):
         ProtoNode(regressor=ProtoNodeRegressorOutput(top_value=7.0)),
         ProtoNode(regressor=ProtoNodeRegressorOutput(top_value=8.0)),
     ]
-    tree = tree_lib.proto_nodes_to_tree(nodes, dataspec)
-    expected_tree = Tree(
+    self.tree = Tree(
         root=NonLeaf(
             condition=NumericalHigherThanCondition(
                 missing=False, score=3.0, attribute=0, threshold=2.0
@@ -99,12 +93,28 @@ class TreeTest(absltest.TestCase):
             ),
         )
     )
-    self.assertEqual(tree, expected_tree)
+
+  def test_valid_input(self):
+    Tree(
+        root=NonLeaf(
+            condition=IsMissingInCondition(missing=True, score=3, attribute=0),
+            pos_child=Leaf(value=RegressionValue(value=1, num_examples=1)),
+            neg_child=Leaf(value=RegressionValue(value=2, num_examples=1)),
+        )
+    )
+
+  def test_proto_nodes_to_tree_with_valid_input(self):
+    tree = tree_lib.proto_nodes_to_tree(self.nodes, self.dataspec)
+    self.assertEqual(tree, self.tree)
     test_utils.golden_check_string(
         self,
-        tree.pretty(dataspec),
+        tree.pretty(self.dataspec),
         os.path.join(test_utils.pydf_test_data_path(), "toy_tree.txt"),
     )
+
+  def test_tree_to_proto_nodes_with_valid_input(self):
+    nodes = tree_lib.tree_to_proto_nodes(self.tree, self.dataspec)
+    self.assertEqual(nodes, self.nodes)
 
 
 if __name__ == "__main__":

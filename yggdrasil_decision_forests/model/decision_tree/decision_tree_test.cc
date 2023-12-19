@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "yggdrasil_decision_forests/model/decision_tree/builder.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -744,6 +745,29 @@ TEST(DecisionTree, CheckStructureNACondition) {
 
   EXPECT_FALSE(
       CheckStructure(CheckStructureOptions::NACondition(), dataspec, trees));
+}
+
+TEST(DecisionTree, InputFeatures) {
+  auto tree = std::make_unique<DecisionTree>();
+  TreeBuilder builder(tree.get());
+
+  dataset::proto::DataSpecification dataspec;
+  dataset::AddColumn("l", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+  dataset::AddColumn("f1", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+  dataset::AddColumn("f2", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+  dataset::AddColumn("f3", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+  dataset::AddColumn("f4", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+
+  auto [pos, l1] = builder.ConditionIsGreater(1, 1);
+  auto [l2, l3] = pos.ConditionOblique({2, 3}, {0.5f, 0.5f}, 1);
+  l1.LeafRegression(1);
+  l2.LeafRegression(2);
+  l3.LeafRegression(3);
+
+  std::vector<std::unique_ptr<decision_tree::DecisionTree>> trees;
+  trees.push_back(std::move(tree));
+
+  EXPECT_THAT(input_features(trees), ElementsAre(1, 2, 3));
 }
 
 }  // namespace

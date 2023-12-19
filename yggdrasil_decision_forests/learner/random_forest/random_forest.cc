@@ -237,7 +237,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
 
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamNumTrees);
-    param.mutable_integer()->set_minimum(1);
+    param.mutable_integer()->set_minimum(0);
     param.mutable_integer()->set_default_value(rf_config.num_trees());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(

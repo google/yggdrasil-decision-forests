@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -1429,6 +1430,30 @@ absl::Status Distance(
   }
 
   return absl::OkStatus();
+}
+
+std::vector<int> input_features(
+    absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees) {
+  absl::flat_hash_set<int> input_feature_set;
+  for (auto& tree : trees) {
+    tree->IterateOnNodes(
+        [&](const decision_tree::NodeWithChildren& node, const int depth) {
+          if (!node.IsLeaf()) {
+            if (node.node().condition().condition().has_oblique_condition()) {
+              const auto& oblique_condition =
+                  node.node().condition().condition().oblique_condition();
+              input_feature_set.insert(oblique_condition.attributes().begin(),
+                                       oblique_condition.attributes().end());
+            } else {
+              input_feature_set.insert(node.node().condition().attribute());
+            }
+          }
+        });
+  }
+  std::vector<int> input_features{input_feature_set.begin(),
+                                  input_feature_set.end()};
+  std::sort(input_features.begin(), input_features.end());
+  return input_features;
 }
 
 }  // namespace decision_tree

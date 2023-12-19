@@ -50,13 +50,15 @@
 
 namespace yggdrasil_decision_forests::port::python {
 
-absl::StatusOr<const serving::FastEngine*> GenericCCModel::GetEngine() {
+absl::StatusOr<std::shared_ptr<const serving::FastEngine>>
+GenericCCModel::GetEngine() {
   utils::concurrency::MutexLock lock(&engine_mutex_);
-  if (engine_ == nullptr) {
-    // Note: Not thread safe.
+  if (engine_ == nullptr || invalidate_engine_) {
+    RETURN_IF_ERROR(model_->Validate());
     ASSIGN_OR_RETURN(engine_, model_->BuildFastEngine());
+    invalidate_engine_ = false;
   }
-  return engine_.get();
+  return engine_;
 }
 
 absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
@@ -65,7 +67,7 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
   static_assert(predictions.itemsize() == sizeof(float),
                 "A C++ float should have the same size as a numpy float");
 
-  ASSIGN_OR_RETURN(const auto* engine, GetEngine());
+  ASSIGN_OR_RETURN(const auto engine, GetEngine());
 
   // Convert the prediction to the expected format.
   const int64_t num_prediction_dimensions = engine->NumPredictionDimension();
@@ -115,7 +117,7 @@ absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& options) {
   py::gil_scoped_release release;
-  ASSIGN_OR_RETURN(const auto* engine, GetEngine());
+  ASSIGN_OR_RETURN(const auto engine, GetEngine());
   utils::RandomEngine rnd;
   ASSIGN_OR_RETURN(const auto evaluation,
                    model_->EvaluateWithEngine(*engine, dataset, options, &rnd));
@@ -186,7 +188,7 @@ absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
                                                     /*.time =*/timing_options};
 
   // Run engines.
-  ASSIGN_OR_RETURN(const auto* engine, GetEngine());
+  ASSIGN_OR_RETURN(const auto engine, GetEngine());
   RETURN_IF_ERROR(
       utils::BenchmarkFastEngine(options, *engine, *model_, dataset, &results));
   if (results.empty()) {

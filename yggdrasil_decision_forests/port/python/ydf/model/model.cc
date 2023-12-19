@@ -173,6 +173,12 @@ void init_model(py::module_& m) {
       .def("Distance", WithStatusOr(&DecisionForestCCModel::Distance),
            py::arg("dataset1"), py::arg("dataset2"))
       .def("GetTree", WithStatusOr(&DecisionForestCCModel::GetTree),
+           py::arg("tree_idx"))
+      .def("SetTree", WithStatus(&DecisionForestCCModel::SetTree),
+           py::arg("tree_idx"), py::arg("nodes"))
+      .def("AddTree", WithStatus(&DecisionForestCCModel::AddTree),
+           py::arg("nodes"))
+      .def("RemoveTree", WithStatus(&DecisionForestCCModel::RemoveTree),
            py::arg("tree_idx"));
 
   py::class_<RandomForestCCModel,

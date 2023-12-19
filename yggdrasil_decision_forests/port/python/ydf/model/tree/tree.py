@@ -15,7 +15,7 @@
 """A decision tree."""
 
 import dataclasses
-from typing import Iterator, Optional, Sequence
+from typing import Iterator, List, Optional, Sequence
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 from ydf.model.tree import condition as condition_lib
@@ -59,7 +59,7 @@ class Tree:
       return "No root\n"
 
 
-def _recusive_build_node(
+def _recusive_build_tree(
     node_iterator: Iterator[decision_tree_pb2.Node],
     dataspec: data_spec_pb2.DataSpecification,
 ) -> node_lib.AbstractNode:
@@ -87,8 +87,8 @@ def _recusive_build_node(
     return node_lib.NonLeaf(
         value=value,
         condition=condition_lib.to_condition(proto_node.condition, dataspec),
-        neg_child=_recusive_build_node(node_iterator, dataspec),
-        pos_child=_recusive_build_node(node_iterator, dataspec),
+        neg_child=_recusive_build_tree(node_iterator, dataspec),
+        pos_child=_recusive_build_tree(node_iterator, dataspec),
     )
   else:
     return node_lib.Leaf(value=value_lib.to_value(proto_node))
@@ -99,4 +99,38 @@ def proto_nodes_to_tree(
     dataspec: data_spec_pb2.DataSpecification,
 ) -> Tree:
   """Creates a tree from an depth-first, negative-first list of nodes."""
-  return Tree(root=_recusive_build_node(iter(nodes), dataspec))
+  return Tree(root=_recusive_build_tree(iter(nodes), dataspec))
+
+
+def _list_nodes(
+    node: node_lib.AbstractNode,
+    dataspec: data_spec_pb2.DataSpecification,
+    nodes: List[decision_tree_pb2.Node],
+) -> None:
+  """Unrolls the nodes of a tree."""
+
+  if node.is_leaf:
+    assert isinstance(node, node_lib.Leaf)
+    proto_node = decision_tree_pb2.Node()
+    value_lib.set_proto_node(node.value, proto_node)
+    nodes.append(proto_node)
+  else:
+    assert isinstance(node, node_lib.NonLeaf)
+    proto_node = decision_tree_pb2.Node(
+        condition=condition_lib.to_proto_condition(node.condition, dataspec)
+    )
+    if node.value is not None:
+      value_lib.set_proto_node(node.value, proto_node)
+    nodes.append(proto_node)
+    _list_nodes(node.neg_child, dataspec, nodes)
+    _list_nodes(node.pos_child, dataspec, nodes)
+
+
+def tree_to_proto_nodes(
+    tree: Tree,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Sequence[decision_tree_pb2.Node]:
+  """Creates a depth-first list of proto nodes from a tree."""
+  nodes = []
+  _list_nodes(tree.root, dataspec, nodes)
+  return nodes

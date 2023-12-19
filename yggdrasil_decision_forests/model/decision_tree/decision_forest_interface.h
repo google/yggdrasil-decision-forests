@@ -42,6 +42,9 @@ class DecisionForestInterface {
   virtual const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
   decision_trees() const = 0;
 
+  virtual std::vector<std::unique_ptr<decision_tree::DecisionTree>>*
+  mutable_decision_trees() = 0;
+
   // Apply the model on an example in a VerticalDataset. Instead of the raw
   // prediction (like "AbstractModel::Predict"), this method returns the index
   // of the active leaf in each tree of the model.

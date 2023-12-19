@@ -35,7 +35,7 @@ class DecisionForestModel(generic_model.GenericModel):
     return self._model.num_trees()
 
   def get_tree(self, tree_idx: int) -> tree_lib.Tree:
-    """Gets a single model of the model.
+    """Gets a single tree of the model.
 
     Args:
       tree_idx: Index of the tree. Should be in [0, num_trees()).
@@ -82,6 +82,33 @@ class DecisionForestModel(generic_model.GenericModel):
     """
 
     file.write(self.get_tree(tree_idx).pretty(self.data_spec()))
+
+  def set_tree(self, tree_idx: int, tree: tree_lib.Tree) -> None:
+    """Overrides a single tree of the model.
+
+    Args:
+      tree_idx: Index of the tree. Should be in [0, num_trees()).
+      tree: New tree.
+    """
+    proto_nodes = tree_lib.tree_to_proto_nodes(tree, self.data_spec())
+    self._model.SetTree(tree_idx, proto_nodes)
+
+  def add_tree(self, tree: tree_lib.Tree) -> None:
+    """Adds a single tree of the model.
+
+    Args:
+      tree: New tree.
+    """
+    proto_nodes = tree_lib.tree_to_proto_nodes(tree, self.data_spec())
+    self._model.AddTree(proto_nodes)
+
+  def remove_tree(self, tree_idx: int) -> None:
+    """Removes a single tree of the model.
+
+    Args:
+      tree_idx: Index of the tree. Should be in [0, num_trees()).
+    """
+    self._model.RemoveTree(tree_idx)
 
   def predict_leaves(self, data: dataset.InputDataset) -> np.ndarray:
     """Gets the index of the active leaf in each tree.
