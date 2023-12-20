@@ -429,6 +429,10 @@ class AbstractModel {
         "PlotTrainingLogs not implemented for this model");
   }
 
+  // Compares two models. If the models are equal (except for the meta-data),
+  // return an empty string. Otherwise, returns a description of the difference.
+  virtual std::string DebugCompare(const AbstractModel& other) const;
+
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 

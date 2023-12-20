@@ -401,4 +401,18 @@ constexpr char kYdfTestMetricDumpDir[] = "";
 
 constexpr bool kYdfTestMetricCheckGold = false;
 
+namespace yggdrasil_decision_forests {
+namespace utils {
+
+// If kYdfTestMetricCheckGold=true, checks that "model" is equal to the model
+// stored in
+// "yggdrasil_decision_forests/test_data/golden/<model_name>". The
+// model meta-data is not compared. If kYdfTestMetricCheckGold=false, does
+// nothing.
+void ExpectEqualGoldenModel(const model::AbstractModel& model,
+                            absl::string_view model_name);
+
+}  // namespace utils
+}  // namespace yggdrasil_decision_forests
+
 #endif  // YGGDRASIL_DECISION_FORESTS_TOOL_TEST_UTILS_H_

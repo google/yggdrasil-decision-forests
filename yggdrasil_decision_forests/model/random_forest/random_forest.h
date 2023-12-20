@@ -239,6 +239,8 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
 
   absl::StatusOr<utils::plot::MultiPlot> PlotTrainingLogs() const override;
 
+  std::string DebugCompare(const AbstractModel& other) const override;
+
  private:
   // The decision trees.
   std::vector<std::unique_ptr<decision_tree::DecisionTree>> decision_trees_;

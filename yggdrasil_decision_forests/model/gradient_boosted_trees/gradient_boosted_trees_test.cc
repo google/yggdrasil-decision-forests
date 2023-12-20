@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 
+#include <memory>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -149,6 +151,20 @@ TEST(GradientBoostedTrees, WeightedMeanAbsLeafValue) {
 
   EXPECT_NEAR(internal::WeightedMeanAbsLeafValue(tree),
               (1. * 1. + 0.5 * 2.) / 3., 0.000001);
+}
+
+TEST(GradientBoostedTrees, CompareModel) {
+  std::unique_ptr<model::AbstractModel> model1;
+  std::unique_ptr<model::AbstractModel> model2;
+
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &model1));
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt_32cat"),
+      &model2));
+  EXPECT_THAT(model1->DebugCompare(*model2),
+              ::testing::ContainsRegex("Dataspecs don't match"));
 }
 
 }  // namespace

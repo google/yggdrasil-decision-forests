@@ -504,6 +504,21 @@ TEST(RandomForest, TFDFModel) {
   EXPECT_OK(LoadModel(saved_model_path, &loaded_model));
 }
 
+TEST(RandomForest, CompareModel) {
+  std::unique_ptr<model::AbstractModel> model1;
+  std::unique_ptr<model::AbstractModel> model2;
+
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
+      &model1));
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model",
+                     "adult_binary_class_rf_discret_numerical"),
+      &model2));
+  EXPECT_THAT(model1->DebugCompare(*model2),
+              ::testing::ContainsRegex("Dataspecs don't match"));
+}
+
 }  // namespace
 }  // namespace random_forest
 }  // namespace model

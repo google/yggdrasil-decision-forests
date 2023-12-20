@@ -179,6 +179,8 @@ class GradientBoostedTreesModel : public AbstractModel,
                         const dataset::VerticalDataset& dataset2,
                         absl::Span<float> distances) const override;
 
+  std::string DebugCompare(const AbstractModel& other) const override;
+
  private:
   void PredictClassification(const dataset::VerticalDataset& dataset,
                              dataset::VerticalDataset::row_t row_idx,

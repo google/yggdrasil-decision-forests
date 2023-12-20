@@ -1376,5 +1376,45 @@ absl::Status AbstractModel::MakePureServing() {
   return Validate();
 }
 
+#define STR_CHECK_EQ(a, b)                                       \
+  if (a != b) {                                                  \
+    return absl::StrCat(#a, " != ", #b, " i.e. ", a, " != ", b); \
+  }
+
+#define STR_CHECK_EQ_NO_PRINT(a, b)      \
+  if (a != b) {                          \
+    return absl::StrCat(#a, " != ", #b); \
+  }
+
+std::string AbstractModel::DebugCompare(const AbstractModel& other) const {
+  if (data_spec_.DebugString() != other.data_spec().DebugString()) {
+    return absl::StrCat("Dataspecs don't match.\n\n", data_spec_.DebugString(),
+                        "\nvs\n\n", other.data_spec().DebugString());
+  }
+
+  if (weights_.has_value() != other.weights().has_value()) {
+    return "Only one of the models has weights";
+  }
+  if (weights_.has_value() && other.weights().has_value()) {
+    if (weights_->DebugString() != other.weights_->DebugString()) {
+      return absl::StrCat("Weights don't match.\n\n", data_spec_.DebugString(),
+                          "\nvs\n\n", other.data_spec().DebugString());
+    }
+  }
+
+  STR_CHECK_EQ(name_, other.name_);
+  STR_CHECK_EQ(task_, other.task_);
+  STR_CHECK_EQ(label_col_idx_, other.label_col_idx_);
+  STR_CHECK_EQ(ranking_group_col_idx_, other.ranking_group_col_idx_);
+  STR_CHECK_EQ(uplift_treatment_col_idx_, other.uplift_treatment_col_idx_);
+  STR_CHECK_EQ_NO_PRINT(input_features_, other.input_features_);
+  STR_CHECK_EQ(classification_outputs_probabilities_,
+               other.classification_outputs_probabilities_);
+
+  // Note: We don't check for equality of meta-data.
+
+  return {};
+}
+
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

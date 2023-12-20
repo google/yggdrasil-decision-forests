@@ -269,6 +269,8 @@ TEST_F(RandomForestOnAdult, Base) {
       EXPECT_NE(vi.attribute_idx(), model_->label_col_idx());
     }
   }
+
+  utils::ExpectEqualGoldenModel(*model_, "rf_adult_base");
 }
 
 TEST_F(RandomForestOnAdult, PureServingModel) {
@@ -1258,6 +1260,28 @@ TEST_F(AutotunedRandomForestOnAdult, RandomTuner_MemoryDataset_LocalTraining) {
   TrainAndEvaluateModel();
   EXPECT_GE(metric::Accuracy(evaluation_), 0.86);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 10);
+}
+
+TEST_F(RandomForestOnAdult, Determinism) {
+  TrainAndEvaluateModel();
+  auto model_1 = std::move(model_);
+
+  TrainAndEvaluateModel();
+  auto model_2 = std::move(model_);
+
+  EXPECT_TRUE(model_1->DebugCompare(*model_2).empty());
+}
+
+TEST_F(RandomForestOnAdult, Nondeterminism) {
+  TrainAndEvaluateModel();
+  auto model_1 = std::move(model_);
+
+  train_config_.set_random_seed(train_config_.random_seed() + 1);
+  TrainAndEvaluateModel();
+  auto model_2 = std::move(model_);
+
+  EXPECT_THAT(model_1->DebugCompare(*model_2),
+              ::testing::ContainsRegex("Nodes don't match"));
 }
 
 }  // namespace

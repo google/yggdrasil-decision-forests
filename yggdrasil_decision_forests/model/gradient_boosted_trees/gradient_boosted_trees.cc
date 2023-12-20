@@ -797,6 +797,25 @@ absl::Status GradientBoostedTreesModel::Distance(
                                  distances, tree_weights);
 }
 
+std::string GradientBoostedTreesModel::DebugCompare(
+    const AbstractModel& other) const {
+  if (const auto parent_compare = AbstractModel::DebugCompare(other);
+      !parent_compare.empty()) {
+    return parent_compare;
+  }
+  const auto* other_cast =
+      dynamic_cast<const GradientBoostedTreesModel*>(&other);
+  if (!other_cast) {
+    return "Non matching types";
+  }
+  if (initial_predictions_ != other_cast->initial_predictions_) {
+    return absl::StrCat("Non matching initial predictions");
+  }
+
+  return decision_tree::DebugCompare(
+      data_spec_, label_col_idx_, decision_trees_, other_cast->decision_trees_);
+}
+
 namespace internal {
 
 float WeightedMeanAbsLeafValue(const decision_tree::DecisionTree& tree) {

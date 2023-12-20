@@ -64,24 +64,27 @@ void ExpectEqualGolden(
     YDF_LOG(INFO) << "The given value does not match the golden value: "
                   << path;
 
-    const int max_print = 200;
+    const int max_print = 1000;
     if (content.size() < max_print) {
-      YDF_LOG(INFO) << "Given value\n====================\n"
+      YDF_LOG(INFO) << "Given value  (" << content.size()
+                    << " characters)\n====================\n"
                     << content << "\n====================";
     } else {
-      YDF_LOG(INFO) << "The content is too large (" << content.size()
-                    << " characters) to be printed.\nFirst part:\n"
-                    << content.substr(0, max_print);
+      YDF_LOG(INFO)
+          << "The content is too large (" << content.size()
+          << " characters) to be printed.\nFirst part:\n====================\n"
+          << content.substr(0, max_print) << "\n====================";
     }
 
     if (expected_content.size() < max_print) {
-      YDF_LOG(INFO) << "Expected value\n====================\n"
+      YDF_LOG(INFO) << "Expected value  (" << expected_content.size()
+                    << " characters)\n====================\n"
                     << expected_content << "\n====================";
     } else {
-      YDF_LOG(INFO) << "The expected_content is too large ("
-                    << expected_content.size()
-                    << " characters) to be printed.\nFirst part:\n"
-                    << expected_content.substr(0, max_print);
+      YDF_LOG(INFO)
+          << "The expected_content is too large (" << expected_content.size()
+          << " characters) to be printed.\nFirst part:\n====================\n"
+          << expected_content.substr(0, max_print) << "\n====================";
     }
 
     static int actual_idx = 0;

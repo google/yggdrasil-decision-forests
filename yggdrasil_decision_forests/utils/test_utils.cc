@@ -944,5 +944,45 @@ int GetVariableImportanceRank(
   return std::distance(variable_importance.begin(), found_iterator);
 }
 
+absl::Status ExpectEqualGoldenModelWithStatus(
+    const model::AbstractModel& model, absl::string_view expected_model_path) {
+  std::unique_ptr<model::AbstractModel> expected_model;
+  RETURN_IF_ERROR(model::LoadModel(expected_model_path, &expected_model));
+
+  const std::string comparison = model.DebugCompare(*expected_model);
+  if (!comparison.empty()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Models are different:\n", comparison));
+  }
+
+  return absl::OkStatus();
+}
+
+void ExpectEqualGoldenModel(const model::AbstractModel& model,
+                            absl::string_view model_name) {
+  if (!kYdfTestMetricCheckGold) {
+    return;
+  }
+
+  const std::string local_expected_model_path = file::JoinPath(
+      "yggdrasil_decision_forests/test_data/golden", model_name);
+  const std::string expected_model_path =
+      file::JoinPath(test::DataRootDirectory(), local_expected_model_path);
+  const auto status =
+      ExpectEqualGoldenModelWithStatus(model, expected_model_path);
+  if (!status.ok()) {
+    const std::string observed_model_path =
+        file::JoinPath(test::TmpDirectory(), "golden", model_name);
+    ASSERT_OK(model::SaveModel(observed_model_path, &model));
+
+    YDF_LOG(INFO) << "The model unit test failed.";
+    YDF_LOG(INFO) << "";
+    YDF_LOG(INFO) << "Update the golden file with:\n"
+                  << "cp -R " << observed_model_path << " "
+                  << local_expected_model_path;
+    ASSERT_OK(status);
+  }
+}
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

@@ -128,7 +128,8 @@ if [[ ! -z ${INSTALL_DEPENDENCIES+z} ]]; then
     git \
     python3 \
     python3-pip \
-    python3-dev
+    python3-dev \
+    wget
 
   python3 -m pip install numpy
 

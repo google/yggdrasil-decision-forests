@@ -770,6 +770,47 @@ TEST(DecisionTree, InputFeatures) {
   EXPECT_THAT(input_features(trees), ElementsAre(1, 2, 3));
 }
 
+TEST(DecisionTree, DebugCompare) {
+  dataset::proto::DataSpecification dataspec;
+  dataset::AddColumn("l", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+  dataset::AddColumn("f1", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+
+  DecisionTree tree1;
+  TreeBuilder builder1(&tree1);
+  DecisionTree tree2;
+  TreeBuilder builder2(&tree2);
+  DecisionTree tree3;
+  TreeBuilder builder3(&tree3);
+
+  {
+    auto [pos, l1] = builder1.ConditionIsGreater(1, 1);
+    auto [l2, l3] = pos.ConditionIsGreater(1, 2);
+    l1.LeafRegression(1);
+    l2.LeafRegression(2);
+    l3.LeafRegression(3);
+  }
+
+  {
+    // Same as builder 1
+    auto [pos, l1] = builder2.ConditionIsGreater(1, 1);
+    auto [l2, l3] = pos.ConditionIsGreater(1, 2);
+    l1.LeafRegression(1);
+    l2.LeafRegression(2);
+    l3.LeafRegression(3);
+  }
+
+  {
+    auto [pos, l1] = builder3.ConditionIsGreater(1, 1);
+    auto [l2, l3] = pos.ConditionIsGreater(1, 3);  // Replace value 2 with 3.
+    l1.LeafRegression(1);
+    l2.LeafRegression(2);
+    l3.LeafRegression(3);
+  }
+
+  // Tree 1 and tree 2 are equal.
+  EXPECT_TRUE(tree1.DebugCompare(dataspec, 0, tree2).empty());
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

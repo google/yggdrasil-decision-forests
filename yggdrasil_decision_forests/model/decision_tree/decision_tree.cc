@@ -1456,6 +1456,65 @@ std::vector<int> input_features(
   return input_features;
 }
 
+std::string DebugCompare(
+    const dataset::proto::DataSpecification& dataspec, const int label_idx,
+    absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> a,
+    absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> b) {
+  if (a.size() != b.size()) {
+    return absl::StrCat("The number of trees don't match. ", a.size(),
+                        " != ", b.size());
+  }
+  for (int tree_idx = 0; tree_idx < a.size(); tree_idx++) {
+    const std::string sub_compare =
+        a[tree_idx]->DebugCompare(dataspec, label_idx, *b[tree_idx]);
+    if (!sub_compare.empty()) {
+      return sub_compare;
+    }
+  }
+  return {};
+}
+
+std::string DecisionTree::DebugCompare(
+    const dataset::proto::DataSpecification& dataspec, const int label_idx,
+    const DecisionTree& other) const {
+  if ((root_ == nullptr) && (other.root_ == nullptr)) {
+    return {};
+  }
+  if ((root_ != nullptr) != (other.root_ != nullptr)) {
+    return "Only one tree has a root";
+  }
+  const auto result = root_->DebugCompare(dataspec, label_idx, *other.root_);
+  if (!result.empty()) {
+    // Print the trees.
+    std::string tree_description;
+    std::string other_tree_description;
+    AppendModelStructure(dataspec, label_idx, &tree_description);
+    other.AppendModelStructure(dataspec, label_idx, &other_tree_description);
+    return absl::StrCat(result, "\n==========\nFull trees:\n\n",
+                        tree_description, "\nvs\n\n", other_tree_description);
+  }
+  return {};
+}
+
+std::string NodeWithChildren::DebugCompare(
+    const dataset::proto::DataSpecification& dataspec, const int label_idx,
+    const NodeWithChildren& other) const {
+  if (node_.DebugString() != other.node_.DebugString()) {
+    return absl::StrCat("Nodes don't match.\n\n", node_.DebugString(),
+                        "\nvs\n\n", other.node_.DebugString());
+  }
+  if (!IsLeaf()) {
+    for (const int i : {0, 1}) {
+      if (const auto r = children_[i]->DebugCompare(dataspec, label_idx,
+                                                    *other.children_[i]);
+          !r.empty()) {
+        return r;
+      }
+    }
+  }
+  return {};
+}
+
 }  // namespace decision_tree
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

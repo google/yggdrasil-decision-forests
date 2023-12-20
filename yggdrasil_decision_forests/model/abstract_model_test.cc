@@ -480,6 +480,21 @@ TEST(AppendPredictions, FromVerticalDataset) {
                               .value()));
 }
 
+TEST(CompareModel, Base) {
+  std::unique_ptr<model::AbstractModel> model1;
+  std::unique_ptr<model::AbstractModel> model2;
+
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &model1));
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"),
+      &model2));
+  EXPECT_EQ(
+      model1->DebugCompare(*model2),
+      "name_ != other.name_ i.e. GRADIENT_BOOSTED_TREES != RANDOM_FOREST");
+}
+
 }  // namespace
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

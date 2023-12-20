@@ -364,10 +364,11 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8644, 0.0099, 0.8658);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2979, 0.0127, 0.294);
 
-  auto* gbt_model =
-      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
   EXPECT_TRUE(gbt_model->CheckStructure(
       decision_tree::CheckStructureOptions::GlobalImputation()));
+
+  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_base_deprecated");
 }
 
 // Train and test a model on the adult dataset.
@@ -871,6 +872,9 @@ TEST_F(GradientBoostedTreesOnAdult, BaseConcurrentDeprecated) {
   // calibrated).
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8662, 0.0094, 0.8664);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2966, 0.0145, 0.2942);
+
+  utils::ExpectEqualGoldenModel(*model_,
+                                "gbt_adult_base_concurrent_deprecated");
 }
 
 // Train and test a model on the adult dataset.
@@ -1315,6 +1319,7 @@ TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
   gbt_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1155, 0.0988, 2.1001);
+  utils::ExpectEqualGoldenModel(*model_, "gbt_abalone_sparse_oblique");
 }
 
 TEST_F(GradientBoostedTreesOnAbalone, PoissonLoss) {
@@ -1930,6 +1935,28 @@ INSTANTIATE_TEST_SUITE_P(
     [](const testing::TestParamInfo<RegressionEnd2EndTest::ParamType>& info) {
       return proto::Loss_Name(info.param.loss);
     });
+
+TEST_F(GradientBoostedTreesOnAdult, Determinism) {
+  TrainAndEvaluateModel();
+  auto model_1 = std::move(model_);
+
+  TrainAndEvaluateModel();
+  auto model_2 = std::move(model_);
+
+  EXPECT_TRUE(model_1->DebugCompare(*model_2).empty());
+}
+
+TEST_F(GradientBoostedTreesOnAdult, Nondeterminism) {
+  TrainAndEvaluateModel();
+  auto model_1 = std::move(model_);
+
+  train_config_.set_random_seed(train_config_.random_seed() + 1);
+  TrainAndEvaluateModel();
+  auto model_2 = std::move(model_);
+
+  EXPECT_THAT(model_1->DebugCompare(*model_2),
+              ::testing::ContainsRegex("Non matching initial predictions"));
+}
 
 }  // namespace
 }  // namespace gradient_boosted_trees

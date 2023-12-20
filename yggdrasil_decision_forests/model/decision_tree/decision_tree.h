@@ -203,6 +203,12 @@ class NodeWithChildren {
   int32_t leaf_idx() const { return leaf_idx_; }
   void set_leaf_idx(const int32_t v) { leaf_idx_ = v; }
 
+  // Compare a tree to another tree. If they are equal, return an empty string.
+  // If they are different, returns an explanation of the differences.
+  std::string DebugCompare(const dataset::proto::DataSpecification& dataspec,
+                           const int label_idx,
+                           const NodeWithChildren& other) const;
+
  private:
   // Node content (i.e. value and condition).
   proto::Node node_;
@@ -312,6 +318,11 @@ class DecisionTree {
   // positive).
   void SetLeafIndices();
 
+  // Compare a tree to another tree. If they are equal, return an empty string.
+  // If they are different, returns an explanation of the differences.
+  std::string DebugCompare(const dataset::proto::DataSpecification& dataspec,
+                           int label_idx, const DecisionTree& other) const;
+
  private:
   // Root of the decision tree.
   std::unique_ptr<NodeWithChildren> root_;
@@ -415,6 +426,13 @@ absl::Status Distance(
 // sorted column indices.
 std::vector<int> input_features(
     absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees);
+
+// Compare two forests. If they are equal, return an empty string. If they are
+// different, returns an explanation of the differences.
+std::string DebugCompare(
+    const dataset::proto::DataSpecification& dataspec, int label_idx,
+    absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> a,
+    absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> b);
 
 }  // namespace decision_tree
 }  // namespace model
