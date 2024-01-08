@@ -34,6 +34,12 @@ template <typename T>
 class BlobSequenceShardedReader : public ShardedReader<T> {
  public:
   BlobSequenceShardedReader() = default;
+
+  // This type is neither copyable nor movable.
+  BlobSequenceShardedReader(const BlobSequenceShardedReader&) = delete;
+  BlobSequenceShardedReader& operator=(const BlobSequenceShardedReader&) =
+      delete;
+
   absl::Status OpenShard(absl::string_view path) override;
   absl::StatusOr<bool> NextInShard(T* example) override;
 
@@ -41,8 +47,6 @@ class BlobSequenceShardedReader : public ShardedReader<T> {
   blob_sequence::Reader reader_;
   file::InputFileCloser file_closer_;
   std::string buffer_;
-
-  DISALLOW_COPY_AND_ASSIGN(BlobSequenceShardedReader);
 };
 
 // Specialization of ShardedWriter for TFRecords: Class for the sequential
@@ -51,6 +55,12 @@ template <typename T>
 class BlobSequenceShardedWriter : public ShardedWriter<T> {
  public:
   BlobSequenceShardedWriter() = default;
+
+  // This type is neither copyable nor movable.
+  BlobSequenceShardedWriter(const BlobSequenceShardedWriter&) = delete;
+  BlobSequenceShardedWriter& operator=(const BlobSequenceShardedWriter&) =
+      delete;
+
   ~BlobSequenceShardedWriter() override;
   absl::Status OpenShard(absl::string_view path) final;
   absl::Status WriteInShard(const T& value) final;
@@ -60,8 +70,6 @@ class BlobSequenceShardedWriter : public ShardedWriter<T> {
   blob_sequence::Writer writer_;
   file::OutputFileCloser file_closer_;
   std::string buffer_;
-
-  DISALLOW_COPY_AND_ASSIGN(BlobSequenceShardedWriter);
 };
 
 template <typename T>
