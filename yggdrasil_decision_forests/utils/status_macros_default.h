@@ -66,11 +66,6 @@
       (__VA_ARGS__, ASSIGN_OR_RETURN_3ARGS, ASSIGN_OR_RETURN_2ARGS)) \
   (__VA_ARGS__)
 
-// Don't allow for a class to be copied.
-#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
-  TypeName(const TypeName&) = delete;      \
-  TypeName& operator=(const TypeName&) = delete
-
 #define ASSIGN_OR_RETURN_2ARGS(lhs, rexpr) \
   ASSIGN_OR_RETURN_2ARGS_IMP(lhs, rexpr,   \
                              CONCATENATE(_status_or_value, __LINE__))

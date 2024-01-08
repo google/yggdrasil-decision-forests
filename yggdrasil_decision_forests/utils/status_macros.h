@@ -39,5 +39,10 @@
 #define STATUS_CHECK_LT(a, b) STATUS_CHECK(a < b)
 // NOLINTEND
 
+// Don't allow for a class to be copied.
+#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
+  TypeName(const TypeName&) = delete;      \
+  TypeName& operator=(const TypeName&) = delete
+
 
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_STATUS_MACROS_H_

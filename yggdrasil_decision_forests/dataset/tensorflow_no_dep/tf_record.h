@@ -29,6 +29,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep {
 
