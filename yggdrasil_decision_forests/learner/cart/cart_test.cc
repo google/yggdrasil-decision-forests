@@ -51,6 +51,8 @@ TEST_F(CartOnAdult, Base) {
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
   YDF_LOG(INFO) << description;
+
+  utils::ExpectEqualGoldenModel(*model_, "cart_adult");
 }
 
 // Similar as "CartOnAdult", but use the pre-split train and test dataset (
@@ -94,6 +96,8 @@ TEST_F(CartOnAbalone, Base) {
       dynamic_cast<const random_forest::RandomForestModel*>(model_.get());
   EXPECT_GT(rf_model->num_pruned_nodes().value(), 50);
   EXPECT_GT(rf_model->NumNodes(), 10);
+
+  utils::ExpectEqualGoldenModel(*model_, "cart_abalone");
 }
 
 class CartOnIris : public utils::TrainAndTestTester {

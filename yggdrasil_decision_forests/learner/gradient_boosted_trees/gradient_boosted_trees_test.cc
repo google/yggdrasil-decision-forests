@@ -390,6 +390,8 @@ TEST_F(GradientBoostedTreesOnAdult, BaseWithNAConditions) {
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
   EXPECT_TRUE(gbt_model->CheckStructure(
       decision_tree::CheckStructureOptions::GlobalImputation()));
+
+  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_base_with_na");
 }
 
 // Train and test a model on the adult dataset.
@@ -1302,6 +1304,8 @@ class GradientBoostedTreesOnAbalone : public utils::TrainAndTestTester {
 TEST_F(GradientBoostedTreesOnAbalone, Base) {
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1684, 0.0979, 2.1138);
+
+  utils::ExpectEqualGoldenModel(*model_, "gbt_abalone");
 }
 
 TEST_F(GradientBoostedTreesOnAbalone, L2Regularization) {
@@ -1393,6 +1397,7 @@ TEST_F(GradientBoostedTreesOnIris, Base) {
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9533, 0.03, 0.96);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2988, 0.2562, 0.2255);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
+  utils::ExpectEqualGoldenModel(*model_, "gbt_iris");
 }
 
 TEST_F(GradientBoostedTreesOnIris, Hessian) {
@@ -1402,6 +1407,7 @@ TEST_F(GradientBoostedTreesOnIris, Hessian) {
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.94, 0.05, 0.9733);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3225, 0.3002, 0.1462);
+  utils::ExpectEqualGoldenModel(*model_, "gbt_iris_hessian");
 }
 
 TEST_F(GradientBoostedTreesOnIris, Dart) {
