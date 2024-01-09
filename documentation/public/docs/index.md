@@ -3,7 +3,7 @@ title: Yggdrasil Decision Forests
 ---
 #
 
-![](image/ydf_logo_chrissmass_600px.png){: .center .logo}
+![](image/ydf_logo_original_600px.png){: .center .logo}
 
 **Yggdrasil Decision Forests** (**YDF**) is a library to train, evaluate,
 interpret, and productionize decision forest models such as Random Forest and
