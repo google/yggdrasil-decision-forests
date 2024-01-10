@@ -759,15 +759,19 @@ GradientBoostedTreesModel::PlotTrainingLogs() const {
     validation_metric->label = "validation";
 
     for (const auto& entry : training_logs_.entries()) {
-      // X axis
+      // Training loss
       training_metric->xs.push_back(entry.number_of_trees());
-      validation_metric->xs.push_back(entry.number_of_trees());
-
-      // Y axis
       training_metric->ys.push_back(
           entry.training_secondary_metrics(metric_idx));
-      validation_metric->ys.push_back(
-          entry.validation_secondary_metrics(metric_idx));
+
+      // Validation loss
+      const bool has_validation =
+          metric_idx < entry.validation_secondary_metrics_size();
+      if (has_validation) {
+        validation_metric->xs.push_back(entry.number_of_trees());
+        validation_metric->ys.push_back(
+            entry.validation_secondary_metrics(metric_idx));
+      }
     }
   }
 

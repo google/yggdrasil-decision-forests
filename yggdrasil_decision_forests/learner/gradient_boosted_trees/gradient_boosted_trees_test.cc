@@ -1308,6 +1308,14 @@ TEST_F(GradientBoostedTreesOnAbalone, Base) {
   utils::ExpectEqualGoldenModel(*model_, "gbt_abalone");
 }
 
+TEST_F(GradientBoostedTreesOnAbalone, NoValidation) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_validation_set_ratio(0);
+  TrainAndEvaluateModel();
+  ASSERT_OK_AND_ASSIGN(const auto plot, model_->PlotTrainingLogs());
+}
+
 TEST_F(GradientBoostedTreesOnAbalone, L2Regularization) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
