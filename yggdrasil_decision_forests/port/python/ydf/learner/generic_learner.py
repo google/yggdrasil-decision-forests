@@ -159,8 +159,8 @@ class GenericLearner:
       ds: Training dataset.
       valid: Optional validation dataset. Some learners, such as Random Forest,
         do not need validation dataset. Some learners, such as
-        GradientBoostdTrees, automatically extract a validation from the
-        training dataset if the validation dataset is not provided.
+        GradientBoostedTrees, automatically extract a validation dataset from
+        the training dataset if the validation dataset is not provided.
 
     Returns:
       A trained model.
@@ -324,7 +324,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
     learner = ydf.RandomForestLearner(label="label")
     evaluation = learner.cross_validation(dataset)
 
-    # In notebook, display an interractive evaluation
+    # In a notebook, display an interractive evaluation
     evaluation
 
     # Print the evaluation

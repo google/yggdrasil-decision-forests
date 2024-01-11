@@ -47,7 +47,7 @@ class Task(enum.Enum):
 
   ```python
   learner = ydf.RandomForestLearner(label="income",
-  task=ydf.Task.CLASSIFICATION)
+                                    task=ydf.Task.CLASSIFICATION)
   model = learner.train(dataset)
   assert model.task() == ydf.Task.CLASSIFICATION
   ```
@@ -106,7 +106,7 @@ class ModelIOOptions:
       file_prefix: Optional prefix for the model. File prefixes allow multiple
         models to exist in the same folder. Doing so is heavily DISCOURAGED
         outside of edge cases. When loading a model, the prefix, if not
-        specified, auto-detected if possible. When saving a model, the empty
+        specified, is auto-detected if possible. When saving a model, the empty
         string is used as file prefix unless it is explicitly specified.
   """
 
@@ -175,29 +175,29 @@ class GenericModel:
 
   def describe(
       self,
-      format: Literal["auto", "text", "notebook", "html"] = "auto",
+      output_format: Literal["auto", "text", "notebook", "html"] = "auto",
       full_details: bool = False,
   ) -> Union[str, html.HtmlNotebookDisplay]:
     """Description of the model.
 
     Args:
-      format: Format of the display: - auto: Use the "notebook" format if
-        executed in an IPython notebook. Otherwise, use the "text" format. -
-        text: Text description of the model. - html: Html description of the
-          model. -
-        notebook: Html description of the model displayed in a notebook cell.
+      output_format: Format of the display: - auto: Use the "notebook" format if
+        executed in an IPython notebook / Colab. Otherwise, use the "text"
+        format. - text: Text description of the model. - html: Html description
+        of the model. - notebook: Html description of the model displayed in a
+        notebook cell.
       full_details: Should the full model be printed. This can be large.
 
     Returns:
       The model description.
     """
 
-    if format == "auto":
-      format = "text" if log.is_direct_output() else "notebook"
+    if output_format == "auto":
+      output_format = "text" if log.is_direct_output() else "notebook"
 
     with log.cc_log_context():
-      description = self._model.Describe(full_details, format == "text")
-      if format == "notebook":
+      description = self._model.Describe(full_details, output_format == "text")
+      if output_format == "notebook":
         return html.HtmlNotebookDisplay(description)
       else:
         return description
@@ -226,7 +226,7 @@ Use `model.describe()` for more details
     This benchmark creates batched predictions on the given dataset using the
     C++ API of Yggdrasil Decision Forests. Note that inference times using other
     APIs or on different machines will be different. A serving template for the
-    C++ API can be generated with `to_cpp()`.
+    C++ API can be generated with `model.to_cpp()`.
 
     Args:
       ds: Dataset to perform the benchmark on.
@@ -276,9 +276,7 @@ Use `model.describe()` for more details
     YDF uses a proprietary model format for saving models. A model consists of
     multiple files located in the same directory.
     A directory should only contain a single YDF model. See `advanced_options`
-    for more information. See
-    https://ydf.readthedocs.io/en/latest/convert_model.html for more information
-    about the YDF model format.
+    for more information.
 
     YDF models can also be exported to other formats, see
     `to_tensorflow_saved_model()` and `to_cpp()` for details.
@@ -324,6 +322,27 @@ Use `model.describe()` for more details
       self._model.Save(path, advanced_options.file_prefix)
 
   def predict(self, data: dataset.InputDataset) -> np.ndarray:
+    """Returns the predictions of the model on the given dataset.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.RandomForestLearner(label="label").train(train_ds)
+
+    test_ds = pd.read_csv("test.csv")
+    predictions = model.predict(test_ds)
+    ```
+
+    Args:
+      data: Dataset. Can be a dictionary of list or numpy array of values,
+        Pandas DataFrame, or a VerticalDataset. If the dataset contains the
+        label column, that column is ignored.
+    """
     with log.cc_log_context():
       # The data spec contains the label / weights /  ranking group / uplift
       # treatment column, but those are not required for making predictions.
@@ -350,9 +369,9 @@ Use `model.describe()` for more details
 
     # Train model
     train_ds = pd.read_csv("train.csv")
-    model = ydf.RandomForestLearner(label="label").Train(train_ds)
+    model = ydf.RandomForestLearner(label="label").train(train_ds)
 
-    test_ds = pd.read_csv("train.csv")
+    test_ds = pd.read_csv("test.csv")
     evaluation = model.evaluates(test_ds)
     ```
 
@@ -419,7 +438,7 @@ Use `model.describe()` for more details
 
     # Train model
     train_ds = pd.read_csv("train.csv")
-    model = ydf.RandomForestLearner(label="label").Train(train_ds)
+    model = ydf.RandomForestLearner(label="label").train(train_ds)
 
     test_ds = pd.read_csv("test.csv")
 
@@ -433,8 +452,8 @@ Use `model.describe()` for more details
     ```
 
     Args:
-      single_example: Example to explain. Can be a dictionary of list or numpy
-        array of values, Pandas DataFrame, or a VerticalDataset.
+      single_example: Example to explain. Can be a dictionary of lists or numpy
+        arrays of values, Pandas DataFrame, or a VerticalDataset.
 
     Returns:
       Prediction explanation.
@@ -462,8 +481,11 @@ Use `model.describe()` for more details
     """Analyzes a model on a test dataset.
 
     An analysis contains structual information about the model (e.g., variable
-    importance, training logs), the dataset (e.g., column statistics), and the
-    application of the model on the dataset (e.g. partial dependence plots).
+    importances), and the information about the application of the model on the
+    given dataset (e.g. partial dependence plots).
+
+    For a large dataset (many examples and / or features), computing the
+    analysis can take significant time.
 
     While some information might be valid, it is generatly not recommended to
     analyze a model on its training dataset.
@@ -476,7 +498,7 @@ Use `model.describe()` for more details
 
     # Train model
     train_ds = pd.read_csv("train.csv")
-    model = ydf.RandomForestLearner(label="label").Train(train_ds)
+    model = ydf.RandomForestLearner(label="label").train(train_ds)
 
     test_ds = pd.read_csv("test.csv")
     analysis = model.analyze(test_ds)
@@ -553,7 +575,7 @@ Use `model.describe()` for more details
       const auto model = ydf::exported_model_123::Load(<path to model>);
       // Run the model
       predictions = model.Predict();
-    4. The generated "Predict" function takes no inputs. Instead, it fill the
+    4. The generated "Predict" function takes no inputs. Instead, it fills the
       input features with placeholder values. Therefore, you will want to add
       your input as arguments to the "Predict" function, and use it to populate
       the "examples->Set..." section accordingly.
@@ -668,7 +690,7 @@ Use `model.describe()` for more details
 
     # TODO: Add variable importances to documentation.
 
-    Values are sorted by decreasing value/importance.
+    Features are sorted by decreasing importance.
 
     Usage example:
 
@@ -677,10 +699,10 @@ Use `model.describe()` for more details
     # importances.
     model = ydf.RandomForestModel(compute_oob_variable_importances=True,
                                   label=...).train(ds)
-    # List the available variable importances
+    # List the available variable importances.
     print(model.variable_importances().keys())
 
-    # Show a specific variable importance
+    # Show a specific variable importance.
     model.variable_importances()["MEAN_DECREASE_IN_ACCURACY"]
     >> [("bill_length_mm", 0.0713061951754389),
         ("island", 0.007298519736842035),
