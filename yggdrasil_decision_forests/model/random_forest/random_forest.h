@@ -181,6 +181,11 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
     return &out_of_bag_evaluations_;
   }
 
+  const std::vector<proto::OutOfBagTrainingEvaluations>&
+  out_of_bag_evaluations() const {
+    return out_of_bag_evaluations_;
+  }
+
   std::vector<std::string> AvailableVariableImportances() const override;
 
   // List the variable importances that can be computed from the model

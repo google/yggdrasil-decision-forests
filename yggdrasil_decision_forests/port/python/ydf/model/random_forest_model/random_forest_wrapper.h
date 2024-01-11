@@ -18,10 +18,12 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
+#include "yggdrasil_decision_forests/model/random_forest/random_forest.pb.h"
 #include "ydf/model/decision_forest_model/decision_forest_wrapper.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -45,6 +47,11 @@ class RandomForestCCModel : public DecisionForestCCModel {
   RandomForestCCModel(std::unique_ptr<YDFModel> model, YDFModel* rf_model)
       : DecisionForestCCModel(std::move(model), rf_model), rf_model_(rf_model) {
     DCHECK_EQ(model_.get(), rf_model_);
+  }
+
+  std::vector<model::random_forest::proto::OutOfBagTrainingEvaluations>
+  out_of_bag_evaluations() const {
+    return rf_model_->out_of_bag_evaluations();
   }
 
  private:

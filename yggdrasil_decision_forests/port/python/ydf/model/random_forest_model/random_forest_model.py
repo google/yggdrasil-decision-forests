@@ -14,8 +14,25 @@
 
 """Definitions for Random Forest models."""
 
+import dataclasses
+from typing import Sequence
+from yggdrasil_decision_forests.model.random_forest import random_forest_pb2
 from ydf.cc import ydf
+from ydf.metric import metric
 from ydf.model.decision_forest_model import decision_forest_model
+
+
+@dataclasses.dataclass(frozen=True)
+class OutOfBagEvaluation:
+  """A collection of out-of-bag metrics.
+
+  Attributes:
+    number_of_trees: Number of trees when the evaluation was created.
+    evaluation: Rich evaluation object containing the OOB evaluation metrics.
+  """
+
+  number_of_trees: int
+  evaluation: metric.Evaluation
 
 
 class RandomForestModel(decision_forest_model.DecisionForestModel):
@@ -23,6 +40,48 @@ class RandomForestModel(decision_forest_model.DecisionForestModel):
 
   _model: ydf.RandomForestCCModel
 
-  def out_of_bag_evaluation(self):
-    """Returns the OOB evaluation of the model, if available."""
-    raise NotImplementedError("OOB Evaluation support not yet implemented")
+  def out_of_bag_evaluations(self) -> Sequence[OutOfBagEvaluation]:
+    """Returns the Out-Of-Bag evaluations of the model, if available.
+
+    Each tree in a random forest is only trained on a fraction of the training
+    examples. Out-of-bag (OOB) evaluations evaluate each training example on the
+    trees that have not seen it in training. This creates a self-evaluation
+    method that does not require a training dataset. See
+    https://developers.google.com/machine-learning/decision-forests/out-of-bag
+    for details.
+
+    Computing OOB metrics slows down training and requires hyperparameter
+    `compute_oob_performances` to be set. The learner then computes the OOB
+    evaluation at regular intervals during the training. The returned list of
+    evaluations is sorted by the number of trees and its last element is the OOB
+    evaluation of the full model.
+
+    If no OOB evaluations have been computed, an empty list is returned.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    learner = ydf.RandomForestLearner(label="label",
+                                      compute_oob_performances=True)
+    model = ydf.train(train_ds)
+
+    oob_evaluations = model.out_of_bag_evaluations()
+    # In an interactive Python environment, print a rich evaluation report.
+    oob_evaluations[-1].evaluation
+    ```
+    """
+    raw_evaluations: Sequence[random_forest_pb2.OutOfBagTrainingEvaluations] = (
+        self._model.out_of_bag_evaluations()
+    )
+    return [
+        OutOfBagEvaluation(
+            number_of_trees=evaluation_proto.number_of_trees,
+            evaluation=metric.Evaluation(evaluation_proto.evaluation),
+        )
+        for evaluation_proto in raw_evaluations
+    ]

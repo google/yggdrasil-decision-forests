@@ -357,10 +357,10 @@ Use `model.describe()` for more details
     ```
 
     In a notebook, if a cell returns an evaluation object, this evaluation will
-    be as a rich html and plots:
+    be as a rich html with plots:
 
     ```
-    evaluation = model.evaluates(test_ds)
+    evaluation = model.evaluate(test_ds)
     evaluation
     ```
 

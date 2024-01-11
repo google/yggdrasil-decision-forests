@@ -27,14 +27,32 @@ from ydf.utils import test_utils
 
 class RandomForestModelTest(absltest.TestCase):
 
-  def test_oob_evaluations(self):
+  def test_out_of_bag_evaluations(self):
     model_path = os.path.join(
         test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
     )
     model = model_lib.load_model(model_path)
-    # TODO: Fill this test when OOB evaluations are exposed.
-    with self.assertRaises(NotImplementedError):
-      model.out_of_bag_evaluation()
+
+    oob_evaluations = model.out_of_bag_evaluations()
+
+    self.assertLen(oob_evaluations, 2)
+    self.assertEqual(oob_evaluations[0].number_of_trees, 1)
+    self.assertAlmostEqual(oob_evaluations[0].evaluation.loss, 1.80617348178)
+    self.assertEqual(oob_evaluations[1].number_of_trees, 100)
+    self.assertAlmostEqual(oob_evaluations[1].evaluation.loss, 0.31474323732)
+
+  def test_empty_out_of_bag_evaluations(self):
+    # Uplift models do not have OOB evaluations.
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "sim_pte_categorical_uplift_rf",
+    )
+    model = model_lib.load_model(model_path)
+
+    oob_evaluations = model.out_of_bag_evaluations()
+
+    self.assertEmpty(oob_evaluations)
 
   def test_predict_distance(self):
     model_path = os.path.join(

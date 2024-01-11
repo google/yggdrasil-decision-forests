@@ -188,6 +188,8 @@ void init_model(py::module_& m) {
              return absl::Substitute(
                  "<model_cc.RandomForestCCModel of type $0.", a.name());
            })
+      .def("out_of_bag_evaluations",
+           &RandomForestCCModel::out_of_bag_evaluations)
       .def_property_readonly_static(
           "kRegisteredName", [](py::object /* self */) {
             return model::random_forest::RandomForestModel::kRegisteredName;

@@ -19,6 +19,7 @@ pybind_library(
         "@com_google_absl//absl/status:statusor",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
+        "@ydf_cc//yggdrasil_decision_forests/model/random_forest:random_forest_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
     ],
 )
@@ -28,7 +29,9 @@ py_library(
     srcs = ["random_forest_model.py"],
     deps = [
         "//ydf/cc:ydf",
+        "//ydf/metric",
         "//ydf/model/decision_forest_model",
+        "@ydf_cc//yggdrasil_decision_forests/model/random_forest:random_forest_py_proto",
     ],
 )
 

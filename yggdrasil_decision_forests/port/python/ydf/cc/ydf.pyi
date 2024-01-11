@@ -9,6 +9,7 @@ from google3.third_party.yggdrasil_decision_forests.metric import metric_pb2
 from google3.third_party.yggdrasil_decision_forests.model import abstract_model_pb2
 from google3.third_party.yggdrasil_decision_forests.model import hyperparameter_pb2
 from google3.third_party.yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
+from google3.third_party.yggdrasil_decision_forests.model.random_forest import random_forest_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import model_analysis_pb2
@@ -177,6 +178,9 @@ class DecisionForestCCModel(GenericCCModel):
 class RandomForestCCModel(DecisionForestCCModel):
   @property
   def kRegisteredName(self): ...
+  def out_of_bag_evaluations(
+      self,
+  ) -> List[random_forest_pb2.OutOfBagTrainingEvaluations]: ...
 
 class GradientBoostedTreesCCModel(DecisionForestCCModel):
   @property
