@@ -115,7 +115,7 @@ class GenericLearner:
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
-  ) -> generic_model.GenericModel:
+  ) -> generic_model.ModelType:
     """Trains a model on the given dataset.
 
     Options for dataset reading are given on the learner. Consult the
@@ -190,7 +190,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
 
   def _train_from_path(
       self, ds: str, valid: Optional[str]
-  ) -> generic_model.GenericModel:
+  ) -> generic_model.ModelType:
     """Trains a model from a file path (dataset reading in YDF C++)."""
     with log.cc_log_context():
       if self._data_spec is not None:
@@ -206,7 +206,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
-  ) -> generic_model.GenericModel:
+  ) -> generic_model.ModelType:
     """Trains a model from in-memory data."""
 
     with log.cc_log_context():

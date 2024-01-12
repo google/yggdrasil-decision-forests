@@ -15,7 +15,7 @@
 """Tests for the Gradient Boosted trees models."""
 
 import os
-from typing import Tuple
+from typing import Dict, Tuple
 
 from absl import logging
 from absl.testing import absltest
@@ -111,6 +111,14 @@ class GradientBoostedTreesTest(absltest.TestCase):
   def test_validation_loss(self):
     validation_loss = self.adult_binary_class_gbdt.validation_loss()
     self.assertAlmostEqual(validation_loss, 0.573842942, places=6)
+
+  def test_validation_loss_if_no_validation_dataset(self):
+    dataset = {"x": np.array([0, 0, 1, 1]), "y": np.array([0, 0, 0, 1])}
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="y", validation_ratio=0.0, num_trees=2
+    ).train(dataset)
+    validation_loss = model.validation_loss()
+    self.assertIsNone(validation_loss)
 
   def test_initial_predictions(self):
     initial_predictions = self.adult_binary_class_gbdt.initial_predictions()
@@ -227,7 +235,8 @@ class EditModelTest(absltest.TestCase):
   def create_model_and_dataset(
       self,
   ) -> Tuple[
-      gradient_boosted_trees_model.GradientBoostedTreesModel, pd.DataFrame
+      gradient_boosted_trees_model.GradientBoostedTreesModel,
+      Dict[str, np.ndarray],
   ]:
     dataset = {
         "x1": np.array([0, 0, 0, 1, 1, 1]),
