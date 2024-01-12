@@ -190,6 +190,7 @@ void init_model(py::module_& m) {
            })
       .def("out_of_bag_evaluations",
            &RandomForestCCModel::out_of_bag_evaluations)
+      .def("winner_takes_all", &RandomForestCCModel::winner_takes_all)
       .def_property_readonly_static(
           "kRegisteredName", [](py::object /* self */) {
             return model::random_forest::RandomForestModel::kRegisteredName;

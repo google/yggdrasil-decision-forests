@@ -85,3 +85,19 @@ class RandomForestModel(decision_forest_model.DecisionForestModel):
         )
         for evaluation_proto in raw_evaluations
     ]
+
+  def winner_takes_all(self) -> bool:
+    """Returns if the model uses a winner-takes-all strategy for classification.
+
+    This parameter determines how to aggregate individual tree votes during
+    inference in a classification random forest. It is defined by the
+    `winner_take_all` Random Forest learner hyper-parameter,
+
+    If true, each tree votes for a single class, which is the traditional random
+    forest inference method. If false, each tree outputs a probability
+    distribution across all classes.
+
+    If the model is not a classification model, the return value of this
+    function is arbitrary and does not influence model inference.
+    """
+    return self._model.winner_takes_all()

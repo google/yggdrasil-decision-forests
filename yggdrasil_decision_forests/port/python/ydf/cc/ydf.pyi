@@ -181,6 +181,7 @@ class RandomForestCCModel(DecisionForestCCModel):
   def out_of_bag_evaluations(
       self,
   ) -> List[random_forest_pb2.OutOfBagTrainingEvaluations]: ...
+  def winner_takes_all(self) -> bool: ...
 
 class GradientBoostedTreesCCModel(DecisionForestCCModel):
   @property

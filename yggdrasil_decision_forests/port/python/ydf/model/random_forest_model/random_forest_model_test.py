@@ -27,13 +27,15 @@ from ydf.utils import test_utils
 
 class RandomForestModelTest(absltest.TestCase):
 
-  def test_out_of_bag_evaluations(self):
+  def setUp(self):
+    super().setUp()
     model_path = os.path.join(
         test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
     )
-    model = model_lib.load_model(model_path)
+    self.adult_binary_class_rf = model_lib.load_model(model_path)
 
-    oob_evaluations = model.out_of_bag_evaluations()
+  def test_out_of_bag_evaluations(self):
+    oob_evaluations = self.adult_binary_class_rf.out_of_bag_evaluations()
 
     self.assertLen(oob_evaluations, 2)
     self.assertEqual(oob_evaluations[0].number_of_trees, 1)
@@ -55,13 +57,6 @@ class RandomForestModelTest(absltest.TestCase):
     self.assertEmpty(oob_evaluations)
 
   def test_predict_distance(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(),
-        "model",
-        "adult_binary_class_rf",
-    )
-    model = model_lib.load_model(model_path)
-
     dataset1 = pd.read_csv(
         os.path.join(
             test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
@@ -75,7 +70,7 @@ class RandomForestModelTest(absltest.TestCase):
         nrows=800,
     )
 
-    distances = model.distance(dataset1, dataset2)
+    distances = self.adult_binary_class_rf.distance(dataset1, dataset2)
     logging.info("distances:\n%s", distances)
     self.assertEqual(distances.shape, (dataset1.shape[0], dataset2.shape[0]))
 
@@ -92,6 +87,19 @@ class RandomForestModelTest(absltest.TestCase):
         dataset2.iloc[most_similar_example_idx]["income"],
         dataset1.iloc[0]["income"],
     )
+
+  def test_winner_takes_all_false(self):
+    self.assertFalse(self.adult_binary_class_rf.winner_takes_all())
+
+  def test_winner_takes_all_true(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "golden",
+        "rf_adult_base",
+    )
+    model = model_lib.load_model(model_path)
+
+    self.assertTrue(model.winner_takes_all())
 
 
 if __name__ == "__main__":

@@ -54,6 +54,10 @@ class RandomForestCCModel : public DecisionForestCCModel {
     return rf_model_->out_of_bag_evaluations();
   }
 
+  bool winner_takes_all() const {
+    return rf_model_->winner_take_all_inference();
+  }
+
  private:
   // This is a non-owning pointer to the model held by `model_`.
   YDFModel* rf_model_;
