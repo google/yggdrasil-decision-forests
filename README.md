@@ -1,5 +1,5 @@
 <p align="center">
-<img src="documentation/image/logo.png"  />
+<img src="documentation/public/docs/image/logo.png"  />
 </p>
 
 **Yggdrasil Decision Forests** (YDF) is a production-grade collection of
