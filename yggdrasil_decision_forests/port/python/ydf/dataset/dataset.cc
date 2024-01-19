@@ -486,8 +486,9 @@ absl::Status PopulateColumnCategoricalNPBytes(
 
   if (items.empty()) {
     return absl::InvalidArgumentError(
-        "Empty categorical dictionary. PYDF does not support empty "
-        "dictionaries");
+        absl::Substitute("Column \"$0\": Empty categorical dictionary. PYDF "
+                         "does not support empty dictionaries",
+                         name));
   }
 
   for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {

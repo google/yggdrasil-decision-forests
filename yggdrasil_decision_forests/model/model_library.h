@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 
@@ -62,6 +63,9 @@ absl::StatusOr<bool> ModelExists(absl::string_view directory,
 // given model. Returns absl::StatusCode::kFailedPrecondition if zero or
 // multiple models exist in the given directory.
 absl::StatusOr<std::string> DetectFilePrefix(absl::string_view directory);
+
+// Checks if a given model is a TensorFlow SavedModel.
+absl::StatusOr<bool> IsTensorFlowSavedModel(absl::string_view model_directory);
 
 }  // namespace model
 }  // namespace yggdrasil_decision_forests

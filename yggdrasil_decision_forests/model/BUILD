@@ -82,12 +82,12 @@ cc_library_ydf(
     deps = [
         ":abstract_model",
         ":abstract_model_cc_proto",
-        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
     ],
 )
 
@@ -210,11 +210,16 @@ cc_test(
 cc_test(
     name = "model_library_test",
     srcs = ["model_library_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
     deps = [
         ":abstract_model",
         ":model_library",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/random_forest",
+        "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -147,7 +147,7 @@ message CategoricalSpec {
     // Frequency of the value.
     optional int64 count = 2;
   }
-  // If true, integer categorical values  provided by the user have been offset
+  // If true, integer categorical values provided by the user have been offset
   // by 1. Such pre-processing is done in TensorFlow Decision Forests. See
   // "CATEGORICAL_INTEGER_OFFSET".
   optional bool offset_value_by_one_during_training = 8 [default = false];

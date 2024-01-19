@@ -29,6 +29,7 @@ from ydf.dataset.dataspec import Column as Feature
 
 # Model
 from ydf.model.model_lib import load_model
+from ydf.model.model_lib import from_tensorflow_decision_forests
 from ydf.model.generic_model import Task
 from ydf.model.generic_model import ModelIOOptions
 from ydf.model.generic_model import GenericModel

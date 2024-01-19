@@ -20,15 +20,15 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 #include "absl/strings/substitute.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -39,6 +39,8 @@ constexpr char kModelDataSpecFileName[] = "data_spec.pb";
 
 // Name of the subdirectory containing an YDF model in a TF-DF model.
 constexpr char kTensorFlowDecisionForestsAssets[] = "assets";
+// Name of the file that identifies a Tensorflow SavedModel.
+constexpr char kTensorFlowSavedModelProtoFileName[] = "saved_model.pb";
 
 // Last file created in the model directory when a model is exported.
 //
@@ -103,24 +105,22 @@ absl::Status LoadModel(absl::string_view directory,
   proto::AbstractModel header;
   std::string effective_directory = ImproveModelReadingPath(directory);
 
+  ASSIGN_OR_RETURN(const bool is_tensorflow_saved_model,
+                   IsTensorFlowSavedModel(effective_directory));
+  if (is_tensorflow_saved_model) {
+    effective_directory =
+        file::JoinPath(effective_directory, kTensorFlowDecisionForestsAssets);
+    YDF_LOG(INFO)
+        << "Detected `" << kTensorFlowSavedModelProtoFileName
+        << "` in directory " << directory
+        << ". Loading a TensorFlow Decision Forests model from C++ YDF or CLI "
+           "is brittle and should not be relied upon. Use the Python API of "
+           "YDF to convert the model to a regular YDF model with "
+           "`ydf.from_tensorflow_decision_forests(model_path)`";
+  }
   if (!io_options.file_prefix) {
-    auto prefix_or_status = DetectFilePrefix(directory);
-    if (prefix_or_status.ok()) {
-      io_options.file_prefix = prefix_or_status.value();
-    } else {
-      // Maybe this is a TensorFlow Decision Forests models and the real model
-      // is in the "assets" sub-directory.
-      auto prefix2_or_status = DetectFilePrefix(
-          file::JoinPath(directory, kTensorFlowDecisionForestsAssets));
-      if (prefix2_or_status.ok()) {
-        effective_directory =
-            file::JoinPath(directory, kTensorFlowDecisionForestsAssets);
-        io_options.file_prefix = prefix2_or_status.value();
-      } else {
-        // Return the first error.
-        return prefix_or_status.status();
-      }
-    }
+    ASSIGN_OR_RETURN(io_options.file_prefix,
+                     DetectFilePrefix(effective_directory));
   }
 
   RETURN_IF_ERROR(file::GetBinaryProto(
@@ -162,6 +162,11 @@ absl::StatusOr<std::string> DetectFilePrefix(absl::string_view directory) {
   }
   return file::GetBasename(
       absl::StripSuffix(done_files[0], kModelDataSpecFileName));
+}
+
+absl::StatusOr<bool> IsTensorFlowSavedModel(absl::string_view model_directory) {
+  return file::FileExists(
+      file::JoinPath(model_directory, kTensorFlowSavedModelProtoFileName));
 }
 
 }  // namespace model

@@ -29,6 +29,11 @@ ColumnDefs = Optional[List[ColumnDef]]
 # Normalized version of "ColumnDefs".
 NormalizedColumnDefs = Optional[List["Column"]]
 
+# The key of the "out of vocabulary" (OOV) used by YDF.
+# Must match kOutOfDictionaryItemKey in
+# yggdrasil_decision_forests/dataset/data_spec.h
+YDF_OOD = "<OOD>"
+
 
 class Semantic(enum.Enum):
   """Semantic (e.g. numerical, categorical) of a column.

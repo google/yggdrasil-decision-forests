@@ -111,9 +111,12 @@ py_library(
     deps = [
         ":generic_model",
         # absl/logging dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/cc:ydf",
+        "//ydf/dataset:dataspec",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/random_forest_model",
+        "//ydf/utils:log",
     ],
 )
 
@@ -171,6 +174,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/random_forest_model",
@@ -192,11 +196,11 @@ py_test(
     deps = [
         ":model_lib",
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
         # tensorflow dep,
         # tensorflow_decision_forests dep,
-        "//ydf/utils:test_utils",
     ],
 )
 
