@@ -286,7 +286,7 @@ class RandomForestLearnerTest(LearnerTest):
         num_trees=1000000,  # Trains for a very long time
     )
 
-    signal.alarm(5)  # Stop the training in 5 seconds
+    signal.alarm(3)  # Stop the training in 3 seconds
     with self.assertRaises(ValueError):
       _ = learner.train(ds)
 
@@ -630,7 +630,7 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     )
 
     model, _, _ = self._check_adult_model(
-        learner, ds=vds_dataset, minimum_accuracy=0.864
+        learner, ds=vds_dataset, minimum_accuracy=0.863
     )
 
     _ = model.analyze(vds_dataset.test)

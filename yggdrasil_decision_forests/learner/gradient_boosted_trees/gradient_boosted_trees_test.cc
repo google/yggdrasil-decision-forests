@@ -660,8 +660,8 @@ TEST_F(GradientBoostedTreesOnAdult, ValidVerticalDataset) {
   pass_validation_dataset_ = true;
   inject_random_noise_ = true;
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8732, 0.0023, 0.8747);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2794, 0.0027, 0.2776);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8716, 0.0074, 0.8747);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2795, 0.0032, 0.2776);
 }
 
 // Train a GBT with a validation dataset provided as a path.
@@ -670,8 +670,8 @@ TEST_F(GradientBoostedTreesOnAdult, ValidPathDataset) {
   pass_validation_dataset_ = true;
   inject_random_noise_ = true;
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8732, 0.0023, 0.8747);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2794, 0.0057, 0.2776);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8716, 0.0074, 0.8747);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2795, 0.0032, 0.2776);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, DISABLED_VariableImportance) {

@@ -17,7 +17,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iterator>
 #include <memory>
 #include <random>
 #include <string>
@@ -62,12 +61,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace random_forest {
 namespace {
-
-std::string DatasetDir() {
-  return file::JoinPath(
-      test::DataRootDirectory(),
-      "yggdrasil_decision_forests/test_data/dataset");
-}
 
 // Build a forest with two decision trees as follow:
 // [a>1]
@@ -1063,7 +1056,7 @@ TEST_F(RandomForestOnSyntheticClassification, Base) {
 TEST_F(RandomForestOnSyntheticClassification, SparseOblique) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
-  rf_config->set_num_trees(50);
+  rf_config->set_num_trees(70);
   rf_config->set_winner_take_all_inference(false);
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   rf_config->mutable_decision_tree()
@@ -1075,7 +1068,7 @@ TEST_F(RandomForestOnSyntheticClassification, SparseOblique) {
 TEST_F(RandomForestOnSyntheticClassification, MHLDTOblique) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
-  rf_config->set_num_trees(50);
+  rf_config->set_num_trees(70);
   rf_config->set_winner_take_all_inference(false);
   rf_config->mutable_decision_tree()->mutable_mhld_oblique_split();
   rf_config->mutable_decision_tree()
