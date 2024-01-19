@@ -597,7 +597,9 @@ Use `model.describe()` for more details
     )
 
   def to_tensorflow_saved_model(
-      self, path: str, input_model_signature_fn: Any = None
+      self,
+      path: str,
+      input_model_signature_fn: Any = None,
   ) -> None:
     """Exports the model as a TensorFlow Saved model.
 

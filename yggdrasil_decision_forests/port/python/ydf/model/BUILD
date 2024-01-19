@@ -195,12 +195,15 @@ py_test(
     tags = ["manual"],
     deps = [
         ":model_lib",
+        # absl/logging dep,
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
         # tensorflow dep,
         # tensorflow_decision_forests dep,
+        "//ydf/learner:specialized_learners",
+        "//ydf/utils:test_utils",
     ],
 )
 

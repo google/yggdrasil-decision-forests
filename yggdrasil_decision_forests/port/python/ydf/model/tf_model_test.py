@@ -18,8 +18,10 @@ TensorFlow cannot be compiled in debug mode, so these tests are separated out to
 improve debuggability of the remaining model tests.
 """
 
-from typing import List, Optional, Tuple
+import os
+from typing import Callable, List, Mapping, Optional, Tuple
 
+from absl import logging
 from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
@@ -28,7 +30,9 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_decision_forests as tfdf
 
+from ydf.learner import specialized_learners
 from ydf.model import model_lib
+from ydf.utils import test_utils
 
 
 class TfModelTest(parameterized.TestCase):
@@ -259,6 +263,141 @@ class TfModelTest(parameterized.TestCase):
     npt.assert_allclose(
         tfdf_predictions.flatten(), new_tfdf_predictions.flatten(), atol=0.0001
     )
+
+  def test_to_tensorflow_saved_model_serialized_input(self):
+    # TODO: b/321204507 - Integrate logic in YDF.
+
+    train_ds_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_train.recordio"
+    )
+    test_ds_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.recordio"
+    )
+
+    # Train a model on the tfrecord directly.
+    ydf_model = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        num_trees=10,
+    ).train(f"tfrecordv2+tfe:{train_ds_path}")
+
+    test_predictions = ydf_model.predict(f"tfrecordv2+tfe:{test_ds_path}")
+
+    tempdir = self.create_tempdir().full_path
+
+    # Export the model to a TensorFlow Saved Model.
+    #
+    # This model expects inputs in the form of a dictionary of features
+    # values e.g. {"age": [...], "capital_gain": [...], ...}.
+    #
+    # This is referred as the "predict" API.
+    path_wo_signature = os.path.join(tempdir, "mdl")
+    ydf_model.to_tensorflow_saved_model(path_wo_signature)
+
+    # Load the model, and add a serialized tensorflow examples protobuffer
+    # input signature. In other words, the model expects as input a serialized
+    # tensorflow example proto.
+    #
+    # This is often referred the "classify" or "regress" API.
+    path_w_signature = os.path.join(tempdir, "mdl_ws")
+    tf_model_wo_signature = tf.keras.models.load_model(path_wo_signature)
+
+    # The list of input features to read from the tensorflow example proto.
+    # Note that tensorflow example proto dtypes can only be float32, int64 or
+    # string.
+    feature_spec = {
+        # Numerical
+        "age": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
+        "capital_gain": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
+        "capital_loss": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
+        "education_num": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
+        "fnlwgt": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
+        "hours_per_week": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
+        # Categorical
+        "education": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+        "marital_status": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+        "native_country": tf.io.FixedLenFeature(
+            shape=[], dtype=tf.string, default_value=""
+        ),
+        "occupation": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+        "race": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+        "relationship": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+        "sex": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+        "workclass": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+    }
+
+    # The "classify" requires for all the predictions to return the label
+    # classes. This only make sense for a classification model.
+    label_classes = ydf_model.label_classes()
+
+    # The "make_classify_fn" function combines a tensorflow example proto
+    # parsing stage with the classical model inference.
+    def make_classify_fn(
+        model: tf.keras.Model,
+    ) -> Callable[[tf.Tensor], Mapping[str, tf.Tensor]]:
+      @tf.function(
+          input_signature=[
+              tf.TensorSpec([None], dtype=tf.string, name="inputs")
+          ]
+      )
+      def classify(
+          serialized_tf_examples: tf.Tensor,
+      ) -> Mapping[str, tf.Tensor]:
+        # Parse the serialized tensorflow proto examples into a dictionary of
+        # tensor values.
+        parsed_features = tf.io.parse_example(
+            serialized_tf_examples, feature_spec
+        )
+
+        # Cast all the int64 features into float32 values.
+        #
+        # The SavedModel exported by YDF expects float32 value for all
+        # numerical features (can be overriden with the
+        # `input_model_signature_fn` argument). However, in this dataset, the
+        # numerical features are stored as int64.
+        for feature in parsed_features:
+          if parsed_features[feature].dtype == tf.int64:
+            parsed_features[feature] = tf.cast(
+                parsed_features[feature], tf.float32
+            )
+
+        # Apply the model.
+        outputs = model(parsed_features)
+
+        # Extract the label classes. The "classify" API expects for the label
+        # classes to be returned with every predictions.
+        batch_size = tf.shape(serialized_tf_examples)[0]
+        batched_label_classes = tf.broadcast_to(
+            input=tf.constant(label_classes),
+            shape=(batch_size, len(label_classes)),
+        )
+
+        return {"classes": batched_label_classes, "scores": outputs}
+
+      return classify
+
+    # Save the model to a SavedModel with the "classify" signature.
+    signatures = {
+        "classify": make_classify_fn(tf_model_wo_signature),
+    }
+    tf.saved_model.save(
+        tf_model_wo_signature, path_w_signature, signatures=signatures
+    )
+    tf_model_w_signature = tf.saved_model.load(path_w_signature)
+
+    logging.info("Available signatures: %s", tf_model_w_signature.signatures)
+
+    # Generate predictions with the "classify" signature.
+    classify_model = tf_model_w_signature.signatures["classify"]
+
+    for example_idx, serialized_example in enumerate(
+        tf.data.TFRecordDataset([test_ds_path]).take(10)
+    ):
+      prediction = classify_model(inputs=[serialized_example.numpy()])
+      logging.info("prediction:%s", prediction)
+      npt.assert_almost_equal(
+          prediction["scores"].numpy(), test_predictions[example_idx]
+      )
+      npt.assert_equal(prediction["classes"].numpy(), [[b"<=50K", b">50K"]])
 
 
 if __name__ == "__main__":
