@@ -15,7 +15,7 @@
 """Typing annotations for dataset I/O connectors."""
 
 import typing
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Sequence, Union
 
 import numpy as np
 
@@ -26,7 +26,7 @@ if typing.TYPE_CHECKING:
 InputValues = Union[np.ndarray, List[Any]]
 
 # Supported types of datasets.
-IODataset = Union[Dict[str, InputValues], "pd.DataFrame", str, List[str]]
+IODataset = Union[Dict[str, InputValues], "pd.DataFrame", str, Sequence[str]]
 
 
 SUPPORTED_INPUT_DATA_DESCRIPTION = """\

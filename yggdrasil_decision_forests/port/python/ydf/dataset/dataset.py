@@ -376,7 +376,9 @@ def create_vertical_dataset_with_spec_or_args(
   # If `data` is a path, try to import from the path directly from C++.
   # Everything else we try to transform into a dictionary with Python.
   if isinstance(data, str) or (
-      isinstance(data, list) and data and all(isinstance(s, str) for s in data)
+      isinstance(data, Sequence)
+      and data
+      and all(isinstance(s, str) for s in data)
   ):
     return create_vertical_dataset_from_path(
         data, required_columns, inference_args, data_spec
