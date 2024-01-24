@@ -43,7 +43,7 @@ class GradientBoostedTreesCCModel : public DecisionForestCCModel {
   static absl::StatusOr<std::unique_ptr<GradientBoostedTreesCCModel>> Create(
       std::unique_ptr<model::AbstractModel>& model_ptr);
 
-  // `model` and `rf_model` must point to the same object. Prefer using
+  // `model` and `gbt_model` must point to the same object. Prefer using
   // GradientBoostedTreesCCModel::Compute for construction.
   GradientBoostedTreesCCModel(std::unique_ptr<YDFModel> model,
                               YDFModel* gbt_model)
@@ -52,8 +52,13 @@ class GradientBoostedTreesCCModel : public DecisionForestCCModel {
     DCHECK_EQ(model_.get(), gbt_model_);
   }
 
-  // Return's the model's validation loss.
+  // Returns the model's validation loss.
   float validation_loss() const { return gbt_model_->validation_loss(); }
+
+  // Returns the model's validation evaluation proto.
+  metric::proto::EvaluationResults validation_evaluation() const {
+    return gbt_model_->ValidationEvaluation();
+  }
 
   py::array_t<float> initial_predictions() const;
 

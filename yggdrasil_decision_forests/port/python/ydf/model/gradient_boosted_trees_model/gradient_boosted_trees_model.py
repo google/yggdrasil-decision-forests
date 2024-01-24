@@ -20,6 +20,7 @@ from typing import Optional
 import numpy.typing as npt
 
 from ydf.cc import ydf
+from ydf.metric import metric
 from ydf.model.decision_forest_model import decision_forest_model
 
 
@@ -36,3 +37,28 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
   def initial_predictions(self) -> npt.NDArray[float]:
     """Returns the model's initial predictions (i.e. the model bias)."""
     return self._model.initial_predictions()
+
+  def validation_evaluation(self) -> metric.Evaluation:
+    """Returns the validation evaluation of the model, if available.
+
+    Gradient Boosted Trees use a validation dataset for early stopping.
+
+    If no validation evaluation been computed or has been removed, the
+    evaluation object may be missing fields.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.GradientBoostedTreesLearner(label="label").train(train_ds)
+
+    validation_evaluation = model.validation_evaluation()
+    # In an interactive Python environment, print a rich evaluation report.
+    validation_evaluation
+    ```
+    """
+    return metric.Evaluation(self._model.validation_evaluation())

@@ -29,6 +29,7 @@ py_library(
     deps = [
         # numpy dep,
         "//ydf/cc:ydf",
+        "//ydf/metric",
         "//ydf/model/decision_forest_model",
     ],
 )
