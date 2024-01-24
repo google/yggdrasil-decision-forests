@@ -37,10 +37,41 @@ from ydf.utils import test_utils
 
 class GenericModelTest(parameterized.TestCase):
 
-  def test_predict_adult_rf(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
+  @classmethod
+  def setUpClass(cls):
+    super().setUpClass()
+    # Loading models needed in many unittests.
+    model_dir = os.path.join(test_utils.ydf_test_data_path(), "model")
+    # This model is a Random Forest classification model without training logs.
+    cls.adult_binary_class_rf = model_lib.load_model(
+        os.path.join(model_dir, "adult_binary_class_rf")
     )
+    # This model is a GBDT classification model without training logs.
+    cls.adult_binary_class_gbdt = model_lib.load_model(
+        os.path.join(model_dir, "adult_binary_class_gbdt")
+    )
+    # This model is a GBDT regression model without training logs.
+    cls.abalone_regression_gbdt = model_lib.load_model(
+        os.path.join(model_dir, "abalone_regression_gbdt")
+    )
+
+  def test_rf_instance(self):
+    self.assertIsInstance(
+        self.adult_binary_class_rf,
+        random_forest_model.RandomForestModel,
+    )
+    self.assertEqual(self.adult_binary_class_rf.name(), "RANDOM_FOREST")
+
+  def test_gbt_instance(self):
+    self.assertIsInstance(
+        self.adult_binary_class_gbdt,
+        gradient_boosted_trees_model.GradientBoostedTreesModel,
+    )
+    self.assertEqual(
+        self.adult_binary_class_gbdt.name(), "GRADIENT_BOOSTED_TREES"
+    )
+
+  def test_predict_adult_rf(self):
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
@@ -49,21 +80,15 @@ class GenericModelTest(parameterized.TestCase):
         "prediction",
         "adult_test_binary_class_rf.csv",
     )
-    model = model_lib.load_model(model_path)
-    self.assertIsInstance(model, random_forest_model.RandomForestModel)
-    self.assertEqual(model.name(), "RANDOM_FOREST")
 
     test_df = pd.read_csv(dataset_path)
-    predictions = model.predict(test_df)
+    predictions = self.adult_binary_class_rf.predict(test_df)
     predictions_df = pd.read_csv(predictions_path)
 
     expected_predictions = predictions_df[">50K"].to_numpy()
     npt.assert_almost_equal(predictions, expected_predictions, decimal=5)
 
   def test_predict_adult_gbt(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
@@ -72,23 +97,15 @@ class GenericModelTest(parameterized.TestCase):
         "prediction",
         "adult_test_binary_class_gbdt.csv",
     )
-    model = model_lib.load_model(model_path)
-    self.assertIsInstance(
-        model, gradient_boosted_trees_model.GradientBoostedTreesModel
-    )
-    self.assertEqual(model.name(), "GRADIENT_BOOSTED_TREES")
 
     test_df = pd.read_csv(dataset_path)
-    predictions = model.predict(test_df)
+    predictions = self.adult_binary_class_gbdt.predict(test_df)
     predictions_df = pd.read_csv(predictions_path)
 
     expected_predictions = predictions_df[">50K"].to_numpy()
     npt.assert_almost_equal(predictions, expected_predictions, decimal=5)
 
   def test_predict_without_label_column(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
@@ -97,52 +114,39 @@ class GenericModelTest(parameterized.TestCase):
         "prediction",
         "adult_test_binary_class_rf.csv",
     )
-    model = model_lib.load_model(model_path)
 
     test_df = pd.read_csv(dataset_path).drop(columns=["income"])
-    predictions = model.predict(test_df)
+    predictions = self.adult_binary_class_rf.predict(test_df)
     predictions_df = pd.read_csv(predictions_path)
 
     expected_predictions = predictions_df[">50K"].to_numpy()
     npt.assert_almost_equal(predictions, expected_predictions, decimal=5)
 
   def test_predict_fails_with_missing_feature_columns(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
-    model = model_lib.load_model(model_path)
 
     test_df = pd.read_csv(dataset_path).drop(columns=["age"])
     with self.assertRaises(ValueError):
-      _ = model.predict(test_df)
+      _ = self.adult_binary_class_rf.predict(test_df)
 
   def test_evaluate_fails_with_missing_label_columns(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
-    model = model_lib.load_model(model_path)
 
     test_df = pd.read_csv(dataset_path).drop(columns=["income"])
     with self.assertRaises(ValueError):
-      _ = model.evaluate(test_df)
+      _ = self.adult_binary_class_rf.evaluate(test_df)
 
   def test_evaluate_adult_gbt(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
 
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
-    evaluation = model.evaluate(test_df)
+    evaluation = self.adult_binary_class_gbdt.evaluate(test_df)
 
     self.assertEqual(
         str(evaluation),
@@ -169,16 +173,14 @@ class GenericModelTest(parameterized.TestCase):
     )
 
   def test_analyze_adult_gbt(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
 
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
-    analysis = model.analyze(test_df, permutation_variable_importance_rounds=5)
+    analysis = self.adult_binary_class_gbdt.analyze(
+        test_df, permutation_variable_importance_rounds=5
+    )
 
     self.assertEqual(
         str(analysis),
@@ -194,16 +196,12 @@ class GenericModelTest(parameterized.TestCase):
     self.assertIn("Variable Importance", analysis_html)
 
   def test_explain_prediction_adult_gbt(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
 
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path, nrows=1)
-    analysis = model.analyze_prediction(test_df)
+    analysis = self.adult_binary_class_gbdt.analyze_prediction(test_df)
 
     self.assertEqual(
         str(analysis),
@@ -218,70 +216,54 @@ class GenericModelTest(parameterized.TestCase):
     self.assertIn("Feature Variation", analysis_html)
 
   def test_explain_prediction_adult_gbt_with_wrong_selection(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path, nrows=3)
     with self.assertRaises(ValueError):
-      _ = model.analyze_prediction(test_df)
+      _ = self.adult_binary_class_gbdt.analyze_prediction(test_df)
     with self.assertRaises(ValueError):
-      _ = model.analyze_prediction(test_df.iloc[:0])
+      _ = self.adult_binary_class_gbdt.analyze_prediction(test_df.iloc[:0])
 
   def test_evaluate_bootstrapping_default(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "abalone_regression_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
     )
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
-    evaluation = model.evaluate(test_df)
+    evaluation = self.abalone_regression_gbdt.evaluate(test_df)
     self.assertIsNone(evaluation.rmse_ci95_bootstrap)
 
   def test_evaluate_bootstrapping_bool(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "abalone_regression_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
     )
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
-    evaluation = model.evaluate(test_df, bootstrapping=True)
+    evaluation = self.abalone_regression_gbdt.evaluate(
+        test_df, bootstrapping=True
+    )
     self.assertIsNotNone(evaluation.rmse_ci95_bootstrap)
     self.assertAlmostEqual(evaluation.rmse_ci95_bootstrap[0], 1.723, 2)
     self.assertAlmostEqual(evaluation.rmse_ci95_bootstrap[1], 1.866, 2)
 
   def test_evaluate_bootstrapping_integer(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "abalone_regression_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
     )
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
-    evaluation = model.evaluate(test_df, bootstrapping=599)
+    evaluation = self.abalone_regression_gbdt.evaluate(
+        test_df, bootstrapping=599
+    )
     self.assertIsNotNone(evaluation.rmse_ci95_bootstrap)
     self.assertAlmostEqual(evaluation.rmse_ci95_bootstrap[0], 1.723, 1)
     self.assertAlmostEqual(evaluation.rmse_ci95_bootstrap[1], 1.866, 1)
 
   def test_evaluate_bootstrapping_error(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "abalone_regression_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
     )
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
     with self.assertRaisesRegex(ValueError, "an integer greater than 100"):
-      model.evaluate(test_df, bootstrapping=1)
+      self.abalone_regression_gbdt.evaluate(test_df, bootstrapping=1)
 
   def test_prefixed_model_loading_autodetection(self):
     model_path = os.path.join(
@@ -328,14 +310,8 @@ class GenericModelTest(parameterized.TestCase):
       self.assertTrue(os.path.exists(os.path.join(tempdir, "my_prefixdone")))
 
   def test_model_str(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(),
-        "model",
-        "adult_binary_class_gbdt",
-    )
-    model = model_lib.load_model(model_path)
     self.assertEqual(
-        str(model),
+        str(self.adult_binary_class_gbdt),
         """\
 Model: GRADIENT_BOOSTED_TREES
 Task: CLASSIFICATION
@@ -345,73 +321,42 @@ Use `model.describe()` for more details
     )
 
   def test_model_describe_text(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(),
-        "model",
-        "adult_binary_class_gbdt",
+    self.assertIn(
+        'Type: "GRADIENT_BOOSTED_TREES"',
+        self.adult_binary_class_gbdt.describe("text"),
     )
-    model = model_lib.load_model(model_path)
-    self.assertIn('Type: "GRADIENT_BOOSTED_TREES"', model.describe("text"))
 
   def test_model_describe_html(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(),
-        "model",
-        "adult_binary_class_gbdt",
-    )
-    model = model_lib.load_model(model_path)
-    html_description = model.describe("html")
+    html_description = self.adult_binary_class_gbdt.describe("html")
     self.assertIn("GRADIENT_BOOSTED_TREES", html_description)
 
   def test_model_to_cpp(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(),
-        "model",
-        "adult_binary_class_gbdt",
-    )
-    model = model_lib.load_model(model_path)
-    cc = model.to_cpp()
+    cc = self.adult_binary_class_gbdt.to_cpp()
     logging.info("cc:\n%s", cc)
 
   def test_benchmark(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
-    benchmark_result = model.benchmark(test_df)
+    benchmark_result = self.adult_binary_class_gbdt.benchmark(test_df)
     print(benchmark_result)
 
   def test_model_metadata(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
-    model = model_lib.load_model(model_path)
     metadata = model_metadata.ModelMetadata(
         owner="TestOwner",
         created_date=31415,
         uid=271828,
         framework="TestFramework",
     )
-    model.set_metadata(metadata)
-    self.assertEqual(metadata, model.metadata())
+    self.adult_binary_class_gbdt.set_metadata(metadata)
+    self.assertEqual(metadata, self.adult_binary_class_gbdt.metadata())
 
   def test_label_col_idx(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
-    model = model_lib.load_model(model_path)
-    self.assertEqual(model.label_col_idx(), 14)
+    self.assertEqual(self.adult_binary_class_gbdt.label_col_idx(), 14)
 
   def test_label_classes(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
-    model = model_lib.load_model(model_path)
-    label_classes = model.label_classes()
+    label_classes = self.adult_binary_class_gbdt.label_classes()
     self.assertEqual(label_classes, ["<=50K", ">50K"])
 
   def test_model_with_catset(self):
@@ -426,21 +371,19 @@ Use `model.describe()` for more details
     self.assertAlmostEqual(evaluation.accuracy, 0.80011, places=5)
 
   def test_multi_thread_predict(self):
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
     dataset_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
-    model = model_lib.load_model(model_path)
     test_df = pd.read_csv(dataset_path)
     test_ds = dataset.create_vertical_dataset(
-        test_df, data_spec=model.data_spec()
+        test_df, data_spec=self.adult_binary_class_gbdt.data_spec()
     )
     for num_workers in range(1, 10 + 1):
       with concurrent.futures.ThreadPoolExecutor(num_workers) as executor:
         begin = time.time()
-        _ = list(executor.map(model.predict, [test_ds] * 10))
+        _ = list(
+            executor.map(self.adult_binary_class_gbdt.predict, [test_ds] * 10)
+        )
         end = time.time()
         logging.info("Runtime for %s workers: %s", num_workers, end - begin)
 
