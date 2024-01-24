@@ -15,7 +15,8 @@
 """Definitions for Random Forest models."""
 
 import dataclasses
-from typing import Sequence
+from typing import Optional, Sequence
+from yggdrasil_decision_forests.metric import metric_pb2
 from yggdrasil_decision_forests.model.random_forest import random_forest_pb2
 from ydf.cc import ydf
 from ydf.metric import metric
@@ -68,7 +69,7 @@ class RandomForestModel(decision_forest_model.DecisionForestModel):
     train_ds = pd.read_csv("train.csv")
     learner = ydf.RandomForestLearner(label="label",
                                       compute_oob_performances=True)
-    model = ydf.train(train_ds)
+    model = learner.train(train_ds)
 
     oob_evaluations = model.out_of_bag_evaluations()
     # In an interactive Python environment, print a rich evaluation report.
@@ -101,3 +102,41 @@ class RandomForestModel(decision_forest_model.DecisionForestModel):
     function is arbitrary and does not influence model inference.
     """
     return self._model.winner_takes_all()
+
+  def self_evaluation(self) -> Optional[metric.Evaluation]:
+    """Returns the model's self-evaluation.
+
+    For Random Forest models, the self-evaluation is out-of-bag evaluation on
+    the full model. Note that the Random Forest models do not use a validation
+    dataset. If out-of-bag evaluation is not enabled, no self-evaluation is
+    computed.
+
+    Different models use different methods for self-evaluation. Notably,
+    Gradient Boosted Trees use the evaluation on the validation dataset.
+    Therefore, self-evaluations are not comparable between different model
+    types.
+
+    Returns None if no self-evaluation has been computed.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    learner = ydf.RandomForestLearner(label="label",
+                                    compute_oob_performances=True)
+    model = learner.train(train_ds)
+
+    self_evaluation = model.self_evaluation()
+    # In an interactive Python environment, print a rich evaluation report.
+    self_evaluation
+    ```
+    """
+    oob_evaluation = self.out_of_bag_evaluations()
+    if oob_evaluation:
+      return oob_evaluation[-1].evaluation
+    # Return an empty evaluation object.
+    return None

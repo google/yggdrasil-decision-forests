@@ -387,6 +387,29 @@ Use `model.describe()` for more details
         end = time.time()
         logging.info("Runtime for %s workers: %s", num_workers, end - begin)
 
+  def test_self_evaluation_gbt(self):
+    # This model is a classification model with full training logs.
+    gbt_adult_base_with_na_path = os.path.join(
+        test_utils.ydf_test_data_path(), "golden", "gbt_adult_base_with_na"
+    )
+    gbt_adult_base_with_na = model_lib.load_model(gbt_adult_base_with_na_path)
+    self_evaluation = gbt_adult_base_with_na.self_evaluation()
+    self.assertAlmostEqual(self_evaluation.accuracy, 0.8498403)
+
+  def test_self_evaluation_rf(self):
+    self_evaluation = self.adult_binary_class_rf.self_evaluation()
+    self.assertAlmostEqual(self_evaluation.loss, 0.31474323732)
+
+  def test_empty_self_evaluation_rf(self):
+    # Uplift models do not have OOB evaluations.
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "sim_pte_categorical_uplift_rf",
+    )
+    model = model_lib.load_model(model_path)
+    self.assertIsNone(model.self_evaluation())
+
 
 if __name__ == "__main__":
   absltest.main()

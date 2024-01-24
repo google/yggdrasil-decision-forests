@@ -19,6 +19,7 @@ from typing import Optional
 
 import numpy.typing as npt
 
+from yggdrasil_decision_forests.metric import metric_pb2
 from ydf.cc import ydf
 from ydf.metric import metric
 from ydf.model.decision_forest_model import decision_forest_model
@@ -38,13 +39,13 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
     """Returns the model's initial predictions (i.e. the model bias)."""
     return self._model.initial_predictions()
 
-  def validation_evaluation(self) -> metric.Evaluation:
+  def validation_evaluation(self) -> Optional[metric.Evaluation]:
     """Returns the validation evaluation of the model, if available.
 
     Gradient Boosted Trees use a validation dataset for early stopping.
 
-    If no validation evaluation been computed or has been removed, the
-    evaluation object may be missing fields.
+    Returns None if no validation evaluation been computed or it has been
+    removed from the model.
 
     Usage example:
 
@@ -61,4 +62,40 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
     validation_evaluation
     ```
     """
+    validation_evaluation_proto = self._model.validation_evaluation()
+    # There is no canonical way of checking if a proto is empty. This workaround
+    # just checks if the evaluation proto is valid.
+    if not validation_evaluation_proto.HasField("task"):
+      return None
     return metric.Evaluation(self._model.validation_evaluation())
+
+  def self_evaluation(self) -> Optional[metric.Evaluation]:
+    """Returns the model's self-evaluation.
+
+    For Gradient Boosted Trees models, the self-evaluation is the evaluation on
+    the validation dataset. Note that the validation dataset is extracted
+    automatically if not explicitly given. If the validation dataset is
+    deactivated, no self-evaluation is computed.
+
+    Different models use different methods for self-evaluation. Notably, Random
+    Forests use the last Out-Of-Bag evaluation. Therefore, self-evaluations are
+    not comparable between different model types.
+
+    Returns None if no self-evaluation has been computed.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.GradientBoostedTreesLearner(label="label").train(train_ds)
+
+    self_evaluation = model.self_evaluation()
+    # In an interactive Python environment, print a rich evaluation report.
+    self_evaluation
+    ```
+    """
+    return self.validation_evaluation()

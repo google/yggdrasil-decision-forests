@@ -174,11 +174,9 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/random_forest_model",
-        "//ydf/utils:log",
         "//ydf/utils:test_utils",
     ],
 )

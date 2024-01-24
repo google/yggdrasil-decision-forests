@@ -150,8 +150,7 @@ class GradientBoostedTreesTest(absltest.TestCase):
         model, gradient_boosted_trees_model.GradientBoostedTreesModel
     )
     validation_evaluation = model.validation_evaluation()
-    self.assertIsNone(validation_evaluation.accuracy)
-    self.assertEqual(validation_evaluation.__str__(), "No metrics")
+    self.assertIsNone(validation_evaluation)
 
   def test_validation_evaluation_no_training_logs(self):
     validation_evaluation = self.adult_binary_class_gbdt.validation_evaluation()

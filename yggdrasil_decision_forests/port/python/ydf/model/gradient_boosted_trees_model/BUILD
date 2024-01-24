@@ -28,6 +28,7 @@ py_library(
     srcs = ["gradient_boosted_trees_model.py"],
     deps = [
         # numpy dep,
+        "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
         "//ydf/cc:ydf",
         "//ydf/metric",
         "//ydf/model/decision_forest_model",
