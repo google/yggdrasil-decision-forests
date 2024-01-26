@@ -1,8 +1,22 @@
 # Changelog
 
-## HEAD
+## 0.1.0 - 2024-01-25
 
+### Features
+
+-   Added model validation evaluation (for GBTs) and OOB evaluation (for RFs).
+-   Expose winner-takes-all for Random Forests.
 -   Added model self evaluation.
+-   Added `ydf.from_tensorflow_decision_forests()` for importing TF-DF models.
+-   Allow feeding datasets as sequence of strings.
+
+### Fixes
+
+-   Fixes a plotting issue for GBTs without validation loss
+
+#### Release music
+
+Flötenuhren von 1772 und 1793 - Vivace (Hob XIX:13). Joseph Haydn
 
 ## 0.0.8 - 2023-12-19
 
