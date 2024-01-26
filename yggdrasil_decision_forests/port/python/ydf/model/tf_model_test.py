@@ -351,7 +351,7 @@ class TfModelTest(parameterized.TestCase):
         # Cast all the int64 features into float32 values.
         #
         # The SavedModel exported by YDF expects float32 value for all
-        # numerical features (can be overriden with the
+        # numerical features (can be overridden with the
         # `input_model_signature_fn` argument). However, in this dataset, the
         # numerical features are stored as int64.
         for feature in parsed_features:
