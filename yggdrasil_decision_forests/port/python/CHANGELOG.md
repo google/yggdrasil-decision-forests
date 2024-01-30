@@ -1,5 +1,12 @@
 # Changelog
 
+## HEAD
+
+### Bug
+
+-   In the tuner, run `parallel_trials` trials in parallel, instead of
+    `num_threads` trials in parallel.
+
 ## 0.1.0 - 2024-01-25
 
 ### Features

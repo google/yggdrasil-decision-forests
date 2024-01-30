@@ -178,6 +178,8 @@ py_test(
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     python_version = "PY3",
     shard_count = 10,
+    tags = [
+    ],
     deps = [
         ":generic_learner",
         ":specialized_learners",
@@ -253,6 +255,8 @@ py_test(
     name = "tuner_test",
     srcs = ["tuner_test.py"],
     python_version = "PY3",
+    tags = [
+    ],
     deps = [
         ":tuner",
         # absl/logging dep,

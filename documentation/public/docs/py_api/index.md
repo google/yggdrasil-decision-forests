@@ -36,6 +36,7 @@ A **Tuner** finds the optimal set of hyper-parameters using repeated training
 and evaluation.
 
 -   [RandomSearchTuner](RandomSearchTuner.md)
+-   [VizierTuner](VizierTuner.md) (currently, for Googlers only)
 
 ## Utilities
 

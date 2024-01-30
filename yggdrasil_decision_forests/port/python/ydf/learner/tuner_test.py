@@ -14,7 +14,6 @@
 
 """Unit tests of the tuner."""
 
-
 from absl.testing import absltest
 from absl.testing import parameterized
 
@@ -58,7 +57,8 @@ class TunerTest(parameterized.TestCase):
 
     expected_optimizer = HyperParametersOptimizerLearnerTrainingConfig(
         optimizer=hyperparameters_optimizer_pb2.Optimizer(
-            optimizer_key="RANDOM"
+            optimizer_key="RANDOM",
+            parallel_trials=2,
         ),
         base_learner=abstract_learner_pb2.TrainingConfig(
             maximum_training_duration_seconds=10
@@ -162,7 +162,8 @@ class TunerTest(parameterized.TestCase):
 
     expected_optimizer = HyperParametersOptimizerLearnerTrainingConfig(
         optimizer=hyperparameters_optimizer_pb2.Optimizer(
-            optimizer_key="RANDOM"
+            optimizer_key="RANDOM",
+            parallel_trials=1,
         ),
         search_space=hyperparameter_pb2.HyperParameterSpace(
             fields=[

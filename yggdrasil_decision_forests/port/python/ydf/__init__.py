@@ -51,6 +51,7 @@ from ydf.learner.worker import start_worker
 
 # Tuner
 from ydf.learner.tuner import RandomSearchTuner
+from ydf.learner.tuner import VizierTuner
 
 # Logs
 from ydf.utils.log import verbose

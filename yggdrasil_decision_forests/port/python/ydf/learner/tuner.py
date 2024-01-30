@@ -38,11 +38,11 @@ learner = ydf.RandomForestLearner(tuner=tuner)
 
 from typing import Optional, Sequence, Union
 
+from google.protobuf.internal import containers
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.learner.hyperparameters_optimizer import hyperparameters_optimizer_pb2
 from yggdrasil_decision_forests.learner.hyperparameters_optimizer.optimizers import random_pb2
 from yggdrasil_decision_forests.model import hyperparameter_pb2
-from google.protobuf.internal import containers
 
 
 # Single hyperparameter value
@@ -80,9 +80,14 @@ class AbstractTuner:
       automatic_search_space: If true, automatically define the search space of
         hyperparameters. In this case, configuring the hyperparameters manually
         (e.g. calling "choice(...)" on the tuner) is not necessary.
-      parallel_trials: Number of trials to evaluate in parallel. In the
-        non-distributed training setting, the effective number of threads will
-        be `parallel_trials x num_threads`.
+      parallel_trials: Number of trials to evaluate in parallel. The training of
+        an individual model uses "num_threads" threads (configured in the
+        learner). Therefore, in the non-distributed training setting, the total
+        number of threads will be `parallel_trials x num_threads`. In the
+        distributed training setting, the average number of user threads per
+        worker will be `parallel_trials x num_threads // num_workers`. In this
+        case, make sure `parallel_trials` is a multiple of the number of
+        workers.
       max_trial_duration: Maximum training duration of an individual trial
         expressed in seconds. This parameter is different from the
         `maximum_training_duration_seconds` learner parameter that defines the
@@ -98,6 +103,7 @@ class AbstractTuner:
 
     optimizer_config = self._optimizer_config()
     optimizer_config.optimizer.optimizer_key = optimizer_key
+    optimizer_config.optimizer.parallel_trials = parallel_trials
 
     if automatic_search_space:
       optimizer_config.predefined_search_space.SetInParent()
@@ -164,9 +170,13 @@ class RandomSearchTuner(AbstractTuner):
     automatic_search_space: If true, automatically define the search space of
       hyperparameters. In this case, configuring the hyperparameters manually
       (e.g. calling "choice(...)" on the tuner) is not necessary.
-    parallel_trials: Number of trials to evaluate in parallel. In the
-      non-distributed training setting, the effective number of threads will be
-      `parallel_trials x num_threads`.
+    parallel_trials: Number of trials to evaluate in parallel. The training of
+      an individual model uses "num_threads" threads (configured in the
+      learner). Therefore, in the non-distributed training setting, the total
+      number of threads will be `parallel_trials x num_threads`. In the
+      distributed training setting, the average number of user threads per
+      worker will be `parallel_trials x num_threads // num_workers`. In this
+      case, make sure `parallel_trials` is a multiple of the number of workers.
     max_trial_duration: Maximum training duration of an individual trial
       expressed in seconds. This parameter is different from the
       `maximum_training_duration_seconds` learner parameter that define the
@@ -190,6 +200,42 @@ class RandomSearchTuner(AbstractTuner):
 
   def _random_optimizer_config(self) -> random_pb2.RandomOptimizerConfig:
     return self._optimizer_config().optimizer.Extensions[random_pb2.random]
+
+
+class VizierTuner(AbstractTuner):
+  """Tuner using Vizier.
+
+  Attributes:
+    num_trials: Number of hyperparameter configurations to evaluate.
+    automatic_search_space: If true, automatically define the search space of
+      hyperparameters. In this case, configuring the hyperparameters manually
+      (e.g. calling "choice(...)" on the tuner) is not necessary.
+    parallel_trials: Number of trials to evaluate in parallel. The training of
+      an individual model uses "num_threads" threads (configured in the
+      learner). Therefore, in the non-distributed training setting, the total
+      number of threads will be `parallel_trials x num_threads`. In the
+      distributed training setting, the average number of user threads per
+      worker will be `parallel_trials x num_threads // num_workers`. In this
+      case, make sure `parallel_trials` is a multiple of the number of workers.
+    max_trial_duration: Maximum training duration of an individual trial
+      expressed in seconds. This parameter is different from the
+      `maximum_training_duration_seconds` learner parameter that define the
+      maximum total training and tuning duration. Set to None for no time limit.
+  """
+
+  def __init__(
+      self,
+      num_trials: int = 100,
+      automatic_search_space: bool = False,
+      parallel_trials: int = 1,
+      max_trial_duration: Optional[float] = None,
+  ):
+    super().__init__(
+        optimizer_key="VIZIER",
+        automatic_search_space=automatic_search_space,
+        parallel_trials=parallel_trials,
+        max_trial_duration=max_trial_duration,
+    )
 
 
 class SearchSpace:
