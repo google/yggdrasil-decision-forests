@@ -15,10 +15,19 @@
 
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers/random.h"
 
+#include <cmath>
+#include <cstddef>
+#include <random>
+#include <utility>
+#include <vector>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizer_interface.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers/random.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -27,9 +36,11 @@ namespace hyperparameters_optimizer_v2 {
 
 constexpr char RandomOptimizer::kRegisteredName[];
 
-RandomOptimizer::RandomOptimizer(const proto::Optimizer& config,
-                                 const model::proto::HyperParameterSpace& space)
-    : OptimizerInterface(config, space), space_(space) {
+RandomOptimizer::RandomOptimizer(
+    const proto::Optimizer& config,
+    const model::proto::HyperParameterSpace& space,
+    const model::proto::GenericHyperParameterSpecification& space_spec)
+    : OptimizerInterface(config, space, space_spec), space_(space) {
   config_ = config.GetExtension(proto::random);
   constructor_status_ = internal::UpdateWeights(&space_);
 }

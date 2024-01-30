@@ -92,6 +92,13 @@ message Optimizer {
   // Registered name of the optimizer.
   optional string optimizer_key = 1;
 
+  // Number of trials to evaluate in parallel. If using distributed tuning, it
+  // is best for this parameter to be a multiple of the number of workers, since
+  // the training of an individual model takes "num_threads" threads (as
+  // configured in the learner). The total number of threads used by a worker
+  // is, on average, "num_threads * parallel_trials // num_workers".
+  optional int32 parallel_trials = 2 [default = 1];
+
   // Optimizer specific options.
   extensions 1000 to max;
 }

@@ -47,7 +47,10 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETERS_OPTIMIZER_OPTIMIZER_INTERFACE_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETERS_OPTIMIZER_OPTIMIZER_INTERFACE_H_
 
-#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include <utility>
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.pb.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
 
@@ -70,8 +73,16 @@ enum class NextCandidateStatus {
 
 class OptimizerInterface {
  public:
-  OptimizerInterface(const proto::Optimizer& config,
-                     const model::proto::HyperParameterSpace& space) {}
+  // Arguments
+  //   config: The configuration of the optimizer (e.g. random optimizer).
+  //   space: The space of hyper-parameter to optimize. For example, list the
+  //      possible values of parameters.
+  //   space_spec: The specification of the space to optimize. For example, list
+  //     the type and default values of parameters.
+  OptimizerInterface(
+      const proto::Optimizer& config,
+      const model::proto::HyperParameterSpace& space,
+      const model::proto::GenericHyperParameterSpecification& space_spec) {}
   virtual ~OptimizerInterface() {}
 
   // Queries a new candidate hyperparameter set. "candidate" is only populated
@@ -94,8 +105,10 @@ class OptimizerInterface {
   virtual int NumExpectedRounds() = 0;
 };
 
-REGISTRATION_CREATE_POOL(OptimizerInterface, const proto::Optimizer&,
-                         const model::proto::HyperParameterSpace&);
+REGISTRATION_CREATE_POOL(
+    OptimizerInterface, const proto::Optimizer&,
+    const model::proto::HyperParameterSpace&,
+    const model::proto::GenericHyperParameterSpecification&);
 
 #define REGISTER_AbstractHyperParametersOptimizer(implementation, key) \
   REGISTRATION_REGISTER_CLASS(implementation, key, OptimizerInterface);

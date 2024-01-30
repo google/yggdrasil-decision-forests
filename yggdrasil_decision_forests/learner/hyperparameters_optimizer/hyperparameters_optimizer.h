@@ -21,10 +21,14 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETERS_OPTIMIZER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETERS_OPTIMIZER_H_
 
+#include <functional>
 #include <memory>
+#include <string>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -146,7 +150,9 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
 
   // Creates an initialized distribute manager with "GENERIC_WORKER" workers.
   absl::StatusOr<std::unique_ptr<distribute::AbstractManager>>
-  CreateDistributeManager(int num_threads_in_base_learner_deployment) const;
+  CreateDistributeManager(
+      const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config)
+      const;
 
   // Trains a model remotely.
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainRemoteModel(
@@ -154,7 +160,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const model::proto::TrainingConfigLinking& config_link,
       const model::proto::DeploymentConfig& deployment_config,
       const model::proto::GenericHyperParameters& generic_hyper_params,
-      const absl::string_view typed_train_path,
+      absl::string_view typed_train_path,
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path,
       distribute::AbstractManager* manager) const;

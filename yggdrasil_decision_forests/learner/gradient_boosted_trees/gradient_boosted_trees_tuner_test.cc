@@ -48,6 +48,7 @@ class AutotunedGradientBoostedTreesOnAdult : public utils::TrainAndTestTester {
 
         optimizer {
           optimizer_key: "RANDOM"
+          parallel_trials: 10
           [yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto
                .random] { num_trials: 25 }
         }
@@ -58,10 +59,7 @@ class AutotunedGradientBoostedTreesOnAdult : public utils::TrainAndTestTester {
                .gradient_boosted_trees_config] { num_trees: 50 }
         }
 
-        base_learner_deployment {
-          # The multi-threading is done at the optimizer level.
-          num_threads: 1
-        }
+        base_learner_deployment { num_threads: 3 }
 
         predefined_search_space {}
       }

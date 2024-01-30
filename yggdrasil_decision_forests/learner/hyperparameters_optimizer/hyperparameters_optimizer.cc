@@ -17,10 +17,15 @@
 
 #include <cmath>
 #include <limits>
+#include <string>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.pb.h"
@@ -293,9 +298,7 @@ HyperParameterOptimizerLearner::TrainWithStatus(
       effective_config.GetExtension(proto::hyperparameters_optimizer_config);
 
   // Initialize the remote workers.
-  ASSIGN_OR_RETURN(auto manager,
-                   CreateDistributeManager(
-                       spe_config.base_learner_deployment().num_threads()));
+  ASSIGN_OR_RETURN(auto manager, CreateDistributeManager(spe_config));
 
   utils::usage::OnTrainingStart(data_spec, effective_config, config_link, -1);
 
@@ -387,7 +390,8 @@ HyperParameterOptimizerLearner::TrainRemoteModel(
 
 absl::StatusOr<std::unique_ptr<distribute::AbstractManager>>
 HyperParameterOptimizerLearner::CreateDistributeManager(
-    const int num_threads_in_base_learner_deployment) const {
+    const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config)
+    const {
   // Configure the working directory.
   if (deployment().cache_path().empty()) {
     return absl::InvalidArgumentError(
@@ -413,8 +417,8 @@ HyperParameterOptimizerLearner::CreateDistributeManager(
   ASSIGN_OR_RETURN(const int num_workers,
                    distribute::NumWorkers(distribute_config));
   const int parallel_execution_per_worker =
-      (num_workers + num_threads_in_base_learner_deployment - 1) /
-      num_threads_in_base_learner_deployment;
+      (spe_config.optimizer().parallel_trials() + num_workers - 1) /
+      num_workers;
 
   return distribute::CreateManager(distribute_config, "GENERIC_WORKER",
                                    welcome.SerializeAsString(),
@@ -474,7 +478,8 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
   // Instantiate the optimizer.
   ASSIGN_OR_RETURN(auto optimizer, OptimizerInterfaceRegisterer::Create(
                                        spe_config.optimizer().optimizer_key(),
-                                       spe_config.optimizer(), search_space));
+                                       spe_config.optimizer(), search_space,
+                                       search_space_spec));
 
   // The "async_evaluator" evaluates candidates in parallel using
   // multi-threading.
@@ -486,9 +491,13 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
   utils::concurrency::StreamProcessor<model::proto::GenericHyperParameters,
                                       absl::StatusOr<Output>>
       async_evaluator(
-          "evaluator", deployment().num_threads(),
+          "evaluator", spe_config.optimizer().parallel_trials(),
           [&](const model::proto::GenericHyperParameters& candidate)
               -> absl::StatusOr<Output> {
+            if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
+              return absl::InternalError("Training interrupted");
+            }
+
             std::unique_ptr<AbstractModel> model;
             ASSIGN_OR_RETURN(
                 const auto score,
@@ -497,8 +506,10 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
             return Output{score, candidate, std::move(model)};
           });
 
-  YDF_LOG(INFO) << "Start local tuner with " << deployment().num_threads()
-                << " thread(s)";
+  YDF_LOG(INFO) << "Start local tuner with "
+                << spe_config.optimizer().parallel_trials()
+                << " parallel trial(s), each with "
+                << deployment().num_threads() << " thread(s)";
   async_evaluator.StartWorkers();
 
   // Number of candidate being evaluated.
@@ -628,7 +639,8 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
   // Instantiate the optimizer.
   ASSIGN_OR_RETURN(auto optimizer, OptimizerInterfaceRegisterer::Create(
                                        spe_config.optimizer().optimizer_key(),
-                                       spe_config.optimizer(), search_space));
+                                       spe_config.optimizer(), search_space,
+                                       search_space_spec));
 
   // Mapping between request_id and hyperparameter of the currently running
   // evaluations.

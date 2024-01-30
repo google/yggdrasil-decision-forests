@@ -1,5 +1,12 @@
 # Changelog
 
+## HEAD
+
+### Feature
+
+-   Add "parallel_trials" parameter in the hyper-parameter tuner to control the
+    number of trials to run in parallel.
+
 ## 1.8.0 - 2023-11-17
 
 ### Feature
@@ -9,7 +16,7 @@
 
 ### Fix
 
--   Regression with Mean Squared Error loss and Mean Average error loss 
+-   Regression with Mean Squared Error loss and Mean Average error loss
     incorrectly clamped the gradients, leading to incorrect predictions.
 -   Change dependency from boost to boost_math for faster builds.
 

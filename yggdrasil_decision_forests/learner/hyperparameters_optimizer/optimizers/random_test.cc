@@ -16,18 +16,17 @@
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers/random.h"
 
 #include <limits>
-#include <memory>
-#include <string>
+#include <tuple>
+#include <vector>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizer_interface.h"
-#include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
-#include "yggdrasil_decision_forests/utils/test_utils.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -81,7 +80,7 @@ TEST(Random, Base) {
   auto& spe_config = *optimizer_config.MutableExtension(proto::random);
   spe_config.set_num_trials(100);
 
-  RandomOptimizer optimizer(optimizer_config, search_space);
+  RandomOptimizer optimizer(optimizer_config, search_space, {});
   int trial_idx = 0;
   while (true) {
     model::proto::GenericHyperParameters candidate;

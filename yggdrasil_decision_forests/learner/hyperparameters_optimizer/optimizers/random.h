@@ -16,7 +16,15 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETER_OPTIMIZER_RANDOM_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETER_OPTIMIZER_RANDOM_H_
 
+#include <cstddef>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "absl/container/node_hash_set.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizer_interface.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers/random.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -31,8 +39,10 @@ class RandomOptimizer : public OptimizerInterface {
   // Unique identifier of the optimizer algorithm.
   static constexpr char kRegisteredName[] = "RANDOM";
 
-  RandomOptimizer(const proto::Optimizer& config,
-                  const model::proto::HyperParameterSpace& space);
+  RandomOptimizer(
+      const proto::Optimizer& config,
+      const model::proto::HyperParameterSpace& space,
+      const model::proto::GenericHyperParameterSpecification& space_spec);
 
   absl::StatusOr<NextCandidateStatus> NextCandidate(
       model::proto::GenericHyperParameters* candidate) override;

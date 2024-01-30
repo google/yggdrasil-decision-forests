@@ -21,6 +21,7 @@ cc_library_ydf(
         "@com_google_absl//absl/container:node_hash_set",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
     ],
     alwayslink = 1,
 )
@@ -47,12 +48,10 @@ cc_test(
         "//yggdrasil_decision_forests/learner/cart",
         "//yggdrasil_decision_forests/learner/hyperparameters_optimizer:hyperparameters_optimizer_cc_proto",
         "//yggdrasil_decision_forests/learner/hyperparameters_optimizer:optimizer_interface",
-        "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
-        "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:test",
-        "//yggdrasil_decision_forests/utils:test_utils",
         "@com_google_googletest//:gtest_main",
     ],
 )

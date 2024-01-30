@@ -16,6 +16,8 @@
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.h"
 
 #include "gtest/gtest.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -30,92 +32,7 @@ namespace {
 
 class OnAdult : public utils::TrainAndTestTester {
   void SetUp() override {
-    train_config_ = PARSE_TEST_PROTO(R"pb(
-      task: CLASSIFICATION
-      learner: "HYPERPARAMETER_OPTIMIZER"
-      label: "income"
-
-      [yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto
-           .hyperparameters_optimizer_config] {
-
-        retrain_final_model: true
-
-        optimizer {
-          optimizer_key: "RANDOM"
-          [yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto
-               .random] { num_trials: 25 }
-        }
-
-        base_learner {
-          learner: "GRADIENT_BOOSTED_TREES"
-          [yggdrasil_decision_forests.model.gradient_boosted_trees.proto
-               .gradient_boosted_trees_config] { num_trees: 50 }
-        }
-
-        base_learner_deployment {
-          # The multi-threading is done at the optimizer level.
-          num_threads: 1
-        }
-
-        search_space {
-          fields {
-            name: "num_candidate_attributes_ratio"
-            discrete_candidates {
-              possible_values { real: 1.0 }
-              possible_values { real: 0.8 }
-              possible_values { real: 0.6 }
-            }
-          }
-
-          fields {
-            name: "use_hessian_gain"
-            discrete_candidates {
-              possible_values { categorical: "true" }
-              possible_values { categorical: "false" }
-            }
-          }
-
-          fields {
-            name: "growing_strategy"
-            discrete_candidates {
-              possible_values { categorical: "LOCAL" }
-              possible_values { categorical: "BEST_FIRST_GLOBAL" }
-            }
-
-            children {
-              parent_discrete_values {
-                possible_values { categorical: "LOCAL" }
-              }
-              name: "max_depth"
-              discrete_candidates {
-                possible_values { integer: 4 }
-                possible_values { integer: 5 }
-                possible_values { integer: 6 }
-                possible_values { integer: 7 }
-              }
-            }
-
-            children {
-              parent_discrete_values {
-                possible_values { categorical: "BEST_FIRST_GLOBAL" }
-              }
-              name: "max_num_nodes"
-              discrete_candidates {
-                possible_values { integer: 16 }
-                possible_values { integer: 32 }
-                possible_values { integer: 64 }
-                possible_values { integer: 128 }
-              }
-            }
-          }
-        }
-      }
-    )pb");
-
-    train_config_.set_learner(HyperParameterOptimizerLearner::kRegisteredName);
-    train_config_.set_task(model::proto::Task::CLASSIFICATION);
-    train_config_.set_label("income");
-    train_config_.add_features(".*");
+    SetTrainConfig();
     dataset_filename_ = "adult.csv";
 
     deployment_config_.set_cache_path(
@@ -123,13 +40,101 @@ class OnAdult : public utils::TrainAndTestTester {
   }
 
  public:
+  void SetTrainConfig(const absl::string_view optimizer_key = "RANDOM",
+                      const absl::string_view optimizer_proto = "random",
+                      const int num_trials = 25) {
+    train_config_ = PARSE_TEST_PROTO(absl::Substitute(
+        R"pb(
+          task: CLASSIFICATION
+          learner: "HYPERPARAMETER_OPTIMIZER"
+          label: "income"
+
+          [yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto
+               .hyperparameters_optimizer_config] {
+
+            retrain_final_model: true
+
+            optimizer {
+              optimizer_key: "$0"
+              [yggdrasil_decision_forests.model.hyperparameters_optimizer_v2
+                   .proto.$2] { num_trials: $1 }
+            }
+
+            base_learner {
+              learner: "GRADIENT_BOOSTED_TREES"
+              [yggdrasil_decision_forests.model.gradient_boosted_trees.proto
+                   .gradient_boosted_trees_config] { num_trees: 50 }
+            }
+
+            base_learner_deployment {
+              # The multi-threading is done at the optimizer level.
+              num_threads: 1
+            }
+
+            search_space {
+              fields {
+                name: "num_candidate_attributes_ratio"
+                discrete_candidates {
+                  possible_values { real: 1.0 }
+                  possible_values { real: 0.8 }
+                  possible_values { real: 0.6 }
+                }
+              }
+
+              fields {
+                name: "use_hessian_gain"
+                discrete_candidates {
+                  possible_values { categorical: "true" }
+                  possible_values { categorical: "false" }
+                }
+              }
+
+              fields {
+                name: "growing_strategy"
+                discrete_candidates {
+                  possible_values { categorical: "LOCAL" }
+                  possible_values { categorical: "BEST_FIRST_GLOBAL" }
+                }
+
+                children {
+                  parent_discrete_values {
+                    possible_values { categorical: "LOCAL" }
+                  }
+                  name: "max_depth"
+                  discrete_candidates {
+                    possible_values { integer: 4 }
+                    possible_values { integer: 5 }
+                    possible_values { integer: 6 }
+                    possible_values { integer: 7 }
+                  }
+                }
+
+                children {
+                  parent_discrete_values {
+                    possible_values { categorical: "BEST_FIRST_GLOBAL" }
+                  }
+                  name: "max_num_nodes"
+                  discrete_candidates {
+                    possible_values { integer: 16 }
+                    possible_values { integer: 32 }
+                    possible_values { integer: 64 }
+                    possible_values { integer: 128 }
+                  }
+                }
+              }
+            }
+          }
+        )pb",
+        optimizer_key, num_trials, optimizer_proto));
+  }
+
   void SetLocalTraining() {
     deployment_config_.set_num_threads(4);
     deployment_config_.clear_distribute();
   }
 
   void SetDistributedTraining(const int num_workers = 2) {
-    // Note: This test effectively using local mult-threaded training. However,
+    // Note: This test effectively using local multi-threaded training. However,
     // because we use the "distribute" API, this would behave the same way as
     // with distributed training.
     deployment_config_.set_num_threads(2);

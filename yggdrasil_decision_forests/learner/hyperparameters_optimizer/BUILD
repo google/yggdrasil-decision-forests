@@ -9,7 +9,10 @@ cc_library_ydf(
     name = "all_optimizers",
     deps = [
         "//yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers:random",
-    ],
+    ] + select({
+        "//conditions:default": [
+        ],
+    }),
 )
 
 # Library
@@ -40,7 +43,9 @@ cc_library_ydf(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
     ],
     alwayslink = 1,
 )
@@ -50,8 +55,9 @@ cc_library_ydf(
     hdrs = ["optimizer_interface.h"],
     deps = [
         ":hyperparameters_optimizer_cc_proto",
-        "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/utils:registration",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -77,6 +83,8 @@ cc_test(
     srcs = ["hyperparameters_optimizer_test.cc"],
     data = ["//yggdrasil_decision_forests/test_data"],
     shard_count = 8,
+    tags = [
+    ],
     deps = [
         ":hyperparameters_optimizer",
         "//yggdrasil_decision_forests/learner/generic_worker",
@@ -88,6 +96,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )
