@@ -43,19 +43,23 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_H_
 
+#include <cstdint>
 #include <memory>
-#include <random>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping/early_stopping.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -71,7 +75,7 @@ namespace gradient_boosted_trees {
 
 namespace internal {
 struct AllTrainingConfiguration;
-};
+}  // namespace internal
 
 // A GBT learner i.e. takes as input a dataset and outputs a GBT model.
 // See the file header for a description of the GBT learning algorithm/model.
@@ -172,6 +176,12 @@ class GradientBoostedTreesLearner : public AbstractLearner {
       const dataset::proto::DataSpecification& data_spec,
       internal::AllTrainingConfiguration* all_config) const;
 
+  // Sets the custom loss function to use if loss is CUSTOM.
+  void SetCustomLossFunctions(
+      const CustomLossFunctions& custom_loss_functions) {
+    custom_loss_functions_ = custom_loss_functions;
+  }
+
  private:
   // Initializes and returns a model.
   std::unique_ptr<GradientBoostedTreesModel> InitializeModel(
@@ -183,6 +193,8 @@ class GradientBoostedTreesLearner : public AbstractLearner {
       const absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path) const;
+
+  CustomLossFunctions custom_loss_functions_;
 };
 
 REGISTER_AbstractLearner(GradientBoostedTreesLearner,

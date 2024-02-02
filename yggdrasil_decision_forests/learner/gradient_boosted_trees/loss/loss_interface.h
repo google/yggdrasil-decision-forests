@@ -33,12 +33,10 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/metric/ranking_utils.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
-#include "yggdrasil_decision_forests/utils/distribution.pb.h"
+#include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
 
@@ -185,7 +183,7 @@ class AbstractLoss {
   virtual absl::StatusOr<std::vector<float>> InitialPredictions(
       const decision_tree::proto::LabelStatistics& label_statistics) const = 0;
 
-  // Returns true iif. the loss needs for the examples to be grouped i.e.
+  // Returns true iff. the loss needs for the examples to be grouped i.e.
   // "ranking_index" will be set in "UpdateGradients" and "Loss". For example,
   // grouping can be used in ranking.
   virtual bool RequireGroupingAttribute() const { return false; }

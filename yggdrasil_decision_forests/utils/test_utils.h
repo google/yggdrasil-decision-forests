@@ -52,6 +52,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -173,6 +174,9 @@ class TrainAndTestTester : public ::testing::Test {
 
   // If true, randomize learner seeds in unit tests.
   bool change_random_seed_ = false;
+
+  // If set, specifies the custom loss used.
+  model::gradient_boosted_trees::CustomLossFunctions custom_loss_;
 
  private:
   std::pair<std::string, std::string> GetTrainAndTestDatasetPaths();

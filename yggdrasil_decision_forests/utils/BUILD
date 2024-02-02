@@ -560,6 +560,8 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner:abstract_learner",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/learner:learner_library",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",
         "//yggdrasil_decision_forests/metric:report",

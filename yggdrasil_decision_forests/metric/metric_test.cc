@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/metric/metric.h"
 
 #include <cmath>
+#include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -1460,22 +1461,25 @@ TEST(Metric, EvaluationOfRankingCI) {
 TEST(Metric, RMSE) {
   // R> sqrt(mean((c(1,2,3)-c(1,3,4))^2))
   // 0.8164966
-  EXPECT_NEAR(RMSE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
-                   /*weights=*/{1, 1, 1})
+  EXPECT_NEAR(RMSE(/*labels=*/std::vector<float>{1, 2, 3},
+                   /*predictions=*/std::vector<float>{1, 3, 4},
+                   /*weights=*/std::vector<float>{1, 1, 1})
                   .value(),
               0.8164966, 0.0001);
 
   // R> sqrt(mean((c(1,2,2,3,3,3)-c(1,3,3,4,4,4))^2))
   // 0.9128709
-  EXPECT_NEAR(RMSE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
-                   /*weights=*/{1, 2, 3})
+  EXPECT_NEAR(RMSE(/*labels=*/std::vector<float>{1, 2, 3},
+                   /*predictions=*/std::vector<float>{1, 3, 4},
+                   /*weights=*/std::vector<float>{1, 2, 3})
                   .value(),
               0.9128709, 0.0001);
 
-  EXPECT_NEAR(
-      RMSE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4}, /*weights=*/{})
-          .value(),
-      0.8164966, 0.0001);
+  EXPECT_NEAR(RMSE(/*labels=*/std::vector<float>{1, 2, 3},
+                   /*predictions=*/std::vector<float>{1, 3, 4},
+                   /*weights=*/std::vector<float>{})
+                  .value(),
+              0.8164966, 0.0001);
 }
 
 TEST(Metric, RMSEThreaded) {
@@ -1483,20 +1487,23 @@ TEST(Metric, RMSEThreaded) {
   thread_pool.StartWorkers();
   // R> sqrt(mean((c(1,2,3)-c(1,3,4))^2))
   // 0.8164966
-  EXPECT_NEAR(RMSE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
-                   /*weights=*/{1, 1, 1}, &thread_pool)
+  EXPECT_NEAR(RMSE(/*labels=*/std::vector<float>{1, 2, 3},
+                   /*predictions=*/std::vector<float>{1, 3, 4},
+                   /*weights=*/std::vector<float>{1, 1, 1}, &thread_pool)
                   .value(),
               0.8164966, 0.0001);
 
   // R> sqrt(mean((c(1,2,2,3,3,3)-c(1,3,3,4,4,4))^2))
   // 0.9128709
-  EXPECT_NEAR(RMSE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
-                   /*weights=*/{1, 2, 3}, &thread_pool)
+  EXPECT_NEAR(RMSE(/*labels=*/std::vector<float>{1, 2, 3},
+                   /*predictions=*/std::vector<float>{1, 3, 4},
+                   /*weights=*/std::vector<float>{1, 2, 3}, &thread_pool)
                   .value(),
               0.9128709, 0.0001);
 
-  EXPECT_NEAR(RMSE(/*labels=*/{1, 2, 3}, /*predictions=*/{1, 3, 4},
-                   /*weights=*/{}, &thread_pool)
+  EXPECT_NEAR(RMSE(/*labels=*/std::vector<float>{1, 2, 3},
+                   /*predictions=*/std::vector<float>{1, 3, 4},
+                   /*weights=*/std::vector<float>{}, &thread_pool)
                   .value(),
               0.8164966, 0.0001);
 }

@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -280,11 +281,18 @@ std::vector<MetricDefinition> DefaultMetrics(
 // Computes the RMSE of a set of predictions.
 // If `use_weights` is false, sum_weights will not be changed.
 template <bool use_weights>
-static void RMSEImp(const std::vector<float>& labels,
-                    const std::vector<float>& predictions,
-                    const std::vector<float>& weights, size_t begin_example_idx,
+static void RMSEImp(absl::Span<const float> labels,
+                    absl::Span<const float> predictions,
+                    absl::Span<const float> weights, size_t begin_example_idx,
                     size_t end_example_idx, double* __restrict sum_sq_err,
                     double* __restrict sum_weights);
+
+// Computes the RMSE of a set of predictions. If `weights` is empty, unit
+// weights are assumed.
+absl::StatusOr<double> RMSE(
+    absl::Span<const float> labels, absl::Span<const float> predictions,
+    absl::Span<const float> weights,
+    utils::concurrency::ThreadPool* thread_pool = nullptr);
 
 // Computes the RMSE of a set of predictions. If `weights` is empty, unit
 // weights are assumed.

@@ -19,6 +19,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <iterator>
 #include <limits>
@@ -31,19 +33,27 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/container/btree_set.h"
+#include "absl/container/fixed_array.h"
 #include "absl/memory/memory.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_binary_classification.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_multi_classification.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_regression.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -60,6 +70,7 @@
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/snapshot.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -126,6 +137,185 @@ std::string ShardDataset(const dataset::VerticalDataset& dataset,
                                      absl::StrCat("csv:", shards[shard_idx])));
   }
   return typed_sharded_path;
+}
+
+// Custom loss for mean squared error loss.
+CustomRegressionLossFunctions MeanSquaredErrorCustomLoss() {
+  auto initial_predictions =
+      [](const absl::Span<const float>& labels,
+         const absl::Span<const float>& weights) -> absl::StatusOr<float> {
+    STATUS_CHECK_EQ(labels.size(), weights.size());
+    double weighted_sum_values = 0;
+    double sum_weights = 0;
+
+    for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
+      sum_weights += weights[example_idx];
+      weighted_sum_values += weights[example_idx] * labels[example_idx];
+    }
+    return weighted_sum_values / sum_weights;
+  };
+  auto loss =
+      [](const absl::Span<const float>& labels,
+         const absl::Span<const float>& predictions,
+         const absl::Span<const float>& weights) -> absl::StatusOr<float> {
+    STATUS_CHECK_EQ(labels.size(), predictions.size());
+    STATUS_CHECK_EQ(labels.size(), weights.size());
+    return metric::RMSE(labels, predictions, weights).value();
+  };
+  auto gradient_and_hessian = [](const absl::Span<const float>& labels,
+                                 const absl::Span<const float>& predictions,
+                                 absl::Span<float> gradients,
+                                 absl::Span<float> hessian) -> absl::Status {
+    const auto num_examples = labels.size();
+    STATUS_CHECK_EQ(predictions.size(), num_examples);
+    STATUS_CHECK_EQ(gradients.size(), num_examples);
+    STATUS_CHECK_EQ(hessian.size(), num_examples);
+
+    for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
+      const float label = labels[example_idx];
+      const float prediction = predictions[example_idx];
+      gradients[example_idx] = label - prediction;
+      hessian[example_idx] = 1.f;
+    }
+    return absl::OkStatus();
+  };
+  return CustomRegressionLossFunctions{initial_predictions, loss,
+                                       gradient_and_hessian};
+}
+
+// Custom loss for binomial loss.
+CustomBinaryClassificationLossFunctions BinomialCustomLoss() {
+  auto initial_predictions =
+      [](const absl::Span<const int32_t>& labels,
+         const absl::Span<const float>& weights) -> absl::StatusOr<float> {
+    STATUS_CHECK_EQ(labels.size(), weights.size());
+
+    double weighted_sum_positive = 0;
+    double sum_weights = 0;
+    for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
+      sum_weights += weights[example_idx];
+      weighted_sum_positive +=
+          weights[example_idx] * (labels[example_idx] == 2);
+    }
+    const double ratio_positive = weighted_sum_positive / sum_weights;
+
+    if (ratio_positive == 0.0) {
+      return -std::numeric_limits<float>::max();
+    } else if (ratio_positive == 1.0) {
+      return std::numeric_limits<float>::max();
+    } else {
+      return std::log(ratio_positive / (1. - ratio_positive));
+    }
+  };
+  auto loss =
+      [](const absl::Span<const int32_t>& labels,
+         const absl::Span<const float>& predictions,
+         const absl::Span<const float>& weights) -> absl::StatusOr<float> {
+    STATUS_CHECK_EQ(labels.size(), predictions.size());
+    STATUS_CHECK_EQ(labels.size(), weights.size());
+
+    double sum_loss = 0;
+    for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
+      // The loss function expects a 0/1 label.
+      const bool pos_label = labels[example_idx] == 2;
+      const float label_for_loss = pos_label ? 1.f : 0.f;
+      const float prediction = predictions[example_idx];
+      const float weight = weights[example_idx];
+      sum_loss -=
+          2 * weight *
+          (label_for_loss * prediction - std::log(1.f + std::exp(prediction)));
+    }
+    return sum_loss;
+  };
+  auto gradient_and_hessian =
+      [](const absl::Span<const int32_t>& labels,
+         const absl::Span<const float>& predictions,
+         const absl::Span<float> gradient,
+         const absl::Span<float> hessian) -> absl::Status {
+    const auto num_examples = labels.size();
+    STATUS_CHECK_EQ(gradient.size(), num_examples);
+    STATUS_CHECK_EQ(hessian.size(), num_examples);
+
+    for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
+      const float label = (labels[example_idx] == 2) ? 1.f : 0.f;
+      const float prediction = predictions[example_idx];
+      const float prediction_proba = 1.f / (1.f + std::exp(-prediction));
+      gradient[example_idx] = label - prediction_proba;
+      hessian[example_idx] = prediction_proba * (1 - prediction_proba);
+    }
+    return absl::OkStatus();
+  };
+  return CustomBinaryClassificationLossFunctions{initial_predictions, loss,
+                                                 gradient_and_hessian};
+}
+
+// Custom Loss for equal to three-class multinomial loss.
+CustomMultiClassificationLossFunctions Multinomial3CustomLoss() {
+  constexpr int dimension = 3;
+  auto initial_predictions =
+      [](const absl::Span<const int32_t>& labels,
+         const absl::Span<const float>& weights,
+         const absl::Span<float> initial_predictions_out) -> absl::Status {
+    for (int i = 0; i < dimension; i++) {
+      initial_predictions_out[i] = 0;
+    }
+    return absl::OkStatus();
+  };
+  auto loss =
+      [](const absl::Span<const int32_t>& labels,
+         const absl::Span<const float>& predictions,
+         const absl::Span<const float>& weights) -> absl::StatusOr<float> {
+    double loss = 0;
+    for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
+      const int label = labels[example_idx];
+      float sum_exp = 0;
+      const float weight = weights[example_idx];
+      for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
+        const float exp_val =
+            std::exp(predictions[grad_idx + example_idx * dimension]);
+        sum_exp += exp_val;
+      }
+      // Loss: - log(predict_proba[true_label])
+      const float tree_label_exp_value =
+          std::exp(predictions[(label - 1) + example_idx * dimension]);
+      loss -= weight * std::log(tree_label_exp_value / sum_exp);
+    }
+    return loss;
+  };
+  auto gradient_and_hessian =
+      [](const absl::Span<const int32_t>& labels,
+         const absl::Span<const float>& predictions,
+         absl::Span<const absl::Span<float>> gradient,
+         absl::Span<const absl::Span<float>> hessian) -> absl::Status {
+    absl::FixedArray<float> accumulator(dimension);
+    const auto num_examples = labels.size();
+
+    for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
+      // Compute normalization term.
+      float sum_exp = 0;
+      for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
+        float exp_val =
+            std::exp(predictions[grad_idx + example_idx * dimension]);
+        accumulator[grad_idx] = exp_val;
+        sum_exp += exp_val;
+      }
+      const float normalization = 1.f / sum_exp;
+      // Update gradient.
+      const int label_cat = labels[example_idx];
+      for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
+        const float label = (label_cat == (grad_idx + 1)) ? 1.f : 0.f;
+        const float prediction = accumulator[grad_idx] * normalization;
+        const float grad = label - prediction;
+        const float abs_grad = std::abs(grad);
+        // Examples should be blocks
+        gradient[grad_idx][example_idx] = grad;
+        hessian[grad_idx][example_idx] = abs_grad * (1 - abs_grad);
+      }
+    }
+    return absl::OkStatus();
+  };
+  return CustomMultiClassificationLossFunctions{initial_predictions, loss,
+                                                gradient_and_hessian};
 }
 
 TEST(GradientBoostedTrees, ExtractValidationDataset) {
@@ -566,6 +756,22 @@ TEST_F(GradientBoostedTreesOnAdult, ObliqueMonotonicConstraints) {
       file::JoinPath(test::TmpDirectory(), "analysis"), {}));
 }
 
+// Train and test a model on the adult dataset.
+TEST_F(GradientBoostedTreesOnAdult, CustomLossBase) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
+  custom_loss_ = BinomialCustomLoss();
+  TrainAndEvaluateModel();
+
+  // The expected accuracy is the same as for the built-in loss.
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8647, 0.0099, 0.8658);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2984, 0.0162, 0.294);
+}
+
 // Train and test a model on the adult dataset with focal loss, but with gamma
 // equals zero, which equals to log loss.
 TEST_F(GradientBoostedTreesOnAdult, FocalLossWithGammaZero) {
@@ -981,6 +1187,22 @@ TEST_F(GradientBoostedTreesOnAdult, BaseWithWeights) {
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3614, 0.0313, 0.3533);
 }
 
+// Train and test a model on the adult dataset.
+TEST_F(GradientBoostedTreesOnAdult, CustomLossWithWeights) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
+  custom_loss_ = BinomialCustomLoss();
+  TrainAndEvaluateModel(/*numerical_weight_attribute=*/"age");
+
+  // The expected accuracy is the same as for the built-in loss.
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8388, 0.0146, 0.8375);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3614, 0.0313, 0.3533);
+}
+
 TEST_F(GradientBoostedTreesOnAdult, NumCandidateAttributeRatio) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1208,6 +1430,21 @@ TEST_F(GradientBoostedTreesOnAdult, Hessian) {
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2962, 0.0159, 0.2907);
 }
 
+TEST_F(GradientBoostedTreesOnAdult, CustomLossHessian) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_subsample(0.9f);
+  gbt_config->set_use_hessian_gain(true);
+  custom_loss_ = BinomialCustomLoss();
+
+  TrainAndEvaluateModel();
+
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8664, 0.0101, 0.8661);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2962, 0.0159, 0.2907);
+}
+
 TEST_F(GradientBoostedTreesOnAdult, HessianRandomCategorical) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1306,6 +1543,13 @@ TEST_F(GradientBoostedTreesOnAbalone, Base) {
   YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1684, 0.0979, 2.1138);
 
   utils::ExpectEqualGoldenModel(*model_, "gbt_abalone");
+}
+
+TEST_F(GradientBoostedTreesOnAbalone, CustomLoss) {
+  custom_loss_ = MeanSquaredErrorCustomLoss();
+  TrainAndEvaluateModel();
+  // We expect the same error as for the built-in loss.
+  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1684, 0.0979, 2.1138);
 }
 
 TEST_F(GradientBoostedTreesOnAbalone, NoValidation) {
@@ -1408,6 +1652,14 @@ TEST_F(GradientBoostedTreesOnIris, Base) {
   utils::ExpectEqualGoldenModel(*model_, "gbt_iris");
 }
 
+// Train and test a model on the adult dataset.
+TEST_F(GradientBoostedTreesOnIris, CustomLossBase) {
+  custom_loss_ = Multinomial3CustomLoss();
+  TrainAndEvaluateModel();
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9533, 0.03, 0.96);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2988, 0.2562, 0.2255);
+}
+
 TEST_F(GradientBoostedTreesOnIris, Hessian) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1416,6 +1668,17 @@ TEST_F(GradientBoostedTreesOnIris, Hessian) {
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.94, 0.05, 0.9733);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3225, 0.3002, 0.1462);
   utils::ExpectEqualGoldenModel(*model_, "gbt_iris_hessian");
+}
+
+// Train and test a model on the adult dataset.
+TEST_F(GradientBoostedTreesOnIris, CustomLossHessian) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_use_hessian_gain(true);
+  custom_loss_ = Multinomial3CustomLoss();
+  TrainAndEvaluateModel();
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.94, 0.05, 0.9733);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3225, 0.3002, 0.1462);
 }
 
 TEST_F(GradientBoostedTreesOnIris, Dart) {

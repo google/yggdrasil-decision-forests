@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_mean_square_error.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -125,7 +126,7 @@ TEST_P(MeanSquareErrorLossTest, UpdateGradients) {
   }
 }
 
-TEST_P(MeanSquareErrorLossTest, ComputeClassificationLoss) {
+TEST_P(MeanSquareErrorLossTest, ComputeRegressionLoss) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
   const bool weighted = std::get<0>(GetParam());
@@ -154,12 +155,12 @@ TEST_P(MeanSquareErrorLossTest, ComputeClassificationLoss) {
   }
   if (weighted) {
     EXPECT_NEAR(loss_results.loss, std::sqrt(200. / 20.), kTestPrecision);
-    // For classification, the only secondary metric is also RMSE.
+    // For regression, the only secondary metric is also RMSE.
     EXPECT_THAT(loss_results.secondary_metrics,
                 ElementsAre(FloatNear(std::sqrt(200. / 20.), kTestPrecision)));
   } else {
     EXPECT_NEAR(loss_results.loss, std::sqrt(30. / 4.), kTestPrecision);
-    // For classification, the only secondary metric is also RMSE.
+    // For regression, the only secondary metric is also RMSE.
     EXPECT_THAT(loss_results.secondary_metrics,
                 ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision)));
   }
@@ -211,13 +212,12 @@ TEST_P(MeanSquareErrorLossTest, ComputeRankingLoss) {
   }
 }
 
-TEST(MeanSquareErrorLossTest, SecondaryMetricNamesClassification) {
+TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRegression) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const MeanSquaredErrorLoss loss_imp_classification(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
-  EXPECT_THAT(loss_imp_classification.SecondaryMetricNames(),
-              ElementsAre("rmse"));
+  const MeanSquaredErrorLoss loss_imp_regression(
+      {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(1));
+  EXPECT_THAT(loss_imp_regression.SecondaryMetricNames(), ElementsAre("rmse"));
 }
 
 TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRanking) {

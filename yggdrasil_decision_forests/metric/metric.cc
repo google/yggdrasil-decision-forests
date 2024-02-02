@@ -1934,9 +1934,9 @@ absl::StatusOr<double> MAE(const std::vector<float>& labels,
 }
 
 template <bool use_weights>
-void RMSEImp(const std::vector<float>& labels,
-             const std::vector<float>& predictions,
-             const std::vector<float>& weights, size_t begin_example_idx,
+void RMSEImp(absl::Span<const float> labels,
+             absl::Span<const float> predictions,
+             absl::Span<const float> weights, size_t begin_example_idx,
              size_t end_example_idx, double* __restrict sum_sq_err,
              double* __restrict sum_weights) {
   for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
@@ -1958,6 +1958,14 @@ void RMSEImp(const std::vector<float>& labels,
 absl::StatusOr<double> RMSE(const std::vector<float>& labels,
                             const std::vector<float>& predictions,
                             const std::vector<float>& weights,
+                            utils::concurrency::ThreadPool* thread_pool) {
+  return RMSE(absl::MakeConstSpan(labels), absl::MakeConstSpan(predictions),
+              absl::MakeConstSpan(weights), thread_pool);
+}
+
+absl::StatusOr<double> RMSE(absl::Span<const float> labels,
+                            absl::Span<const float> predictions,
+                            absl::Span<const float> weights,
                             utils::concurrency::ThreadPool* thread_pool) {
   double sum_sq_err = 0;
   double sum_weights = 0;

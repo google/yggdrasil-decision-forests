@@ -17,6 +17,8 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_binary_classification.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_regression.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -68,6 +70,74 @@ TEST(LossLibrary, CanonicalLosses) {
 
   EXPECT_OK(CreateLoss(proto::Loss::POISSON, model::proto::Task::REGRESSION,
                        numerical_label_column, config));
+}
+
+TEST(LossLibrary, CustomLosses) {
+  proto::GradientBoostedTreesTrainingConfig config;
+  dataset::proto::Column binary_categorical_label_column =
+      PARSE_TEST_PROTO(R"pb(
+        type: CATEGORICAL
+        categorical { number_of_unique_values: 3 is_already_integerized: true }
+      )pb");
+
+  dataset::proto::Column numerical_label_column = PARSE_TEST_PROTO(R"pb(
+    type: NUMERICAL
+  )pb");
+  dataset::proto::Column multiclass_categorical_label_column =
+      PARSE_TEST_PROTO(R"pb(
+        type: CATEGORICAL
+        categorical { number_of_unique_values: 20 is_already_integerized: true }
+      )pb");
+
+  EXPECT_OK(CreateLoss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD,
+                       model::proto::Task::CLASSIFICATION,
+                       binary_categorical_label_column, config,
+                       CustomBinaryClassificationLossFunctions{}));
+
+  EXPECT_OK(CreateLoss(proto::Loss::BINARY_FOCAL_LOSS,
+                       model::proto::Task::CLASSIFICATION,
+                       binary_categorical_label_column, config,
+                       CustomBinaryClassificationLossFunctions{}));
+
+  EXPECT_OK(CreateLoss(proto::Loss::SQUARED_ERROR,
+                       model::proto::Task::REGRESSION, numerical_label_column,
+                       config, CustomRegressionLossFunctions{}));
+
+  EXPECT_OK(CreateLoss(proto::Loss::POISSON, model::proto::Task::REGRESSION,
+                       numerical_label_column, config,
+                       CustomRegressionLossFunctions{}));
+
+  EXPECT_FALSE(CreateLoss(proto::Loss::SQUARED_ERROR,
+                          model::proto::Task::REGRESSION,
+                          numerical_label_column, config,
+                          CustomBinaryClassificationLossFunctions{})
+                   .ok());
+
+  EXPECT_FALSE(CreateLoss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD,
+                          model::proto::Task::CLASSIFICATION,
+                          numerical_label_column, config,
+                          CustomRegressionLossFunctions{})
+                   .ok());
+
+  EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG5,
+                          model::proto::Task::RANKING, numerical_label_column,
+                          config, CustomBinaryClassificationLossFunctions{})
+                   .ok());
+
+  EXPECT_FALSE(CreateLoss(proto::Loss::XE_NDCG_MART,
+                          model::proto::Task::RANKING, numerical_label_column,
+                          config, CustomBinaryClassificationLossFunctions{})
+                   .ok());
+
+  EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG5,
+                          model::proto::Task::RANKING, numerical_label_column,
+                          config, CustomRegressionLossFunctions{})
+                   .ok());
+
+  EXPECT_FALSE(CreateLoss(proto::Loss::XE_NDCG_MART,
+                          model::proto::Task::RANKING, numerical_label_column,
+                          config, CustomRegressionLossFunctions{})
+                   .ok());
 }
 
 }  // namespace

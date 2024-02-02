@@ -13,16 +13,18 @@
  * limitations under the License.
  */
 
-#ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_MEAN_SQUARE_ERROR_H_
-#define YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_MEAN_SQUARE_ERROR_H_
+#ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_CUSTOM_REGRESSION_H_
+#define YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_CUSTOM_REGRESSION_H_
 
 #include <stddef.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -37,19 +39,44 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-// Mean squared Error loss.
-// Suited for univariate regression.
-// See "AbstractLoss" for the method documentation.
-class MeanSquaredErrorLoss : public AbstractLoss {
+// Functionals for computing a custom regression loss.
+struct CustomRegressionLossFunctions {
+  // Functional to return the initial predictions.
+  std::function<absl::StatusOr<float>(
+      const absl::Span<const float>& /*labels*/,
+      const absl::Span<const float>& /*weights*/)>
+      initial_predictions;
+  // Functional to return the loss of the current predictions.
+  std::function<absl::StatusOr<float>(
+      const absl::Span<const float>& /*labels*/,
+      const absl::Span<const float>& /*predictions*/,
+      const absl::Span<const float>& /*weights*/)>
+      loss;
+  // Functional to compute the gradient and the hessian of the current
+  // predictions.
+  std::function<absl::Status(const absl::Span<const float>& /*labels*/,
+                             const absl::Span<const float>& /*predictions*/,
+                             absl::Span<float> /*gradients*/,
+                             absl::Span<float> /*hessian*/)>
+      gradient_and_hessian;
+};
+
+// Custom loss implementation suited for univariate regression.
+// The loss function is specified by the user through the constructor.
+// See the tests for a sample loss.
+// See `AbstractLoss` for the method documentation.
+class CustomRegressionLoss : public AbstractLoss {
  public:
   // For unit testing.
   using AbstractLoss::Loss;
   using AbstractLoss::UpdateGradients;
 
-  MeanSquaredErrorLoss(
+  CustomRegressionLoss(
       const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-      model::proto::Task task, const dataset::proto::Column& label_column)
-      : AbstractLoss(gbt_config, task, label_column) {}
+      model::proto::Task task, const dataset::proto::Column& label_column,
+      const CustomRegressionLossFunctions& custom_loss_functions)
+      : AbstractLoss(gbt_config, task, label_column),
+        custom_loss_functions_(custom_loss_functions) {}
 
   absl::Status Status() const override;
 
@@ -71,7 +98,6 @@ class MeanSquaredErrorLoss : public AbstractLoss {
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
-
   std::vector<std::string> SecondaryMetricNames() const override;
 
   absl::StatusOr<LossResults> Loss(
@@ -79,12 +105,13 @@ class MeanSquaredErrorLoss : public AbstractLoss {
       const std::vector<float>& weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const override;
-};
 
-REGISTER_AbstractGradientBoostedTreeLoss(MeanSquaredErrorLoss, "SQUARED_ERROR");
+ private:
+  CustomRegressionLossFunctions custom_loss_functions_;
+};
 
 }  // namespace gradient_boosted_trees
 }  // namespace model
 }  // namespace yggdrasil_decision_forests
 
-#endif  // YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_MEAN_SQUARE_ERROR_H_
+#endif  // YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LOSS_IMP_CUSTOM_REGRESSION_H_

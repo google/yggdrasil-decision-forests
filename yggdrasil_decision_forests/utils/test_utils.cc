@@ -45,6 +45,7 @@
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -188,6 +189,17 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   YDF_LOG(INFO) << "Set log directory: " << log_dir;
   learner_->set_log_directory(log_dir);
+
+  // Apply custom loss if necessary.
+  if (custom_loss_.index() != 0) {
+    auto gbt_config = train_config_.GetExtension(
+        model::gradient_boosted_trees::proto::gradient_boosted_trees_config);
+    auto* gbt_learner = dynamic_cast<
+        model::gradient_boosted_trees::GradientBoostedTreesLearner*>(
+        learner_.get());
+    CHECK_NE(gbt_learner, nullptr);
+    gbt_learner->SetCustomLossFunctions(custom_loss_);
+  }
 
   if (callback_training_about_to_start) {
     callback_training_about_to_start();
