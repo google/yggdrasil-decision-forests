@@ -70,14 +70,14 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
 CustomRegressionLossFunctions CreateToyLoss() {
   CustomRegressionLossFunctions toy_loss_data;
   toy_loss_data.initial_predictions =
-      [](const absl::Span<const float>& labels,
-         const absl::Span<const float>& weights) -> absl::StatusOr<float> {
+      [](const absl::Span<const float> labels,
+         const absl::Span<const float> weights) -> absl::StatusOr<float> {
     return std::inner_product(labels.begin(), labels.end(), weights.begin(),
                               0.f);
   };
   toy_loss_data.gradient_and_hessian =
-      [](const absl::Span<const float>& labels,
-         const absl::Span<const float>& predictions, absl::Span<float> gradient,
+      [](const absl::Span<const float> labels,
+         const absl::Span<const float> predictions, absl::Span<float> gradient,
          absl::Span<float> hessian) -> absl::Status {
     STATUS_CHECK_EQ(labels.size(), predictions.size());
     STATUS_CHECK_EQ(labels.size(), gradient.size());
@@ -89,9 +89,9 @@ CustomRegressionLossFunctions CreateToyLoss() {
                    hessian.begin(), std::multiplies<float>());
     return absl::OkStatus();
   };
-  toy_loss_data.loss = [](const absl::Span<const float>& labels,
-                          const absl::Span<const float>& predictions,
-                          const absl::Span<const float>& weights) -> float {
+  toy_loss_data.loss = [](const absl::Span<const float> labels,
+                          const absl::Span<const float> predictions,
+                          const absl::Span<const float> weights) -> float {
     float loss =
         std::inner_product(labels.begin(), labels.end(), weights.begin(), 0.0);
     loss += std::inner_product(predictions.begin(), predictions.end(),

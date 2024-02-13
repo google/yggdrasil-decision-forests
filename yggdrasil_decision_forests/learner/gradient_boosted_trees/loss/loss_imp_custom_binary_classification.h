@@ -44,19 +44,19 @@ namespace gradient_boosted_trees {
 struct CustomBinaryClassificationLossFunctions {
   // Functional to return the initial predictions.
   std::function<absl::StatusOr<float>(
-      const absl::Span<const int32_t>& /*labels*/,
-      const absl::Span<const float>& /*weights*/)>
+      const absl::Span<const int32_t> /*labels*/,
+      const absl::Span<const float> /*weights*/)>
       initial_predictions;
   // Functional to return the loss of the current predictions.
   std::function<absl::StatusOr<float>(
-      const absl::Span<const int32_t>& /*labels*/,
-      const absl::Span<const float>& /*predictions*/,
-      const absl::Span<const float>& /*weights*/)>
+      const absl::Span<const int32_t> /*labels*/,
+      const absl::Span<const float> /*predictions*/,
+      const absl::Span<const float> /*weights*/)>
       loss;
   // Functional to compute the gradient and the hessian of the current
   // predictions.
-  std::function<absl::Status(const absl::Span<const int32_t>& /*labels*/,
-                             const absl::Span<const float>& /*predictions*/,
+  std::function<absl::Status(const absl::Span<const int32_t> /*labels*/,
+                             const absl::Span<const float> /*predictions*/,
                              absl::Span<float> /*gradients*/,
                              absl::Span<float> /*hessian*/)>
       gradient_and_hessian;

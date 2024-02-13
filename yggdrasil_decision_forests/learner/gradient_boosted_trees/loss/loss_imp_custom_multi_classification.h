@@ -43,20 +43,20 @@ namespace gradient_boosted_trees {
 // Functionals for computing a custom multi-class classification loss.
 struct CustomMultiClassificationLossFunctions {
   // Functional to compute the initial predictions, one per class.
-  std::function<absl::Status(const absl::Span<const int32_t>& /*labels*/,
-                             const absl::Span<const float>& /*weights*/,
+  std::function<absl::Status(const absl::Span<const int32_t> /*labels*/,
+                             const absl::Span<const float> /*weights*/,
                              absl::Span<float> /*initial_predictions*/)>
       initial_predictions;
   // Functional to return the loss of the current predictions.
   std::function<absl::StatusOr<float>(
-      const absl::Span<const int32_t>& /*labels*/,
-      const absl::Span<const float>& /*predictions*/,
-      const absl::Span<const float>& /*weights*/)>
+      const absl::Span<const int32_t> /*labels*/,
+      const absl::Span<const float> /*predictions*/,
+      const absl::Span<const float> /*weights*/)>
       loss;
   // Functional to compute the gradient and the hessian of the current
   // predictions. The function must one gradient per class.
-  std::function<absl::Status(const absl::Span<const int32_t>& /*labels*/,
-                             const absl::Span<const float>& /*predictions*/,
+  std::function<absl::Status(const absl::Span<const int32_t> /*labels*/,
+                             const absl::Span<const float> /*predictions*/,
                              absl::Span<const absl::Span<float>> /*gradients*/,
                              absl::Span<const absl::Span<float>> /*hessian*/)>
       gradient_and_hessian;

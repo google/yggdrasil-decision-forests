@@ -80,8 +80,8 @@ CustomMultiClassificationLossFunctions Create3DimToyLoss() {
 
   CustomMultiClassificationLossFunctions toy_loss;
   toy_loss.initial_predictions =
-      [](const absl::Span<const int32_t>& labels,
-         const absl::Span<const float>& weights,
+      [](const absl::Span<const int32_t> labels,
+         const absl::Span<const float> weights,
          absl::Span<float> initial_predictions_out) -> absl::Status {
     STATUS_CHECK_EQ(initial_predictions_out.size(), 3);
     auto weight_times_labels =
@@ -92,9 +92,9 @@ CustomMultiClassificationLossFunctions Create3DimToyLoss() {
     return absl::OkStatus();
   };
   toy_loss.loss =
-      [](const absl::Span<const int32_t>& labels,
-         const absl::Span<const float>& predictions,
-         const absl::Span<const float>& weights) -> absl::StatusOr<float> {
+      [](const absl::Span<const int32_t> labels,
+         const absl::Span<const float> predictions,
+         const absl::Span<const float> weights) -> absl::StatusOr<float> {
     STATUS_CHECK_EQ(labels.size() * dimension, predictions.size());
     STATUS_CHECK_EQ(labels.size(), weights.size());
     float loss = 0.0;
@@ -108,8 +108,8 @@ CustomMultiClassificationLossFunctions Create3DimToyLoss() {
     return loss;
   };
   toy_loss.gradient_and_hessian =
-      [](const absl::Span<const int32_t>& labels,
-         const absl::Span<const float>& predictions,
+      [](const absl::Span<const int32_t> labels,
+         const absl::Span<const float> predictions,
          absl::Span<const absl::Span<float>> gradient,
          absl::Span<const absl::Span<float>> hessian) -> absl::Status {
     STATUS_CHECK_EQ(labels.size() * dimension, predictions.size());
