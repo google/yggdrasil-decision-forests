@@ -89,7 +89,7 @@ which means that models trained by either library will be identical.
 | Python model serving | `model.predict(ds)` makes predictions. | `model.predict(ds)` works sometimes. However, because of limitation in the TensorFlow SavedModel format, calling `model.predict(ds)` on a model loaded from disk might require signature engineering. |
 | Other model serving | Model directly available in C++, Python, CLI, go and Javascript. You can also use utilities to generate serving code: For example, call `model.to_cpp()` to generate C++ serving code. Models can be exported to a TensorFlow SavedModel with `model.to_tensorflow_saved_model(path)`. | Call `model.save(path, signature)` to generate a TensorFlow SaveModel, and use the TensorFlow C++ API to run the model in C++. Alternatively, export the model to YDF. |
 | Training speed | On a small dataset, training up to 5x faster than TensorFlow Decision Forests. On all dataset sizes, model inference is up to 1000x faster than TensorFlow Decision Forests. | On a small dataset, most of the time is spent in TensorFlow dataset reading. |
-| Library loading speed | The YDF library is ~4MB. | The TF-DF library is ~4MB, but it requires TensorFlow which is ~600MB. |
+| Library loading speed | The YDF library is ~9MB. | The TF-DF library is ~12MB, but it requires TensorFlow which is ~600MB. |
 | Error messages | Short, high level and actionable error messages. | Long and hard to understand error messages often about Tensor shapes. |
 
 ## Common modeling questions
