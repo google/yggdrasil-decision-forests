@@ -215,17 +215,19 @@ CustomBinaryClassificationLossFunctions BinomialCustomLoss() {
     STATUS_CHECK_EQ(labels.size(), weights.size());
 
     double sum_loss = 0;
+    double sum_weights = 0;
     for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
       // The loss function expects a 0/1 label.
       const bool pos_label = labels[example_idx] == 2;
       const float label_for_loss = pos_label ? 1.f : 0.f;
       const float prediction = predictions[example_idx];
       const float weight = weights[example_idx];
+      sum_weights += weight;
       sum_loss -=
           2 * weight *
           (label_for_loss * prediction - std::log(1.f + std::exp(prediction)));
     }
-    return sum_loss;
+    return sum_loss / sum_weights;
   };
   auto gradient_and_hessian =
       [](const absl::Span<const int32_t>& labels,
@@ -266,10 +268,12 @@ CustomMultiClassificationLossFunctions Multinomial3CustomLoss() {
          const absl::Span<const float>& predictions,
          const absl::Span<const float>& weights) -> absl::StatusOr<float> {
     double loss = 0;
+    double sum_weights = 0;
     for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
       const int label = labels[example_idx];
       float sum_exp = 0;
       const float weight = weights[example_idx];
+      sum_weights += weight;
       for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
         const float exp_val =
             std::exp(predictions[grad_idx + example_idx * dimension]);
@@ -280,7 +284,7 @@ CustomMultiClassificationLossFunctions Multinomial3CustomLoss() {
           std::exp(predictions[(label - 1) + example_idx * dimension]);
       loss -= weight * std::log(tree_label_exp_value / sum_exp);
     }
-    return loss;
+    return loss / sum_weights;
   };
   auto gradient_and_hessian =
       [](const absl::Span<const int32_t>& labels,

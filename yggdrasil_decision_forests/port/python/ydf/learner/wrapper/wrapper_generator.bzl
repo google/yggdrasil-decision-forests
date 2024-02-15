@@ -73,6 +73,7 @@ def py_wrap_yggdrasil_learners(
             "//ydf/dataset:dataspec",
             "//ydf/learner:generic_learner",
             "//ydf/learner:hyperparameters",
+            "//ydf/learner:custom_loss_py",
             "//ydf/learner:tuner",
         ],
         data = [":" + run_wrapper_name, ":" + wrapper_name],

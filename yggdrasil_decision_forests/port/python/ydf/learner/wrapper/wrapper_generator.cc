@@ -95,6 +95,20 @@ std::string PythonFloat(const float value) {
   return str_value;
 }
 
+void FixGBTDefinition(std::string* fields_documentation,
+                      std::string* fields_constructor) {
+  absl::StrReplaceAll(
+      {{"loss: Optional[str]",
+        "loss: Optional[Union[str, custom_loss.AbstractCustomLoss]]"}},
+      fields_constructor);
+  absl::StrReplaceAll({{"Mean average error a.k.a. MAE.",
+                        "Mean average error a.k.a. MAE. For custom losses, "
+                        "pass the loss object here. Note that when using "
+                        "custom losses, the link function is deactivated (aka "
+                        "apply_link_function is always False)."}},
+                      fields_documentation);
+}
+
 // Generates the Python object for the pre-defined hyper-parameters and the name
 // of the first template for the documentation.
 absl::StatusOr<std::pair<std::string, std::string>>
@@ -230,6 +244,7 @@ absl::StatusOr<std::string> GenLearnerWrapper() {
 from $0yggdrasil_decision_forests.dataset import data_spec_pb2
 from $0yggdrasil_decision_forests.learner import abstract_learner_pb2
 from $1dataset import dataspec
+from $1learner import custom_loss
 from $1learner import generic_learner
 from $1learner import hyperparameters
 from $1learner import tuner as tuner_lib
@@ -255,7 +270,7 @@ included for reference only. The actual wrappers are re-generated during
 compilation.
 """
 
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, Union
 $0
 
 )",
@@ -403,6 +418,9 @@ $0
 
     const auto nice_learner_name = LearnerKeyToNiceLearnerName(learner_key);
 
+    if (learner_key == "GRADIENT_BOOSTED_TREES") {
+      FixGBTDefinition(&fields_documentation, &fields_constructor);
+    }
     // TODO: Add support for hyperparameter templates.
     absl::SubstituteAndAppend(&wrapper, R"(
 class $0(generic_learner.GenericLearner):

@@ -18,7 +18,7 @@ import copy
 import datetime
 import os
 import re
-from typing import Optional, Sequence, Union
+from typing import Any, Optional, Sequence, Union
 
 from absl import logging
 
@@ -30,6 +30,7 @@ from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
+from ydf.learner import custom_loss
 from ydf.learner import hyperparameters
 from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
@@ -235,7 +236,8 @@ Hyper-parameters: ydf.{self._hyperparameters}
         )
 
       time_begin_training_model = datetime.datetime.now()
-      cc_model = self._get_learner().Train(**train_args)
+      learner = self._get_learner()
+      cc_model = learner.Train(**train_args)
       log.info(
           "Model trained in %s",
           datetime.datetime.now() - time_begin_training_model,
@@ -282,11 +284,32 @@ Hyper-parameters: ydf.{self._hyperparameters}
     """Gets a ready-to-train learner."""
 
     training_config = self._get_training_config()
+    cc_custom_loss = None
+    if "loss" in self._hyperparameters and isinstance(
+        self._hyperparameters["loss"], custom_loss.AbstractCustomLoss
+    ):
+      log.info(
+          "Using a custom loss. Note when using custom losses, hyperparameter"
+          " `apply_link_function` is ignored. Use the losses' activation"
+          " function instead."
+      )
+      py_custom_loss: custom_loss.AbstractCustomLoss = self._hyperparameters[
+          "loss"
+      ]
+      py_custom_loss.check_is_compatible_task(training_config.task)
+      cc_custom_loss = py_custom_loss._to_cc()  # pylint: disable=protected-access
+      # TODO: b/322763329 - Fail if the user set apply_link_function.
+      if py_custom_loss.activation.name == "IDENTITY":
+        self._hyperparameters["apply_link_function"] = False
+      else:
+        self._hyperparameters["apply_link_function"] = True
 
     hp_proto = hyperparameters.dict_to_generic_hyperparameter(
         self._hyperparameters
     )
-    return ydf.GetLearner(training_config, hp_proto, self._deployment_config)
+    return ydf.GetLearner(
+        training_config, hp_proto, self._deployment_config, cc_custom_loss
+    )
 
   def _get_vertical_dataset(
       self, ds: dataset.InputDataset

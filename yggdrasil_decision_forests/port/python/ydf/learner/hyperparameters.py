@@ -18,8 +18,12 @@ import dataclasses
 from typing import Dict, Union
 
 from yggdrasil_decision_forests.model import hyperparameter_pb2
+from ydf.learner import custom_loss
 
-HyperParameters = Dict[str, Union[int, float, str, bool]]
+
+HyperParameters = Dict[
+    str, Union[int, float, str, bool, custom_loss.AbstractCustomLoss]
+]
 
 
 def dict_to_generic_hyperparameter(
@@ -30,6 +34,9 @@ def dict_to_generic_hyperparameter(
   for key, value in src.items():
     if value is None:
       # The value is not defined, use default.
+      continue
+    if key == "loss" and isinstance(value, custom_loss.AbstractCustomLoss):
+      # Custom Python fields must be treated separately.
       continue
     # Boolean has to come first, since it is a subtype of int.
     if isinstance(value, bool):

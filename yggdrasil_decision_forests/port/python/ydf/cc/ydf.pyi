@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Sequence, TypeVar, Union
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -206,6 +206,69 @@ def PredictionAnalysisCreateHtmlReport(
 # Learner bindings
 # ================
 
+class CCRegressionLoss:
+  def __init__(
+      self,
+      initial_predictions: Callable[
+          [npt.NDArray[np.float32], npt.NDArray[np.float32]],
+          np.float32,
+      ],
+      loss: Callable[
+          [
+              npt.NDArray[np.float32],
+              npt.NDArray[np.float32],
+              npt.NDArray[np.float32],
+          ],
+          np.float32,
+      ],
+      gradient_and_hessian: Callable[
+          [npt.NDArray[np.float32], npt.NDArray[np.float32]],
+          Tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]],
+      ],
+  ): ...
+
+class CCBinaryClassificationLoss:
+  def __init__(
+      self,
+      initial_predictions: Callable[
+          [npt.NDArray[np.int32], npt.NDArray[np.float32]],
+          np.float32,
+      ],
+      loss: Callable[
+          [
+              npt.NDArray[np.int32],
+              npt.NDArray[np.float32],
+              npt.NDArray[np.float32],
+          ],
+          np.float32,
+      ],
+      gradient_and_hessian: Callable[
+          [npt.NDArray[np.int32], npt.NDArray[np.float32]],
+          Tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]],
+      ],
+  ): ...
+
+class CCMultiClassificationLoss:
+  def __init__(
+      self,
+      initial_predictions: Callable[
+          [npt.NDArray[np.int32], npt.NDArray[np.float32]],
+          npt.NDArray[np.float32],
+      ],
+      loss: Callable[
+          [
+              npt.NDArray[np.int32],
+              npt.NDArray[np.float32],
+              npt.NDArray[np.float32],
+          ],
+          np.float32,
+      ],
+      gradient_and_hessian: Callable[
+          [npt.NDArray[np.int32], npt.NDArray[np.float32]],
+          Tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]],
+      ],
+  ): ...
+
 class GenericCCLearner:
   def Train(
       self,
@@ -236,6 +299,7 @@ def GetLearner(
     train_config: abstract_learner_pb2.TrainingConfig,
     hyperparameters: hyperparameter_pb2.GenericHyperParameters,
     deployment_config: abstract_learner_pb2.DeploymentConfig,
+    custom_loss: Optional[CCRegressionLoss],
 ) -> GenericCCLearner: ...
 
 

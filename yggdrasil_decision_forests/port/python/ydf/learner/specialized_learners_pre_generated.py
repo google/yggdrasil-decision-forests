@@ -30,11 +30,12 @@ included for reference only. The actual wrappers are re-generated during
 compilation.
 """
 
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, Union
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from ydf.dataset import dataspec
+from ydf.learner import custom_loss
 from ydf.learner import generic_learner
 from ydf.learner import hyperparameters
 from ydf.learner import tuner as tuner_lib
@@ -420,6 +421,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
       tuner: Optional[tuner_lib.AbstractTuner] = None,
       workers: Optional[Sequence[str]] = None,
   ):
+
     hyper_parameters = {
         "adapt_bootstrap_size_ratio_for_maximum_training_duration": (
             adapt_bootstrap_size_ratio_for_maximum_training_duration
@@ -728,6 +730,7 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
       tuner: Optional[tuner_lib.AbstractTuner] = None,
       workers: Optional[Sequence[str]] = None,
   ):
+
     hyper_parameters = {
         "maximum_model_size_in_memory_in_bytes": (
             maximum_model_size_in_memory_in_bytes
@@ -1021,7 +1024,13 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       regression. - `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood
       i.e. cross-entropy. Only valid for binary or multi-class classification. -
       `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5. - `XE_NDCG_MART`:  Cross
-      Entropy Loss NDCG. See arxiv.org/abs/1911.09798.
+      Entropy Loss NDCG. See arxiv.org/abs/1911.09798. - `BINARY_FOCAL_LOSS`:
+      Focal loss. Only valid for binary classification. See
+      https://arxiv.org/pdf/1708.02002.pdf. - `POISSON`: Poisson log likelihood.
+        Only valid for regression. - `MEAN_AVERAGE_ERROR`: Mean average error
+        a.k.a. MAE. For custom losses, pass the loss object here. Note that when
+        using custom losses, the link function is deactivated (aka
+        apply_link_function is always False).
         Default: "DEFAULT".
     max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
       will be roots. Negative values are ignored. Default: 6.
@@ -1221,7 +1230,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       l2_categorical_regularization: Optional[float] = 1.0,
       l2_regularization: Optional[float] = 0.0,
       lambda_loss: Optional[float] = 1.0,
-      loss: Optional[str] = "DEFAULT",
+      loss: Optional[Union[str, custom_loss.AbstractCustomLoss]] = "DEFAULT",
       max_depth: Optional[int] = 6,
       max_num_nodes: Optional[int] = None,
       maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
@@ -1255,6 +1264,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       tuner: Optional[tuner_lib.AbstractTuner] = None,
       workers: Optional[Sequence[str]] = None,
   ):
+
     hyper_parameters = {
         "adapt_subsample_for_maximum_training_duration": (
             adapt_subsample_for_maximum_training_duration
@@ -1639,6 +1649,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       tuner: Optional[tuner_lib.AbstractTuner] = None,
       workers: Optional[Sequence[str]] = None,
   ):
+
     hyper_parameters = {
         "apply_link_function": apply_link_function,
         "force_numerical_discretization": force_numerical_discretization,
@@ -2048,6 +2059,7 @@ class CartLearner(generic_learner.GenericLearner):
       tuner: Optional[tuner_lib.AbstractTuner] = None,
       workers: Optional[Sequence[str]] = None,
   ):
+
     hyper_parameters = {
         "allow_na_conditions": allow_na_conditions,
         "categorical_algorithm": categorical_algorithm,

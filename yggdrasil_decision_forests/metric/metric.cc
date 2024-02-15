@@ -877,8 +877,6 @@ absl::Status AddPrediction(const proto::EvaluationOptions& option,
         }
         if (pred_prob_true_class == 0)
           pred_prob_true_class = std::numeric_limits<double>::epsilon();
-        DCHECK_GE(pred_prob_true_class, 0);
-        DCHECK_LE(pred_prob_true_class, 1);
         const double logloss = -std::log(pred_prob_true_class);
         eval_cls->set_sum_log_loss(eval_cls->sum_log_loss() +
                                    logloss * pred.weight());

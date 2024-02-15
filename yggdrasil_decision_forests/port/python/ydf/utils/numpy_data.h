@@ -33,9 +33,9 @@ namespace py = ::pybind11;
 
 namespace yggdrasil_decision_forests::port::python {
 
-// A collection of values, somehow similar to a "Span<const float>", but with a
+// A collection of values, similar to a "Span<const float>", but with a
 // stride (i.e., items are evenly spaced, but possibly with a constant gap).
-// Only support what is needed in this file.
+// Only support what is needed by PYDF.
 //
 // "StridedSpanFloat32" does not own the underlying data and relies on the data
 // in "data". The initialization "py::array_t data" object should not be
@@ -45,7 +45,7 @@ class StridedSpanFloat32 {
   // Build a "StridedSpanFloat32".
   //
   // Args:
-  //   data: A one dimentionnal array of float32 values.
+  //   data: A one dimentional array of float32 values.
   StridedSpanFloat32(py::array_t<float>& data)
       : item_stride_(data.strides(0) / data.itemsize()),
         size_(static_cast<size_t>(data.shape(0))),
