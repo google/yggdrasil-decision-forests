@@ -225,7 +225,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
       model interpretation as well as hyper parameter tuning. This can take lots
       of space, sometimes accounting for half of the model size. Default: True.
     max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
-      will be roots. Negative values are ignored. Default: 16.
+      will be roots. `max_depth=-1` means that tree depth is not restricted by
+      this parameter. Values <= -2 will be ignored. Default: 16.
     max_num_nodes: Maximum number of nodes in the tree. Set to -1 to disable
       this limit. Only available for `growing_strategy=BEST_FIRST_GLOBAL`.
       Default: None.
@@ -1120,7 +1121,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         apply_link_function is always False).
         Default: "DEFAULT".
     max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
-      will be roots. Negative values are ignored. Default: 6.
+      will be roots. `max_depth=-1` means that tree depth is not restricted by
+      this parameter. Values <= -2 will be ignored. Default: 6.
     max_num_nodes: Maximum number of nodes in the tree. Set to -1 to disable
       this limit. Only available for `growing_strategy=BEST_FIRST_GLOBAL`.
       Default: None.
@@ -1666,7 +1668,8 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       "max_unique_values_for_discretized_numerical" bins. This parameter will
       impact the model training. Default: False.
     max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
-      will be roots. Negative values are ignored. Default: 6.
+      will be roots. `max_depth=-1` means that tree depth is not restricted by
+      this parameter. Values <= -2 will be ignored. Default: 6.
     max_unique_values_for_discretized_numerical: Maximum number of unique value
       of a numerical feature to allow its pre-discretization. In case of large
       datasets, discretized numerical features with a small number of unique
@@ -2057,7 +2060,8 @@ class CartLearner(generic_learner.GenericLearner):
       model interpretation as well as hyper parameter tuning. This can take lots
       of space, sometimes accounting for half of the model size. Default: True.
     max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
-      will be roots. Negative values are ignored. Default: 16.
+      will be roots. `max_depth=-1` means that tree depth is not restricted by
+      this parameter. Values <= -2 will be ignored. Default: 16.
     max_num_nodes: Maximum number of nodes in the tree. Set to -1 to disable
       this limit. Only available for `growing_strategy=BEST_FIRST_GLOBAL`.
       Default: None.

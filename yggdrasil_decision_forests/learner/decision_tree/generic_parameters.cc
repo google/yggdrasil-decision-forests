@@ -16,7 +16,6 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 
 #include <string>
-#include <type_traits>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
@@ -25,7 +24,6 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
-#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -58,7 +56,7 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_integer()->set_minimum(-1);
     param->mutable_integer()->set_default_value(config.max_depth());
     param->mutable_documentation()->set_description(
-        R"(Maximum depth of the tree. `max_depth=1` means that all trees will be roots. Negative values are ignored.)");
+        R"(Maximum depth of the tree. `max_depth=1` means that all trees will be roots. `max_depth=-1` means that tree depth is not restricted by this parameter. Values <= -2 will be ignored.)");
   }
   {
     ASSIGN_OR_RETURN(auto param, get_params(kHParamMinExamples));
