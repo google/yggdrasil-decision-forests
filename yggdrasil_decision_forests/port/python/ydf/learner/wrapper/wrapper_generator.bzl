@@ -70,7 +70,11 @@ def py_wrap_yggdrasil_learners(
         deps = [
             "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
             "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+            "//ydf/dataset:dataset",
             "//ydf/dataset:dataspec",
+            "//ydf/model:generic_model",
+            "//ydf/model/gradient_boosted_trees_model:gradient_boosted_trees_model",
+            "//ydf/model/random_forest_model:random_forest_model",
             "//ydf/learner:generic_learner",
             "//ydf/learner:hyperparameters",
             "//ydf/learner:custom_loss_py",

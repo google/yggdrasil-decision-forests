@@ -67,6 +67,18 @@ std::string LearnerKeyToClassName(const absl::string_view key) {
   return absl::StrCat(absl::StrReplaceAll(value, {{"_", ""}}), "Learner");
 }
 
+// Converts a learner name into the model class associated with it.
+std::string LearnerKeyToModelClassName(const absl::string_view key) {
+  if (key == "RANDOM_FOREST" || key == "CART") {
+    return "random_forest_model.RandomForestModel";
+  } else if (key == "GRADIENT_BOOSTED_TREES" ||
+             key == "DISTRIBUTED_GRADIENT_BOOSTED_TREES") {
+    return "gradient_boosted_trees_model.GradientBoostedTreesModel";
+  } else {
+    return "generic_model.GenericModel";
+  }
+}
+
 // Converts a learner name into a nice name.
 // e.g. "RANDOM_FOREST" -> "Random Forest"
 std::string LearnerKeyToNiceLearnerName(absl::string_view key) {
@@ -243,11 +255,15 @@ absl::StatusOr<std::string> GenLearnerWrapper() {
   std::string imports = absl::Substitute(R"(
 from $0yggdrasil_decision_forests.dataset import data_spec_pb2
 from $0yggdrasil_decision_forests.learner import abstract_learner_pb2
+from $1dataset import dataset
 from $1dataset import dataspec
 from $1learner import custom_loss
 from $1learner import generic_learner
 from $1learner import hyperparameters
 from $1learner import tuner as tuner_lib
+from $1model import generic_model
+from $1model.gradient_boosted_trees_model import gradient_boosted_trees_model
+from $1model.random_forest_model import random_forest_model
 )",
                                          prefix, pydf_prefix);
 
@@ -278,6 +294,7 @@ $0
 
   for (const auto& learner_key : model::AllRegisteredLearners()) {
     const auto class_name = LearnerKeyToClassName(learner_key);
+    const auto model_class_name = LearnerKeyToModelClassName(learner_key);
 
     // Get a learner instance.
     std::unique_ptr<model::AbstractLearner> learner;
@@ -596,12 +613,53 @@ $4
       deployment_config=deployment_config,
       tuner=tuner,
     )
+
+  def train(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset] = None,
+  ) -> $7:
+    """Trains a model on the given dataset.
+
+    Options for dataset reading are given on the learner. Consult the
+    documentation of the learner or ydf.create_vertical_dataset() for additional
+    information on dataset reading in YDF.
+
+    Usage example:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+
+    learner = ydf.$0(label="label")
+    model = learner.train(train_ds)
+    print(model.summary())
+    ```
+
+    If training is interrupted (for example, by interrupting the cell execution
+    in Colab), the model will be returned to the state it was in at the moment
+    of interruption.
+
+    Args:
+      ds: Training dataset.
+      valid: Optional validation dataset. Some learners, such as Random Forest,
+        do not need validation dataset. Some learners, such as
+        GradientBoostedTrees, automatically extract a validation dataset from
+        the training dataset if the validation dataset is not provided.
+
+    Returns:
+      A trained model.
+    """
+    return super().train(ds, valid)
 )",
                               /*$0*/ class_name, /*$1*/ learner_key,
                               /*$2*/ fields_documentation,
                               /*$3*/ fields_constructor, /*$4*/ fields_dict,
                               /*$5*/ free_text_documentation,
-                              /*$6*/ nice_learner_name);
+                              /*$6*/ nice_learner_name,
+                              /*$7*/ model_class_name);
 
     const auto bool_rep = [](const bool value) -> std::string {
       return value ? "True" : "False";

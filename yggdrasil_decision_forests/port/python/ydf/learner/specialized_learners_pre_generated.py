@@ -34,11 +34,15 @@ from typing import Dict, Optional, Sequence, Union
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
+from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.learner import custom_loss
 from ydf.learner import generic_learner
 from ydf.learner import hyperparameters
 from ydf.learner import tuner as tuner_lib
+from ydf.model import generic_model
+from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
+from ydf.model.random_forest_model import random_forest_model
 
 
 class RandomForestLearner(generic_learner.GenericLearner):
@@ -512,6 +516,46 @@ class RandomForestLearner(generic_learner.GenericLearner):
         tuner=tuner,
     )
 
+  def train(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset] = None,
+  ) -> random_forest_model.RandomForestModel:
+    """Trains a model on the given dataset.
+
+    Options for dataset reading are given on the learner. Consult the
+    documentation of the learner or ydf.create_vertical_dataset() for additional
+    information on dataset reading in YDF.
+
+    Usage example:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+
+    learner = ydf.RandomForestLearner(label="label")
+    model = learner.train(train_ds)
+    print(model.summary())
+    ```
+
+    If training is interrupted (for example, by interrupting the cell execution
+    in Colab), the model will be returned to the state it was in at the moment
+    of interruption.
+
+    Args:
+      ds: Training dataset.
+      valid: Optional validation dataset. Some learners, such as Random Forest,
+        do not need validation dataset. Some learners, such as
+        GradientBoostedTrees, automatically extract a validation dataset from
+        the training dataset if the validation dataset is not provided.
+
+    Returns:
+      A trained model.
+    """
+    return super().train(ds, valid)
+
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
@@ -772,6 +816,46 @@ class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
         deployment_config=deployment_config,
         tuner=tuner,
     )
+
+  def train(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset] = None,
+  ) -> generic_model.GenericModel:
+    """Trains a model on the given dataset.
+
+    Options for dataset reading are given on the learner. Consult the
+    documentation of the learner or ydf.create_vertical_dataset() for additional
+    information on dataset reading in YDF.
+
+    Usage example:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+
+    learner = ydf.HyperparameterOptimizerLearner(label="label")
+    model = learner.train(train_ds)
+    print(model.summary())
+    ```
+
+    If training is interrupted (for example, by interrupting the cell execution
+    in Colab), the model will be returned to the state it was in at the moment
+    of interruption.
+
+    Args:
+      ds: Training dataset.
+      valid: Optional validation dataset. Some learners, such as Random Forest,
+        do not need validation dataset. Some learners, such as
+        GradientBoostedTrees, automatically extract a validation dataset from
+        the training dataset if the validation dataset is not provided.
+
+    Returns:
+      A trained model.
+    """
+    return super().train(ds, valid)
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
@@ -1382,6 +1466,46 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         tuner=tuner,
     )
 
+  def train(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset] = None,
+  ) -> gradient_boosted_trees_model.GradientBoostedTreesModel:
+    """Trains a model on the given dataset.
+
+    Options for dataset reading are given on the learner. Consult the
+    documentation of the learner or ydf.create_vertical_dataset() for additional
+    information on dataset reading in YDF.
+
+    Usage example:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+
+    learner = ydf.GradientBoostedTreesLearner(label="label")
+    model = learner.train(train_ds)
+    print(model.summary())
+    ```
+
+    If training is interrupted (for example, by interrupting the cell execution
+    in Colab), the model will be returned to the state it was in at the moment
+    of interruption.
+
+    Args:
+      ds: Training dataset.
+      valid: Optional validation dataset. Some learners, such as Random Forest,
+        do not need validation dataset. Some learners, such as
+        GradientBoostedTrees, automatically extract a validation dataset from
+        the training dataset if the validation dataset is not provided.
+
+    Returns:
+      A trained model.
+    """
+    return super().train(ds, valid)
+
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
@@ -1713,6 +1837,46 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
         deployment_config=deployment_config,
         tuner=tuner,
     )
+
+  def train(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset] = None,
+  ) -> gradient_boosted_trees_model.GradientBoostedTreesModel:
+    """Trains a model on the given dataset.
+
+    Options for dataset reading are given on the learner. Consult the
+    documentation of the learner or ydf.create_vertical_dataset() for additional
+    information on dataset reading in YDF.
+
+    Usage example:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+
+    learner = ydf.DistributedGradientBoostedTreesLearner(label="label")
+    model = learner.train(train_ds)
+    print(model.summary())
+    ```
+
+    If training is interrupted (for example, by interrupting the cell execution
+    in Colab), the model will be returned to the state it was in at the moment
+    of interruption.
+
+    Args:
+      ds: Training dataset.
+      valid: Optional validation dataset. Some learners, such as Random Forest,
+        do not need validation dataset. Some learners, such as
+        GradientBoostedTrees, automatically extract a validation dataset from
+        the training dataset if the validation dataset is not provided.
+
+    Returns:
+      A trained model.
+    """
+    return super().train(ds, valid)
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
@@ -2146,6 +2310,46 @@ class CartLearner(generic_learner.GenericLearner):
         deployment_config=deployment_config,
         tuner=tuner,
     )
+
+  def train(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset] = None,
+  ) -> random_forest_model.RandomForestModel:
+    """Trains a model on the given dataset.
+
+    Options for dataset reading are given on the learner. Consult the
+    documentation of the learner or ydf.create_vertical_dataset() for additional
+    information on dataset reading in YDF.
+
+    Usage example:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+
+    learner = ydf.CartLearner(label="label")
+    model = learner.train(train_ds)
+    print(model.summary())
+    ```
+
+    If training is interrupted (for example, by interrupting the cell execution
+    in Colab), the model will be returned to the state it was in at the moment
+    of interruption.
+
+    Args:
+      ds: Training dataset.
+      valid: Optional validation dataset. Some learners, such as Random Forest,
+        do not need validation dataset. Some learners, such as
+        GradientBoostedTrees, automatically extract a validation dataset from
+        the training dataset if the validation dataset is not provided.
+
+    Returns:
+      A trained model.
+    """
+    return super().train(ds, valid)
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:

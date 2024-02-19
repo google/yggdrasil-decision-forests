@@ -267,6 +267,46 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       tuner=tuner,
     )
 
+  def train(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset] = None,
+  ) -> generic_model.GenericModel:
+    """Trains a model on the given dataset.
+
+    Options for dataset reading are given on the learner. Consult the
+    documentation of the learner or ydf.create_vertical_dataset() for additional
+    information on dataset reading in YDF.
+
+    Usage example:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+
+    learner = ydf.FakeAlgorithmLearner(label="label")
+    model = learner.train(train_ds)
+    print(model.summary())
+    ```
+
+    If training is interrupted (for example, by interrupting the cell execution
+    in Colab), the model will be returned to the state it was in at the moment
+    of interruption.
+
+    Args:
+      ds: Training dataset.
+      valid: Optional validation dataset. Some learners, such as Random Forest,
+        do not need validation dataset. Some learners, such as
+        GradientBoostedTrees, automatically extract a validation dataset from
+        the training dataset if the validation dataset is not provided.
+
+    Returns:
+      A trained model.
+    """
+    return super().train(ds, valid)
+
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
