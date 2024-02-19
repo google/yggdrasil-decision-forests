@@ -167,6 +167,14 @@ class GenericLearner:
       A trained model.
     """
 
+    if valid is not None:
+      if not self.__class__.capabilities().support_validation_dataset:
+        raise ValueError(
+            f"The learner {self.__class__.__name__!r} does not use a"
+            " validation dataset. If you can, add the validation examples to"
+            " the training dataset."
+        )
+
     if isinstance(ds, str):
       if valid is not None and not isinstance(valid, str):
         raise ValueError(
@@ -215,13 +223,6 @@ Hyper-parameters: ydf.{self._hyperparameters}
       train_args = {"dataset": train_ds}
 
       if valid is not None:
-        if not self.__class__.capabilities().support_validation_dataset:
-          raise ValueError(
-              f"The learner {self.__class__.__name__!r} does not use a"
-              " validation dataset. If you can, add the validation examples to"
-              " the training dataset."
-          )
-
         valid_ds = self._get_vertical_dataset(valid)._dataset  # pylint: disable=protected-access
         train_args["validation_dataset"] = valid_ds
         log.info(
