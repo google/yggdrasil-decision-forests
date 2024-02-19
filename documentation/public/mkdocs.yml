@@ -81,6 +81,7 @@ nav:
   - Advanced:
     - Inspecting trees: tutorial/inspecting_trees.ipynb
     - Editing trees: tutorial/editing_trees.ipynb
+    - Custom loss: tutorial/custom_loss.ipynb
   #  - example distance: tutorial/example_distance.ipynb
     # TODO: model inspection, manual tree creation, custom loss.
   - Other APIs:
