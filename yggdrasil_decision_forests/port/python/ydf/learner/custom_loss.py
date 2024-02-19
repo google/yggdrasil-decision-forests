@@ -25,6 +25,18 @@ from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 
 
+class Activation(enum.Enum):
+  """Activation functions for custom losses.
+
+  Not all activation functions are supported for all custom losses. Activation
+  function IDENTITY (i.e., no activation function applied) is always supported.
+  """
+
+  IDENTITY = "IDENTITY"
+  SIGMOID = "SIGMOID"
+  SOFTMAX = "SOFTMAX"
+
+
 @dataclasses.dataclass(frozen=True)
 class AbstractCustomLoss:
   """Abstract Base class for custom losses."""
@@ -90,9 +102,6 @@ class RegressionLoss(AbstractCustomLoss):
     applying the activation function.
   """
 
-  class Activation(enum.Enum):
-    IDENTITY = "IDENTITY"
-
   initial_predictions: Callable[
       [npt.NDArray[np.float32], npt.NDArray[np.float32]],
       np.float32,
@@ -111,6 +120,12 @@ class RegressionLoss(AbstractCustomLoss):
   ]
 
   activation: Activation
+
+  def __post_init__(self):
+    if self.activation != Activation.IDENTITY:
+      raise ValueError(
+          "Only activation function IDENTITY is supported for RegressionLoss."
+      )
 
   def check_is_compatible_task(self, task: abstract_model_pb2.Task) -> None:
     """Raises an error if the given task is incompatible with this loss type."""
@@ -164,10 +179,6 @@ class BinaryClassificationLoss(AbstractCustomLoss):
     the activation function.
   """
 
-  class Activation(enum.Enum):
-    IDENTITY = "IDENTITY"
-    SIGMOID = "SIGMOID"
-
   initial_predictions: Callable[
       [npt.NDArray[np.int32], npt.NDArray[np.float32]],
       np.float32,
@@ -186,6 +197,13 @@ class BinaryClassificationLoss(AbstractCustomLoss):
   ]
 
   activation: Activation
+
+  def __post_init__(self):
+    if self.activation not in [Activation.IDENTITY, Activation.SIGMOID]:
+      raise ValueError(
+          "Only activation functions IDENTITY and SIGMOID are supported for"
+          " BinaryClassificationLoss."
+      )
 
   def check_is_compatible_task(self, task: abstract_model_pb2.Task) -> None:
     """Raises an error if the given task is incompatible with this loss type."""
@@ -243,10 +261,6 @@ class MultiClassificationLoss(AbstractCustomLoss):
     the classes after applying the activation function.
   """
 
-  class Activation(enum.Enum):
-    IDENTITY = "IDENTITY"
-    SOFTMAX = "SOFTMAX"
-
   initial_predictions: Callable[
       [npt.NDArray[np.int32], npt.NDArray[np.float32]],
       npt.NDArray[np.float32],
@@ -265,6 +279,16 @@ class MultiClassificationLoss(AbstractCustomLoss):
   ]
 
   activation: Activation
+
+  def __post_init__(self):
+    if (
+        self.activation != Activation.IDENTITY
+        and self.activation != Activation.SOFTMAX
+    ):
+      raise ValueError(
+          "Only activation functions IDENTITY and SOFTMAX are supported for"
+          " MultiClassificationLoss."
+      )
 
   def check_is_compatible_task(self, task: abstract_model_pb2.Task) -> None:
     """Raises an error if the given task is incompatible with this loss type."""

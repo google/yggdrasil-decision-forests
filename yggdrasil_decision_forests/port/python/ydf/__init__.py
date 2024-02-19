@@ -47,6 +47,7 @@ from ydf.learner.specialized_learners import GradientBoostedTreesLearner
 from ydf.learner.specialized_learners import DistributedGradientBoostedTreesLearner
 
 # Custom Losses
+from ydf.learner.custom_loss import Activation
 from ydf.learner.custom_loss import RegressionLoss
 from ydf.learner.custom_loss import BinaryClassificationLoss
 from ydf.learner.custom_loss import MultiClassificationLoss

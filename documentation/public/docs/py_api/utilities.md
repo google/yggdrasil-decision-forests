@@ -21,3 +21,11 @@
 ::: ydf.create_vertical_dataset
 
 ::: ydf.ModelMetadata
+
+::: ydf.RegressionLoss
+
+::: ydf.BinaryClassificationLoss
+
+::: ydf.MultiClassificationLoss
+
+::: ydf.Activation

@@ -849,7 +849,7 @@ class CustomLossTest(LearnerTest):
         initial_predictions=faulty_inital_prediction,
         gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
         loss=lambda x, y, z: np.float32(0),
-        activation=loss_type.Activation.IDENTITY,
+        activation=custom_loss.Activation.IDENTITY,
     )
     ds = toy_dataset()
     learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -876,7 +876,7 @@ class CustomLossTest(LearnerTest):
         initial_predictions=faulty_inital_prediction,
         gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
         loss=lambda x, y, z: np.float32(0),
-        activation=custom_loss.RegressionLoss.Activation.IDENTITY,
+        activation=custom_loss.Activation.IDENTITY,
     )
     ds = toy_dataset()
     learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -913,7 +913,7 @@ class CustomLossTest(LearnerTest):
         initial_predictions=lambda x, y: np.float32(0),
         gradient_and_hessian=lambda x, y: np.ones([6, len(x)]),
         loss=lambda x, y, z: np.float32(0),
-        activation=custom_loss.MultiClassificationLoss.Activation.IDENTITY,
+        activation=custom_loss.Activation.IDENTITY,
     )
     ds = toy_dataset()
     learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -951,7 +951,7 @@ class CustomLossTest(LearnerTest):
         initial_predictions=mse_inital_predictions,
         gradient_and_hessian=mse_gradient,
         loss=mse_loss,
-        activation=custom_loss.RegressionLoss.Activation.IDENTITY,
+        activation=custom_loss.Activation.IDENTITY,
     )
 
     learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -984,8 +984,8 @@ class CustomLossTest(LearnerTest):
     )
 
   @parameterized.parameters(
-      custom_loss.BinaryClassificationLoss.Activation.IDENTITY,
-      custom_loss.BinaryClassificationLoss.Activation.SIGMOID,
+      custom_loss.Activation.IDENTITY,
+      custom_loss.Activation.SIGMOID,
   )
   def test_binomial_custom_equal_to_builtin(self, activation):
     def binomial_inital_predictions(
@@ -1052,7 +1052,7 @@ class CustomLossTest(LearnerTest):
         task=generic_learner.Task.CLASSIFICATION,
         apply_link_function=(
             activation
-            == custom_loss.BinaryClassificationLoss.Activation.SIGMOID
+            == custom_loss.Activation.SIGMOID
         ),
         early_stopping="NONE",
         validation_ratio=0.0,
@@ -1069,8 +1069,8 @@ class CustomLossTest(LearnerTest):
     )
 
   @parameterized.parameters(
-      custom_loss.MultiClassificationLoss.Activation.IDENTITY,
-      custom_loss.MultiClassificationLoss.Activation.SOFTMAX,
+      custom_loss.Activation.IDENTITY,
+      custom_loss.Activation.SOFTMAX,
   )
   def test_multinomial_custom_equal_to_builtin(self, activation):
     def multinomial_inital_predictions(
@@ -1141,7 +1141,7 @@ class CustomLossTest(LearnerTest):
         label="LABEL",
         task=generic_learner.Task.CLASSIFICATION,
         apply_link_function=(
-            activation == custom_loss.MultiClassificationLoss.Activation.SOFTMAX
+            activation == custom_loss.Activation.SOFTMAX
         ),
         early_stopping="NONE",
         validation_ratio=0.0,
@@ -1171,7 +1171,7 @@ class CustomLossTest(LearnerTest):
             np.ones([3, len(x)]),
         ),
         loss=lambda x, y, z: np.float32(0),
-        activation=custom_loss.MultiClassificationLoss.Activation.IDENTITY,
+        activation=custom_loss.Activation.IDENTITY,
     )
     ds = toy_dataset()
     learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -1199,7 +1199,7 @@ class CustomLossTest(LearnerTest):
             np.ones([3, len(x)]),
         ),
         loss=lambda x, y, z: np.float32(0),
-        activation=custom_loss.MultiClassificationLoss.Activation.IDENTITY,
+        activation=custom_loss.Activation.IDENTITY,
     )
     ds = toy_dataset()
     learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -1235,7 +1235,7 @@ class CustomLossTest(LearnerTest):
             np.ones(len(x)),
         ),
         loss=lambda x, y, z: np.float32(0),
-        activation=loss_type.Activation.IDENTITY,
+        activation=custom_loss.Activation.IDENTITY,
     )
     ds = toy_dataset()
     learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -1270,7 +1270,7 @@ class CustomLossTest(LearnerTest):
             np.ones(len(x) - 1),
         ),
         loss=lambda x, y, z: np.float32(0),
-        activation=loss_type.Activation.IDENTITY,
+        activation=custom_loss.Activation.IDENTITY,
     )
     ds = toy_dataset()
     learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -1302,7 +1302,7 @@ class CustomLossTest(LearnerTest):
         initial_predictions=lambda x, y: np.float32(0),
         gradient_and_hessian=lambda x, y: 3 * np.ones([2, 5]),
         loss=lambda x, y, z: np.float32(0),
-        activation=loss_type.Activation.IDENTITY,
+        activation=custom_loss.Activation.IDENTITY,
     )
     ds = toy_dataset()
     learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
