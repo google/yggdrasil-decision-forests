@@ -145,7 +145,7 @@ reasonable time.
 -   **Type:** Categorical **Default:** LOSS_INCREASE **Possible values:** NONE,
     MIN_LOSS_FINAL, LOSS_INCREASE
 
--   Early stopping detects the overfitting of the model and halts it training using the validation dataset controlled by `validation_ratio`.<br>- `NONE`: No early stopping. The model is trained entirely.<br>- `MIN_LOSS_FINAL`: No early stopping. However, the model is then truncated to minimize the validation loss.<br>- `LOSS_INCREASE`: Stop the training when the validation does not decrease for `early_stopping_num_trees_look_ahead` trees.
+-   Early stopping detects the overfitting of the model and halts it training using the validation dataset. If not provided directly, the validation dataset is extracted from the training dataset (see "validation_ratio" parameter):<br>- `NONE`: No early stopping. All the num_trees are trained and kept.<br>- `MIN_LOSS_FINAL`: All the num_trees are trained. The model is then truncated to minimize the validation loss i.e. some of the trees are discarded as to minimum the validation loss.<br>- `LOSS_INCREASE`: Classical early stopping. Stop the training when the validation does not decrease for `early_stopping_num_trees_look_ahead` trees.
 
 #### [early_stopping_initial_iteration](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
@@ -357,7 +357,7 @@ reasonable time.
 
 #### [num_trees](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
--   **Type:** Integer **Default:** 300 **Possible values:** min:1
+-   **Type:** Integer **Default:** 300 **Possible values:** min:0
 
 -   Maximum number of decision trees. The effective number of trained tree can
     be smaller if early stopping is enabled.
@@ -498,8 +498,14 @@ reasonable time.
 
 -   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
 
--   Ratio of the training dataset used to monitor the training. Require to be >0
-    if early stopping is enabled.
+-   Fraction of the training dataset used for validation if not validation
+    dataset is provided. The validation dataset, whether provided directly or
+    extracted from the training dataset, is used to compute the validation loss,
+    other validation metrics, and possibly trigger early stopping (if enabled).
+    When early stopping is disabled, the validation dataset is only used for
+    monitoring and does not influence the model directly. If the
+    "validation_ratio" is set to 0, early stopping is disabled (i.e., it implies
+    setting early_stopping=NONE).
 
 ## RANDOM_FOREST
 
@@ -763,7 +769,7 @@ reasonable time.
 
 #### [num_trees](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/random_forest/random_forest.proto)
 
--   **Type:** Integer **Default:** 300 **Possible values:** min:1
+-   **Type:** Integer **Default:** 300 **Possible values:** min:0
 
 -   Number of individual decision trees. Increasing the number of trees can
     increase the quality of the model at the expense of size, training speed,
@@ -1217,7 +1223,7 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 #### [num_trees](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
--   **Type:** Integer **Default:** 300 **Possible values:** min:1
+-   **Type:** Integer **Default:** 300 **Possible values:** min:0
 
 -   Maximum number of decision trees. The effective number of trained tree can
     be smaller if early stopping is enabled.

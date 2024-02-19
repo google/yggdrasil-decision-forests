@@ -937,12 +937,15 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
     dart_dropout: Dropout rate applied when using the DART i.e. when
       forest_extraction=DART. Default: 0.01.
     early_stopping: Early stopping detects the overfitting of the model and
-      halts it training using the validation dataset controlled by
-      `validation_ratio`. - `NONE`: No early stopping. The model is trained
-      entirely. - `MIN_LOSS_FINAL`: No early stopping. However, the model is
-      then truncated to minimize the validation loss. - `LOSS_INCREASE`: Stop
-      the training when the validation does not decrease for
-      `early_stopping_num_trees_look_ahead` trees. Default: "LOSS_INCREASE".
+      halts it training using the validation dataset. If not provided directly,
+      the validation dataset is extracted from the training dataset (see
+      "validation_ratio" parameter): - `NONE`: No early stopping. All the
+      num_trees are trained and kept. - `MIN_LOSS_FINAL`: All the num_trees are
+      trained. The model is then truncated to minimize the validation loss i.e.
+      some of the trees are discarded as to minimum the validation loss. -
+      `LOSS_INCREASE`: Classical early stopping. Stop the training when the
+      validation does not decrease for `early_stopping_num_trees_look_ahead`
+      trees. Default: "LOSS_INCREASE".
     early_stopping_initial_iteration: 0-based index of the first iteration
       considered for early stopping computation. Increasing this value prevents
       too early stopping due to noisy initial iterations of the learner.
@@ -1154,8 +1157,14 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       "validation_interval_in_trees" trees. Increasing this value reduce the
       cost of validation and can impact the early stopping policy (as early
       stopping is only tested during the validation). Default: 1.
-    validation_ratio: Ratio of the training dataset used to monitor the
-      training. Require to be >0 if early stopping is enabled. Default: 0.1.
+    validation_ratio: Fraction of the training dataset used for validation if
+      not validation dataset is provided. The validation dataset, whether
+      provided directly or extracted from the training dataset, is used to
+      compute the validation loss, other validation metrics, and possibly
+      trigger early stopping (if enabled). When early stopping is disabled, the
+      validation dataset is only used for monitoring and does not influence the
+      model directly. If the "validation_ratio" is set to 0, early stopping is
+      disabled (i.e., it implies setting early_stopping=NONE). Default: 0.1.
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
