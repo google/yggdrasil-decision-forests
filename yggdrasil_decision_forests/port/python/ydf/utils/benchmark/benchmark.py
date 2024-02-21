@@ -12,72 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Simple Benchmark for PYDF and its sister projects.
-
-Usage example:
-sudo apt install linux-cpupower
-sudo cpupower frequency-set --governor performance
-bazel run -c opt <fastest possible flags> \
-//external/ydf_cc/yggdrasil_decision_forests/port/python/utils/benchmark:benchmark
-"""
+"""Simple training benchmark for YDF and TF-DF."""
 
 import functools
-import itertools
 import os
 import time
-from typing import List, NamedTuple, Union
+from typing import List, NamedTuple, Optional, Tuple, Union
 
-from absl import app
-from absl import flags
 import pandas as pd
 import tensorflow_decision_forests as tfdf
-
-from ydf.dataset import dataset
-from ydf.learner import generic_learner
-from ydf.learner import specialized_learners
-
-AVAILABLE_APPLICATIONS = ["tfdf", "pydf"]
-AVAILABLE_DATASETS = ["adult", "abalone", "iris", "dna"]
-AVAILABLE_ALGORITHMS = ["rf", "gbt", "cart"]
-AVAILABLE_CONFIGURATIONS = ["default", "oblique"]
-
-_DATASETS = flags.DEFINE_list(
-    "datasets",
-    AVAILABLE_DATASETS,
-    "Datasets to use for benchmarking. If not specified, all datasets are"
-    f" used. Possible values: {AVAILABLE_DATASETS}",
-)
-_APPLICATIONS = flags.DEFINE_list(
-    "applications",
-    AVAILABLE_APPLICATIONS,
-    "Applications to use, defaults to all available. Possible values:"
-    f" {AVAILABLE_APPLICATIONS}",
-)
-_ALGORITHMS = flags.DEFINE_list(
-    "algorithms",
-    ["rf", "gbt"],
-    "Algorithms to use, defaults to [rf, gbt]. Possible values:"
-    f" {AVAILABLE_ALGORITHMS}",
-)
-_CONFIGURATIONS = flags.DEFINE_list(
-    "configurations",
-    AVAILABLE_CONFIGURATIONS,
-    "Hyperparameter configurations to benchmark. Defaults to all available"
-    " configurations. Possible values:"
-    f" {AVAILABLE_CONFIGURATIONS}",
-)
-_NUM_REPETITIONS = flags.DEFINE_integer(
-    "num_repetitions",
-    5,
-    "Number of repetitions (outside warmup) to use.",
-    lower_bound=1,
-)
-_NUM_THREADS = flags.DEFINE_integer(
-    "num_threads",
-    16,
-    "Number of threads to use.",
-    lower_bound=1,
-)
+import ydf
 
 
 TEST_DATA_PATH = (
@@ -102,6 +46,7 @@ class BenchmarkResult(NamedTuple):
 
 
 class Runner:
+  """Wrapper for the benchmark runs."""
 
   def __init__(self):
     # Name and training time (in seconds) of each benchmarks.
@@ -114,6 +59,7 @@ class Runner:
       repetitions,
       warmup_repetitions=1,
   ):
+    """Runs a sequence of benchmarks."""
     print(f"Running {name}")
     # Warmup
     for _ in range(warmup_repetitions):
@@ -153,26 +99,31 @@ class Runner:
     print("=" * sep_length, flush=True)
 
 
-def get_pd_dataset(name: str):
-  """Load the given dataset to a dataframe, return it with task and label."""
+def get_pd_dataset(
+    name: str,
+) -> Tuple[pd.DataFrame, ydf.Task, str, Optional[str]]:
+  """Load the given dataset, returns dataset, task, label and ranking group."""
   csv_path = get_test_file(f"{name}.csv")
-  df = pd.read_csv(csv_path)
+  df: pd.DataFrame = pd.read_csv(csv_path)
   labels = {
       "adult": "income",
       "iris": "class",
       "abalone": "Rings",
       "dna": "LABEL",
+      "synthetic_ranking_train": "LABEL",
   }
   tasks = {
-      "adult": generic_learner.Task.CLASSIFICATION,
-      "iris": generic_learner.Task.CLASSIFICATION,
-      "abalone": generic_learner.Task.REGRESSION,
-      "dna": generic_learner.Task.CLASSIFICATION,
+      "adult": ydf.Task.CLASSIFICATION,
+      "iris": ydf.Task.CLASSIFICATION,
+      "abalone": ydf.Task.REGRESSION,
+      "synthetic_ranking_train": ydf.Task.RANKING,
+      "dna": ydf.Task.CLASSIFICATION,
   }
-  return df, labels[name], tasks[name]
+  ranking_group = "GROUP" if name == "synthetic_ranking_train" else None
+  return df, tasks[name], labels[name], ranking_group
 
 
-def build_learning_params(configuration: str):
+def build_learning_params(configuration: str, num_threads: int):
   """Returns a dictionary with the parameters for the learning algorithm."""
   hyperparameters = {}
   if configuration == "oblique":
@@ -181,37 +132,38 @@ def build_learning_params(configuration: str):
         "sparse_oblique_num_projections_exponent": 1.0,
         "sparse_oblique_normalization": "MIN_MAX",
     })
-  hyperparameters["num_threads"] = _NUM_THREADS.value
+  hyperparameters["num_threads"] = num_threads
   return hyperparameters
 
 
-def bench_train_pydf(
+def bench_train_ydf(
     df: pd.DataFrame,
     label: str,
-    task: generic_learner.Task,
-    hp_dict: dict,
+    task: ydf.Task,
+    hyperparameters: dict,
     algo: str,
 ):
+  """Trains a model with YDF."""
   algo_to_function = {
-      "rf": specialized_learners.RandomForestLearner,
+      "rf": ydf.RandomForestLearner,
       "gbt": functools.partial(
-          specialized_learners.GradientBoostedTreesLearner,
+          ydf.GradientBoostedTreesLearner,
           early_stopping="NONE",
       ),
-      "cart": specialized_learners.CartLearner,
+      "cart": ydf.CartLearner,
   }
-  ds = dataset.create_vertical_dataset(df)
   train_func = algo_to_function[algo]
-  train_func(label=label, task=task, **hp_dict).train(ds)
+  train_func(label=label, task=task, **hyperparameters).train(df)
 
 
 def bench_train_tfdf(
     df: pd.DataFrame,
     label: str,
-    task: generic_learner.Task,
-    hp_dict: dict,
+    task: ydf.Task,
+    hyperparameters: dict,
     algo: str,
 ):
+  """Trains a model with TF-DF."""
   algo_to_function = {
       "rf": tfdf.keras.RandomForestModel,
       "gbt": functools.partial(
@@ -219,9 +171,10 @@ def bench_train_tfdf(
       ),
       "cart": tfdf.keras.CartModel,
   }
-  ds = tfdf.keras.pd_dataframe_to_tf_dataset(df, label=label, task=task)
+  tfdf_task = tfdf.keras.Task.Value(task.value)
+  ds = tfdf.keras.pd_dataframe_to_tf_dataset(df, label=label, task=tfdf_task)
   train_func = algo_to_function[algo]
-  model = train_func(**hp_dict, task=task, verbose=0)
+  model = train_func(**hyperparameters, task=tfdf_task, verbose=0)
   model.fit(ds)
 
 
@@ -231,41 +184,22 @@ def bench_train(
     algo: str,
     application: str,
     runner: Runner,
-):
+    num_threads: int,
+    num_repetitions: int,
+) -> None:
   """Train a model and report timing to the runner."""
+  ydf.verbose(0)  # Don't print logs
   runner.add_separator()
-  df, label, task = get_pd_dataset(ds)
-  hp_dict = build_learning_params(configuration)
+  df, task, label, ranking_group = get_pd_dataset(ds)
+  hyperparameters = build_learning_params(configuration, num_threads)
+  hyperparameters["ranking_group"] = ranking_group
   bench = None
   if application == "tfdf":
-    bench = functools.partial(bench_train_tfdf, df, label, task, hp_dict, algo)
-  if application == "pydf":
-    bench = functools.partial(bench_train_pydf, df, label, task, hp_dict, algo)
+    bench = functools.partial(bench_train_tfdf, df, label, task, hyperparameters, algo)
+  if application == "ydf":
+    bench = functools.partial(bench_train_ydf, df, label, task, hyperparameters, algo)
   runner.benchmark(
       f"{application};{ds};{algo};{configuration}",
       bench,
-      repetitions=_NUM_REPETITIONS.value,
+      repetitions=num_repetitions,
   )
-
-
-def main(argv):
-  print("Running PYDF benchmark")
-  runner = Runner()
-
-  for application, config, ds, algo in itertools.product(
-      _APPLICATIONS.value,
-      _CONFIGURATIONS.value,
-      _DATASETS.value,
-      _ALGORITHMS.value,
-  ):
-    try:
-      bench_train(ds, config, algo, application, runner)
-    except NameError:
-      print(f"Application '{application}' not found.")
-
-  print("All results (again)")
-  runner.print_results()
-
-
-if __name__ == "__main__":
-  app.run(main)
