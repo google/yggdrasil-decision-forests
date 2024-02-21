@@ -49,6 +49,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/fold_generator.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
@@ -445,13 +446,15 @@ absl::Status AbstractLearner::CheckConfiguration(
       if (ranking_group_col_spec.type() ==
           dataset::proto::ColumnType::CATEGORICAL) {
         YDF_LOG(WARNING) << "The grouping column \"" << config.ranking_group()
-                         << "\" is of CATEGORICAL type. The STRING type is "
+                         << "\" is of CATEGORICAL type. The HASH type is "
                             "generally a better choice.";
         if (ranking_group_col_spec.categorical().min_value_count() != 1) {
-          return absl::InvalidArgumentError(
-              "The \"ranking_group\" column must have a \"min_value_count\" "
-              "of 1 in the dataspec guide. This ensures that rare groups are "
-              "not pruned.");
+          return absl::InvalidArgumentError(absl::Substitute(
+              "The \"ranking_group\" column \"$0\" cannot "
+              "have any pruned values (\"min_value_count\" "
+              "of 1). Set \"min_vocab_frequency=1\" to ensure this is the "
+              "case, or use column type HASH for the ranking group column.",
+              ranking_group_col_spec.name()));
         }
         if (ranking_group_col_spec.categorical()
                 .max_number_of_unique_values() != -1) {

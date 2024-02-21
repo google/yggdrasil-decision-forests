@@ -14,6 +14,7 @@
 
 """Tests for model learning."""
 
+import dataclasses
 import os
 import signal
 from typing import Optional, Sequence, Tuple
@@ -44,6 +45,18 @@ from ydf.utils import test_utils
 
 ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
 Column = dataspec.Column
+
+
+@dataclasses.dataclass(frozen=True)
+class TrainAndTestDataset:
+  """Training / test dataset as path, VerticalDataset and DataFrame."""
+
+  train_path: str
+  test_path: str
+  train_pd: pd.DataFrame
+  test_pd: pd.DataFrame
+  train: dataset.VerticalDataset
+  test: dataset.VerticalDataset
 
 
 def toy_dataset():
@@ -77,7 +90,7 @@ class LearnerTest(parameterized.TestCase):
 
     def load_datasets(
         name: str, column_args: Optional[Sequence[Column]] = None
-    ):
+    ) -> TrainAndTestDataset:
       train_path = os.path.join(self.dataset_directory, f"{name}_train.csv")
       test_path = os.path.join(self.dataset_directory, f"{name}_test.csv")
       train_pd = pd.read_csv(train_path)
@@ -88,26 +101,17 @@ class LearnerTest(parameterized.TestCase):
       test_vds = dataset.create_vertical_dataset(
           test_pd, data_spec=train_vds.data_spec()
       )
-      setattr(self, f"{name}_train_path", train_path)
-      setattr(self, f"{name}_test_path", train_path)
-      setattr(self, f"{name}_train_pd", train_pd)
-      setattr(self, f"{name}_test_pd", test_pd)
-      setattr(self, f"{name}_train", train_vds)
-      setattr(self, f"{name}_test", test_vds)
+      return TrainAndTestDataset(
+          train_path, test_path, train_pd, test_pd, train_vds, test_vds
+      )
 
-    load_datasets("adult")
-    load_datasets("two_center_regression")
-    load_datasets(
+    self.adult = load_datasets("adult")
+    self.two_center_regression = load_datasets("two_center_regression")
+    self.synthetic_ranking = load_datasets(
         "synthetic_ranking",
-        [
-            Column(
-                "GROUP",
-                semantic=dataspec.Semantic.CATEGORICAL,
-                min_vocab_frequency=1,
-            )
-        ],
+        [Column("GROUP", semantic=dataspec.Semantic.HASH)],
     )
-    load_datasets(
+    self.sim_pte = load_datasets(
         "sim_pte",
         [
             Column("y", semantic=dataspec.Semantic.CATEGORICAL),
@@ -140,31 +144,29 @@ class LearnerTest(parameterized.TestCase):
       The model, its evaluation and the predictions on the test dataset.
     """
     # Train the model.
-    model = learner.train(self.adult_train)
+    model = learner.train(self.adult.train)
     logging.info("Trained model: %s", model)
 
     # Evaluate the trained model.
-    evaluation = model.evaluate(self.adult_test)
+    evaluation = model.evaluate(self.adult.test)
     logging.info("Evaluation: %s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, minimum_accuracy)
 
-    predictions = model.predict(self.adult_test)
+    predictions = model.predict(self.adult.test)
     logging.info("Predictions: %s", predictions)
 
     return model, evaluation, predictions
-
-  _HAS_DYNAMIC_ATTRIBUTES = True
 
 
 class RandomForestLearnerTest(LearnerTest):
 
   def test_adult_classification(self):
     learner = specialized_learners.RandomForestLearner(label="income")
-    model = learner.train(self.adult_train)
+    model = learner.train(self.adult.train)
     logging.info("Trained model: %s", model)
 
     # Evaluate the trained model.
-    evaluation = model.evaluate(self.adult_test)
+    evaluation = model.evaluate(self.adult.test)
     logging.info("Evaluation: %s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, 0.864)
 
@@ -172,11 +174,11 @@ class RandomForestLearnerTest(LearnerTest):
     learner = specialized_learners.RandomForestLearner(
         label="target", task=generic_learner.Task.REGRESSION
     )
-    model = learner.train(self.two_center_regression_train)
+    model = learner.train(self.two_center_regression.train)
     logging.info("Trained model: %s", model)
 
     # Evaluate the trained model.
-    evaluation = model.evaluate(self.two_center_regression_test)
+    evaluation = model.evaluate(self.two_center_regression.test)
     logging.info("Evaluation: %s", evaluation)
     self.assertAlmostEqual(evaluation.rmse, 114.54, places=0)
 
@@ -186,11 +188,11 @@ class RandomForestLearnerTest(LearnerTest):
         uplift_treatment="treat",
         task=generic_learner.Task.CATEGORICAL_UPLIFT,
     )
-    model = learner.train(self.sim_pte_train)
+    model = learner.train(self.sim_pte.train)
     logging.info("Trained model: %s", model)
 
     # Evaluate the trained model.
-    evaluation = model.evaluate(self.sim_pte_test)
+    evaluation = model.evaluate(self.sim_pte.test)
     logging.info("Evaluation: %s", evaluation)
     self.assertAlmostEqual(evaluation.qini, 0.105709, places=2)
 
@@ -198,12 +200,12 @@ class RandomForestLearnerTest(LearnerTest):
     learner = specialized_learners.RandomForestLearner(
         label="income", num_trees=50
     )
-    model_pd = learner.train(self.adult_train_pd)
-    model_vds = learner.train(self.adult_train)
+    model_pd = learner.train(self.adult.train_pd)
+    model_vds = learner.train(self.adult.train)
 
-    predictions_pd_from_vds = model_vds.predict(self.adult_test_pd)
-    predictions_pd_from_pd = model_pd.predict(self.adult_test_pd)
-    predictions_vds_from_vds = model_vds.predict(self.adult_test)
+    predictions_pd_from_vds = model_vds.predict(self.adult.test_pd)
+    predictions_pd_from_pd = model_pd.predict(self.adult.test_pd)
+    predictions_vds_from_vds = model_vds.predict(self.adult.test)
 
     npt.assert_equal(predictions_pd_from_vds, predictions_vds_from_vds)
     npt.assert_equal(predictions_pd_from_pd, predictions_vds_from_vds)
@@ -212,17 +214,17 @@ class RandomForestLearnerTest(LearnerTest):
     learner = specialized_learners.RandomForestLearner(
         label="target", task=generic_learner.Task.REGRESSION, num_trees=50
     )
-    model_pd = learner.train(self.two_center_regression_train_pd)
-    model_vds = learner.train(self.two_center_regression_train)
+    model_pd = learner.train(self.two_center_regression.train_pd)
+    model_vds = learner.train(self.two_center_regression.train)
 
     predictions_pd_from_vds = model_vds.predict(
-        self.two_center_regression_test_pd
+        self.two_center_regression.test_pd
     )
     predictions_pd_from_pd = model_pd.predict(
-        self.two_center_regression_test_pd
+        self.two_center_regression.test_pd
     )
     predictions_vds_from_vds = model_vds.predict(
-        self.two_center_regression_test
+        self.two_center_regression.test
     )
 
     npt.assert_equal(predictions_pd_from_vds, predictions_vds_from_vds)
@@ -253,8 +255,8 @@ class RandomForestLearnerTest(LearnerTest):
         winner_take_all=False,
         data_spec=data_spec,
     )
-    model = learner.train(self.adult_train_pd)
-    predictions = model.predict(self.adult_test_pd)
+    model = learner.train(self.adult.train_pd)
+    predictions = model.predict(self.adult.test_pd)
     expected_predictions = predictions_df[">50K"].to_numpy()
     # This is not particularly exact, but enough for a confidence check.
     np.testing.assert_almost_equal(predictions, expected_predictions, decimal=1)
@@ -352,20 +354,20 @@ class RandomForestLearnerTest(LearnerTest):
 
     signal.alarm(3)  # Stop the training in 3 seconds
     with self.assertRaises(ValueError):
-      _ = learner.train(self.adult_train)
+      _ = learner.train(self.adult.train)
 
   def test_cross_validation(self):
     learner = specialized_learners.RandomForestLearner(
         label="income", num_trees=10
     )
     evaluation = learner.cross_validation(
-        self.adult_train, folds=10, parallel_evaluations=2
+        self.adult.train, folds=10, parallel_evaluations=2
     )
     logging.info("evaluation:\n%s", evaluation)
     self.assertAlmostEqual(evaluation.accuracy, 0.87, 1)
     # All the examples are used in the evaluation
     self.assertEqual(
-        evaluation.num_examples, self.adult_train.data_spec().created_num_rows
+        evaluation.num_examples, self.adult.train.data_spec().created_num_rows
     )
 
     with open(self.create_tempfile(), "w") as f:
@@ -430,7 +432,7 @@ class RandomForestLearnerTest(LearnerTest):
     ):
       _ = specialized_learners.RandomForestLearner(
           label="income", num_trees=5
-      ).train(self.adult_train, valid=self.adult_test)
+      ).train(self.adult.train, valid=self.adult.test)
 
   def test_train_with_path_validation_dataset(self):
     with self.assertRaisesRegex(
@@ -439,20 +441,20 @@ class RandomForestLearnerTest(LearnerTest):
     ):
       _ = specialized_learners.RandomForestLearner(
           label="income", num_trees=5
-      ).train(self.adult_train_path, valid=self.adult_test_path)
+      ).train(self.adult.train_path, valid=self.adult.test_path)
 
   def test_compare_pandas_and_path(self):
     learner = specialized_learners.RandomForestLearner(
         label="income", num_trees=50
     )
-    model_from_pd = learner.train(self.adult_train)
-    predictions_from_pd = model_from_pd.predict(self.adult_test)
+    model_from_pd = learner.train(self.adult.train)
+    predictions_from_pd = model_from_pd.predict(self.adult.test)
 
     learner_from_path = specialized_learners.RandomForestLearner(
         label="income", data_spec=model_from_pd.data_spec(), num_trees=50
     )
-    model_from_path = learner_from_path.train(self.adult_train_path)
-    predictions_from_path = model_from_path.predict(self.adult_test)
+    model_from_path = learner_from_path.train(self.adult.train_path)
+    predictions_from_path = model_from_path.predict(self.adult.test)
 
     npt.assert_equal(predictions_from_pd, predictions_from_path)
 
@@ -535,8 +537,8 @@ class RandomForestLearnerTest(LearnerTest):
         label=label, num_trees=10
     )
     # The age column is automatically interpreted as categorical
-    model_from_pd = learner.train(self.adult_train_pd)
-    evaluation = model_from_pd.evaluate(self.adult_test_pd)
+    model_from_pd = learner.train(self.adult.train_pd)
+    evaluation = model_from_pd.evaluate(self.adult.test_pd)
     self.assertGreaterEqual(evaluation.accuracy, 0.05)
 
   def test_model_metadata_contains_framework(self):
@@ -565,8 +567,8 @@ class CARTLearnerTest(LearnerTest):
     learner = specialized_learners.CartLearner(
         label="target", task=generic_learner.Task.REGRESSION
     )
-    model = learner.train(self.two_center_regression_train)
-    evaluation = model.evaluate(self.two_center_regression_test)
+    model = learner.train(self.two_center_regression.train)
+    evaluation = model.evaluate(self.two_center_regression.test)
     self.assertAlmostEqual(evaluation.rmse, 114.081, places=3)
 
   def test_monotonic_non_compatible_learner(self):
@@ -588,17 +590,18 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
 
     self._check_adult_model(learner=learner, minimum_accuracy=0.869)
 
-  @absltest.skip("Broken")  # TODO: b/325574064 - Fails due to column spec
   def test_ranking(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
         label="LABEL",
         ranking_group="GROUP",
         task=generic_learner.Task.RANKING,
     )
+    print(self.synthetic_ranking.train.data_spec())
 
-    model = learner.train(self.synthetic_ranking_train)
-    evaluation = model.evaluate(self.synthetic_ranking_test)
-    self.assertAlmostEqual(evaluation.ndcg, 0.71, places=1)
+    model = learner.train(self.synthetic_ranking.train)
+    evaluation = model.evaluate(self.synthetic_ranking.test)
+    self.assertGreaterEqual(evaluation.ndcg, 0.70)
+    self.assertLessEqual(evaluation.ndcg, 0.74)
 
   def test_ranking_pd(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
@@ -607,11 +610,11 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         task=generic_learner.Task.RANKING,
     )
 
-    model = learner.train(self.synthetic_ranking_train_pd)
-    evaluation = model.evaluate(self.synthetic_ranking_test_pd)
-    self.assertAlmostEqual(evaluation.ndcg, 0.71, places=1)
+    model = learner.train(self.synthetic_ranking.train_pd)
+    evaluation = model.evaluate(self.synthetic_ranking.test_pd)
+    self.assertGreaterEqual(evaluation.ndcg, 0.70)
+    self.assertLessEqual(evaluation.ndcg, 0.74)
 
-  @absltest.skip("Broken")  # TODO: b/325574064 - NDCG higher than expected
   def test_ranking_path(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
         label="LABEL",
@@ -619,9 +622,10 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         task=generic_learner.Task.RANKING,
     )
 
-    model = learner.train(self.synthetic_ranking_train_path)
-    evaluation = model.evaluate(self.synthetic_ranking_test_path)
-    self.assertAlmostEqual(evaluation.ndcg, 0.71, places=1)
+    model = learner.train(self.synthetic_ranking.train_path)
+    evaluation = model.evaluate(self.synthetic_ranking.test_path)
+    self.assertGreaterEqual(evaluation.ndcg, 0.70)
+    self.assertLessEqual(evaluation.ndcg, 0.74)
 
   def test_adult_num_threads(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
@@ -694,15 +698,15 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
 
     model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.863)
 
-    _ = model.analyze(self.adult_test)
+    _ = model.analyze(self.adult.test)
 
   def test_with_validation_pd(self):
     evaluation = (
         specialized_learners.GradientBoostedTreesLearner(
             label="income", num_trees=50
         )
-        .train(self.adult_train, valid=self.adult_test)
-        .evaluate(self.adult_test)
+        .train(self.adult.train, valid=self.adult.test)
+        .evaluate(self.adult.test)
     )
 
     logging.info("evaluation:\n%s", evaluation)
@@ -713,8 +717,8 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         specialized_learners.GradientBoostedTreesLearner(
             label="income", num_trees=50
         )
-        .train(self.adult_train_path, valid=self.adult_test_path)
-        .evaluate(self.adult_test_path)
+        .train(self.adult.train_path, valid=self.adult.test_path)
+        .evaluate(self.adult.test_path)
     )
 
     logging.info("evaluation:\n%s", evaluation)
@@ -728,7 +732,7 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     ):
       specialized_learners.GradientBoostedTreesLearner(
           label="income", num_trees=50
-      ).train(self.adult_train_path, valid=self.adult_test)
+      ).train(self.adult.train_path, valid=self.adult.test)
 
   def test_failure_train_pd_validation_path(self):
     with self.assertRaisesRegex(
@@ -738,7 +742,7 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     ):
       specialized_learners.GradientBoostedTreesLearner(
           label="income", num_trees=50
-      ).train(self.adult_train, valid=self.adult_test_path)
+      ).train(self.adult.train, valid=self.adult.test_path)
 
   def test_resume_training(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
@@ -747,11 +751,11 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         resume_training=True,
         working_dir=self.create_tempdir().full_path,
     )
-    model_1 = learner.train(self.adult_train)
+    model_1 = learner.train(self.adult.train)
     assert isinstance(model_1, decision_forest_model.DecisionForestModel)
     self.assertEqual(model_1.num_trees(), 10)
     learner.hyperparameters["num_trees"] = 50
-    model_2 = learner.train(self.adult_train)
+    model_2 = learner.train(self.adult.train)
     assert isinstance(model_2, decision_forest_model.DecisionForestModel)
     self.assertEqual(model_2.num_trees(), 50)
 
@@ -963,7 +967,7 @@ class CustomLossTest(LearnerTest):
         validation_ratio=0.0,
     )
     model_custom_loss: generic_model.GenericModel = learner_custom_loss.train(
-        self.two_center_regression_train
+        self.two_center_regression.train
     )
 
     learner_builtin_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -974,11 +978,11 @@ class CustomLossTest(LearnerTest):
         validation_ratio=0.0,
     )
     model_builtin_loss: generic_model.GenericModel = learner_builtin_loss.train(
-        self.two_center_regression_train
+        self.two_center_regression.train
     )
     npt.assert_allclose(
-        model_custom_loss.predict(self.two_center_regression_test),
-        model_builtin_loss.predict(self.two_center_regression_test),
+        model_custom_loss.predict(self.two_center_regression.test),
+        model_builtin_loss.predict(self.two_center_regression.test),
         rtol=1e-5,  # Without activation function, the predictions can be large.
         atol=1e-6,
     )
@@ -1044,7 +1048,7 @@ class CustomLossTest(LearnerTest):
         num_trees=30,
     )
     model_custom_loss: generic_model.GenericModel = learner_custom_loss.train(
-        self.adult_train
+        self.adult.train
     )
 
     learner_builtin_loss = specialized_learners.GradientBoostedTreesLearner(
@@ -1059,11 +1063,11 @@ class CustomLossTest(LearnerTest):
         num_trees=30,
     )
     model_builtin_loss: generic_model.GenericModel = learner_builtin_loss.train(
-        self.adult_train
+        self.adult.train
     )
     npt.assert_allclose(
-        model_custom_loss.predict(self.adult_test),
-        model_builtin_loss.predict(self.adult_test),
+        model_custom_loss.predict(self.adult.test),
+        model_builtin_loss.predict(self.adult.test),
         rtol=1e-5,  # Without activation function, the predictions can be large.
         atol=1e-6,
     )
