@@ -33,6 +33,7 @@ cc_library_ydf(
     srcs = ["example_set.cc"],
     hdrs = ["example_set.h"],
     deps = [
+        "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/utils:compatibility",

@@ -194,11 +194,31 @@ class RandomForestLearnerTest(LearnerTest):
         task=generic_learner.Task.CATEGORICAL_UPLIFT,
     )
     model = learner.train(self.sim_pte.train)
-    logging.info("Trained model: %s", model)
 
-    # Evaluate the trained model.
     evaluation = model.evaluate(self.sim_pte.test)
-    logging.info("Evaluation: %s", evaluation)
+    self.assertAlmostEqual(evaluation.qini, 0.105709, places=2)
+
+  def test_sim_pte_uplift_pd(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="y",
+        uplift_treatment="treat",
+        task=generic_learner.Task.CATEGORICAL_UPLIFT,
+    )
+    model = learner.train(self.sim_pte.train_pd)
+
+    evaluation = model.evaluate(self.sim_pte.test_pd)
+    self.assertAlmostEqual(evaluation.qini, 0.105709, places=2)
+
+  def test_sim_pte_uplift_path(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="y",
+        uplift_treatment="treat",
+        task=generic_learner.Task.CATEGORICAL_UPLIFT,
+        num_threads=1,
+        max_depth=2,
+    )
+    model = learner.train(self.sim_pte.train_path)
+    evaluation = model.evaluate(self.sim_pte.test_path)
     self.assertAlmostEqual(evaluation.qini, 0.105709, places=2)
 
   def test_adult_classification_pd_and_vds_match(self):
@@ -601,7 +621,6 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         ranking_group="GROUP",
         task=generic_learner.Task.RANKING,
     )
-    print(self.synthetic_ranking.train.data_spec())
 
     model = learner.train(self.synthetic_ranking.train)
     evaluation = model.evaluate(self.synthetic_ranking.test)

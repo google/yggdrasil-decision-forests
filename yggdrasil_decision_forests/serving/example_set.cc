@@ -15,10 +15,19 @@
 
 #include "yggdrasil_decision_forests/serving/example_set.h"
 
+#include <algorithm>
 #include <limits>
+#include <ostream>
+#include <string>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -381,6 +390,12 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
   };
 
   for (const auto& feature : features.input_features()) {
+    if (feature.spec_idx < 0 || feature.spec_idx >= dataset.ncol()) {
+      return absl::InvalidArgumentError(
+          absl::Substitute("Invalid feature index $0. Feature indices should"
+                           "be between 0 and $1",
+                           feature.spec_idx, dataset.ncol()));
+    }
     if (num_examples > 0 && dataset.column(feature.spec_idx)->nrows() == 0) {
       return absl::InvalidArgumentError(absl::StrCat(
           "Feature \"", feature.name, "\" is empty. Cannot extract it."));
