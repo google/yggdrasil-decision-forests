@@ -1,11 +1,30 @@
 # Changelog
 
-## HEAD
+## 0.2.0 - 2024-02-22
 
-### Bug
+### Features
+
+-   Add support for custom losses for GBTs (Classification & Regression).
+
+### Fixes
 
 -   In the tuner, run `parallel_trials` trials in parallel, instead of
     `num_threads` trials in parallel.
+-   Force validation dataset as path if training dataset is a path.
+-   Fix benchmark.
+-   Clarify error when using an incompatible dataset when ranking.
+-   Improve test coverage.
+-   Fix an issue with the conditions when building trees manually.
+
+### Documentation
+
+-   Add a migration guide TF-DF ==> YDF.
+-   Clarify max_depth parameter documentation.
+-   Clarify early stopping documentation.
+
+#### Release music
+
+Galop infernal d'Orphée aux Enfers. Jacques Offenbach
 
 ## 0.1.0 - 2024-01-25
 
