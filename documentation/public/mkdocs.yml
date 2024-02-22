@@ -47,6 +47,7 @@ nav:
     - What are decision forests?: https://developers.google.com/machine-learning/decision-forests
     - Improve model quality: guide_how_to_improve_model.md
     - Improve training speed: guide_how_to_improve_learner.md
+    - Migrating from TF-DF: tutorial/migrating_to_ydf.ipynb
   - Task:
     - Classification: tutorial/classification.ipynb
     - Regression: tutorial/regression.ipynb

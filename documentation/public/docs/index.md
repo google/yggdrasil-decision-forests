@@ -95,7 +95,8 @@ model.save("/tmp/my_model")
 Check the [Getting Started tutorial 🧭](tutorial/getting_started.ipynb). Then,
 explore the other tutorials on the left depending on your interests. For
 example, if you are going to rank things, check the
-[ranking](tutorial/ranking.ipynb) tutorial.
+[ranking](tutorial/ranking.ipynb) tutorial. Users coming from TensorFlow
+Forests should check out the [migration guide](tutorial/migrating_to_ydf.ipynb).
 
 ## License
 
