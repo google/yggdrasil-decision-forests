@@ -185,6 +185,7 @@ py_test(
     name = "tf_model_test",
     srcs = ["tf_model_test.py"],
     data = [
+        # tensorflow_decision_forests dep,  # buildcleaner: keep
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],

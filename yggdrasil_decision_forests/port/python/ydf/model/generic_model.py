@@ -649,9 +649,10 @@ Use `model.describe()` for more details
       import tensorflow_decision_forests as tfdf  # type:ignore
     except ImportError as exc:
       raise ValueError(
-          "Exporting to tensorflow requires the tensorflow_decision_forests"
-          " package to be installed. When using pip, run `pip install"
-          " tensorflow_decision_forests`"
+          'Exporting to tensorflow requires the "tensorflow_decision_forests"'
+          " package to be installed. If using pip, run `pip install"
+          " tensorflow_decision_forests`. If using Bazel/Blaze, add a"
+          " dependency."
       ) from exc
     # Do not pass input_model_signature_fn if it is None.
     not_none_params = {}
