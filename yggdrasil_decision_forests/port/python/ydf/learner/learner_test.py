@@ -38,6 +38,7 @@ from ydf.learner import specialized_learners
 from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
 from ydf.model import generic_model
+from ydf.model import model_lib
 from ydf.model.decision_forest_model import decision_forest_model
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from ydf.utils import log
@@ -123,6 +124,7 @@ class LearnerTest(parameterized.TestCase):
       self,
       learner: generic_learner.GenericLearner,
       minimum_accuracy: float,
+      check_serialization: bool = True,
   ) -> Tuple[generic_model.GenericModel, metric.Evaluation, np.ndarray]:
     """Runs a battery of test on a model compatible with the adult dataset.
 
@@ -130,30 +132,33 @@ class LearnerTest(parameterized.TestCase):
       - Train the model.
       - Run and evaluate the model.
       - Serialize the model to a YDF model.
-      - Run the model is a separate binary (without dependencies to the training
-        custom OPs).
-      - Move the serialized model to another random location.
       - Load the serialized model.
-      - Evaluate and run the loaded model.
+      - Make sure predictions of original model and serialized model match.
 
     Args:
       learner: A learner for on the adult dataset.
       minimum_accuracy: minimum accuracy.
+      check_serialization: If true, check the serialization of the model.
 
     Returns:
       The model, its evaluation and the predictions on the test dataset.
     """
     # Train the model.
     model = learner.train(self.adult.train)
-    logging.info("Trained model: %s", model)
 
     # Evaluate the trained model.
     evaluation = model.evaluate(self.adult.test)
-    logging.info("Evaluation: %s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, minimum_accuracy)
 
     predictions = model.predict(self.adult.test)
-    logging.info("Predictions: %s", predictions)
+
+    if check_serialization:
+      ydf_model_path = os.path.join(
+          self.create_tempdir().full_path, "ydf_model"
+      )
+      model.save(ydf_model_path)
+      loaded_model = model_lib.load_model(ydf_model_path)
+      npt.assert_equal(predictions, loaded_model.predict(self.adult.test))
 
     return model, evaluation, predictions
 

@@ -240,6 +240,7 @@ py_test(
         "//ydf/dataset:dataspec",
         "//ydf/metric",
         "//ydf/model:generic_model",
+        "//ydf/model:model_lib",
         "//ydf/model/decision_forest_model",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/utils:log",
