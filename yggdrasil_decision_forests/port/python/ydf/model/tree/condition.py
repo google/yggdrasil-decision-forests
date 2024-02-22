@@ -373,9 +373,9 @@ def _to_proto_condition_is_in(
   proto_condition = decision_tree_pb2.NodeCondition(
       na_value=condition.missing,
       split_score=condition.score,
+      attribute=condition.attribute,
   )
   feature_column = dataspec.columns[proto_condition.attribute]
-  proto_condition.attribute = condition.attribute
   # Select the most efficient way to represent the mask.
   #
   # A list of indices takes 32bits per active item. A bitmap takes 1 bit per
