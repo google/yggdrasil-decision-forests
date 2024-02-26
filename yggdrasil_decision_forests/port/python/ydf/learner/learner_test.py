@@ -22,6 +22,8 @@ from typing import Optional, Sequence, Tuple
 from absl import logging
 from absl.testing import absltest
 from absl.testing import parameterized
+import jax
+import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
 import numpy.typing as npty
@@ -870,11 +872,12 @@ class CustomLossTest(LearnerTest):
       ),
   )
   def test_loss_raises_exception(self, loss_type, task, label_col):
-    def faulty_inital_prediction(*args):
+
+    def faulty_initial_prediction(*args):
       raise NotImplementedError("Faulty initial prediction")
 
     faulty_custom_loss = loss_type(
-        initial_predictions=faulty_inital_prediction,
+        initial_predictions=faulty_initial_prediction,
         gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
         loss=lambda x, y, z: np.float32(0),
         activation=custom_loss.Activation.IDENTITY,
@@ -893,7 +896,7 @@ class CustomLossTest(LearnerTest):
   def test_avoid_memory_corruption(self):
     ref_to_labels = None
 
-    def faulty_inital_prediction(
+    def faulty_initial_prediction(
         labels: npty.NDArray[np.float32], _: npty.NDArray[np.float32]
     ) -> np.float32:
       nonlocal ref_to_labels
@@ -901,7 +904,7 @@ class CustomLossTest(LearnerTest):
       return np.float32(0)
 
     faulty_custom_loss = custom_loss.RegressionLoss(
-        initial_predictions=faulty_inital_prediction,
+        initial_predictions=faulty_initial_prediction,
         gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
         loss=lambda x, y, z: np.float32(0),
         activation=custom_loss.Activation.IDENTITY,
@@ -917,6 +920,28 @@ class CustomLossTest(LearnerTest):
         'Cannot hold a reference to "labels" outside of a custom loss'
         " function.*",
     ):
+      _ = learner_custom_loss.train(ds)
+
+  def test_readonly_args(self):
+    def faulty_initial_prediction(
+        labels: npty.NDArray[np.float32], _: npty.NDArray[np.float32]
+    ) -> np.float32:
+      labels[0] = 5
+      return np.float32(0)
+
+    faulty_custom_loss = custom_loss.RegressionLoss(
+        initial_predictions=faulty_initial_prediction,
+        gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
+        loss=lambda x, y, z: np.float32(0),
+        activation=custom_loss.Activation.IDENTITY,
+    )
+    ds = toy_dataset()
+    learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
+        label="col_float",
+        loss=faulty_custom_loss,
+        task=generic_learner.Task.REGRESSION,
+    )
+    with self.assertRaisesRegex(RuntimeError, ".*read-only.*"):
       _ = learner_custom_loss.train(ds)
 
   @parameterized.parameters(
@@ -956,7 +981,8 @@ class CustomLossTest(LearnerTest):
       _ = learner_custom_loss.train(ds)
 
   def test_mse_custom_equal_to_builtin(self):
-    def mse_inital_predictions(
+
+    def mse_initial_predictions(
         labels: npty.NDArray[np.float32], weights: npty.NDArray[np.float32]
     ) -> np.float32:
       return np.average(labels, weights=weights)
@@ -976,7 +1002,7 @@ class CustomLossTest(LearnerTest):
       return np.sqrt(numerator / denominator)
 
     mse_custom_loss = custom_loss.RegressionLoss(
-        initial_predictions=mse_inital_predictions,
+        initial_predictions=mse_initial_predictions,
         gradient_and_hessian=mse_gradient,
         loss=mse_loss,
         activation=custom_loss.Activation.IDENTITY,
@@ -1016,7 +1042,8 @@ class CustomLossTest(LearnerTest):
       custom_loss.Activation.SIGMOID,
   )
   def test_binomial_custom_equal_to_builtin(self, activation):
-    def binomial_inital_predictions(
+
+    def binomial_initial_predictions(
         labels: npty.NDArray[np.int32], weights: npty.NDArray[np.float32]
     ) -> np.float32:
       sum_weights = np.sum(weights)
@@ -1057,7 +1084,7 @@ class CustomLossTest(LearnerTest):
       )
 
     binomial_custom_loss = custom_loss.BinaryClassificationLoss(
-        initial_predictions=binomial_inital_predictions,
+        initial_predictions=binomial_initial_predictions,
         gradient_and_hessian=binomial_gradient,
         loss=binomial_loss,
         activation=activation,
@@ -1101,7 +1128,8 @@ class CustomLossTest(LearnerTest):
       custom_loss.Activation.SOFTMAX,
   )
   def test_multinomial_custom_equal_to_builtin(self, activation):
-    def multinomial_inital_predictions(
+
+    def multinomial_initial_predictions(
         labels: npty.NDArray[np.int32], _: npty.NDArray[np.float32]
     ) -> npty.NDArray[np.float32]:
       dimension = np.max(labels)
@@ -1147,7 +1175,7 @@ class CustomLossTest(LearnerTest):
     test_ds = all_ds.iloc[split_idx:]
 
     multinomial_custom_loss = custom_loss.MultiClassificationLoss(
-        initial_predictions=multinomial_inital_predictions,
+        initial_predictions=multinomial_initial_predictions,
         gradient_and_hessian=multinomial_gradient,
         loss=multinomial_loss,
         activation=activation,
@@ -1186,14 +1214,15 @@ class CustomLossTest(LearnerTest):
     )
 
   def test_multiclass_initial_prediction(self):
-    def multiclass_inital_prediction(
+
+    def multiclass_initial_prediction(
         labels: npty.NDArray[np.int32], _: npty.NDArray[np.float32]
     ) -> npty.NDArray[np.float32]:
       dimension = np.max(labels)
       return np.arange(1, dimension + 1)
 
     multiclass_custom_loss = custom_loss.MultiClassificationLoss(
-        initial_predictions=multiclass_inital_prediction,
+        initial_predictions=multiclass_initial_prediction,
         gradient_and_hessian=lambda x, y: (
             np.ones([3, len(x)]),
             np.ones([3, len(x)]),
@@ -1214,14 +1243,15 @@ class CustomLossTest(LearnerTest):
     npt.assert_equal(model.initial_predictions(), [1, 2, 3])
 
   def test_multiclass_wrong_initial_prediction_dimensions(self):
-    def multiclass_inital_prediction(
+
+    def multiclass_initial_prediction(
         labels: npty.NDArray[np.int32], _: npty.NDArray[np.float32]
     ) -> npty.NDArray[np.float32]:
       dimension = np.max(labels)
       return np.arange(1, dimension)
 
     multiclass_custom_loss = custom_loss.MultiClassificationLoss(
-        initial_predictions=multiclass_inital_prediction,
+        initial_predictions=multiclass_initial_prediction,
         gradient_and_hessian=lambda x, y: (
             np.ones([3, len(x)]),
             np.ones([3, len(x)]),
@@ -1345,6 +1375,128 @@ class CustomLossTest(LearnerTest):
         " Sequence of two numpy arrays.*",
     ):
       _ = learner_custom_loss.train(ds)
+
+  def test_loss_with_jax_nojit(self):
+    def mse_loss(labels, predictions):
+      numerator = jnp.sum(jnp.square(jnp.subtract(labels, predictions)))
+      denominator = jnp.size(labels)
+      res = jax.block_until_ready(jnp.divide(numerator, denominator))
+      return res
+
+    def weighted_mse_loss(labels, predictions, _):
+      return mse_loss(labels, predictions)
+
+    mse_grad = jax.grad(mse_loss, argnums=1)
+    mse_hessian = jax.jacfwd(jax.jacrev(mse_loss), argnums=1)
+
+    def mse_gradient_and_hessian(labels, predictions):
+      res = (
+          -mse_grad(labels, predictions).block_until_ready(),
+          -jnp.diagonal(mse_hessian(labels, predictions)).block_until_ready(),
+      )
+      return res
+
+    def mse_initial_predictions(labels, weights):
+      res = jax.block_until_ready(jnp.average(labels, weights=weights))
+      return res
+
+    mse_custom_loss = custom_loss.RegressionLoss(
+        initial_predictions=mse_initial_predictions,
+        gradient_and_hessian=mse_gradient_and_hessian,
+        loss=weighted_mse_loss,
+        activation=custom_loss.Activation.IDENTITY,
+    )
+
+    learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
+        label="target",
+        loss=mse_custom_loss,
+        task=generic_learner.Task.REGRESSION,
+        num_trees=30,
+        early_stopping="NONE",
+        validation_ratio=0.0,
+    )
+    model_custom_loss: generic_model.GenericModel = learner_custom_loss.train(
+        self.two_center_regression.train
+    )
+
+    learner_builtin_loss = specialized_learners.GradientBoostedTreesLearner(
+        label="target",
+        task=generic_learner.Task.REGRESSION,
+        num_trees=30,
+        early_stopping="NONE",
+        validation_ratio=0.0,
+    )
+    model_builtin_loss: generic_model.GenericModel = learner_builtin_loss.train(
+        self.two_center_regression.train
+    )
+    npt.assert_allclose(
+        model_custom_loss.predict(self.two_center_regression.test),
+        model_builtin_loss.predict(self.two_center_regression.test),
+        rtol=1e-5,  # Without activation function, the predictions can be large.
+        atol=1e-6,
+    )
+
+  def test_loss_with_jax_jit(self):
+    @jax.jit
+    def mse_loss(labels, predictions):
+      numerator = jnp.sum(jnp.square(jnp.subtract(labels, predictions)))
+      denominator = jnp.size(labels)
+      res = jax.block_until_ready(jnp.divide(numerator, denominator))
+      return res
+
+    @jax.jit
+    def weighted_mse_loss(labels, predictions, _):
+      return mse_loss(labels, predictions)
+
+    mse_grad = jax.jit(jax.grad(mse_loss, argnums=1))
+    mse_hessian = jax.jit(jax.jacfwd(jax.jacrev(mse_loss), argnums=1))
+
+    def mse_gradient_and_hessian(labels, predictions):
+      return (
+          -mse_grad(labels, predictions).block_until_ready(),
+          -jnp.diagonal(mse_hessian(labels, predictions)).block_until_ready(),
+      )
+
+    @jax.jit
+    def mse_initial_predictions(labels, weights):
+      res = jax.block_until_ready(jnp.average(labels, weights=weights))
+      return res
+
+    mse_custom_loss = custom_loss.RegressionLoss(
+        initial_predictions=mse_initial_predictions,
+        gradient_and_hessian=mse_gradient_and_hessian,
+        loss=weighted_mse_loss,
+        activation=custom_loss.Activation.IDENTITY,
+    )
+
+    learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
+        label="target",
+        loss=mse_custom_loss,
+        task=generic_learner.Task.REGRESSION,
+        num_trees=30,
+        early_stopping="NONE",
+        validation_ratio=0.0,
+    )
+    model_custom_loss: generic_model.GenericModel = learner_custom_loss.train(
+        self.two_center_regression.train
+    )
+
+    learner_builtin_loss = specialized_learners.GradientBoostedTreesLearner(
+        label="target",
+        task=generic_learner.Task.REGRESSION,
+        num_trees=30,
+        early_stopping="NONE",
+        validation_ratio=0.0,
+    )
+    model_builtin_loss: generic_model.GenericModel = learner_builtin_loss.train(
+        self.two_center_regression.train
+    )
+    npt.assert_allclose(
+        model_custom_loss.predict(self.two_center_regression.test),
+        model_builtin_loss.predict(self.two_center_regression.test),
+        rtol=1e-5,  # Without activation function, the predictions can be large.
+        atol=1e-6,
+    )
 
 
 if __name__ == "__main__":

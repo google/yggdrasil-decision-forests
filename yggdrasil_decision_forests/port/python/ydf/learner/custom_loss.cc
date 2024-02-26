@@ -21,7 +21,6 @@
 #include <cstdint>
 #include <exception>
 #include <string>
-#include <tuple>
 #include <variant>
 
 #include "absl/status/status.h"
@@ -44,11 +43,17 @@ namespace {
 absl::Status CheckRefCountIsNull(const py::object& py_ref,
                                  const std::string& ref_name) {
   if (py_ref.ref_count() > 1) {
-    return absl::InternalError(absl::Substitute(
-        "Cannot hold a reference to \"$0\" outside of a custom loss function. "
-        "Currently holding $1 references. If this variable is required outside "
-        "of the function, create a copy with np.copy($0).",
-        ref_name, py_ref.ref_count()));
+    // Trigger GC - maybe we haven't collected yet?
+    py::module_::import("gc").attr("collect")();
+    if (py_ref.ref_count() > 1) {
+      return absl::InternalError(
+          absl::Substitute("Cannot hold a reference to \"$0\" outside of a "
+                           "custom loss function. "
+                           "Currently holding $1 references. If this variable "
+                           "is required outside "
+                           "of the function, create a copy with np.copy($0).",
+                           ref_name, py_ref.ref_count()));
+    }
   }
   return absl::OkStatus();
 };
@@ -101,13 +106,18 @@ absl::Status Check2DArrayShape(const py::array_t<float>& arr,
   return absl::OkStatus();
 }
 
-// Returns a numpy array referencing the data in `data` with unlimited lifetime.
-// This is dangerous, since the C++ might delete `data`, which would lead to
-// undefined behaviour. The caller must therefore make sure the return value is
-// no longer referenced when `data` is removed.
+// Returns a read-only Numpy array referencing the data in `data`. The array
+// does not own the data. Its lifetime is tied to an no-op capsule. This is
+// dangerous, since the C++ might delete `data`, which would lead to undefined
+// behaviour. The caller must therefore make sure the returned array is no
+// longer referenced when `data` is removed.
 template <typename T>
 py::array_t<T> SpanToUnsafeNumpyArray(absl::Span<T> data) {
-  return py::array_t<T>(data.size(), data.data(), py::none());
+  auto arr = py::array_t<T>(data.size(), data.data(),
+                            py::capsule(data.data(), [](void* v) {}));
+  py::detail::array_proxy(arr.ptr())->flags &=
+      ~py::detail::npy_api::NPY_ARRAY_WRITEABLE_;
+  return arr;
 }
 }  // namespace
 
@@ -128,7 +138,8 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
       try {
         current_initial_predictions = initial_predictions(pylabels, pyweights);
       } catch (const std::exception& e) {
-        return absl::AbortedError(e.what());
+        return absl::UnknownError(
+            absl::Substitute("initial predictions raised: $0", e.what()));
       }
       RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
       RETURN_IF_ERROR(CheckRefCountIsNull(pyweights, "weights"));
@@ -149,7 +160,8 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
       try {
         current_loss = loss(pylabels, pypredictions, pyweights);
       } catch (const std::exception& e) {
-        return absl::AbortedError(e.what());
+        return absl::UnknownError(
+            absl::Substitute("loss raised: $0", e.what()));
       }
       RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
       RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
@@ -171,7 +183,8 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
       try {
         py_result = gradient_and_hessian(pylabels, pypredictions);
       } catch (const std::exception& e) {
-        return absl::AbortedError(e.what());
+        return absl::UnknownError(
+            absl::Substitute("gradient_and_hessian raised: $0", e.what()));
       }
       RETURN_IF_ERROR(CheckGradientAndHessianShape(py_result));
       auto py_gradient = py_result[0].cast<py::array_t<float>>();

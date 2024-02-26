@@ -2,3 +2,5 @@ pandas
 tensorflow_decision_forests
 tensorflow
 portpicker
+jax
+jaxlib
