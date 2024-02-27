@@ -21,7 +21,6 @@ import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.proto";
 import "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto";
-import "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.proto";
 
 // Training configuration for the Distributed Gradient Boosted Trees algorithm.
 message DistributedGradientBoostedTreesTrainingConfig {

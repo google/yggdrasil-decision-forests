@@ -1,11 +1,11 @@
 # Changelog
 
-## HEAD
+## 1.9.0rc0 - 2024-02-26
 
 ### Feature
 
--   Add "parallel_trials" parameter in the hyper-parameter tuner to control the
-    number of trials to run in parallel.
+-   Add "parallel_trials" parameter in the hyper-parameter tuner to control the number of trials to run in parallel.
+-   Add support for custom losses.
 
 ## 1.8.0 - 2023-11-17
 

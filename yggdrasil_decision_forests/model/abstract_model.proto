@@ -17,7 +17,6 @@ syntax = "proto2";
 
 package yggdrasil_decision_forests.model.proto;
 
-import "yggdrasil_decision_forests/dataset/data_spec.proto";
 import "yggdrasil_decision_forests/dataset/weight.proto";
 import "yggdrasil_decision_forests/model/hyperparameter.proto";
 

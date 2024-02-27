@@ -24,7 +24,6 @@ learner: "RANDOM_FOREST"
   num_trees: 1000
 }
 ```
-
 ## GRADIENT_BOOSTED_TREES
 
 A [Gradient Boosted Trees](https://statweb.stanford.edu/~jhf/ftp/trebst.pdf)
@@ -295,7 +294,8 @@ reasonable time.
 -   **Type:** Integer **Default:** 6 **Possible values:** min:-1
 
 -   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
-    Negative values are ignored.
+    `max_depth=-1` means that tree depth is not restricted by this parameter.
+    Values <= -2 will be ignored.
 
 #### [max_num_nodes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -698,7 +698,8 @@ reasonable time.
 -   **Type:** Integer **Default:** 16 **Possible values:** min:-1
 
 -   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
-    Negative values are ignored.
+    `max_depth=-1` means that tree depth is not restricted by this parameter.
+    Values <= -2 will be ignored.
 
 #### [max_num_nodes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -983,7 +984,8 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 -   **Type:** Integer **Default:** 16 **Possible values:** min:-1
 
 -   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
-    Negative values are ignored.
+    `max_depth=-1` means that tree depth is not restricted by this parameter.
+    Values <= -2 will be ignored.
 
 #### [max_num_nodes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1165,7 +1167,8 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 -   **Type:** Integer **Default:** 6 **Possible values:** min:-1
 
 -   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
-    Negative values are ignored.
+    `max_depth=-1` means that tree depth is not restricted by this parameter.
+    Values <= -2 will be ignored.
 
 #### [max_unique_values_for_discretized_numerical](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.proto)
 

@@ -20,7 +20,6 @@ package yggdrasil_decision_forests.model.distributed_gradient_boosted_trees.prot
 import "yggdrasil_decision_forests/dataset/data_spec.proto";
 import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
-import "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.proto";
 import "yggdrasil_decision_forests/learner/distributed_decision_tree/training.proto";
 import "yggdrasil_decision_forests/model/decision_tree/decision_tree.proto";
