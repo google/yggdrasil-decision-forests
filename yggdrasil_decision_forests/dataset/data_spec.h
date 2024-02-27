@@ -30,6 +30,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/hash.h"
@@ -139,6 +140,11 @@ absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
 int32_t CategoricalStringToValue(const std::string& value,
                                  const proto::Column& col_spec);
 
+// Similar to "CategoricalStringToValueWithStatus" above, but only work for
+// non-integerized values.
+int32_t NonintegerizedCategoricalStringToValue(absl::string_view value,
+                                               const proto::Column& col_spec);
+
 // Tokenize a string. "tokens" is cleared before being filled.
 absl::Status Tokenize(const absl::string_view text,
                       const proto::Tokenizer& tokenizer,
@@ -165,9 +171,30 @@ std::string CategoricalIdxsToRepresentation(
     int max_values, const absl::string_view separator = ", ");
 
 // Add a column with specified name and specified type to a dataspec.
-proto::Column* AddColumn(const absl::string_view name,
-                         const proto::ColumnType type,
+proto::Column* AddColumn(absl::string_view name, proto::ColumnType type,
                          proto::DataSpecification* data_spec);
+
+// Adds a numerical column.
+proto::Column* AddNumericalColumn(absl::string_view name,
+                                  proto::DataSpecification* data_spec);
+
+// Adds a boolean column.
+proto::Column* AddBooleanColumn(absl::string_view name,
+                                proto::DataSpecification* data_spec);
+
+// Adds a categorical column with a vocabulary.
+// The Out-of-vocabulary item is added automatically i.e. the created column has
+// "vocab.size() + 1" items.
+proto::Column* AddCategoricalColumn(absl::string_view name,
+                                    absl::Span<const absl::string_view> vocab,
+                                    proto::DataSpecification* data_spec);
+
+// Adds a categorical-set column with a vocabulary.
+// The Out-of-vocabulary item is added automatically i.e. the created column has
+// "vocab.size() + 1" items.
+proto::Column* AddCategoricalSetColumn(
+    absl::string_view name, absl::Span<const absl::string_view> vocab,
+    proto::DataSpecification* data_spec);
 
 // Is this column type multidimensional?
 bool IsMultiDimensional(proto::ColumnType type);

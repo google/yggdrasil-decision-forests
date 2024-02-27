@@ -128,6 +128,17 @@ int32_t CategoricalStringToValue(const std::string& value,
   return CategoricalStringToValueWithStatus(value, col_spec).value();
 }
 
+int32_t NonintegerizedCategoricalStringToValue(absl::string_view value,
+                                               const proto::Column& col_spec) {
+  DCHECK(!col_spec.categorical().is_already_integerized());
+  auto value_in_dict = col_spec.categorical().items().find(value);
+  if (value_in_dict == col_spec.categorical().items().end()) {
+    return kOutOfDictionaryItemIndex;
+  } else {
+    return value_in_dict->second.index();
+  }
+}
+
 // TODO: Remove this version when external protobuffer supports dictionary
 // query with absl::string_view.
 absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
@@ -143,12 +154,7 @@ absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
                     col_spec.categorical().number_of_unique_values());
     return int_value;
   } else {
-    auto value_in_dict = col_spec.categorical().items().find(value);
-    if (value_in_dict == col_spec.categorical().items().end()) {
-      return kOutOfDictionaryItemIndex;
-    } else {
-      return value_in_dict->second.index();
-    }
+    return NonintegerizedCategoricalStringToValue(value, col_spec);
   }
 }
 
@@ -767,6 +773,43 @@ proto::Column* AddColumn(const absl::string_view name,
   col->set_name(std::string(name));
   col->set_type(type);
   return col;
+}
+
+proto::Column* AddNumericalColumn(const absl::string_view name,
+                                  proto::DataSpecification* data_spec) {
+  return AddColumn(name, proto::ColumnType::NUMERICAL, data_spec);
+}
+
+proto::Column* AddBooleanColumn(const absl::string_view name,
+                                proto::DataSpecification* data_spec) {
+  return AddColumn(name, proto::ColumnType::BOOLEAN, data_spec);
+}
+
+proto::Column* AddCategoricalColumn(const absl::string_view name,
+                                    absl::Span<const absl::string_view> vocab,
+                                    proto::DataSpecification* data_spec) {
+  auto* def = AddColumn(name, proto::ColumnType::CATEGORICAL, data_spec);
+  auto* categorical_def = def->mutable_categorical();
+  categorical_def->set_number_of_unique_values(vocab.size() + 1);
+  (*categorical_def->mutable_items())[kOutOfDictionaryItemKey].set_index(0);
+  for (int idx = 0; idx < vocab.size(); idx++) {
+    (*categorical_def->mutable_items())[vocab[idx]].set_index(idx + 1);
+  }
+  return def;
+}
+
+proto::Column* AddCategoricalSetColumn(
+    const absl::string_view name,
+    const absl::Span<const absl::string_view> vocab,
+    proto::DataSpecification* data_spec) {
+  auto* def = AddColumn(name, proto::ColumnType::CATEGORICAL_SET, data_spec);
+  auto* categorical_def = def->mutable_categorical();
+  categorical_def->set_number_of_unique_values(vocab.size() + 1);
+  (*categorical_def->mutable_items())[kOutOfDictionaryItemKey].set_index(0);
+  for (int idx = 0; idx < vocab.size(); idx++) {
+    (*categorical_def->mutable_items())[vocab[idx]].set_index(idx + 1);
+  }
+  return def;
 }
 
 absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(

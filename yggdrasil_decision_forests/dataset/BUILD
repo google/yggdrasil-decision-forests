@@ -65,6 +65,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -348,6 +349,20 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "example_builder",
+    srcs = ["example_builder.cc"],
+    hdrs = ["example_builder.h"],
+    deps = [
+        ":data_spec",
+        ":data_spec_cc_proto",
+        ":example_cc_proto",
+        "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
 # Proto
 # ========
 
@@ -577,6 +592,17 @@ cc_test(
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "example_builder_test",
+    srcs = ["example_builder_test.cc"],
+    deps = [
+        ":example_builder",
+        "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/types:span",
         "@com_google_googletest//:gtest_main",
     ],
 )

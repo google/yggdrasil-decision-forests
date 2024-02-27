@@ -54,6 +54,10 @@ absl::Status LoadModel(absl::string_view directory,
                        std::unique_ptr<AbstractModel>* model,
                        ModelIOOptions io_options = {});
 
+// Loads a model in memory.
+absl::StatusOr<std::unique_ptr<AbstractModel>> LoadModel(
+    absl::string_view directory, ModelIOOptions io_options = {});
+
 // Serializes a model to a string.
 //
 // "SerializeModel" is suited for small models. For large models, using

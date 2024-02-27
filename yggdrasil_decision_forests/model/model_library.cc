@@ -105,6 +105,13 @@ absl::Status SaveModel(absl::string_view directory,
   return absl::OkStatus();
 }
 
+absl::StatusOr<std::unique_ptr<AbstractModel>> LoadModel(
+    const absl::string_view directory, ModelIOOptions io_options) {
+  std::unique_ptr<AbstractModel> model;
+  RETURN_IF_ERROR(model::LoadModel(directory, &model, io_options));
+  return model;
+}
+
 absl::Status LoadModel(absl::string_view directory,
                        std::unique_ptr<AbstractModel>* model,
                        ModelIOOptions io_options) {

@@ -380,6 +380,66 @@ TEST(DataSpecUtil, AddColumn) {
   EXPECT_THAT(data_spec, EqualsProto(expected));
 }
 
+TEST(DataSpecUtil, AddColumnTyped) {
+  proto::DataSpecification data_spec;
+  AddNumericalColumn("a", &data_spec);
+  AddCategoricalColumn("b", {"X", "Y", "Z"}, &data_spec);
+  AddBooleanColumn("c", &data_spec);
+  AddCategoricalSetColumn("d", {"X", "Y", "Z"}, &data_spec);
+  const proto::DataSpecification expected = PARSE_TEST_PROTO(
+      R"pb(
+        columns { type: NUMERICAL name: "a" }
+        columns {
+          type: CATEGORICAL
+          name: "b"
+          categorical {
+            number_of_unique_values: 4
+            items {
+              key: "<OOD>"
+              value { index: 0 }
+            }
+            items {
+              key: "X"
+              value { index: 1 }
+            }
+            items {
+              key: "Y"
+              value { index: 2 }
+            }
+            items {
+              key: "Z"
+              value { index: 3 }
+            }
+          }
+        }
+        columns { type: BOOLEAN name: "c" }
+        columns {
+          type: CATEGORICAL_SET
+          name: "d"
+          categorical {
+            number_of_unique_values: 4
+            items {
+              key: "<OOD>"
+              value { index: 0 }
+            }
+            items {
+              key: "X"
+              value { index: 1 }
+            }
+            items {
+              key: "Y"
+              value { index: 2 }
+            }
+            items {
+              key: "Z"
+              value { index: 3 }
+            }
+          }
+        }
+      )pb");
+  EXPECT_THAT(data_spec, EqualsProto(expected));
+}
+
 // Conversion discretized numerical -> numerical.
 TEST(DataSpec, DiscretizedNumericalToNumerical) {
   const float eps = 0.0001f;
