@@ -17,6 +17,7 @@ syntax = "proto2";
 
 package yggdrasil_decision_forests.model.gradient_boosted_trees.proto;
 
+import "yggdrasil_decision_forests/model/abstract_model.proto";
 import "yggdrasil_decision_forests/utils/distribution.proto";
 
 // Header for the gradient boosted trees model.
@@ -113,4 +114,13 @@ message TrainingLogs {
     optional utils.proto.IntegersConfusionMatrixDouble
         validation_confusion_matrix = 8;
   }
+}
+
+message GradientBoostedTreesSerializedModel {
+  optional Header header = 1;
+}
+
+extend model.proto.SerializedModel {
+  optional GradientBoostedTreesSerializedModel
+      gradient_boosted_trees_serialized_model = 1001;
 }

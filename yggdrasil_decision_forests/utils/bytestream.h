@@ -21,7 +21,10 @@
 #include <string>
 
 #include "absl/base/macros.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/cord.h"
+#include "absl/strings/string_view.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -44,10 +47,28 @@ class InputByteStream {
   absl::StatusOr<std::string> ReadAll();
 };
 
+// Wraps a InputByteStream around a absl::string_view.
+class StringViewInputByteStream : public InputByteStream {
+ public:
+  StringViewInputByteStream(absl::string_view content) : content_(content) {}
+
+  absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
+
+  absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) override;
+
+ private:
+  // Content.
+  absl::string_view content_;
+
+  // Next character to read in "content_".
+  int current_ = 0;
+};
+
 // Wraps a InputByteStream around a std::string.
 class StringInputByteStream : public InputByteStream {
  public:
-  StringInputByteStream(std::string content) : content_(std::move(content)) {}
+  StringInputByteStream(std::string content)
+      : content_(std::move(content)), stream_(content_) {}
 
   absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
 
@@ -56,9 +77,7 @@ class StringInputByteStream : public InputByteStream {
  private:
   // String content.
   std::string content_;
-
-  // Next character to read in "content_".
-  int current_ = 0;
+  StringViewInputByteStream stream_;
 };
 
 // Output stream of bytes.
@@ -68,6 +87,18 @@ class OutputByteStream {
 
   // Writes a chunk of bytes.
   virtual absl::Status Write(absl::string_view chunk) = 0;
+};
+
+class StringOutputByteStream : public OutputByteStream {
+ public:
+  ~StringOutputByteStream() override{};
+
+  absl::Status Write(absl::string_view chunk) override;
+
+  absl::string_view ToString();
+
+ private:
+  absl::Cord content_;
 };
 
 }  // namespace utils

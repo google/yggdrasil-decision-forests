@@ -69,6 +69,35 @@ constexpr char RandomForestModel::kRegisteredName[];
 constexpr char RandomForestModel::kVariableImportanceMeanDecreaseInAccuracy[];
 constexpr char RandomForestModel::kVariableImportanceMeanIncreaseInRmse[];
 
+proto::Header RandomForestModel::BuildHeaderProto() const {
+  proto::Header header;
+  header.set_num_trees(decision_trees_.size());
+  header.set_winner_take_all_inference(winner_take_all_inference_);
+  *header.mutable_out_of_bag_evaluations() = {out_of_bag_evaluations_.begin(),
+                                              out_of_bag_evaluations_.end()};
+  *header.mutable_mean_decrease_in_accuracy() = {
+      mean_decrease_in_accuracy_.begin(), mean_decrease_in_accuracy_.end()};
+  *header.mutable_mean_increase_in_rmse() = {mean_increase_in_rmse_.begin(),
+                                             mean_increase_in_rmse_.end()};
+  if (num_pruned_nodes_.has_value()) {
+    header.set_num_pruned_nodes(num_pruned_nodes_.value());
+  }
+  return header;
+}
+
+void RandomForestModel::ApplyHeaderProto(const proto::Header& header) {
+  winner_take_all_inference_ = header.winner_take_all_inference();
+  out_of_bag_evaluations_.assign(header.out_of_bag_evaluations().begin(),
+                                 header.out_of_bag_evaluations().end());
+  mean_decrease_in_accuracy_.assign(header.mean_decrease_in_accuracy().begin(),
+                                    header.mean_decrease_in_accuracy().end());
+  mean_increase_in_rmse_.assign(header.mean_increase_in_rmse().begin(),
+                                header.mean_increase_in_rmse().end());
+  if (header.has_num_pruned_nodes()) {
+    num_pruned_nodes_ = header.num_pruned_nodes();
+  }
+}
+
 absl::Status RandomForestModel::Save(absl::string_view directory,
                                      const ModelIOOptions& io_options) const {
   RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
@@ -87,22 +116,10 @@ absl::Status RandomForestModel::Save(absl::string_view directory,
       absl::StrCat(io_options.file_prefix.value(), kNodeBaseFilename);
   RETURN_IF_ERROR(decision_tree::SaveTreesToDisk(
       directory, node_base_filename, decision_trees_, format, &num_shards));
-  proto::Header header;
+
+  auto header = BuildHeaderProto();
   header.set_node_format(format);
   header.set_num_node_shards(num_shards);
-  header.set_num_trees(decision_trees_.size());
-  header.set_winner_take_all_inference(winner_take_all_inference_);
-
-  *header.mutable_out_of_bag_evaluations() = {out_of_bag_evaluations_.begin(),
-                                              out_of_bag_evaluations_.end()};
-  *header.mutable_mean_decrease_in_accuracy() = {
-      mean_decrease_in_accuracy_.begin(), mean_decrease_in_accuracy_.end()};
-  *header.mutable_mean_increase_in_rmse() = {mean_increase_in_rmse_.begin(),
-                                             mean_increase_in_rmse_.end()};
-
-  if (num_pruned_nodes_.has_value()) {
-    header.set_num_pruned_nodes(num_pruned_nodes_.value());
-  }
 
   const auto header_filename =
       absl::StrCat(io_options.file_prefix.value(), kHeaderBaseFilename);
@@ -126,23 +143,33 @@ absl::Status RandomForestModel::Load(absl::string_view directory,
   RETURN_IF_ERROR(decision_tree::LoadTreesFromDisk(
       directory, node_base_filename, header.num_node_shards(),
       header.num_trees(), header.node_format(), &decision_trees_));
-
   node_format_ = header.node_format();
-  winner_take_all_inference_ = header.winner_take_all_inference();
-  out_of_bag_evaluations_.assign(header.out_of_bag_evaluations().begin(),
-                                 header.out_of_bag_evaluations().end());
-
-  mean_decrease_in_accuracy_.assign(header.mean_decrease_in_accuracy().begin(),
-                                    header.mean_decrease_in_accuracy().end());
-
-  mean_increase_in_rmse_.assign(header.mean_increase_in_rmse().begin(),
-                                header.mean_increase_in_rmse().end());
-
-  if (header.has_num_pruned_nodes()) {
-    num_pruned_nodes_ = header.num_pruned_nodes();
-  }
-
+  ApplyHeaderProto(header);
   return absl::OkStatus();
+}
+
+absl::Status RandomForestModel::SerializeModelImpl(
+    model::proto::SerializedModel* dst_proto, std::string* dst_raw) const {
+  const auto& specialized_proto = dst_proto->MutableExtension(
+      random_forest::proto::random_forest_serialized_model);
+  *specialized_proto->mutable_header() = BuildHeaderProto();
+  if (node_format_.has_value()) {
+    specialized_proto->mutable_header()->set_node_format(node_format_.value());
+  }
+  ASSIGN_OR_RETURN(*dst_raw, decision_tree::SerializeTrees(decision_trees_));
+  return absl::OkStatus();
+}
+
+absl::Status RandomForestModel::DeserializeModelImpl(
+    const model::proto::SerializedModel& src_proto, absl::string_view src_raw) {
+  const auto& specialized_proto = src_proto.GetExtension(
+      random_forest::proto::random_forest_serialized_model);
+  ApplyHeaderProto(specialized_proto.header());
+  if (specialized_proto.header().has_node_format()) {
+    node_format_ = specialized_proto.header().node_format();
+  }
+  return decision_tree::DeserializeTrees(
+      src_raw, specialized_proto.header().num_trees(), &decision_trees_);
 }
 
 absl::Status RandomForestModel::Validate() const {

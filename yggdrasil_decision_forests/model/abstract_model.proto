@@ -148,3 +148,13 @@ message HyperparametersOptimizerLogs {
     optional float score = 3;
   }
 }
+
+// Proto used to serialize / deserialize the model to / from string. See
+// "SerializeModel" and "DeserializeModel".
+//
+// This message does not contains the entire model data.
+message SerializedModel {
+  optional AbstractModel abstract_model = 1;
+
+  extensions 1000 to max;
+}

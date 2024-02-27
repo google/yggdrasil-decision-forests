@@ -82,6 +82,8 @@ cc_library_ydf(
     deps = [
         ":abstract_model",
         ":abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/utils:blob_sequence",
+        "//yggdrasil_decision_forests/utils:bytestream",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",

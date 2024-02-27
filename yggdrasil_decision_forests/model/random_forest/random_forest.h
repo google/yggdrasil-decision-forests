@@ -271,8 +271,19 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   // The classical random forest learning algorithm does not prune nodes.
   absl::optional<int64_t> num_pruned_nodes_;
 
+  absl::Status SerializeModelImpl(model::proto::SerializedModel* dst_proto,
+                                  std::string* dst_raw) const override;
+
+  absl::Status DeserializeModelImpl(
+      const model::proto::SerializedModel& src_proto,
+      absl::string_view src_raw) override;
+
   // Fields related to unit testing.
   struct Testing testing_;
+
+ private:
+  proto::Header BuildHeaderProto() const;
+  void ApplyHeaderProto(const proto::Header& header);
 };
 
 namespace internal {

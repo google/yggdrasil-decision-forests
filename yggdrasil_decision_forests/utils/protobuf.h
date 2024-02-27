@@ -27,7 +27,7 @@
 namespace yggdrasil_decision_forests {
 namespace utils {
 
-// Unserializes a proto from its text representation.
+// Deserializes a proto from its text representation.
 template <typename T>
 absl::StatusOr<T> ParseTextProto(absl::string_view raw) {
   T message;
@@ -38,7 +38,7 @@ absl::StatusOr<T> ParseTextProto(absl::string_view raw) {
   return message;
 }
 
-// Unserializes a proto from its binary representation.
+// Deserializes a proto from its binary representation.
 template <typename T>
 absl::StatusOr<T> ParseBinaryProto(absl::string_view raw) {
   T message;

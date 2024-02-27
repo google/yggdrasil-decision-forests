@@ -64,6 +64,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
@@ -275,7 +276,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
     return;
   }
 
-  // Export the model to drive.
+  // Save model to disk.
   const std::string model_path =
       file::JoinPath(test::TmpDirectory(), test_dir_, "model");
   EXPECT_OK(SaveModel(model_path, model_.get(), model_io));
@@ -312,8 +313,8 @@ void TrainAndTestTester::TrainAndEvaluateModel(
         }
       };
 
-  // Evaluate the exported model.
-  YDF_LOG(INFO) << "Evaluate the exported model";
+  // Evaluate the model saved to disk.
+  YDF_LOG(INFO) << "Evaluate model saved to disk";
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_OK(LoadModel(model_path, &loaded_model, model_io));
   rnd.seed(1234);
@@ -323,6 +324,11 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   // Test that the exported model evaluation is the same as the original model
   // evaluation.
   check_evaluation_is_equal(evaluation_, evaluation_loaded_model);
+
+  // Model serialization / unserialization.
+  if (test_model_serialization_) {
+    TestModelSerialization();
+  }
 
   // Ensure that the predictions of the semi-fast engine are similar as the
   // predictions of the generic engine.
@@ -344,6 +350,17 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   const auto evaluation_loaded_and_pure_model =
       loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
   check_evaluation_is_equal(evaluation_, evaluation_loaded_and_pure_model);
+}
+
+void TrainAndTestTester::TestModelSerialization() {
+  ASSERT_OK_AND_ASSIGN(const std::string serialized_model,
+                       model::SerializeModel(*model_));
+
+  ASSERT_OK_AND_ASSIGN(
+      const std::unique_ptr<model::AbstractModel> deserialized_model,
+      model::DeserializeModel(serialized_model));
+
+  EXPECT_EQ(model_->DebugCompare(*deserialized_model), "");
 }
 
 std::pair<std::string, std::string>

@@ -269,7 +269,10 @@ cc_library_ydf(
     deps = [
         ":status_macros",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:cord",
     ],
 )
 
@@ -546,6 +549,7 @@ cc_library_ydf(
         ":logging",
         ":random",
         ":test",
+        ":testing_macros",
         ":uid",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:data_spec",
@@ -968,6 +972,8 @@ cc_test(
     srcs = ["bytestream_test.cc"],
     deps = [
         ":bytestream",
+        ":test",
+        # "@com_google_googletest//:gtest_main",  # When fixed
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -433,6 +433,33 @@ class AbstractModel {
   // return an empty string. Otherwise, returns a description of the difference.
   virtual std::string DebugCompare(const AbstractModel& other) const;
 
+  // WARNING: Don't use this function directly. Instead use
+  // "model::SerializeModel".
+  //
+  // Serializes the virtual part of the AbstractModel. This function should not
+  // serialize the fields defined in "AbstractModel". The model data can be
+  // serialized in an extension in the "dst_proto" or in the "dst_raw".
+  // Note that protos are limited to 2GB of data. Therefore, part of the model
+  // that is expected to be larger than 2GB should be serialized in the
+  // "dst_raw".
+  virtual absl::Status SerializeModelImpl(proto::SerializedModel* dst_proto,
+                                          std::string* dst_raw) const {
+    return absl::UnimplementedError(
+        "This model does not implemented Serialize/Deserialize. Use "
+        "SaveModel/LoadModel instead.");
+  }
+
+  // WARNING: Don't use this function directly. Instead use
+  // "model::DeserializeModel".
+  //
+  // Deserializes the virtual part of the model.
+  virtual absl::Status DeserializeModelImpl(
+      const proto::SerializedModel& src_proto, absl::string_view src_raw) {
+    return absl::UnimplementedError(
+        "This model does not implemented Serialize/Deserialize. Use "
+        "SaveModel/LoadModel instead.");
+  }
+
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 

@@ -79,7 +79,7 @@ class AbstractWorker {
   // AsynchronousRequestToOtherWorker or AsynchronousProtoRequestToOtherWorker.
   absl::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker();
 
-  // Same as "NextAsynchronousAnswerFromOtherWorker", but unserialize the answer
+  // Same as "NextAsynchronousAnswerFromOtherWorker", but deserialize the answer
   // into a proto.
   template <typename Result>
   absl::StatusOr<Result> NextAsynchronousProtoAnswerFromOtherWorker();
@@ -153,7 +153,7 @@ class AbstractManager {
   // AsynchronousProtoRequest.
   virtual absl::StatusOr<Blob> NextAsynchronousAnswer() = 0;
 
-  // Same as "NextAsynchronousAnswer", but unserialize the answer into a proto.
+  // Same as "NextAsynchronousAnswer", but deserialize the answer into a proto.
   template <typename Result>
   absl::StatusOr<Result> NextAsynchronousProtoAnswer();
 

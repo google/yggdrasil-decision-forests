@@ -15,6 +15,13 @@
 
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 
+#include <algorithm>
+#include <string>
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/cord.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -35,6 +42,16 @@ absl::StatusOr<std::string> InputByteStream::ReadAll() {
 
 absl::StatusOr<int> StringInputByteStream::ReadUpTo(char* buffer,
                                                     int max_read) {
+  return stream_.ReadUpTo(buffer, max_read);
+}
+
+absl::StatusOr<bool> StringInputByteStream::ReadExactly(char* buffer,
+                                                        int num_read) {
+  return stream_.ReadExactly(buffer, num_read);
+}
+
+absl::StatusOr<int> StringViewInputByteStream::ReadUpTo(char* buffer,
+                                                        int max_read) {
   const int num_read =
       std::min(static_cast<int>(content_.size()) - current_, max_read);
   if (num_read > 0) {
@@ -44,8 +61,8 @@ absl::StatusOr<int> StringInputByteStream::ReadUpTo(char* buffer,
   return num_read;
 }
 
-absl::StatusOr<bool> StringInputByteStream::ReadExactly(char* buffer,
-                                                        int num_read) {
+absl::StatusOr<bool> StringViewInputByteStream::ReadExactly(char* buffer,
+                                                            int num_read) {
   if (current_ == content_.size()) {
     return false;
   }
@@ -57,6 +74,15 @@ absl::StatusOr<bool> StringInputByteStream::ReadExactly(char* buffer,
   }
   current_ += num_read;
   return true;
+}
+
+absl::Status StringOutputByteStream::Write(const absl::string_view chunk) {
+  content_.Append(chunk);
+  return absl::OkStatus();
+}
+
+absl::string_view StringOutputByteStream::ToString() {
+  return content_.Flatten();
 }
 
 }  // namespace utils

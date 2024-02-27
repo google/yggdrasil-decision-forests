@@ -178,6 +178,9 @@ class TrainAndTestTester : public ::testing::Test {
   // If set, specifies the custom loss used.
   model::gradient_boosted_trees::CustomLossFunctions custom_loss_;
 
+  // If true, tests if the model can be serialized / deserialized.
+  bool test_model_serialization_ = true;
+
  private:
   std::pair<std::string, std::string> GetTrainAndTestDatasetPaths();
 
@@ -194,6 +197,10 @@ class TrainAndTestTester : public ::testing::Test {
       const dataset::proto::DataSpecification& data_spec,
       const absl::string_view train_path, const absl::string_view test_path,
       int32_t numerical_weight_attribute_idx, float max_numerical_weight_value);
+
+  // Serialize the model to std::string, deserialize it, and check the equality
+  // of the original and deserialized model.
+  void TestModelSerialization();
 };
 
 // Tests the prediction of the (slow) generic engine and the fast generic

@@ -27,6 +27,8 @@
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/blob_sequence.h"
+#include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -36,6 +38,10 @@ namespace model {
 namespace {
 constexpr char kModelHeaderFileName[] = "header.pb";
 constexpr char kModelDataSpecFileName[] = "data_spec.pb";
+
+// Data of the first blob of a string serialized model. Trying to deserialize a
+// string not starting with those characters returns an error.
+constexpr char kSerializedModelHeader[] = "YDF";
 
 // Name of the subdirectory containing an YDF model in a TF-DF model.
 constexpr char kTensorFlowDecisionForestsAssets[] = "assets";
@@ -167,6 +173,85 @@ absl::StatusOr<std::string> DetectFilePrefix(absl::string_view directory) {
 absl::StatusOr<bool> IsTensorFlowSavedModel(absl::string_view model_directory) {
   return file::FileExists(
       file::JoinPath(model_directory, kTensorFlowSavedModelProtoFileName));
+}
+
+absl::StatusOr<std::string> SerializeModel(const AbstractModel& model) {
+  // A serialized model is a blog sequence organized as follow:
+  // - The first blob contains the three characters "YDF".
+  // - The second blob is a serialized proto containing generic and specific
+  //   information about the model (e.g., task, label). This proto might one day
+  //   also contain versioning information.
+  // - The third blob is the serialized dataspec proto.
+  // - The fourth blob is a raw string that can be used by the model
+  //   implementation to store any data that might be larger than 2GB. For
+  //   instance, for tree models, this is another blog sequence containing
+  //   serialized tree node protos.
+
+  utils::StringOutputByteStream stream;
+  ASSIGN_OR_RETURN(auto writer, utils::blob_sequence::Writer::Create(&stream));
+
+  // Serialize proto and raw string.
+  proto::SerializedModel proto;
+  AbstractModel::ExportProto(model, proto.mutable_abstract_model());
+  std::string raw;
+  RETURN_IF_ERROR(model.SerializeModelImpl(&proto, &raw));
+
+  // Write key.
+  RETURN_IF_ERROR(writer.Write(kSerializedModelHeader));
+
+  // Write header + specialized proto.
+  RETURN_IF_ERROR(writer.Write(proto.SerializeAsString()));
+
+  // Write dataspec.
+  RETURN_IF_ERROR(writer.Write(model.data_spec().SerializeAsString()));
+
+  // Write raw string.
+  RETURN_IF_ERROR(writer.Write(raw));
+
+  RETURN_IF_ERROR(writer.Close());
+  return std::string(stream.ToString());
+}
+
+// Deserializes a model from a string.
+absl::StatusOr<std::unique_ptr<AbstractModel>> DeserializeModel(
+    const absl::string_view serialized_model) {
+  utils::StringViewInputByteStream stream(serialized_model);
+  ASSIGN_OR_RETURN(auto reader, utils::blob_sequence::Reader::Create(&stream));
+
+  // Read key.
+  std::string tmp;
+  ASSIGN_OR_RETURN(bool has_data, reader.Read(&tmp));
+  if (!has_data || tmp != kSerializedModelHeader) {
+    return absl::InvalidArgumentError("Cannot deserialize model");
+  }
+
+  // Read header + specialized proto.
+  proto::SerializedModel proto;
+  ASSIGN_OR_RETURN(has_data, reader.Read(&tmp));
+  STATUS_CHECK(has_data);
+  STATUS_CHECK(proto.ParseFromString(tmp));
+
+  // Instantiate model.
+  std::unique_ptr<AbstractModel> model;
+  RETURN_IF_ERROR(CreateEmptyModel(proto.abstract_model().name(), &model));
+  AbstractModel::ImportProto(proto.abstract_model(), model.get());
+
+  // Read dataspec.
+  ASSIGN_OR_RETURN(has_data, reader.Read(&tmp));
+  STATUS_CHECK(has_data);
+  STATUS_CHECK(model->mutable_data_spec()->ParseFromString(tmp));
+
+  // Read raw string.
+  ASSIGN_OR_RETURN(has_data, reader.Read(&tmp));
+  STATUS_CHECK(has_data);
+
+  // Parse specialized model data.
+  RETURN_IF_ERROR(model->DeserializeModelImpl(proto, tmp));
+
+  // Check model.
+  RETURN_IF_ERROR(model->Validate());
+
+  return model;
 }
 
 }  // namespace model

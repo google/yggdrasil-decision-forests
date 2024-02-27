@@ -73,6 +73,29 @@ constexpr char kHeaderBaseFilename[] = "gradient_boosted_trees_header.pb";
 
 }  // namespace
 
+proto::Header GradientBoostedTreesModel::BuildHeaderProto() const {
+  proto::Header header;
+  header.set_num_trees(decision_trees_.size());
+  header.set_loss(loss_);
+  header.set_num_trees_per_iter(num_trees_per_iter_);
+  header.set_validation_loss(validation_loss_);
+  header.set_output_logits(output_logits_);
+  *header.mutable_initial_predictions() = google::protobuf::RepeatedField<float>(
+      initial_predictions_.begin(), initial_predictions_.end());
+  *header.mutable_training_logs() = training_logs_;
+  return header;
+}
+
+void GradientBoostedTreesModel::ApplyHeaderProto(const proto::Header& header) {
+  loss_ = header.loss();
+  initial_predictions_.assign(header.initial_predictions().begin(),
+                              header.initial_predictions().end());
+  num_trees_per_iter_ = header.num_trees_per_iter();
+  validation_loss_ = header.validation_loss();
+  training_logs_ = header.training_logs();
+  output_logits_ = header.output_logits();
+}
+
 absl::Status GradientBoostedTreesModel::Save(
     absl::string_view directory, const ModelIOOptions& io_options) const {
   RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
@@ -91,17 +114,11 @@ absl::Status GradientBoostedTreesModel::Save(
       absl::StrCat(io_options.file_prefix.value(), kNodeBaseFilename);
   RETURN_IF_ERROR(decision_tree::SaveTreesToDisk(
       directory, node_base_filename, decision_trees_, format, &num_shards));
-  proto::Header header;
+
+  auto header = BuildHeaderProto();
   header.set_node_format(format);
   header.set_num_node_shards(num_shards);
-  header.set_num_trees(decision_trees_.size());
-  header.set_loss(loss_);
-  header.set_num_trees_per_iter(num_trees_per_iter_);
-  header.set_validation_loss(validation_loss_);
-  header.set_output_logits(output_logits_);
-  *header.mutable_initial_predictions() = google::protobuf::RepeatedField<float>(
-      initial_predictions_.begin(), initial_predictions_.end());
-  *header.mutable_training_logs() = training_logs_;
+
   std::string header_filename =
       absl::StrCat(io_options.file_prefix.value(), kHeaderBaseFilename);
   RETURN_IF_ERROR(file::SetBinaryProto(
@@ -125,14 +142,32 @@ absl::Status GradientBoostedTreesModel::Load(absl::string_view directory,
       directory, node_base_filename, header.num_node_shards(),
       header.num_trees(), header.node_format(), &decision_trees_));
   node_format_ = header.node_format();
-  loss_ = header.loss();
-  initial_predictions_.assign(header.initial_predictions().begin(),
-                              header.initial_predictions().end());
-  num_trees_per_iter_ = header.num_trees_per_iter();
-  validation_loss_ = header.validation_loss();
-  training_logs_ = header.training_logs();
-  output_logits_ = header.output_logits();
+  ApplyHeaderProto(header);
   return absl::OkStatus();
+}
+
+absl::Status GradientBoostedTreesModel::SerializeModelImpl(
+    model::proto::SerializedModel* dst_proto, std::string* dst_raw) const {
+  const auto& specialized_proto = dst_proto->MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_serialized_model);
+  *specialized_proto->mutable_header() = BuildHeaderProto();
+  if (node_format_.has_value()) {
+    specialized_proto->mutable_header()->set_node_format(node_format_.value());
+  }
+  ASSIGN_OR_RETURN(*dst_raw, decision_tree::SerializeTrees(decision_trees_));
+  return absl::OkStatus();
+}
+
+absl::Status GradientBoostedTreesModel::DeserializeModelImpl(
+    const model::proto::SerializedModel& src_proto, absl::string_view src_raw) {
+  const auto& specialized_proto = src_proto.GetExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_serialized_model);
+  ApplyHeaderProto(specialized_proto.header());
+  if (specialized_proto.header().has_node_format()) {
+    node_format_ = specialized_proto.header().node_format();
+  }
+  return decision_tree::DeserializeTrees(
+      src_raw, specialized_proto.header().num_trees(), &decision_trees_);
 }
 
 absl::Status GradientBoostedTreesModel::Validate() const {

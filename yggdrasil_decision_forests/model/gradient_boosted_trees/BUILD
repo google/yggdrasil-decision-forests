@@ -52,7 +52,10 @@ cc_library_ydf(
 all_proto_library(
     name = "gradient_boosted_trees_proto",
     srcs = ["gradient_boosted_trees.proto"],
-    deps = ["//yggdrasil_decision_forests/utils:distribution_proto"],
+    deps = [
+        "//yggdrasil_decision_forests/model:abstract_model_proto",
+        "//yggdrasil_decision_forests/utils:distribution_proto",
+    ],
 )
 
 # Test
@@ -71,6 +74,7 @@ cc_test(
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -256,7 +256,18 @@ class GradientBoostedTreesModel : public AbstractModel,
 
   struct Testing testing_;
 
+  absl::Status SerializeModelImpl(model::proto::SerializedModel* dst_proto,
+                                  std::string* dst_raw) const override;
+
+  absl::Status DeserializeModelImpl(
+      const model::proto::SerializedModel& src_proto,
+      absl::string_view src_raw) override;
+
   friend GradientBoostedTreesLearner;
+
+ private:
+  proto::Header BuildHeaderProto() const;
+  void ApplyHeaderProto(const proto::Header& header);
 };
 
 namespace internal {

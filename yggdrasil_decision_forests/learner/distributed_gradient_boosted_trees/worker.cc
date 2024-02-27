@@ -1002,7 +1002,7 @@ absl::Status DistributedGradientBoostedTreesWorker::EndIterEvaluationWorker(
     *answer->add_validations() = validation_.evaluation;
   }
 
-  // Unserialize the new trees into a GBT model without bias (since the bias is
+  // Deserialize the new trees into a GBT model without bias (since the bias is
   // already applied at the initialization of the prediction accumulator).
   auto partial_model =
       absl::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();

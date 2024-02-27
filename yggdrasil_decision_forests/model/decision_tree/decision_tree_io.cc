@@ -29,7 +29,10 @@
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree_io_interface.h"
+#include "yggdrasil_decision_forests/utils/blob_sequence.h"
+#include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -82,6 +85,62 @@ absl::Status LoadTreesFromDisk(
     trees->push_back(std::move(decision_tree));
   }
   return absl::OkStatus();
+}
+
+absl::StatusOr<std::string> SerializeTrees(
+    const std::vector<std::unique_ptr<DecisionTree>>& trees) {
+  utils::StringOutputByteStream stream;
+  ASSIGN_OR_RETURN(auto writer, utils::blob_sequence::Writer::Create(&stream));
+
+  class ProtoWriter : public utils::ProtoWriterInterface<proto::Node> {
+   public:
+    virtual ~ProtoWriter() = default;
+    ProtoWriter(utils::blob_sequence::Writer& writer) : writer_(writer) {}
+
+    absl::Status Write(const proto::Node& node) override {
+      return writer_.Write(node.SerializeAsString());
+    }
+    utils::blob_sequence::Writer& writer_;
+  } proto_writer(writer);
+
+  for (const auto& tree : trees) {
+    RETURN_IF_ERROR(tree->WriteNodes(&proto_writer));
+  }
+  RETURN_IF_ERROR(writer.Close());
+  return std::string(stream.ToString());
+}
+
+absl::Status DeserializeTrees(
+    const absl::string_view serialized_trees, const int num_trees,
+    std::vector<std::unique_ptr<DecisionTree>>* trees) {
+  utils::StringViewInputByteStream stream(serialized_trees);
+  ASSIGN_OR_RETURN(auto reader, utils::blob_sequence::Reader::Create(&stream));
+
+  class ProtoReader : public utils::ProtoReaderInterface<proto::Node> {
+   public:
+    virtual ~ProtoReader() = default;
+    ProtoReader(utils::blob_sequence::Reader& reader) : reader_(reader) {}
+
+    absl::StatusOr<bool> Next(proto::Node* node) override {
+      ASSIGN_OR_RETURN(const bool has_data, reader_.Read(&buffer_));
+      if (!has_data) {
+        return false;
+      }
+      node->ParseFromString(buffer_);
+      return true;
+    }
+
+    utils::blob_sequence::Reader& reader_;
+    std::string buffer_;
+  } proto_reader(reader);
+
+  for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {
+    auto decision_tree = absl::make_unique<decision_tree::DecisionTree>();
+    RETURN_IF_ERROR(decision_tree->ReadNodes(&proto_reader));
+    decision_tree->SetLeafIndices();
+    trees->push_back(std::move(decision_tree));
+  }
+  return reader.Close();
 }
 
 absl::StatusOr<std::string> RecommendedSerializationFormat() {

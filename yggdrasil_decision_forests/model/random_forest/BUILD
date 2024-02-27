@@ -84,6 +84,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
         "//yggdrasil_decision_forests/utils:uid",
         "@com_google_absl//absl/container:node_hash_set",
         "@com_google_absl//absl/memory",

@@ -37,22 +37,34 @@ absl::Status CreateEmptyModel(absl::string_view model_name,
 // Returns the list of all registered model names.
 std::vector<std::string> AllRegisteredModels();
 
-// Save the model into a directory. The directory should not exist already.
-// All file names with start with `prefix`.
+// Saves a model into a directory for later re-use.
+//
+// If the directory exists and already contains a model, make sure to empty
+// it first as to avoid unnecessary residual files.
 absl::Status SaveModel(absl::string_view directory,
                        const AbstractModel* const mdl,
                        ModelIOOptions io_options = {});
 
-// Equivalent to "SaveModel" above.
+// Saves a model into a directory for later re-use.
 absl::Status SaveModel(absl::string_view directory, const AbstractModel& mdl,
                        ModelIOOptions io_options = {});
 
-// Load a model from a directory previously created with "SaveModel". If
-// `prefix` is nonempty, only files whose file names use that prefix are
-// considered.
+// Load a model from a directory previously saved with "SaveModel".
 absl::Status LoadModel(absl::string_view directory,
                        std::unique_ptr<AbstractModel>* model,
                        ModelIOOptions io_options = {});
+
+// Serializes a model to a string.
+//
+// "SerializeModel" is suited for small models. For large models, using
+// "SaveModel" is more efficient.
+//
+// The returned string is not compressed (e.g. a serialized proto).
+absl::StatusOr<std::string> SerializeModel(const AbstractModel& model);
+
+// Deserializes a model from a string.
+absl::StatusOr<std::unique_ptr<AbstractModel>> DeserializeModel(
+    absl::string_view serialized_model);
 
 // Checks if a model exist i.e. if the "done" file (see kModelDoneFileName) is
 // present.

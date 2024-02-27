@@ -54,6 +54,7 @@ class MultitaskerOnAdult : public utils::TrainAndTestTester {
     // For the util tester.
     train_config_.set_task(model::proto::Task::CLASSIFICATION);
     dataset_filename_ = "adult.csv";
+    test_model_serialization_ = false;
   }
 };
 

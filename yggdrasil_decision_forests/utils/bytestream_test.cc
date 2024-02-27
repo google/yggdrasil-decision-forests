@@ -17,6 +17,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -29,6 +30,14 @@ TEST(Bytestream, StringInputByteStream) {
   EXPECT_EQ(stream.ReadUpTo(buffer, 1).value(), 1);
   EXPECT_EQ(stream.ReadUpTo(buffer, 5).value(), 5);
   EXPECT_EQ(stream.ReadUpTo(buffer, 50).value(), 0);
+}
+
+TEST(Bytestream, StringOutputByteStream) {
+  StringOutputByteStream stream;
+  EXPECT_OK(stream.Write("ABC"));
+  EXPECT_OK(stream.Write(""));
+  EXPECT_OK(stream.Write("DEF"));
+  EXPECT_EQ(stream.ToString(), "ABCDEF");
 }
 
 }  // namespace

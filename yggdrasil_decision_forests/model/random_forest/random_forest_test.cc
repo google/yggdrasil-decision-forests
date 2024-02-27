@@ -38,6 +38,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
@@ -517,6 +518,20 @@ TEST(RandomForest, CompareModel) {
       &model2));
   EXPECT_THAT(model1->DebugCompare(*model2),
               ::testing::ContainsRegex("Dataspecs don't match"));
+}
+
+TEST(RandomForest, Serialize) {
+  RandomForestModel original_model;
+  dataset::VerticalDataset dataset;
+  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION,
+                             &original_model, &dataset);
+
+  ASSERT_OK_AND_ASSIGN(std::string serialized_model,
+                       SerializeModel(original_model));
+  ASSERT_OK_AND_ASSIGN(const auto loaded_model,
+                       DeserializeModel(serialized_model));
+
+  EXPECT_EQ(original_model.DebugCompare(*loaded_model), "");
 }
 
 }  // namespace

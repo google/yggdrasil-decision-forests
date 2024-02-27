@@ -50,6 +50,16 @@ absl::Status LoadTreesFromDisk(
     int num_trees, absl::string_view format,
     std::vector<std::unique_ptr<DecisionTree>>* trees);
 
+// Serializes a list of decision trees to a string. The tree is encoded by
+// proto-serializing the nodes in a blob sequence.
+absl::StatusOr<std::string> SerializeTrees(
+    const std::vector<std::unique_ptr<DecisionTree>>& trees);
+
+// Deserializes a list of decision trees serialized by "SerializeTrees".
+absl::Status DeserializeTrees(
+    absl::string_view serialized_trees, int num_trees,
+    std::vector<std::unique_ptr<DecisionTree>>* trees);
+
 // Gets the recommended format to store decision trees with
 // SaveTreesToDisk among the registered ones. At least one
 // format should be registered.

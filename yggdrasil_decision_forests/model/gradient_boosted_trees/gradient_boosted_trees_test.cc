@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 
 #include <memory>
+#include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,6 +24,7 @@
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -165,6 +167,20 @@ TEST(GradientBoostedTrees, CompareModel) {
       &model2));
   EXPECT_THAT(model1->DebugCompare(*model2),
               ::testing::ContainsRegex("Dataspecs don't match"));
+}
+
+TEST(GradientBoostedTrees, Serialize) {
+  std::unique_ptr<model::AbstractModel> original_model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &original_model));
+
+  ASSERT_OK_AND_ASSIGN(const std::string serialized_model,
+                       SerializeModel(*original_model));
+  ASSERT_OK_AND_ASSIGN(const auto loaded_model,
+                       DeserializeModel(serialized_model));
+
+  EXPECT_EQ(original_model->DebugCompare(*loaded_model), "");
 }
 
 }  // namespace
