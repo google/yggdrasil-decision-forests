@@ -896,7 +896,15 @@ absl::Status BaseGenericToSpecializedModel(const AbstractModel& src,
   // a fatal error will be raised.
   dst->cpu_supports_avx2 = true;
 #endif
-#elif ABSL_HAVE_BUILTIN(__builtin_cpu_supports)
+// We need the platform check before calling '__builtin_cpu_supports("avx2")'
+// due to a known issue in 'clang' which will trigger a compilation error if the
+// checked CPU feature is not valid for the platform. Hence, the call to
+// '__builtin_cpu_supports("avx2")' would emit a compilation error when compiled
+// for ARM.
+// This is a temporary fix until this issue, tracked under
+// https://github.com/llvm/llvm-project/issues/83407 is fixed.
+#elif ABSL_HAVE_BUILTIN(__builtin_cpu_supports) && \
+    (defined(__x86_64__) || defined(__i386__))
   if (__builtin_cpu_supports("avx2")) {
     LOG_INFO_EVERY_N_SEC(
         30, _ << "The binary was compiled without AVX2 support, but your CPU "
