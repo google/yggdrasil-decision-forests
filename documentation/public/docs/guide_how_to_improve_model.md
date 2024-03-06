@@ -243,7 +243,7 @@ The `winner_take_all_inference` parameter of the Random Forest learner is set to
 True by default. This ensures that by default, the YDF Random Forest is
 equivalent to the original random forest by Breiman.
 
-However, in many cases `winner_take_all_inference=False` can reduce the size and
+However, in many cases `winner_take_all=False` can reduce the size and
 improve the quality of a Random Forest model.
 
 ```python
