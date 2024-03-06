@@ -249,6 +249,29 @@ py_test(
     ],
 )
 
+# Splits the test with tensorflow so that non-tensorflow tests can be run in debug mode.
+# (TensorFlow does not compile in debug mode)
+py_test(
+    name = "custom_loss_test",
+    srcs = ["custom_loss_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    python_version = "PY3",
+    deps = [
+        ":custom_loss_py",
+        ":generic_learner",
+        ":specialized_learners",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # jax dep,
+        # numpy dep,
+        # pandas dep,
+        "//ydf/dataset:dataspec",
+        "//ydf/model:generic_model",
+        "//ydf/model/gradient_boosted_trees_model",
+        "//ydf/utils:test_utils",
+    ],
+)
+
 py_test(
     name = "distributed_learner_test",
     srcs = ["distributed_learner_test.py"],

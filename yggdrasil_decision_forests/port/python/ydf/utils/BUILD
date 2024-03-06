@@ -36,6 +36,9 @@ py_library(
     deps = [
         # absl/flags dep,
         # absl/testing:absltest dep,
+        # pandas dep,
+        "//ydf/dataset",
+        "//ydf/dataset:dataspec",
     ],
 )
 
