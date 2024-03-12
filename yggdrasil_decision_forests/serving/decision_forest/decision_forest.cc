@@ -16,19 +16,30 @@
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <functional>
 #include <limits>
+#include <string>
 #include <type_traits>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -45,8 +56,19 @@ using model::gradient_boosted_trees::GradientBoostedTreesModel;
 using model::gradient_boosted_trees::proto::Loss;
 using model::random_forest::RandomForestModel;
 using ConditionType = model::decision_tree::proto::Condition::TypeCase;
+typedef absl::flat_hash_map<int, FeatureDef> FeatureDefMap;
 
 namespace {
+
+absl::StatusOr<FeatureDef> FindFeatureDefFromMap(const FeatureDefMap& defs,
+                                                 const int spec_feature_idx) {
+  auto it = defs.find(spec_feature_idx);
+  if (it == defs.end()) {
+    return absl::InvalidArgumentError(
+        absl::Substitute("Unknown feature idx $0", spec_feature_idx));
+  }
+  return it->second;
+}
 
 // Tests if a model is compatible with binary classification engines.
 bool IsBinaryClassification(const GradientBoostedTreesModel& model) {
@@ -60,15 +82,16 @@ template <typename GenericModel, typename SpecializedModel>
 absl::Status SetNonLeafNode(const GenericModel& src_model,
                             const NodeWithChildren& src_node,
                             const int spec_feature_idx,
+                            const FeatureDefMap& spec_idx_to_feature,
                             SpecializedModel* dst_model,
                             OneDimensionOutputNumericalFeatureNode* dst_node) {
   static_assert(std::is_same<typename SpecializedModel::NodeType,
                              OneDimensionOutputNumericalFeatureNode>::value,
                 "Non supported node type.");
 
-  ASSIGN_OR_RETURN(const auto feature,
-                   FindFeatureDef(dst_model->features().fixed_length_features(),
-                                  spec_feature_idx));
+  ASSIGN_OR_RETURN(
+      const auto feature,
+      FindFeatureDefFromMap(spec_idx_to_feature, spec_feature_idx));
 
   dst_node->right_idx = 0;
   dst_node->feature_idx =
@@ -98,16 +121,17 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
 template <typename GenericModel, typename SpecializedModel>
 absl::Status SetNonLeafNode(
     const GenericModel& src_model, const NodeWithChildren& src_node,
-    const int spec_feature_idx, SpecializedModel* dst_model,
+    const int spec_feature_idx, const FeatureDefMap& spec_idx_to_feature,
+    SpecializedModel* dst_model,
     OneDimensionOutputNumericalAndCategoricalFeatureNode* dst_node) {
   static_assert(
       std::is_same<typename SpecializedModel::NodeType,
                    OneDimensionOutputNumericalAndCategoricalFeatureNode>::value,
       "Non supported node type.");
 
-  ASSIGN_OR_RETURN(const auto feature,
-                   FindFeatureDef(dst_model->features().fixed_length_features(),
-                                  spec_feature_idx));
+  ASSIGN_OR_RETURN(
+      const auto feature,
+      FindFeatureDefFromMap(spec_idx_to_feature, spec_feature_idx));
 
   dst_node->right_idx = 0;
   dst_node->feature_idx =
@@ -229,7 +253,7 @@ absl::Status SetContainsCondition(
 template <typename SpecializedModel>
 absl::Status SetObliqueCondition(
     const model::decision_tree::proto::Condition::Oblique& condition,
-    SpecializedModel* dst_model,
+    const FeatureDefMap& spec_idx_to_feature, SpecializedModel* dst_model,
     typename SpecializedModel::NodeType* dst_node) {
   using GenericNode = typename SpecializedModel::NodeType;
   using FeatureIdx = typename GenericNode::FeatureIdx;
@@ -243,6 +267,7 @@ absl::Status SetObliqueCondition(
   if (condition.weights_size() >= std::numeric_limits<FeatureIdx>::max()) {
     return absl::InvalidArgumentError("Too many projections");
   }
+  int number_of_projections = static_cast<int>(condition.weights_size());
   if (dst_model->oblique_weights.size() !=
       dst_model->oblique_internal_feature_idxs.size()) {
     return absl::InvalidArgumentError("Inconsistent internal buffers");
@@ -250,12 +275,13 @@ absl::Status SetObliqueCondition(
 
   // Weights and attributes
   dst_node->oblique_projection_offset = dst_model->oblique_weights.size();
-  for (int projection_idx = 0; projection_idx < condition.weights_size();
+  for (int projection_idx = 0; projection_idx < number_of_projections;
        projection_idx++) {
     dst_model->oblique_weights.push_back(condition.weights(projection_idx));
-    ASSIGN_OR_RETURN(const auto sub_feature,
-                     FindFeatureDef(dst_model->features().input_features(),
-                                    condition.attributes(projection_idx)));
+    ASSIGN_OR_RETURN(
+        const auto sub_feature,
+        FindFeatureDefFromMap(spec_idx_to_feature,
+                              condition.attributes(projection_idx)));
     dst_model->oblique_internal_feature_idxs.push_back(
         static_cast<FeatureIdx>(sub_feature.internal_idx));
   }
@@ -265,7 +291,7 @@ absl::Status SetObliqueCondition(
   dst_model->oblique_internal_feature_idxs.push_back(0);
 
   // Number of projections.
-  dst_node->feature_idx = static_cast<FeatureIdx>(condition.weights_size());
+  dst_node->feature_idx = static_cast<FeatureIdx>(number_of_projections);
   return absl::OkStatus();
 }
 
@@ -281,13 +307,14 @@ template <
 absl::Status SetNonLeafNode(const GenericModel& src_model,
                             const NodeWithChildren& src_node,
                             const int spec_feature_idx,
+                            const FeatureDefMap& spec_idx_to_feature,
                             SpecializedModel* dst_model,
                             typename SpecializedModel::NodeType* dst_node) {
   using GenericNode = typename SpecializedModel::NodeType;
   using FeatureIdx = typename GenericNode::FeatureIdx;
   ASSIGN_OR_RETURN(
       const auto feature,
-      FindFeatureDef(dst_model->features().input_features(), spec_feature_idx));
+      FindFeatureDefFromMap(spec_idx_to_feature, spec_feature_idx));
 
   dst_node->right_idx = 0;
   dst_node->feature_idx = static_cast<FeatureIdx>(feature.internal_idx);
@@ -393,7 +420,8 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
     case ConditionType::kObliqueCondition: {
       const auto& condition =
           src_node.node().condition().condition().oblique_condition();
-      RETURN_IF_ERROR(SetObliqueCondition(condition, dst_model, dst_node));
+      RETURN_IF_ERROR(SetObliqueCondition(condition, spec_idx_to_feature,
+                                          dst_model, dst_node));
     } break;
 
     case ConditionType::kNaCondition: {
@@ -647,7 +675,7 @@ template <typename GenericModel, typename SpecializedModel>
 absl::Status ConvertGenericNodeToFlatNode(
     const GenericModel& src_model, const NodeWithChildren& node,
     const SetLeafFunctor<GenericModel, SpecializedModel> set_node,
-    SpecializedModel* dst_model,
+    const FeatureDefMap& spec_idx_to_feature, SpecializedModel* dst_model,
     std::vector<typename SpecializedModel::NodeType>* specialized_node_array) {
   if (node.IsLeaf()) {
     // Create a leaf.
@@ -658,15 +686,16 @@ absl::Status ConvertGenericNodeToFlatNode(
     // Create a non-leaf node.
     const int spec_feature_idx = node.node().condition().attribute();
     typename SpecializedModel::NodeType non_leaf_node;
-    RETURN_IF_ERROR(SetNonLeafNode(src_model, node, spec_feature_idx, dst_model,
+    RETURN_IF_ERROR(SetNonLeafNode(src_model, node, spec_feature_idx,
+                                   spec_idx_to_feature, dst_model,
                                    &non_leaf_node));
     const size_t new_node_idx = specialized_node_array->size();
     specialized_node_array->push_back(non_leaf_node);
 
     // Create its children.
-    RETURN_IF_ERROR(ConvertGenericNodeToFlatNode(src_model, *node.neg_child(),
-                                                 set_node, dst_model,
-                                                 specialized_node_array));
+    RETURN_IF_ERROR(ConvertGenericNodeToFlatNode(
+        src_model, *node.neg_child(), set_node, spec_idx_to_feature, dst_model,
+        specialized_node_array));
     const int node_offset = specialized_node_array->size() - new_node_idx;
     if (node_offset >=
         std::numeric_limits<
@@ -675,9 +704,9 @@ absl::Status ConvertGenericNodeToFlatNode(
           "Tree with too many nodes for this optimized model format.");
     }
     (*specialized_node_array)[new_node_idx].right_idx = node_offset;
-    RETURN_IF_ERROR(ConvertGenericNodeToFlatNode(src_model, *node.pos_child(),
-                                                 set_node, dst_model,
-                                                 specialized_node_array));
+    RETURN_IF_ERROR(ConvertGenericNodeToFlatNode(
+        src_model, *node.pos_child(), set_node, spec_idx_to_feature, dst_model,
+        specialized_node_array));
   }
   return absl::OkStatus();
 }
@@ -688,14 +717,19 @@ absl::Status CreateFlatModelNodes(
     const GenericModel& src_model,
     SetLeafFunctor<GenericModel, SpecializedModel> set_node,
     SpecializedModel* dst_model) {
+  FeatureDefMap spec_idx_to_feature;
+  for (const FeatureDef& f : dst_model->features().input_features()) {
+    spec_idx_to_feature[f.spec_idx] = f;
+  }
   dst_model->nodes.clear();
   dst_model->nodes.reserve(src_model.NumNodes());
   dst_model->root_offsets.clear();
   dst_model->root_offsets.reserve(src_model.NumTrees());
   for (const auto& tree : src_model.decision_trees()) {
     dst_model->root_offsets.push_back(dst_model->nodes.size());
-    RETURN_IF_ERROR(ConvertGenericNodeToFlatNode(
-        src_model, tree->root(), set_node, dst_model, &dst_model->nodes));
+    RETURN_IF_ERROR(ConvertGenericNodeToFlatNode(src_model, tree->root(),
+                                                 set_node, spec_idx_to_feature,
+                                                 dst_model, &dst_model->nodes));
   }
   YDF_LOG(INFO) << "Model loaded with " << dst_model->root_offsets.size()
                 << " root(s), " << dst_model->nodes.size() << " node(s), and "
