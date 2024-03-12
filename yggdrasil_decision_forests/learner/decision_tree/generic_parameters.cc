@@ -200,7 +200,11 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_conditional()->mutable_categorical()->add_values(
         kHParamSplitAxisSparseOblique);
     param->mutable_documentation()->set_description(
-        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections to test at each node as `num_features^num_projections_exponent`.)");
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections to test at each node.
+Increasing this value very likely improves the quality of the model, drastically increases the training time, and doe not impact the inference time.
+Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Therefore, increasing this `num_projections_exponent` and possibly `max_num_projections` may improve model quality, but will also significantly increase training time.
+Note that the complexity of (classic) Random Forests is roughly proportional to `num_projections_exponent=0.5`, since it considers sqrt(num_features) for a split. The complexity of (classic) GBDT is roughly proportional to `num_projections_exponent=1`, since it considers all features for a split.
+The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) recommends values in [1/4, 2].)");
   }
   {
     ASSIGN_OR_RETURN(
@@ -215,7 +219,9 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_conditional()->mutable_categorical()->add_values(
         kHParamSplitAxisSparseOblique);
     param->mutable_documentation()->set_description(
-        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections to test at each node as `num_features^num_projections_exponent`.)");
+        R"(Density of the projections as an exponent of the number of features. Independently for each projection, each feature has a probability "projection_density_factor / num_features" to be considered in the projection.
+The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) calls this parameter `lambda` and recommends values in [1, 5].
+Increasing this value increases training and inference time (on average). This value is best tuned for each dataset.)");
   }
 
   {
@@ -258,6 +264,22 @@ absl::Status GetGenericHyperParameterSpecification(
         R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Possible values:
 - `BINARY`: The oblique weights are sampled in {-1,1} (default).
 - `CONTINUOUS`: The oblique weights are be sampled in [-1,1].)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(
+        auto param, get_params(kHParamSplitAxisSparseObliqueMaxNumProjections));
+    param->mutable_integer()->set_default_value(
+        config.sparse_oblique_split().max_num_projections());
+    param->mutable_integer()->set_minimum(1);
+    param->mutable_documentation()->set_proto_field("max_num_projections");
+    param->mutable_conditional()->set_control_field(kHParamSplitAxis);
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        kHParamSplitAxisSparseOblique);
+    param->mutable_documentation()->set_description(
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after the num_projections_exponent).
+Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Increasing "max_num_projections" increases the training time but not the inference time. In late stage model development, if every bit of accuracy if important, increase this value.
+The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does not define this hyperparameter.)");
   }
 
   {
@@ -534,9 +556,25 @@ absl::Status SetHyperParameters(
         dt_config->mutable_sparse_oblique_split()->set_num_projections_exponent(
             hparam_value);
       } else {
-        return absl::InvalidArgumentError(
-            absl::StrCat(kHParamSplitAxisSparseObliqueNumProjectionsExponent,
-                         " only work with oblique trees"));
+        return absl::InvalidArgumentError(absl::StrCat(
+            kHParamSplitAxisSparseObliqueNumProjectionsExponent,
+            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
+      }
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamSplitAxisSparseObliqueMaxNumProjections);
+    if (hparam.has_value()) {
+      const auto hparam_value = hparam.value().value().integer();
+      if (dt_config->has_sparse_oblique_split()) {
+        dt_config->mutable_sparse_oblique_split()->set_max_num_projections(
+            hparam_value);
+      } else {
+        return absl::InvalidArgumentError(absl::StrCat(
+            kHParamSplitAxisSparseObliqueMaxNumProjections,
+            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
       }
     }
   }
@@ -550,9 +588,9 @@ absl::Status SetHyperParameters(
         dt_config->mutable_sparse_oblique_split()
             ->set_projection_density_factor(hparam_value);
       } else {
-        return absl::InvalidArgumentError(
-            absl::StrCat(kHParamSplitAxisSparseObliqueProjectionDensityFactor,
-                         " only work with oblique trees"));
+        return absl::InvalidArgumentError(absl::StrCat(
+            kHParamSplitAxisSparseObliqueProjectionDensityFactor,
+            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
       }
     }
   }
@@ -573,9 +611,9 @@ absl::Status SetHyperParameters(
       if (dt_config->has_sparse_oblique_split()) {
         dt_config->mutable_sparse_oblique_split()->set_normalization(value);
       } else {
-        return absl::InvalidArgumentError(
-            absl::StrCat(kHParamSplitAxisSparseObliqueNormalization,
-                         " only work with oblique trees"));
+        return absl::InvalidArgumentError(absl::StrCat(
+            kHParamSplitAxisSparseObliqueNormalization,
+            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
       }
     }
   }
@@ -598,9 +636,9 @@ absl::Status SetHyperParameters(
               kHParamSplitAxisSparseObliqueWeightsContinuous, "."));
         }
       } else {
-        return absl::InvalidArgumentError(
-            absl::StrCat(kHParamSplitAxisSparseObliqueWeights,
-                         " only work with oblique trees"));
+        return absl::InvalidArgumentError(absl::StrCat(
+            kHParamSplitAxisSparseObliqueWeights,
+            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
       }
     }
   }

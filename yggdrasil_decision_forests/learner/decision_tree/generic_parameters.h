@@ -66,6 +66,8 @@ constexpr char kHParamSplitAxisSparseObliqueNumProjectionsExponent[] =
     "sparse_oblique_num_projections_exponent";
 constexpr char kHParamSplitAxisSparseObliqueProjectionDensityFactor[] =
     "sparse_oblique_projection_density_factor";
+constexpr char kHParamSplitAxisSparseObliqueMaxNumProjections[] =
+    "sparse_oblique_max_num_projections";
 
 constexpr char kHParamSplitAxisSparseObliqueWeights[] =
     "sparse_oblique_weights";
