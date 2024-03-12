@@ -1,6 +1,9 @@
 # Changelog
 
-## 1.9.0rc0 - 2024-02-26
+Note: This is the changelog of the C++ library. The Python port has a separate
+Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
+
+## 1.9.0 - 2024-03-12
 
 ### Feature
 
