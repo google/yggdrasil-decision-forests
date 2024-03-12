@@ -40,4 +40,7 @@ from ydf.model.tree.value import RegressionValue
 from ydf.model.tree.value import ProbabilityValue
 from ydf.model.tree.value import UpliftValue
 
+# Plotting
+from ydf.model.tree.plot import PlotOptions
+
 # pylint: enable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported

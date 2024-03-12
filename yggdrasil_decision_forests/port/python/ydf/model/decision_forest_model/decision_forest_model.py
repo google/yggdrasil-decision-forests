@@ -22,6 +22,7 @@ import numpy as np
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.model import generic_model
+from ydf.model.tree import plot as plot_lib
 from ydf.model.tree import tree as tree_lib
 
 
@@ -68,7 +69,7 @@ class DecisionForestModel(generic_model.GenericModel):
         "label": ["a", "b", "b", "a", "a"] * 3,
     })
     # Train a CART model
-    learner = ydf.CartLearner(label="label").train(train_ds)
+    model = ydf.CartLearner(label="label").train(train_ds)
     # Make sure the model is a CART
     assert isinstance(model, ydf.CARTModel)
     # Print the tree
@@ -77,11 +78,54 @@ class DecisionForestModel(generic_model.GenericModel):
 
     Args:
       tree_idx: Index of the tree. Should be in [0, self.num_trees()).
-      file: Where to print the tree. By default, prints on the terminal
-        stanrdard output.
+      file: Where to print the tree. By default, prints on the terminal standard
+        output.
     """
 
     file.write(self.get_tree(tree_idx).pretty(self.data_spec()))
+
+  def plot_tree(
+      self,
+      tree_idx: int = 0,
+      max_depth: Optional[int] = None,
+      options: Optional[plot_lib.PlotOptions] = None,
+      d3js_url: str = "https://d3js.org/d3.v6.min.js",
+  ) -> plot_lib.TreePlot:
+    """Plots an interactive HTML rendering of the tree.
+
+    Usage example:
+
+    ```python
+    # Create a dataset
+    train_ds = pd.DataFrame({
+        "c1": [1.0, 1.1, 2.0, 3.5, 4.2] + list(range(10)),
+        "label": ["a", "b", "b", "a", "a"] * 3,
+    })
+    # Train a CART model
+    model = ydf.CartLearner(label="label").train(train_ds)
+    # Make sure the model is a CART
+    assert isinstance(model, ydf.CARTModel)
+    # Plot the tree in Colab
+    model.plot_tree()
+    ```
+
+    Args:
+      tree_idx: Index of the tree. Should be in [0, self.num_trees()).
+      max_depth: Maximum tree depth of the plot. Set to None for full depth.
+      options: Advanced options for plotting. Set to None for default style.
+      d3js_url: URL to load the d3.js library from.
+
+    Returns:
+      In interactive environments, an interactive plot. The HTML source can also
+      be exported to file.
+    """
+    label_classes = None
+    if self.task() == generic_model.Task.CLASSIFICATION:
+      label_classes = self.label_classes()
+
+    return self.get_tree(tree_idx).plot(
+        self.data_spec(), max_depth, label_classes, options, d3js_url
+    )
 
   def set_tree(self, tree_idx: int, tree: tree_lib.Tree) -> None:
     """Overrides a single tree of the model.

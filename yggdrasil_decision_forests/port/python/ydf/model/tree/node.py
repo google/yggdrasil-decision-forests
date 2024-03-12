@@ -16,7 +16,8 @@
 
 import abc
 import dataclasses
-from typing import Optional
+import functools
+from typing import Any, Dict, Optional
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.model.tree import condition as condition_lib
 from ydf.model.tree import value as value_lib
@@ -121,6 +122,65 @@ class NonLeaf(AbstractNode):
       else:
         children_text += "No negative child\n"
       return children_text
+
+
+@functools.singledispatch
+def to_json(
+    node: AbstractNode,
+    depth: int,
+    max_depth: Optional[int],
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  """Creates a JSON-compatible object of the node.
+
+  Note: While public, this logic is not part of the API. This is why this
+  methode's code is not an abstract method in AbstractValue.
+
+  Args:
+    node: Input node.
+    depth: Depth of the current node
+    max_depth: Maximum depth of the tree in the json
+    dataspec: Dataspec associated with this tree.
+
+  Returns:
+    JSON node.
+  """
+  raise NotImplementedError("Unsupported node type")
+
+
+@to_json.register
+def _to_json_leaf(
+    node: Leaf,
+    depth: int,
+    max_depth: Optional[int],
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  return {"value": value_lib.to_json(node.value)}
+
+
+@to_json.register
+def _to_json_non_leaf(
+    node: NonLeaf,
+    depth: int,
+    max_depth: Optional[int],
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  dst = {}
+  if node.value is not None:
+    dst["value"] = value_lib.to_json(node.value)
+
+  if node.condition is not None:
+    dst["condition"] = condition_lib.to_json(node.condition, dataspec)
+  if (
+      (max_depth is None or (max_depth is not None and depth < max_depth))
+      and node.pos_child is not None
+      and node.neg_child is not None
+  ):
+    dst["children"] = [
+        to_json(node.pos_child, depth + 1, max_depth, dataspec),
+        to_json(node.neg_child, depth + 1, max_depth, dataspec),
+    ]
+  return dst
 
 
 def _pretty_local_prefix(is_pos: Optional[bool]) -> str:

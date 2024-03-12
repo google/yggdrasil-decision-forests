@@ -15,11 +15,12 @@
 """A decision tree."""
 
 import dataclasses
-from typing import Iterator, List, Optional, Sequence
+from typing import Any, Dict, Iterator, List, Optional, Sequence
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 from ydf.model.tree import condition as condition_lib
 from ydf.model.tree import node as node_lib
+from ydf.model.tree import plot as plot_lib
 from ydf.model.tree import value as value_lib
 
 
@@ -57,6 +58,39 @@ class Tree:
       )
     else:
       return "No root\n"
+
+  def _to_json(
+      self, dataspec: data_spec_pb2.DataSpecification, max_depth: Optional[int]
+  ) -> Dict[str, Any]:
+    return node_lib.to_json(self.root, 0, max_depth, dataspec)
+
+  def plot(
+      self,
+      dataspec: data_spec_pb2.DataSpecification,
+      max_depth: Optional[int],
+      label_classes: Optional[Sequence[str]],
+      options: Optional[plot_lib.PlotOptions] = None,
+      d3js_url: str = "https://d3js.org/d3.v6.min.js",
+  ) -> plot_lib.TreePlot:
+    """Plots a decision tree.
+
+    Args:
+      dataspec: Dataspec of the tree.
+      max_depth: Maximum tree depth of the plot. Set to None for full depth.
+      label_classes: For classification, label classes of the dataset.
+      options: Advanced options for plotting. Set to None for default style.
+      d3js_url: URL to load the d3.js library from.
+
+    Returns:
+      The html content displaying the tree.
+    """
+
+    if options is None:
+      options = plot_lib.PlotOptions()
+    # Converts the tree into its json representation.
+    json_tree = self._to_json(dataspec, max_depth)
+
+    return plot_lib.TreePlot(json_tree, label_classes, options, d3js_url)
 
 
 def _recusive_build_tree(

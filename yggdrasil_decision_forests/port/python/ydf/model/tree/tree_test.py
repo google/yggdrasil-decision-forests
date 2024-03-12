@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import re
 from absl.testing import absltest
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
@@ -115,6 +116,40 @@ class TreeTest(absltest.TestCase):
   def test_tree_to_proto_nodes_with_valid_input(self):
     nodes = tree_lib.tree_to_proto_nodes(self.tree, self.dataspec)
     self.assertEqual(nodes, self.nodes)
+
+  def test_plot_toy_tree(self):
+    tree_plot = self.tree.plot(
+        self.dataspec, max_depth=None, label_classes=None
+    )
+    raw_output = tree_plot.html()
+    pattern = r"tree_plot_[a-f|\d]{32}"
+    reproducible_html = re.sub(pattern, "tree_plot_element", raw_output)
+    reproducible_html = reproducible_html.replace(
+        """/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+""",
+        "",
+    )
+    test_utils.golden_check_string(
+        self,
+        reproducible_html,
+        os.path.join(
+            test_utils.pydf_test_data_path(), "golden_toy_tree_plot.txt"
+        ),
+    )
 
 
 if __name__ == "__main__":

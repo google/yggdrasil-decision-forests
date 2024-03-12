@@ -18,9 +18,8 @@ import abc
 import dataclasses
 import functools
 import math
-from typing import Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 import numpy as np
-from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 
 
@@ -132,6 +131,52 @@ def to_value(proto_node: decision_tree_pb2.Node) -> AbstractValue:
     )
 
   raise ValueError("Unsupported value")
+
+
+@functools.singledispatch
+def to_json(value: AbstractValue) -> Dict[str, Any]:
+  """Creates a JSON-compatible object of the value.
+
+  Note: While public, this logic is not part of the API. This is why this
+  methode's code is not an abstract method in AbstractValue.
+
+  Args:
+    value: Input value.
+
+  Returns:
+    JSON value.
+  """
+  raise NotImplementedError("Unsupported value type")
+
+
+@to_json.register
+def _to_json_regression(value: RegressionValue) -> Dict[str, Any]:
+  value_as_json = {
+      "type": "REGRESSION",
+      "value": value.value,
+      "num_examples": value.num_examples,
+  }
+  if value.standard_deviation is not None:
+    value_as_json["standard_deviation"] = value.standard_deviation
+  return value_as_json
+
+
+@to_json.register
+def _to_json_probability(value: ProbabilityValue) -> Dict[str, Any]:
+  return {
+      "type": "PROBABILITY",
+      "distribution": value.probability,
+      "num_examples": value.num_examples,
+  }
+
+
+@to_json.register
+def _to_json_uplift(value: UpliftValue) -> Dict[str, Any]:
+  return {
+      "type": "UPLIFT",
+      "treatment_effect": value.treatment_effect,
+      "num_examples": value.num_examples,
+  }
 
 
 @functools.singledispatch

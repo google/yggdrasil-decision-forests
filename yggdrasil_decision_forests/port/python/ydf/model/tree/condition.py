@@ -17,7 +17,7 @@
 import abc
 import dataclasses
 import functools
-from typing import Sequence, Union
+from typing import Any, Dict, Sequence, Union
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 from ydf.dataset import dataspec as dataspec_lib
@@ -265,6 +265,121 @@ def to_condition(
     )
   else:
     raise ValueError(f"Non supported condition type: {proto_condition}")
+
+
+@functools.singledispatch
+def to_json(
+    condition: AbstractCondition, dataspec: data_spec_pb2.DataSpecification
+) -> Dict[str, Any]:
+  """Creates a JSON-compatible object of the condition.
+
+  Note: While public, this logic is not part of the API. This is why this
+  methode's code is not an abstract method in AbstractValue.
+
+  Args:
+    condition: Input condition.
+    dataspec: Dataspec of the model.
+
+  Returns:
+    JSON condition.
+  """
+  raise NotImplementedError("Unsupported value type")
+
+
+@to_json.register
+def _to_json_is_missing(
+    condition: IsMissingInCondition, dataspec: data_spec_pb2.DataSpecification
+) -> Dict[str, Any]:
+  attribute_name = dataspec.columns[condition.attribute].name
+  return {"type": "IS_MISSING", "attribute": attribute_name}
+
+
+@to_json.register
+def _to_json_is_true(
+    condition: IsTrueCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  attribute_name = dataspec.columns[condition.attribute].name
+  return {"type": "IS_TRUE", "attribute": attribute_name}
+
+
+@to_json.register
+def _to_json_higher_than(
+    condition: NumericalHigherThanCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  attribute_name = dataspec.columns[condition.attribute].name
+  return {
+      "type": "NUMERICAL_IS_HIGHER_THAN",
+      "attribute": attribute_name,
+      "threshold": condition.threshold,
+  }
+
+
+@to_json.register
+def _to_json_discretized_higher_than(
+    condition: DiscretizedNumericalHigherThanCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  attribute_name = dataspec.columns[condition.attribute].name
+  return {
+      "type": "DISCRETIZED_NUMERICAL_IS_HIGHER_THAN",
+      "attribute": attribute_name,
+      "threshold_idx": condition.threshold_idx,
+  }
+
+
+@to_json.register
+def _to_json_categorical(
+    condition: CategoricalIsInCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  """Returns a JSON-compatible dict for Categorical conditions."""
+  attribute_name = dataspec.columns[condition.attribute].name
+  column_spec = dataspec.columns[condition.attribute]
+  if column_spec.categorical.is_already_integerized:
+    mask_repr = list(condition.mask)
+  else:
+    vocab = dataspec_lib.categorical_column_dictionary_to_list(column_spec)
+    mask_repr = [vocab[item] for item in condition.mask]
+  return {
+      "type": "CATEGORICAL_IS_IN",
+      "attribute": attribute_name,
+      "mask": mask_repr,
+  }
+
+
+@to_json.register
+def _to_json_categorical_set(
+    condition: CategoricalSetContainsCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  """Returns a JSON-compatible dict for CategoricalSet conditions."""
+  attribute_name = dataspec.columns[condition.attribute].name
+  column_spec = dataspec.columns[condition.attribute]
+  if column_spec.categorical.is_already_integerized:
+    mask_repr = list(condition.mask)
+  else:
+    vocab = dataspec_lib.categorical_column_dictionary_to_list(column_spec)
+    mask_repr = [vocab[item] for item in condition.mask]
+  return {
+      "type": "CATEGORICAL_SET_CONTAINS",
+      "attribute": attribute_name,
+      "mask": mask_repr,
+  }
+
+
+@to_json.register
+def _to_json_numerical_sparse_oblique(
+    condition: NumericalSparseObliqueCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  return {
+      "type": "NUMERICAL_SPARSE_OBLIQUE",
+      "attributes": [dataspec.columns[f].name for f in condition.attributes],
+      "weights": condition.weights,
+      "threshold": condition.threshold,
+  }
 
 
 @functools.singledispatch

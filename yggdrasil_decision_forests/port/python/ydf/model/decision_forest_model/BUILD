@@ -38,6 +38,7 @@ py_library(
         "//ydf/dataset",
         "//ydf/model:generic_model",
         "//ydf/model/tree",
+        "//ydf/model/tree:plot",
     ],
 )
 
@@ -53,6 +54,7 @@ py_test(
     ],
     python_version = "PY3",
     deps = [
+        ":decision_forest_model",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # numpy dep,
