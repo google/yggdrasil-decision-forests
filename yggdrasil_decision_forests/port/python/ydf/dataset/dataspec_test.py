@@ -26,6 +26,7 @@ Column = dataspec_lib.Column
 Monotonic = dataspec_lib.Monotonic
 DataSpecInferenceArgs = dataspec_lib.DataSpecInferenceArgs
 
+
 def toy_dataspec():
   return ds_pb.DataSpecification(
       columns=[
@@ -227,7 +228,7 @@ class DataspecTest(absltest.TestCase):
 
   def test_get_all_columns_missing(self):
     with self.assertRaisesRegex(
-        ValueError, "Column b is required but was not found in the data."
+        ValueError, "Column 'b' is required but was not found in the data."
     ):
       dataspec_lib.get_all_columns(
           ["a"],

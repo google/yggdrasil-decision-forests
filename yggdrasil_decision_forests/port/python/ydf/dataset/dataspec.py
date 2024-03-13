@@ -479,7 +479,7 @@ def get_all_columns(
       else:
         if required_columns is None or col.name in required_columns_as_set:
           raise ValueError(
-              f"Column {col.name} is required but was not found in the data."
+              f"Column {col.name!r} is required but was not found in the data."
               f" Available columns: {available_columns}"
           )
 

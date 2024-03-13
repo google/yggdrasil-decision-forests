@@ -246,13 +246,14 @@ def create_vertical_dataset(
     max_num_scanned_rows_to_compute_statistics: int = 10000,
     data_spec: Optional[data_spec_pb2.DataSpecification] = None,
     required_columns: Optional[Sequence[str]] = None,
+    dont_unroll_columns: Optional[Sequence[str]] = None,
 ) -> VerticalDataset:
   """Creates a VerticalDataset from various sources of data.
 
   The feature semantics are automatically determined and can be explicitly
   set with the `columns` argument. The semantics of a dataset (or model) are
   available its data_spec.
-  
+
   Note that the CATEGORICAL_SET semantic is not automatically inferred when
   reading from file. When reading from CSV files, setting the CATEGORICAL_SET
   semantic for a feature will have YDF tokenize the feature. When reading from
@@ -327,6 +328,8 @@ def create_vertical_dataset(
       provided.
     required_columns: List of columns required in the data. If None, all columns
       mentioned in the data spec or `columns` are required.
+    dont_unroll_columns: List of columns that cannot be unrolled. If one such
+      column needs to be unrolled, raise an error.
 
   Returns:
     Dataset to be ingested by the learner algorithms.
@@ -344,7 +347,11 @@ def create_vertical_dataset(
           " None and all arguments to guide data spec inference are ignored."
       )
     return create_vertical_dataset_with_spec_or_args(
-        data, required_columns, data_spec=data_spec, inference_args=None
+        data,
+        required_columns,
+        data_spec=data_spec,
+        inference_args=None,
+        dont_unroll_columns=dont_unroll_columns,
     )
   else:
     inference_args = dataspec.DataSpecInferenceArgs(
@@ -362,6 +369,7 @@ def create_vertical_dataset(
         required_columns,
         inference_args=inference_args,
         data_spec=None,
+        dont_unroll_columns=dont_unroll_columns,
     )
 
 
@@ -370,6 +378,7 @@ def create_vertical_dataset_with_spec_or_args(
     required_columns: Optional[Sequence[str]],
     inference_args: Optional[dataspec.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
+    dont_unroll_columns: Optional[Sequence[str]] = None,
 ) -> VerticalDataset:
   """Returns a vertical dataset from inference args or data spec (not both!)."""
   assert (data_spec is None) != (inference_args is None)
@@ -384,7 +393,9 @@ def create_vertical_dataset_with_spec_or_args(
         data, required_columns, inference_args, data_spec
     )
   else:
-    data_dict = dataset_io.cast_input_dataset_to_dict(data)
+    data_dict = dataset_io.cast_input_dataset_to_dict(
+        data, dont_unroll_columns=dont_unroll_columns
+    )
     return create_vertical_dataset_from_dict_of_values(
         data_dict,
         required_columns,

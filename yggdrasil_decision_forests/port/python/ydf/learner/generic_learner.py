@@ -18,7 +18,7 @@ import copy
 import datetime
 import os
 import re
-from typing import Any, Optional, Sequence, Union
+from typing import Optional, Sequence, Union
 
 from absl import logging
 
@@ -319,6 +319,17 @@ Hyper-parameters: ydf.{self._hyperparameters}
       return ds
       # TODO: Check that the user has not specified a data spec guide.
     else:
+
+      # List of columns that cannot be unrolled.
+      dont_unroll_columns = [self._label]
+      for column in [
+          self._weights,
+          self._ranking_group,
+          self._uplift_treatment,
+      ]:
+        if column:
+          dont_unroll_columns.append(column)
+
       effective_data_spec_args = None
       if self._data_spec is None:
         effective_data_spec_args = self._build_data_spec_args()
@@ -327,6 +338,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
           data_spec=self._data_spec,
           inference_args=effective_data_spec_args,
           required_columns=None,  # All columns in the dataspec are required.
+          dont_unroll_columns=dont_unroll_columns,
       )
 
   def cross_validation(

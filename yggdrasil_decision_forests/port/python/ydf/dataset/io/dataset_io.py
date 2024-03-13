@@ -15,7 +15,7 @@
 """Common functionality for all dataset I/O connectors."""
 
 import math
-from typing import Dict, Iterator, Tuple
+from typing import Dict, Iterator, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -25,8 +25,7 @@ from ydf.dataset.io import tensorflow_io
 
 
 def _unroll_column(
-    name: str,
-    src: dataset_io_types.InputValues,
+    name: str, src: dataset_io_types.InputValues, allow_unroll: bool
 ) -> Iterator[Tuple[str, dataset_io_types.InputValues]]:
   """Unrolls a possibly multi-dim. column into multiple single-dim columns.
 
@@ -36,6 +35,7 @@ def _unroll_column(
   Args:
     name: Name of the source column.
     src: Single-dimensional or multi-dimensional value.
+    allow_unroll: If false, fails if the column should be unrolled.
 
   Yields:
     Tuple of key and values of single-dimentional features.
@@ -45,6 +45,13 @@ def _unroll_column(
   if not isinstance(src, np.ndarray) or src.ndim <= 1:
     yield name, src
     return
+
+  if not allow_unroll:
+    raise ValueError(
+        f"The column {name!r} is multi-dimensional (shape={src.shape}) while"
+        " the model requires this column to be single-dimensional (e.g."
+        " shape=[num_examples])."
+    )
 
   if src.ndim > 2:
     raise ValueError(
@@ -69,38 +76,54 @@ def _unroll_column(
 
 
 def _unroll_dict(
-    src: Dict[str, dataset_io_types.InputValues]
+    src: Dict[str, dataset_io_types.InputValues],
+    dont_unroll_columns: Optional[Sequence[str]] = None,
 ) -> Dict[str, dataset_io_types.InputValues]:
   """Unrolls multi-dim. columns into multiple single-dim. columns.
 
   Args:
     src: Dictionary of single and multi-dim values.
+    dont_unroll_columns: List of columns that cannot be unrolled. If one such
+      column needs to be unrolled, raise an error.
 
   Returns:
     Dictionary containing only single-dimensional values.
   """
 
+  # Index the columns for fast query.
+  dont_unroll_columns_set = (
+      set(dont_unroll_columns) if dont_unroll_columns else set()
+  )
+
   # Note: We only create a one dictionary independently of the number of
   # features.
   dst = {}
   for name, value in src.items():
-    for sub_name, sub_value in _unroll_column(name, value):
+    for sub_name, sub_value in _unroll_column(
+        name, value, allow_unroll=name not in dont_unroll_columns_set
+    ):
       dst[sub_name] = sub_value
   return dst
 
 
 def cast_input_dataset_to_dict(
     data: dataset_io_types.IODataset,
+    dont_unroll_columns: Optional[Sequence[str]] = None,
 ) -> Dict[str, dataset_io_types.InputValues]:
   """Transforms the input dataset into a dictionary of values."""
+
+  unroll_dict_kwargs = {
+      "dont_unroll_columns": dont_unroll_columns,
+  }
+
   if pandas_io.is_pandas_dataframe(data):
-    return _unroll_dict(pandas_io.to_dict(data))
+    return _unroll_dict(pandas_io.to_dict(data), **unroll_dict_kwargs)
   elif tensorflow_io.is_tensorflow_dataset(data):
-    return _unroll_dict(tensorflow_io.to_dict(data))
+    return _unroll_dict(tensorflow_io.to_dict(data), **unroll_dict_kwargs)
 
   elif isinstance(data, dict):
     # Dictionary of values
-    return _unroll_dict(data)
+    return _unroll_dict(data, **unroll_dict_kwargs)
 
   # TODO: Maybe this error should be raised at a layer above this one?
   raise ValueError(

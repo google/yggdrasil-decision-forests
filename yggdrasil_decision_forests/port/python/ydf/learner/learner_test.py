@@ -506,6 +506,35 @@ class RandomForestLearnerTest(LearnerTest):
     predictions = model.predict(data)
     self.assertEqual(predictions.shape, (2,))
 
+  def test_multidimensional_labels(self):
+    ds = {
+        "feature": np.array([[0, 1], [1, 0]]),
+        "label": np.array([[0, 1], [1, 0]]),
+    }
+    learner = specialized_learners.GradientBoostedTreesLearner(label="label")
+    with self.assertRaisesRegex(
+        test_utils.AbslInvalidArgumentError,
+        "The column 'label' is multi-dimensional \\(shape=\\(2, 2\\)\\) while"
+        " the model requires this column to be single-dimensional",
+    ):
+      _ = learner.train(ds)
+
+  def test_multidimensional_weights(self):
+    ds = {
+        "feature": np.array([[0, 1], [1, 0]]),
+        "label": np.array([0, 1]),
+        "weight": np.array([[0, 1], [1, 0]]),
+    }
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="label", weights="weight"
+    )
+    with self.assertRaisesRegex(
+        test_utils.AbslInvalidArgumentError,
+        "The column 'weight' is multi-dimensional \\(shape=\\(2, 2\\)\\) while"
+        " the model requires this column to be single-dimensional",
+    ):
+      _ = learner.train(ds)
+
   def test_learn_and_predict_when_label_is_not_last_column(self):
     label = "age"
     learner = specialized_learners.RandomForestLearner(
