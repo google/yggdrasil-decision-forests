@@ -559,6 +559,23 @@ class RandomForestLearnerTest(LearnerTest):
     model = learner.train(test_utils.toy_dataset())
     self.assertEqual(model.metadata().owner, "")
 
+  def test_adult_sparse_oblique(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="income",
+        num_trees=4,
+        split_axis="SPARSE_OBLIQUE",
+        sparse_oblique_weights="CONTINUOUS",
+    )
+    model = learner.train(self.adult.train)
+    logging.info("Trained model: %s", model)
+
+  def test_adult_mhld_oblique(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="income", num_trees=4, split_axis="MHLD_OBLIQUE"
+    )
+    model = learner.train(self.adult.train)
+    logging.info("Trained model: %s", model)
+
 
 class CARTLearnerTest(LearnerTest):
 

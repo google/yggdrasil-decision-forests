@@ -183,10 +183,13 @@ absl::Status GetGenericHyperParameterSpecification(
         kHParamSplitAxisAxisAligned);
     param->mutable_categorical()->add_possible_values(
         kHParamSplitAxisSparseOblique);
+    param->mutable_categorical()->add_possible_values(
+        kHParamSplitAxisMhldOblique);
     param->mutable_documentation()->set_description(
         R"(What structure of split to consider for numerical features.
 - `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.
-- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.)");
+- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.
+- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029)");
   }
   {
     ASSIGN_OR_RETURN(
@@ -280,6 +283,35 @@ Increasing this value increases training and inference time (on average). This v
         R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after the num_projections_exponent).
 Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Increasing "max_num_projections" increases the training time but not the inference time. In late stage model development, if every bit of accuracy if important, increase this value.
 The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does not define this hyperparameter.)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(auto param,
+                     get_params(kHParamSplitAxisMhldObliqueMaxNumAttributes));
+    param->mutable_integer()->set_default_value(
+        config.mhld_oblique_split().max_num_attributes());
+    param->mutable_integer()->set_minimum(1);
+    param->mutable_documentation()->set_proto_field("max_num_attributes");
+    param->mutable_conditional()->set_control_field(kHParamSplitAxis);
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        kHParamSplitAxisMhldOblique);
+    param->mutable_documentation()->set_description(
+        R"(For MHLD oblique splits i.e. `split_axis=MHLD_OBLIQUE`. Maximum number of attributes in the projection. Increasing this value increases the training time. Decreasing this value acts as a regularization. The value should be in [2, num_numerical_features]. If the value is above the total number of numerical features, the value is capped automatically. The value 1 is allowed but results in ordinary (non-oblique) splits.)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(auto param,
+                     get_params(kHParamSplitAxisMhldObliqueSampleAttributes));
+    param->mutable_categorical()->set_default_value(
+        config.mhld_oblique_split().sample_attributes() ? kTrue : kFalse);
+    param->mutable_categorical()->add_possible_values(kTrue);
+    param->mutable_categorical()->add_possible_values(kFalse);
+    param->mutable_documentation()->set_proto_field("sample_attributes");
+    param->mutable_conditional()->set_control_field(kHParamSplitAxis);
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        kHParamSplitAxisMhldOblique);
+    param->mutable_documentation()->set_description(
+        R"(For MHLD oblique splits i.e. `split_axis=MHLD_OBLIQUE`. If true, applies the attribute sampling controlled by the "num_candidate_attributes" or "num_candidate_attributes_ratio" parameters. If false, all the attributes are tested.)");
   }
 
   {
@@ -540,6 +572,8 @@ absl::Status SetHyperParameters(
         dt_config->mutable_axis_aligned_split();
       } else if (hparam_value == kHParamSplitAxisSparseOblique) {
         dt_config->mutable_sparse_oblique_split();
+      } else if (hparam_value == kHParamSplitAxisMhldOblique) {
+        dt_config->mutable_mhld_oblique_split();
       } else {
         return absl::InvalidArgumentError(
             absl::StrCat("Unknown axis split strategy: ", hparam_value));
@@ -547,6 +581,7 @@ absl::Status SetHyperParameters(
     }
   }
 
+  // Sparse oblique trees
   {
     const auto hparam = generic_hyper_params->Get(
         kHParamSplitAxisSparseObliqueNumProjectionsExponent);
@@ -556,9 +591,10 @@ absl::Status SetHyperParameters(
         dt_config->mutable_sparse_oblique_split()->set_num_projections_exponent(
             hparam_value);
       } else {
-        return absl::InvalidArgumentError(absl::StrCat(
-            kHParamSplitAxisSparseObliqueNumProjectionsExponent,
-            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueNumProjectionsExponent,
+                         " only works with sparse oblique trees "
+                         "(split_axis=SPARSE_OBLIQUE)"));
       }
     }
   }
@@ -572,9 +608,10 @@ absl::Status SetHyperParameters(
         dt_config->mutable_sparse_oblique_split()->set_max_num_projections(
             hparam_value);
       } else {
-        return absl::InvalidArgumentError(absl::StrCat(
-            kHParamSplitAxisSparseObliqueMaxNumProjections,
-            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueMaxNumProjections,
+                         " only works with sparse oblique trees "
+                         "(split_axis=SPARSE_OBLIQUE)"));
       }
     }
   }
@@ -588,9 +625,10 @@ absl::Status SetHyperParameters(
         dt_config->mutable_sparse_oblique_split()
             ->set_projection_density_factor(hparam_value);
       } else {
-        return absl::InvalidArgumentError(absl::StrCat(
-            kHParamSplitAxisSparseObliqueProjectionDensityFactor,
-            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueProjectionDensityFactor,
+                         " only works with sparse oblique trees "
+                         "(split_axis=SPARSE_OBLIQUE)"));
       }
     }
   }
@@ -611,9 +649,10 @@ absl::Status SetHyperParameters(
       if (dt_config->has_sparse_oblique_split()) {
         dt_config->mutable_sparse_oblique_split()->set_normalization(value);
       } else {
-        return absl::InvalidArgumentError(absl::StrCat(
-            kHParamSplitAxisSparseObliqueNormalization,
-            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueNormalization,
+                         " only works with sparse oblique trees "
+                         "(split_axis=SPARSE_OBLIQUE)"));
       }
     }
   }
@@ -636,13 +675,48 @@ absl::Status SetHyperParameters(
               kHParamSplitAxisSparseObliqueWeightsContinuous, "."));
         }
       } else {
-        return absl::InvalidArgumentError(absl::StrCat(
-            kHParamSplitAxisSparseObliqueWeights,
-            " only works with oblique trees (split_axis SPARSE_OBLIQUE)"));
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueWeights,
+                         " only works with sparse oblique trees "
+                         "(split_axis=SPARSE_OBLIQUE)"));
       }
     }
   }
 
+  // Mhld oblique trees
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamSplitAxisMhldObliqueMaxNumAttributes);
+    if (hparam.has_value()) {
+      const auto hparam_value = hparam.value().value().integer();
+      if (dt_config->has_mhld_oblique_split()) {
+        dt_config->mutable_mhld_oblique_split()->set_max_num_attributes(
+            hparam_value);
+      } else {
+        return absl::InvalidArgumentError(absl::StrCat(
+            kHParamSplitAxisMhldObliqueMaxNumAttributes,
+            " only works with MHLD oblique trees (split_axis=MHLD_OBLIQUE)"));
+      }
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamSplitAxisMhldObliqueSampleAttributes);
+    if (hparam.has_value()) {
+      const auto hparam_value = hparam.value().value().categorical();
+      if (dt_config->has_mhld_oblique_split()) {
+        dt_config->mutable_mhld_oblique_split()->set_sample_attributes(
+            hparam_value == kTrue);
+      } else {
+        return absl::InvalidArgumentError(absl::StrCat(
+            kHParamSplitAxisMhldObliqueSampleAttributes,
+            " only works with MHLD oblique trees (split_axis=MHLD_OBLIQUE)"));
+      }
+    }
+  }
+
+  // Categorical
   {
     const auto hparam = generic_hyper_params->Get(kHParamCategoricalAlgorithm);
     if (hparam.has_value()) {

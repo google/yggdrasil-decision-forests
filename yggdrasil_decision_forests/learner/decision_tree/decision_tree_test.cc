@@ -2798,6 +2798,57 @@ TEST(
             SplitSearchResult::kInvalidAttribute);
 }
 
+struct GenericHyperParameterTestDef {
+  std::vector<std::string> keys;
+  std::string generic_param;
+  std::string dt_proto;
+};
+class GenericHyperParameterTest
+    : public testing::TestWithParam<GenericHyperParameterTestDef> {};
+
+TEST_P(GenericHyperParameterTest, Generic) {
+  const auto& keys = GetParam().keys;
+  model::proto::GenericHyperParameters generic_param =
+      PARSE_TEST_PROTO(GetParam().generic_param);
+  proto::DecisionTreeTrainingConfig expected_dt_proto =
+      PARSE_TEST_PROTO(GetParam().dt_proto);
+
+  // The generic hyper-parameter is defined.
+  model::proto::GenericHyperParameterSpecification hparam_def;
+  EXPECT_OK(GetGenericHyperParameterSpecification({}, &hparam_def));
+  for (const auto& key : keys) {
+    EXPECT_FALSE(
+        std::find_if(hparam_def.fields().begin(), hparam_def.fields().end(),
+                     [&](const auto& field) { return field.first == key; }) ==
+        hparam_def.fields().end());
+  }
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  absl::flat_hash_set<std::string> consumed_hparams;
+  utils::GenericHyperParameterConsumer consumer(generic_param);
+  EXPECT_OK(SetHyperParameters(&consumed_hparams, &dt_config, &consumer));
+  EXPECT_THAT(dt_config, EqualsProto(expected_dt_proto));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MhldOblique, GenericHyperParameterTest,
+    testing::Values(
+        GenericHyperParameterTestDef{
+            {"split_axis"},
+            "fields{name:'split_axis' value {categorical: 'MHLD_OBLIQUE'}}",
+            "mhld_oblique_split {}"},
+        GenericHyperParameterTestDef{
+            {"split_axis", "mhld_oblique_max_num_attributes"},
+            "fields{name:'split_axis' value {categorical: 'MHLD_OBLIQUE'}} "
+            "fields{name:'mhld_oblique_max_num_attributes' value {integer: 5}}",
+            "mhld_oblique_split { max_num_attributes: 5}"},
+        GenericHyperParameterTestDef{
+            {"split_axis", "mhld_oblique_max_num_attributes"},
+            "fields{name:'split_axis' value {categorical: 'MHLD_OBLIQUE'}} "
+            "fields{name:'mhld_oblique_sample_attributes' value {categorical: "
+            "'true'}}",
+            "mhld_oblique_split { sample_attributes: true}"}));
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

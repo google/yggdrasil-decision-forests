@@ -11,6 +11,7 @@
 ### Features
 
 -   Allow setting `may_trigger_gc` on custom losses.
+-   Add support for MHLD oblique decision trees.
 
 ## 0.2.0 - 2024-02-22
 
