@@ -60,7 +60,7 @@ struct GradientData {
 
   // Second order derivative of the loss according to the prediction.
   //
-  // Used to set the leaf values with a newtonian step. Also used to find the
+  // Used to set the leaf values with a Newtonian step. Also used to find the
   // best split if the "use_hessian_gain" hyper-parameter is True.
   std::vector<float>& hessian;
 

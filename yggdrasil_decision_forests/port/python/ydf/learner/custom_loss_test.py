@@ -209,7 +209,7 @@ class CustomLossTest(parameterized.TestCase):
     def mse_gradient(
         labels: npty.NDArray[np.float32], predictions: npty.NDArray[np.float32]
     ) -> Tuple[npty.NDArray[np.float32], npty.NDArray[np.float32]]:
-      return (labels - predictions, np.ones(labels.shape))
+      return (predictions - labels, -np.ones(labels.shape))
 
     def mse_loss(
         labels: npty.NDArray[np.float32],
@@ -279,8 +279,8 @@ class CustomLossTest(parameterized.TestCase):
       pred_probability = 1.0 / (1.0 + np.exp(-predictions))
       binary_labels = labels == 2
       return (
-          binary_labels - pred_probability,
-          pred_probability * (1 - pred_probability),
+          pred_probability - binary_labels,
+          pred_probability * (pred_probability - 1),
       )
 
     def binomial_loss(
@@ -358,8 +358,8 @@ class CustomLossTest(parameterized.TestCase):
       label_indicator = (
           (labels - 1)[:, np.newaxis] == np.arange(dimension)
       ).astype(int)
-      gradient = label_indicator - normalized_predictions
-      hessian = np.abs(gradient) * (1 - np.abs(gradient))
+      gradient = normalized_predictions - label_indicator
+      hessian = np.abs(gradient) * (np.abs(gradient) - 1)
       return (np.transpose(gradient), np.transpose(hessian))
 
     def multinomial_loss(
@@ -601,8 +601,8 @@ class CustomLossTest(parameterized.TestCase):
 
     def mse_gradient_and_hessian(labels, predictions):
       res = (
-          -mse_grad(labels, predictions).block_until_ready(),
-          -jnp.diagonal(mse_hessian(labels, predictions)).block_until_ready(),
+          mse_grad(labels, predictions).block_until_ready(),
+          jnp.diagonal(mse_hessian(labels, predictions)).block_until_ready(),
       )
       return res
 
@@ -663,8 +663,8 @@ class CustomLossTest(parameterized.TestCase):
 
     def mse_gradient_and_hessian(labels, predictions):
       return (
-          -mse_grad(labels, predictions).block_until_ready(),
-          -jnp.diagonal(mse_hessian(labels, predictions)).block_until_ready(),
+          mse_grad(labels, predictions).block_until_ready(),
+          jnp.diagonal(mse_hessian(labels, predictions)).block_until_ready(),
       )
 
     @jax.jit

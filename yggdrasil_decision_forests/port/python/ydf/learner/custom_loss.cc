@@ -195,8 +195,9 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
       StridedSpanFloat32 py_hessian_accessor(py_hessian);
       for (ssize_t example_idx = 0; example_idx < gradient.size();
            ++example_idx) {
-        gradient[example_idx] = py_gradient_accessor[example_idx];
-        hessian[example_idx] = py_hessian_accessor[example_idx];
+        // TODO: Consider removing this copy (also for other losses).
+        gradient[example_idx] = -py_gradient_accessor[example_idx];
+        hessian[example_idx] = -py_hessian_accessor[example_idx];
       }
       if (may_trigger_gc) {
         RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
@@ -281,8 +282,8 @@ CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
       StridedSpanFloat32 py_hessian_accessor(py_hessian);
       for (ssize_t example_idx = 0; example_idx < gradient.size();
            ++example_idx) {
-        gradient[example_idx] = py_gradient_accessor[example_idx];
-        hessian[example_idx] = py_hessian_accessor[example_idx];
+        gradient[example_idx] = -py_gradient_accessor[example_idx];
+        hessian[example_idx] = -py_hessian_accessor[example_idx];
       }
       if (may_trigger_gc) {
         RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
@@ -388,9 +389,9 @@ CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
       for (ssize_t example_idx = 0; example_idx < num_examples; ++example_idx) {
         for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
           gradient[grad_idx][example_idx] =
-              py_gradient_unchecked(grad_idx, example_idx);
+              -py_gradient_unchecked(grad_idx, example_idx);
           hessian[grad_idx][example_idx] =
-              py_hessian_unchecked(grad_idx, example_idx);
+              -py_hessian_unchecked(grad_idx, example_idx);
         }
       }
       if (may_trigger_gc) {

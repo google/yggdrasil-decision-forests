@@ -1,5 +1,17 @@
 # Changelog
 
+## HEAD
+
+## Breaking
+
+-   Custom losses now require to provide the gradient, instead of the negative
+    of the gradient.
+-   Clarified that YDF may modify numpy arrays containing the custom loss.
+
+### Features
+
+-   Allow setting `may_trigger_gc` on custom losses.
+
 ## 0.2.0 - 2024-02-22
 
 ### Features
