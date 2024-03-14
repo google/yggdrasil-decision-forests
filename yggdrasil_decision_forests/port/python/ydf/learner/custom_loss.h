@@ -48,6 +48,7 @@ struct CCRegressionLoss {
   InitFunc initial_predictions;
   LossFunc loss;
   GradFunc gradient_and_hessian;
+  bool may_trigger_gc;
 
   absl::StatusOr<model::gradient_boosted_trees::CustomRegressionLossFunctions>
   ToCustomRegressionLossFunctions() const;
@@ -64,6 +65,7 @@ struct CCBinaryClassificationLoss {
   InitFunc initial_predictions;
   LossFunc loss;
   GradFunc gradient_and_hessian;
+  bool may_trigger_gc;
 
   absl::StatusOr<
       model::gradient_boosted_trees::CustomBinaryClassificationLossFunctions>
@@ -81,6 +83,7 @@ struct CCMultiClassificationLoss {
   InitFunc initial_predictions;
   LossFunc loss;
   GradFunc gradient_and_hessian;
+  bool may_trigger_gc;
 
   absl::StatusOr<
       model::gradient_boosted_trees::CustomMultiClassificationLossFunctions>

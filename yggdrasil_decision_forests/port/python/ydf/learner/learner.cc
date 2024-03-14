@@ -233,15 +233,15 @@ void init_learner(py::module_& m) {
         py::arg("custom_loss").noconvert() = std::monostate());
   py::class_<CCRegressionLoss>(m, "CCRegressionLoss")
       .def(py::init<CCRegressionLoss::InitFunc, CCRegressionLoss::LossFunc,
-                    CCRegressionLoss::GradFunc>());
+                    CCRegressionLoss::GradFunc, bool>());
   py::class_<CCBinaryClassificationLoss>(m, "CCBinaryClassificationLoss")
       .def(py::init<CCBinaryClassificationLoss::InitFunc,
                     CCBinaryClassificationLoss::LossFunc,
-                    CCBinaryClassificationLoss::GradFunc>());
+                    CCBinaryClassificationLoss::GradFunc, bool>());
   py::class_<CCMultiClassificationLoss>(m, "CCMultiClassificationLoss")
       .def(py::init<CCMultiClassificationLoss::InitFunc,
                     CCMultiClassificationLoss::LossFunc,
-                    CCMultiClassificationLoss::GradFunc>());
+                    CCMultiClassificationLoss::GradFunc, bool>());
   py::class_<GenericCCLearner>(m, "GenericCCLearner")
       .def("__repr__",
            [](const GenericCCLearner& a) {

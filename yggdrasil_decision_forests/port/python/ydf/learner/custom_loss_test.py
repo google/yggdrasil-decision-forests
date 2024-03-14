@@ -92,16 +92,14 @@ class CustomLossTest(parameterized.TestCase):
   def test_avoid_memory_corruption(self):
     ref_to_labels = None
 
-    def faulty_initial_prediction(
-        labels: npty.NDArray[np.float32], _: npty.NDArray[np.float32]
-    ) -> np.float32:
+    def faulty_gradient_and_hessian(labels, predictions):
       nonlocal ref_to_labels
       ref_to_labels = labels
-      return np.float32(0)
+      return (np.ones(len(labels)), np.ones(len(predictions)))
 
     faulty_custom_loss = custom_loss.RegressionLoss(
-        initial_predictions=faulty_initial_prediction,
-        gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
+        initial_predictions=lambda x, y: np.float32(0),
+        gradient_and_hessian=faulty_gradient_and_hessian,
         loss=lambda x, y, z: np.float32(0),
         activation=custom_loss.Activation.IDENTITY,
     )
@@ -110,6 +108,7 @@ class CustomLossTest(parameterized.TestCase):
         label="col_float",
         loss=faulty_custom_loss,
         task=generic_learner.Task.REGRESSION,
+        num_trees=5,
     )
     with self.assertRaisesRegex(
         RuntimeError,
@@ -117,6 +116,31 @@ class CustomLossTest(parameterized.TestCase):
         " function.*",
     ):
       _ = learner_custom_loss.train(ds)
+
+  def test_honor_trigger_gc(self):
+    ref_to_labels = None
+
+    def faulty_gradient_and_hessian(labels, predictions):
+      nonlocal ref_to_labels
+      ref_to_labels = labels
+      return (np.ones(len(labels)), np.ones(len(predictions)))
+
+    faulty_custom_loss = custom_loss.RegressionLoss(
+        initial_predictions=lambda x, y: np.float32(0),
+        gradient_and_hessian=faulty_gradient_and_hessian,
+        loss=lambda x, y, z: np.float32(0),
+        activation=custom_loss.Activation.IDENTITY,
+        may_trigger_gc=False,
+    )
+    ds = test_utils.toy_dataset()
+    learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
+        label="col_float",
+        loss=faulty_custom_loss,
+        task=generic_learner.Task.REGRESSION,
+        num_trees=5,
+    )
+    model = learner_custom_loss.train(ds)
+    self.assertEqual(model.num_trees(), 5)
 
   def test_readonly_args(self):
     def faulty_initial_prediction(

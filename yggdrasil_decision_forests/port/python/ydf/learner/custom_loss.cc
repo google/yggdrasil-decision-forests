@@ -46,13 +46,15 @@ absl::Status CheckRefCountIsNull(const py::object& py_ref,
     // Trigger GC - maybe we haven't collected yet?
     py::module_::import("gc").attr("collect")();
     if (py_ref.ref_count() > 1) {
-      return absl::InternalError(
-          absl::Substitute("Cannot hold a reference to \"$0\" outside of a "
-                           "custom loss function. "
-                           "Currently holding $1 references. If this variable "
-                           "is required outside "
-                           "of the function, create a copy with np.copy($0).",
-                           ref_name, py_ref.ref_count()));
+      return absl::InternalError(absl::Substitute(
+          "Cannot hold a reference to \"$0\" outside of a "
+          "custom loss function. "
+          "Currently holding $1 references. If this variable "
+          "is required outside "
+          "of the function, create a copy with np.copy($0). This check can be "
+          "deactivated by setting `may_trigger_gc=False` on the custom loss "
+          "object.",
+          ref_name, py_ref.ref_count()));
     }
   }
   return absl::OkStatus();
@@ -141,8 +143,6 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
         return absl::UnknownError(
             absl::Substitute("initial predictions raised: $0", e.what()));
       }
-      RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pyweights, "weights"));
     }
     return current_initial_predictions;
   };
@@ -163,18 +163,16 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
         return absl::UnknownError(
             absl::Substitute("loss raised: $0", e.what()));
       }
-      RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pyweights, "weights"));
     }
     return current_loss;
   };
   auto cc_gradient_and_hessian =
-      [gradient_and_hessian = gradient_and_hessian](
+      [gradient_and_hessian = gradient_and_hessian,
+       may_trigger_gc = may_trigger_gc](
           const absl::Span<const float>& labels,
           const absl::Span<const float>& predictions,
           absl::Span<float> gradient,
-          absl::Span<float> hessian) -> absl::Status {
+          absl::Span<float> hessian) mutable -> absl::Status {
     {
       py::gil_scoped_acquire acquire;
       auto pylabels = SpanToUnsafeNumpyArray(labels);
@@ -200,8 +198,12 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
         gradient[example_idx] = py_gradient_accessor[example_idx];
         hessian[example_idx] = py_hessian_accessor[example_idx];
       }
-      RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
+      if (may_trigger_gc) {
+        RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
+        RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
+        // Only trigger GC once.
+        may_trigger_gc = false;
+      }
     }
     return absl::OkStatus();
   };
@@ -229,8 +231,6 @@ CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
       } catch (const std::exception& e) {
         return absl::AbortedError(e.what());
       }
-      RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pyweights, "weights"));
     }
     return current_initial_predictions;
   };
@@ -250,18 +250,16 @@ CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
       } catch (const std::exception& e) {
         return absl::AbortedError(e.what());
       }
-      RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pyweights, "weights"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
     }
     return current_loss;
   };
   auto cc_gradient_and_hessian =
-      [gradient_and_hessian = gradient_and_hessian](
+      [gradient_and_hessian = gradient_and_hessian,
+       may_trigger_gc = may_trigger_gc](
           const absl::Span<const int32_t>& labels,
           const absl::Span<const float>& predictions,
           absl::Span<float> gradient,
-          absl::Span<float> hessian) -> absl::Status {
+          absl::Span<float> hessian) mutable -> absl::Status {
     {
       py::gil_scoped_acquire acquire;
       auto pylabels = SpanToUnsafeNumpyArray(labels);
@@ -286,8 +284,12 @@ CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
         gradient[example_idx] = py_gradient_accessor[example_idx];
         hessian[example_idx] = py_hessian_accessor[example_idx];
       }
-      RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
+      if (may_trigger_gc) {
+        RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
+        RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
+        // Only trigger GC once.
+        may_trigger_gc = false;
+      }
     }
     return absl::OkStatus();
   };
@@ -326,8 +328,6 @@ CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
            ++example_idx) {
         cc_initial_predictions[example_idx] = accessor[example_idx];
       }
-      RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pyweights, "weights"));
     }
     return absl::OkStatus();
   };
@@ -351,18 +351,16 @@ CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
       } catch (const std::exception& e) {
         return absl::AbortedError(e.what());
       }
-      RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pyweights, "weights"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
     }
     return current_loss;
   };
   auto cc_gradient_and_hessian =
-      [gradient_and_hessian = gradient_and_hessian](
+      [gradient_and_hessian = gradient_and_hessian,
+       may_trigger_gc = may_trigger_gc](
           const absl::Span<const int32_t>& labels,
           const absl::Span<const float>& predictions,
           absl::Span<const absl::Span<float>> gradient,
-          absl::Span<const absl::Span<float>> hessian) -> absl::Status {
+          absl::Span<const absl::Span<float>> hessian) mutable -> absl::Status {
     int num_examples = labels.size();
     DCHECK_GT(num_examples, 0);
     int dimension = predictions.size() / num_examples;
@@ -395,8 +393,12 @@ CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
               py_hessian_unchecked(grad_idx, example_idx);
         }
       }
-      RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
-      RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
+      if (may_trigger_gc) {
+        RETURN_IF_ERROR(CheckRefCountIsNull(pylabels, "labels"));
+        RETURN_IF_ERROR(CheckRefCountIsNull(pypredictions, "predictions"));
+        // Only trigger GC once.
+        may_trigger_gc = false;
+      }
     }
     return absl::OkStatus();
   };
