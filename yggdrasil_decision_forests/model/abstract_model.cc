@@ -1270,78 +1270,94 @@ absl::Status AbstractModel::Validate() const {
 
 std::vector<std::unique_ptr<FastEngineFactory>>
 AbstractModel::ListCompatibleFastEngines() const {
-  std::vector<std::unique_ptr<FastEngineFactory>> compatible_engines;
+  // Index the compatible engines.
+  struct Item {
+    std::unique_ptr<FastEngineFactory> factory;
+    absl::flat_hash_set<std::string> is_better_than;
+  };
+  std::vector<Item> items;
+
   for (auto& factory : ListAllFastEngines()) {
     if (!factory->IsCompatible(this)) {
       continue;
     }
-    compatible_engines.push_back(std::move(factory));
+    const auto is_better_than = factory->IsBetterThan();
+    items.push_back(Item{std::move(factory),
+                         {is_better_than.begin(), is_better_than.end()}});
+  }
+
+  // Sort the engine by speed (fastest first).
+  std::sort(items.begin(), items.end(), [](const Item& a, const Item& b) {
+    if (a.is_better_than.find(b.factory->name()) != a.is_better_than.end()) {
+      // "a" is better than "b".
+      return true;
+    }
+    return false;
+  });
+
+  std::vector<std::unique_ptr<FastEngineFactory>> compatible_engines;
+  compatible_engines.reserve(items.size());
+  for (auto& item : items) {
+    compatible_engines.push_back(std::move(item.factory));
+  }
+  return compatible_engines;
+}
+
+std::vector<std::string> AbstractModel::ListCompatibleFastEngineNames() const {
+  std::vector<std::string> compatible_engines;
+  for (auto& factory : ListCompatibleFastEngines()) {
+    compatible_engines.push_back(factory->name());
   }
   return compatible_engines;
 }
 
 absl::StatusOr<std::unique_ptr<serving::FastEngine>>
-AbstractModel::BuildFastEngine() const {
+AbstractModel::BuildFastEngine(
+    const absl::optional<std::string>& force_engine_name) const {
   if (!allow_fast_engine_) {
     return absl::NotFoundError("allow_fast_engine is set to false.");
   }
 
   // List the compatible engines.
-  auto compatible_engines = ListCompatibleFastEngines();
+  auto sorted_compatible_engines = ListCompatibleFastEngines();
 
-  // Each engine in this set is slower than at least one other compatible
-  // engine.
-  absl::flat_hash_set<std::string> all_is_better_than;
-
-  for (auto& engine_factory : compatible_engines) {
-    const auto is_better_than = engine_factory->IsBetterThan();
-    all_is_better_than.insert(is_better_than.begin(), is_better_than.end());
-  }
-
-  const auto no_compatible_engine_message = absl::Substitute(
-      "No compatible engine available for model $0. 1) Make sure the "
-      "corresponding engine is added as a dependency, 2) use the (slow) "
-      "generic engine (i.e. \"model.Predict()\") or 3) use one of the fast "
-      "non-generic engines available in ../serving.",
-      name());
-  if (compatible_engines.empty()) {
-    return absl::NotFoundError(no_compatible_engine_message);
-  }
-
-  // Select the best engine.
-  std::vector<std::unique_ptr<FastEngineFactory>> best_engines;
-  for (auto& compatible_engine : compatible_engines) {
-    if (all_is_better_than.find(compatible_engine->name()) !=
-        all_is_better_than.end()) {
-      // One other engine is better than this engine.
-      continue;
+  // How to create the engine.
+  std::unique_ptr<FastEngineFactory> engine_factory;
+  if (force_engine_name.has_value()) {
+    for (auto& compatible_engine : sorted_compatible_engines) {
+      if (compatible_engine->name() == *force_engine_name) {
+        engine_factory = std::move(compatible_engine);
+        break;
+      }
     }
-    best_engines.push_back(std::move(compatible_engine));
-  }
-
-  std::unique_ptr<FastEngineFactory> best_engine;
-  if (best_engines.empty()) {
-    // No engine is better than all the other engines.
-    YDF_LOG(WARNING) << "Circular is_better relation between engines.";
-    best_engine = std::move(compatible_engines.front());
+    if (!engine_factory) {
+      return absl::NotFoundError(absl::StrCat(
+          "The forced engine \"", *force_engine_name,
+          "\" does not exist or is not compatible with the model"));
+    }
   } else {
-    if (best_engines.size() > 1) {
-      // Multiple engines are "the best".
-      YDF_LOG(WARNING)
-          << "Non complete relation between engines. Cannot select the "
-             "best one. One engine selected randomly.";
+    if (sorted_compatible_engines.empty()) {
+      return absl::NotFoundError(absl::Substitute(
+          "No compatible engine available for model $0. 1)interresting Make "
+          "sure the "
+          "corresponding engine is added as a dependency, 2) use the (slow) "
+          "generic engine (i.e. \"model.Predict()\") or 3) use one of the fast "
+          "non-generic engines available in ../serving.",
+          name()));
     }
-    best_engine = std::move(best_engines.front());
+
+    // Select the best engine.
+    engine_factory = std::move(sorted_compatible_engines.front());
   }
 
-  auto engine_or = best_engine->CreateEngine(this);
+  auto engine_or = engine_factory->CreateEngine(this);
   if (!engine_or.ok()) {
-    YDF_LOG(WARNING) << "The engine \"" << best_engine->name()
+    YDF_LOG(WARNING) << "The engine \"" << engine_factory->name()
                      << "\" is compatible but could not be created: "
                      << engine_or.status().message();
   } else {
-    LOG_INFO_EVERY_N_SEC(10,
-                         _ << "Engine \"" << best_engine->name() << "\" built");
+    LOG_INFO_EVERY_N_SEC(
+        10, _ << "Engine \"" << engine_factory->name() << "\" built");
   }
   return engine_or;
 }

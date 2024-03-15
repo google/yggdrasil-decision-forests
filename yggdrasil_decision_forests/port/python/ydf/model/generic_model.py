@@ -812,5 +812,31 @@ Use `model.describe()` for more details
         "Self-evaluation is not available for this model type."
     )
 
+  def list_compatible_engines(self) -> Sequence[str]:
+    """Lists the inference engines compatible with the model.
+
+    The engines are sorted to likely-fastest to  likely-slowest.
+
+    Returns:
+      List of compatible engines.
+    """
+    return self._model.ListCompatibleEngines()
+
+  def force_engine(self, engine_name: Optional[str]) -> None:
+    """Forces the engines used by the model.
+
+    If not specified (i.e., None; default value), the fastest compatible engine
+    (i.e., the first value returned from "list_compatible_engines") is used for
+    all model inferences (e.g., model.predict, model.evaluate).
+
+    If passing a non-existing or non-compatible engine, the next model inference
+    (e.g., model.predict, model.evaluate) will fail.
+
+    Args:
+      engine_name: Name of a compatible engine or None to automatically select
+        the fastest engine.
+    """
+    self._model.ForceEngine(engine_name)
+
 
 ModelType = TypeVar("ModelType", bound=GenericModel)

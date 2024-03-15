@@ -95,11 +95,23 @@ class AbstractModel {
   //
   // Because "BuildFastEngine" uses virtual calls, this solution is slower
   // than selecting directly the inference engine at compile time.
-  absl::StatusOr<std::unique_ptr<serving::FastEngine>> BuildFastEngine() const;
+  //
+  // If specified, "force_engine_name" is the name of the created engine.
+  // If "force_engine_name" is not specified, create the fastest compatible
+  // engine.
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> BuildFastEngine(
+      const absl::optional<std::string>& force_engine_name = {}) const;
 
-  // List the fast engines compatible with the model.
+  // Lists the fast engines compatible with the model.
+  // Engines are sorted by decreasing expected speed i.e., for the fastest
+  // inference, use the first one.
   std::vector<std::unique_ptr<FastEngineFactory>> ListCompatibleFastEngines()
       const;
+
+  // Lists the names of fast engines compatible with the model.
+  // Engines are sorted by decreasing expected speed i.e., for the fastest
+  // inference, use the first one.
+  std::vector<std::string> ListCompatibleFastEngineNames() const;
 
   // If set to "False", "BuildFastEngine" won't return an engine, even if one if
   // available.

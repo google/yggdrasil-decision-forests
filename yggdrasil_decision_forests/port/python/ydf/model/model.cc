@@ -137,7 +137,9 @@ void init_model(py::module_& m) {
       .def("Benchmark", WithStatusOr(&GenericCCModel::Benchmark),
            py::arg("dataset"), py::arg("benchmark_duration"),
            py::arg("warmup_duration"), py::arg("batch_size"))
-      .def("VariableImportances", &GenericCCModel::VariableImportances);
+      .def("VariableImportances", &GenericCCModel::VariableImportances)
+      .def("ForceEngine", &GenericCCModel::ForceEngine, py::arg("engine_name"))
+      .def("ListCompatibleEngines", &GenericCCModel::ListCompatibleEngines);
 
   py::class_<BenchmarkInferenceCCResult>(m, "BenchmarkInferenceCCResult")
       .def_readwrite("duration_per_example",

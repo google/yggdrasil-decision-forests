@@ -139,14 +139,29 @@ class GenericCCModel {
 
   void invalidate_engine() { invalidate_engine_ = true; }
 
+  void ForceEngine(std::optional<std::string> engine_name) {
+    // TODO: Let the user configure inference without an engine.
+    utils::concurrency::MutexLock lock(&engine_mutex_);
+    force_engine_name_ = engine_name;
+    invalidate_engine();
+  }
+
+  std::vector<std::string> ListCompatibleEngines() const {
+    return model_->ListCompatibleFastEngineNames();
+  }
+
  protected:
   std::unique_ptr<model::AbstractModel> model_;
   utils::concurrency::Mutex engine_mutex_;
   std::shared_ptr<const serving::FastEngine> engine_ GUARDED_BY(engine_mutex_);
 
-  // If true, the "engine_mutex_" is outdated (e.g., the model was modified) and
+  // If true, the "engine_" is outdated (e.g., the model was modified) and
   // should be re-computed.
   std::atomic_bool invalidate_engine_{false};
+
+  // If set, for the creation of this specific engine. If non set, fastest
+  // compatible engine is created.
+  std::optional<std::string> force_engine_name_;
 };
 
 }  // namespace yggdrasil_decision_forests::port::python

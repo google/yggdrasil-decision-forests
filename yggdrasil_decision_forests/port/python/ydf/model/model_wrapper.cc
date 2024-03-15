@@ -55,7 +55,7 @@ GenericCCModel::GetEngine() {
   utils::concurrency::MutexLock lock(&engine_mutex_);
   if (engine_ == nullptr || invalidate_engine_) {
     RETURN_IF_ERROR(model_->Validate());
-    ASSIGN_OR_RETURN(engine_, model_->BuildFastEngine());
+    ASSIGN_OR_RETURN(engine_, model_->BuildFastEngine(force_engine_name_));
     invalidate_engine_ = false;
   }
   return engine_;

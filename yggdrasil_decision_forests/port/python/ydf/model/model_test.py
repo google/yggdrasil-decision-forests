@@ -23,6 +23,7 @@ import time
 
 from absl.testing import absltest
 from absl.testing import parameterized
+import numpy as np
 import numpy.testing as npt
 import pandas as pd
 
@@ -409,6 +410,43 @@ Use `model.describe()` for more details
     )
     model = model_lib.load_model(model_path)
     self.assertIsNone(model.self_evaluation())
+
+  def test_gbt_list_compatible_engines(self):
+    self.assertContainsSubsequence(
+        self.adult_binary_class_gbdt.list_compatible_engines(),
+        ["GradientBoostedTreesGeneric"],
+    )
+
+  def test_rf_list_compatible_engines(self):
+    self.assertContainsSubsequence(
+        self.adult_binary_class_rf.list_compatible_engines(),
+        ["RandomForestGeneric"],
+    )
+
+  def test_gbt_force_compatible_engines(self):
+    test_df = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+        )
+    )
+    p1 = self.adult_binary_class_gbdt.predict(test_df)
+    self.adult_binary_class_gbdt.force_engine("GradientBoostedTreesGeneric")
+    p2 = self.adult_binary_class_gbdt.predict(test_df)
+    self.adult_binary_class_gbdt.force_engine(None)
+    p3 = self.adult_binary_class_gbdt.predict(test_df)
+
+    np.testing.assert_allclose(
+        p1,
+        p2,
+        rtol=1e-5,
+        atol=1e-5,
+    )
+    np.testing.assert_allclose(
+        p1,
+        p3,
+        rtol=1e-5,
+        atol=1e-5,
+    )
 
 
 if __name__ == "__main__":
