@@ -9,10 +9,11 @@ confirmation () {
 }
 
 # Warning message.
-echo "You are about to release a new version of the YDF Python API"
+echo "You are about to prepare the release of a new version of the YDF Python API"
 confirmation
 
-SRC="third_party/yggdrasil_decision_forests/port/python"
+SRC=""
+
 
 # Get version
 CURRENT_VERSION=$(cat ${SRC}/ydf/version.py | grep -o "[\.0-9]\+")

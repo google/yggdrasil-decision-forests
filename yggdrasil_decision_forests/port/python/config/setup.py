@@ -21,7 +21,7 @@ import setuptools
 from setuptools.command.install import install
 from setuptools.dist import Distribution
 
-_VERSION = "0.2.0"
+_VERSION = "0.3.0"
 
 with open("README.md", "r", encoding="utf-8") as fh:
   long_description = fh.read()
@@ -33,6 +33,8 @@ REQUIRED_PACKAGES = [
 ]
 
 OPTIONAL_PACKAGES = {"pandas": ["pandas"]}
+
+MAC_CROSS_COMPILED = False  # Change if cross-compiled
 
 
 class InstallPlatlib(install):
@@ -63,12 +65,13 @@ try:
 
     def get_tag(self):
       python, abi, plat = _bdist_wheel.get_tag(self)
-      if platform.system() == "Darwin":
-        # Uncomment on of the lines below to adapt the platform string when
-        # cross-compiling.
-        # plat = "macosx_12_0_arm64"
-        # plat = "macosx_10_15_x86_64"
-        pass
+      if platform.system() == "Darwin" and MAC_CROSS_COMPILED:
+        if platform.processor() == "arm":
+          plat = "macosx_10_15_x86_64"
+        elif platform.processor() == "i386":
+          plat = "macosx_12_0_arm64"
+        else:
+          raise ValueError(f"Unknown processor {platform.processor()}")
       return python, abi, plat
 
 except ImportError:

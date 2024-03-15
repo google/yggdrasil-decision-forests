@@ -1,8 +1,5 @@
 # Bazel configuration for Yggdrasil Decision Forests
 
-# Common flags.
-common --experimental_repo_remote_exec
-
 # On Windows, uncomment the next line to solve long path issues:
 # startup --output_user_root=C:/tmpbld
 

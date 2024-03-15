@@ -14,17 +14,18 @@
 # limitations under the License.
 
 
-DOCKER=gcr.io/tfx-oss-public/manylinux2014-bazel:bazel-5.3.0
+DOCKER=quay.io/pypa/manylinux2014_x86_64@sha256:2e37241d9c9fbbccea009e59505a1384f9501a7bfea77b21fdcbf332c7036e70
 
-# Current directory
-# Useful if Yggdrasil Decision Forests is available locally in a neighbor
-# directory.
+BAZELISK_VERSION="v1.19.0"
 YDF_PATH=$(realpath $PWD/../../..)
-YDF_DIRNAME=${YDF_PATH##*/}
 
 # Download docker
-sudo docker pull ${DOCKER}
+docker pull $DOCKER
 
-# Start docker
-sudo docker run -it -v ${PWD}/../../../../:/working_dir -w /working_dir/${YDF_DIRNAME}/yggdrasil_decision_forests/port/python ${DOCKER} \
-  /bin/bash -c "./tools/build_linux_release.sh"
+# Start the container
+docker run -it -v $YDF_PATH:/working_dir -w /working_dir/yggdrasil_decision_forests/port/python \
+  $DOCKER /bin/bash -c " \
+  yum update && yum install -y rsync && \
+  curl -L -o /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/${BAZELISK_VERSION}/bazelisk-linux-amd64 && \
+  chmod +x /usr/local/bin/bazel && \
+  ./tools/build_linux_release.sh "

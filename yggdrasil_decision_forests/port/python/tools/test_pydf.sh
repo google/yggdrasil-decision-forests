@@ -20,26 +20,22 @@
 #
 # Options:
 #  RUN_TESTS: Run the unit tests, 0 or 1 (default).
-#  COMPILERS: Compilers to build, separated by semicolon. Defaults to gcc-9
 #
 # Usage example:
 #
-#   # Compilation with GCC 9, C++17. Running tests.
-#   ./tools/test_pydf.sh
-#
 #   # Compilation with Clang 14, without tests
-#   COMPILERS="clang-14" RUN_TESTS=0 ./tools/test_pydf.sh
+#   CC="clang-14" RUN_TESTS=0 ./tools/test_pydf.sh
 #
 set -xev
 
 build_and_maybe_test () {
    echo "Building PYDF the following settings:"
-   echo "   Compiler : $1"
+   echo "   Compiler : $CC"
 
     BAZEL=bazel
     ${BAZEL} version
 
-    local flags="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --repo_env=CC=${1}"
+    local flags="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link"
     local pydf_targets="//ydf/...:all"
     # Install PYDF components
     python -m pip install -r requirements.txt
@@ -54,14 +50,9 @@ build_and_maybe_test () {
 
 main () {
   # Set default values
-  : "${COMPILERS:="gcc-9"}"
   : "${RUN_TESTS:=1}"
 
-  local compilers_array=(${COMPILERS//;/ })
-
-for compiler in ${compilers_array[@]}; do
-  build_and_maybe_test "$compiler"
-done
+  build_and_maybe_test
 }
 
 main

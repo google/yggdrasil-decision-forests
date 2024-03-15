@@ -1,17 +1,39 @@
 # Changelog
 
-## HEAD
+## 0.3.0 - 2024-03-15
 
-## Breaking
+### Breaking
 
 -   Custom losses now require to provide the gradient, instead of the negative
     of the gradient.
--   Clarified that YDF may modify numpy arrays containing the custom loss.
+-   Clarified that YDF may modify numpy arrays returned by a custom loss
+    function.
 
 ### Features
 
+-   Allow using Jax for custom loss definitions.
 -   Allow setting `may_trigger_gc` on custom losses.
 -   Add support for MHLD oblique decision trees.
+-   Expose hyperparameter `sparse_oblique_max_num_projections`.
+-   HTML plots for trees with `model.plot_tree()`.
+-   Fix protobuf version to 4.24.3 to fix some incompatibilities when using
+    conda.
+-   Allow to list compatible engines with `model.list_compatible_engines()`.
+-   Allow to choose a fast engine with `model.force_engine(...)`.
+
+### Fix
+
+-   Fix slow engine creation for some combination of oblique splits.
+-   Improve error message when feeding multi-dimensional labels.
+
+### Documentation
+
+-   Clarified documentation of hyperparameters for oblique splits.
+-   Fix plots, typos.
+
+#### Release music
+
+Doctor Gradus ad Parnassum from "Children's Corner" (L. 113). Claude Debussy
 
 ## 0.2.0 - 2024-02-22
 

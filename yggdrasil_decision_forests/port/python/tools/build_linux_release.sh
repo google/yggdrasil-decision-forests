@@ -24,7 +24,8 @@ function build_py() {
   $PYTHON -m venv /tmp/venv_$PYTHON
   source /tmp/venv_$PYTHON/bin/activate
   bazel clean --expunge
-  COMPILERS="gcc" ./tools/test_pydf.sh
+  export CC="gcc"
+  ./tools/test_pydf.sh
   ./tools/build_pydf.sh python
 }
 

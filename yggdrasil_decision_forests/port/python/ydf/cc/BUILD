@@ -21,7 +21,6 @@ pybind_extension(
         "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
     ],
 )
-
 # Libraries
 # =========
 

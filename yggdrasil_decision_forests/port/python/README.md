@@ -18,6 +18,8 @@ To install YDF, in Python, simply grab the package from pip:
 pip install ydf
 ```
 
+For build instructions, see INSTALLATION.md.
+
 ## Usage Example
 
 ```python
@@ -36,19 +38,6 @@ model.save("my_model")
 
 loaded_model = ydf.load_model("my_model")
 ```
-
-## Compiling & Building
-
-To build the Python port of YDF, install Bazel, GCC 9 and run the following
-command from the root of the port/python directory in the YDF repository
-
-```sh
-PYTHON_BIN=python3.9
-./tools/test_pydf.sh
-./tools/build_pydf.sh $PYTHON_BIN
-```
-
-Browse the `tools/` directory for more build helpers.
 
 ## Frequently Asked Questions
 
