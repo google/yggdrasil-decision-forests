@@ -22,7 +22,7 @@
 ::
 :: Usage example:
 ::   :: Update "YDF_VERSION" and run
-::   tools\build.bat
+::   tools\build_windows_release.bat
 ::   :: The output pip packages are put in "dist".
 ::
 :: Requirements:
@@ -34,12 +34,14 @@
 cls
 setlocal
 
-set YDF_VERSION=0.0.4
+set YDF_VERSION=0.3.0
 set BAZEL=bazel.exe
 set BAZEL_SH=C:\msys64\usr\bin\bash.exe
 set BAZEL_FLAGS=--config=windows_cpp20 --config=windows_avx2
+set BAZEL_VC=C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC
 %BAZEL% version
 
+CALL :End2End 38 || goto :error
 CALL :End2End 39 || goto :error
 CALL :End2End 310 || goto :error
 CALL :End2End 311 || goto :error

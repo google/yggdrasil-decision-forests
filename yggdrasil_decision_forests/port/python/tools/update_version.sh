@@ -30,6 +30,7 @@ echo "Update version"
 sed -i -e "s/_VERSION = \"[_rcv\.0-9]\+\"/_VERSION = \"${NEW_VERSION}\"/" ${SRC}/config/setup.py
 sed -i -e "s/version = \"[_rcv\.0-9]\+\"/version = \"${NEW_VERSION}\"/" ${SRC}/ydf/version.py
 # TODO: Fail if the version cannot be updated
+# TODO: Update the version in the build_windows_release.bat script.
 
 echo
 echo "Check that the following files have been updated correctly:"
@@ -37,3 +38,4 @@ echo ${SRC}/config/setup.py
 echo ${SRC}/ydf/version.py
 echo "Update the changelog:"
 echo ${SRC}/CHANGELOG.md
+echo ${SRC}/tools/build_windows_release.bat

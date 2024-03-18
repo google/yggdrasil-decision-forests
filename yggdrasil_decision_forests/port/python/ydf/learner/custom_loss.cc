@@ -37,6 +37,11 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
+#ifdef _WIN32
+#include <cstddef>
+typedef std::ptrdiff_t ssize_t;
+#endif
+
 namespace yggdrasil_decision_forests::port::python {
 
 namespace {
