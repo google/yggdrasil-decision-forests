@@ -253,6 +253,7 @@ py_test(
 # (TensorFlow does not compile in debug mode)
 py_test(
     name = "custom_loss_test",
+    timeout = "long",
     srcs = ["custom_loss_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     python_version = "PY3",
