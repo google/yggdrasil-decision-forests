@@ -211,9 +211,9 @@ def cc_log_context():
 
     # pylint: disable=g-import-not-at-top
     try:
-      from colabtools.googlelog import Capture  # pytype: disable=import-error
+      from colabtools.googlelog import CaptureLog  # pytype: disable=import-error
       # This is a Google Colab
-      return Capture()
+      return CaptureLog()
     except ImportError:
       # Wurlitzer hangs when logs are shown directly.
       if is_direct_output():
