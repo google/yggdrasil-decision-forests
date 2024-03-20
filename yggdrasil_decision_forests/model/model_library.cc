@@ -118,17 +118,17 @@ absl::Status LoadModel(absl::string_view directory,
   proto::AbstractModel header;
   std::string effective_directory = ImproveModelReadingPath(directory);
 
-  ASSIGN_OR_RETURN(const bool is_tensorflow_saved_model,
-                   IsTensorFlowSavedModel(effective_directory));
-  if (is_tensorflow_saved_model) {
+  const auto is_tensorflow_saved_model =
+      IsTensorFlowSavedModel(effective_directory);
+  if (is_tensorflow_saved_model.ok() && is_tensorflow_saved_model.value()) {
     effective_directory =
         file::JoinPath(effective_directory, kTensorFlowDecisionForestsAssets);
     YDF_LOG(INFO)
         << "Detected `" << kTensorFlowSavedModelProtoFileName
         << "` in directory " << directory
-        << ". Loading a TensorFlow Decision Forests model from C++ YDF or CLI "
-           "is brittle and should not be relied upon. Use the Python API of "
-           "YDF to convert the model to a regular YDF model with "
+        << ". Loading a TensorFlow Decision Forests model from C++ YDF or "
+           "CLI is brittle and should not be relied upon. Use the Python API "
+           "of YDF to convert the model to a regular YDF model with "
            "`ydf.from_tensorflow_decision_forests(model_path)`";
   }
   if (!io_options.file_prefix) {
