@@ -34,8 +34,12 @@ build_and_maybe_test () {
 
     BAZEL=bazel
     ${BAZEL} version
+    local ARCHITECTURE=$(uname --machine)
 
-    local flags="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link"
+    local flags="--config=linux_cpp17 --features=-fully_static_link"
+    if [ "$ARCHITECTURE" == "x86_64" ]; then
+        flags="$flags --config=linux_avx2"
+    fi
     local pydf_targets="//ydf/...:all"
     # Install PYDF components
     python -m pip install -r requirements.txt

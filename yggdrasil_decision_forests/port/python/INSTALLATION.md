@@ -15,7 +15,7 @@ pip install ydf --upgrade
 Use `tools/update_version.sh` to update the version number (if needed) and
 remember to update `CHANGELOG.md`.
 
-### Linux
+### Linux x86_64
 
 #### Docker
 
@@ -63,6 +63,19 @@ Note that we may not be able to help with issues during manual builds.
     ```shell
     ./tools/build_pydf.sh ALL_VERSIONS
     ```
+
+### Linux ARM64
+
+This build configuration is experimental at this time and may break.
+
+#### Docker
+
+For building manylinux2014-compatible packages, you can use an appropriate
+Docker image. The pre-configured build script at
+`tools/build_linux_aarch64_release_in_docker.sh` starts a container and builds
+the wheels end-to-end. You can find the wheels in the `dist/`subdirectory.
+
+For details and configuration options, please consult the corresponding scripts.
 
 ### MacOS
 

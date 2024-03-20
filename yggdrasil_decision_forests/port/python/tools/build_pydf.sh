@@ -37,6 +37,7 @@
 set -xve
 
 PLATFORM="$(uname -s | tr 'A-Z' 'a-z')"
+ARCHITECTURE=$(uname --machine)
 function is_macos() {
   [[ "${PLATFORM}" == "darwin" ]]
 }
@@ -134,7 +135,7 @@ function test_package() {
   if is_macos; then
     PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
   else
-    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*.manylinux2014_x86_64.whl"
+    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*.manylinux2014_${ARCHITECTURE}.whl"
   fi
   ${PIP} install ${PACKAGEPATH} --force-reinstall
 
@@ -186,8 +187,8 @@ function e2e_native() {
   if is_macos; then
     PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
   else
-    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-linux_x86_64.whl"
-    ${PYTHON} -m auditwheel repair --plat manylinux2014_x86_64 -w dist ${PACKAGEPATH}
+    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-linux_${ARCHITECTURE}.whl"
+    ${PYTHON} -m auditwheel repair --plat manylinux2014_${ARCHITECTURE} -w dist ${PACKAGEPATH}
   fi
 
   test_package ${PYTHON} ${PACKAGE}
