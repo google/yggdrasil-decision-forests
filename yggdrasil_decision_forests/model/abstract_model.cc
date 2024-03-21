@@ -866,8 +866,10 @@ void AbstractModel::AppendDescriptionAndStatistics(
   } else {
     absl::StrAppend(description, "Trained with weights\n");
     if (full_definition) {
+      std::string weights_str;
+      google::protobuf::TextFormat::PrintToString(weights_.value(), &weights_str);
       absl::StrAppend(description, "\nWeights:\n",
-                      weights_.value().DebugString(), "n");
+                      weights_str, "n");
     }
   }
 

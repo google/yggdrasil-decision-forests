@@ -1,6 +1,6 @@
 Nodes don't match.
 
-condition 	 {
+condition {
   attribute: 1
   condition {
     higher_condition {
@@ -11,7 +11,7 @@ condition 	 {
 
 vs
 
-condition 	 {
+condition {
   attribute: 1
   condition {
     higher_condition {

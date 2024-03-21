@@ -47,6 +47,7 @@
 #include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -1499,9 +1500,13 @@ std::string DecisionTree::DebugCompare(
 std::string NodeWithChildren::DebugCompare(
     const dataset::proto::DataSpecification& dataspec, const int label_idx,
     const NodeWithChildren& other) const {
-  if (node_.DebugString() != other.node_.DebugString()) {
-    return absl::StrCat("Nodes don't match.\n\n", node_.DebugString(),
-                        "\nvs\n\n", other.node_.DebugString());
+  std::string node_text;
+  std::string other_node_text;
+  google::protobuf::TextFormat::PrintToString(node_, &node_text);
+  google::protobuf::TextFormat::PrintToString(other.node_, &other_node_text);
+  if (node_text != other_node_text) {
+    return absl::StrCat("Nodes don't match.\n\n", node_text,
+                        "\nvs\n\n", other_node_text);
   }
   if (!IsLeaf()) {
     for (const int i : {0, 1}) {

@@ -97,7 +97,9 @@ utils::html::Html Model(const model::AbstractModel& model) {
   if (!model.weights().has_value()) {
     AddKeyValue(&content, "Weights", "None");
   } else {
-    AddKeyMultiLinesValue(&content, "Weights", model.weights()->DebugString());
+    std::string weights_text;
+    google::protobuf::TextFormat::PrintToString(*model.weights(), &weights_text);
+    AddKeyMultiLinesValue(&content, "Weights", weights_text);
   }
 
   AddKeyValue(&content, "Trained with tuner", HasTuner(model) ? "Yes" : "No");
