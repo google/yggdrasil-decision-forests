@@ -393,11 +393,14 @@ def create_vertical_dataset_with_spec_or_args(
         data, required_columns, inference_args, data_spec
     )
   else:
-    data_dict = dataset_io.cast_input_dataset_to_dict(
+    # Convert the data to an in-memory dictionary of numpy array.
+    # Also unroll multi-dimensional features.
+    data_dict, unroll_feature_info = dataset_io.cast_input_dataset_to_dict(
         data, dont_unroll_columns=dont_unroll_columns
     )
     return create_vertical_dataset_from_dict_of_values(
         data_dict,
+        unroll_feature_info,
         required_columns,
         inference_args=inference_args,
         data_spec=data_spec,
@@ -428,6 +431,7 @@ def create_vertical_dataset_from_path(
 
 def create_vertical_dataset_from_dict_of_values(
     data: Dict[str, dataset_io_types.InputValues],
+    unroll_feature_info: dataset_io_types.UnrolledFeaturesInfo,
     required_columns: Optional[Sequence[str]],
     inference_args: Optional[dataspec.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
@@ -439,6 +443,7 @@ def create_vertical_dataset_from_dict_of_values(
 
   Args:
     data: Data to copy to the Vertical Dataset.
+    unroll_feature_info: Information about feature unrolling.
     required_columns: Names of columns that are required in the data.
     inference_args: Arguments for data spec inference. Must be None if data_spec
       is set.
@@ -491,6 +496,7 @@ def create_vertical_dataset_from_dict_of_values(
         available_columns=list(data.keys()),
         inference_args=inference_args,
         required_columns=required_columns,
+        unroll_feature_info=unroll_feature_info,
     )
   else:
     dataset._initialize_from_data_spec(data_spec)  # pylint: disable=protected-access

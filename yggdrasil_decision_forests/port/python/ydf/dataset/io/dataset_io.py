@@ -15,7 +15,7 @@
 """Common functionality for all dataset I/O connectors."""
 
 import math
-from typing import Dict, Iterator, Optional, Sequence, Tuple
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -26,7 +26,7 @@ from ydf.dataset.io import tensorflow_io
 
 def _unroll_column(
     name: str, src: dataset_io_types.InputValues, allow_unroll: bool
-) -> Iterator[Tuple[str, dataset_io_types.InputValues]]:
+) -> Iterator[Tuple[str, dataset_io_types.InputValues, bool]]:
   """Unrolls a possibly multi-dim. column into multiple single-dim columns.
 
   Yield the results. If the "src" column is not multi-dimensional, yields "src"
@@ -38,12 +38,13 @@ def _unroll_column(
     allow_unroll: If false, fails if the column should be unrolled.
 
   Yields:
-    Tuple of key and values of single-dimentional features.
+    Tuple of key and values of single-dimentional features, and boolean
+    indicating if the feature is unrolled.
   """
 
   # Numpy is currently the only way to pass multi-dim features.
   if not isinstance(src, np.ndarray) or src.ndim <= 1:
-    yield name, src
+    yield name, src, False
     return
 
   if not allow_unroll:
@@ -72,13 +73,15 @@ def _unroll_column(
   postfix = f"_of_{num_features:0{num_leading_zeroes}}"
   for dim_idx in range(num_features):
     sub_name = f"{name}.{dim_idx:0{num_leading_zeroes}}{postfix}"
-    yield sub_name, src[:, dim_idx]
+    yield sub_name, src[:, dim_idx], True
 
 
 def _unroll_dict(
-    src: Dict[str, dataset_io_types.InputValues],
+    src: dataset_io_types.DictInputValues,
     dont_unroll_columns: Optional[Sequence[str]] = None,
-) -> Dict[str, dataset_io_types.InputValues]:
+) -> Tuple[
+    dataset_io_types.DictInputValues, dataset_io_types.UnrolledFeaturesInfo
+]:
   """Unrolls multi-dim. columns into multiple single-dim. columns.
 
   Args:
@@ -95,22 +98,46 @@ def _unroll_dict(
       set(dont_unroll_columns) if dont_unroll_columns else set()
   )
 
+  unrolled_features_info = {}
+
   # Note: We only create a one dictionary independently of the number of
   # features.
   dst = {}
   for name, value in src.items():
-    for sub_name, sub_value in _unroll_column(
+
+    any_is_unrolling = False
+    sub_dst = {}
+    for sub_name, sub_value, is_unrolling in _unroll_column(
         name, value, allow_unroll=name not in dont_unroll_columns_set
     ):
-      dst[sub_name] = sub_value
-  return dst
+      sub_dst[sub_name] = sub_value
+      any_is_unrolling |= is_unrolling
+
+    dst.update(sub_dst)
+
+    if any_is_unrolling:
+      unrolled_features_info[name] = list(sub_dst.keys())
+
+  return dst, unrolled_features_info
 
 
 def cast_input_dataset_to_dict(
     data: dataset_io_types.IODataset,
     dont_unroll_columns: Optional[Sequence[str]] = None,
-) -> Dict[str, dataset_io_types.InputValues]:
-  """Transforms the input dataset into a dictionary of values."""
+) -> Tuple[
+    dataset_io_types.DictInputValues, dataset_io_types.UnrolledFeaturesInfo
+]:
+  """Normalizes the input dataset into a dictionary of values.
+
+    Also unrolls the multi-dimentional features.
+
+  Args:
+    data: Input data.
+    dont_unroll_columns: Column in "dont_unroll_columns" will not be unrolled.
+
+  Returns:
+    The normalized features, and information about unrolled features.
+  """
 
   unroll_dict_kwargs = {
       "dont_unroll_columns": dont_unroll_columns,

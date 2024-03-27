@@ -306,6 +306,29 @@ class DataspecTest(absltest.TestCase):
         ],
     )
 
+  def test_get_all_columns_with_unrolled_features(self):
+    self.assertEqual(
+        dataspec_lib.get_all_columns(
+            ["a.0", "a.1", "a.2", "b.0", "b.1", "b.2"],
+            DataSpecInferenceArgs(
+                columns=[Column("a")],
+                include_all_columns=False,
+                max_vocab_count=1,
+                min_vocab_frequency=1,
+                discretize_numerical_columns=False,
+                num_discretized_numerical_bins=1,
+                max_num_scanned_rows_to_infer_semantic=10000,
+                max_num_scanned_rows_to_compute_statistics=10000,
+            ),
+            required_columns=[],
+            unroll_feature_info={
+                "a": ["a.0", "a.1", "a.2"],
+                "b": ["b.0", "b.1", "b.2"],
+            },
+        ),
+        [Column("a.0"), Column("a.1"), Column("a.2")],
+    )
+
   def test_normalize_column_defs(self):
     self.assertEqual(
         dataspec_lib.normalize_column_defs([

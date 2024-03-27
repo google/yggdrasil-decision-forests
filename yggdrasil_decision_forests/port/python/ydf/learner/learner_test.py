@@ -506,12 +506,29 @@ class RandomForestLearnerTest(LearnerTest):
     predictions = model.predict(data)
     self.assertEqual(predictions.shape, (2,))
 
+  def test_multidimensional_features_with_feature_arg(self):
+    ds = {
+        "f1": np.random.uniform(size=(100, 5)),
+        "f2": np.random.uniform(size=(100, 5)),
+        "label": np.random.randint(0, 2, size=100),
+    }
+    learner = specialized_learners.RandomForestLearner(
+        label="label",
+        features=["f1"],
+        num_trees=3,
+    )
+    model = learner.train(ds)
+    self.assertEqual(
+        model.input_feature_names(),
+        ["f1.0_of_5", "f1.1_of_5", "f1.2_of_5", "f1.3_of_5", "f1.4_of_5"],
+    )
+
   def test_multidimensional_labels(self):
     ds = {
         "feature": np.array([[0, 1], [1, 0]]),
         "label": np.array([[0, 1], [1, 0]]),
     }
-    learner = specialized_learners.GradientBoostedTreesLearner(label="label")
+    learner = specialized_learners.RandomForestLearner(label="label")
     with self.assertRaisesRegex(
         test_utils.AbslInvalidArgumentError,
         "The column 'label' is multi-dimensional \\(shape=\\(2, 2\\)\\) while"
@@ -525,7 +542,7 @@ class RandomForestLearnerTest(LearnerTest):
         "label": np.array([0, 1]),
         "weight": np.array([[0, 1], [1, 0]]),
     }
-    learner = specialized_learners.GradientBoostedTreesLearner(
+    learner = specialized_learners.RandomForestLearner(
         label="label", weights="weight"
     )
     with self.assertRaisesRegex(

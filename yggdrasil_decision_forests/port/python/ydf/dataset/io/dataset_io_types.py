@@ -25,6 +25,15 @@ if typing.TYPE_CHECKING:
 # Supported type of column input values.
 InputValues = Union[np.ndarray, List[Any]]
 
+DictInputValues = Dict[str, InputValues]
+
+
+# Information about unrolled features
+# Maps an original feature name to a list of unrolled features.
+# e.g. {"f" : ["f.0", "f.1", "f.2"]}
+UnrolledFeaturesInfo = Dict[str, List[str]]
+
+
 # Supported types of datasets.
 IODataset = Union[Dict[str, InputValues], "pd.DataFrame", str, Sequence[str]]
 

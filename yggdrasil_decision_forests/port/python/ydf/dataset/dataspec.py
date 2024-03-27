@@ -320,7 +320,7 @@ def normalize_column_defs(
 
 
 def _normalized_column(
-    column: Union[Column, str, Tuple[str, Semantic]]
+    column: Union[Column, str, Tuple[str, Semantic]],
 ) -> Column:
   """Normalizes a single column."""
 
@@ -440,6 +440,7 @@ def get_all_columns(
     available_columns: Sequence[str],
     inference_args: DataSpecInferenceArgs,
     required_columns: Optional[Sequence[str]],
+    unroll_feature_info: Dict[str, List[str]] = {},
 ) -> Sequence[Column]:
   """Gets all the columns to use by the model / learner.
 
@@ -451,6 +452,7 @@ def get_all_columns(
       columns is important. First should come the columns in
       `inference_args.columns` in unchanged order, then any remaining columns in
       the order they appear at in the data.
+    unroll_feature_info: Information about feature unrolling.
 
   Returns:
     The list of model input columns. This includes the required columns plus the
@@ -475,7 +477,15 @@ def get_all_columns(
     # Add the specified columns in order, but ignore those that do not exist.
     for col in inference_args.columns:
       if col.name in available_columns_as_set:
+        if col.name in unroll_feature_info:
+          raise ValueError(
+              f"Column {col.name!r} is available both natively and unrolled."
+          )
         specified_columns.append(col)
+      elif col.name in unroll_feature_info:
+        specified_columns.extend(
+            [Column(col) for col in unroll_feature_info[col.name]]
+        )
       else:
         if required_columns is None or col.name in required_columns_as_set:
           raise ValueError(
