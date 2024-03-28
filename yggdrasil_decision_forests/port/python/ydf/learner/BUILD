@@ -1,8 +1,8 @@
 # Learner bindings for PYDF
 # pytype binary, test, library
 load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
-load("//ydf/learner/wrapper:wrapper_generator.bzl", "py_wrap_yggdrasil_learners")
 load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
+load("//ydf/learner/wrapper:wrapper_generator.bzl", "py_wrap_yggdrasil_learners")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -67,6 +67,7 @@ pybind_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:optional",
         "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_inference",
         "@ydf_cc//yggdrasil_decision_forests/dataset:formats",

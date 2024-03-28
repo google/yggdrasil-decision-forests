@@ -1,5 +1,5 @@
-load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],

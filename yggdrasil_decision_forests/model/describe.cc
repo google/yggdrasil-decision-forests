@@ -36,6 +36,7 @@
 #include "yggdrasil_decision_forests/utils/html.h"
 #include "yggdrasil_decision_forests/utils/html_content.h"
 #include "yggdrasil_decision_forests/utils/plot.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 
 namespace yggdrasil_decision_forests::model {
 namespace {
@@ -97,9 +98,9 @@ utils::html::Html Model(const model::AbstractModel& model) {
   if (!model.weights().has_value()) {
     AddKeyValue(&content, "Weights", "None");
   } else {
-    std::string weights_text;
-    google::protobuf::TextFormat::PrintToString(*model.weights(), &weights_text);
-    AddKeyMultiLinesValue(&content, "Weights", weights_text);
+    AddKeyMultiLinesValue(
+        &content, "Weights",
+        utils::SerializeTextProto(*model.weights()).value_or("ERROR"));
   }
 
   AddKeyValue(&content, "Trained with tuner", HasTuner(model) ? "Yes" : "No");

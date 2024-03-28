@@ -34,6 +34,7 @@
 #include "absl/status/statusor.h"
 #include "absl/types/optional.h"
 #include "pybind11_protobuf/native_proto_caster.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
@@ -138,6 +139,8 @@ class GenericCCLearner {
       const absl::optional<
           std::reference_wrapper<const dataset::VerticalDataset>>
           validation_dataset = std::nullopt) const {
+    YDF_LOG(INFO) << "Data spec:\n"
+                  << dataset::PrintHumanReadable(dataset.data_spec());
     EnableUserInterruption();
     absl::StatusOr<std::unique_ptr<model::AbstractModel>> model;
     {
@@ -154,6 +157,7 @@ class GenericCCLearner {
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string> validation_dataset_path =
           std::nullopt) const {
+    YDF_LOG(INFO) << "Data spec:\n" << dataset::PrintHumanReadable(data_spec);
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,
                      dataset::GetTypedPath(dataset_path));
     std::optional<std::string> typed_valid_path;
@@ -177,6 +181,8 @@ class GenericCCLearner {
       const std::string& dataset_path,
       const dataset::proto::DataSpecificationGuide& data_spec_guide,
       const std::optional<std::string> validation_dataset_path) const {
+    YDF_LOG(INFO) << "Data spec guide:\n" << data_spec_guide.DebugString();
+
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,
                      dataset::GetTypedPath(dataset_path));
     dataset::proto::DataSpecification generated_data_spec;

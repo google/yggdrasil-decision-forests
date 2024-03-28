@@ -18,10 +18,14 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_PROTOBUF_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_PROTOBUF_H_
 
+#include <string>
+
+#include "src/google/protobuf/message.h"
 #include "src/google/protobuf/text_format.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
@@ -73,6 +77,11 @@ class ProtoWriterInterface {
   // Write a new record.
   virtual absl::Status Write(const T& value) = 0;
 };
+
+// This method should be used instead of "message.DebugString()" whenever
+// the full message (unredacted) is to be serialized in a way that can be
+// deserialized with ParseTextProto().
+absl::StatusOr<std::string> SerializeTextProto(const google::protobuf::Message& message);
 
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

@@ -1500,13 +1500,13 @@ std::string DecisionTree::DebugCompare(
 std::string NodeWithChildren::DebugCompare(
     const dataset::proto::DataSpecification& dataspec, const int label_idx,
     const NodeWithChildren& other) const {
-  std::string node_text;
-  std::string other_node_text;
-  google::protobuf::TextFormat::PrintToString(node_, &node_text);
-  google::protobuf::TextFormat::PrintToString(other.node_, &other_node_text);
+  std::string node_text =
+      utils::SerializeTextProto(node_).value_or("cannot serialize first arg");
+  std::string other_node_text = utils::SerializeTextProto(other.node_)
+                                    .value_or("cannot serialize second arg");
   if (node_text != other_node_text) {
-    return absl::StrCat("Nodes don't match.\n\n", node_text,
-                        "\nvs\n\n", other_node_text);
+    return absl::StrCat("Nodes don't match.\n\n", node_text, "\nvs\n\n",
+                        other_node_text);
   }
   if (!IsLeaf()) {
     for (const int i : {0, 1}) {
