@@ -36,6 +36,7 @@ py_library(
     deps = [
         # absl/flags dep,
         # absl/testing:absltest dep,
+        # numpy dep,
         # pandas dep,
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
@@ -114,5 +115,16 @@ py_test(
     deps = [
         ":paths",
         # absl/testing:absltest dep,
+    ],
+)
+
+py_test(
+    name = "test_utils_test",
+    srcs = ["test_utils_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":test_utils",
+        # absl/testing:absltest dep,
+        # numpy dep,
     ],
 )

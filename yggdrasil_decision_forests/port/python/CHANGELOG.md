@@ -5,6 +5,8 @@
 ### Feature
 
 -   Add support for manual selection of multi-dimensional features by name.
+-   Add programmatic access to partial dependence plots and variable importances
+    in a model analysis.
 
 ## 0.3.0 - 2024-03-15
 

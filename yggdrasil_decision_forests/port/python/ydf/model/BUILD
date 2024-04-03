@@ -124,8 +124,12 @@ py_library(
     name = "analysis",
     srcs = ["analysis.py"],
     deps = [
+        # numpy dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/cc:ydf",
+        "//ydf/dataset:dataspec",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/utils:partial_dependence_plot_py_proto",
     ],
 )
 
@@ -167,6 +171,7 @@ py_test(
     ],
     python_version = "PY3",
     deps = [
+        ":analysis",
         ":generic_model",
         ":model_lib",
         ":model_metadata",

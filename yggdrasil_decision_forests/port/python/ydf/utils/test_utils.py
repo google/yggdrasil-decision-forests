@@ -22,6 +22,7 @@ from typing import Optional, Sequence
 
 from absl import flags
 from absl.testing import absltest
+import numpy as np
 import pandas as pd
 
 from ydf.dataset import dataset
@@ -140,3 +141,69 @@ def golden_check_string(
       f.write(value)
 
   test.assertEqual(value, golden_data)
+
+
+def assert_almost_equal(a, b):
+  msg = test_almost_equal(a, b)
+  if msg is not None:
+    raise AssertionError(msg)
+
+
+def test_almost_equal(a, b) -> Optional[str]:
+  """Checks that two dataclasses are almost equal.
+
+  Unlike "assert_almost_equal_dataclasses" and "self.assertEqual", this method
+  supports dataclasses containing numpy arrays.
+
+  Args:
+    a: First item to compare.
+    b: Second item to compare.
+
+  Returns:
+    None if "a" and "b" are equal. A description of the different otherwise.
+  """
+
+  if type(a) != type(b):
+    return f"Type mismatch: {type(a)} != {type(b)}"
+
+  elif dataclasses.is_dataclass(a):
+    sub_msg = test_almost_equal(dataclasses.asdict(a), dataclasses.asdict(b))
+    if sub_msg is not None:
+      return sub_msg
+
+  elif isinstance(a, np.ndarray):
+    if a.dtype != b.dtype:
+      return f"numpy array type mismatch: {a} != {b}"
+
+    if a.dtype.type in [np.string_, np.bytes_, np.str_]:
+      if not np.equal(a, b).all():
+        return f"numpy array mismatch: {a} != {b}"
+    else:
+      if not np.allclose(a, b):
+        return f"numpy array mismatch: {a} != {b}"
+
+  elif isinstance(a, (bool, str, bytes, int, float, type(None))):
+    if a != b:
+      return f"primitive mismatch: {a} != {b}"
+
+  elif isinstance(a, list):
+    if len(a) != len(b):
+      return f"list len mismatch: {len(a)} != {len(b)}"
+
+    for sa, sb in zip(a, b):
+      sub_msg = test_almost_equal(sa, sb)
+      if sub_msg is not None:
+        return sub_msg
+
+  elif isinstance(a, dict):
+    if set(a) != set(b):
+      return f"dict field mismatch: {set(a)} != {set(b)}"
+    for field in a:
+      sub_msg = test_almost_equal(a[field], b[field])
+      if sub_msg is not None:
+        return sub_msg
+
+  else:
+    raise ValueError(f"Non implemented comparison for type: {type(a)}")
+
+  return None

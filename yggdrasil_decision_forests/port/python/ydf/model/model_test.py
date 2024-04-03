@@ -28,6 +28,7 @@ import numpy.testing as npt
 import pandas as pd
 
 from ydf.dataset import dataset
+from ydf.model import analysis as analysis_lib
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model import model_metadata
@@ -37,6 +38,8 @@ from ydf.utils import test_utils
 
 
 class GenericModelTest(parameterized.TestCase):
+
+  maxDiff = None
 
   @classmethod
   def setUpClass(cls):
@@ -54,6 +57,10 @@ class GenericModelTest(parameterized.TestCase):
     # This model is a GBDT regression model without training logs.
     cls.abalone_regression_gbdt = model_lib.load_model(
         os.path.join(model_dir, "abalone_regression_gbdt")
+    )
+    # This model is a GBDT ranking model.
+    cls.synthetic_ranking_gbdt = model_lib.load_model(
+        os.path.join(model_dir, "synthetic_ranking_gbdt")
     )
 
   def test_rf_instance(self):
@@ -195,6 +202,168 @@ class GenericModelTest(parameterized.TestCase):
     self.assertIn("Partial Dependence Plot", analysis_html)
     self.assertIn("Conditional Expectation Plot", analysis_html)
     self.assertIn("Variable Importance", analysis_html)
+
+  def test_analyze_programmatic_data_access_classification(self):
+    """Test programmatic access to analysis data."""
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+    test_df = pd.read_csv(dataset_path)
+    analysis = self.adult_binary_class_gbdt.analyze(test_df, num_bins=4)
+
+    # Checked against report.
+    self.assertSetEqual(
+        set(analysis.variable_importances()),
+        set([
+            "MEAN_DECREASE_IN_ACCURACY",
+            "MEAN_DECREASE_IN_AP_>50K_VS_OTHERS",
+            "MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS",
+            "MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS",
+            "[In model] NUM_NODES",
+            "[In model] NUM_AS_ROOT",
+            "[In model] SUM_SCORE",
+            "[In model] INV_MEAN_MIN_DEPTH",
+        ]),
+    )
+    self.assertEqual(
+        analysis.variable_importances()["[In model] NUM_AS_ROOT"],
+        [
+            (31.0, "age"),
+            (22.0, "marital_status"),
+            (8.0, "capital_gain"),
+            (3.0, "occupation"),
+            (2.0, "education_num"),
+            (1.0, "education"),
+            (1.0, "capital_loss"),
+        ],
+    )
+    pdps = analysis.partial_dependence_plots()
+    self.assertLen(pdps, 14)
+    test_utils.assert_almost_equal(
+        pdps[:2],
+        [
+            analysis_lib.PartialDependencePlot(
+                feature_names=["age"],
+                feature_values=[np.array([22.25, 32.5, 43.0, 69.25])],
+                predictions=np.array([
+                    [0.89487603, 0.10512417],
+                    [0.77957238, 0.22042732],
+                    [0.73085017, 0.26914773],
+                    [0.79168959, 0.20831237],
+                ]),
+            ),
+            analysis_lib.PartialDependencePlot(
+                feature_names=["workclass"],
+                feature_values=[
+                    np.array(
+                        [
+                            "<OOD>",
+                            "Private",
+                            "Self-emp-not-inc",
+                            "Local-gov",
+                            "State-gov",
+                            "Self-emp-inc",
+                            "Federal-gov",
+                            "Without-pay",
+                        ],
+                    )
+                ],
+                predictions=np.array([
+                    [0.75371707, 0.24627779],
+                    [0.75371707, 0.24627779],
+                    [0.78163852, 0.21835641],
+                    [0.77356506, 0.2264321],
+                    [0.76878546, 0.23121109],
+                    [0.73476332, 0.26523371],
+                    [0.72042147, 0.27957545],
+                    [0.72042147, 0.27957545],
+                ]),
+            ),
+        ],
+    )
+
+  def test_analyze_programmatic_data_access_regression(self):
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
+    )
+    test_df = pd.read_csv(dataset_path)
+    analysis = self.abalone_regression_gbdt.analyze(test_df, num_bins=4)
+
+    # Checked against report.
+    self.assertSetEqual(
+        set(analysis.variable_importances()),
+        set([
+            "MEAN_INCREASE_IN_RMSE",
+            "[In model] INV_MEAN_MIN_DEPTH",
+            "[In model] SUM_SCORE",
+            "[In model] NUM_NODES",
+            "[In model] NUM_AS_ROOT",
+        ]),
+    )
+    self.assertEqual(
+        analysis.variable_importances()["[In model] NUM_AS_ROOT"],
+        [
+            (20.0, "ShellWeight"),
+            (10.0, "Height"),
+            (4.0, "Type"),
+            (3.0, "Diameter"),
+            (1.0, "LongestShell"),
+        ],
+    )
+    pdps = analysis.partial_dependence_plots()
+    self.assertLen(pdps, 8)
+    test_utils.assert_almost_equal(
+        pdps[:1],
+        [
+            analysis_lib.PartialDependencePlot(
+                feature_names=["Type"],
+                feature_values=[np.array(["<OOD>", "M", "I", "F"])],
+                predictions=np.array([
+                    10.20926439,
+                    10.22119849,
+                    9.8006166,
+                    10.19440551,
+                ]),
+            ),
+        ],
+    )
+
+  def test_analyze_programmatic_data_access_ranking(self):
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "synthetic_ranking_test.csv"
+    )
+    test_df = pd.read_csv(dataset_path)
+    analysis = self.synthetic_ranking_gbdt.analyze(test_df, num_bins=4)
+
+    # Checked against report.
+    self.assertSetEqual(
+        set(analysis.variable_importances()),
+        set([
+            "MEAN_DECREASE_IN_NDCG",
+            "[In model] SUM_SCORE",
+            "[In model] NUM_NODES",
+            "[In model] INV_MEAN_MIN_DEPTH",
+            "[In model] NUM_AS_ROOT",
+        ]),
+    )
+    self.assertEqual(
+        analysis.variable_importances()["[In model] NUM_AS_ROOT"],
+        [(11.0, "cat_str_0"), (2.0, "num_0"), (1.0, "num_2")],
+    )
+    pdps = analysis.partial_dependence_plots()
+    self.assertLen(pdps, 8)
+    test_utils.assert_almost_equal(
+        pdps[:1],
+        [
+            analysis_lib.PartialDependencePlot(
+                feature_names=["cat_int_0"],
+                feature_values=[np.array([4.25, 11.5, 19.5, 26.75])],
+                predictions=np.array(
+                    [-0.2301757, -0.20255686, -0.2001005, -0.19919406]
+                ),
+            ),
+        ],
+    )
 
   def test_explain_prediction_adult_gbt(self):
     dataset_path = os.path.join(
