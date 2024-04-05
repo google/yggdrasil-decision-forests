@@ -19,7 +19,8 @@ improve debuggability of the remaining model tests.
 """
 
 import os
-from typing import Callable, List, Mapping, Optional, Tuple
+import tempfile
+from typing import Callable, Dict, List, Mapping, Optional, Tuple
 
 from absl import logging
 from absl.testing import absltest
@@ -30,7 +31,9 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_decision_forests as tfdf
 
+from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
+from ydf.model import export_tf
 from ydf.model import model_lib
 from ydf.utils import test_utils
 
@@ -67,6 +70,21 @@ class TfModelTest(parameterized.TestCase):
       df["ranking_group"] = ["a", "a", "a", "a", "a", "b", "b", "b", "b", "b"]
       df["label"] = [0, 0, 0, 1, 1, 1, 3, 3, 4, 4]
     return df
+
+  def create_dataset_v2(self, columns: List[str]) -> Dict[str, np.ndarray]:
+    """Creates a dataset with random values."""
+    data = {
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "i1": np.random.randint(100, size=100),
+        "i2": np.random.randint(100, size=100),
+        "c1": np.random.choice(["x", "y", "z"], size=100),
+        "b1": np.random.randint(2, size=100).astype(np.bool_),
+        "label_class_binary": np.random.choice(["l1", "l2"], size=100),
+        "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=100),
+        "label_regress": np.random.random(size=100),
+    }
+    return {k: data[k] for k in columns}
 
   def create_csv(
       self, columns: List[str], label: Optional[str], weights: Optional[str]
@@ -398,6 +416,439 @@ class TfModelTest(parameterized.TestCase):
           prediction["scores"].numpy(), test_predictions[example_idx]
       )
       npt.assert_equal(prediction["classes"].numpy(), [[b"<=50K", b">50K"]])
+
+  def test_to_tensorflow_function(self):
+    """A simple function conversion."""
+
+    # Create YDF model
+    columns = ["f1", "f2", "i1", "c1", "b1", "label_class_binary"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+
+    # Golden predictions
+    test_ds = self.create_dataset_v2(columns)
+    ydf_predictions = model.predict(test_ds)
+
+    # Convert model to tf function + generate predictions
+    tf_function = model.to_tensorflow_function()
+    tf_test_ds = {
+        "f1": tf.constant(test_ds["f1"]),
+        "f2": tf.constant(test_ds["f2"]),
+        "i1": tf.constant(test_ds["i1"]),
+        "c1": tf.constant(test_ds["c1"]),
+        "b1": tf.constant(test_ds["b1"], tf.float32),  # bool is feed as float32
+    }
+    tf_predictions = tf_function(tf_test_ds)
+
+    npt.assert_array_equal(ydf_predictions, tf_predictions)
+
+  @parameterized.product(can_be_saved=[True, False])
+  def test_to_multi_tensorflow_function(self, can_be_saved: bool):
+    """Function export and serialization with multiple YDF models."""
+
+    # Create YDF model
+    columns = ["f1", "f2", "i1", "c1", "label_class_binary"]
+    model_1 = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+    model_2 = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+
+    # Golden predictions
+    test_ds = self.create_dataset_v2(columns)
+    ydf_predictions = model_1.predict(test_ds) + model_2.predict(test_ds) * 2
+
+    # Convert to tf function + generate predictions
+    tf_function_m1 = model_1.to_tensorflow_function(can_be_saved=can_be_saved)
+    tf_function_m2 = model_2.to_tensorflow_function(can_be_saved=can_be_saved)
+
+    @tf.function
+    def tf_function(features):
+      return tf_function_m1(features) + tf_function_m2(features) * 2
+
+    tf_test_ds = {k: tf.constant(v) for k, v in test_ds.items()}
+    tf_predictions = tf_function(tf_test_ds)
+
+    # Check predictions
+    npt.assert_array_equal(ydf_predictions, tf_predictions)
+
+    if not can_be_saved:
+      return
+
+    # Serialize / unserialize model
+    with tempfile.TemporaryDirectory() as tmp_dir:
+      tf_model = tf.Module()
+      tf_model.__call__ = tf_function
+      tf_model.tf_function_m1 = tf_function_m1
+      tf_model.tf_function_m2 = tf_function_m2
+      tf.saved_model.save(tf_model, tmp_dir)
+      loaded_tf_model = tf.saved_model.load(tmp_dir)
+
+    # Check predictions gain
+    loaded_tf_predictions = loaded_tf_model(tf_test_ds)
+    npt.assert_array_equal(ydf_predictions, loaded_tf_predictions)
+
+  def test_to_raw_tensorflow_saved_model(self):
+    """Simple export to SavedModel format."""
+
+    # Create YDF model
+    columns = ["f1", "f2", "i1", "c1", "b1", "label_class_binary"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+
+    # Golden predictions
+    test_ds = self.create_dataset_v2(columns[:-1])
+    ydf_predictions = model.predict(test_ds)
+
+    # Save model
+    tmp_dir = self.create_tempdir().full_path
+    model.to_tensorflow_saved_model(
+        tmp_dir,
+        mode="tf",
+        feature_dtypes={"f1": tf.float64},
+    )
+
+    # Load model
+    tf_model = tf.saved_model.load(tmp_dir)
+
+    # Test predictions
+    tf_test_ds = {
+        "f1": tf.constant(test_ds["f1"]),
+        "f2": tf.constant(test_ds["f2"], tf.float32),
+        "i1": tf.constant(test_ds["i1"], tf.float32),
+        "c1": tf.constant(test_ds["c1"]),
+        "b1": tf.constant(test_ds["b1"], tf.float32),
+    }
+    tf_predictions = tf_model(tf_test_ds)
+    npt.assert_equal(ydf_predictions, tf_predictions)
+
+  def test_to_tensorflow_saved_model_classify_api(self):
+    """Export to SavedModel format with regress API."""
+    columns = ["f1", "f2", "label_class_multi"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_multi",
+        num_trees=10,
+        task=generic_learner.Task.CLASSIFICATION,
+    ).train(self.create_dataset_v2(columns))
+    test_ds = self.create_dataset_v2(columns[:-1])
+    ydf_predictions = model.predict(test_ds)
+    tmp_dir = self.create_tempdir().full_path
+    model.to_tensorflow_saved_model(path=tmp_dir, mode="tf", servo_api=True)
+    tf_model = tf.saved_model.load(tmp_dir)
+    tf_model_predict = tf_model.signatures["serving_default"]
+    tf_prediction = tf_model_predict(**test_ds)
+    self.assertEqual(tf_prediction["scores"].shape, (100, 3))
+    self.assertEqual(tf_prediction["classes"].shape, (100, 3))
+    npt.assert_equal(ydf_predictions, tf_prediction["scores"])
+
+  def test_to_tensorflow_saved_model_regress_api(self):
+    """Export to SavedModel format with regress API."""
+    columns = ["f1", "i1", "label_regress"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_regress",
+        num_trees=10,
+        task=generic_learner.Task.REGRESSION,
+    ).train(self.create_dataset_v2(columns))
+    test_ds = self.create_dataset_v2(columns[:-1])
+    ydf_predictions = model.predict(test_ds)
+    tmp_dir = self.create_tempdir().full_path
+    model.to_tensorflow_saved_model(path=tmp_dir, mode="tf", servo_api=True)
+    tf_model = tf.saved_model.load(tmp_dir)
+    tf_model_predict = tf_model.signatures["serving_default"]
+    tf_prediction = tf_model_predict(**test_ds)
+    self.assertEqual(tf_prediction["outputs"].shape, (100,))
+    npt.assert_equal(ydf_predictions, tf_prediction["outputs"])
+
+  def test_to_tensorflow_saved_model_with_example_proto(self):
+    """Export to SavedModel format with serialized example inputs."""
+
+    # Create YDF model
+    columns = ["f1", "i1", "c1", "b1", "label_class_binary"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+
+    # Golden predictions
+    test_ds = self.create_dataset_v2(columns[:-1])
+
+    # Save model
+    tmp_dir = self.create_tempdir().full_path
+
+    def pre_processing(features):
+      features = features.copy()
+      features["f1"] = features["f1"] * 2
+      return features
+
+    def post_processing(output):
+      return output * 3
+
+    # Model predictions with all transformations
+    ydf_no_post_process_predictions = model.predict(pre_processing(test_ds))
+    # Add extra dimension: ydf squeeze its predictions, while the servo api
+    # expects non-squeezed predictions.
+    ydf_no_post_process_predictions = np.stack(
+        [
+            1.0 - ydf_no_post_process_predictions,
+            ydf_no_post_process_predictions,
+        ],
+        axis=1,
+    )
+    ydf_predictions = post_processing(ydf_no_post_process_predictions)
+
+    model.to_tensorflow_saved_model(
+        tmp_dir,
+        mode="tf",
+        feed_example_proto=True,
+        servo_api=True,
+        feature_dtypes={"i1": tf.int64},
+        pre_processing=pre_processing,
+        post_processing=post_processing,
+    )
+
+    # Load model
+    tf_model = tf.saved_model.load(tmp_dir)
+
+    # Raw predictions
+    tf_test_ds = {
+        "f1": tf.constant(test_ds["f1"], tf.float32),
+        "i1": tf.constant(test_ds["i1"]),
+        "c1": tf.constant(test_ds["c1"]),
+        "b1": tf.constant(test_ds["b1"], tf.float32),
+    }
+    raw_tf_predictions = tf_model(tf_test_ds)
+    npt.assert_array_equal(ydf_predictions, raw_tf_predictions)
+
+    # Stored pre and post processing.
+    for feature in columns[:-1]:
+      npt.assert_array_equal(
+          tf_model.pre_processing(tf_test_ds)[feature],
+          pre_processing(tf_test_ds)[feature],
+      )
+
+    npt.assert_array_equal(
+        tf_model.post_processing(tf.constant([[1.0, 2.0]], tf.float32)),
+        post_processing(tf.constant([[1.0, 2.0]], tf.float32)),
+    )
+
+    # Servo API predictions
+    tf_model_predict = tf_model.signatures["serving_default"]
+    tf_test_ds = []
+    for example_idx in range(100):
+      tf_test_ds.append(
+          tf.train.Example(
+              features=tf.train.Features(
+                  feature={
+                      "f1": tf.train.Feature(
+                          float_list=tf.train.FloatList(
+                              value=[test_ds["f1"][example_idx]]
+                          )
+                      ),
+                      "i1": tf.train.Feature(
+                          int64_list=tf.train.Int64List(
+                              value=[test_ds["i1"][example_idx]]
+                          )
+                      ),
+                      "c1": tf.train.Feature(
+                          bytes_list=tf.train.BytesList(
+                              value=[bytes(test_ds["c1"][example_idx], "utf-8")]
+                          )
+                      ),
+                      "b1": tf.train.Feature(
+                          float_list=tf.train.FloatList(
+                              value=[test_ds["b1"][example_idx]]
+                          )
+                      ),
+                  }
+              )
+          ).SerializeToString()
+      )
+    tf_predictions = tf_model_predict(inputs=tf_test_ds)
+    npt.assert_equal(ydf_predictions, tf_predictions["scores"])
+
+  def test_to_tensorflow_saved_model_with_resource_postprocessing(self):
+    """Test having the post processing be resource dependent."""
+
+    columns = ["f1", "f2", "label_class_binary"]
+    m1_ds = self.create_dataset_v2(columns)
+    m1_ydf = specialized_learners.RandomForestLearner(
+        label="label_class_binary",
+        num_trees=10,
+        task=generic_learner.Task.CLASSIFICATION,
+    ).train(m1_ds)
+    m1_tf = m1_ydf.to_tensorflow_function()
+
+    class PreProcessing(tf.Module):
+
+      def __call__(self, features):
+        features = features.copy()
+        features["m1"] = m1_tf(features)
+        return features
+
+    pre_processing = PreProcessing()
+    pre_processing.m1_tf = m1_tf
+
+    m2_ds = {**m1_ds, "m1": m1_ydf.predict(m1_ds)}
+    m2 = specialized_learners.RandomForestLearner(
+        label="label_class_binary",
+        num_trees=10,
+        task=generic_learner.Task.CLASSIFICATION,
+    ).train(m2_ds)
+
+    tmp_dir = self.create_tempdir().full_path
+    m2.to_tensorflow_saved_model(
+        path=tmp_dir, mode="tf", pre_processing=pre_processing
+    )
+
+    _ = tf.saved_model.load(tmp_dir)
+
+  def test_to_tensorflow_saved_model_adult_classify_api_serialized_examples(
+      self,
+  ):
+    """Export to SavedModel format of a model trained from file."""
+
+    train_ds_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_train.recordio"
+    )
+    test_ds_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.recordio"
+    )
+
+    model = specialized_learners.RandomForestLearner(
+        label="income",
+        num_trees=10,
+    ).train(f"tfrecordv2+tfe:{train_ds_path}")
+
+    ydf_predictions = model.predict(f"tfrecordv2+tfe:{test_ds_path}")
+
+    tempdir = self.create_tempdir().full_path
+
+    # TODO: Implement automatic dtype.
+    model.to_tensorflow_saved_model(
+        tempdir,
+        mode="tf",
+        servo_api=True,
+        feed_example_proto=True,
+        feature_dtypes={
+            "age": tf.int64,
+            "capital_gain": tf.int64,
+            "capital_loss": tf.int64,
+            "education_num": tf.int64,
+            "fnlwgt": tf.int64,
+            "hours_per_week": tf.int64,
+        },
+    )
+
+    tf_model = tf.saved_model.load(tempdir)
+    tf_predict = tf_model.signatures["serving_default"]
+
+    for example_idx, serialized_example in enumerate(
+        tf.data.TFRecordDataset([test_ds_path]).take(10)
+    ):
+      tf_prediction = tf_predict(inputs=[serialized_example])
+      npt.assert_array_equal(
+          tf_prediction["scores"][:, 1], ydf_predictions[example_idx]
+      )
+      npt.assert_array_equal(tf_prediction["classes"], [[b"<=50K", b">50K"]])
+
+  def test_tensorflow_raw_input_signature_default(self):
+    columns = ["f1", "i1", "c1", "b1", "label_class_binary"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+    self.assertEqual(
+        export_tf.tensorflow_raw_input_signature(model, {}),
+        {
+            "f1": tf.TensorSpec(shape=(None,), dtype=tf.float32, name="f1"),
+            "i1": tf.TensorSpec(shape=(None,), dtype=tf.float32, name="i1"),
+            "c1": tf.TensorSpec(shape=(None,), dtype=tf.string, name="c1"),
+            "b1": tf.TensorSpec(shape=(None,), dtype=tf.float32, name="b1"),
+        },
+    )
+
+  def test_tensorflow_raw_input_signature_override(self):
+    columns = ["f1", "i1", "c1", "b1", "label_class_binary"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+    self.assertEqual(
+        export_tf.tensorflow_raw_input_signature(
+            model,
+            {"f1": tf.int32, "i1": tf.int64, "c1": tf.string, "b1": tf.float16},
+        ),
+        {
+            "f1": tf.TensorSpec(shape=(None,), dtype=tf.int32, name="f1"),
+            "i1": tf.TensorSpec(shape=(None,), dtype=tf.int64, name="i1"),
+            "c1": tf.TensorSpec(shape=(None,), dtype=tf.string, name="c1"),
+            "b1": tf.TensorSpec(shape=(None,), dtype=tf.float16, name="b1"),
+        },
+    )
+
+  def test_usage_example_to_tensorflow_function(self):
+    """Usage example of the "to_tensorflow_function" method."""
+
+    # Train a model.
+    model = specialized_learners.RandomForestLearner(label="l").train({
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    })
+
+    # Convert model to a TF module.
+    tf_model = model.to_tensorflow_function()
+
+    # Make predictions with the TF module.
+    tf_predictions = tf_model({
+        "f1": tf.constant([0, 0.5, 1]),
+        "f2": tf.constant([1, 0, 0.5]),
+    })
+
+  def test_usage_example_to_tensorflow_saved_model(self):
+    """Usage example of the "to_tensorflow_saved_model" method."""
+    # Train a model.
+    model = specialized_learners.RandomForestLearner(label="l").train({
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    })
+
+    # Export the model to the TensorFlow SavedModel format.
+    model.to_tensorflow_saved_model(path="/tmp/my_model", mode="tf")
+
+    # Load the saved model.
+    tf_model = tf.saved_model.load("/tmp/my_model")
+
+    # Make predictions
+    tf_predictions = tf_model({
+        "f1": tf.constant(np.random.random(size=10), tf.float32),
+        "f2": tf.constant(np.random.random(size=10), tf.float32),
+    })
+
+    # Part 2
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model", mode="tf", feed_example_proto=True, servo_api=True
+    )
+
+    # Part 3
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model",
+        mode="tf",
+        feature_dtypes={"f1": tf.int64},  # f1 is feed as an tf.int64.
+    )
+
+    # Part 4
+    def pre_processing(features):
+      features = features.copy()
+      features["f1"] = features["f1"] * 2
+      return features
+
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model",
+        mode="tf",
+        pre_processing=pre_processing,
+    )
 
 
 if __name__ == "__main__":

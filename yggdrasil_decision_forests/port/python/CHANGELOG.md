@@ -7,6 +7,9 @@
 -   Add support for manual selection of multi-dimensional features by name.
 -   Add programmatic access to partial dependence plots and variable importances
     in a model analysis.
+-   Add `to_tensorflow_function` function to convert a YDF model into a
+    TensorFlow function / module.
+-   Add support for Servo API to `to_tensorflow_saved_model` function.
 
 ## 0.3.0 - 2024-03-15
 

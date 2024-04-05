@@ -84,7 +84,10 @@ pybind_library(
 
 py_library(
     name = "generic_model",
-    srcs = ["generic_model.py"],
+    srcs = [
+        "export_tf.py",
+        "generic_model.py",
+    ],
     deps = [
         ":analysis",
         ":model_metadata",
@@ -195,9 +198,11 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
     python_version = "PY3",
+    shard_count = 5,
     # TODO: This test fails in OSS due to a package name clash on yggdrasil_decision_forests.
     tags = ["manual"],
     deps = [
+        ":generic_model",
         ":model_lib",
         # absl/logging dep,
         # absl/testing:absltest dep,
@@ -206,6 +211,7 @@ py_test(
         # pandas dep,
         # tensorflow dep,
         # tensorflow_decision_forests dep,
+        "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
         "//ydf/utils:test_utils",
     ],

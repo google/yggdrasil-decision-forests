@@ -114,21 +114,10 @@ class VerticalDataset:
       elif column_data.dtype.type in [
           np.object_,
           np.string_,
-          np.int8,
-          np.int16,
-          np.int32,
-          np.int64,
-          np.uint8,
-          np.uint16,
-          np.uint32,
-          np.uint64,
-      ]:
+          np.str_,
+      ] or np.issubdtype(column_data.dtype, np.integer):
         column_data = column_data.astype(np.bytes_)
-      elif column_data.dtype.type in [
-          np.float16,
-          np.float32,
-          np.float64,
-      ]:
+      elif np.issubdtype(column_data.dtype, np.floating):
         raise ValueError(
             f"Cannot import column {column.name!r} with"
             f" semantic={column.semantic} as it contains floating point values."
@@ -188,21 +177,9 @@ class VerticalDataset:
           np.object_,
           np.string_,
           np.bool_,
-          np.int8,
-          np.int16,
-          np.int32,
-          np.int64,
-          np.uint8,
-          np.uint16,
-          np.uint32,
-          np.uint64,
-      ]:
+      ] or np.issubdtype(column_data.dtype, np.integer):
         column_data = column_data.astype(np.bytes_)
-      elif column_data.dtype.type in [
-          np.float16,
-          np.float32,
-          np.float64,
-      ]:
+      elif np.issubdtype(column_data.dtype, np.floating):
         raise ValueError(
             f"Cannot import column {column.name!r} with"
             f" semantic={column.semantic} as it contains floating point values."
@@ -549,22 +526,12 @@ def infer_semantic(name: str, data: Any) -> dataspec.Semantic:
 
   if isinstance(data, np.ndarray):
     # We finely control the supported types.
-    if data.dtype.type in [
-        np.float16,
-        np.float32,
-        np.float64,
-        np.int8,
-        np.int16,
-        np.int32,
-        np.int64,
-        np.uint8,
-        np.uint16,
-        np.uint32,
-        np.uint64,
-    ]:
+    if np.issubdtype(data.dtype, np.integer) or np.issubdtype(
+        data.dtype, np.floating
+    ):
       return dataspec.Semantic.NUMERICAL
 
-    if data.dtype.type in [np.string_, np.bytes_]:
+    if data.dtype.type in [np.string_, np.bytes_, np.str_]:
       return dataspec.Semantic.CATEGORICAL
 
     if data.dtype.type in [np.object_]:

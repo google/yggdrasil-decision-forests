@@ -17,8 +17,7 @@
 import dataclasses
 import enum
 import os
-import tempfile
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, TypeVar, Union
 
 from absl import logging
 import numpy as np
@@ -31,6 +30,7 @@ from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.metric import metric
 from ydf.model import analysis
+from ydf.model import export_tf
 from ydf.model import model_metadata
 from ydf.model import optimizer_logs
 from ydf.model import template_cpp_export
@@ -115,6 +115,7 @@ class ModelIOOptions:
 
 @enum.unique
 class NodeFormat(enum.Enum):
+  # pyformat: disable
   """Serialization format for a model.
 
   Determines the storage format for nodes.
@@ -122,6 +123,7 @@ class NodeFormat(enum.Enum):
   Attributes:
     BLOB_SEQUENCE: Default format for the public version of YDF.
   """
+  # pyformat: enable
 
   BLOB_SEQUENCE = enum.auto()
 
@@ -154,7 +156,7 @@ class GenericModel:
 
   def task(self) -> Task:
     """Task solved by the model."""
-    return Task._from_proto_type(self._model.task())
+    return Task._from_proto_type(self._model.task())  # pylint: disable=protected-access
 
   def metadata(self) -> model_metadata.ModelMetadata:
     """Metadata associated with the model.
@@ -266,7 +268,7 @@ Use `model.describe()` for more details
           required_columns=self.input_feature_names(),
       )
       result = self._model.Benchmark(
-          vds._dataset, benchmark_duration, warmup_duration, batch_size
+          vds._dataset, benchmark_duration, warmup_duration, batch_size  # pylint: disable=protected-access
       )
     return result
 
@@ -416,7 +418,7 @@ Use `model.describe()` for more details
 
       options_proto = metric_pb2.EvaluationOptions(
           bootstrapping_samples=bootstrapping_samples,
-          task=self.task()._to_proto_type(),
+          task=self.task()._to_proto_type(),  # pylint: disable=protected-access
       )
 
       evaluation_proto = self._model.Evaluate(ds._dataset, options_proto)  # pylint: disable=protected-access
@@ -596,43 +598,103 @@ Use `model.describe()` for more details
         key, self._model.data_spec(), self._model.input_features()
     )
 
-  def to_tensorflow_saved_model(
+  # TODO: Change default value of "mode" before 1.0 release.
+  def to_tensorflow_saved_model(  # pylint: disable=dangerous-default-value
       self,
       path: str,
       input_model_signature_fn: Any = None,
+      *,
+      mode: Literal["keras", "tf"] = "keras",
+      feature_dtypes: Dict[str, export_tf.TFDType] = {},
+      servo_api: bool = False,
+      feed_example_proto: bool = False,
+      pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
+      post_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
+      temp_dir: Optional[str] = None,
   ) -> None:
     """Exports the model as a TensorFlow Saved model.
 
-    The generated model is a Tensorflow SavedModel that requires the TensorFlow
-    Decision Forests custom ops. It is compatible with TF Serving and
-    Tensorflow.js, but it may not be compatible with other TensorFlow libraries.
-    The signature of the resulting model is determined automatically based on
-    the dataspec of the model unless given by `input_model_signature_fn`.
-
-    Requires Tensorflow Decision Forests to be installed.
+    This function requires TensorFlow and TensorFlow Decision Forests to be
+    installed. You can install them using the command `pip install
+    tensorflow_decision_forests`. The generated SavedModel model relies on the
+    TensorFlow Decision Forests Custom Inference Op. This Op is available by
+    default in various platforms such as Servomatic, TensorFlow Serving, Vertex
+    AI, and TensorFlow.js.
 
     Usage example:
 
     ```python
     !pip install tensorflow_decision_forests
-    import tensorflow as tf
-    import tensorflow_decision_forests as tfdf
+
     import ydf
-    import pandas as pd
+    import numpy as np
 
-    path_to_tfdf_model = '/path/to/tfdfmodel'
-    # `model` is a model trained with ydf.
-    model.to_tensorflow_saved_model(path=path_to_tfdf_model)
+    # Train a model.
+    model = ydf.RandomForestLearner(label="l").train({
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+        })
 
-    # Load the dataset and convert to TensorFlow
-    test_df = pd.read_csv(test_dataset_path)
-    tf_test = tfdf.keras.pd_dataframe_to_tf_dataset(test_df, "Rings")
+    # Export the model to the TensorFlow SavedModel format.
+    model.to_tensorflow_saved_model(path="/tmp/my_model", mode="tf")
 
-    # Load the model with TF-DF.
-    tf_model = tf.keras.models.load_model(path_to_tfdf_model)
-    # Run predictions with TF-DF
-    tfdf_predictions = tf_model.predict(tf_test)
+    # Load the saved model.
+    tf_model = tf.saved_model.load("/tmp/my_model")
+
+    # Make predictions
+    tf_predictions = tf_model({
+        "f1": tf.constant(np.random.random(size=10), tf.float32),
+        "f2": tf.constant(np.random.random(size=10), tf.float32),
+    })
     ```
+
+    In the previous example, the model consumes raw feature values and output
+    raw predictions. Often, models run in TF Serving / Servomatic, consume
+    input features stored as a serialized tensorflow example protobuf, and
+    output structured predictions using the "regress" or "classify" Servo API.
+
+    ```python
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model",
+        mode="tf",
+        feed_example_proto=True,
+        servo_api=True)
+    ```
+
+    The dtypes of input features is selected automatically according to the
+    feature semantic. For instance, a NUMERICAL feature will be encoded as a
+    tf.float32. You can override this behavior with the `feature_dtypes`
+    argument:
+
+    ```python
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model",
+        mode="tf",
+        # The exported model expects "f1" is fed as an tf.int64.
+        feature_dtypes={"f1": tf.int64},
+        )
+    ```
+
+    The SavedModel format allows for custom computation in addition to the
+    model inference. Such computation can be specified with the `pre_processing`
+    and `post_processing` arguments:
+
+    ```python
+    def pre_processing(features):
+          features = features.copy()
+          features["f1"] = features["f1"] * 2
+          return features
+
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model",
+        mode="tf",
+        pre_processing=pre_processing,
+        )
+    ```
+
+    For more complex combinations, such as composing multiple models, use the
+    method `to_tensorflow_function` instead of `to_tensorflow_saved_model`.
 
     Args:
       path: Path to store the Tensorflow Decision Forests model.
@@ -643,29 +705,119 @@ Use `model.describe()` for more details
         `tfdf.keras.build_default_input_model_signature`. For example, specify
         `input_model_signature_fn` if an numerical input feature (which is
         consumed as DenseTensorSpec(float32) by default) will be feed
-        differently (e.g. RaggedTensor(int64)).
+        differently (e.g. RaggedTensor(int64)). Only compatible with
+        mode="keras".
+      mode: How is the YDF converted into a TensorFlow SavedModel. 1) mode =
+        "keras" (default): Turn the model into a Keras 2 model using TensorFlow
+        Decision Forests, and then save it with `tf_keras.models.save_model`. 2)
+        mode = "tf" (recommended; will become default): Turn the model into a
+        TensorFlow Module, and save it with `tf.saved_model.save`.
+      feature_dtypes: Mapping from feature name to TensorFlow dtype. Use this
+        mapping to feature dtype. For instance, numerical features are encoded
+        with tf.float32 by default. If you plan on feeding tf.float64 or
+        tf.int32, use `feature_dtype` to specify it. Only compatible with
+        mode="tf".
+      servo_api: If true, adds a SavedModel signature to make the model
+        compatible with the `Classify` or `Regress` servo APIs. Only compatible
+        with mode="tf".
+      feed_example_proto: If false (default), the model expects for the input
+        features to be provided as TensorFlow values. This is the default and
+        most efficient way to make predictions. If true, the model expects for
+        the input featurs to be provided as a binary serialized TensorFlow
+        Example proto. Only compatible with mode="tf".
+      pre_processing: Optional TensorFlow function or module to apply on the
+        input features before applying the model. Only compatible with
+        mode="tf".
+      post_processing: Optional TensorFlow function or module to apply on the
+        model predictions. Only compatible with mode="tf".
+      temp_dir: Temporary directory used during the conversion. If None
+        (default), uses `tempfile.mkdtemp` default temporary directory.
     """
-    try:
-      import tensorflow_decision_forests as tfdf  # type:ignore
-    except ImportError as exc:
-      raise ValueError(
-          'Exporting to tensorflow requires the "tensorflow_decision_forests"'
-          " package to be installed. If using pip, run `pip install"
-          " tensorflow_decision_forests`. If using Bazel/Blaze, add a"
-          " dependency."
-      ) from exc
-    # Do not pass input_model_signature_fn if it is None.
-    not_none_params = {}
-    if input_model_signature_fn is not None:
-      not_none_params["input_model_signature_fn"] = input_model_signature_fn
-    with tempfile.TemporaryDirectory() as tmpdirname:
-      self.save(tmpdirname)
-      tfdf.keras.yggdrasil_model_to_keras_model(
-          src_path=tmpdirname,
-          dst_path=path,
-          verbose=log.current_log_level(),
-          **not_none_params,
-      )
+
+    export_tf.ydf_model_to_tensorflow_saved_model(
+        ydf_model=self,
+        path=path,
+        input_model_signature_fn=input_model_signature_fn,
+        mode=mode,
+        feature_dtypes=feature_dtypes,
+        servo_api=servo_api,
+        feed_example_proto=feed_example_proto,
+        pre_processing=pre_processing,
+        post_processing=post_processing,
+        temp_dir=temp_dir,
+    )
+
+  def to_tensorflow_function(  # pytype: disable=name-error
+      self,
+      temp_dir: Optional[str] = None,
+      can_be_saved: bool = True,
+      squeeze_binary_classification: bool = True,
+  ) -> "tensorflow.Module":
+    """Converts the YDF model into a @tf.function callable TensorFlow Module.
+
+    The output module can be composed with other TensorFlow operations,
+    including other models serialized with `to_tensorflow_function`.
+
+    This function requires TensorFlow and TensorFlow Decision Forests to be
+    installed. You can install them using the command `pip install
+    tensorflow_decision_forests`. The generated SavedModel model relies on the
+    TensorFlow Decision Forests Custom Inference Op. This Op is available by
+    default in various platforms such as Servomatic, TensorFlow Serving, Vertex
+    AI, and TensorFlow.js.
+
+    Usage example:
+
+    ```python
+    !pip install tensorflow_decision_forests
+
+    import ydf
+    import numpy as np
+
+    # Train a model.
+    model = ydf.RandomForestLearner(label="l").train({
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    })
+
+    # Convert model to a TF module.
+    tf_model = model.to_tensorflow_function()
+
+    # Make predictions with the TF module.
+    tf_predictions = tf_model({
+        "f1": tf.constant([0, 0.5, 1]),
+        "f2": tf.constant([1, 0, 0.5]),
+    })
+    ```
+
+    Args:
+      temp_dir: Temporary directory used during the conversion. If None
+        (default), uses `tempfile.mkdtemp` default temporary directory.
+      can_be_saved: If can_be_saved = True (default), the returned module can be
+        saved using `tf.saved_model.save`. In this case, files created in
+        temporary directory during the conversion are not removed when
+        `to_tensorflow_function` exit, and those files should still be present
+        when calling `tf.saved_model.save`. If can_be_saved = False, the files
+        created in the temporary directory during conversion are immediately
+        removed, and the returned object cannot be serialized with
+        `tf.saved_model.save`.
+      squeeze_binary_classification: If true (default), in case of binary
+        classification, outputs a tensor of shape [num examples] containing the
+        probability of the positive class. If false, in case of binary
+        classification, outputs a tensorflow of shape [num examples, 2]
+        containing the probability of both the negative and positive classes.
+        Has no effect on non-binary classification models.
+
+    Returns:
+      A TensorFlow @tf.function.
+    """
+
+    return export_tf.ydf_model_to_tf_function(
+        ydf_model=self,
+        temp_dir=temp_dir,
+        can_be_saved=can_be_saved,
+        squeeze_binary_classification=squeeze_binary_classification,
+    )
 
   def hyperparameter_optimizer_logs(
       self,
