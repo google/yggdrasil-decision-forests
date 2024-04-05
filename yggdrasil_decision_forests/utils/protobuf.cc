@@ -17,10 +17,10 @@
 
 #include <string>
 
-#include "src/google/protobuf/message.h"
-#include "src/google/protobuf/text_format.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "src/google/protobuf/message.h"
+#include "src/google/protobuf/text_format.h"
 
 namespace yggdrasil_decision_forests::utils {
 

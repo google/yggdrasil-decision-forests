@@ -22,12 +22,12 @@
 #include <utility>
 #include <vector>
 
-#include "src/google/protobuf/text_format.h"
-#include "src/google/protobuf/util/message_differencer.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
+#include "src/google/protobuf/text_format.h"
+#include "src/google/protobuf/util/message_differencer.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {

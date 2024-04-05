@@ -20,12 +20,12 @@
 
 #include <string>
 
-#include "src/google/protobuf/message.h"
-#include "src/google/protobuf/text_format.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "src/google/protobuf/message.h"
+#include "src/google/protobuf/text_format.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {

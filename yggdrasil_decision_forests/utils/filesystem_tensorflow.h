@@ -19,10 +19,10 @@
 
 #include <vector>
 
-#include "src/google/protobuf/text_format.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "src/google/protobuf/text_format.h"
 #include "tensorflow/core/platform/file_system.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 
