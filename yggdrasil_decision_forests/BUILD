@@ -1,3 +1,5 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
@@ -11,11 +13,25 @@ config_setting(
     values = {"define": "use_ydf_tensorflow_proto=1"},
 )
 
-# Use the TensorFlow IO library instead of the default one (relying on std).
-# This option is required for < c++17.
+# Compile with "--define=ydf_use_tensorflow_io=1" to use TensorFlow IO FileSystem for all file IO
+# operations. This is required for YDF to support Google Cloud Storage filepaths.
 config_setting(
-    name = "use_tensorflow_io",
+    name = "use_tensorflow_io_v2",
+    define_values = {"ydf_use_tensorflow_io": "1"},
+)
+
+# Deprecated. Use "use_tensorflow_io_v2" instead.
+config_setting(
+    name = "use_tensorflow_io_v1",
     values = {"define": "use_tensorflow_io=1"},
+)
+
+selects.config_setting_group(
+    name = "use_tensorflow_io",
+    match_any = [
+        ":use_tensorflow_io_v1",
+        ":use_tensorflow_io_v2",
+    ],
 )
 
 # TF-nightly uses absl::anyinvocable, while stable TF uses an Abseil version that does not use it.
