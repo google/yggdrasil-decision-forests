@@ -43,8 +43,8 @@ function run_export () {
 run_test() {
   cd "${LOCAL_DIR}/yggdrasil_decision_forests/port/python"
 
-  DOCKER_IMAGE=gcr.io/tfx-oss-public/manylinux2014-bazel:bazel-5.3.0
-  DOCKER_CONTAINER=compile_pydf
+  DOCKER_IMAGE=quay.io/pypa/manylinux2014_x86_64@sha256:2e37241d9c9fbbccea009e59505a1384f9501a7bfea77b21fdcbf332c7036e70
+  DOCKER_CONTAINER=compile_pydf_v2
   YDF_PATH=$(realpath $PWD/../../..)
   YDF_DIRNAME=${YDF_PATH##*/}
 
@@ -57,18 +57,16 @@ run_test() {
   sudo docker start ${DOCKER_CONTAINER}
   set -e
 
-  CMD='PYTHON=python3.9;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate;COMPILERS="gcc" ./tools/test_pydf.sh;$SHELL'
+  CMD='yum update;yum install -y rsync;curl -L -o /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-amd64;chmod +x /usr/local/bin/bazel;PYTHON=python3.11;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate;export COMPILERS="gcc";./tools/test_pydf.sh;./tools/build_pydf.sh python;$SHELL'
 
   # Only get a shell, uncomment the following line.
   # CMD='$SHELL'
 
-  # If the compilation fails, you can restart it with:
-  # COMPILERS="gcc" ./tools/test_pydf.sh
+  # If the test fails, you can restart it with:
+  # ./tools/test_pydf.sh
   #
   # To build a pip package, run:
-  # ./tools/build_linux_release.sh
-  # To speed-up the process, you might want to only select one version of python
-  # in tools/build_linux_release.sh e.g. py3.11.
+  # ./tools/build_pydf.sh python
   #
   # To start a notebook instance, run:
   # ./tools/start_notebook.sh
