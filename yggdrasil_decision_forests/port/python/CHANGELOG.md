@@ -1,15 +1,29 @@
 # Changelog
 
-## HEAD
+## 0.4.0 - 2024-04-10
 
 ### Feature
 
--   Add support for manual selection of multi-dimensional features by name.
--   Add programmatic access to partial dependence plots and variable importances
-    in a model analysis.
--   Add `to_tensorflow_function` function to convert a YDF model into a
-    TensorFlow function / module.
--   Add support for Servo API to `to_tensorflow_saved_model` function.
+-   Multi-dimensional features can be selected / configured with the `features=`
+    training argument.
+-   Programmatic access to partial dependence plots and variable importances.
+-   Add `model.to_tensorflow_function()` function to convert a YDF model into a
+    TensorFlow function that can be combined with other TensorFlow operations.
+    This function is compatible with Keras 2 and Keras 3.
+-   Add arguments `servo_api=False` and `feed_example_proto=False` for
+    `model.to_tensorflow_function(mode="tf")` to export TensorFlow SavedModel
+    following respectively the Servo API and consuming serialized TensorFlow
+    Example protos.
+-   Add `pre_processing` and `post_processing` arguments to the
+    `model.to_tensorflow_function` function to pack pre/post processing
+    operations in a TensorFlow SavedModel.
+
+### Tutorials
+
+-   Add tutorial
+    [Vertex AI with TF Serving](https://ydf.readthedocs.io/en/latest/tutorial/tf_serving/)
+-   Add tutorial
+    [Deep-learning with YDF and TensorFlow](https://ydf.readthedocs.io/en/latest/tutorial/compose_with_tf/)
 
 ## 0.3.0 - 2024-03-15
 
