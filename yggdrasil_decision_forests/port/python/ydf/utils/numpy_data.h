@@ -33,20 +33,21 @@ namespace py = ::pybind11;
 
 namespace yggdrasil_decision_forests::port::python {
 
-// A collection of values, similar to a "Span<const float>", but with a
+// A collection of values, similar to a "Span<const T>", but with a
 // stride (i.e., items are evenly spaced, but possibly with a constant gap).
 // Only support what is needed by PYDF.
 //
-// "StridedSpanFloat32" does not own the underlying data and relies on the data
+// "StridedSpan" does not own the underlying data and relies on the data
 // in "data". The initialization "py::array_t data" object should not be
-// destroyed before "StridedSpanFloat32".
-class StridedSpanFloat32 {
+// destroyed before "StridedSpan".
+template <typename T>
+class StridedSpan {
  public:
-  // Build a "StridedSpanFloat32".
+  // Build a "StridedSpan".
   //
   // Args:
-  //   data: A one dimentional array of float32 values.
-  StridedSpanFloat32(py::array_t<float>& data)
+  //   data: A one dimensional array of values.
+  StridedSpan(py::array_t<T>& data)
       : item_stride_(data.strides(0) / data.itemsize()),
         size_(static_cast<size_t>(data.shape(0))),
         values_(data.data()) {
@@ -57,7 +58,7 @@ class StridedSpanFloat32 {
   size_t size() const { return size_; }
 
   // Accesses to a value. "index" should be in [0, size).
-  float operator[](const size_t index) const {
+  T operator[](const size_t index) const {
     DCHECK_LT(index, size_);
     return values_[index * item_stride_];
   }
@@ -65,8 +66,10 @@ class StridedSpanFloat32 {
  private:
   const size_t item_stride_;
   const size_t size_;
-  const float* const values_;
+  const T* const values_;
 };
+
+typedef StridedSpan<float> StridedSpanFloat32;
 
 // Non owning accessor to a Numpy bytes array.
 struct NPByteArray {

@@ -975,7 +975,7 @@ four entries,8,4,4.4
 """
     self.assertEqual(expected_dataset_content, ds._dataset.DebugString())
 
-  def test_singledimensional_strided(self):
+  def test_singledimensional_strided_float32(self):
     data = np.array([[0, 1], [4, 5]], np.float32)
     feature = data[:, 0]  # "feature" shares the same memory as "data".
     self.assertEqual(data.strides, (8, 4))
@@ -1000,9 +1000,32 @@ four entries,8,4,4.4
         ),
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+    self.assertEqual("feature\n0\n4\n", ds._dataset.DebugString())
 
-    expected_dataset_content = "feature\n0\n4\n"
-    self.assertEqual(expected_dataset_content, ds._dataset.DebugString())
+  def test_singledimensional_strided_boolean(self):
+    data = np.array([[True, False], [False, True]])
+    feature = data[:, 0]  # "feature" shares the same memory as "data".
+    self.assertEqual(data.strides, (2, 1))
+    self.assertEqual(feature.strides, (2,))
+
+    ds = dataset.create_vertical_dataset({"feature": feature})
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.BOOLEAN,
+                dtype=ds_pb.DType.DTYPE_BOOL,
+                count_nas=0,
+                boolean=ds_pb.BooleanSpec(
+                    count_true=1,
+                    count_false=1,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+    self.assertEqual("feature\n1\n0\n", ds._dataset.DebugString())
 
   def test_multidimensional_strided(self):
     # Note: multidimensional features are unrolled into singledimensional

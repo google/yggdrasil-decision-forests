@@ -207,14 +207,14 @@ absl::Status PopulateColumnNumericalNPFloat32(
 
 // Creates a column spec for a boolean column.
 absl::StatusOr<dataset::proto::Column> CreateBooleanColumnSpec(
-    const std::string& name, absl::Span<const bool> values) {
+    const std::string& name, const StridedSpan<bool> values) {
   // Note: A span of bool cannot represent missing values.
   const size_t num_valid_values = values.size();
   size_t count_true = 0;
   size_t count_false = 0;
 
-  for (const bool value : values) {
-    if (value) {
+  for (size_t value_idx = 0; value_idx < values.size(); value_idx++) {
+    if (values[value_idx]) {
       count_true++;
     } else {
       count_false++;
@@ -242,32 +242,31 @@ absl::Status PopulateColumnBooleanNPBool(
     dataset::VerticalDataset& self, const std::string& name,
     py::array_t<bool>& data, std::optional<dataset::proto::DType> ydf_dtype,
     std::optional<int> column_idx) {
-  const auto unchecked = data.unchecked<1>();
+  StridedSpan<bool> src_values(data);
 
-  if (data.strides(0) != data.itemsize()) {
-    return absl::InternalError("Expecting non-strided np.bool_ array.");
-  }
-  const auto values = absl::Span<const bool>(data.data(), unchecked.shape(0));
-
-  if (!column_idx) {
+  BooleanColumn* column;
+  if (!column_idx.has_value()) {
     // Create column spec
-    ASSIGN_OR_RETURN(auto column_spec, CreateBooleanColumnSpec(name, values));
+    ASSIGN_OR_RETURN(auto column_spec,
+                     CreateBooleanColumnSpec(name, src_values));
     if (ydf_dtype.has_value()) {
       column_spec.set_dtype(*ydf_dtype);
     }
     ASSIGN_OR_RETURN(auto* abstract_column, self.AddColumn(column_spec));
     // Import column data
-    ASSIGN_OR_RETURN(auto* column,
+    ASSIGN_OR_RETURN(column,
                      abstract_column->MutableCastWithStatus<BooleanColumn>());
-    column->mutable_values()->assign(values.data(),
-                                     values.data() + values.size());
   } else {
-    ASSIGN_OR_RETURN(auto* column,
+    ASSIGN_OR_RETURN(column,
                      self.MutableColumnWithCastWithStatus<BooleanColumn>(
                          column_idx.value()));
-    column->mutable_values()->insert(column->mutable_values()->end(),
-                                     values.data(),
-                                     values.data() + values.size());
+  }
+
+  std::vector<BooleanColumn::Format>& dst_values = *column->mutable_values();
+  const size_t offset = dst_values.size();
+  dst_values.resize(offset + src_values.size());
+  for (size_t i = 0; i < src_values.size(); i++) {
+    dst_values[i + offset] = src_values[i];
   }
 
   return absl::OkStatus();
