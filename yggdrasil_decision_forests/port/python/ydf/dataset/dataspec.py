@@ -14,10 +14,11 @@
 
 """Dataspec utilities."""
 
-import copy
 import dataclasses
 import enum
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
+
+import numpy as np
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 
@@ -33,6 +34,66 @@ NormalizedColumnDefs = Optional[List["Column"]]
 # Must match kOutOfDictionaryItemKey in
 # yggdrasil_decision_forests/dataset/data_spec.h
 YDF_OOD = "<OOD>"
+
+# Mapping between Numpy dtypes and YDF dtypes.
+_NP_DTYPE_TO_YDF_DTYPE = {
+    np.int8: ds_pb.DType.DTYPE_INT8,
+    np.int16: ds_pb.DType.DTYPE_INT16,
+    np.int32: ds_pb.DType.DTYPE_INT32,
+    np.int64: ds_pb.DType.DTYPE_INT64,
+    np.uint8: ds_pb.DType.DTYPE_UINT8,
+    np.uint16: ds_pb.DType.DTYPE_UINT16,
+    np.uint32: ds_pb.DType.DTYPE_UINT32,
+    np.uint64: ds_pb.DType.DTYPE_UINT64,
+    np.float16: ds_pb.DType.DTYPE_FLOAT16,
+    np.float32: ds_pb.DType.DTYPE_FLOAT32,
+    np.float64: ds_pb.DType.DTYPE_FLOAT64,
+    np.bool_: ds_pb.DType.DTYPE_BOOL,
+    np.string_: ds_pb.DType.DTYPE_BYTES,
+    np.str_: ds_pb.DType.DTYPE_BYTES,
+    np.bytes_: ds_pb.DType.DTYPE_BYTES,
+    np.object_: ds_pb.DType.DTYPE_BYTES,
+}
+
+NP_SUPPORTED_INT_DTYPE = [
+    np.int8,
+    np.int16,
+    np.int32,
+    np.int64,
+    np.uint8,
+    np.uint16,
+    np.uint32,
+    np.uint64,
+]
+
+NP_SUPPORTED_FLOAT_DTYPE = [
+    np.float16,
+    np.float32,
+    np.float64,
+]
+
+
+def np_dtype_to_ydf_dtype(np_dtype: np.dtype) -> Optional["ds_pb.DType"]:
+  """Converts a Numpy dtype to a YDF dtype.
+
+  If the numpy dtype has no matching ydf dtype, returns None.
+
+  Args:
+    np_dtype: Numpy dtype.
+
+  Returns:
+    YDF dtype.
+  """
+
+  if hasattr(np_dtype, "type"):
+    ydf_dtype = _NP_DTYPE_TO_YDF_DTYPE.get(np_dtype.type)
+  else:
+    ydf_dtype = _NP_DTYPE_TO_YDF_DTYPE.get(np_dtype)
+
+  if ydf_dtype is None:
+    raise ValueError(f"ydf_dtype: {ydf_dtype!r} {np_dtype!r}")
+
+  return ydf_dtype
 
 
 class Semantic(enum.Enum):

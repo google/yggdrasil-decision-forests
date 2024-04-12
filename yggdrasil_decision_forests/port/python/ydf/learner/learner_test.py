@@ -26,6 +26,7 @@ import numpy.testing as npt
 import pandas as pd
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
+from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.dataset import dataspec
@@ -458,6 +459,7 @@ class RandomForestLearnerTest(LearnerTest):
         data_spec_pb2.Column(
             name="feature.0_of_4",
             type=data_spec_pb2.ColumnType.NUMERICAL,
+            dtype=ds_pb.DType.DTYPE_INT64,
             count_nas=0,
             numerical=data_spec_pb2.NumericalSpec(
                 mean=2,
@@ -469,6 +471,7 @@ class RandomForestLearnerTest(LearnerTest):
         data_spec_pb2.Column(
             name="feature.1_of_4",
             type=data_spec_pb2.ColumnType.NUMERICAL,
+            dtype=ds_pb.DType.DTYPE_INT64,
             count_nas=0,
             numerical=data_spec_pb2.NumericalSpec(
                 mean=3,
@@ -480,6 +483,7 @@ class RandomForestLearnerTest(LearnerTest):
         data_spec_pb2.Column(
             name="feature.2_of_4",
             type=data_spec_pb2.ColumnType.NUMERICAL,
+            dtype=ds_pb.DType.DTYPE_INT64,
             count_nas=0,
             numerical=data_spec_pb2.NumericalSpec(
                 mean=4,
@@ -491,6 +495,7 @@ class RandomForestLearnerTest(LearnerTest):
         data_spec_pb2.Column(
             name="feature.3_of_4",
             type=data_spec_pb2.ColumnType.NUMERICAL,
+            dtype=ds_pb.DType.DTYPE_INT64,
             count_nas=0,
             numerical=data_spec_pb2.NumericalSpec(
                 mean=5,

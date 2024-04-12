@@ -86,6 +86,13 @@ void SortColumnByName(proto::DataSpecification* data_spec) {
             });
 }
 
+void RemoveDtypes(proto::DataSpecification* data_spec) {
+  for (proto::Column& column : *data_spec->mutable_columns()) {
+    ASSERT_TRUE(column.has_dtype());
+    column.clear_dtype();
+  }
+}
+
 proto::DataSpecificationGuide ToyDatasetGuide1() {
   proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
       R"pb(
@@ -141,55 +148,139 @@ proto::DataSpecificationGuide ToyDatasetGuideIgnoreColumn() {
   return guide;
 }
 
-proto::DataSpecification ToyDatasetExpectedDataSpecTypeOnlyNoGuide() {
-  proto::DataSpecification data_spec_type_only = PARSE_TEST_PROTO(
+proto::DataSpecification ToyDatasetExpectedDataSpecTypeOnlyNoGuide(
+    bool with_dtype = false) {
+  proto::DataSpecification data_spec = PARSE_TEST_PROTO(
       R"pb(
-        columns { type: NUMERICAL name: "Num_1" is_manual_type: false }
-        columns { type: NUMERICAL name: "Num_2" is_manual_type: false }
-        columns { type: CATEGORICAL name: "Cat_1" is_manual_type: false }
-        columns { type: CATEGORICAL name: "Cat_2" is_manual_type: false }
+        columns {
+          type: NUMERICAL
+          name: "Num_1"
+          is_manual_type: false
+          dtype: DTYPE_FLOAT32
+        }
+        columns {
+          type: NUMERICAL
+          name: "Num_2"
+          is_manual_type: false
+          dtype: DTYPE_FLOAT32
+        }
+        columns {
+          type: CATEGORICAL
+          name: "Cat_1"
+          is_manual_type: false
+          dtype: DTYPE_BYTES
+        }
+        columns {
+          type: CATEGORICAL
+          name: "Cat_2"
+          is_manual_type: false
+          dtype: DTYPE_BYTES
+        }
         columns {
           type: CATEGORICAL_SET
           name: "Cat_set_1"
           is_manual_type: false
+          dtype: DTYPE_BYTES
         }
         columns {
           type: CATEGORICAL_SET
           name: "Cat_set_2"
           is_manual_type: false
+          dtype: DTYPE_BYTES
         }
-        columns { type: BOOLEAN name: "Bool_1" is_manual_type: false }
-        columns { type: BOOLEAN name: "Bool_2" is_manual_type: false }
-        columns { type: NUMERICAL name: "Cat_3" is_manual_type: false }
+        columns {
+          type: BOOLEAN
+          name: "Bool_1"
+          is_manual_type: false
+          dtype: DTYPE_INT64
+        }
+        columns {
+          type: BOOLEAN
+          name: "Bool_2"
+          is_manual_type: false
+          dtype: DTYPE_INT64
+        }
+        columns {
+          type: NUMERICAL
+          name: "Cat_3"
+          is_manual_type: false
+          dtype: DTYPE_FLOAT32
+        }
       )pb");
-  return data_spec_type_only;
+
+  if (!with_dtype) {
+    RemoveDtypes(&data_spec);
+  }
+  return data_spec;
 }
 
-proto::DataSpecification ToyDatasetExpectedDataSpecTypeOnlyGuide2() {
-  proto::DataSpecification data_spec_type_only = PARSE_TEST_PROTO(
+proto::DataSpecification ToyDatasetExpectedDataSpecTypeOnlyGuide2(
+    bool with_dtype = false) {
+  proto::DataSpecification data_spec = PARSE_TEST_PROTO(
       R"pb(
-        columns { type: STRING name: "Num_1" is_manual_type: true }
-        columns { type: STRING name: "Num_2" is_manual_type: true }
-        columns { type: CATEGORICAL name: "Cat_1" is_manual_type: false }
-        columns { type: CATEGORICAL name: "Cat_2" is_manual_type: false }
+        columns {
+          type: STRING
+          name: "Num_1"
+          is_manual_type: true
+          dtype: DTYPE_FLOAT32
+        }
+        columns {
+          type: STRING
+          name: "Num_2"
+          is_manual_type: true
+          dtype: DTYPE_FLOAT32
+        }
+        columns {
+          type: CATEGORICAL
+          name: "Cat_1"
+          is_manual_type: false
+          dtype: DTYPE_BYTES
+        }
+        columns {
+          type: CATEGORICAL
+          name: "Cat_2"
+          is_manual_type: false
+          dtype: DTYPE_BYTES
+        }
         columns {
           type: CATEGORICAL_SET
           name: "Cat_set_1"
           is_manual_type: false
+          dtype: DTYPE_BYTES
         }
         columns {
           type: CATEGORICAL_SET
           name: "Cat_set_2"
           is_manual_type: false
+          dtype: DTYPE_BYTES
         }
-        columns { type: BOOLEAN name: "Bool_1" is_manual_type: false }
-        columns { type: BOOLEAN name: "Bool_2" is_manual_type: false }
-        columns { type: NUMERICAL name: "Cat_3" is_manual_type: false }
+        columns {
+          type: BOOLEAN
+          name: "Bool_1"
+          is_manual_type: false
+          dtype: DTYPE_INT64
+        }
+        columns {
+          type: BOOLEAN
+          name: "Bool_2"
+          is_manual_type: false
+          dtype: DTYPE_INT64
+        }
+        columns {
+          type: NUMERICAL
+          name: "Cat_3"
+          is_manual_type: false
+          dtype: DTYPE_FLOAT32
+        }
       )pb");
-  return data_spec_type_only;
+  if (!with_dtype) {
+    RemoveDtypes(&data_spec);
+  }
+  return data_spec;
 }
 
-proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
+proto::DataSpecification ToyDatasetExpectedDataSpecGuide1(
+    bool with_dtype = false) {
   proto::DataSpecification data_spec = PARSE_TEST_PROTO(
       R"pb(
         created_num_rows: 4
@@ -203,6 +294,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
             max_value: 4
             standard_deviation: 1.1180339887498949
           }
+          dtype: DTYPE_FLOAT32
         }
         columns {
           type: NUMERICAL
@@ -210,6 +302,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
           is_manual_type: false
           numerical { mean: 3 min_value: 2 max_value: 4 standard_deviation: 1 }
           count_nas: 2
+          dtype: DTYPE_FLOAT32
         }
         columns {
           type: CATEGORICAL
@@ -230,6 +323,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
               value { index: 1 count: 2 }
             }
           }
+          dtype: DTYPE_BYTES
         }
         columns {
           type: CATEGORICAL
@@ -247,6 +341,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
             }
           }
           count_nas: 2
+          dtype: DTYPE_BYTES
         }
         columns {
           type: CATEGORICAL_SET
@@ -275,6 +370,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
               value { index: 3 count: 2 }
             }
           }
+          dtype: DTYPE_BYTES
         }
         columns {
           type: CATEGORICAL_SET
@@ -300,12 +396,14 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
             }
           }
           count_nas: 1
+          dtype: DTYPE_BYTES
         }
         columns {
           type: BOOLEAN
           name: "Bool_1"
           is_manual_type: false
           boolean { count_true: 2 count_false: 2 }
+          dtype: DTYPE_INT64
         }
         columns {
           type: BOOLEAN
@@ -313,6 +411,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
           is_manual_type: false
           count_nas: 2
           boolean { count_true: 1 count_false: 1 }
+          dtype: DTYPE_INT64
         }
         columns {
           type: CATEGORICAL
@@ -324,12 +423,17 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide1() {
             max_number_of_unique_values: 2000
             is_already_integerized: true
           }
+          dtype: DTYPE_FLOAT32
         }
       )pb");
+  if (!with_dtype) {
+    RemoveDtypes(&data_spec);
+  }
   return data_spec;
 }
 
-proto::DataSpecification ToyDatasetExpectedDataSpecGuide3() {
+proto::DataSpecification ToyDatasetExpectedDataSpecGuide3(
+    bool with_dtype = false) {
   proto::DataSpecification data_spec = PARSE_TEST_PROTO(
       R"pb(
         created_num_rows: 4
@@ -352,6 +456,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide3() {
             maximum_num_bins: 255
             min_obs_in_bins: 3
           }
+          dtype: DTYPE_FLOAT32
         }
         columns {
           type: DISCRETIZED_NUMERICAL
@@ -367,8 +472,12 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide3() {
             maximum_num_bins: 255
             min_obs_in_bins: 3
           }
+          dtype: DTYPE_FLOAT32
         }
       )pb");
+  if (!with_dtype) {
+    RemoveDtypes(&data_spec);
+  }
   return data_spec;
 }
 
@@ -450,7 +559,8 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide4FirstRowType() {
   return data_spec;
 }
 
-proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
+proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn(
+    bool with_dtype = false) {
   proto::DataSpecification data_spec = PARSE_TEST_PROTO(
       R"pb(
         columns {
@@ -465,6 +575,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
               value { index: 0 count: 4 }
             }
           }
+          dtype: DTYPE_BYTES
         }
         columns {
           type: CATEGORICAL
@@ -479,6 +590,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
             }
           }
           count_nas: 2
+          dtype: DTYPE_BYTES
         }
         columns {
           type: CATEGORICAL_SET
@@ -492,6 +604,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
               value { index: 0 count: 9 }
             }
           }
+          dtype: DTYPE_BYTES
         }
         columns {
           type: CATEGORICAL_SET
@@ -505,6 +618,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
               value { index: 0 count: 6 }
             }
           }
+          dtype: DTYPE_BYTES
           count_nas: 1
         }
         columns {
@@ -512,6 +626,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
           name: "Bool_1"
           is_manual_type: false
           boolean { count_true: 2 count_false: 2 }
+          dtype: DTYPE_INT64
         }
         columns {
           type: BOOLEAN
@@ -519,6 +634,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
           is_manual_type: false
           count_nas: 2
           boolean { count_true: 1 count_false: 1 }
+          dtype: DTYPE_INT64
         }
         columns {
           type: NUMERICAL
@@ -530,9 +646,13 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuideIgnoreColumn() {
             max_value: 3
             standard_deviation: 0.82915619758885
           }
+          dtype: DTYPE_FLOAT32
         }
         created_num_rows: 4
       )pb");
+  if (!with_dtype) {
+    RemoveDtypes(&data_spec);
+  }
   return data_spec;
 }
 
@@ -658,7 +778,7 @@ TEST(Dataset, InferDataSpecTypeTFExampleTFRecord) {
   proto::DataSpecificationGuide guide;
   proto::DataSpecification data_spec;
   InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide, &data_spec);
-  auto target = ToyDatasetExpectedDataSpecTypeOnlyNoGuide();
+  auto target = ToyDatasetExpectedDataSpecTypeOnlyNoGuide(/*with_dtype=*/true);
   // Since tf.Example use dictionary, the columns can be in any random order.
   SortColumnByName(&data_spec);
   SortColumnByName(&target);
@@ -677,7 +797,7 @@ TEST(Dataset, InferDataSpecTypeTFExampleTFRecordGuide2) {
   auto guide = ToyDatasetGuide2();
   proto::DataSpecification data_spec;
   InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide, &data_spec);
-  auto target = ToyDatasetExpectedDataSpecTypeOnlyGuide2();
+  auto target = ToyDatasetExpectedDataSpecTypeOnlyGuide2(/*with_dtype=*/true);
   // Since tf.Example use dictionary, the columns can be in any random order.
   SortColumnByName(&data_spec);
   SortColumnByName(&target);
@@ -758,7 +878,7 @@ TEST(Dataset, CreateLocalDataSpecFromTFExampleTFRecordGuide1) {
   proto::DataSpecification data_spec;
   CreateDataSpec(ToyDatasetTypedPathTFExampleTFRecord(), false, guide,
                  &data_spec);
-  auto target = ToyDatasetExpectedDataSpecGuide1();
+  auto target = ToyDatasetExpectedDataSpecGuide1(/*with_dtype=*/true);
   SortColumnByName(&data_spec);
   SortColumnByName(&target);
   EXPECT_THAT(data_spec, EqualsProto(target));
@@ -778,34 +898,63 @@ TEST(Dataset, CreateLocalDataSpecFromTFExampleTFRecordAllHash) {
   EXPECT_THAT(data_spec,
               EqualsProto(PARSE_TEST_PROTO_WITH_TYPE(proto::DataSpecification,
                                                      R"(
-            columns { type: HASH name: "Bool_1" is_manual_type: true }
+            columns {
+              type: HASH
+              name: "Bool_1"
+              is_manual_type: true
+              dtype: DTYPE_INT64
+            }
             columns {
               type: HASH
               name: "Bool_2"
               is_manual_type: true
               count_nas: 2
+              dtype: DTYPE_INT64
             }
-            columns { type: HASH name: "Cat_1" is_manual_type: true }
+            columns {
+              type: HASH
+              name: "Cat_1"
+              is_manual_type: true
+              dtype: DTYPE_BYTES
+            }
             columns {
               type: HASH
               name: "Cat_2"
               is_manual_type: true
               count_nas: 2
+              dtype: DTYPE_BYTES
             }
-            columns { type: HASH name: "Cat_3" is_manual_type: true }
-            columns { type: HASH name: "Cat_set_1" is_manual_type: true }
+            columns {
+              type: HASH
+              name: "Cat_3"
+              is_manual_type: true
+              dtype: DTYPE_FLOAT32
+            }
+            columns {
+              type: HASH
+              name: "Cat_set_1"
+              is_manual_type: true
+              dtype: DTYPE_BYTES
+            }
             columns {
               type: HASH
               name: "Cat_set_2"
               is_manual_type: true
               count_nas: 1
+              dtype: DTYPE_BYTES
             }
-            columns { type: HASH name: "Num_1" is_manual_type: true }
+            columns {
+              type: HASH
+              name: "Num_1"
+              is_manual_type: true
+              dtype: DTYPE_FLOAT32
+            }
             columns {
               type: HASH
               name: "Num_2"
               is_manual_type: true
               count_nas: 2
+              dtype: DTYPE_FLOAT32
             }
             created_num_rows: 4
           )")));
@@ -824,7 +973,7 @@ TEST(Dataset, CreateLocalDataSpecFromTFExampleTFRecordGuide3) {
   proto::DataSpecification data_spec;
   CreateDataSpec(ToyDatasetTypedPathTFExampleTFRecord(), false, guide,
                  &data_spec);
-  auto target = ToyDatasetExpectedDataSpecGuide3();
+  auto target = ToyDatasetExpectedDataSpecGuide3(/*with_dtype=*/true);
   SortColumnByName(&data_spec);
   SortColumnByName(&target);
   EXPECT_THAT(data_spec, ApproximatelyEqualsProto(target));
@@ -843,7 +992,8 @@ TEST(Dataset, CreateLocalDataSpecFromTFExampleTFRecordIgnoreColumn) {
   proto::DataSpecification data_spec;
   CreateDataSpec(ToyDatasetTypedPathTFExampleTFRecord(), false, guide,
                  &data_spec);
-  auto target = ToyDatasetExpectedDataSpecGuideIgnoreColumn();
+  auto target =
+      ToyDatasetExpectedDataSpecGuideIgnoreColumn(/*with_dtype=*/true);
   SortColumnByName(&data_spec);
   SortColumnByName(&target);
   EXPECT_THAT(data_spec, EqualsProto(target));

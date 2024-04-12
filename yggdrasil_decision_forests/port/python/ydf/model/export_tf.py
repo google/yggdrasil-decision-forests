@@ -20,10 +20,10 @@ import tempfile
 from typing import Any, Callable, Dict, Literal, Optional
 import uuid
 
+from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec
 from ydf.model import generic_model
 from ydf.utils import log
-
 
 _ERROR_MESSAGE_MISSING_TF = (
     '"tensorflow" is needed by this function. Make sure it'
@@ -40,6 +40,62 @@ _ERROR_MESSAGE_MISSING_TFDF = (
 )
 
 TFDType = Any  # TensorFlow DType e.g. tf.float32
+
+# Mapping between YDF dtype and TF dtypes.
+_YDF_DTYPE_TO_TF_DTYPE: Dict["ds_pb.DType", TFDType] = None
+
+# Mapping TF dtypes to the TF dtype compatible with tensorflow example.
+# Note that tensorflow example proto only support tf.int64, tf.float32,
+# and tf.string dtypes.
+_TF_DTYPE_TO_TF_EXAMPLE_DTYPE: Dict[TFDType, TFDType] = None
+
+
+def mapping_ydf_dtype_to_tf_dtype() -> Dict["ds_pb.DType", TFDType]:
+  """Mapping between YDF dtype and TF dtypes."""
+
+  global _YDF_DTYPE_TO_TF_DTYPE
+  tf = import_tensorflow()
+  if _YDF_DTYPE_TO_TF_DTYPE is None:
+    _YDF_DTYPE_TO_TF_DTYPE = {
+        ds_pb.DType.DTYPE_INT8: tf.int8,
+        ds_pb.DType.DTYPE_INT16: tf.int16,
+        ds_pb.DType.DTYPE_INT32: tf.int32,
+        ds_pb.DType.DTYPE_INT64: tf.int64,
+        ds_pb.DType.DTYPE_UINT8: tf.uint8,
+        ds_pb.DType.DTYPE_UINT16: tf.uint16,
+        ds_pb.DType.DTYPE_UINT32: tf.uint32,
+        ds_pb.DType.DTYPE_UINT64: tf.uint64,
+        ds_pb.DType.DTYPE_FLOAT16: tf.float16,
+        ds_pb.DType.DTYPE_FLOAT32: tf.float32,
+        ds_pb.DType.DTYPE_FLOAT64: tf.float64,
+        ds_pb.DType.DTYPE_BOOL: tf.bool,
+        ds_pb.DType.DTYPE_BYTES: tf.string,
+    }
+  return _YDF_DTYPE_TO_TF_DTYPE
+
+
+def mapping_tf_dtype_to_tf_example_dtype() -> Dict[TFDType, TFDType]:
+  """Mapping TF dtypes to the TF dtype compatible with tensorflow example."""
+
+  global _TF_DTYPE_TO_TF_EXAMPLE_DTYPE
+  tf = import_tensorflow()
+  if _TF_DTYPE_TO_TF_EXAMPLE_DTYPE is None:
+    _TF_DTYPE_TO_TF_EXAMPLE_DTYPE = {
+        tf.int8: tf.int64,
+        tf.int16: tf.int64,
+        tf.int32: tf.int64,
+        tf.int64: tf.int64,
+        tf.uint8: tf.int64,
+        tf.uint16: tf.int64,
+        tf.uint32: tf.int64,
+        tf.uint64: tf.int64,
+        tf.float16: tf.float32,
+        tf.float32: tf.float32,
+        tf.float64: tf.float32,
+        tf.bool: tf.int64,
+        tf.string: tf.string,
+    }
+  return _TF_DTYPE_TO_TF_EXAMPLE_DTYPE
 
 
 def ydf_model_to_tensorflow_saved_model(
@@ -277,7 +333,7 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
     else:
       extract_dim = None
   else:
-    # Single dimention outputs (e.g. regression, ranking) is always squeezed.
+    # Single dimension outputs (e.g. regression, ranking) is always squeezed.
     extract_dim = 0
 
   # Wrap the model into a tf module.
@@ -323,6 +379,40 @@ def import_tensorflow_decision_forests():
     raise ValueError(_ERROR_MESSAGE_MISSING_TFDF) from exc
 
 
+def tf_feature_dtype(
+    feature: "generic_model.InputFeature",
+    model_dataspec: ds_pb.DataSpecification,
+    user_dtypes: Dict[str, TFDType],
+) -> TFDType:
+
+  # User specified dtype.
+  user_dtype = user_dtypes.get(feature.name)
+  if user_dtype is not None:
+    return user_dtype
+
+  tf = import_tensorflow()
+
+  # DType from training dataset
+  column_spec = model_dataspec.columns[feature.column_idx]
+  if column_spec.HasField("dtype"):
+    tf_dtype = mapping_ydf_dtype_to_tf_dtype().get(column_spec.dtype)
+    if tf_dtype is None:
+      raise ValueError(f"Unsupported dtype: {column_spec.dtype}")
+    return tf_dtype
+
+  # DType from feature semantic
+  if feature.semantic == dataspec.Semantic.NUMERICAL:
+    return tf.float32
+  elif feature.semantic == dataspec.Semantic.CATEGORICAL:
+    return tf.string
+  elif feature.semantic == dataspec.Semantic.BOOLEAN:
+    return tf.int64
+  elif feature.semantic == dataspec.Semantic.CATEGORICAL_SET:
+    return tf.string
+  else:
+    raise ValueError(f"Unsupported semantic: {feature.semantic}")
+
+
 def tensorflow_raw_input_signature(
     model: "generic_model.GenericModel",
     feature_dtypes: Dict[str, TFDType],
@@ -330,41 +420,32 @@ def tensorflow_raw_input_signature(
   """A TF input_signature to feed raw feature values into the model."""
   tf = import_tensorflow()
 
-  used_feature_dtypes = set()
+  model_dataspec = model.data_spec()
 
   input_signature = {}
   for src_feature in model.input_features():
-    user_dtype = feature_dtypes.get(src_feature.name)
-    if user_dtype is not None:
-      used_feature_dtypes.add(src_feature.name)
+    tf_dtype = tf_feature_dtype(src_feature, model_dataspec, feature_dtypes)
 
     if src_feature.semantic == dataspec.Semantic.NUMERICAL:
       dst_feature = tf.TensorSpec(
-          shape=[None], dtype=user_dtype or tf.float32, name=src_feature.name
+          shape=[None], dtype=tf_dtype, name=src_feature.name
       )
     elif src_feature.semantic == dataspec.Semantic.CATEGORICAL:
       dst_feature = tf.TensorSpec(
-          shape=[None], dtype=user_dtype or tf.string, name=src_feature.name
+          shape=[None], dtype=tf_dtype, name=src_feature.name
       )
     elif src_feature.semantic == dataspec.Semantic.BOOLEAN:
       dst_feature = tf.TensorSpec(
-          shape=[None], dtype=user_dtype or tf.float32, name=src_feature.name
+          shape=[None], dtype=tf_dtype, name=src_feature.name
       )
     elif src_feature.semantic == dataspec.Semantic.CATEGORICAL_SET:
       dst_feature = tf.RaggedTensorSpec(
           shape=[None, None],
-          dtype=user_dtype or tf.string,
-          name=src_feature.name,
+          dtype=tf_dtype,
       )
     else:
       raise ValueError(f"Unsupported semantic: {src_feature.semantic}")
     input_signature[src_feature.name] = dst_feature
-
-  diff = set(feature_dtypes).difference(used_feature_dtypes)
-  if diff:
-    raise ValueError(
-        f"Input dtypes for features not used by the model: {list(diff)!r}"
-    )
 
   return input_signature
 
@@ -386,33 +467,41 @@ def tensorflow_feature_spec(
     else:
       return None  # Missing value not allowed
 
+  model_dataspec = model.data_spec()
+
   feature_spec = {}
   for src_feature in model.input_features():
-    user_dtype = feature_dtypes.get(src_feature.name)
+    tf_dtype = tf_feature_dtype(src_feature, model_dataspec, feature_dtypes)
+
+    tfe_dtype = mapping_tf_dtype_to_tf_example_dtype().get(tf_dtype)
+    if tfe_dtype is None:
+      raise ValueError(f"Unsupported dtype: {tf_dtype}")
 
     if src_feature.semantic == dataspec.Semantic.NUMERICAL:
-      effective_dtype = user_dtype or tf.float32
+      effective_dtype = tfe_dtype
       dst_feature = tf.io.FixedLenFeature(
           shape=[],
           dtype=effective_dtype,
           default_value=missing_value(effective_dtype),
       )
     elif src_feature.semantic == dataspec.Semantic.CATEGORICAL:
-      effective_dtype = user_dtype or tf.string
+      effective_dtype = tfe_dtype
       dst_feature = tf.io.FixedLenFeature(
           shape=[],
           dtype=effective_dtype,
           default_value=missing_value(effective_dtype),
       )
     elif src_feature.semantic == dataspec.Semantic.BOOLEAN:
-      effective_dtype = user_dtype or tf.float32
+      effective_dtype = tfe_dtype
       dst_feature = tf.io.FixedLenFeature(
           shape=[],
           dtype=effective_dtype,
           default_value=missing_value(effective_dtype),
       )
     elif src_feature.semantic == dataspec.Semantic.CATEGORICAL_SET:
-      dst_feature = tf.io.VarLenFeature(dtype=user_dtype or tf.string)
+      dst_feature = tf.io.RaggedFeature(
+          dtype=tfe_dtype, row_splits_dtype=tf.dtypes.int64
+      )
     else:
       raise ValueError(f"Unsupported semantic: {src_feature.semantic}")
     feature_spec[src_feature.name] = dst_feature

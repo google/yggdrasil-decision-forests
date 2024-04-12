@@ -32,6 +32,7 @@ class VerticalDataset:
       self,
       name: str,
       data: npt.NDArray[np.bytes_],
+      ydf_dtype: Optional[data_spec_pb2.DType],
       max_vocab_count: int = -1,
       min_vocab_frequency: int = -1,
       column_idx: Optional[int] = None,
@@ -42,6 +43,7 @@ class VerticalDataset:
       name: str,
       data_bank: npt.NDArray[np.bytes_],
       data_boundaries: npt.NDArray[np.int64],
+      ydf_dtype: Optional[data_spec_pb2.DType],
       max_vocab_count: int = -1,
       min_vocab_frequency: int = -1,
       column_idx: Optional[int] = None,
@@ -51,19 +53,22 @@ class VerticalDataset:
       self,
       name: str,
       data: npt.NDArray[np.float32],
+      ydf_dtype: Optional[data_spec_pb2.DType],
       column_idx: Optional[int],
   ) -> None: ...
   def PopulateColumnBooleanNPBool(
       self,
       name: str,
       data: npt.NDArray[np.bool_],
+      ydf_dtype: Optional[data_spec_pb2.DType],
       column_idx: Optional[int],
   ) -> None: ...
   def PopulateColumnHashNPBytes(
       self,
       name: str,
       data: npt.NDArray[np.bytes_],
-      column_idx: Optional[int] = None,
+      ydf_dtype: Optional[data_spec_pb2.DType],
+      column_idx: Optional[int],
   ) -> None: ...
   def CreateFromPathWithDataSpec(
       self,

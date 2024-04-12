@@ -103,6 +103,35 @@ message Column {
   optional MultiValuesSpec multi_values = 10;
   // Is the feature derived from unstacking a multi-dimensional dimension?
   optional bool is_unstacked = 11 [default = false];
+
+  // Storage representation of a column.
+  // Internally, feature representation is determined by its semantic. For
+  // instance, a NUMERICAL feature is always stored as a float32. DTypes are
+  // used to record the feature representation fed to YDF, and then used for
+  // APIs without automatic casting.
+  optional DType dtype = 12;
+}
+
+// Storage representation of a column.
+enum DType {
+  DTYPE_INVALID = 0;
+
+  DTYPE_INT8 = 1;
+  DTYPE_INT16 = 2;
+  DTYPE_INT32 = 3;
+  DTYPE_INT64 = 4;
+
+  DTYPE_UINT8 = 5;
+  DTYPE_UINT16 = 6;
+  DTYPE_UINT32 = 7;
+  DTYPE_UINT64 = 8;
+
+  DTYPE_FLOAT16 = 9;
+  DTYPE_FLOAT32 = 10;
+  DTYPE_FLOAT64 = 11;
+
+  DTYPE_BOOL = 12;
+  DTYPE_BYTES = 13;
 }
 
 // Specification of a categorical column.

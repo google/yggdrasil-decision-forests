@@ -65,6 +65,7 @@ class VerticalDataset:
     if column.semantic == dataspec.Semantic.NUMERICAL:
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, np.float32)
+      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
 
       if column_data.dtype != np.float32:
         log.warning(
@@ -89,33 +90,47 @@ class VerticalDataset:
           ) from e
 
       self._dataset.PopulateColumnNumericalNPFloat32(
-          column.name, column_data, column_idx  # `column_idx` may be None
+          column.name,
+          column_data,
+          ydf_dtype=ydf_dtype,
+          column_idx=column_idx,  # `column_idx` may be None
       )
       return
 
     elif column.semantic == dataspec.Semantic.BOOLEAN:
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, np.bool_)
+      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
 
       self._dataset.PopulateColumnBooleanNPBool(
-          column.name, column_data, column_idx  # `column_idx` may be None
+          column.name,
+          column_data,
+          ydf_dtype=ydf_dtype,
+          column_idx=column_idx,  # `column_idx` may be None
       )
       return
 
     elif column.semantic == dataspec.Semantic.CATEGORICAL:
+
       from_boolean = False
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, dtype=np.bytes_)
-      elif column_data.dtype.type in [np.bool_]:
+      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
+
+      if column_data.dtype.type in [np.bool_]:
         bool_column_data = column_data
         column_data = np.full_like(bool_column_data, b"false", "|S5")
         column_data[bool_column_data] = b"true"
         from_boolean = True
-      elif column_data.dtype.type in [
-          np.object_,
-          np.string_,
-          np.str_,
-      ] or np.issubdtype(column_data.dtype, np.integer):
+      elif (
+          column_data.dtype.type
+          in [
+              np.object_,
+              np.string_,
+              np.str_,
+          ]
+          or column_data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE
+      ):
         column_data = column_data.astype(np.bytes_)
       elif np.issubdtype(column_data.dtype, np.floating):
         raise ValueError(
@@ -135,16 +150,22 @@ class VerticalDataset:
                 [b"<OOV>", b"false", b"true"], dtype=np.bytes_
             )
           self._dataset.PopulateColumnCategoricalNPBytes(
-              column.name, column_data, **guide
+              column.name, column_data, **guide, ydf_dtype=ydf_dtype
           )
         else:
           self._dataset.PopulateColumnCategoricalNPBytes(
-              column.name, column_data, column_idx=column_idx
+              column.name,
+              column_data,
+              column_idx=column_idx,
+              ydf_dtype=ydf_dtype,
           )
         return
 
     elif column.semantic == dataspec.Semantic.CATEGORICAL_SET:
-      if column_data.dtype.type != np.object_:
+      if (
+          not isinstance(column_data, list)
+          and column_data.dtype.type != np.object_
+      ):
         raise ValueError("Categorical Set columns must be a list of lists.")
       if len(column_data) > 0:
         if column_data[0] and not isinstance(
@@ -158,22 +179,33 @@ class VerticalDataset:
           [0] + [len(row) for row in column_data[:-1]], dtype=np.int64
       )
       bank = np.concatenate(column_data)
+      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(bank.dtype)
 
       if inference_args is not None:
         guide = dataspec.categorical_column_guide(column, inference_args)
         self._dataset.PopulateColumnCategoricalSetNPBytes(
-            column.name, bank, boundaries, **guide
+            column.name,
+            bank,
+            boundaries,
+            ydf_dtype,
+            **guide,
         )
       else:
         self._dataset.PopulateColumnCategoricalSetNPBytes(
-            column.name, bank, boundaries, column_idx=column_idx
+            column.name,
+            bank,
+            boundaries,
+            ydf_dtype,
+            column_idx=column_idx,
         )
       return
 
     elif column.semantic == dataspec.Semantic.HASH:
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, dtype=np.bytes_)
-      elif column_data.dtype.type in [
+      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
+
+      if column_data.dtype.type in [
           np.object_,
           np.string_,
           np.bool_,
@@ -188,7 +220,10 @@ class VerticalDataset:
 
       if column_data.dtype.type == np.bytes_:
         self._dataset.PopulateColumnHashNPBytes(
-            column.name, column_data, column_idx=column_idx
+            column.name,
+            column_data,
+            ydf_dtype=ydf_dtype,
+            column_idx=column_idx,
         )
         return
 
@@ -526,8 +561,9 @@ def infer_semantic(name: str, data: Any) -> dataspec.Semantic:
 
   if isinstance(data, np.ndarray):
     # We finely control the supported types.
-    if np.issubdtype(data.dtype, np.integer) or np.issubdtype(
-        data.dtype, np.floating
+    if (
+        data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE
+        or data.dtype.type in dataspec.NP_SUPPORTED_FLOAT_DTYPE
     ):
       return dataspec.Semantic.NUMERICAL
 

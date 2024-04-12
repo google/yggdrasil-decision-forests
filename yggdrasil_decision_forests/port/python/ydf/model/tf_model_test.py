@@ -20,7 +20,7 @@ improve debuggability of the remaining model tests.
 
 import os
 import tempfile
-from typing import Callable, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from absl import logging
 from absl.testing import absltest
@@ -31,6 +31,7 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_decision_forests as tfdf
 
+from ydf.dataset import dataspec
 from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
 from ydf.model import export_tf
@@ -71,7 +72,7 @@ class TfModelTest(parameterized.TestCase):
       df["label"] = [0, 0, 0, 1, 1, 1, 3, 3, 4, 4]
     return df
 
-  def create_dataset_v2(self, columns: List[str]) -> Dict[str, np.ndarray]:
+  def create_dataset_v2(self, columns: List[str]) -> Dict[str, Any]:
     """Creates a dataset with random values."""
     data = {
         "f1": np.random.random(size=100),
@@ -80,6 +81,8 @@ class TfModelTest(parameterized.TestCase):
         "i2": np.random.randint(100, size=100),
         "c1": np.random.choice(["x", "y", "z"], size=100),
         "b1": np.random.randint(2, size=100).astype(np.bool_),
+        "b2": np.random.randint(2, size=100).astype(np.bool_),
+        "cs1": [[], ["a", "b", "c"], ["b", "c"], ["a"]] * 25,
         "label_class_binary": np.random.choice(["l1", "l2"], size=100),
         "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=100),
         "label_regress": np.random.random(size=100),
@@ -421,9 +424,12 @@ class TfModelTest(parameterized.TestCase):
     """A simple function conversion."""
 
     # Create YDF model
-    columns = ["f1", "f2", "i1", "c1", "b1", "label_class_binary"]
+    columns = ["f1", "f2", "i1", "c1", "b1", "cs1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
-        label="label_class_binary", num_trees=10
+        label="label_class_binary",
+        num_trees=10,
+        features=[("cs1", dataspec.Semantic.CATEGORICAL_SET)],
+        include_all_columns=True,
     ).train(self.create_dataset_v2(columns))
 
     # Golden predictions
@@ -437,7 +443,8 @@ class TfModelTest(parameterized.TestCase):
         "f2": tf.constant(test_ds["f2"]),
         "i1": tf.constant(test_ds["i1"]),
         "c1": tf.constant(test_ds["c1"]),
-        "b1": tf.constant(test_ds["b1"], tf.float32),  # bool is feed as float32
+        "b1": tf.constant(test_ds["b1"]),
+        "cs1": tf.ragged.constant(test_ds["cs1"]),
     }
     tf_predictions = tf_function(tf_test_ds)
 
@@ -494,9 +501,12 @@ class TfModelTest(parameterized.TestCase):
     """Simple export to SavedModel format."""
 
     # Create YDF model
-    columns = ["f1", "f2", "i1", "c1", "b1", "label_class_binary"]
+    columns = ["f1", "f2", "i1", "c1", "b1", "cs1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
-        label="label_class_binary", num_trees=10
+        label="label_class_binary",
+        num_trees=10,
+        features=[("cs1", dataspec.Semantic.CATEGORICAL_SET)],
+        include_all_columns=True,
     ).train(self.create_dataset_v2(columns))
 
     # Golden predictions
@@ -508,7 +518,9 @@ class TfModelTest(parameterized.TestCase):
     model.to_tensorflow_saved_model(
         tmp_dir,
         mode="tf",
-        feature_dtypes={"f1": tf.float64},
+        servo_api=False,
+        feed_example_proto=False,
+        feature_dtypes={"f1": tf.float32},
     )
 
     # Load model
@@ -516,11 +528,13 @@ class TfModelTest(parameterized.TestCase):
 
     # Test predictions
     tf_test_ds = {
-        "f1": tf.constant(test_ds["f1"]),
-        "f2": tf.constant(test_ds["f2"], tf.float32),
-        "i1": tf.constant(test_ds["i1"], tf.float32),
+        # While f1 was feed as a float64, it was saved as a float32.
+        "f1": tf.constant(test_ds["f1"], tf.float32),
+        "f2": tf.constant(test_ds["f2"]),
+        "i1": tf.constant(test_ds["i1"]),
         "c1": tf.constant(test_ds["c1"]),
-        "b1": tf.constant(test_ds["b1"], tf.float32),
+        "b1": tf.constant(test_ds["b1"]),
+        "cs1": tf.ragged.constant(test_ds["cs1"]),
     }
     tf_predictions = tf_model(tf_test_ds)
     npt.assert_equal(ydf_predictions, tf_predictions)
@@ -536,7 +550,9 @@ class TfModelTest(parameterized.TestCase):
     test_ds = self.create_dataset_v2(columns[:-1])
     ydf_predictions = model.predict(test_ds)
     tmp_dir = self.create_tempdir().full_path
-    model.to_tensorflow_saved_model(path=tmp_dir, mode="tf", servo_api=True)
+    model.to_tensorflow_saved_model(
+        path=tmp_dir, mode="tf", feed_example_proto=False
+    )
     tf_model = tf.saved_model.load(tmp_dir)
     tf_model_predict = tf_model.signatures["serving_default"]
     tf_prediction = tf_model_predict(**test_ds)
@@ -555,7 +571,9 @@ class TfModelTest(parameterized.TestCase):
     test_ds = self.create_dataset_v2(columns[:-1])
     ydf_predictions = model.predict(test_ds)
     tmp_dir = self.create_tempdir().full_path
-    model.to_tensorflow_saved_model(path=tmp_dir, mode="tf", servo_api=True)
+    model.to_tensorflow_saved_model(
+        path=tmp_dir, mode="tf", feed_example_proto=False
+    )
     tf_model = tf.saved_model.load(tmp_dir)
     tf_model_predict = tf_model.signatures["serving_default"]
     tf_prediction = tf_model_predict(**test_ds)
@@ -566,9 +584,12 @@ class TfModelTest(parameterized.TestCase):
     """Export to SavedModel format with serialized example inputs."""
 
     # Create YDF model
-    columns = ["f1", "i1", "c1", "b1", "label_class_binary"]
+    columns = ["f1", "i1", "i2", "c1", "b1", "b2", "cs1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
-        label="label_class_binary", num_trees=10
+        label="label_class_binary",
+        num_trees=10,
+        features=[("cs1", dataspec.Semantic.CATEGORICAL_SET)],
+        include_all_columns=True,
     ).train(self.create_dataset_v2(columns))
 
     # Golden predictions
@@ -601,9 +622,7 @@ class TfModelTest(parameterized.TestCase):
     model.to_tensorflow_saved_model(
         tmp_dir,
         mode="tf",
-        feed_example_proto=True,
-        servo_api=True,
-        feature_dtypes={"i1": tf.int64},
+        feature_dtypes={"i2": tf.float32, "b2": tf.float32},
         pre_processing=pre_processing,
         post_processing=post_processing,
     )
@@ -613,16 +632,19 @@ class TfModelTest(parameterized.TestCase):
 
     # Raw predictions
     tf_test_ds = {
-        "f1": tf.constant(test_ds["f1"], tf.float32),
+        "f1": tf.constant(test_ds["f1"]),
         "i1": tf.constant(test_ds["i1"]),
+        "i2": tf.constant(test_ds["i2"], dtype=tf.float32),
         "c1": tf.constant(test_ds["c1"]),
-        "b1": tf.constant(test_ds["b1"], tf.float32),
+        "b1": tf.constant(test_ds["b1"]),
+        "b2": tf.constant(test_ds["b2"], dtype=tf.float32),
+        "cs1": tf.ragged.constant(test_ds["cs1"]),
     }
     raw_tf_predictions = tf_model(tf_test_ds)
     npt.assert_array_equal(ydf_predictions, raw_tf_predictions)
 
     # Stored pre and post processing.
-    for feature in columns[:-1]:
+    for feature in columns[:-2]:
       npt.assert_array_equal(
           tf_model.pre_processing(tf_test_ds)[feature],
           pre_processing(tf_test_ds)[feature],
@@ -651,14 +673,32 @@ class TfModelTest(parameterized.TestCase):
                               value=[test_ds["i1"][example_idx]]
                           )
                       ),
+                      "i2": tf.train.Feature(
+                          float_list=tf.train.FloatList(
+                              value=[test_ds["i2"][example_idx]]
+                          )
+                      ),
                       "c1": tf.train.Feature(
                           bytes_list=tf.train.BytesList(
                               value=[bytes(test_ds["c1"][example_idx], "utf-8")]
                           )
                       ),
                       "b1": tf.train.Feature(
-                          float_list=tf.train.FloatList(
+                          int64_list=tf.train.Int64List(
                               value=[test_ds["b1"][example_idx]]
+                          )
+                      ),
+                      "b2": tf.train.Feature(
+                          float_list=tf.train.FloatList(
+                              value=[test_ds["b2"][example_idx]]
+                          )
+                      ),
+                      "cs1": tf.train.Feature(
+                          bytes_list=tf.train.BytesList(
+                              value=[
+                                  bytes(x, "utf-8")
+                                  for x in test_ds["cs1"][example_idx]
+                              ]
                           )
                       ),
                   }
@@ -729,16 +769,6 @@ class TfModelTest(parameterized.TestCase):
     model.to_tensorflow_saved_model(
         tempdir,
         mode="tf",
-        servo_api=True,
-        feed_example_proto=True,
-        feature_dtypes={
-            "age": tf.int64,
-            "capital_gain": tf.int64,
-            "capital_loss": tf.int64,
-            "education_num": tf.int64,
-            "fnlwgt": tf.int64,
-            "hours_per_week": tf.int64,
-        },
     )
 
     tf_model = tf.saved_model.load(tempdir)
@@ -753,6 +783,25 @@ class TfModelTest(parameterized.TestCase):
       )
       npt.assert_array_equal(tf_prediction["classes"], [[b"<=50K", b">50K"]])
 
+  def test_to_tensorflow_saved_model_wrong_dtype(self):
+    columns = ["f1", "label_class_binary"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+    tmp_dir = self.create_tempdir().full_path
+    with self.assertRaisesRegex(
+        ValueError,
+        "expected to have type \\[tf.float16, tf.float32, tf.float64\\] or"
+        " \\[tf.int8, tf.int16, tf.int32, tf.int64, tf.uint8, tf.uint16,"
+        " tf.uint32, tf.uint64\\]",
+    ):
+      model.to_tensorflow_saved_model(
+          tmp_dir,
+          mode="tf",
+          feed_example_proto=False,
+          feature_dtypes={"f1": tf.string},
+      )
+
   def test_tensorflow_raw_input_signature_default(self):
     columns = ["f1", "i1", "c1", "b1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
@@ -761,10 +810,10 @@ class TfModelTest(parameterized.TestCase):
     self.assertEqual(
         export_tf.tensorflow_raw_input_signature(model, {}),
         {
-            "f1": tf.TensorSpec(shape=(None,), dtype=tf.float32, name="f1"),
-            "i1": tf.TensorSpec(shape=(None,), dtype=tf.float32, name="i1"),
+            "f1": tf.TensorSpec(shape=(None,), dtype=tf.float64, name="f1"),
+            "i1": tf.TensorSpec(shape=(None,), dtype=tf.int64, name="i1"),
             "c1": tf.TensorSpec(shape=(None,), dtype=tf.string, name="c1"),
-            "b1": tf.TensorSpec(shape=(None,), dtype=tf.float32, name="b1"),
+            "b1": tf.TensorSpec(shape=(None,), dtype=tf.bool, name="b1"),
         },
     )
 
@@ -807,10 +856,14 @@ class TfModelTest(parameterized.TestCase):
 
   def test_usage_example_to_tensorflow_saved_model(self):
     """Usage example of the "to_tensorflow_saved_model" method."""
+    ydf = specialized_learners
+
+    # Part 1
+
     # Train a model.
-    model = specialized_learners.RandomForestLearner(label="l").train({
+    model = ydf.RandomForestLearner(label="l").train({
         "f1": np.random.random(size=100),
-        "f2": np.random.random(size=100),
+        "f2": np.random.random(size=100).astype(dtype=np.float32),
         "l": np.random.randint(2, size=100),
     })
 
@@ -822,20 +875,16 @@ class TfModelTest(parameterized.TestCase):
 
     # Make predictions
     tf_predictions = tf_model({
-        "f1": tf.constant(np.random.random(size=10), tf.float32),
-        "f2": tf.constant(np.random.random(size=10), tf.float32),
+        "f1": tf.constant(np.random.random(size=10)),
+        "f2": tf.constant(np.random.random(size=10), dtype=tf.float32),
     })
-
-    # Part 2
-    model.to_tensorflow_saved_model(
-        path="/tmp/my_model", mode="tf", feed_example_proto=True, servo_api=True
-    )
 
     # Part 3
     model.to_tensorflow_saved_model(
         path="/tmp/my_model",
         mode="tf",
-        feature_dtypes={"f1": tf.int64},  # f1 is feed as an tf.int64.
+        # "f1" is fed as an tf.int64 instead of tf.float64
+        feature_dtypes={"f1": tf.int64},
     )
 
     # Part 4

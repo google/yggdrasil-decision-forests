@@ -626,6 +626,9 @@ std::string PrintHumanReadable(const proto::DataSpecification& data_spec,
           }
         }
       }
+      if (col.has_dtype()) {
+        absl::StrAppend(&result, " dtype:", proto::DType_Name(col.dtype()));
+      }
       absl::StrAppend(&result, "\n");
     }
     absl::StrAppend(&result, "\n");

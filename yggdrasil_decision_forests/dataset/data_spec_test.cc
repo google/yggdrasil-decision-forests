@@ -95,6 +95,38 @@ Terminology:
   EXPECT_EQ(readable_representation, expected_result);
 }
 
+TEST(DataSpecUtil, PrintHumanReadableWithDType) {
+  dataset::proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+      R"pb(
+        columns { name: "f1" type: NUMERICAL dtype: DTYPE_UINT8 }
+        columns { name: "f2" type: NUMERICAL dtype: DTYPE_INT64 }
+      )pb");
+  std::string readable_representation = PrintHumanReadable(data_spec, true);
+  YDF_LOG(INFO) << readable_representation;
+  std::string expected_result =
+      R"(Number of records: 0
+Number of columns: 2
+
+Number of columns by type:
+	NUMERICAL: 2 (100%)
+
+Columns:
+
+NUMERICAL: 2 (100%)
+	0: "f1" NUMERICAL dtype:DTYPE_UINT8
+	1: "f2" NUMERICAL dtype:DTYPE_INT64
+
+Terminology:
+	nas: Number of non-available (i.e. missing) values.
+	ood: Out of dictionary.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
+	tokenized: The attribute value is obtained through tokenization.
+	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
+	vocab-size: Number of unique values.
+)";
+  EXPECT_EQ(readable_representation, expected_result);
+}
+
 // Loading two numerical columns of the adult dataset as DISCRETIZED_NUMERICAL.
 TEST(Dataset, DiscretizeAdult) {
   const std::string ds_typed_path =

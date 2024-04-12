@@ -606,8 +606,8 @@ Use `model.describe()` for more details
       *,
       mode: Literal["keras", "tf"] = "keras",
       feature_dtypes: Dict[str, export_tf.TFDType] = {},
-      servo_api: bool = False,
-      feed_example_proto: bool = False,
+      servo_api: Optional[bool] = None,
+      feed_example_proto: Optional[bool] = None,
       pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
       post_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
       temp_dir: Optional[str] = None,
@@ -615,7 +615,7 @@ Use `model.describe()` for more details
     """Exports the model as a TensorFlow Saved model.
 
     This function requires TensorFlow and TensorFlow Decision Forests to be
-    installed. You can install them using the command `pip install
+    installed. Install them by running the command `pip install
     tensorflow_decision_forests`. The generated SavedModel model relies on the
     TensorFlow Decision Forests Custom Inference Op. This Op is available by
     default in various platforms such as Servomatic, TensorFlow Serving, Vertex
@@ -628,69 +628,61 @@ Use `model.describe()` for more details
 
     import ydf
     import numpy as np
+    import tensorflow as tf
 
     # Train a model.
     model = ydf.RandomForestLearner(label="l").train({
         "f1": np.random.random(size=100),
-        "f2": np.random.random(size=100),
+        "f2": np.random.random(size=100).astype(dtype=np.float32),
         "l": np.random.randint(2, size=100),
-        })
+    })
 
     # Export the model to the TensorFlow SavedModel format.
+    # The model can be executed with Servomatic, TensorFlow Serving and
+    # Vertex AI.
     model.to_tensorflow_saved_model(path="/tmp/my_model", mode="tf")
 
-    # Load the saved model.
+    # The model can also be loaded in TensorFlow and executed locally.
+
+    # Load the TensorFlow Saved model.
     tf_model = tf.saved_model.load("/tmp/my_model")
 
     # Make predictions
     tf_predictions = tf_model({
-        "f1": tf.constant(np.random.random(size=10), tf.float32),
-        "f2": tf.constant(np.random.random(size=10), tf.float32),
+        "f1": tf.constant(np.random.random(size=10)),
+        "f2": tf.constant(np.random.random(size=10), dtype=tf.float32),
     })
     ```
 
-    In the previous example, the model consumes raw feature values and output
-    raw predictions. Often, models run in TF Serving / Servomatic, consume
-    input features stored as a serialized tensorflow example protobuf, and
-    output structured predictions using the "regress" or "classify" Servo API.
+    TensorFlow SavedModel do not cast automatically feature values. For
+    instance, a model trained with a dtype=float32 semantic=numerical feature,
+    will require for this feature to be fed as float32 numbers during inference.
+    You can override the dtype of a feature with the `feature_dtypes` argument:
 
     ```python
     model.to_tensorflow_saved_model(
         path="/tmp/my_model",
         mode="tf",
-        feed_example_proto=True,
-        servo_api=True)
-    ```
-
-    The dtypes of input features is selected automatically according to the
-    feature semantic. For instance, a NUMERICAL feature will be encoded as a
-    tf.float32. You can override this behavior with the `feature_dtypes`
-    argument:
-
-    ```python
-    model.to_tensorflow_saved_model(
-        path="/tmp/my_model",
-        mode="tf",
-        # The exported model expects "f1" is fed as an tf.int64.
+        # "f1" is fed as an tf.int64 instead of tf.float64
         feature_dtypes={"f1": tf.int64},
-        )
+    )
     ```
 
-    The SavedModel format allows for custom computation in addition to the
-    model inference. Such computation can be specified with the `pre_processing`
-    and `post_processing` arguments:
+    The SavedModel format allows for custom preprocessing and postprocessing
+    computation in addition to the model inference. Such computation can be
+    specified with the `pre_processing` and `post_processing` arguments:
 
     ```python
     def pre_processing(features):
-          features = features.copy()
-          features["f1"] = features["f1"] * 2
-          return features
+      features = features.copy()
+      features["f1"] = features["f1"] * 2
+      return features
 
     model.to_tensorflow_saved_model(
         path="/tmp/my_model",
         mode="tf",
         pre_processing=pre_processing,
-        )
+    )
     ```
 
     For more complex combinations, such as composing multiple models, use the
@@ -717,14 +709,16 @@ Use `model.describe()` for more details
         with tf.float32 by default. If you plan on feeding tf.float64 or
         tf.int32, use `feature_dtype` to specify it. Only compatible with
         mode="tf".
-      servo_api: If true, adds a SavedModel signature to make the model
-        compatible with the `Classify` or `Regress` servo APIs. Only compatible
-        with mode="tf".
-      feed_example_proto: If false (default), the model expects for the input
-        features to be provided as TensorFlow values. This is the default and
-        most efficient way to make predictions. If true, the model expects for
-        the input featurs to be provided as a binary serialized TensorFlow
-        Example proto. Only compatible with mode="tf".
+      servo_api: If true (default if mode="tf"), adds a SavedModel signature to
+        make the model compatible with the `Classify` or `Regress` servo APIs.
+        Only compatible with mode="tf". If false (default if mode="keras"),
+        outputs the raw model predictions.
+      feed_example_proto: If false (default if mode="keras"), the model expects
+        for the input features to be provided as TensorFlow values. This is most
+        efficient way to make predictions. If true (default if mode="tf"), the
+        model expects for the input featurs to be provided as a binary
+        serialized TensorFlow Example proto. This is the format expected by
+        VertexAI and most TensorFlow Serving pipelines.
       pre_processing: Optional TensorFlow function or module to apply on the
         input features before applying the model. Only compatible with
         mode="tf".
@@ -733,6 +727,11 @@ Use `model.describe()` for more details
       temp_dir: Temporary directory used during the conversion. If None
         (default), uses `tempfile.mkdtemp` default temporary directory.
     """
+
+    if servo_api is None:
+      servo_api = mode == "tf"
+    if feed_example_proto is None:
+      feed_example_proto = mode == "tf"
 
     export_tf.ydf_model_to_tensorflow_saved_model(
         ydf_model=self,
@@ -772,6 +771,7 @@ Use `model.describe()` for more details
 
     import ydf
     import numpy as np
+    import tensorflow as tf
 
     # Train a model.
     model = ydf.RandomForestLearner(label="l").train({

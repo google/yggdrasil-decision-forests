@@ -30,7 +30,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -38,6 +37,7 @@
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow/tf_example.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -48,6 +48,25 @@ namespace dataset {
 using yggdrasil_decision_forests::dataset::GetDatasetPathAndTypeOrStatus;
 
 using proto::ColumnType;
+
+namespace {
+
+// Converts a TensorFlow Example DType into a YDF DType.
+absl::optional<dataset::proto::DType> TFEDtypeToDType(
+    const tensorflow::Feature::KindCase kind) {
+  switch (kind) {
+    case tensorflow::Feature::KindCase::KIND_NOT_SET:
+      return {};
+    case tensorflow::Feature::KindCase::kFloatList:
+      return dataset::proto::DType::DTYPE_FLOAT32;
+    case tensorflow::Feature::KindCase::kInt64List:
+      return dataset::proto::DType::DTYPE_INT64;
+    case tensorflow::Feature::KindCase::kBytesList:
+      return dataset::proto::DType::DTYPE_BYTES;
+  }
+}
+
+}  // namespace
 
 // Information attached to each feature a tf.example when parsing a tf.example
 // container, in order to determine the most likely type of each feature.
@@ -331,6 +350,15 @@ absl::Status TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
       } else {
         column = data_spec->mutable_columns(col_type_info.col_idx);
       }
+
+      if (!column->has_dtype()) {
+        // Note: We don't check for the consistency of dtypes.
+        const auto dtype = TFEDtypeToDType(feature.second.kind_case());
+        if (dtype.has_value()) {
+          column->set_dtype(*dtype);
+        }
+      }
+
       if (column->is_manual_type()) {
         // The user has already specified the type of this column.
         continue;

@@ -35,6 +35,7 @@ class DatasetWithTfTest(absltest.TestCase):
             ds_pb.Column(
                 name="a",
                 type=ds_pb.ColumnType.NUMERICAL,
+                dtype=ds_pb.DType.DTYPE_INT64,
                 count_nas=0,
                 numerical=ds_pb.NumericalSpec(
                     mean=2,

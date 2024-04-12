@@ -56,6 +56,7 @@ py_library(
     name = "dataspec",
     srcs = ["dataspec.py"],
     deps = [
+        # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )

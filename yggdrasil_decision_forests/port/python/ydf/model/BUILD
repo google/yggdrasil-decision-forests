@@ -211,6 +211,7 @@ py_test(
         # pandas dep,
         # tensorflow dep,
         # tensorflow_decision_forests dep,
+        "//ydf/dataset:dataspec",
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
         "//ydf/utils:test_utils",
