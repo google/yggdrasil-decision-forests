@@ -18,6 +18,7 @@ TensorFlow cannot be compiled in debug mode, so these tests are separated out to
 improve debuggability of the remaining model tests.
 """
 
+import math
 import os
 import tempfile
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
@@ -75,6 +76,7 @@ class TfModelTest(parameterized.TestCase):
   def create_dataset_v2(self, columns: List[str]) -> Dict[str, Any]:
     """Creates a dataset with random values."""
     data = {
+        # Single-dim features
         "f1": np.random.random(size=100),
         "f2": np.random.random(size=100),
         "i1": np.random.randint(100, size=100),
@@ -82,7 +84,15 @@ class TfModelTest(parameterized.TestCase):
         "c1": np.random.choice(["x", "y", "z"], size=100),
         "b1": np.random.randint(2, size=100).astype(np.bool_),
         "b2": np.random.randint(2, size=100).astype(np.bool_),
+        # Cat-set features
         "cs1": [[], ["a", "b", "c"], ["b", "c"], ["a"]] * 25,
+        # Multi-dim features
+        "multi_f1": np.random.random(size=(100, 5)),
+        "multi_f2": np.random.random(size=(100, 5)),
+        "multi_i1": np.random.randint(100, size=(100, 5)),
+        "multi_c1": np.random.choice(["x", "y", "z"], size=(100, 5)),
+        "multi_b1": np.random.randint(2, size=(100, 5)).astype(np.bool_),
+        # Labels
         "label_class_binary": np.random.choice(["l1", "l2"], size=100),
         "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=100),
         "label_regress": np.random.random(size=100),
@@ -497,6 +507,30 @@ class TfModelTest(parameterized.TestCase):
     loaded_tf_predictions = loaded_tf_model(tf_test_ds)
     npt.assert_array_equal(ydf_predictions, loaded_tf_predictions)
 
+  def test_to_tensorflow_function_with_multidim_input(self):
+    # Train a model
+    columns = [
+        "multi_f1",
+        "multi_i1",
+        "multi_c1",
+        "multi_b1",
+        "label_class_binary",
+    ]
+    train_ds = self.create_dataset_v2(columns)
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary"
+    ).train(train_ds)
+    # Generate predictions with YDF
+    ydf_predictions = model.predict(train_ds)
+
+    # Convert ydf model into a tf function
+    tf_function = model.to_tensorflow_function()
+
+    # Validate the tf model predictions
+    tf_test_ds = {k: tf.constant(train_ds[k]) for k in columns[:-1]}
+    tf_predictions = tf_function(tf_test_ds)
+    npt.assert_array_equal(ydf_predictions, tf_predictions)
+
   def test_to_raw_tensorflow_saved_model(self):
     """Simple export to SavedModel format."""
 
@@ -539,6 +573,46 @@ class TfModelTest(parameterized.TestCase):
     tf_predictions = tf_model(tf_test_ds)
     npt.assert_equal(ydf_predictions, tf_predictions)
 
+  @parameterized.parameters(True, False)
+  def test_to_raw_tensorflow_saved_model_with_multidim_input(
+      self, with_filter: bool
+  ):
+    # Create YDF model
+    columns = [
+        "multi_f1",
+        "multi_i1",
+        "multi_c1",
+        "multi_b1",
+        "label_class_binary",
+    ]
+    feature_columns = columns[:-2] if with_filter else columns[:-1]
+    train_ds = self.create_dataset_v2(columns)
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary",
+        num_trees=10,
+        features=feature_columns if with_filter else None,
+    ).train(train_ds)
+
+    # Golden predictions
+    ydf_predictions = model.predict(train_ds)
+
+    # Save model
+    tmp_dir = self.create_tempdir().full_path
+    model.to_tensorflow_saved_model(
+        tmp_dir,
+        mode="tf",
+        servo_api=False,
+        feed_example_proto=False,
+    )
+
+    # Load model
+    tf_model = tf.saved_model.load(tmp_dir)
+
+    # Test predictions
+    tf_test_ds = {k: tf.constant(train_ds[k]) for k in feature_columns}
+    tf_predictions = tf_model(tf_test_ds)
+    npt.assert_equal(ydf_predictions, tf_predictions)
+
   def test_to_tensorflow_saved_model_classify_api(self):
     """Export to SavedModel format with regress API."""
     columns = ["f1", "f2", "label_class_multi"]
@@ -551,7 +625,10 @@ class TfModelTest(parameterized.TestCase):
     ydf_predictions = model.predict(test_ds)
     tmp_dir = self.create_tempdir().full_path
     model.to_tensorflow_saved_model(
-        path=tmp_dir, mode="tf", feed_example_proto=False
+        path=tmp_dir,
+        mode="tf",
+        feed_example_proto=False,
+        servo_api=True,
     )
     tf_model = tf.saved_model.load(tmp_dir)
     tf_model_predict = tf_model.signatures["serving_default"]
@@ -572,7 +649,10 @@ class TfModelTest(parameterized.TestCase):
     ydf_predictions = model.predict(test_ds)
     tmp_dir = self.create_tempdir().full_path
     model.to_tensorflow_saved_model(
-        path=tmp_dir, mode="tf", feed_example_proto=False
+        path=tmp_dir,
+        mode="tf",
+        feed_example_proto=False,
+        servo_api=True,
     )
     tf_model = tf.saved_model.load(tmp_dir)
     tf_model_predict = tf_model.signatures["serving_default"]
@@ -592,7 +672,6 @@ class TfModelTest(parameterized.TestCase):
         include_all_columns=True,
     ).train(self.create_dataset_v2(columns))
 
-    # Golden predictions
     test_ds = self.create_dataset_v2(columns[:-1])
 
     # Save model
@@ -625,6 +704,8 @@ class TfModelTest(parameterized.TestCase):
         feature_dtypes={"i2": tf.float32, "b2": tf.float32},
         pre_processing=pre_processing,
         post_processing=post_processing,
+        servo_api=True,
+        feed_example_proto=True,
     )
 
     # Load model
@@ -708,6 +789,95 @@ class TfModelTest(parameterized.TestCase):
     tf_predictions = tf_model_predict(inputs=tf_test_ds)
     npt.assert_equal(ydf_predictions, tf_predictions["scores"])
 
+  @parameterized.parameters(True, False)
+  def test_to_tensorflow_saved_model_with_example_proto_multidim(
+      self, with_filter: bool
+  ):
+    """Export to SavedModel format with serialized example inputs."""
+
+    # Create YDF model
+    columns = [
+        "multi_f1",
+        "multi_i1",
+        "multi_c1",
+        "multi_b1",
+        "label_class_binary",
+    ]
+    feature_columns = columns[:-2] if with_filter else columns[:-1]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary",
+        num_trees=10,
+        features=feature_columns if with_filter else None,
+    ).train(self.create_dataset_v2(columns))
+
+    # Golden predictions
+    test_ds = self.create_dataset_v2(feature_columns)
+
+    # Save model
+    tmp_dir = self.create_tempdir().full_path
+
+    # Golden predictions
+    ydf_predictions = model.predict(test_ds)
+    # Add extra dimension: ydf squeeze its predictions, while the servo api
+    # expects non-squeezed predictions.
+    ydf_predictions = np.stack(
+        [
+            1.0 - ydf_predictions,
+            ydf_predictions,
+        ],
+        axis=1,
+    )
+
+    model.to_tensorflow_saved_model(
+        tmp_dir, mode="tf", servo_api=True, feed_example_proto=True
+    )
+
+    # Load model
+    tf_model = tf.saved_model.load(tmp_dir)
+
+    # Raw predictions
+    tf_test_ds = {k: tf.constant(test_ds[k]) for k in feature_columns}
+    raw_tf_predictions = tf_model(tf_test_ds)
+    npt.assert_array_equal(ydf_predictions, raw_tf_predictions)
+
+    # Servo API predictions
+    tf_model_predict = tf_model.signatures["serving_default"]
+    tf_test_ds = []
+    for example_idx in range(100):
+      proto_feature = {
+          "multi_f1": tf.train.Feature(
+              float_list=tf.train.FloatList(
+                  value=test_ds["multi_f1"][example_idx][:]
+              )
+          ),
+          "multi_i1": tf.train.Feature(
+              int64_list=tf.train.Int64List(
+                  value=test_ds["multi_i1"][example_idx][:]
+              )
+          ),
+          "multi_c1": tf.train.Feature(
+              bytes_list=tf.train.BytesList(
+                  value=[
+                      bytes(x, "utf-8")
+                      for x in test_ds["multi_c1"][example_idx]
+                  ]
+              )
+          ),
+      }
+      if not with_filter:
+        proto_feature["multi_b1"] = tf.train.Feature(
+            int64_list=tf.train.Int64List(
+                value=test_ds["multi_b1"][example_idx][:]
+            )
+        )
+      tf_test_ds.append(
+          tf.train.Example(
+              features=tf.train.Features(feature=proto_feature)
+          ).SerializeToString()
+      )
+    tf_predictions = tf_model_predict(inputs=tf_test_ds)
+    npt.assert_equal(ydf_predictions, tf_predictions["scores"])
+
   def test_to_tensorflow_saved_model_with_resource_postprocessing(self):
     """Test having the post processing be resource dependent."""
 
@@ -769,6 +939,8 @@ class TfModelTest(parameterized.TestCase):
     model.to_tensorflow_saved_model(
         tempdir,
         mode="tf",
+        servo_api=True,
+        feed_example_proto=True,
     )
 
     tf_model = tf.saved_model.load(tempdir)
@@ -817,6 +989,35 @@ class TfModelTest(parameterized.TestCase):
         },
     )
 
+  def test_tensorflow_raw_input_signature_multidim(self):
+    columns = [
+        "multi_f1",
+        "multi_i1",
+        "multi_c1",
+        "multi_b1",
+        "label_class_binary",
+    ]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+    self.assertEqual(
+        export_tf.tensorflow_raw_input_signature(model, {}),
+        {
+            "multi_f1": tf.TensorSpec(
+                shape=(None, 5), dtype=tf.float64, name="multi_f1"
+            ),
+            "multi_i1": tf.TensorSpec(
+                shape=(None, 5), dtype=tf.int64, name="multi_i1"
+            ),
+            "multi_c1": tf.TensorSpec(
+                shape=(None, 5), dtype=tf.string, name="multi_c1"
+            ),
+            "multi_b1": tf.TensorSpec(
+                shape=(None, 5), dtype=tf.bool, name="multi_b1"
+            ),
+        },
+    )
+
   def test_tensorflow_raw_input_signature_override(self):
     columns = ["f1", "i1", "c1", "b1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
@@ -832,6 +1033,82 @@ class TfModelTest(parameterized.TestCase):
             "i1": tf.TensorSpec(shape=(None,), dtype=tf.int64, name="i1"),
             "c1": tf.TensorSpec(shape=(None,), dtype=tf.string, name="c1"),
             "b1": tf.TensorSpec(shape=(None,), dtype=tf.float16, name="b1"),
+        },
+    )
+
+  def test_tensorflow_raw_input_multidim_signature_override(self):
+    columns = [
+        "multi_f1",
+        "multi_i1",
+        "multi_c1",
+        "multi_b1",
+        "label_class_binary",
+    ]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+    self.assertEqual(
+        export_tf.tensorflow_raw_input_signature(
+            model,
+            {
+                "multi_f1": tf.int32,
+                "multi_i1": tf.int64,
+                "multi_c1": tf.string,
+                "multi_b1": tf.float16,
+            },
+        ),
+        {
+            "multi_f1": tf.TensorSpec(
+                shape=(None, 5), dtype=tf.int32, name="multi_f1"
+            ),
+            "multi_i1": tf.TensorSpec(
+                shape=(None, 5), dtype=tf.int64, name="multi_i1"
+            ),
+            "multi_c1": tf.TensorSpec(
+                shape=(None, 5), dtype=tf.string, name="multi_c1"
+            ),
+            "multi_b1": tf.TensorSpec(
+                shape=(None, 5), dtype=tf.float16, name="multi_b1"
+            ),
+        },
+    )
+
+  def test_tensorflow_feature_spec_default(self):
+    columns = [
+        "f1",
+        "i1",
+        "c1",
+        "b1",
+        "multi_f1",
+        "multi_i1",
+        "multi_c1",
+        "multi_b1",
+        "label_class_binary",
+    ]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=10
+    ).train(self.create_dataset_v2(columns))
+    self.assertEqual(
+        export_tf.tensorflow_feature_spec(model, {}),
+        {
+            "f1": tf.io.FixedLenFeature(
+                shape=[], dtype=tf.float32, default_value=math.nan
+            ),
+            "i1": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
+            "c1": tf.io.FixedLenFeature(
+                shape=[], dtype=tf.string, default_value=""
+            ),
+            "b1": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
+            "multi_f1": tf.io.FixedLenFeature(
+                shape=[5], dtype=tf.float32, default_value=[math.nan] * 5
+            ),
+            "multi_i1": tf.io.FixedLenFeature(shape=[5], dtype=tf.int64),
+            "multi_c1": tf.io.FixedLenFeature(
+                shape=[5],
+                dtype=tf.string,
+                default_value=[""] * 5,
+            ),
+            "multi_b1": tf.io.FixedLenFeature(shape=[5], dtype=tf.int64),
         },
     )
 

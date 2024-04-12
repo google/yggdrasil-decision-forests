@@ -39,6 +39,15 @@ py_library(
     ],
 )
 
+py_library(
+    name = "tensorflow_io",
+    srcs = ["tensorflow_io.py"],
+    deps = [":dataset_io_types"],
+)
+
+# Tests
+# =====
+
 py_test(
     name = "pandas_io_test",
     srcs = ["pandas_io_test.py"],
@@ -49,8 +58,11 @@ py_test(
     ],
 )
 
-py_library(
-    name = "tensorflow_io",
-    srcs = ["tensorflow_io.py"],
-    deps = [":dataset_io_types"],
+py_test(
+    name = "dataset_io_test",
+    srcs = ["dataset_io_test.py"],
+    deps = [
+        ":dataset_io",
+        # absl/testing:absltest dep,
+    ],
 )

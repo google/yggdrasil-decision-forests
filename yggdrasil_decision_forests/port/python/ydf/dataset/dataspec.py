@@ -16,6 +16,7 @@
 
 import dataclasses
 import enum
+import logging
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -502,7 +503,7 @@ def get_all_columns(
     inference_args: DataSpecInferenceArgs,
     required_columns: Optional[Sequence[str]],
     unroll_feature_info: Dict[str, List[str]] = {},
-) -> Sequence[Column]:
+) -> Tuple[Sequence[Column], Dict[str, List[str]]]:
   """Gets all the columns to use by the model / learner.
 
   Args:
@@ -516,8 +517,9 @@ def get_all_columns(
     unroll_feature_info: Information about feature unrolling.
 
   Returns:
-    The list of model input columns. This includes the required columns plus the
-      specified columns in the inference_args that are available
+    The list of model input columns (This includes the required columns plus the
+    specified columns in the inference_args that are available), and the
+    actually used unrolled features.
 
   Raises:
     ValueError: One of the required columns is not available
@@ -531,8 +533,12 @@ def get_all_columns(
         f" columns: {required_columns}, available columns: {available_columns}"
     )
 
+  used_unroll_feature_info = {}
+
   if inference_args.columns is None:
+    # The user did not filter on the column names, so we use all the columns.
     specified_columns = [Column(col) for col in available_columns]
+    used_unroll_feature_info.update(unroll_feature_info)
   else:
     specified_columns = []
     # Add the specified columns in order, but ignore those that do not exist.
@@ -544,6 +550,8 @@ def get_all_columns(
           )
         specified_columns.append(col)
       elif col.name in unroll_feature_info:
+        if col.name in unroll_feature_info:
+          used_unroll_feature_info[col.name] = unroll_feature_info[col.name]
         specified_columns.extend(
             [Column(col) for col in unroll_feature_info[col.name]]
         )
@@ -555,7 +563,10 @@ def get_all_columns(
           )
 
   specified_columns_names = set(col.name for col in specified_columns)
-  if inference_args.include_all_columns:
+  if inference_args.include_all_columns and inference_args.columns is not None:
+    # The user specified the type of some of the columns, but asked for all the
+    # columns to be used.
+    used_unroll_feature_info.update(unroll_feature_info)
     for col_name in available_columns:
       if col_name not in specified_columns_names:
         specified_columns.append(Column(col_name))
@@ -567,10 +578,10 @@ def get_all_columns(
         col_name in required_columns_as_set
         and col_name not in specified_columns_names
     ):
+      # Note: Required columns that are not already included, are not unrolled.
       specified_columns.append(Column(col_name))
       specified_columns_names.add(col_name)
-
-  return specified_columns
+  return specified_columns, used_unroll_feature_info
 
 
 def priority(a: Any, b: Any) -> Any:

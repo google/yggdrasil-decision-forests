@@ -606,8 +606,8 @@ Use `model.describe()` for more details
       *,
       mode: Literal["keras", "tf"] = "keras",
       feature_dtypes: Dict[str, export_tf.TFDType] = {},
-      servo_api: Optional[bool] = None,
-      feed_example_proto: Optional[bool] = None,
+      servo_api: bool = False,
+      feed_example_proto: bool = False,
       pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
       post_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
       temp_dir: Optional[str] = None,
@@ -709,16 +709,14 @@ Use `model.describe()` for more details
         with tf.float32 by default. If you plan on feeding tf.float64 or
         tf.int32, use `feature_dtype` to specify it. Only compatible with
         mode="tf".
-      servo_api: If true (default if mode="tf"), adds a SavedModel signature to
-        make the model compatible with the `Classify` or `Regress` servo APIs.
-        Only compatible with mode="tf". If false (default if mode="keras"),
-        outputs the raw model predictions.
-      feed_example_proto: If false (default if mode="keras"), the model expects
-        for the input features to be provided as TensorFlow values. This is most
-        efficient way to make predictions. If true (default if mode="tf"), the
-        model expects for the input featurs to be provided as a binary
-        serialized TensorFlow Example proto. This is the format expected by
-        VertexAI and most TensorFlow Serving pipelines.
+      servo_api: If true, adds a SavedModel signature to make the model
+        compatible with the `Classify` or `Regress` servo APIs. Only compatible
+        with mode="tf". If false, outputs the raw model predictions.
+      feed_example_proto: If false, the model expects for the input features to
+        be provided as TensorFlow values. This is most efficient way to make
+        predictions. If true, the model expects for the input featurs to be
+        provided as a binary serialized TensorFlow Example proto. This is the
+        format expected by VertexAI and most TensorFlow Serving pipelines.
       pre_processing: Optional TensorFlow function or module to apply on the
         input features before applying the model. Only compatible with
         mode="tf".
@@ -727,11 +725,6 @@ Use `model.describe()` for more details
       temp_dir: Temporary directory used during the conversion. If None
         (default), uses `tempfile.mkdtemp` default temporary directory.
     """
-
-    if servo_api is None:
-      servo_api = mode == "tf"
-    if feed_example_proto is None:
-      feed_example_proto = mode == "tf"
 
     export_tf.ydf_model_to_tensorflow_saved_model(
         ydf_model=self,

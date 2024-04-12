@@ -82,6 +82,9 @@ class VerticalDataset:
       data_spec_guide: data_spec_pb2.DataSpecificationGuide,
       required_columns: Optional[Sequence[str]] = None,
   ) -> None: ...
+  def SetMultiDimDataspec(
+      self, unrolling: Dict[str, List[str]],
+      ) -> None: ...
 
 
 # Model bindings

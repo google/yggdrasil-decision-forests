@@ -196,7 +196,7 @@ class DataspecTest(absltest.TestCase):
                 max_num_scanned_rows_to_compute_statistics=10000,
             ),
             required_columns=None,
-        ),
+        )[0],
         [
             Column("a"),
             Column("b", Semantic.NUMERICAL),
@@ -219,7 +219,7 @@ class DataspecTest(absltest.TestCase):
                 max_num_scanned_rows_to_compute_statistics=10000,
             ),
             required_columns=None,
-        ),
+        )[0],
         [
             Column("a"),
             Column("b"),
@@ -262,7 +262,7 @@ class DataspecTest(absltest.TestCase):
               max_num_scanned_rows_to_compute_statistics=10000,
           ),
           required_columns=["b"],
-      )
+      )[0]
 
   def test_get_all_columns_does_not_require_all_specified(self):
     self.assertEqual(
@@ -279,7 +279,7 @@ class DataspecTest(absltest.TestCase):
                 max_num_scanned_rows_to_compute_statistics=10000,
             ),
             required_columns=[],
-        ),
+        )[0],
         [
             Column("a"),
         ],
@@ -300,34 +300,36 @@ class DataspecTest(absltest.TestCase):
                 max_num_scanned_rows_to_compute_statistics=10000,
             ),
             required_columns=[],
-        ),
+        )[0],
         [
             Column("a"),
         ],
     )
 
   def test_get_all_columns_with_unrolled_features(self):
-    self.assertEqual(
-        dataspec_lib.get_all_columns(
-            ["a.0", "a.1", "a.2", "b.0", "b.1", "b.2"],
-            DataSpecInferenceArgs(
-                columns=[Column("a")],
-                include_all_columns=False,
-                max_vocab_count=1,
-                min_vocab_frequency=1,
-                discretize_numerical_columns=False,
-                num_discretized_numerical_bins=1,
-                max_num_scanned_rows_to_infer_semantic=10000,
-                max_num_scanned_rows_to_compute_statistics=10000,
-            ),
-            required_columns=[],
-            unroll_feature_info={
-                "a": ["a.0", "a.1", "a.2"],
-                "b": ["b.0", "b.1", "b.2"],
-            },
+    columns, unroll_info = dataspec_lib.get_all_columns(
+        ["a.0", "a.1", "a.2", "b.0", "b.1", "b.2"],
+        DataSpecInferenceArgs(
+            columns=[Column("a")],
+            include_all_columns=False,
+            max_vocab_count=1,
+            min_vocab_frequency=1,
+            discretize_numerical_columns=False,
+            num_discretized_numerical_bins=1,
+            max_num_scanned_rows_to_infer_semantic=10000,
+            max_num_scanned_rows_to_compute_statistics=10000,
         ),
+        required_columns=[],
+        unroll_feature_info={
+            "a": ["a.0", "a.1", "a.2"],
+            "b": ["b.0", "b.1", "b.2"],
+        },
+    )
+    self.assertEqual(
+        columns,
         [Column("a.0"), Column("a.1"), Column("a.2")],
     )
+    self.assertEqual(unroll_info, {"a": ["a.0", "a.1", "a.2"]})
 
   def test_normalize_column_defs(self):
     self.assertEqual(

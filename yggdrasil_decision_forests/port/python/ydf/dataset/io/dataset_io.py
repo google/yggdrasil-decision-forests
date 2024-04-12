@@ -24,6 +24,26 @@ from ydf.dataset.io import pandas_io
 from ydf.dataset.io import tensorflow_io
 
 
+def unrolled_feature_names(name: str, num_dims: int) -> Sequence[str]:
+  """Returns the names of an unrolled feature."""
+
+  if num_dims <= 0:
+    raise ValueError("num_dims should be strictly positive.")
+
+  # For example:
+  #   num_features=1 => num_leading_zeroes = 1
+  #   num_features=9 => num_leading_zeroes = 1
+  #   num_features=10 => num_leading_zeroes = 2
+  num_leading_zeroes = int(math.log10(num_dims)) + 1
+
+  postfix = f"_of_{num_dims:0{num_leading_zeroes}}"
+
+  return [
+      f"{name}.{dim_idx:0{num_leading_zeroes}}{postfix}"
+      for dim_idx in range(num_dims)
+  ]
+
+
 def _unroll_column(
     name: str, src: dataset_io_types.InputValues, allow_unroll: bool
 ) -> Iterator[Tuple[str, dataset_io_types.InputValues, bool]]:
@@ -64,15 +84,8 @@ def _unroll_column(
   if num_features == 0:
     raise ValueError(f"Multi-dimention feature {name!r} has no features.")
 
-  # For example:
-  #   num_features=1 => num_leading_zeroes = 1
-  #   num_features=9 => num_leading_zeroes = 1
-  #   num_features=10 => num_leading_zeroes = 2
-  num_leading_zeroes = int(math.log10(num_features)) + 1
-
-  postfix = f"_of_{num_features:0{num_leading_zeroes}}"
-  for dim_idx in range(num_features):
-    sub_name = f"{name}.{dim_idx:0{num_leading_zeroes}}{postfix}"
+  sub_names = unrolled_feature_names(name, num_features)
+  for dim_idx, sub_name in enumerate(sub_names):
     yield sub_name, src[:, dim_idx], True
 
 

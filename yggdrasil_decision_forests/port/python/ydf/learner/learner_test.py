@@ -467,6 +467,7 @@ class RandomForestLearnerTest(LearnerTest):
                 min_value=0,
                 max_value=4,
             ),
+            is_unstacked=True,
         ),
         data_spec_pb2.Column(
             name="feature.1_of_4",
@@ -479,6 +480,7 @@ class RandomForestLearnerTest(LearnerTest):
                 min_value=1,
                 max_value=5,
             ),
+            is_unstacked=True,
         ),
         data_spec_pb2.Column(
             name="feature.2_of_4",
@@ -491,6 +493,7 @@ class RandomForestLearnerTest(LearnerTest):
                 min_value=2,
                 max_value=6,
             ),
+            is_unstacked=True,
         ),
         data_spec_pb2.Column(
             name="feature.3_of_4",
@@ -503,6 +506,7 @@ class RandomForestLearnerTest(LearnerTest):
                 min_value=3,
                 max_value=7,
             ),
+            is_unstacked=True,
         ),
     ]
     # Skip the first column that contains the label.

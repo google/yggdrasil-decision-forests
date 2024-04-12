@@ -504,13 +504,16 @@ def create_vertical_dataset_from_dict_of_values(
     # If `required_columns` is None, only check if the columns mentioned in the
     # `inference_args` are required. This is checked by
     # dataspec.get_all_columns()
-    normalized_columns = dataspec.get_all_columns(
-        available_columns=list(data.keys()),
-        inference_args=inference_args,
-        required_columns=required_columns,
-        unroll_feature_info=unroll_feature_info,
+    normalized_columns, effective_unroll_feature_info = (
+        dataspec.get_all_columns(
+            available_columns=list(data.keys()),
+            inference_args=inference_args,
+            required_columns=required_columns,
+            unroll_feature_info=unroll_feature_info,
+        )
     )
   else:
+    effective_unroll_feature_info = None  # To please linter
     dataset._initialize_from_data_spec(data_spec)  # pylint: disable=protected-access
     required_columns = (
         required_columns
@@ -539,6 +542,10 @@ def create_vertical_dataset_from_dict_of_values(
         inference_args=inference_args,  # Might be None
         column_idx=column_idx if data_spec is not None else None,
     )
+
+  if data_spec is None:
+    assert effective_unroll_feature_info is not None
+    dataset._dataset.SetMultiDimDataspec(effective_unroll_feature_info)  # pylint: disable=protected-access
 
   dataset._finalize(set_num_rows_in_data_spec=(data_spec is None))  # pylint: disable=protected-access
   return dataset

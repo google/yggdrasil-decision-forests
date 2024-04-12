@@ -894,6 +894,7 @@ B,3""")
                     min_value=0,
                     max_value=4,
                 ),
+                is_unstacked=True,
             ),
             ds_pb.Column(
                 name="feature.1_of_3",
@@ -906,6 +907,7 @@ B,3""")
                     min_value=1,
                     max_value=5,
                 ),
+                is_unstacked=True,
             ),
             ds_pb.Column(
                 name="feature.2_of_3",
@@ -918,6 +920,15 @@ B,3""")
                     min_value=2,
                     max_value=6,
                 ),
+                is_unstacked=True,
+            ),
+        ),
+        unstackeds=(
+            ds_pb.Unstacked(
+                original_name="feature",
+                begin_column_idx=0,
+                size=3,
+                type=ds_pb.ColumnType.NUMERICAL,
             ),
         ),
     )
@@ -1047,6 +1058,7 @@ four entries,8,4,4.4
                     min_value=0,
                     max_value=4,
                 ),
+                is_unstacked=True,
             ),
             ds_pb.Column(
                 name="feature.1_of_3",
@@ -1059,6 +1071,7 @@ four entries,8,4,4.4
                     min_value=1,
                     max_value=5,
                 ),
+                is_unstacked=True,
             ),
             ds_pb.Column(
                 name="feature.2_of_3",
@@ -1071,6 +1084,15 @@ four entries,8,4,4.4
                     min_value=2,
                     max_value=6,
                 ),
+                is_unstacked=True,
+            ),
+        ),
+        unstackeds=(
+            ds_pb.Unstacked(
+                original_name="feature",
+                begin_column_idx=0,
+                size=3,
+                type=ds_pb.ColumnType.NUMERICAL,
             ),
         ),
     )

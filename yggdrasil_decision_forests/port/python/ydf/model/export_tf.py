@@ -17,11 +17,12 @@
 import math
 import shutil
 import tempfile
-from typing import Any, Callable, Dict, Literal, Optional
+from typing import Any, Callable, Dict, Literal, Optional, Sequence
 import uuid
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec
+from ydf.dataset.io import dataset_io
 from ydf.model import generic_model
 from ydf.utils import log
 
@@ -40,6 +41,7 @@ _ERROR_MESSAGE_MISSING_TFDF = (
 )
 
 TFDType = Any  # TensorFlow DType e.g. tf.float32
+TFTensor = Any  # A TensorFlow Tensor i.e. tensorflow.Tensor
 
 # Mapping between YDF dtype and TF dtypes.
 _YDF_DTYPE_TO_TF_DTYPE: Dict["ds_pb.DType", TFDType] = None
@@ -336,6 +338,9 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
     # Single dimension outputs (e.g. regression, ranking) is always squeezed.
     extract_dim = 0
 
+  model_dataspec = ydf_model.data_spec()
+  input_features = ydf_model.input_feature_names()
+
   # Wrap the model into a tf module.
   class CallableModule(tf.Module):
 
@@ -347,7 +352,8 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
 
   @tf.function
   def call(features):
-    dense_predictions = op_model.apply(features).dense_predictions
+    unrolled_features = _unroll_dict(features, model_dataspec, input_features)
+    dense_predictions = op_model.apply(unrolled_features).dense_predictions
     assert len(dense_predictions.shape) == 2
     if extract_dim is not None:
       return dense_predictions[:, extract_dim]
@@ -384,16 +390,33 @@ def tf_feature_dtype(
     model_dataspec: ds_pb.DataSpecification,
     user_dtypes: Dict[str, TFDType],
 ) -> TFDType:
+  """Determines the TF Dtype of a feature."""
+
+  return tf_feature_dtype_manual(
+      feature.name,
+      feature.column_idx,
+      model_dataspec,
+      user_dtypes,
+  )
+
+
+def tf_feature_dtype_manual(
+    feature_name: str,
+    column_idx: int,
+    model_dataspec: ds_pb.DataSpecification,
+    user_dtypes: Dict[str, TFDType],
+) -> TFDType:
+  """Determines the TF Dtype of a feature."""
 
   # User specified dtype.
-  user_dtype = user_dtypes.get(feature.name)
+  user_dtype = user_dtypes.get(feature_name)
   if user_dtype is not None:
     return user_dtype
 
   tf = import_tensorflow()
 
   # DType from training dataset
-  column_spec = model_dataspec.columns[feature.column_idx]
+  column_spec = model_dataspec.columns[column_idx]
   if column_spec.HasField("dtype"):
     tf_dtype = mapping_ydf_dtype_to_tf_dtype().get(column_spec.dtype)
     if tf_dtype is None:
@@ -401,16 +424,16 @@ def tf_feature_dtype(
     return tf_dtype
 
   # DType from feature semantic
-  if feature.semantic == dataspec.Semantic.NUMERICAL:
+  if column_spec.type == ds_pb.NUMERICAL:
     return tf.float32
-  elif feature.semantic == dataspec.Semantic.CATEGORICAL:
+  elif column_spec.type == ds_pb.CATEGORICAL:
     return tf.string
-  elif feature.semantic == dataspec.Semantic.BOOLEAN:
+  elif column_spec.type == ds_pb.BOOLEAN:
     return tf.int64
-  elif feature.semantic == dataspec.Semantic.CATEGORICAL_SET:
+  elif column_spec.type == ds_pb.CATEGORICAL_SET:
     return tf.string
   else:
-    raise ValueError(f"Unsupported semantic: {feature.semantic}")
+    raise ValueError(f"Unsupported semantic: {column_spec.type}")
 
 
 def tensorflow_raw_input_signature(
@@ -421,30 +444,74 @@ def tensorflow_raw_input_signature(
   tf = import_tensorflow()
 
   model_dataspec = model.data_spec()
+  input_features = model.input_features()
+  input_feature_names_set = set(f.name for f in input_features)
 
   input_signature = {}
-  for src_feature in model.input_features():
+
+  # Multi-dim features
+  for unstacked in model_dataspec.unstackeds:
+    if unstacked.size == 0:
+      raise RuntimeError("Empty unstacked")
+    sub_names = dataset_io.unrolled_feature_names(
+        unstacked.original_name, unstacked.size
+    )
+    # Note: The "input_features" contain unrolled feature names.
+    if sub_names[0] not in input_feature_names_set:
+      continue
+
+    tf_dtype = tf_feature_dtype_manual(
+        unstacked.original_name,
+        unstacked.begin_column_idx,
+        model_dataspec,
+        feature_dtypes,
+    )
+
+    if unstacked.type in [
+        ds_pb.ColumnType.NUMERICAL,
+        ds_pb.ColumnType.DISCRETIZED_NUMERICAL,
+        ds_pb.ColumnType.CATEGORICAL,
+        ds_pb.ColumnType.BOOLEAN,
+    ]:
+      dst_feature = tf.TensorSpec(
+          shape=[None, unstacked.size],
+          dtype=tf_dtype,
+          name=unstacked.original_name,
+      )
+    else:
+      raise ValueError(
+          f"Unsupported semantic {unstacked.type} for multi-dim feature"
+          f" {unstacked.original_name!r}"
+      )
+    input_signature[unstacked.original_name] = dst_feature
+
+  # Single-dim features
+  for src_feature in input_features:
+    column = model_dataspec.columns[src_feature.column_idx]
+    if column.is_unstacked:
+      continue
+
     tf_dtype = tf_feature_dtype(src_feature, model_dataspec, feature_dtypes)
 
-    if src_feature.semantic == dataspec.Semantic.NUMERICAL:
+    if column.type in [
+        ds_pb.ColumnType.NUMERICAL,
+        ds_pb.ColumnType.DISCRETIZED_NUMERICAL,
+        ds_pb.ColumnType.CATEGORICAL,
+        ds_pb.ColumnType.BOOLEAN,
+    ]:
       dst_feature = tf.TensorSpec(
           shape=[None], dtype=tf_dtype, name=src_feature.name
       )
-    elif src_feature.semantic == dataspec.Semantic.CATEGORICAL:
-      dst_feature = tf.TensorSpec(
-          shape=[None], dtype=tf_dtype, name=src_feature.name
-      )
-    elif src_feature.semantic == dataspec.Semantic.BOOLEAN:
-      dst_feature = tf.TensorSpec(
-          shape=[None], dtype=tf_dtype, name=src_feature.name
-      )
-    elif src_feature.semantic == dataspec.Semantic.CATEGORICAL_SET:
+    elif column.type == ds_pb.ColumnType.CATEGORICAL_SET:
       dst_feature = tf.RaggedTensorSpec(
           shape=[None, None],
           dtype=tf_dtype,
       )
     else:
-      raise ValueError(f"Unsupported semantic: {src_feature.semantic}")
+      raise ValueError(
+          f"Unsupported semantic {column.type} for single-dim feature"
+          f" {src_feature.name!r}"
+      )
     input_signature[src_feature.name] = dst_feature
 
   return input_signature
@@ -468,30 +535,78 @@ def tensorflow_feature_spec(
       return None  # Missing value not allowed
 
   model_dataspec = model.data_spec()
+  input_features = model.input_features()
+  input_feature_names_set = set(f.name for f in input_features)
 
   feature_spec = {}
-  for src_feature in model.input_features():
+
+  # Multi-dim features
+  for unstacked in model_dataspec.unstackeds:
+    if unstacked.size == 0:
+      raise RuntimeError("Empty unstacked")
+    sub_names = dataset_io.unrolled_feature_names(
+        unstacked.original_name, unstacked.size
+    )
+    # Note: The "input_features" contain unrolled feature names.
+    if sub_names[0] not in input_feature_names_set:
+      continue
+
+    tf_dtype = tf_feature_dtype_manual(
+        unstacked.original_name,
+        unstacked.begin_column_idx,
+        model_dataspec,
+        feature_dtypes,
+    )
+
+    tfe_dtype = mapping_tf_dtype_to_tf_example_dtype().get(tf_dtype)
+    if tfe_dtype is None:
+      raise ValueError(f"Unsupported dtype: {tf_dtype}")
+
+    if unstacked.type in [
+        ds_pb.ColumnType.NUMERICAL,
+        ds_pb.ColumnType.DISCRETIZED_NUMERICAL,
+        ds_pb.ColumnType.CATEGORICAL,
+        ds_pb.ColumnType.BOOLEAN,
+    ]:
+      effective_dtype = tfe_dtype
+      effective_missing_value = missing_value(effective_dtype)
+      if effective_missing_value is None:
+        multidim_missing_value = None
+      else:
+        multidim_missing_value = [
+            missing_value(effective_dtype)
+        ] * unstacked.size
+
+      dst_feature = tf.io.FixedLenFeature(
+          shape=[unstacked.size],
+          dtype=effective_dtype,
+          default_value=multidim_missing_value,
+      )
+    else:
+      raise ValueError(
+          f"Unsupported semantic {unstacked.type} for multi-dim feature"
+          f" {unstacked.original_name!r}"
+      )
+    feature_spec[unstacked.original_name] = dst_feature
+
+  # Single-dim features
+  for src_feature in input_features:
+    column = model_dataspec.columns[src_feature.column_idx]
+    if column.is_unstacked:
+      continue
+
     tf_dtype = tf_feature_dtype(src_feature, model_dataspec, feature_dtypes)
 
     tfe_dtype = mapping_tf_dtype_to_tf_example_dtype().get(tf_dtype)
     if tfe_dtype is None:
       raise ValueError(f"Unsupported dtype: {tf_dtype}")
 
-    if src_feature.semantic == dataspec.Semantic.NUMERICAL:
-      effective_dtype = tfe_dtype
-      dst_feature = tf.io.FixedLenFeature(
-          shape=[],
-          dtype=effective_dtype,
-          default_value=missing_value(effective_dtype),
-      )
-    elif src_feature.semantic == dataspec.Semantic.CATEGORICAL:
-      effective_dtype = tfe_dtype
-      dst_feature = tf.io.FixedLenFeature(
-          shape=[],
-          dtype=effective_dtype,
-          default_value=missing_value(effective_dtype),
-      )
-    elif src_feature.semantic == dataspec.Semantic.BOOLEAN:
+    if column.type in [
+        ds_pb.ColumnType.NUMERICAL,
+        ds_pb.ColumnType.DISCRETIZED_NUMERICAL,
+        ds_pb.ColumnType.CATEGORICAL,
+        ds_pb.ColumnType.BOOLEAN,
+    ]:
       effective_dtype = tfe_dtype
       dst_feature = tf.io.FixedLenFeature(
           shape=[],
@@ -507,3 +622,52 @@ def tensorflow_feature_spec(
     feature_spec[src_feature.name] = dst_feature
 
   return feature_spec
+
+
+def _unroll_dict(
+    src: Dict[str, TFTensor],
+    data_spec: ds_pb.DataSpecification,
+    input_features: Sequence[str],
+) -> Dict[str, TFTensor]:
+  """Unrolls multi-dimensional features.
+
+  This function mirrors "_unroll_dict" in "dataset/io/dataset_io.py" which
+  unrolls numpy arrays automatically (i.e., without a dataspec).
+
+  Args:
+    src: Dictionary of single and multi-dimensional values.
+    data_spec: A dataspec.
+    input_features: Input features to unroll.
+
+  Returns:
+    Dictionary containing only single-dimensional values.
+  """
+
+  try:
+    dst = {}
+    # Unroll multi-dim features.
+    input_features_set = set(input_features)
+    for unstacked in data_spec.unstackeds:
+      sub_names = dataset_io.unrolled_feature_names(
+          unstacked.original_name, unstacked.size
+      )
+      if sub_names[0] not in input_features_set:
+        continue
+      value = src[unstacked.original_name]
+      for dim_idx, sub_name in enumerate(sub_names):
+        dst[sub_name] = value[:, dim_idx]
+
+    # Copy single-dim features
+    for column in data_spec.columns:
+      if column.is_unstacked:
+        continue
+      if column.name not in input_features_set:
+        continue
+      dst[column.name] = src[column.name]
+    return dst
+  except (KeyError, ValueError) as exc:
+    exc.add_note(
+        f"While looking for unrolled features {input_features!r} in the tensor"
+        f" dictionary {src!r}"
+    )
+    raise exc

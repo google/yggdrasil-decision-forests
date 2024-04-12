@@ -28,6 +28,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -601,6 +602,72 @@ absl::Status PopulateColumnCategoricalSetNPBytes(
   return absl::OkStatus();
 }
 
+// Records, in the dataspec, which column comes from an unrolled
+// multi-dimensional feature. This function can only be called once.
+absl::Status SetMultiDimDataspec(
+    dataset::VerticalDataset& self,
+    const std::unordered_map<std::string, std::vector<std::string>>&
+        unrolling) {
+  auto& dataspec = *self.mutable_data_spec();
+
+  if (dataspec.unstackeds_size() != 0) {
+    return absl::InvalidArgumentError(
+        "Multi-dimensional information already set");
+  }
+
+  // Index column indices
+  absl::flat_hash_map<std::string, int> column_name_to_idx;
+  {
+    int column_idx = 0;
+    for (const auto& column : dataspec.columns()) {
+      column_name_to_idx[column.name()] = column_idx;
+      column_idx++;
+    }
+    DCHECK_EQ(column_idx, dataspec.columns_size());
+  }
+
+  for (const auto& [original_name, unrolled_names] : unrolling) {
+    // Column index of the first dimension
+    int begin_column_idx = -1;
+
+    for (int dim_idx = 0; dim_idx < unrolled_names.size(); dim_idx++) {
+      const auto& unrolled_name = unrolled_names[dim_idx];
+
+      // Search for the column idx of this dimension
+      const auto it_column_idx = column_name_to_idx.find(unrolled_name);
+      if (it_column_idx == column_name_to_idx.end()) {
+        return absl::InvalidArgumentError(
+            absl::Substitute("Column \"$0\" not found ", unrolled_name));
+      }
+
+      // Check that columns are contiguous
+      if (dim_idx == 0) {
+        begin_column_idx = it_column_idx->second;
+      }
+      if (it_column_idx->second != begin_column_idx + dim_idx) {
+        return absl::InvalidArgumentError("Non contiguous column");
+      }
+
+      // Tag the column
+      dataspec.mutable_columns(it_column_idx->second)->set_is_unstacked(true);
+    }
+
+    if (begin_column_idx == -1) {
+      // Note: This should never happen.
+      return absl::InvalidArgumentError(
+          "Empty unrolled columns are not allowed");
+    }
+
+    auto* unstacked = dataspec.add_unstackeds();
+    unstacked->set_original_name(original_name);
+    unstacked->set_size(unrolled_names.size());
+    unstacked->set_begin_column_idx(begin_column_idx);
+    unstacked->set_type(dataspec.columns(begin_column_idx).type());
+  }
+
+  return absl::OkStatus();
+}
+
 // Append contents of `data` to a HASH column. If no `column_idx` is not
 // given, a new column is created.
 //
@@ -805,7 +872,11 @@ void init_dataset(py::module_& m) {
            py::arg("data_boundaries").noconvert(), py::arg("ydf_dtype"),
            py::arg("max_vocab_count") = -1, py::arg("min_vocab_frequency") = -1,
            py::arg("column_idx") = std::nullopt,
-           py::arg("dictionary") = std::nullopt);
+           py::arg("dictionary") = std::nullopt)
+      .def("SetMultiDimDataspec", WithStatus(SetMultiDimDataspec),
+           py::arg("unrolling"),
+           "Records, in the dataspec, which columns have been unrolled from "
+           "multi-dimensional features.");
 }
 
 }  // namespace yggdrasil_decision_forests::port::python
