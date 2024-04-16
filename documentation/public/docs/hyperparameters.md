@@ -24,6 +24,11 @@ learner: "RANDOM_FOREST"
   num_trees: 1000
 }
 ```
+
+## Table of content
+
+[TOC]
+
 ## GRADIENT_BOOSTED_TREES
 
 A [Gradient Boosted Trees](https://statweb.stanford.edu/~jhf/ftp/trebst.pdf)
