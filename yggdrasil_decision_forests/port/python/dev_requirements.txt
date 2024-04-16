@@ -2,5 +2,5 @@ pandas
 tensorflow_decision_forests; platform_machine != 'aarch64'
 tensorflow; platform_machine != 'aarch64'
 portpicker
-jax; platform_machine != 'aarch64'
-jaxlib; platform_machine != 'aarch64'
+jax; platform_machine != 'aarch64'  and platform_system != 'Windows'
+jaxlib; platform_machine != 'aarch64'  and platform_system != 'Windows'
