@@ -12,7 +12,9 @@ h1#_1 {
 }
 
 .logo {
-  width: 300px;
+  width: 397px;
+  margin-top: 20px;
+  margin-bottom: 10px;
 }
 
 .md-main__inner {
@@ -42,7 +44,7 @@ h1#_1 {
 }
 
 .jp-OutputArea-executeResult {
-  font-size: 10pt;
+  /* font-size: 10pt; */
 }
 
 .jp-InputPrompt.jp-InputArea-prompt {
@@ -53,16 +55,113 @@ h1#_1 {
   display: none !important;
 }
 
+.md-typeset {
+  line-height: 1.5;
+}
+
 .md-typeset pre {
-  line-height: 1;
-  font-size: 10pt;
-  white-space: pre !important;
+  line-height: 1.4;
+  font-size: 14px;
+   white-space: pre-wrap !important;
 }
 
 .md-typeset code {
-  font-size: 1em;
+  font-size: 14px;
 }
 
 .md-ellipsis {
   overflow: visible;
+}
+
+.jupyter-wrapper .jp-RenderedText[data-mime-type="application/vnd.jupyter.stderr"] pre {
+  font-size: 12px;
+  color: gray;
+}
+
+.jp-OutputArea-child .jp-OutputArea-executeResult {
+  font-size: 14px;
+}
+
+.intro_text {
+  max-width: 600px;
+  margin: auto;
+  text-align: center;
+}
+
+.getting_started_button {
+  display: block;
+  margin: 40px auto;
+  width: 200px;
+  text-align: center;
+  color: white !important;
+  border-radius: 5px;
+  padding: 12px;
+  font-weight: bold;
+  background: #4552af;
+}
+
+.getting_started_button:hover {
+  background-color: yellow;
+  background: #6f7bcf;
+}
+
+.arguments {
+  margin: 60px 0;
+}
+
+.argument {
+  display: flex;
+  align-items: center;
+}
+
+.argument .column {
+  margin: 30px 30px;
+  padding: 10px; 
+  flex: 1;
+}
+
+.argument .explanation {
+  display: flex;
+}
+
+.argument .explanation .icon {
+  margin-right: 4px;
+  margin-top: 2px;
+}
+
+.argument .explanation .icon span {
+  font-size: 20px;
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 20;
+  color: #ff772c;
+}
+
+.argument .explanation .reason {
+}
+
+.argument .explanation .reason .title {
+  font-weight: bold;
+}
+
+.argument .explanation .reason .text {
+}
+
+.argument .illustration {
+  flex-grow: 1.5;
+  border: none;
+  border-radius: 4px;
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 3px 40px;
+}
+
+.argument .illustration .label {
+  font-size: 11px;
+  color: gray;
+}
+
+.argument .illustration .code {
+  background-color: transparent;
+  white-space: pre-wrap;
 }
