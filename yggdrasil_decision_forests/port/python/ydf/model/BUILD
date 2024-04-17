@@ -85,6 +85,7 @@ pybind_library(
 py_library(
     name = "generic_model",
     srcs = [
+        "export_jax.py",
         "export_tf.py",
         "generic_model.py",
     ],
@@ -274,5 +275,22 @@ py_test(
         # absl/testing:parameterized dep,
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
+    ],
+)
+
+py_test(
+    name = "jax_model_test",
+    srcs = ["jax_model_test.py"],
+    data = [
+        "//test_data",
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
+    ],
+    python_version = "PY3",
+    deps = [
+        ":generic_model",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # jax dep,
+        # numpy dep,
     ],
 )
