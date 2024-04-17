@@ -19,25 +19,8 @@
 # Version
 from ydf.version import version as __version__
 
-# Dataset
-from ydf.dataset.dataset import create_vertical_dataset
-from ydf.dataset.dataspec import Column
-from ydf.dataset.dataspec import Semantic
-# A feature is a column used as input of a model. In practice, users generally
-# use them interchangeably.
-from ydf.dataset.dataspec import Column as Feature
-
-# Model
-from ydf.model.model_lib import load_model
-from ydf.model.model_lib import from_tensorflow_decision_forests
-from ydf.model.generic_model import Task
-from ydf.model.generic_model import ModelIOOptions
-from ydf.model.generic_model import GenericModel
-from ydf.model.random_forest_model.random_forest_model import RandomForestModel
-from ydf.model.gradient_boosted_trees_model.gradient_boosted_trees_model import GradientBoostedTreesModel
-from ydf.model.model_metadata import ModelMetadata
-# A CART model is a Random Forest with a single tree
-CARTModel = RandomForestModel
+# Note: Keep this file organized in the same order as:
+# public/docs/py_api/index.md
 
 # Learner
 from ydf.learner.generic_learner import GenericLearner
@@ -46,24 +29,45 @@ from ydf.learner.specialized_learners import RandomForestLearner
 from ydf.learner.specialized_learners import GradientBoostedTreesLearner
 from ydf.learner.specialized_learners import DistributedGradientBoostedTreesLearner
 
-# Custom Losses
-from ydf.learner.custom_loss import Activation
-from ydf.learner.custom_loss import RegressionLoss
-from ydf.learner.custom_loss import BinaryClassificationLoss
-from ydf.learner.custom_loss import MultiClassificationLoss
-
-# Worker
-from ydf.learner.worker import start_worker
+# Model
+from ydf.model.generic_model import GenericModel
+from ydf.model.random_forest_model.random_forest_model import RandomForestModel
+from ydf.model.gradient_boosted_trees_model.gradient_boosted_trees_model import GradientBoostedTreesModel
+# A CART model is a Random Forest with a single tree
+CARTModel = RandomForestModel
 
 # Tuner
 from ydf.learner.tuner import RandomSearchTuner
 from ydf.learner.tuner import VizierTuner
 
-# Logs
+# Utilities
 from ydf.utils.log import verbose
+from ydf.model.model_lib import load_model
+# A feature is a column used as input of a model. In practice, users generally
+# use them interchangeably.
+from ydf.dataset.dataspec import Column as Feature
+from ydf.dataset.dataspec import Column
+from ydf.model.generic_model import Task
+from ydf.dataset.dataspec import Semantic
+from ydf.learner.worker import start_worker
 from ydf.utils.log import strict
 
-# Tree inspector
+# Advanced Utilities
+from ydf.model.generic_model import ModelIOOptions
+from ydf.dataset.dataset import create_vertical_dataset
+from ydf.model.model_metadata import ModelMetadata
+from ydf.model.model_lib import from_tensorflow_decision_forests
+
+
+# Custom Loss
+from ydf.learner.custom_loss import RegressionLoss
+from ydf.learner.custom_loss import BinaryClassificationLoss
+from ydf.learner.custom_loss import MultiClassificationLoss
+from ydf.learner.custom_loss import Activation
+
+
+# Tree
 from ydf.model import tree
+
 
 # pylint: enable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported

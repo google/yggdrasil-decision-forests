@@ -55,23 +55,25 @@ and evaluation.
 
 ## Advanced Utilities
 
--   [ModelIOOptions](utilities.md#ydf.ModelIOOptions): Options to save a model to
-    disk.
+-   [ModelIOOptions](utilities.md#ydf.ModelIOOptions): Options to save a model
+    to disk.
 -   [create_vertical_dataset](utilities.md#ydf.create_vertical_dataset): Load a
     dataset in memory.
 -   [ModelMetadata](utilities.md#ydf.ModelMetadata): Meta-data about the model
     e.g. training date, uid.
+-   [from_tensorflow_decision_forests](utilities.md#ydf.from_tensorflow_decision_forests):
+    Load a TensorFlow Decision Forests model from disk.
 
-### Custom Loss
+## Custom Loss
 
 -   [RegressionLoss](utilities.md#ydf.RegressionLoss): Custom loss for
     regression tasks.
 -   [BinaryClassificationLoss](utilities.md#ydf.BinaryClassificationLoss):
     Custom loss for binary classification tasks.
--   [MultiClassificationLoss](utilities.md#ydf.MultiClassificationLoss):
-    Custom loss for multi-class classification tasks.
--   [Activation](utilities.md#ydf.Activation): Collection of activation
-    (aka linkage) functions for custom losses.
+-   [MultiClassificationLoss](utilities.md#ydf.MultiClassificationLoss): Custom
+    loss for multi-class classification tasks.
+-   [Activation](utilities.md#ydf.Activation): Collection of activation (aka
+    linkage) functions for custom losses.
 
 ## Tree
 

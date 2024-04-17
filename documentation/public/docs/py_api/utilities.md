@@ -1,4 +1,6 @@
-## Utilities
+# Utilities
+
+[TOC]
 
 ::: ydf.verbose
 
@@ -21,6 +23,8 @@
 ::: ydf.create_vertical_dataset
 
 ::: ydf.ModelMetadata
+
+::: ydf.from_tensorflow_decision_forests
 
 ::: ydf.RegressionLoss
 

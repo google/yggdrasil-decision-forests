@@ -1,10 +1,12 @@
-## Tree
+# Tree
 
-### Tree
+[TOC]
+
+## Tree
 
 ::: ydf.tree.Tree
 
-### Conditions
+## Conditions
 
 ::: ydf.tree.AbstractCondition
 
@@ -22,7 +24,7 @@
 
 ::: ydf.tree.NumericalSparseObliqueCondition
 
-### Nodes
+## Nodes
 
 ::: ydf.tree.AbstractNode
 
@@ -30,7 +32,7 @@
 
 ::: ydf.tree.NonLeaf
 
-### Values
+## Values
 
 ::: ydf.tree.AbstractValue
 

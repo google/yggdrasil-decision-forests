@@ -158,7 +158,7 @@ plugins:
             show_docstring_attributes: true
             allow_inspection: true
             show_root_full_path: false
-            docstring_section_style: list
+            docstring_section_style: table
             signature_crossrefs: true
             show_signature: true
             separate_signature: true
