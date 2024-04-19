@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1- 2024-04-18
+
+### Fix
+
+-   Solve dependency collision to YDF between PYDF and TF-DF. If TF-DF is
+    installed after PYDF, importing YDF will fails with a `has no attribute
+    'DType'` error.
+-   Allow for training on cached TensorFlow dataset.
+
 ## 0.4.0 - 2024-04-10
 
 ### Feature

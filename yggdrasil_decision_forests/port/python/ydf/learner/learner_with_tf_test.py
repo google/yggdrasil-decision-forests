@@ -14,8 +14,8 @@
 
 """Tests for model learning."""
 
-
 from absl.testing import absltest
+from absl.testing import parameterized
 import pandas as pd
 import tensorflow as tf
 
@@ -34,9 +34,12 @@ def toy_dataset():
   return df
 
 
-class RandomForestLearnerTest(absltest.TestCase):
+class RandomForestLearnerTest(parameterized.TestCase):
 
-  def test_tensorflow_dataset(self):
+  @parameterized.parameters({"use_cache": True}, {"use_filter": True})
+  def test_tensorflow_dataset(
+      self, use_cache: bool = False, use_filter: bool = False
+  ):
     learner = specialized_learners.RandomForestLearner(
         label="label", num_trees=1
     )
@@ -45,6 +48,10 @@ class RandomForestLearnerTest(absltest.TestCase):
     )
     for x in tf_dataset.take(2):
       print(x)
+    if use_cache:
+      tf_dataset = tf_dataset.cache()
+    if use_filter:
+      tf_dataset = tf_dataset.filter(lambda x: True)
     self.assertEqual(
         learner.train(tf_dataset).task(), generic_learner.Task.CLASSIFICATION
     )

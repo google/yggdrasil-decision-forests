@@ -302,6 +302,7 @@ py_test(
         ":generic_learner",
         ":specialized_learners",
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
         # pandas dep,
         # tensorflow:tensorflow_no_contrib dep,
     ],

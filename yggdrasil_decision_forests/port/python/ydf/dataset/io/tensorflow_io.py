@@ -14,9 +14,9 @@
 
 """Connectors for loading data from Pandas dataframes."""
 
+import logging
 import sys
 from typing import Dict
-
 from ydf.dataset.io import dataset_io_types
 
 
@@ -24,12 +24,26 @@ def is_tensorflow_dataset(data: dataset_io_types.IODataset) -> bool:
   # Note: We only test if the dataset is a TensorFlow dataset if the object name
   # look like a TensorFlow object. This way, we avoid importing TF is not
   # necessary.
-  return (
-      "tensorflow" in str(type(data))
-      and data.__class__.__name__
-      in ("_BatchDataset", "_MapDataset", "DatasetV1Adapter")
-      and hasattr(data, "rebatch")
-  )
+  str_class = str(type(data))
+  if "tensorflow" in str_class and hasattr(data, "rebatch"):
+
+    if data.__class__.__name__ in (
+        "_BatchDataset",
+        "_MapDataset",
+        "DatasetV1Adapter",
+        "CacheDataset",
+    ):
+      return True
+
+    if "data.ops" in str_class:
+      logging.warning(
+          "The dataset %s object is not listed as a YDF compatible TensorFlow"
+          " Dataset, but it looks like one",
+          str_class,
+      )
+      return True
+
+  return False
 
 
 def to_dict(

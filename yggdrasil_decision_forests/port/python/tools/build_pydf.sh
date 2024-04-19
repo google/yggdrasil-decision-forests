@@ -22,17 +22,6 @@
 # Usage example:
 #   # Generate the pip package with python3.9
 #   ./tools/build_pydf.sh python3.9
-#
-#   # Generate the pip package for all the versions of python using pyenv.
-#   # Make sure the package are compatible with manylinux2014.
-#   ./tools/build_pip_package.sh ALL_VERSIONS
-#
-# Requirements:
-#
-#   pyenv (if using ALL_VERSIONS_ALREADY_ASSEMBLED or ALL_VERSIONS)
-#     See https://github.com/pyenv/pyenv-installer
-#     Will be installed by this script if INSTALL_PYENV is set to INSTALL_PYENV.
-#
 
 set -xve
 
@@ -78,33 +67,7 @@ function check_is_build() {
 function assemble_files() {
   check_is_build
 
-  rm -fr ${SRCPK}
-  mkdir -p ${SRCPK}
-  cp -R ydf config/setup.py config/MANIFEST.in README.md CHANGELOG.md ${SRCPK}
-
-  # When cross-compiling, adapt setup.py
-  if [ ${ARG} == "ALL_VERSIONS_MAC_CROSSCOMPILE" ]; then
-    sed -i'.bak' -e "s/MAC_CROSS_COMPILED = False/MAC_CROSS_COMPILED = True/" ${SRCPK}/setup.py
-  fi
-
-  # YDF's wrappers and .so.
-  SRCBIN="bazel-bin/ydf"
-  cp ${SRCBIN}/cc/ydf.so ${SRCPK}/ydf/cc/
-
-  cp ${SRCBIN}/learner/specialized_learners.py ${SRCPK}/ydf/learner/
-
-  # YDF's proto wrappers.
-  YDFSRCBIN="bazel-bin/external/ydf_cc/yggdrasil_decision_forests"
-  mkdir -p ${SRCPK}/yggdrasil_decision_forests
-  pushd ${YDFSRCBIN}
-  find . -name \*.py -exec rsync -R -arv {} ${SRCPK}/yggdrasil_decision_forests \;
-  popd
-
-  # Copy the license file from YDF
-  cp bazel-python/external/ydf_cc/LICENSE ${SRCPK}
-
-  # Add __init__.py to all exported Yggdrasil sub-directories.
-  find ${SRCPK}/yggdrasil_decision_forests -type d -exec touch {}/__init__.py \;
+  ${PYTHON} tools/assembly_pip_files.py
 }
 
 # Build a pip package.
@@ -194,92 +157,5 @@ function e2e_native() {
   test_package ${PYTHON} ${PACKAGE}
 }
 
-# Builds and tests a pip package in Pyenv.
-function e2e_pyenv() {
-  VERSION="$1"
-  shift
-
-  # Don't force updating pyenv, we use a fixed version.
-  # pyenv update
-
-  ENVNAME=env_${VERSION}
-  pyenv install ${VERSION} -s
-
-  # Enable pyenv virtual environment.
-  set +e
-  pyenv virtualenv ${VERSION} ${ENVNAME}
-  set -e
-  pyenv activate ${ENVNAME}
-
-  e2e_native python3
-
-  # Disable virtual environment.
-  pyenv deactivate
-}
-
-ARG="$1"
-INSTALL_PYENV="$2"
-shift | true
-
-if [ ${INSTALL_PYENV} == "INSTALL_PYENV" ]; then 
-  if ! [ -x "$(command -v pyenv)" ]; then
-    echo "Pyenv not found."
-    echo "Installing build deps, pyenv 2.3.7 and pyenv virtualenv 1.2.1"
-    # Install python dependencies.
-    if ! is_macos; then
-      sudo apt-get update
-      sudo apt-get install -qq make build-essential libssl-dev zlib1g-dev \
-                libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
-                libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
-                libffi-dev liblzma-dev patchelf
-    fi
-    git clone https://github.com/pyenv/pyenv.git
-    (
-      cd pyenv && git checkout 74f923b5fca82054b3c579f9eb936338c7f5a394
-    )
-    PYENV_ROOT="$(pwd)/pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init --path)"
-    eval "$(pyenv init -)"
-    git clone https://github.com/pyenv/pyenv-virtualenv.git $(pyenv root)/plugins/pyenv-virtualenv
-    (
-      cd $(pyenv root)/plugins/pyenv-virtualenv && git checkout 13bc1877ef06ed038c65dcab4e901da6ea6c67ae
-    )
-    eval "$(pyenv init --path)"
-    eval "$(pyenv init -)"
-    eval "$(pyenv virtualenv-init -)"
-  fi
-fi
-
-if [ -z "${ARG}" ]; then
-  echo "The first argument should be one of:"
-  echo "  ALL_VERSIONS: Build all pip packages using pyenv."
-  echo "  ALL_VERSIONS_ALREADY_ASSEMBLED: Build all pip packages from already assembled files using pyenv."
-  echo "  ALL_VERSIONS_MAC_CROSSCOMPILE: Build all pip packages from already assembled files using pyenv and cross-compile between MacOS ARM64 / Intel builds."
-  echo "  Python binary (e.g. python3.9): Build a pip package for a specific python version without pyenv."
-  exit 1
-elif [ ${ARG} == "ALL_VERSIONS" ]; then
-  # Compile with all the version of python using pyenv.
-  assemble_files
-  eval "$(pyenv init -)"
-  e2e_pyenv 3.9.12
-  e2e_pyenv 3.10.4
-  e2e_pyenv 3.11.0
-elif [ ${ARG} == "ALL_VERSIONS_ALREADY_ASSEMBLED" ]; then
-  eval "$(pyenv init -)"
-  e2e_pyenv 3.9.12
-  e2e_pyenv 3.10.4
-  e2e_pyenv 3.11.0
-elif [ ${ARG} == "ALL_VERSIONS_MAC_CROSSCOMPILE" ]; then
-  eval "$(pyenv init -)"
-  assemble_files
-  e2e_pyenv 3.9.12
-  e2e_pyenv 3.10.4
-  e2e_pyenv 3.11.0
-else
-  # Compile with a specific version of python provided in the call arguments.
-  assemble_files
-  PYTHON=${ARG}
-  e2e_native ${PYTHON}
-fi
-
+PYTHON="$1"
+assemble_files ${PYTHON}
