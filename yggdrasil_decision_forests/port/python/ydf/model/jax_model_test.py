@@ -12,14 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Dict, List
 from absl.testing import absltest
 from absl.testing import parameterized
+import jax
 import jax.numpy as jnp
 import numpy as np
+from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
+from ydf.dataset import dataspec as dataspec_lib
+from ydf.learner import specialized_learners
 from ydf.model import export_jax as to_jax
+from ydf.model import generic_model
 
 
 class JaxModelTest(parameterized.TestCase):
+
+  def create_dataset(self, columns: List[str]) -> Dict[str, Any]:
+    """Creates a dataset with random values."""
+    data = {
+        # Single-dim features
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "i1": np.random.randint(100, size=100),
+        "i2": np.random.randint(100, size=100),
+        "c1": np.random.choice(["x", "y", "z"], size=100, p=[0.6, 0.3, 0.1]),
+        "b1": np.random.randint(2, size=100).astype(np.bool_),
+        "b2": np.random.randint(2, size=100).astype(np.bool_),
+        # Cat-set features
+        "cs1": [[], ["a", "b", "c"], ["b", "c"], ["a"]] * 25,
+        # Multi-dim features
+        "multi_f1": np.random.random(size=(100, 5)),
+        "multi_f2": np.random.random(size=(100, 5)),
+        "multi_i1": np.random.randint(100, size=(100, 5)),
+        "multi_c1": np.random.choice(["x", "y", "z"], size=(100, 5)),
+        "multi_b1": np.random.randint(2, size=(100, 5)).astype(np.bool_),
+        # Labels
+        "label_class_binary": np.random.choice(["l1", "l2"], size=100),
+        "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=100),
+        "label_regress": np.random.random(size=100),
+    }
+    return {k: data[k] for k in columns}
 
   @parameterized.parameters(
       ((0,), jnp.int8),
@@ -44,6 +76,103 @@ class JaxModelTest(parameterized.TestCase):
   def test_compact_dtype_non_supported(self):
     with self.assertRaisesRegex(ValueError, "No supported compact dtype"):
       to_jax.compact_dtype((0x80000000,))
+
+  def test_feature_encoding_basic(self):
+    feature_encoding = to_jax.FeatureEncoding.build(
+        [
+            generic_model.InputFeature(
+                "f1", dataspec_lib.Semantic.NUMERICAL, 0
+            ),
+            generic_model.InputFeature(
+                "f2", dataspec_lib.Semantic.CATEGORICAL, 1
+            ),
+            generic_model.InputFeature(
+                "f3", dataspec_lib.Semantic.CATEGORICAL, 2
+            ),
+        ],
+        ds_pb.DataSpecification(
+            created_num_rows=3,
+            columns=(
+                ds_pb.Column(
+                    name="f1",
+                    type=ds_pb.ColumnType.NUMERICAL,
+                ),
+                ds_pb.Column(
+                    name="f2",
+                    type=ds_pb.ColumnType.CATEGORICAL,
+                    categorical=ds_pb.CategoricalSpec(
+                        items={
+                            "<OOD>": ds_pb.CategoricalSpec.VocabValue(index=0),
+                            "A": ds_pb.CategoricalSpec.VocabValue(index=1),
+                            "B": ds_pb.CategoricalSpec.VocabValue(index=2),
+                        },
+                    ),
+                ),
+                ds_pb.Column(
+                    name="f3",
+                    type=ds_pb.ColumnType.CATEGORICAL,
+                    categorical=ds_pb.CategoricalSpec(
+                        is_already_integerized=True,
+                    ),
+                ),
+                ds_pb.Column(
+                    name="f4",
+                    type=ds_pb.ColumnType.CATEGORICAL,
+                    categorical=ds_pb.CategoricalSpec(
+                        items={
+                            "<OOD>": ds_pb.CategoricalSpec.VocabValue(index=0),
+                            "X": ds_pb.CategoricalSpec.VocabValue(index=1),
+                            "Y": ds_pb.CategoricalSpec.VocabValue(index=2),
+                        },
+                    ),
+                ),
+            ),
+        ),
+    )
+    self.assertIsNotNone(feature_encoding)
+    self.assertDictEqual(
+        feature_encoding.categorical, {"f2": {"<OOD>": 0, "A": 1, "B": 2}}
+    )
+
+  def test_feature_encoding_on_model(self):
+    columns = ["f1", "i1", "c1", "b1", "cs1", "label_class_binary"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary",
+        num_trees=2,
+        features=[("cs1", dataspec_lib.Semantic.CATEGORICAL_SET)],
+        include_all_columns=True,
+    ).train(self.create_dataset(columns))
+    feature_encoding = to_jax.FeatureEncoding.build(
+        model.input_features(), model.data_spec()
+    )
+    self.assertIsNotNone(feature_encoding)
+    self.assertDictEqual(
+        feature_encoding.categorical,
+        {
+            "c1": {"<OOD>": 0, "x": 1, "y": 2, "z": 3},
+            "cs1": {"<OOD>": 0, "a": 1, "b": 2, "c": 3},
+        },
+    )
+
+    encoded_features = feature_encoding.encode(
+        {"f1": [1, 2, 3], "c1": ["x", "y", "other"]}
+    )
+    np.testing.assert_array_equal(
+        encoded_features["f1"], jax.numpy.asarray([1, 2, 3])
+    )
+    np.testing.assert_array_equal(
+        encoded_features["c1"], jax.numpy.asarray([1, 2, 0])
+    )
+
+  def test_feature_encoding_is_none(self):
+    columns = ["f1", "i1", "label_class_binary"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary", num_trees=2
+    ).train(self.create_dataset(columns))
+    feature_encoding = to_jax.FeatureEncoding.build(
+        model.input_features(), model.data_spec()
+    )
+    self.assertIsNone(feature_encoding)
 
 
 if __name__ == "__main__":

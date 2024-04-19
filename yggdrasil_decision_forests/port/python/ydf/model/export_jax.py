@@ -14,7 +14,12 @@
 
 """Utilities to export JAX models."""
 
-from typing import Any, Sequence
+import dataclasses
+from typing import Any, Sequence, Dict, Optional
+
+from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
+from ydf.dataset import dataspec as dataspec_lib
+from ydf.model import generic_model
 
 # pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
@@ -61,3 +66,73 @@ def to_compact_jax_array(values: Sequence[int]) -> jax.Array:
   """Converts a list of integers to a compact Jax array."""
 
   return jnp.asarray(values, dtype=compact_dtype(values))
+
+
+@dataclasses.dataclass
+class FeatureEncoding:
+  """Utility to prepare feature values before being fed into the Jax model.
+
+  Does the following:
+  - Encodes categorical strings into categorical integers.
+
+  Attributes:
+    categorical: Mapping between categorical-string feature to the dictionary of
+      categorical-string value to categorical-integer value.
+    categorical_out_of_vocab_item: Integer value representing an out of
+      vocabulary item.
+  """
+
+  categorical: Dict[str, Dict[str, int]]
+  categorical_out_of_vocab_item: int = 0
+
+  @classmethod
+  def build(
+      cls,
+      input_features: Sequence[generic_model.InputFeature],
+      dataspec: ds_pb.DataSpecification,
+  ) -> Optional["FeatureEncoding"]:
+    """Creates a FeatureEncoding object.
+
+    If the input feature does not require feature encoding, returns None.
+
+    Args:
+      input_features: All the input features of a model.
+      dataspec: Dataspec of the model.
+
+    Returns:
+      A FeatureEncoding or None.
+    """
+
+    categorical = {}
+    for input_feature in input_features:
+      column_spec = dataspec.columns[input_feature.column_idx]
+      if (
+          input_feature.semantic
+          in [
+              dataspec_lib.Semantic.CATEGORICAL,
+              dataspec_lib.Semantic.CATEGORICAL_SET,
+          ]
+          and not column_spec.categorical.is_already_integerized
+      ):
+        categorical[input_feature.name] = {
+            key: item.index
+            for key, item in column_spec.categorical.items.items()
+        }
+    if not categorical:
+      return None
+    return FeatureEncoding(categorical=categorical)
+
+  def encode(self, feature_values: Dict[str, Any]) -> Dict[str, jax.Array]:
+    """Encodes feature values for a model."""
+
+    def encode_item(key: str, value: Any) -> jax.Array:
+      categorical_map = self.categorical.get(key)
+      if categorical_map is not None:
+        # Categorical string encoding.
+        value = [
+            categorical_map.get(x, self.categorical_out_of_vocab_item)
+            for x in value
+        ]
+      return jax.numpy.asarray(value)
+
+    return {k: encode_item(k, v) for k, v in feature_values.items()}

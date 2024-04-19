@@ -292,5 +292,9 @@ py_test(
         # absl/testing:parameterized dep,
         # jax dep,
         # numpy dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "//ydf/dataset:dataspec",
+        "//ydf/learner:generic_learner",
+        "//ydf/learner:specialized_learners",
     ],
 )
