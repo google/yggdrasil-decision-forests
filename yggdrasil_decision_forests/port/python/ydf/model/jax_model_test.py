@@ -175,5 +175,76 @@ class JaxModelTest(parameterized.TestCase):
     self.assertIsNone(feature_encoding)
 
 
+class InternalFeatureSpecTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.basic_mapping = to_jax.InternalFeatureSpec([
+        generic_model.InputFeature("n1", dataspec_lib.Semantic.NUMERICAL, 0),
+        generic_model.InputFeature("n2", dataspec_lib.Semantic.NUMERICAL, 1),
+        generic_model.InputFeature("c1", dataspec_lib.Semantic.CATEGORICAL, 2),
+        generic_model.InputFeature("c2", dataspec_lib.Semantic.CATEGORICAL, 3),
+        generic_model.InputFeature("b1", dataspec_lib.Semantic.BOOLEAN, 4),
+        generic_model.InputFeature("b2", dataspec_lib.Semantic.BOOLEAN, 5),
+    ])
+
+  def test_basic(self):
+    self.assertEqual(self.basic_mapping.numerical, ["n1", "n2"])
+    self.assertEqual(self.basic_mapping.categorical, ["c1", "c2"])
+    self.assertEqual(self.basic_mapping.boolean, ["b1", "b2"])
+    self.assertEqual(self.basic_mapping.inv_numerical, {0: 0, 1: 1})
+    self.assertEqual(self.basic_mapping.inv_categorical, {2: 0, 3: 1})
+    self.assertEqual(self.basic_mapping.inv_boolean, {4: 0, 5: 1})
+    self.assertEqual(
+        self.basic_mapping.feature_names, {"n1", "n2", "c1", "c2", "b1", "b2"}
+    )
+
+  def test_non_supported_type(self):
+    with self.assertRaisesRegex(ValueError, "is not supported"):
+      to_jax.InternalFeatureSpec(
+          [generic_model.InputFeature("n", dataspec_lib.Semantic.HASH, 0)]
+      )
+
+  def test_mapping_convert_empty(self):
+    with self.assertRaisesRegex(ValueError, "At least one feature"):
+      self.basic_mapping.convert_features({})
+
+  def test_mapping_convert_missing(self):
+    with self.assertRaisesRegex(ValueError, "Expecting values with keys"):
+      self.basic_mapping.convert_features({"n1": jnp.array([1, 2])})
+
+  def test_mapping_convert_unused(self):
+    with self.assertRaisesRegex(ValueError, "Expecting values with keys"):
+      self.basic_mapping.convert_features({
+          "n1": jnp.array([1, 2]),
+          "n2": jnp.array([3, 4]),
+          "c1": jnp.array([5, 6]),
+          "c2": jnp.array([7, 8]),
+          "b1": jnp.array([True, False]),
+          "b2": jnp.array([False, True]),
+          "other": jnp.array([1, 2]),
+      })
+
+  def test_mapping_convert(self):
+    internal_values = self.basic_mapping.convert_features({
+        "n1": jnp.array([1, 2]),
+        "n2": jnp.array([3, 4]),
+        "c1": jnp.array([5, 6]),
+        "c2": jnp.array([7, 8]),
+        "b1": jnp.array([True, False]),
+        "b2": jnp.array([False, True]),
+    })
+    np.testing.assert_array_equal(
+        internal_values.numerical, jnp.array([[1.0, 3.0], [2.0, 4.0]])
+    )
+    np.testing.assert_array_equal(
+        internal_values.categorical, jnp.array([[5, 7], [6, 8]])
+    )
+    np.testing.assert_array_equal(
+        internal_values.boolean, jnp.array([[True, False], [False, True]])
+    )
+
+
+
 if __name__ == "__main__":
   absltest.main()

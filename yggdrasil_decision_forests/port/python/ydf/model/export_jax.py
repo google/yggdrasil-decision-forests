@@ -15,7 +15,7 @@
 """Utilities to export JAX models."""
 
 import dataclasses
-from typing import Any, Sequence, Dict, Optional
+from typing import Any, Sequence, Dict, Optional, List, Set
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
@@ -136,3 +136,103 @@ class FeatureEncoding:
       return jax.numpy.asarray(value)
 
     return {k: encode_item(k, v) for k, v in feature_values.items()}
+
+
+@dataclasses.dataclass
+class InternalFeatureValues:
+  """Internal representation of feature values.
+
+  In the internal model format, features with the same semantic are grouped
+  together i.e. densified.
+  """
+
+  numerical: jax.Array
+  categorical: jax.Array
+  boolean: jax.Array
+
+
+@dataclasses.dataclass
+class InternalFeatureSpec:
+  """Spec of the internal feature value representation.
+
+  Attributes:
+    input_features: Input features of the model.
+    numerical: Name of numerical features in internal order.
+    categorical: Name of categorical features in internal order.
+    boolean: Name of boolean features in internal order.
+    inv_numerical: Column idx to internal idx mapping for numerical features.
+    inv_categorical: Column idx to internal idx mapping for categorical features
+    inv_boolean: Column idx to internal idx mapping for boolean features.
+    feature_names: Name of all the input features.
+  """
+
+  input_features: dataclasses.InitVar[Sequence[generic_model.InputFeature]]
+
+  numerical: List[str] = dataclasses.field(default_factory=list)
+  categorical: List[str] = dataclasses.field(default_factory=list)
+  boolean: List[str] = dataclasses.field(default_factory=list)
+
+  inv_numerical: Dict[int, int] = dataclasses.field(default_factory=dict)
+  inv_categorical: Dict[int, int] = dataclasses.field(default_factory=dict)
+  inv_boolean: Dict[int, int] = dataclasses.field(default_factory=dict)
+
+  feature_names: Set[str] = dataclasses.field(default_factory=set)
+
+  def __post_init__(self, input_features: Sequence[generic_model.InputFeature]):
+    for input_feature in input_features:
+      self.feature_names.add(input_feature.name)
+      if input_feature.semantic == dataspec_lib.Semantic.NUMERICAL:
+        self.inv_numerical[input_feature.column_idx] = len(self.numerical)
+        self.numerical.append(input_feature.name)
+
+      elif input_feature.semantic == dataspec_lib.Semantic.CATEGORICAL:
+        self.inv_categorical[input_feature.column_idx] = len(self.categorical)
+        self.categorical.append(input_feature.name)
+
+      elif input_feature.semantic == dataspec_lib.Semantic.BOOLEAN:
+        self.inv_boolean[input_feature.column_idx] = len(self.boolean)
+        self.boolean.append(input_feature.name)
+
+      else:
+        raise ValueError(
+            f"The semantic of feature {input_feature} is not supported by the"
+            " YDF to Jax exporter"
+        )
+
+  def convert_features(
+      self, feature_values: Dict[str, jax.Array]
+  ) -> InternalFeatureValues:
+    """Converts user provided user values into the internal model format.
+
+    Args:
+      feature_values: User input features.
+
+    Returns:
+      Internal feature values.
+    """
+
+    if not feature_values:
+      raise ValueError("At least one feature should be provided")
+
+    batch_size = next(iter(feature_values.values())).shape[0]
+
+    if set(feature_values) != self.feature_names:
+      raise ValueError(
+          f"Expecting values with keys {set(self.feature_names)!r}. Got"
+          f" {set(feature_values.keys())!r}"
+      )
+
+    def stack(features, dtype):
+      if not features:
+        return jnp.zeros(shape=[batch_size, 0], dtype=dtype)
+      return jnp.stack(
+          [feature_values[feature] for feature in features],
+          dtype=dtype,
+          axis=1,
+      )
+
+    return InternalFeatureValues(
+        numerical=stack(self.numerical, jnp.float32),
+        categorical=stack(self.categorical, jnp.int32),
+        boolean=stack(self.boolean, jnp.bool_),
+    )
