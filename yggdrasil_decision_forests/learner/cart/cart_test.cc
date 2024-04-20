@@ -114,6 +114,17 @@ TEST_F(CartOnIris, Base) {
   // Random Forest has an accuracy of ~0.947.
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9333, 0.01);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 1.0883, 0.04);
+
+  EXPECT_GE(metric::Accuracy(model_->ValidationEvaluation()), 0.80);
+}
+
+TEST_F(CartOnIris, WithManualValidation) {
+  pass_validation_dataset_ = true;
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9730, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.11347, 0.04);
+
+  EXPECT_GE(metric::Accuracy(model_->ValidationEvaluation()), 0.80);
 }
 
 TEST(Cart, SetHyperParameters) {

@@ -184,10 +184,43 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
   RETURN_IF_ERROR(dataset::GetWeights(train_dataset, config_link, &weights));
   utils::RandomEngine random(config.random_seed());
 
-  // Select the example for training and for pruning.
-  std::vector<UnsignedExampleIdx> train_examples, valid_examples;
-  GenTrainAndValidIndices(cart_config.validation_ratio(), train_dataset.nrow(),
-                          &train_examples, &valid_examples, &random);
+  // Select the example for training and for validation.
+  // The validation dataset is used for tree pruning and for self reported
+  // validation.
+
+  // Note: "effective_valid_dataset" will be either null, point to
+  // "valid_dataset" or point to "buffer_valid_dataset".
+  dataset::VerticalDataset const* effective_valid_dataset = nullptr;
+  dataset::VerticalDataset buffer_valid_dataset;
+  std::vector<UnsignedExampleIdx> train_examples_in_train_ds,
+      valid_examples_in_valid_ds;
+  if (valid_dataset.has_value()) {
+    // The user provided a validation dataset.
+    effective_valid_dataset = &valid_dataset.value().get();
+    train_examples_in_train_ds.resize(train_dataset.nrow());
+    std::iota(train_examples_in_train_ds.begin(),
+              train_examples_in_train_ds.end(), 0);
+  } else {
+    // Extract a validation dataset from the training dataset.
+    std::vector<UnsignedExampleIdx> valid_examples_in_train_ds;
+    GenTrainAndValidIndices(cart_config.validation_ratio(),
+                            train_dataset.nrow(), &train_examples_in_train_ds,
+                            &valid_examples_in_train_ds, &random);
+    if (!valid_examples_in_train_ds.empty()) {
+      ASSIGN_OR_RETURN(buffer_valid_dataset,
+                       train_dataset.Extract(valid_examples_in_train_ds));
+      effective_valid_dataset = &buffer_valid_dataset;
+    } else {
+      // No validation examples.
+      effective_valid_dataset = nullptr;
+    }
+  }
+
+  if (effective_valid_dataset) {
+    valid_examples_in_valid_ds.resize(effective_valid_dataset->nrow());
+    std::iota(valid_examples_in_valid_ds.begin(),
+              valid_examples_in_valid_ds.end(), 0);
+  }
 
   // Timeout in the tree training.
   absl::optional<absl::Time> timeout;
@@ -200,18 +233,42 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
   // Trains the tree.
   decision_tree::InternalTrainConfig internal_config;
   internal_config.timeout = timeout;
-  RETURN_IF_ERROR(decision_tree::Train(train_dataset, train_examples, config,
-                                       config_link, cart_config.decision_tree(),
-                                       deployment(), weights, &random,
-                                       decision_tree, internal_config));
+  RETURN_IF_ERROR(decision_tree::Train(
+      train_dataset, train_examples_in_train_ds, config, config_link,
+      cart_config.decision_tree(), deployment(), weights, &random,
+      decision_tree, internal_config));
 
-  if (!valid_examples.empty()) {
+  if (effective_valid_dataset) {
+    // "valid_examples_in_valid_ds" always contains all the examples in
+    // "effective_valid_dataset".
+    DCHECK_EQ(effective_valid_dataset->nrow(),
+              valid_examples_in_valid_ds.size());
     // Prune the tree.
     const auto num_nodes_pre_pruning = decision_tree->NumNodes();
-    RETURN_IF_ERROR(internal::PruneTree(train_dataset, weights, valid_examples,
-                                        config, config_link, decision_tree));
+    RETURN_IF_ERROR(internal::PruneTree(*effective_valid_dataset, weights,
+                                        valid_examples_in_valid_ds, config,
+                                        config_link, decision_tree));
     mdl->set_num_pruned_nodes(num_nodes_pre_pruning -
                               decision_tree->NumNodes());
+
+    // Evaluate model on the validation dataset.
+    metric::proto::EvaluationOptions valid_evaluation_options;
+    valid_evaluation_options.set_task(training_config().task());
+    valid_evaluation_options.set_bootstrapping_samples(0);
+    if (training_config().has_weight_definition()) {
+      *valid_evaluation_options.mutable_weights() =
+          training_config().weight_definition();
+    }
+    utils::RandomEngine rnd;
+    ASSIGN_OR_RETURN(const auto valid_evaluation,
+                     mdl->EvaluateWithStatus(*effective_valid_dataset,
+                                             valid_evaluation_options, &rnd));
+
+    // Store the validation evaluation in the RF OOB evaluation field.
+    random_forest::proto::OutOfBagTrainingEvaluations oob_evaluation;
+    oob_evaluation.set_number_of_trees(1);
+    *oob_evaluation.mutable_evaluation() = valid_evaluation;
+    mdl->mutable_out_of_bag_evaluations()->push_back(oob_evaluation);
   }
 
   utils::usage::OnTrainingEnd(train_dataset.data_spec(), config, config_link,

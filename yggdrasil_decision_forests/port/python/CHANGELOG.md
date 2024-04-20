@@ -1,5 +1,12 @@
 # Changelog
 
+## HEAD
+
+### Feature
+
+-   Add option to specify a validation dataset for the CartLearner.
+-   `DecisionForestsLearner` is an alias to `CartLearner`.
+
 ## 0.4.1- 2024-04-18
 
 ### Fix

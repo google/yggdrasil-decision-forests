@@ -16,7 +16,7 @@
 
 import os
 import signal
-from typing import Tuple
+from typing import Any, Optional, Tuple
 
 from absl import logging
 from absl.testing import absltest
@@ -73,6 +73,7 @@ class LearnerTest(parameterized.TestCase):
       learner: generic_learner.GenericLearner,
       minimum_accuracy: float,
       check_serialization: bool = True,
+      valid: Optional[Any] = None,
   ) -> Tuple[generic_model.GenericModel, metric.Evaluation, np.ndarray]:
     """Runs a battery of test on a model compatible with the adult dataset.
 
@@ -92,7 +93,7 @@ class LearnerTest(parameterized.TestCase):
       The model, its evaluation and the predictions on the test dataset.
     """
     # Train the model.
-    model = learner.train(self.adult.train)
+    model = learner.train(self.adult.train, valid=valid)
 
     # Evaluate the trained model.
     evaluation = model.evaluate(self.adult.test)
@@ -608,7 +609,23 @@ class CARTLearnerTest(LearnerTest):
   def test_adult(self):
     learner = specialized_learners.CartLearner(label="income")
 
-    self._check_adult_model(learner=learner, minimum_accuracy=0.853)
+    model, _, _ = self._check_adult_model(
+        learner=learner, minimum_accuracy=0.853
+    )
+    self.assertGreater(model.self_evaluation().accuracy, 0.84)
+
+  def test_adult_with_validation(self):
+    learner = specialized_learners.CartLearner(label="income")
+
+    model, evaluation, _ = self._check_adult_model(
+        learner=learner, minimum_accuracy=0.853, valid=self.adult.test
+    )
+    # Make sure the test dataset is effectively used for validation.
+    self.assertEqual(model.self_evaluation().accuracy, evaluation.accuracy)
+    self.assertEqual(
+        model.self_evaluation().num_examples,
+        self.adult.test_pd.shape[0],
+    )
 
   def test_two_center_regression(self):
     learner = specialized_learners.CartLearner(
@@ -628,6 +645,46 @@ class CARTLearnerTest(LearnerTest):
         "The learner CART does not support monotonic constraints",
     ):
       _ = learner.train(ds)
+
+  def test_tuner_manual(self):
+    tuner = tuner_lib.RandomSearchTuner(num_trials=5)
+    tuner.choice("min_examples", [1, 2, 5, 10])
+    tuner.choice("max_depth", [3, 4, 5, 6])
+    learner = specialized_learners.CartLearner(label="income", tuner=tuner)
+
+    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.83)
+    logs = model.hyperparameter_optimizer_logs()
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.trials, 5)
+
+  def test_tuner_manual_on_validation(self):
+    tuner = tuner_lib.RandomSearchTuner(num_trials=5)
+    tuner.choice("min_examples", [1, 2, 5, 10])
+    tuner.choice("max_depth", [3, 4, 5, 6])
+    learner = specialized_learners.CartLearner(label="income", tuner=tuner)
+
+    model, evaluation, _ = self._check_adult_model(
+        learner, minimum_accuracy=0.83, valid=self.adult.test
+    )
+    # Make sure the test dataset is effectively used for validation.
+    self.assertEqual(model.self_evaluation().accuracy, evaluation.accuracy)
+    self.assertEqual(
+        model.self_evaluation().num_examples, self.adult.test_pd.shape[0]
+    )
+    logs = model.hyperparameter_optimizer_logs()
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.trials, 5)
+
+  def test_tuner_predefined(self):
+    tuner = tuner_lib.RandomSearchTuner(
+        num_trials=5, automatic_search_space=True
+    )
+    learner = specialized_learners.CartLearner(label="income", tuner=tuner)
+
+    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.83)
+    logs = model.hyperparameter_optimizer_logs()
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.trials, 5)
 
 
 class GradientBoostedTreesLearnerTest(LearnerTest):

@@ -26,11 +26,11 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/cart/cart.pb.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
@@ -70,6 +70,7 @@ class CartLearner : public AbstractLearner {
   model::proto::LearnerCapabilities Capabilities() const override {
     model::proto::LearnerCapabilities capabilities;
     capabilities.set_support_max_training_duration(true);
+    capabilities.set_support_validation_dataset(true);
     return capabilities;
   }
 };
