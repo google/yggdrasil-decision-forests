@@ -28,6 +28,7 @@ from ydf.learner.specialized_learners import CartLearner
 from ydf.learner.specialized_learners import RandomForestLearner
 from ydf.learner.specialized_learners import GradientBoostedTreesLearner
 from ydf.learner.specialized_learners import DistributedGradientBoostedTreesLearner
+DecisionTreeLearner = CartLearner
 
 # Model
 from ydf.model.generic_model import GenericModel

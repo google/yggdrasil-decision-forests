@@ -10,6 +10,8 @@ A **Learner** trains models and can be cross-validated.
 -   [GradientBoostedTreesLearner](GradientBoostedTreesLearner.md)
 -   [RandomForestLearner](RandomForestLearner.md)
 -   [CartLearner](CartLearner.md)
+-   [DecisionTreeLearner](CartLearner.md): Alias to
+    [CartLearner](CartLearner.md).
 -   [DistributedGradientBoostedTreesLearner](DistributedGradientBoostedTreesLearner.md)
 
 All learners derive from [GenericLearner](GenericLearner.md).
