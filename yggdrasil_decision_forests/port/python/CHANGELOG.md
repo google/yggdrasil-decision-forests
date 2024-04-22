@@ -1,9 +1,11 @@
 # Changelog
 
-## HEAD
+## 0.4.2- 2024-04-22
 
 ### Feature
 
+-   Show error message when TF-DF and YDF shared proto dependencies are
+    colliding.
 -   Add option to specify a validation dataset for the CartLearner.
 -   `DecisionForestsLearner` is an alias to `CartLearner`.
 

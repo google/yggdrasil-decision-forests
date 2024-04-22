@@ -52,6 +52,7 @@ class WarningMessage(enum.Enum):
 
   CANNOT_SHOW_DETAILS_LOGS = 0
   CAST_NUMERICAL_TO_FLOAT32 = 1
+  TO_TF_SAVED_MODEL_KERAS_MODE = 2
 
 
 # List of already showed warning message that should not be displayed again.

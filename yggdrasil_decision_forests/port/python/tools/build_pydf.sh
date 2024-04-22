@@ -38,14 +38,14 @@ SRCPK="$(pwd)/tmp_package"
 # Example: Python3.8.2 => Package version: "38"
 function python_to_package_version() {
   PYTHON="$1"
-  shift
+
   ${PYTHON} -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")'
 }
 
 # Installs dependency requirement for build the Pip package.
 function install_dependencies() {
   PYTHON="$1"
-  shift
+
   ${PYTHON} -m ensurepip -U || true
   ${PYTHON} -m pip install pip -U
   ${PYTHON} -m pip install setuptools -U
@@ -65,15 +65,15 @@ function check_is_build() {
 
 # Collects the library files into ${SRCPK}
 function assemble_files() {
-  check_is_build
+  PYTHON="$1"
 
+  check_is_build
   ${PYTHON} tools/assembly_pip_files.py
 }
 
 # Build a pip package.
 function build_package() {
   PYTHON="$1"
-  shift
 
   pushd ${SRCPK}
   $PYTHON -m build
@@ -84,14 +84,8 @@ function build_package() {
 
 # Tests a pip package.
 function test_package() {
-  if [ ${ARG} == "ALL_VERSIONS_MAC_CROSSCOMPILE" ]; then
-    echo "Cross-compiled packages cannot be tested on the machine they're built with."
-    return
-  fi
   PYTHON="$1"
-  shift
-  PACKAGE="$1"
-  shift
+  PACKAGE="$2"
 
   PIP="${PYTHON} -m pip"
 
@@ -101,7 +95,6 @@ function test_package() {
     PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*.manylinux2014_${ARCHITECTURE}.whl"
   fi
   ${PIP} install ${PACKAGEPATH} --force-reinstall
-
 
   ${PIP} list
   ${PIP} show ydf -f
@@ -140,7 +133,7 @@ function test_package() {
 # Builds and tests a pip package in a given version of python
 function e2e_native() {
   PYTHON="$1"
-  shift
+
   PACKAGE=$(python_to_package_version ${PYTHON})
 
   install_dependencies ${PYTHON}
@@ -159,3 +152,4 @@ function e2e_native() {
 
 PYTHON="$1"
 assemble_files ${PYTHON}
+e2e_native ${PYTHON}

@@ -726,6 +726,15 @@ Use `model.describe()` for more details
         (default), uses `tempfile.mkdtemp` default temporary directory.
     """
 
+    if mode == "keras":
+      log.warning(
+          "Calling `to_tensorflow_saved_model(mode='keras', ...)`. Use"
+          " `to_tensorflow_saved_model(mode='tf', ...)` instead. mode='tf' is"
+          " more efficient, has better compatibility, and offers more options."
+          " Starting June 2024, `mode='tf'` will become the default value.",
+          message_id=log.WarningMessage.TO_TF_SAVED_MODEL_KERAS_MODE,
+      )
+
     export_tf.ydf_model_to_tensorflow_saved_model(
         ydf_model=self,
         path=path,

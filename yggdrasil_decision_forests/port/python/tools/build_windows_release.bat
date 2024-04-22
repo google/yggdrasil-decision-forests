@@ -34,7 +34,7 @@
 cls
 setlocal
 
-set YDF_VERSION=0.4.1
+set YDF_VERSION=0.4.2
 set BAZEL=bazel.exe
 set BAZEL_SH=C:\msys64\usr\bin\bash.exe
 set BAZEL_FLAGS=--config=windows_cpp20 --config=windows_avx2

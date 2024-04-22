@@ -61,6 +61,8 @@ def main(argv):
   predictions = loaded_model.predict(test_df)
   print(predictions)
 
+  loaded_model.to_tensorflow_saved_model("/tmp/tf_saved_model")
+
 
 if __name__ == "__main__":
   app.run(main)

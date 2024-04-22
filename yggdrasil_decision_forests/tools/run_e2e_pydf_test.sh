@@ -60,7 +60,7 @@ run_test() {
   CMD='yum update;yum install -y rsync;curl -L -o /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-amd64;chmod +x /usr/local/bin/bazel;PYTHON=python3.11;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate;export COMPILERS="gcc";./tools/test_pydf.sh;./tools/build_pydf.sh python;$SHELL'
 
   # Only get a shell, uncomment the following line.
-  # CMD='$SHELL'
+  CMD='$SHELL'
 
   # If the test fails, you can restart it with:
   # ./tools/test_pydf.sh

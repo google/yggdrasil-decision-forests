@@ -14,6 +14,21 @@
 
 """(P)YDF - Yggdrasil Decision Forests in Python."""
 
+
+def _check_install():
+  from yggdrasil_decision_forests.dataset import data_spec_pb2
+
+  if not hasattr(data_spec_pb2, "DType"):
+    raise ValueError("""\
+Collision between YDF and TensorFlow Decision Forests protobuf shared dependencies.
+Please, reinstall YDF with the "--force" argument, restart the notebook runtime (if using a notebook), and try again:
+
+!pip install ydf --force""")
+
+
+_check_install()
+
+
 # pylint: disable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported
 
 # Version
@@ -28,6 +43,7 @@ from ydf.learner.specialized_learners import CartLearner
 from ydf.learner.specialized_learners import RandomForestLearner
 from ydf.learner.specialized_learners import GradientBoostedTreesLearner
 from ydf.learner.specialized_learners import DistributedGradientBoostedTreesLearner
+
 DecisionTreeLearner = CartLearner
 
 # Model
@@ -69,6 +85,5 @@ from ydf.learner.custom_loss import Activation
 
 # Tree
 from ydf.model import tree
-
 
 # pylint: enable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported

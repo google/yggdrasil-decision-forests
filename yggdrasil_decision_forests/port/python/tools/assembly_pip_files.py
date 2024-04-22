@@ -41,27 +41,6 @@ def rec_glob_copy(src_dir: str, dst_dir: str, pattern: str):
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     s.copy(f"{src_dir}/{frel}", dst)
 
-
-def replace_in_files(src_dir, extension, old_string, new_string):
-  """Replaces a string in all files with a given extension within a directory."""
-
-  for root, _, filenames in os.walk(src_dir):
-    for filename in filenames:
-      if filename.endswith(extension):
-        filepath = os.path.join(root, filename)
-
-        # Read file content
-        with open(filepath, "r") as f:
-          file_content = f.read()
-
-        # Replace the string
-        new_content = file_content.replace(old_string, new_string)
-
-        # Overwrite the file with the modified content
-        with open(filepath, "w") as f:
-          f.write(new_content)
-
-
 # Remove and recreate the package directory
 if os.path.exists(DST_PK):
   try:
@@ -95,7 +74,7 @@ s.copy(f"{SRC_BIN}/learner/specialized_learners.py", f"{DST_PK}/ydf/learner")
 # Copy the YDF c++ protos
 rec_glob_copy(
     "bazel-bin/external/ydf_cc/yggdrasil_decision_forests",
-    f"{DST_PK}/ydf/proto",
+    f"{DST_PK}/yggdrasil_decision_forests",
     "**/*.py",
 )
 
@@ -104,11 +83,6 @@ rec_glob_copy("ydf", f"{DST_PK}/ydf", "**/*.py")
 
 # Create the missing __init__.py files
 INIT_FILENAME = "__init__.py"
-for path, _, files in os.walk(f"{DST_PK}/ydf/proto"):
+for path, _, files in os.walk(f"{DST_PK}/yggdrasil_decision_forests"):
   if INIT_FILENAME not in files:
     Path(f"{path}/{INIT_FILENAME}").touch()
-
-# Change path to YDF proto files
-replace_in_files(
-    DST_PK, ".py", "from yggdrasil_decision_forests.", "from ydf.proto."
-)
