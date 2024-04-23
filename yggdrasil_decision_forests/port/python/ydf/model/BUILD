@@ -85,7 +85,6 @@ pybind_library(
 py_library(
     name = "generic_model",
     srcs = [
-        "export_jax.py",
         "export_tf.py",
         "generic_model.py",
     ],
@@ -108,6 +107,19 @@ py_library(
         "//ydf/utils:html",
         "//ydf/utils:log",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
+    ],
+)
+
+py_library(
+    name = "export_jax",
+    srcs = ["export_jax.py"],
+    deps = [
+        ":generic_model",
+        # jax dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "//ydf/dataset:dataspec",
+        "//ydf/model/decision_forest_model",
+        "//ydf/model/tree:all",
     ],
 )
 
@@ -287,6 +299,7 @@ py_test(
     ],
     python_version = "PY3",
     deps = [
+        ":export_jax",
         ":generic_model",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
@@ -296,5 +309,6 @@ py_test(
         "//ydf/dataset:dataspec",
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
+        "//ydf/model/tree:all",
     ],
 )

@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List
+import array
+from typing import Any, Dict, List, Optional, Sequence
 from absl.testing import absltest
 from absl.testing import parameterized
 import jax
@@ -20,38 +21,41 @@ import jax.numpy as jnp
 import numpy as np
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
+from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
 from ydf.model import export_jax as to_jax
 from ydf.model import generic_model
+from ydf.model import tree as tree_lib
+
+
+def create_dataset(columns: List[str]) -> Dict[str, Any]:
+  """Creates a dataset with random values."""
+  data = {
+      # Single-dim features
+      "f1": np.random.random(size=100),
+      "f2": np.random.random(size=100),
+      "i1": np.random.randint(100, size=100),
+      "i2": np.random.randint(100, size=100),
+      "c1": np.random.choice(["x", "y", "z"], size=100, p=[0.6, 0.3, 0.1]),
+      "b1": np.random.randint(2, size=100).astype(np.bool_),
+      "b2": np.random.randint(2, size=100).astype(np.bool_),
+      # Cat-set features
+      "cs1": [[], ["a", "b", "c"], ["b", "c"], ["a"]] * 25,
+      # Multi-dim features
+      "multi_f1": np.random.random(size=(100, 5)),
+      "multi_f2": np.random.random(size=(100, 5)),
+      "multi_i1": np.random.randint(100, size=(100, 5)),
+      "multi_c1": np.random.choice(["x", "y", "z"], size=(100, 5)),
+      "multi_b1": np.random.randint(2, size=(100, 5)).astype(np.bool_),
+      # Labels
+      "label_class_binary": np.random.choice(["l1", "l2"], size=100),
+      "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=100),
+      "label_regress": np.random.random(size=100),
+  }
+  return {k: data[k] for k in columns}
 
 
 class JaxModelTest(parameterized.TestCase):
-
-  def create_dataset(self, columns: List[str]) -> Dict[str, Any]:
-    """Creates a dataset with random values."""
-    data = {
-        # Single-dim features
-        "f1": np.random.random(size=100),
-        "f2": np.random.random(size=100),
-        "i1": np.random.randint(100, size=100),
-        "i2": np.random.randint(100, size=100),
-        "c1": np.random.choice(["x", "y", "z"], size=100, p=[0.6, 0.3, 0.1]),
-        "b1": np.random.randint(2, size=100).astype(np.bool_),
-        "b2": np.random.randint(2, size=100).astype(np.bool_),
-        # Cat-set features
-        "cs1": [[], ["a", "b", "c"], ["b", "c"], ["a"]] * 25,
-        # Multi-dim features
-        "multi_f1": np.random.random(size=(100, 5)),
-        "multi_f2": np.random.random(size=(100, 5)),
-        "multi_i1": np.random.randint(100, size=(100, 5)),
-        "multi_c1": np.random.choice(["x", "y", "z"], size=(100, 5)),
-        "multi_b1": np.random.randint(2, size=(100, 5)).astype(np.bool_),
-        # Labels
-        "label_class_binary": np.random.choice(["l1", "l2"], size=100),
-        "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=100),
-        "label_regress": np.random.random(size=100),
-    }
-    return {k: data[k] for k in columns}
 
   @parameterized.parameters(
       ((0,), jnp.int8),
@@ -141,7 +145,7 @@ class JaxModelTest(parameterized.TestCase):
         num_trees=2,
         features=[("cs1", dataspec_lib.Semantic.CATEGORICAL_SET)],
         include_all_columns=True,
-    ).train(self.create_dataset(columns))
+    ).train(create_dataset(columns))
     feature_encoding = to_jax.FeatureEncoding.build(
         model.input_features(), model.data_spec()
     )
@@ -168,7 +172,7 @@ class JaxModelTest(parameterized.TestCase):
     columns = ["f1", "i1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
         label="label_class_binary", num_trees=2
-    ).train(self.create_dataset(columns))
+    ).train(create_dataset(columns))
     feature_encoding = to_jax.FeatureEncoding.build(
         model.input_features(), model.data_spec()
     )
@@ -244,6 +248,254 @@ class InternalFeatureSpecTest(parameterized.TestCase):
         internal_values.boolean, jnp.array([[True, False], [False, True]])
     )
 
+
+class NodexIdxTest(parameterized.TestCase):
+
+  @parameterized.parameters(
+      (2, None, 2, 3, 0),
+      (3, None, 2, 3, 1),
+      (None, 3, 2, 3, -1),
+      (None, 4, 2, 3, -2),
+  )
+  def test_node_offset(
+      self,
+      non_leaf_node: Optional[int],
+      leaf_node: Optional[int],
+      begin_non_leaf_node: int,
+      begin_leaf_node: int,
+      expected: int,
+  ):
+    self.assertEqual(
+        to_jax.NodeIdx(non_leaf_node=non_leaf_node, leaf_node=leaf_node).offset(
+            to_jax.BeginNodeIdx(
+                non_leaf_node=begin_non_leaf_node, leaf_node=begin_leaf_node
+            )
+        ),
+        expected,
+    )
+
+  @parameterized.parameters(
+      ((), 0, []),
+      ((), 4, [False, False, False, False]),
+      ((1, 3), 4, [False, True, False, True]),
+      ((0, 1, 2, 3), 4, [True, True, True, True]),
+  )
+  def test_categorical_list_to_bitmap(
+      self, items: Sequence[int], size: int, expected: List[bool]
+  ):
+    self.assertEqual(
+        to_jax._categorical_list_to_bitmap(
+            ds_pb.Column(
+                categorical=ds_pb.CategoricalSpec(number_of_unique_values=size)
+            ),
+            items,
+        ),
+        expected,
+    )
+
+
+class InternalForestTest(parameterized.TestCase):
+
+  def test_categorical_list_to_bitmap_invalid(self):
+    with self.assertRaisesRegex(ValueError, "Invalid item"):
+      to_jax._categorical_list_to_bitmap(
+          ds_pb.Column(
+              categorical=ds_pb.CategoricalSpec(number_of_unique_values=2)
+          ),
+          [2],
+      )
+
+  def test_internal_forest_on_manual(self):
+    columns = ["f1", "c1", "f2", "label_regress"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_regress",
+        task=generic_learner.Task.REGRESSION,
+        num_trees=1,
+    ).train(create_dataset(columns))
+    model.remove_tree(0)
+
+    print(model.data_spec(), flush=True)
+
+    RegressionValue = tree_lib.RegressionValue
+    Leaf = tree_lib.Leaf
+    NonLeaf = tree_lib.NonLeaf
+    NumericalHigherThanCondition = tree_lib.NumericalHigherThanCondition
+    CategoricalIsInCondition = tree_lib.CategoricalIsInCondition
+    Tree = tree_lib.Tree
+
+    model.add_tree(
+        Tree(
+            root=NonLeaf(
+                condition=NumericalHigherThanCondition(
+                    missing=False, score=0.0, attribute=1, threshold=2.0
+                ),
+                pos_child=NonLeaf(
+                    condition=CategoricalIsInCondition(
+                        missing=False,
+                        score=0.0,
+                        attribute=2,
+                        mask=[1, 2],
+                    ),
+                    pos_child=NonLeaf(
+                        condition=CategoricalIsInCondition(
+                            missing=False,
+                            score=0.0,
+                            attribute=2,
+                            mask=[1],
+                        ),
+                        pos_child=Leaf(
+                            value=RegressionValue(num_examples=0.0, value=1.0)
+                        ),
+                        neg_child=Leaf(
+                            value=RegressionValue(num_examples=0.0, value=2.0)
+                        ),
+                    ),
+                    neg_child=Leaf(
+                        value=RegressionValue(num_examples=0.0, value=3.0)
+                    ),
+                ),
+                neg_child=NonLeaf(
+                    condition=NumericalHigherThanCondition(
+                        missing=False, score=0.0, attribute=1, threshold=1.0
+                    ),
+                    pos_child=Leaf(
+                        value=RegressionValue(num_examples=0.0, value=4.0)
+                    ),
+                    neg_child=Leaf(
+                        value=RegressionValue(num_examples=0.0, value=5.0)
+                    ),
+                ),
+            )
+        )
+    )
+
+    model.add_tree(
+        Tree(
+            root=NonLeaf(
+                condition=NumericalHigherThanCondition(
+                    missing=False, score=0.0, attribute=3, threshold=1.5
+                ),
+                pos_child=Leaf(
+                    value=RegressionValue(num_examples=0.0, value=6.0)
+                ),
+                neg_child=Leaf(
+                    value=RegressionValue(num_examples=0.0, value=7.0)
+                ),
+            )
+        )
+    )
+
+    print(model.get_tree(0).pretty(model.data_spec()), flush=True)
+    print(model.get_tree(1).pretty(model.data_spec()), flush=True)
+
+    self.assertEqual(
+        model.get_tree(0).pretty(model.data_spec()),
+        """\
+'f1' >= 2 [score=0 missing=False]
+    ├─(pos)─ 'c1' in ['x', 'y'] [score=0 missing=False]
+    │        ├─(pos)─ 'c1' in ['x'] [score=0 missing=False]
+    │        │        ├─(pos)─ value=1
+    │        │        └─(neg)─ value=2
+    │        └─(neg)─ value=3
+    └─(neg)─ 'f1' >= 1 [score=0 missing=False]
+             ├─(pos)─ value=4
+             └─(neg)─ value=5
+""",
+    )
+
+    self.assertEqual(
+        model.get_tree(1).pretty(model.data_spec()),
+        """\
+'f2' >= 1.5 [score=0 missing=False]
+    ├─(pos)─ value=6
+    └─(neg)─ value=7
+""",
+    )
+
+    internal_forest = to_jax.InternalForest(model)
+
+    self.assertEqual(internal_forest.feature_spec.numerical, ["f1", "f2"])
+    self.assertEqual(internal_forest.feature_spec.categorical, ["c1"])
+    self.assertEqual(internal_forest.feature_spec.boolean, [])
+    self.assertEqual(internal_forest.feature_spec.inv_numerical, {1: 0, 3: 1})
+    self.assertEqual(internal_forest.feature_spec.inv_categorical, {2: 0})
+    self.assertEqual(internal_forest.feature_spec.inv_boolean, {})
+    self.assertEqual(
+        internal_forest.feature_spec.feature_names, {"f1", "f2", "c1"}
+    )
+
+    self.assertEqual(internal_forest.num_trees(), 2)
+    self.assertIsNotNone(internal_forest.feature_encoding)
+
+    self.assertEqual(
+        internal_forest.leaf_outputs,
+        array.array("f", [5.0, 4.0, 3.0, 2.0, 1.0, 7.0, 6.0]),
+    )
+    self.assertEqual(
+        internal_forest.split_features, array.array("l", [0, 0, 0, 0, 1])
+    )
+
+    def bitcast_uint32_to_float(x):
+      return float(
+          jax.lax.bitcast_convert_type(
+              jnp.array(x, dtype=jnp.int32), jnp.float32
+          )
+      )
+
+    self.assertEqual(
+        internal_forest.split_parameters,
+        array.array(
+            "f",
+            [
+                2.0,
+                1.0,
+                bitcast_uint32_to_float(0),
+                bitcast_uint32_to_float(4),
+                1.5,
+            ],
+        ),
+    )
+    self.assertEqual(
+        internal_forest.negative_children, array.array("l", [1, -1, -3, -4, -1])
+    )
+    self.assertEqual(
+        internal_forest.positive_children, array.array("l", [2, -2, 3, -5, -2])
+    )
+    self.assertEqual(
+        internal_forest.condition_types,
+        array.array(
+            "l",
+            [
+                to_jax.ConditionType.GREATER_THAN,
+                to_jax.ConditionType.GREATER_THAN,
+                to_jax.ConditionType.IS_IN,
+                to_jax.ConditionType.IS_IN,
+                to_jax.ConditionType.GREATER_THAN,
+            ],
+        ),
+    )
+    self.assertEqual(
+        internal_forest.begin_non_leaf_nodes, array.array("l", [0, 4])
+    )
+    self.assertEqual(internal_forest.begin_leaf_nodes, array.array("l", [0, 5]))
+    self.assertEqual(
+        internal_forest.catgorical_mask,
+        array.array("b", [False, True, True, False, False, True, False, False]),
+    )
+    self.assertEqual(internal_forest.max_depth, 3)
+
+  def test_internal_forest_on_model(self):
+    columns = ["f1", "i1", "c1", "label_regress"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_regress",
+        task=generic_learner.Task.REGRESSION,
+        num_trees=10,
+        max_depth=5,
+    ).train(create_dataset(columns))
+
+    internal_forest = to_jax.InternalForest(model)
+    self.assertEqual(internal_forest.num_trees(), 10)
+    self.assertIsNotNone(internal_forest.feature_encoding)
 
 
 if __name__ == "__main__":

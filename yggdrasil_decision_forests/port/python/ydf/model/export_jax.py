@@ -15,11 +15,15 @@
 """Utilities to export JAX models."""
 
 import dataclasses
+import enum
 from typing import Any, Sequence, Dict, Optional, List, Set
+import array
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
 from ydf.model import generic_model
+from ydf.model import tree as tree_lib
+from ydf.model.decision_forest_model import decision_forest_model
 
 # pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
@@ -33,6 +37,17 @@ except ImportError as exc:
   ) from exc
 # pylint: enable=g-import-not-at-top
 # pytype: enable=import-error
+
+# Typehint for arrays
+ArrayFloat = array.array
+ArrayInt = array.array
+ArrayBool = array.array
+
+
+# Index of the type of conditions in the intermediate tree representation.
+class ConditionType(enum.IntEnum):
+  GREATER_THAN = 0
+  IS_IN = 1
 
 
 def compact_dtype(values: Sequence[int]) -> Any:
@@ -236,3 +251,252 @@ class InternalFeatureSpec:
         categorical=stack(self.categorical, jnp.int32),
         boolean=stack(self.boolean, jnp.bool_),
     )
+
+
+@dataclasses.dataclass(frozen=True)
+class BeginNodeIdx:
+  """Index of the first leaf and non leaf node in a tree."""
+
+  leaf_node: int
+  non_leaf_node: int
+
+
+@dataclasses.dataclass(frozen=True)
+class NodeIdx:
+  """Index of a leaf or a non-leaf node."""
+
+  leaf_node: Optional[int] = None
+  non_leaf_node: Optional[int] = None
+
+  def __post_init__(self):
+    if (self.leaf_node is None) == (self.non_leaf_node is None):
+      raise ValueError(
+          "Exactly one of leaf_node and non_leaf_node must be set."
+      )
+
+  def offset(
+      self,
+      begin_node_idx: BeginNodeIdx,
+  ) -> int:
+    """Gets the offset of a node to allow for compact representation."""
+
+    if self.non_leaf_node is not None:
+      # This is not a leaf
+      return self.non_leaf_node - begin_node_idx.non_leaf_node
+    else:
+      # This is a leaf
+      return -(self.leaf_node - begin_node_idx.leaf_node) - 1
+
+
+def _categorical_list_to_bitmap(
+    column_spec: ds_pb.Column, items: Sequence[int]
+) -> Sequence[bool]:
+  """Converts a list of categorical integer values to a bitmap."""
+
+  size = column_spec.categorical.number_of_unique_values
+  bitmap = [False] * size
+  for item in items:
+    if item < 0 or item >= size:
+      raise ValueError(f"Invalid item {item} for column {column_spec!r}")
+    bitmap[item] = True
+  return bitmap
+
+
+@dataclasses.dataclass
+class InternalForest:
+  """Internal representation of a forest before being converted to Jax code.
+
+  Several fields (negative_children, positive_children, root_nodes) encode
+  collections of node indexes where the sign of the offset indicates if the node
+  is a non-leaf node (non strict positive value) or a leaf node (strict negative
+  value), and the the absolute value of the offset is relative to the first leaf
+  / non-leaf node in the tree containing the node.
+
+  Example:
+    Assume a node index offset X = 1 in the Y = 4th tree.
+      The value is positive => This is a non-leaf node.
+      The non-leaf node index is: begin_non_leaf_nodes[Y] + X
+
+    Assume a node index offset X = -2 in the Y = 4th tree.
+      The value is strictly negative => This is a leaf node.
+      The non-leaf node index is: begin_leaf_nodes[Y] - X - 1
+
+  Attributes:
+    model: Input decision forest model.
+    feature_spec: Internal feature indexing.
+    feature_encoding: How to encode features before feeding them to the model.
+    dataspec: Dataspec.
+    leaf_outputs: Prediction values for each leaf node.
+    split_features: Internal idx of the feature being tested for each non-leaf
+      node.
+    split_parameters: Parameter of the condition for each non-leaf nodes. (1)
+      For "greather than" condition (i.e., feature >= threshold),
+      "split_parameter" is the threshold. (2) For "is in" condition (i.e.,
+      feature in mask), "split_parameter" is an uint32 offset in the mask
+      "catgorical_mask" wheret the condition is evaluated as
+      "catgorical_mask[split_parameter + attribute_value]".
+    negative_children: Node offset of the negative children for each non-leaf
+      node in the forest.
+    positive_children: Node offset of the positive children for each non-leaf
+      node in the forest.
+    condition_types: Condition type for each non-leaf nodes in the forest.
+    root_nodes: Index of the root node for each of the trees.
+    begin_non_leaf_nodes: Index of the first non leaf node for each of the
+      trees.
+    begin_leaf_nodes: Index of the first leaf node for each of the trees.
+    catgorical_mask: Boolean mask used in "is in" conditions.
+    max_depth: Maximum depth of the trees.
+  """
+
+  model: dataclasses.InitVar[generic_model.GenericModel]
+  feature_spec: InternalFeatureSpec = dataclasses.field(init=False)
+  feature_encoding: Optional[FeatureEncoding] = dataclasses.field(init=False)
+  dataspec: Any = dataclasses.field(repr=False, init=False)
+  leaf_outputs: ArrayFloat = dataclasses.field(
+      default_factory=lambda: array.array("f", [])
+  )
+  split_features: ArrayInt = dataclasses.field(
+      default_factory=lambda: array.array("l", [])
+  )
+  split_parameters: ArrayFloat = dataclasses.field(
+      default_factory=lambda: array.array("f", [])
+  )
+  negative_children: ArrayInt = dataclasses.field(
+      default_factory=lambda: array.array("l", [])
+  )
+  positive_children: ArrayInt = dataclasses.field(
+      default_factory=lambda: array.array("l", [])
+  )
+  condition_types: ArrayInt = dataclasses.field(
+      default_factory=lambda: array.array("l", [])
+  )
+  root_nodes: ArrayInt = dataclasses.field(
+      default_factory=lambda: array.array("l", [])
+  )
+  begin_non_leaf_nodes: ArrayInt = dataclasses.field(
+      default_factory=lambda: array.array("l", [])
+  )
+  begin_leaf_nodes: ArrayInt = dataclasses.field(
+      default_factory=lambda: array.array("l", [])
+  )
+  catgorical_mask: ArrayBool = dataclasses.field(
+      default_factory=lambda: array.array("b", [])
+  )
+  max_depth: int = 0
+
+  def __post_init__(self, model: generic_model.GenericModel):
+    if not isinstance(model, decision_forest_model.DecisionForestModel):
+      raise ValueError("The model is not a decision forest")
+
+    input_features = model.input_features()
+    self.dataspec = model.data_spec()
+    self.feature_encoding = FeatureEncoding.build(input_features, self.dataspec)
+    self.feature_spec = InternalFeatureSpec(input_features)
+
+    for tree in model.iter_trees():
+      self._add_tree(tree)
+
+  def _add_tree(self, tree: tree_lib.Tree) -> None:
+    """Adds a tree to the forest."""
+
+    begin_node_idx = BeginNodeIdx(
+        leaf_node=self._num_leaf_nodes(),
+        non_leaf_node=self._num_non_leaf_nodes(),
+    )
+    self.begin_leaf_nodes.append(begin_node_idx.leaf_node)
+    self.begin_non_leaf_nodes.append(begin_node_idx.non_leaf_node)
+
+    root_node = self._add_node(tree.root, begin_node_idx, depth=0)
+    self.root_nodes.append(root_node.offset(begin_node_idx))
+
+  def num_trees(self) -> int:
+    """Number of trees in the forest."""
+
+    return len(self.root_nodes)
+
+  def _num_non_leaf_nodes(self) -> int:
+    """Number of non leaf nodes in the forest so far."""
+
+    n = len(self.split_features)
+    # Check data consistency.
+    assert n == len(self.split_parameters)
+    assert n == len(self.negative_children)
+    assert n == len(self.positive_children)
+    assert n == len(self.condition_types)
+    return n
+
+  def _num_leaf_nodes(self) -> int:
+    """Number of leaf nodes in the forest so far."""
+
+    return len(self.leaf_outputs)
+
+  def _add_node(
+      self,
+      node: tree_lib.AbstractNode,
+      begin_node_idx: BeginNodeIdx,
+      depth: int,
+  ) -> NodeIdx:
+    """Adds a node to the forest."""
+
+    if node.is_leaf:  # A leaf node
+      # Keep track of the maximum depth
+      self.max_depth = max(self.max_depth, depth)
+
+      assert isinstance(node, tree_lib.Leaf)
+      # TODO: Add support for other types of leaf nodes.
+      if not isinstance(node.value, tree_lib.RegressionValue):
+        raise ValueError(
+            "The YDF Jax exporter does not support this leaf value:"
+            f" {node.value!r}"
+        )
+      node_idx = self._num_leaf_nodes()
+      self.leaf_outputs.append(node.value.value)
+      return NodeIdx(leaf_node=node_idx)
+
+    # A non leaf node
+    assert isinstance(node, tree_lib.NonLeaf)
+    node_idx = self._num_non_leaf_nodes()
+
+    # Set condition
+    if isinstance(node.condition, tree_lib.NumericalHigherThanCondition):
+      feature_idx = self.feature_spec.inv_numerical[node.condition.attribute]
+      self.split_features.append(feature_idx)
+      self.split_parameters.append(node.condition.threshold)
+      self.condition_types.append(ConditionType.GREATER_THAN)
+
+    elif isinstance(node.condition, tree_lib.CategoricalIsInCondition):
+      feature_idx = self.feature_spec.inv_categorical[node.condition.attribute]
+      column_spec = self.dataspec.columns[node.condition.attribute]
+      bitmap = _categorical_list_to_bitmap(column_spec, node.condition.mask)
+
+      offset = len(self.catgorical_mask)
+      float_offset = float(
+          jax.lax.bitcast_convert_type(
+              jnp.array(offset, dtype=jnp.int32), jnp.float32
+          )
+      )
+
+      self.split_features.append(feature_idx)
+      self.split_parameters.append(float_offset)
+      self.condition_types.append(ConditionType.IS_IN)
+      self.catgorical_mask.extend(bitmap)
+    else:
+      # TODO: Add support for other types of conditions.
+      raise ValueError(
+          "The YDF Jax exporter does not support this condition type:"
+          f" {node.condition}"
+      )
+
+    # Placeholders until the children node indices are computed
+    self.positive_children.append(-1)
+    self.negative_children.append(-1)
+
+    # Populate child nodes
+    neg_child_node = self._add_node(node.neg_child, begin_node_idx, depth + 1)
+    pos_child_node = self._add_node(node.pos_child, begin_node_idx, depth + 1)
+
+    # Index the children
+    self.negative_children[node_idx] = neg_child_node.offset(begin_node_idx)
+    self.positive_children[node_idx] = pos_child_node.offset(begin_node_idx)
+
+    return NodeIdx(non_leaf_node=node_idx)

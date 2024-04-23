@@ -146,7 +146,7 @@ message FeatureVariation {
 message FeatureVariationItem {
   // Bins, i.e., model outputs.
   repeated Bin bins = 1;
-  // Attributes beeing varied.
+  // Attributes being varied.
   repeated Attribute attributes = 2;
 
   message Bin {
