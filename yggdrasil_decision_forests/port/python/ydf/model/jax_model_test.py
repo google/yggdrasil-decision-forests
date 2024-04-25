@@ -13,12 +13,18 @@
 # limitations under the License.
 
 import array
+import sys
+import tempfile
 from typing import Any, Dict, List, Optional, Sequence
+
 from absl.testing import absltest
 from absl.testing import parameterized
 import jax
+from jax.experimental import jax2tf
 import jax.numpy as jnp
 import numpy as np
+import tensorflow as tf
+
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
 from ydf.learner import generic_learner
@@ -28,29 +34,30 @@ from ydf.model import generic_model
 from ydf.model import tree as tree_lib
 
 
-def create_dataset(columns: List[str]) -> Dict[str, Any]:
+def create_dataset(columns: List[str], n: int = 1000) -> Dict[str, Any]:
   """Creates a dataset with random values."""
+  np.random.seed(10)
   data = {
       # Single-dim features
-      "f1": np.random.random(size=100),
-      "f2": np.random.random(size=100),
-      "i1": np.random.randint(100, size=100),
-      "i2": np.random.randint(100, size=100),
-      "c1": np.random.choice(["x", "y", "z"], size=100, p=[0.6, 0.3, 0.1]),
-      "b1": np.random.randint(2, size=100).astype(np.bool_),
-      "b2": np.random.randint(2, size=100).astype(np.bool_),
+      "f1": np.random.random(size=n),
+      "f2": np.random.random(size=n),
+      "i1": np.random.randint(100, size=n),
+      "i2": np.random.randint(100, size=n),
+      "c1": np.random.choice(["x", "y", "z"], size=n, p=[0.6, 0.3, 0.1]),
+      "b1": np.random.randint(2, size=n).astype(np.bool_),
+      "b2": np.random.randint(2, size=n).astype(np.bool_),
       # Cat-set features
-      "cs1": [[], ["a", "b", "c"], ["b", "c"], ["a"]] * 25,
+      "cs1": [[], ["a", "b", "c"], ["b", "c"], ["a"]] * (n // 4),
       # Multi-dim features
-      "multi_f1": np.random.random(size=(100, 5)),
-      "multi_f2": np.random.random(size=(100, 5)),
-      "multi_i1": np.random.randint(100, size=(100, 5)),
-      "multi_c1": np.random.choice(["x", "y", "z"], size=(100, 5)),
-      "multi_b1": np.random.randint(2, size=(100, 5)).astype(np.bool_),
+      "multi_f1": np.random.random(size=(n, 5)),
+      "multi_f2": np.random.random(size=(n, 5)),
+      "multi_i1": np.random.randint(100, size=(n, 5)),
+      "multi_c1": np.random.choice(["x", "y", "z"], size=(n, 5)),
+      "multi_b1": np.random.randint(2, size=(n, 5)).astype(np.bool_),
       # Labels
-      "label_class_binary": np.random.choice(["l1", "l2"], size=100),
-      "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=100),
-      "label_regress": np.random.random(size=100),
+      "label_class_binary": np.random.choice(["l1", "l2"], size=n),
+      "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=n),
+      "label_regress": np.random.random(size=n),
   }
   return {k: data[k] for k in columns}
 
@@ -76,6 +83,11 @@ class JaxModelTest(parameterized.TestCase):
     jax_array = to_jax.to_compact_jax_array(values)
     self.assertEqual(jax_array.dtype.type, expected_dtype)
     np.testing.assert_array_equal(jax_array, jnp.array(values, expected_dtype))
+
+  def test_empty_to_compact_jax_array(self):
+    jax_array = to_jax.to_compact_jax_array([])
+    self.assertEqual(jax_array.dtype.type, jnp.int32)
+    np.testing.assert_array_equal(jax_array, jnp.array([0], jnp.int32))
 
   def test_compact_dtype_non_supported(self):
     with self.assertRaisesRegex(ValueError, "No supported compact dtype"):
@@ -162,10 +174,10 @@ class JaxModelTest(parameterized.TestCase):
         {"f1": [1, 2, 3], "c1": ["x", "y", "other"]}
     )
     np.testing.assert_array_equal(
-        encoded_features["f1"], jax.numpy.asarray([1, 2, 3])
+        encoded_features["f1"], jnp.asarray([1, 2, 3])
     )
     np.testing.assert_array_equal(
-        encoded_features["c1"], jax.numpy.asarray([1, 2, 0])
+        encoded_features["c1"], jnp.asarray([1, 2, 0])
     )
 
   def test_feature_encoding_is_none(self):
@@ -314,14 +326,14 @@ class InternalForestTest(parameterized.TestCase):
     ).train(create_dataset(columns))
     model.remove_tree(0)
 
-    print(model.data_spec(), flush=True)
-
+    # pylint: disable=invalid-name
     RegressionValue = tree_lib.RegressionValue
     Leaf = tree_lib.Leaf
     NonLeaf = tree_lib.NonLeaf
     NumericalHigherThanCondition = tree_lib.NumericalHigherThanCondition
     CategoricalIsInCondition = tree_lib.CategoricalIsInCondition
     Tree = tree_lib.Tree
+    # pylint: enable=invalid-name
 
     model.add_tree(
         Tree(
@@ -384,9 +396,6 @@ class InternalForestTest(parameterized.TestCase):
             )
         )
     )
-
-    print(model.get_tree(0).pretty(model.data_spec()), flush=True)
-    print(model.get_tree(1).pretty(model.data_spec()), flush=True)
 
     self.assertEqual(
         model.get_tree(0).pretty(model.data_spec()),
@@ -498,5 +507,114 @@ class InternalForestTest(parameterized.TestCase):
     self.assertIsNotNone(internal_forest.feature_encoding)
 
 
+class ToJaxTest(parameterized.TestCase):
+
+  @parameterized.parameters(
+      ([], {}, []),
+      ([1, 2, 3], {1: 0, 2: 1, 3: 2}, [0, 1, 2]),
+      ([1, 3], {1: 0, 3: 1}, [0, 1]),
+  )
+  def test_densify_conditions(
+      self, src_conditions, expected_mapping, expected_dense_conditions
+  ):
+    mapping, dense_conditions = to_jax._densify_conditions(src_conditions)
+    self.assertEqual(mapping, expected_mapping)
+    self.assertEqual(
+        dense_conditions, array.array("l", expected_dense_conditions)
+    )
+
+  @parameterized.named_parameters(
+      (
+          "regression_num",
+          ["f1", "f2"],
+          "label_regress",
+          generic_learner.Task.REGRESSION,
+          False,
+      ),
+      (
+          "regression_num_cat",
+          ["f1", "f2", "c1"],
+          "label_regress",
+          generic_learner.Task.REGRESSION,
+          True,
+      ),
+  )
+  def test_to_jax_function(
+      self,
+      features: List[str],
+      label: str,
+      task: generic_learner.Task,
+      has_encoding: bool,
+  ):
+
+    # Create YDF model
+    columns = features + [label]
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label=label,
+        task=task,
+        validation_ratio=0.0,
+    ).train(create_dataset(columns, 1000))
+
+    # Golden predictions
+    test_ds = create_dataset(columns, 1000)
+    ydf_predictions = model.predict(test_ds)
+
+    # Convert model to tf function
+    jax_model, feature_encoding = to_jax.to_jax_function(model)
+    assert (feature_encoding is not None) == has_encoding
+
+    # Generate Jax predictions
+    del test_ds[label]
+    if feature_encoding is not None:
+      input_values = feature_encoding.encode(test_ds)
+    else:
+      input_values = {
+          k: jnp.asarray(v) for k, v in test_ds.items() if k != label
+      }
+    jax_predictions = jax_model(input_values)
+
+    # Test predictions
+    np.testing.assert_allclose(
+        jax_predictions,
+        ydf_predictions,
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+    # Convert to a TensorFlow function
+    tf_model = tf.Module()
+    tf_model.my_call = tf.function(
+        jax2tf.convert(jax_model, with_gradient=False),
+        jit_compile=True,
+        autograph=False,
+    )
+
+    # Check TF predictions
+    tf_predictions = tf_model.my_call(input_values)
+    np.testing.assert_allclose(
+        tf_predictions,
+        ydf_predictions,
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+    # Saved and restore the TensorFlow function
+    with tempfile.TemporaryDirectory() as tempdir:
+      tf.saved_model.save(tf_model, tempdir)
+      restored_tf_model = tf.saved_model.load(tempdir)
+
+    # Check TF predictions from the restored model
+    restored_tf_predictions = restored_tf_model.my_call(input_values)
+    np.testing.assert_allclose(
+        restored_tf_predictions,
+        ydf_predictions,
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+
 if __name__ == "__main__":
-  absltest.main()
+  if sys.version_info < (3, 9):
+    print("JAX is not supported anymore on python <= 3.8. Skipping JAX tests.")
+  else:
+    absltest.main()

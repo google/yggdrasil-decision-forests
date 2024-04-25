@@ -16,14 +16,16 @@
 
 import dataclasses
 import enum
-from typing import Any, Sequence, Dict, Optional, List, Set
+import functools
 import array
+from typing import Any, Sequence, Dict, Optional, List, Set, Tuple
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
 from ydf.model import generic_model
 from ydf.model import tree as tree_lib
 from ydf.model.decision_forest_model import decision_forest_model
+from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
 
 # pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
@@ -79,6 +81,11 @@ def compact_dtype(values: Sequence[int]) -> Any:
 
 def to_compact_jax_array(values: Sequence[int]) -> jax.Array:
   """Converts a list of integers to a compact Jax array."""
+
+  if not values:
+    # Note: Because of the way Jax handle virtual out of bound access in vmap,
+    # it is important for arrayes to never be empty.
+    return jnp.asarray([0], dtype=jnp.int32)
 
   return jnp.asarray(values, dtype=compact_dtype(values))
 
@@ -345,6 +352,8 @@ class InternalForest:
       trees.
     begin_leaf_nodes: Index of the first leaf node for each of the trees.
     catgorical_mask: Boolean mask used in "is in" conditions.
+    initial_predictions: Initial predictions of the forest (before any tree is
+      applied).
     max_depth: Maximum depth of the trees.
   """
 
@@ -382,7 +391,24 @@ class InternalForest:
   catgorical_mask: ArrayBool = dataclasses.field(
       default_factory=lambda: array.array("b", [])
   )
+  initial_predictions: ArrayFloat = dataclasses.field(
+      default_factory=lambda: array.array("f", [])
+  )
   max_depth: int = 0
+
+  def clear_array_data(self) -> None:
+    """Clear all the array data."""
+    self.leaf_outputs = array.array("f", [])
+    self.split_features = array.array("l", [])
+    self.split_parameters = array.array("l", [])
+    self.negative_children = array.array("l", [])
+    self.positive_children = array.array("l", [])
+    self.condition_types = array.array("l", [])
+    self.root_nodes = array.array("l", [])
+    self.begin_non_leaf_nodes = array.array("l", [])
+    self.begin_leaf_nodes = array.array("l", [])
+    self.catgorical_mask = array.array("l", [])
+    self.initial_predictions = array.array("f", [])
 
   def __post_init__(self, model: generic_model.GenericModel):
     if not isinstance(model, decision_forest_model.DecisionForestModel):
@@ -393,6 +419,15 @@ class InternalForest:
     self.feature_encoding = FeatureEncoding.build(input_features, self.dataspec)
     self.feature_spec = InternalFeatureSpec(input_features)
 
+    if isinstance(
+        model, gradient_boosted_trees_model.GradientBoostedTreesModel
+    ):
+      self.initial_predictions = model.initial_predictions().tolist()
+    else:
+      self.initial_predictions = [0.0]
+
+    if not isinstance(model, decision_forest_model.DecisionForestModel):
+      raise ValueError("The model is not a decision forest")
     for tree in model.iter_trees():
       self._add_tree(tree)
 
@@ -400,8 +435,8 @@ class InternalForest:
     """Adds a tree to the forest."""
 
     begin_node_idx = BeginNodeIdx(
-        leaf_node=self._num_leaf_nodes(),
-        non_leaf_node=self._num_non_leaf_nodes(),
+        leaf_node=self.num_leaf_nodes(),
+        non_leaf_node=self.num_non_leaf_nodes(),
     )
     self.begin_leaf_nodes.append(begin_node_idx.leaf_node)
     self.begin_non_leaf_nodes.append(begin_node_idx.non_leaf_node)
@@ -414,7 +449,7 @@ class InternalForest:
 
     return len(self.root_nodes)
 
-  def _num_non_leaf_nodes(self) -> int:
+  def num_non_leaf_nodes(self) -> int:
     """Number of non leaf nodes in the forest so far."""
 
     n = len(self.split_features)
@@ -425,7 +460,7 @@ class InternalForest:
     assert n == len(self.condition_types)
     return n
 
-  def _num_leaf_nodes(self) -> int:
+  def num_leaf_nodes(self) -> int:
     """Number of leaf nodes in the forest so far."""
 
     return len(self.leaf_outputs)
@@ -449,13 +484,13 @@ class InternalForest:
             "The YDF Jax exporter does not support this leaf value:"
             f" {node.value!r}"
         )
-      node_idx = self._num_leaf_nodes()
+      node_idx = self.num_leaf_nodes()
       self.leaf_outputs.append(node.value.value)
       return NodeIdx(leaf_node=node_idx)
 
     # A non leaf node
     assert isinstance(node, tree_lib.NonLeaf)
-    node_idx = self._num_non_leaf_nodes()
+    node_idx = self.num_non_leaf_nodes()
 
     # Set condition
     if isinstance(node.condition, tree_lib.NumericalHigherThanCondition):
@@ -500,3 +535,292 @@ class InternalForest:
     self.positive_children[node_idx] = pos_child_node.offset(begin_node_idx)
 
     return NodeIdx(non_leaf_node=node_idx)
+
+
+def _densify_conditions(
+    src_conditions: ArrayInt,
+) -> Tuple[Dict[int, int], ArrayInt]:
+  """Creates a dense mapping of condition indices.
+
+  For instance, if the model only uses conditions 1 and 3, creates the mapping
+  { 1 -> 0, 3 -> 1} so condition index can be encoded as a value in [0, 2).
+  So _densify_conditions([3, 1, 3]) == ({1: 0, 3: 1}, [1, 0, 1]).
+
+  Args:
+    src_conditions: List of conditions.
+
+  Returns:
+    Mapping of conditions and result of mapping applied to "conditions".
+  """
+
+  unique_conditions: List[int] = sorted(list(set(src_conditions)))  # pytype: disable=annotation-type-mismatch
+  mapping = {old_id: new_id for new_id, old_id in enumerate(unique_conditions)}
+  dst_conditions = [mapping[c] for c in src_conditions]
+  return mapping, array.array("l", dst_conditions)
+
+
+@dataclasses.dataclass
+class InternalForestJaxArrays:
+  """Jax arrays for each of the data fields in InternalForest."""
+
+  forest: dataclasses.InitVar[InternalForest]
+  leaf_outputs: jax.Array = dataclasses.field(init=False)
+  split_features: jax.Array = dataclasses.field(init=False)
+  split_parameters: jax.Array = dataclasses.field(init=False)
+  negative_children: jax.Array = dataclasses.field(init=False)
+  positive_children: jax.Array = dataclasses.field(init=False)
+  dense_condition_mapping: Dict[int, int] = dataclasses.field(init=False)
+  dense_condition_types: Optional[jax.Array] = dataclasses.field(init=False)
+  root_nodes: jax.Array = dataclasses.field(init=False)
+  begin_non_leaf_nodes: jax.Array = dataclasses.field(init=False)
+  begin_leaf_nodes: jax.Array = dataclasses.field(init=False)
+  catgorical_mask: Optional[jax.Array] = dataclasses.field(init=False)
+  initial_predictions: jax.Array = dataclasses.field(init=False)
+
+  def __post_init__(self, forest: InternalForest):
+    asarray = jax.numpy.asarray
+
+    self.leaf_outputs = asarray(forest.leaf_outputs, dtype=jnp.float32)
+    self.split_features = to_compact_jax_array(forest.split_features)
+    self.split_parameters = asarray(forest.split_parameters, dtype=jnp.float32)
+    self.negative_children = to_compact_jax_array(forest.negative_children)
+    self.positive_children = to_compact_jax_array(forest.positive_children)
+
+    self.dense_condition_mapping, dense_condition_types = _densify_conditions(
+        forest.condition_types
+    )
+    if len(self.dense_condition_mapping) == 1:
+      self.dense_condition_types = None
+    else:
+      self.dense_condition_types = to_compact_jax_array(dense_condition_types)
+
+    self.root_nodes = to_compact_jax_array(forest.root_nodes)
+    self.begin_non_leaf_nodes = to_compact_jax_array(
+        forest.begin_non_leaf_nodes
+    )
+    self.begin_leaf_nodes = to_compact_jax_array(forest.begin_leaf_nodes)
+
+    if forest.catgorical_mask:
+      self.catgorical_mask = asarray(forest.catgorical_mask, dtype=jnp.bool_)
+    else:
+      self.catgorical_mask = None
+
+    self.initial_predictions = asarray(
+        forest.initial_predictions, dtype=jnp.float32
+    )
+
+
+def to_jax_function(
+    model: generic_model.GenericModel,
+    jit: bool = True,
+) -> Tuple[Any, Optional[FeatureEncoding]]:
+  """Converts a model into a JAX function.
+
+  Args:
+    model: A YDF model.
+    jit: If true, compiles the function with @jax.jit.
+
+  Returns:
+    A Jax function and optionally a FeatureEncoding object to encode
+    features. If the model does not need any special feature
+    encoding, the second returned value is None.
+  """
+
+  # TODO: Add support for Random Forest models.
+  if not isinstance(
+      model, gradient_boosted_trees_model.GradientBoostedTreesModel
+  ):
+    raise ValueError(
+        "The YDF JAX convertor only support GBDT models. Instead, got model of"
+        f" type {type(model)}"
+    )
+
+  # TODO: Add support for all tasks.
+  if model.task() != generic_model.Task.REGRESSION:
+    raise ValueError(
+        "The YDF JAX convertor only support regression models. Instead got"
+        f" model with task: {model.task()}"
+    )
+
+  forest = InternalForest(model)
+
+  if forest.num_trees() == 0:
+    raise ValueError(
+        "The YDF JAX convertor only supports models with at least one tree"
+    )
+
+  if forest.num_non_leaf_nodes() == 0:
+    raise ValueError(
+        "The YDF JAX convertor does not support constant models e.g. models"
+        " containing only stumps"
+    )
+
+  jax_arrays = InternalForestJaxArrays(forest)
+  forest.clear_array_data()
+
+  if len(jax_arrays.initial_predictions) != 1:
+    # TODO: Add support for multi-dim models.
+    raise ValueError(
+        "The YDF JAX convertor only supports single dimensional models"
+    )
+
+  predict = functools.partial(_predict_fn, forest=forest, jax_arrays=jax_arrays)
+
+  if jit:
+    predict = jax.jit(predict)
+  return predict, forest.feature_encoding
+
+
+def _predict_fn(
+    feature_values: Dict[str, jax.Array],
+    forest: InternalForest,
+    jax_arrays: InternalForestJaxArrays,
+) -> jax.Array:
+  """Computes the predictions of the model in Jax.
+
+  Following are some notes about the implementation of the routing algorithm in
+    JAX:
+  - Because of the vmap operators, all branches of switchs / selects /
+    for-conditions can be executed. Therefore, non-active branch should be
+    robust to out-of-bounds array access. After this execution, only the result
+    of the active branch is kept.
+  - To minimize the amount of synchronizations between the host and device, the
+    number of iterations of the routing algorithm is constant and equal to the
+    maximum node depth access the entire model (instead of depending on the
+    depth of the active leaf). When the routing algorithm reaches a leaf, it
+    "loops on itself" until the pre-defined number of routing iterations are
+    executed.
+  - Model dependent optimizations can be applied during the generation of the
+    XLA code. For example, if all the conditions have the same type, the
+    condition switch block can be removed from the XLA code.
+
+  Args:
+    feature_values: Dictionary of input feature values.
+    forest: Forest data.
+    jax_arrays: JAX array data.
+
+  Returns:
+    Model predictions.
+  """
+
+  def predict_one_example(intern_feature_values):
+    """Compute model predictions on a single example."""
+
+    def predict_one_example_one_tree(
+        root_node, begin_non_leaf_node, begin_leaf_node
+    ):
+      """Generates the prediction of a single tree on a single example."""
+
+      node_offset_idx = jax.lax.fori_loop(
+          0,
+          forest.max_depth,
+          functools.partial(
+              _get_leaf_idx,
+              begin_non_leaf_node=begin_non_leaf_node,
+              intern_feature_values=intern_feature_values,
+              jax_arrays=jax_arrays,
+          ),
+          root_node,
+          unroll=True,
+      )
+      value_idx = begin_leaf_node - 1 - node_offset_idx
+      return jax_arrays.leaf_outputs[value_idx]
+
+    # Compute forest prediction.
+    all_predictions = jax.vmap(predict_one_example_one_tree)(
+        jax_arrays.root_nodes,
+        jax_arrays.begin_non_leaf_nodes,
+        jax_arrays.begin_leaf_nodes,
+    )
+    return jax.numpy.sum(
+        all_predictions, initial=jax_arrays.initial_predictions[0]
+    )
+
+  # Process the feature values for the model consuption.
+  intern_feature_values = dataclasses.asdict(
+      forest.feature_spec.convert_features(feature_values)
+  )
+
+  return jax.vmap(predict_one_example)(intern_feature_values)
+
+
+def _get_leaf_idx(
+    iter_idx,
+    node_offset,
+    begin_non_leaf_node,
+    intern_feature_values: Dict[str, jax.Array],
+    jax_arrays: InternalForestJaxArrays,
+):
+  """Finds the leaf reached by an example using a routing algorithm.
+
+  Args:
+    iter_idx: Iterator index. Not used.
+    node_offset: Current node offset.
+    begin_non_leaf_node: Index of the root node of the tree.
+    intern_feature_values: Feature values.
+    jax_arrays: JAX array data.
+
+  Returns:
+    Active child node offset.
+  """
+  del iter_idx
+
+  node_idx = node_offset + begin_non_leaf_node
+
+  # Implementation of the various conditions.
+
+  def condition_greater_than(node_idx):
+    """Evaluates a "greather-than" condition."""
+    feature_value = intern_feature_values["numerical"][
+        jax_arrays.split_features[node_idx]
+    ]
+    return feature_value >= jax_arrays.split_parameters[node_idx]
+
+  def condition_is_in(node_idx):
+    """Evaluates a "is-in" condition."""
+    feature_value = intern_feature_values["categorical"][
+        jax_arrays.split_features[node_idx]
+    ]
+    categorical_mask_offset = feature_value + jax.lax.bitcast_convert_type(
+        jax_arrays.split_parameters[node_idx], jnp.uint32
+    )
+    return jax_arrays.catgorical_mask[categorical_mask_offset]
+
+  # Assemble the condition map.
+  condition_fns = [None] * len(jax_arrays.dense_condition_mapping)
+  if ConditionType.GREATER_THAN in jax_arrays.dense_condition_mapping:
+    condition_fns[
+        jax_arrays.dense_condition_mapping[ConditionType.GREATER_THAN]
+    ] = condition_greater_than
+  if ConditionType.IS_IN in jax_arrays.dense_condition_mapping:
+    condition_fns[jax_arrays.dense_condition_mapping[ConditionType.IS_IN]] = (
+        condition_is_in
+    )
+
+  if len(condition_fns) == 1:
+    # Since there is only one type of conditions, there is not need for a
+    # condition switch.
+    assert jax_arrays.dense_condition_types is None
+    condition_value = condition_fns[0](node_idx)
+
+  else:
+    # Condition switch on the type of conditions.
+    assert jax_arrays.dense_condition_types is not None
+    condition_value = jax.lax.switch(
+        jax_arrays.dense_condition_types[node_idx],
+        condition_fns,
+        node_idx,
+    )
+
+  new_node_offset_if_non_leaf = jax.lax.select(
+      condition_value,
+      jax_arrays.positive_children[node_idx],
+      jax_arrays.negative_children[node_idx],
+  )
+
+  # Repeats forever the leaf node if we are already in a leaf node.
+  return jax.lax.select(
+      node_offset >= 0,
+      new_node_offset_if_non_leaf,  # Non-leaf
+      node_offset,  # Leaf
+  )

@@ -119,6 +119,7 @@ py_library(
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/model/decision_forest_model",
+        "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/tree:all",
     ],
 )
@@ -304,7 +305,9 @@ py_test(
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # jax dep,
+        # jax/experimental/jax2tf dep,
         # numpy dep,
+        # tensorflow dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/learner:generic_learner",
