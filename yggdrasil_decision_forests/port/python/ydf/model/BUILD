@@ -179,6 +179,20 @@ py_library(
     ],
 )
 
+py_library(
+    name = "benchmark",
+    srcs = ["benchmark.py"],
+    deps = [
+        ":export_jax",  # buildcleaner: keep
+        ":generic_model",
+        # jax dep,
+        # numpy dep,
+        "//ydf/dataset",
+        "//ydf/learner:specialized_learners",
+        "//ydf/utils:string_lib",
+    ],
+)
+
 # Tests
 # =====
 
@@ -314,5 +328,17 @@ py_test(
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
         "//ydf/model/tree:all",
+    ],
+)
+
+py_test(
+    name = "benchmark_test",
+    srcs = ["benchmark_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":benchmark",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
     ],
 )
