@@ -14,8 +14,7 @@
 
 """String utilities."""
 
-
-from typing import Any, List, Optional, Sequence
+from typing import Any, Optional, Sequence
 
 
 def indent(text: str, num_spaces: int = 4) -> str:
@@ -45,6 +44,8 @@ def table(
     content: Sequence[Sequence[Any]],
     row_labels: Optional[Sequence[str]] = None,
     column_labels: Optional[Sequence[str]] = None,
+    data_row_separator: bool = True,
+    squeeze_column: bool = False,
 ) -> str:
   """Returns a string representation of the table.
 
@@ -81,6 +82,10 @@ def table(
     row_labels: Row names. If set, `content` should have `len(row_labels)` rows.
     column_labels: Column names. If set, `content` should have
       `len(column_labels)` columns.
+    data_row_separator: If true, separate all the rows with a line. If False,
+      only separate the header and footer rows.
+    squeeze_column: If true, squeeze columns to content. If false, all the
+      columns have the same width.
   """
 
   if not content or not content[0]:
@@ -126,26 +131,34 @@ def table(
     row_label = [row_labels[row_idx]] if row_labels is not None else []
     str_content.append(row_label + [format_cell(cell) for cell in row])
 
-  max_length = 0
-  for col_idx in range(num_columns):
-    max_length = max(max_length, max(len(row[col_idx]) for row in str_content))
+  margin = 2  # One space before and after each cell content.
+  cell_length_per_col = [
+      max(len(row[col_idx]) for row in str_content) + margin
+      for col_idx in range(num_columns)
+  ]
 
-  # One space before and after each cell content.
-  cell_length = max_length + 2
+  if not squeeze_column:
+    # Make all the cells having the same width
+    max_cell_length_per_col = max(*cell_length_per_col)
+    cell_length_per_col = [max_cell_length_per_col for _ in range(num_columns)]
 
   vertical_separator = "|"
   horizontal_separator = "-"
   dot_separator = "+"
 
-  row_separator = (
-      (dot_separator + horizontal_separator * cell_length) * num_columns
-      + dot_separator
-      + "\n"
+  row_separator = "".join(
+      [
+          (dot_separator + horizontal_separator * cell_length)
+          for cell_length in cell_length_per_col
+      ]
+      + [dot_separator, "\n"]
   )
 
   output = [row_separator]
-  for row in str_content:
-    for col in row:
+  for row_idx, row in enumerate(str_content):
+    for col, cell_length in zip(row, cell_length_per_col):
       output.append(f"{vertical_separator}{col.rjust(cell_length - 1)} ")
-    output.append(f"{vertical_separator}\n{row_separator}")
+    output.append(f"{vertical_separator}\n")
+    if data_row_separator or row_idx == 0 or row_idx == len(str_content) - 1:
+      output.append(row_separator)
   return "".join(output)

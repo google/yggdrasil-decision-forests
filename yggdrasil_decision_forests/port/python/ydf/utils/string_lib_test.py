@@ -63,6 +63,56 @@ class StringTest(absltest.TestCase):
         """),
     )
 
+  def test_table_with_col_no_data_row_separator(self):
+    self.assertEqual(
+        string_lib.table(
+            content=[["a", "b"], [5.12345678, 7.0]],
+            column_labels=["X", "Y"],
+            data_row_separator=False,
+        ),
+        textwrap.dedent("""\
+        +---------+---------+
+        |       X |       Y |
+        +---------+---------+
+        |       a |       b |
+        | 5.12346 |       7 |
+        +---------+---------+
+        """),
+    )
+
+  def test_table_squeezed_column(self):
+    self.assertEqual(
+        string_lib.table(
+            content=[["a", "b"], [5.12345678, 7.0]],
+            squeeze_column=True,
+        ),
+        textwrap.dedent("""\
+        +---------+---+
+        |       a | b |
+        +---------+---+
+        | 5.12346 | 7 |
+        +---------+---+
+        """),
+    )
+
+  def test_table_squeezed_column_and_no_data_row_separator(self):
+    self.assertEqual(
+        string_lib.table(
+            content=[["a", "b"], [5.12345678, 7.0]],
+            column_labels=["X", "Y"],
+            data_row_separator=False,
+            squeeze_column=True,
+        ),
+        textwrap.dedent("""\
+        +---------+---+
+        |       X | Y |
+        +---------+---+
+        |       a | b |
+        | 5.12346 | 7 |
+        +---------+---+
+        """),
+    )
+
   def test_table_with_row(self):
     self.assertEqual(
         string_lib.table(
