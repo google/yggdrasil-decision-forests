@@ -9,6 +9,7 @@ from google3.third_party.yggdrasil_decision_forests.metric import metric_pb2
 from google3.third_party.yggdrasil_decision_forests.model import abstract_model_pb2
 from google3.third_party.yggdrasil_decision_forests.model import hyperparameter_pb2
 from google3.third_party.yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
+from google3.third_party.yggdrasil_decision_forests.model.gradient_boosted_trees import gradient_boosted_trees_pb2
 from google3.third_party.yggdrasil_decision_forests.model.random_forest import random_forest_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
 from google3.third_party.yggdrasil_decision_forests.utils import fold_generator_pb2
@@ -199,6 +200,8 @@ class GradientBoostedTreesCCModel(DecisionForestCCModel):
   def validation_loss(self) -> float: ...
   def validation_evaluation(self) -> metric_pb2.EvaluationResults: ...
   def initial_predictions(self) -> npt.NDArray[float]: ...
+  def num_trees_per_iter(self) -> int: ...
+  def loss(self) -> gradient_boosted_trees_pb2.Loss: ...
 
 ModelCCType = TypeVar('ModelCCType', bound=GenericCCModel)
 

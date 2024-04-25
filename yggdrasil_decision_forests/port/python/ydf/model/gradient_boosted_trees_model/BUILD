@@ -19,6 +19,7 @@ pybind_library(
         "@com_google_absl//absl/status:statusor",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
     ],
 )
@@ -29,7 +30,9 @@ py_library(
     deps = [
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_py_proto",
         "//ydf/cc:ydf",
+        "//ydf/learner:custom_loss_py",
         "//ydf/metric",
         "//ydf/model/decision_forest_model",
     ],
@@ -53,6 +56,7 @@ py_test(
         # numpy dep,
         # pandas dep,
         "//ydf/dataset:dataspec",
+        "//ydf/learner:custom_loss_py",
         "//ydf/learner:specialized_learners",
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",

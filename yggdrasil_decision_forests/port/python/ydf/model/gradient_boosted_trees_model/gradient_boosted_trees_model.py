@@ -20,7 +20,9 @@ from typing import Optional
 import numpy.typing as npt
 
 from yggdrasil_decision_forests.metric import metric_pb2
+from yggdrasil_decision_forests.model.gradient_boosted_trees import gradient_boosted_trees_pb2
 from ydf.cc import ydf
+from ydf.learner import custom_loss
 from ydf.metric import metric
 from ydf.model.decision_forest_model import decision_forest_model
 
@@ -99,3 +101,29 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
     ```
     """
     return self.validation_evaluation()
+
+  def num_trees_per_iteration(self) -> int:
+    """The number of trees trained per gradient boosting iteration."""
+
+    return self._model.num_trees_per_iter()
+
+  def activation(self) -> custom_loss.Activation:
+    """The model activation function."""
+    loss = self._model.loss()
+    if loss in [
+        gradient_boosted_trees_pb2.Loss.BINOMIAL_LOG_LIKELIHOOD,
+        gradient_boosted_trees_pb2.Loss.BINARY_FOCAL_LOSS,
+    ]:
+      return custom_loss.Activation.SIGMOID
+    elif loss == gradient_boosted_trees_pb2.Loss.MULTINOMIAL_LOG_LIKELIHOOD:
+      return custom_loss.Activation.SOFTMAX
+    elif loss in [
+        gradient_boosted_trees_pb2.Loss.SQUARED_ERROR,
+        gradient_boosted_trees_pb2.Loss.LAMBDA_MART_NDCG5,
+        gradient_boosted_trees_pb2.Loss.XE_NDCG_MART,
+        gradient_boosted_trees_pb2.Loss.POISSON,
+        gradient_boosted_trees_pb2.Loss.MEAN_AVERAGE_ERROR,
+    ]:
+      return custom_loss.Activation.IDENTITY
+    else:
+      raise ValueError(f"No activation registered for loss: {loss!r}")

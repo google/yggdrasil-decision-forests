@@ -118,6 +118,7 @@ py_library(
         # jax dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",
+        "//ydf/learner:custom_loss_py",
         "//ydf/model/decision_forest_model",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/tree:all",

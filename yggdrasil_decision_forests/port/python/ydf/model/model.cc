@@ -211,6 +211,9 @@ void init_model(py::module_& m) {
            &GradientBoostedTreesCCModel::initial_predictions)
       .def("validation_evaluation",
            &GradientBoostedTreesCCModel::validation_evaluation)
+      .def("loss", &GradientBoostedTreesCCModel::loss)
+      .def("num_trees_per_iter",
+           &GradientBoostedTreesCCModel::num_trees_per_iter)
       .def_property_readonly_static(
           "kRegisteredName", [](py::object /* self */) {
             return model::gradient_boosted_trees::GradientBoostedTreesModel::

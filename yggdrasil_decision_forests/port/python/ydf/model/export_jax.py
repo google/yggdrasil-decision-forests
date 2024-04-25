@@ -19,6 +19,7 @@ import enum
 import functools
 import array
 from typing import Any, Sequence, Dict, Optional, List, Set, Tuple
+import logging
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
@@ -26,6 +27,7 @@ from ydf.model import generic_model
 from ydf.model import tree as tree_lib
 from ydf.model.decision_forest_model import decision_forest_model
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
+from ydf.learner import custom_loss
 
 # pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
@@ -355,6 +357,7 @@ class InternalForest:
     initial_predictions: Initial predictions of the forest (before any tree is
       applied).
     max_depth: Maximum depth of the trees.
+    activation: Activation (a.k.a linkage) function applied on the model output.
   """
 
   model: dataclasses.InitVar[generic_model.GenericModel]
@@ -395,6 +398,7 @@ class InternalForest:
       default_factory=lambda: array.array("f", [])
   )
   max_depth: int = 0
+  activation: custom_loss.Activation = dataclasses.field(init=False)
 
   def clear_array_data(self) -> None:
     """Clear all the array data."""
@@ -408,7 +412,7 @@ class InternalForest:
     self.begin_non_leaf_nodes = array.array("l", [])
     self.begin_leaf_nodes = array.array("l", [])
     self.catgorical_mask = array.array("l", [])
-    self.initial_predictions = array.array("f", [])
+    # Note: We don't release "initial_predictions".
 
   def __post_init__(self, model: generic_model.GenericModel):
     if not isinstance(model, decision_forest_model.DecisionForestModel):
@@ -418,6 +422,13 @@ class InternalForest:
     self.dataspec = model.data_spec()
     self.feature_encoding = FeatureEncoding.build(input_features, self.dataspec)
     self.feature_spec = InternalFeatureSpec(input_features)
+
+    if isinstance(
+        model, gradient_boosted_trees_model.GradientBoostedTreesModel
+    ):
+      self.activation = model.activation()
+    else:
+      self.activation = custom_loss.Activation.IDENTITY
 
     if isinstance(
         model, gradient_boosted_trees_model.GradientBoostedTreesModel
@@ -635,13 +646,6 @@ def to_jax_function(
         f" type {type(model)}"
     )
 
-  # TODO: Add support for all tasks.
-  if model.task() != generic_model.Task.REGRESSION:
-    raise ValueError(
-        "The YDF JAX convertor only support regression models. Instead got"
-        f" model with task: {model.task()}"
-    )
-
   forest = InternalForest(model)
 
   if forest.num_trees() == 0:
@@ -655,14 +659,16 @@ def to_jax_function(
         " containing only stumps"
     )
 
+  if len(forest.initial_predictions) != 1 and any(
+      [v != 0.0 for v in forest.initial_predictions]
+  ):
+    raise ValueError(
+        "JAX conversion does not support non-zero multi-dimensional"
+        f" initial_predictions. Got {forest.initial_predictions!r}"
+    )
+
   jax_arrays = InternalForestJaxArrays(forest)
   forest.clear_array_data()
-
-  if len(jax_arrays.initial_predictions) != 1:
-    # TODO: Add support for multi-dim models.
-    raise ValueError(
-        "The YDF JAX convertor only supports single dimensional models"
-    )
 
   predict = functools.partial(_predict_fn, forest=forest, jax_arrays=jax_arrays)
 
@@ -732,9 +738,25 @@ def _predict_fn(
         jax_arrays.begin_non_leaf_nodes,
         jax_arrays.begin_leaf_nodes,
     )
-    return jax.numpy.sum(
-        all_predictions, initial=jax_arrays.initial_predictions[0]
-    )
+
+    if len(forest.initial_predictions) == 1:
+      raw_output = jax.numpy.sum(
+          all_predictions, initial=jax_arrays.initial_predictions[0]
+      )
+    else:
+      shaped_predictions = jax.numpy.reshape(
+          all_predictions, (-1, len(forest.initial_predictions))
+      )
+      raw_output = jax.numpy.sum(shaped_predictions, axis=0)
+
+    if forest.activation == custom_loss.Activation.IDENTITY:
+      return raw_output
+    elif forest.activation == custom_loss.Activation.SIGMOID:
+      return jax.nn.sigmoid(raw_output)
+    elif forest.activation == custom_loss.Activation.SOFTMAX:
+      return jax.nn.softmax(raw_output)
+    else:
+      raise ValueError(f"Unsupported activation: {forest.activation!r}")
 
   # Process the feature values for the model consuption.
   intern_feature_values = dataclasses.asdict(

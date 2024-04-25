@@ -525,18 +525,36 @@ class ToJaxTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       (
-          "regression_num",
+          "gbt_regression_num",
           ["f1", "f2"],
           "label_regress",
           generic_learner.Task.REGRESSION,
           False,
+          specialized_learners.GradientBoostedTreesLearner,
       ),
       (
-          "regression_num_cat",
+          "gbt_regression_num_cat",
           ["f1", "f2", "c1"],
           "label_regress",
           generic_learner.Task.REGRESSION,
           True,
+          specialized_learners.GradientBoostedTreesLearner,
+      ),
+      (
+          "gbt_class_binary_num_cat",
+          ["f1", "f2", "c1", "label_class_binary"],
+          "label_class_binary",
+          generic_learner.Task.CLASSIFICATION,
+          True,
+          specialized_learners.GradientBoostedTreesLearner,
+      ),
+      (
+          "gbt_class_multi_num_cat",
+          ["f1", "f2", "c1", "label_class_multi"],
+          "label_class_multi",
+          generic_learner.Task.CLASSIFICATION,
+          True,
+          specialized_learners.GradientBoostedTreesLearner,
       ),
   )
   def test_to_jax_function(
@@ -545,14 +563,20 @@ class ToJaxTest(parameterized.TestCase):
       label: str,
       task: generic_learner.Task,
       has_encoding: bool,
+      learner,
   ):
+
+    if learner == specialized_learners.GradientBoostedTreesLearner:
+      learner_kwargs = {"validation_ratio": 0.0}
+    else:
+      learner_kwargs = {}
 
     # Create YDF model
     columns = features + [label]
-    model = specialized_learners.GradientBoostedTreesLearner(
+    model = learner(
         label=label,
         task=task,
-        validation_ratio=0.0,
+        **learner_kwargs,
     ).train(create_dataset(columns, 1000))
 
     # Golden predictions

@@ -24,6 +24,7 @@ import numpy.testing as npt
 import pandas as pd
 
 from ydf.dataset import dataspec
+from ydf.learner import custom_loss
 from ydf.learner import specialized_learners
 from ydf.model import generic_model
 from ydf.model import model_lib
@@ -45,20 +46,25 @@ class GradientBoostedTreesTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
+
+    def load_model(
+        name: str,
+        directory: str = "model",
+    ) -> gradient_boosted_trees_model.GradientBoostedTreesModel:
+      path = os.path.join(test_utils.ydf_test_data_path(), directory, name)
+      return model_lib.load_model(path)
+
     # This model is a classification model for pure serving.
-    adult_binary_class_gbdt_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
-    )
-    self.adult_binary_class_gbdt = model_lib.load_model(
-        adult_binary_class_gbdt_path
-    )
+    self.adult_binary_class_gbdt = load_model("adult_binary_class_gbdt")
+
     # This model is a classification model with full training logs.
-    gbt_adult_base_with_na_path = os.path.join(
-        test_utils.ydf_test_data_path(), "golden", "gbt_adult_base_with_na"
+    self.gbt_adult_base_with_na = load_model(
+        "gbt_adult_base_with_na", directory="golden"
     )
-    self.gbt_adult_base_with_na = model_lib.load_model(
-        gbt_adult_base_with_na_path
-    )
+
+    self.iris_multi_class_gbdt = load_model("iris_multi_class_gbdt")
+    self.synthetic_ranking_gbdt = load_model("synthetic_ranking_gbdt")
+    self.abalone_regression_gbdt = load_model("abalone_regression_gbdt")
 
   def test_input_feature_names(self):
     self.assertEqual(
@@ -154,11 +160,13 @@ class GradientBoostedTreesTest(absltest.TestCase):
 
   def test_validation_evaluation_no_training_logs(self):
     validation_evaluation = self.adult_binary_class_gbdt.validation_evaluation()
+    self.assertIsNotNone(validation_evaluation)
     self.assertIsNone(validation_evaluation.accuracy)
     self.assertAlmostEqual(validation_evaluation.loss, 0.57384294)
 
   def test_validation_evaluation_with_content(self):
     validation_evaluation = self.gbt_adult_base_with_na.validation_evaluation()
+    self.assertIsNotNone(validation_evaluation)
     self.assertAlmostEqual(validation_evaluation.accuracy, 0.8498403)
 
   def test_variable_importances(self):
@@ -198,6 +206,27 @@ class GradientBoostedTreesTest(absltest.TestCase):
         },
     )
 
+  def test_activation(self):
+    self.assertEqual(
+        self.adult_binary_class_gbdt.activation(),
+        custom_loss.Activation.SIGMOID,
+    )
+    self.assertEqual(
+        self.iris_multi_class_gbdt.activation(),
+        custom_loss.Activation.SOFTMAX,
+    )
+    self.assertEqual(
+        self.synthetic_ranking_gbdt.activation(),
+        custom_loss.Activation.IDENTITY,
+    )
+    self.assertEqual(
+        self.abalone_regression_gbdt.activation(),
+        custom_loss.Activation.IDENTITY,
+    )
+
+  def test_num_trees_per_iterations(self):
+    self.assertEqual(self.adult_binary_class_gbdt.num_trees_per_iteration(), 1)
+
   def test_predict_distance(self):
     dataset = pd.read_csv(
         os.path.join(
@@ -234,6 +263,8 @@ class GradientBoostedTreesTest(absltest.TestCase):
     tree = self.adult_binary_class_gbdt.get_tree(1)
     self.assertFalse(tree.root.is_leaf)
     # Validated with: external/ydf_cc/yggdrasil_decision_forests/cli:show_model
+    self.assertIsNotNone(tree.root)
+    assert isinstance(tree.root, node_lib.NonLeaf)
     self.assertEqual(
         tree.root.condition,
         condition_lib.CategoricalIsInCondition(

@@ -24,6 +24,7 @@
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "ydf/model/decision_forest_model/decision_forest_wrapper.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -61,6 +62,13 @@ class GradientBoostedTreesCCModel : public DecisionForestCCModel {
   }
 
   py::array_t<float> initial_predictions() const;
+
+  ::yggdrasil_decision_forests::model::gradient_boosted_trees::proto::Loss
+  loss() const {
+    return gbt_model_->loss();
+  }
+
+  int num_trees_per_iter() const { return gbt_model_->num_trees_per_iter(); }
 
  private:
   // This is a non-owning pointer to the model held by `model_`.
