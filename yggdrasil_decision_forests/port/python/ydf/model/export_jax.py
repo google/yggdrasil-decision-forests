@@ -35,10 +35,7 @@ try:
   import jax.numpy as jnp
   import jax
 except ImportError as exc:
-  raise ImportError(
-      "JAX is needed for this operation. Install JAX following"
-      " https://jax.readthedocs.io/en/latest/installation.html and try again."
-  ) from exc
+  raise ImportError("Cannot import jax") from exc
 # pylint: enable=g-import-not-at-top
 # pytype: enable=import-error
 

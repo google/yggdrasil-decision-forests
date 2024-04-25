@@ -110,18 +110,19 @@ py_library(
     ],
 )
 
+# Note: This build rule does not depends on JAX. To use its functionalities, JAX needs to be
+# imported manually by the call i.e. //third_party/py/jax.
 py_library(
     name = "export_jax",
     srcs = ["export_jax.py"],
     deps = [
         ":generic_model",
-        # jax dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/learner:custom_loss_py",
         "//ydf/model/decision_forest_model",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/tree:all",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## HEAD
+
+### Feature
+
+-   Add `model.to_jax_function()` function to convert a YDF model into a JAX
+    function that can be combined with other JAX operations.
+
 ## 0.4.2- 2024-04-22
 
 ### Feature

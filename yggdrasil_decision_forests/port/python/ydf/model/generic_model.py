@@ -821,6 +821,46 @@ Use `model.describe()` for more details
         squeeze_binary_classification=squeeze_binary_classification,
     )
 
+  def to_jax_function(
+      self, jit: bool = True
+  ) -> Tuple[Any, Optional["export_jax.FeatureEncoding"]]:  # pytype: disable=name-error
+    """Converts the YDF model into a JAX function.
+
+    Usage example:
+
+    ```python
+    import ydf
+    import numpy as np
+    import jax.numpy as jnp
+
+    # Train a model.
+    model = ydf.RandomForestLearner(label="l").train({
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    })
+
+    # Convert model to a JAX function.
+    jax_model, feature_encoding = model.o_jax_function()
+
+    # Make predictions with the TF module.
+    jax_predictions = jax_model({
+        "f1": jnp.array([0, 0.5, 1]),
+        "f2": jnp.array([1, 0, 0.5]),
+    })
+    ```
+
+    Args:
+      jit: If true, compiles the function with @jax.jit.
+
+    Returns:
+      A Jax function and optionnaly a FeatureEncoding object to encode
+      features. If the model does not need any special feature
+      encoding, the second returned value is None.
+    """
+
+    return _get_export_jax().to_jax_function(model=self, jit=jit)
+
   def hyperparameter_optimizer_logs(
       self,
   ) -> Optional[optimizer_logs.OptimizerLogs]:
@@ -991,6 +1031,19 @@ Use `model.describe()` for more details
         the fastest engine.
     """
     self._model.ForceEngine(engine_name)
+
+
+def _get_export_jax():
+  try:
+    from ydf.model import export_jax  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+
+    return export_jax
+  except ImportError as exc:
+    raise ValueError(
+        '"jax" is needed by this function. Make sure it installed and try'
+        " again. See https://jax.readthedocs.io/en/latest/installation.html or"
+        " add dependency //third_party/py/jax"
+    ) from exc
 
 
 ModelType = TypeVar("ModelType", bound=GenericModel)

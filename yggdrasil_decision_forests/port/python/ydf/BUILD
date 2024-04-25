@@ -1,5 +1,3 @@
-# TODO: describe this package.
-
 # pytype test and library
 
 package(
@@ -22,6 +20,7 @@ py_library(
         "//ydf/learner:specialized_learners",
         "//ydf/learner:tuner",
         "//ydf/learner:worker",
+        "//ydf/model:export_jax",  # buildcleaner: keep
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
         "//ydf/model:model_metadata",
@@ -50,6 +49,7 @@ py_test(
         ":api",
         # absl/logging dep,
         # absl/testing:absltest dep,
+        # jax dep,  # buildcleaner: keep
         # pandas dep,
         "//ydf/utils:test_utils",
     ],
