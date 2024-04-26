@@ -12,18 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-r"""Tests the model inference benchmark.
-
-Run the benchmark locally with:
-
-sudo apt install linux-cpupower
-sudo cpupower frequency-set --governor performance
-
-bazel run -c opt --copt=-mfma --copt=-mavx2 --copt=-mavx \
-    //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/model:benchmark_test\
-        --test_filter=ToJaxTest.test_benchmark
-
-"""
+"""Tests the model inference benchmark."""
 
 import sys
 
@@ -37,7 +26,9 @@ from ydf.model import benchmark
 class ToJaxTest(parameterized.TestCase):
 
   def test_benchmark(self):
-    benchmark.run_preconfigured()
+    benchmark.run_preconfigured(
+        models=["reg gbt; num feat"]
+    )
 
   def test_get_num_examples(self):
     self.assertEqual(

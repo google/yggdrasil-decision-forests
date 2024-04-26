@@ -195,9 +195,13 @@ py_library(
     srcs = ["benchmark.py"],
     deps = [
         ":export_jax",  # buildcleaner: keep
+        ":export_tf",  # buildcleaner: keep
         ":generic_model",
         # jax dep,
         # numpy dep,
+        # tensorflow:tensorflow_no_contrib dep,
+        # tensorflow_decision_forests dep,
+        # ydf dep,
         "//ydf/dataset",
         "//ydf/learner:specialized_learners",
         "//ydf/utils:string_lib",
