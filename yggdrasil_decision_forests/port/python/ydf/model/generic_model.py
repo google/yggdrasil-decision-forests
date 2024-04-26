@@ -30,7 +30,6 @@ from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.metric import metric
 from ydf.model import analysis
-from ydf.model import export_tf
 from ydf.model import model_metadata
 from ydf.model import optimizer_logs
 from ydf.model import template_cpp_export
@@ -605,7 +604,7 @@ Use `model.describe()` for more details
       input_model_signature_fn: Any = None,
       *,
       mode: Literal["keras", "tf"] = "keras",
-      feature_dtypes: Dict[str, export_tf.TFDType] = {},
+      feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
       servo_api: bool = False,
       feed_example_proto: bool = False,
       pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
@@ -735,7 +734,7 @@ Use `model.describe()` for more details
           message_id=log.WarningMessage.TO_TF_SAVED_MODEL_KERAS_MODE,
       )
 
-    export_tf.ydf_model_to_tensorflow_saved_model(
+    _get_export_tf().ydf_model_to_tensorflow_saved_model(
         ydf_model=self,
         path=path,
         input_model_signature_fn=input_model_signature_fn,
@@ -814,7 +813,7 @@ Use `model.describe()` for more details
       A TensorFlow @tf.function.
     """
 
-    return export_tf.ydf_model_to_tf_function(
+    return _get_export_tf().ydf_model_to_tf_function(
         ydf_model=self,
         temp_dir=temp_dir,
         can_be_saved=can_be_saved,
@@ -1041,8 +1040,20 @@ def _get_export_jax():
   except ImportError as exc:
     raise ValueError(
         '"jax" is needed by this function. Make sure it installed and try'
-        " again. See https://jax.readthedocs.io/en/latest/installation.html or"
-        " add dependency //third_party/py/jax"
+        " again. See https://jax.readthedocs.io/en/latest/installation.html"
+    ) from exc
+
+
+def _get_export_tf():
+  try:
+    from ydf.model import export_tf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+
+    return export_tf
+  except ImportError as exc:
+    raise ValueError(
+        '"tensorflow_decision_forests" is needed by this function. Make sure '
+        "it installed and try again. If using pip, run `pip install"
+        " tensorflow_decision_forests`."
     ) from exc
 
 

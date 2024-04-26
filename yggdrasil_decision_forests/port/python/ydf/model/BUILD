@@ -84,10 +84,7 @@ pybind_library(
 
 py_library(
     name = "generic_model",
-    srcs = [
-        "export_tf.py",
-        "generic_model.py",
-    ],
+    srcs = ["generic_model.py"],
     deps = [
         ":analysis",
         ":model_metadata",
@@ -95,7 +92,6 @@ py_library(
         ":template_cpp_export",
         # absl/logging dep,
         # numpy dep,
-        # tensorflow_decision_forests dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
@@ -107,6 +103,20 @@ py_library(
         "//ydf/utils:html",
         "//ydf/utils:log",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
+    ],
+)
+
+# Note: This build rule does not depends on TF. To use its functionalities, TF and TF-DF needs to be
+# imported manually by the call i.e. //third_party/py/tensorflow_decision_forests.
+py_library(
+    name = "export_tf",
+    srcs = ["export_tf.py"],
+    deps = [
+        ":generic_model",
+        "//ydf/dataset:dataspec",
+        "//ydf/dataset/io:dataset_io",
+        "//ydf/utils:log",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
@@ -234,6 +244,7 @@ py_test(
     # TODO: This test fails in OSS due to a package name clash on yggdrasil_decision_forests.
     tags = ["manual"],
     deps = [
+        ":export_tf",
         ":generic_model",
         ":model_lib",
         # absl/logging dep,

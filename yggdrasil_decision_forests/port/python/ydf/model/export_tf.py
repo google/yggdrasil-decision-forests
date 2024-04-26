@@ -26,19 +26,21 @@ from ydf.dataset.io import dataset_io
 from ydf.model import generic_model
 from ydf.utils import log
 
-_ERROR_MESSAGE_MISSING_TF = (
-    '"tensorflow" is needed by this function. Make sure it'
-    " installed and try again. If using pip, run `pip install"
-    " tensorflow`. If using Bazel/Blaze, add a dependency to"
-    " TensorFlow."
-)
+# Bypass the dependency checker + returns details explanations about why
+# importing tf or tf-df fails (e.g. missing dependency, missing or invalid .so
+# file).
+# pytype: disable=import-error
+# pylint: disable=g-import-not-at-top
+try:
+  import tensorflow as tf
+  import tensorflow_decision_forests as tfdf
+except ImportError as exc:
+  raise ImportError(
+      "Cannot import tensorflow or tensorflow_decision_forests."
+  ) from exc
+# pylint: enable=g-import-not-at-top
+# pytype: enable=import-error
 
-_ERROR_MESSAGE_MISSING_TFDF = (
-    '"tensorflow_decision_forests" is needed by this function. Make sure it'
-    " installed and try again. If using pip, run `pip install"
-    " tensorflow_decision_forests`. If using Bazel/Blaze, add a dependency to"
-    " TensorFlow Decision Forests."
-)
 
 TFDType = Any  # TensorFlow DType e.g. tf.float32
 TFTensor = Any  # A TensorFlow Tensor i.e. tensorflow.Tensor
@@ -56,7 +58,6 @@ def mapping_ydf_dtype_to_tf_dtype() -> Dict["ds_pb.DType", TFDType]:
   """Mapping between YDF dtype and TF dtypes."""
 
   global _YDF_DTYPE_TO_TF_DTYPE
-  tf = import_tensorflow()
   if _YDF_DTYPE_TO_TF_DTYPE is None:
     _YDF_DTYPE_TO_TF_DTYPE = {
         ds_pb.DType.DTYPE_INT8: tf.int8,
@@ -80,7 +81,6 @@ def mapping_tf_dtype_to_tf_example_dtype() -> Dict[TFDType, TFDType]:
   """Mapping TF dtypes to the TF dtype compatible with tensorflow example."""
 
   global _TF_DTYPE_TO_TF_EXAMPLE_DTYPE
-  tf = import_tensorflow()
   if _TF_DTYPE_TO_TF_EXAMPLE_DTYPE is None:
     _TF_DTYPE_TO_TF_EXAMPLE_DTYPE = {
         tf.int8: tf.int64,
@@ -158,7 +158,6 @@ def ydf_model_to_tensorflow_saved_model_keras_mode(
     input_model_signature_fn: Any,
     temp_dir: Optional[str],
 ):  # pylint: disable=g-doc-args
-  tfdf = import_tensorflow_decision_forests()
 
   # Do not pass input_model_signature_fn if it is None.
   not_none_params = {}
@@ -184,8 +183,6 @@ def ydf_model_to_tensorflow_saved_model_tf_mode(
     post_processing: Optional[Callable],  # pylint: disable=g-bare-generic
     temp_dir: Optional[str],
 ):  # pylint: disable=g-doc-args
-
-  tf = import_tensorflow()
 
   # The temporary files should remain available until the call to
   # "tf.saved_model.save"
@@ -306,8 +303,6 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
   See GenericModel.to_tensorflow_function for the documentation.
   """
 
-  tf = import_tensorflow()
-  tfdf = import_tensorflow_decision_forests()
   tf_op = tfdf.keras.core.tf_op
 
   # Using prefixes ensure multiple models can be combined in a single
@@ -365,26 +360,6 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
   return callable_module
 
 
-def import_tensorflow():
-  """Imports the tensorflow module."""
-  try:
-    import tensorflow  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
-
-    return tensorflow
-  except ImportError as exc:
-    raise ValueError(_ERROR_MESSAGE_MISSING_TF) from exc
-
-
-def import_tensorflow_decision_forests():
-  """Imports the tensorflow decision forests module."""
-  try:
-    import tensorflow_decision_forests as tfdf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
-
-    return tfdf
-  except ImportError as exc:
-    raise ValueError(_ERROR_MESSAGE_MISSING_TFDF) from exc
-
-
 def tf_feature_dtype(
     feature: "generic_model.InputFeature",
     model_dataspec: ds_pb.DataSpecification,
@@ -413,8 +388,6 @@ def tf_feature_dtype_manual(
   if user_dtype is not None:
     return user_dtype
 
-  tf = import_tensorflow()
-
   # DType from training dataset
   column_spec = model_dataspec.columns[column_idx]
   if column_spec.HasField("dtype"):
@@ -441,7 +414,6 @@ def tensorflow_raw_input_signature(
     feature_dtypes: Dict[str, TFDType],
 ) -> Dict[str, Any]:
   """A TF input_signature to feed raw feature values into the model."""
-  tf = import_tensorflow()
 
   model_dataspec = model.data_spec()
   input_features = model.input_features()
@@ -522,7 +494,6 @@ def tensorflow_feature_spec(
     feature_dtypes: Dict[str, TFDType],
 ) -> Dict[str, Any]:
   """A TF feature spec used to deserialize tf example protos."""
-  tf = import_tensorflow()
 
   def missing_value(tf_dtype):
     """Representation of a missing value; if possible."""
