@@ -333,7 +333,7 @@ class RandomForestLearnerTest(LearnerTest):
     with self.assertRaises(ValueError):
       _ = learner.train(self.adult.train)
 
-  def test_cross_validation(self):
+  def test_cross_validation_classification(self):
     learner = specialized_learners.RandomForestLearner(
         label="income", num_trees=10
     )
@@ -345,6 +345,66 @@ class RandomForestLearnerTest(LearnerTest):
     # All the examples are used in the evaluation
     self.assertEqual(
         evaluation.num_examples, self.adult.train.data_spec().created_num_rows
+    )
+
+    with open(self.create_tempfile(), "w") as f:
+      f.write(evaluation._repr_html_())
+
+  def test_cross_validation_regression(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="target", num_trees=10, task=generic_learner.Task.REGRESSION
+    )
+    evaluation = learner.cross_validation(
+        self.two_center_regression.train, folds=10, parallel_evaluations=2
+    )
+    logging.info("evaluation:\n%s", evaluation)
+    self.assertAlmostEqual(evaluation.rmse, 116, delta=1)
+    # All the examples are used in the evaluation
+    self.assertEqual(
+        evaluation.num_examples,
+        self.two_center_regression.train.data_spec().created_num_rows,
+    )
+
+    with open(self.create_tempfile(), "w") as f:
+      f.write(evaluation._repr_html_())
+
+  def test_cross_validation_uplift(self):
+    learner = specialized_learners.RandomForestLearner(
+        label="y",
+        uplift_treatment="treat",
+        num_trees=10,
+        task=generic_learner.Task.CATEGORICAL_UPLIFT,
+    )
+    evaluation = learner.cross_validation(
+        self.sim_pte.train, folds=10, parallel_evaluations=2
+    )
+    logging.info("evaluation:\n%s", evaluation)
+    self.assertAlmostEqual(evaluation.qini, 0.06893, delta=1)
+    # All the examples are used in the evaluation
+    self.assertEqual(
+        evaluation.num_examples, self.sim_pte.train.data_spec().created_num_rows
+    )
+
+    with open(self.create_tempfile(), "w") as f:
+      f.write(evaluation._repr_html_())
+
+  def test_cross_validation_ranking(self):
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="LABEL",
+        ranking_group="GROUP",
+        task=generic_learner.Task.RANKING,
+        num_trees=10,
+    )
+    evaluation = learner.cross_validation(
+        self.synthetic_ranking.train, folds=10, parallel_evaluations=2
+    )
+    logging.info("evaluation:\n%s", evaluation)
+    self.assertGreaterEqual(evaluation.ndcg, 0.70)
+    self.assertLessEqual(evaluation.ndcg, 0.75)
+    # All the examples are used in the evaluation
+    self.assertEqual(
+        evaluation.num_examples,
+        self.synthetic_ranking.train.data_spec().created_num_rows,
     )
 
     with open(self.create_tempfile(), "w") as f:

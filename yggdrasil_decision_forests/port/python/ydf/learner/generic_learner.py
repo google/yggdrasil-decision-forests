@@ -406,7 +406,8 @@ Hyper-parameters: ydf.{self._hyperparameters}
           f" {bootstrapping!r} instead"
       )
     evaluation_options = metric_pb2.EvaluationOptions(
-        bootstrapping_samples=bootstrapping_samples
+        bootstrapping_samples=bootstrapping_samples,
+        task=self._task._to_proto_type(),
     )
 
     deployment_evaluation = abstract_learner_pb2.DeploymentConfig(

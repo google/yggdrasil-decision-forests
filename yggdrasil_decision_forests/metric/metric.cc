@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/metric/metric.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -390,7 +391,8 @@ void MergeEvaluationRanking(const proto::EvaluationResults::Ranking& src,
 
 void MergeEvaluationUplift(const proto::EvaluationResults::Uplift& src,
                            proto::EvaluationResults::Uplift* dst) {
-  // No merging to be done.
+  dst->set_num_treatments(
+      std::max(dst->num_treatments(), src.num_treatments()));
 }
 
 }  // namespace

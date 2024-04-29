@@ -7,6 +7,10 @@
 -   Add `model.to_jax_function()` function to convert a YDF model into a JAX
     function that can be combined with other JAX operations.
 
+### Fix
+
+-   Fix cross-validation for non-classification learners.
+
 ## 0.4.2- 2024-04-22
 
 ### Feature

@@ -1664,6 +1664,42 @@ TEST(Metric, MergeEvaluationClassification) {
   EXPECT_THAT(dst, EqualsProto(expected_dst));
 }
 
+TEST(Metric, MergeEvaluationUplifting) {
+  const proto::EvaluationResults src = PARSE_TEST_PROTO(
+      R"pb(
+        count_predictions: 1
+        count_predictions_no_weight: 2
+        sampled_predictions { example_key: "a" }
+        count_sampled_predictions: 3
+        training_duration_in_seconds: 4
+        num_folds: 5
+        uplift { num_treatments: 1 }
+      )pb");
+  proto::EvaluationResults dst = PARSE_TEST_PROTO(
+      R"pb(
+        count_predictions: 10
+        count_predictions_no_weight: 20
+        sampled_predictions { example_key: "b" }
+        count_sampled_predictions: 30
+        training_duration_in_seconds: 40
+        num_folds: 50
+        uplift { num_treatments: 2 }
+      )pb");
+  EXPECT_OK(MergeEvaluation({}, src, &dst));
+  proto::EvaluationResults expected_dst = PARSE_TEST_PROTO(
+      R"pb(
+        count_predictions: 11
+        count_predictions_no_weight: 22
+        sampled_predictions { example_key: "b" }
+        sampled_predictions { example_key: "a" }
+        count_sampled_predictions: 33
+        training_duration_in_seconds: 44
+        num_folds: 55
+        uplift { num_treatments: 2 }
+      )pb");
+  EXPECT_THAT(dst, EqualsProto(expected_dst));
+}
+
 TEST(Metric, HigherIsBetter) {
   {
     const proto::MetricAccessor accessor = PARSE_TEST_PROTO(

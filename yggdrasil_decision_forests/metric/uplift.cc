@@ -94,7 +94,7 @@ absl::Status FinalizeUpliftMetricsFromSampledPredictions(
   const int num_treatments = eval->uplift().num_treatments();
   if (num_treatments < 2) {
     return absl::InvalidArgumentError(
-        absl::StrCat("There should be at least two treatments (including"
+        absl::StrCat("There should be at least two treatments (including "
                      "control). Found ",
                      num_treatments, " treatments"));
   }
