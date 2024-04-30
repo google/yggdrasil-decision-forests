@@ -10,6 +10,7 @@
 ### Fix
 
 -   Fix cross-validation for non-classification learners.
+-   Fix missing ydf/model/tree/plotter.js
 
 ## 0.4.2- 2024-04-22
 

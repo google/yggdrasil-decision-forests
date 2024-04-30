@@ -41,6 +41,7 @@ def rec_glob_copy(src_dir: str, dst_dir: str, pattern: str):
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     s.copy(f"{src_dir}/{frel}", dst)
 
+
 # Remove and recreate the package directory
 if os.path.exists(DST_PK):
   try:
@@ -80,6 +81,9 @@ rec_glob_copy(
 
 # The PYDF source files
 rec_glob_copy("ydf", f"{DST_PK}/ydf", "**/*.py")
+
+# Copy the JS files.
+s.copy("ydf/model/tree/plotter.js", f"{DST_PK}/ydf/model/tree")
 
 # Create the missing __init__.py files
 INIT_FILENAME = "__init__.py"

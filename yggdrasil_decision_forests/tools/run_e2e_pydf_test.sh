@@ -57,16 +57,23 @@ run_test() {
   sudo docker start ${DOCKER_CONTAINER}
   set -e
 
-  CMD='yum update;yum install -y rsync;curl -L -o /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-amd64;chmod +x /usr/local/bin/bazel;PYTHON=python3.11;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate;export COMPILERS="gcc";./tools/test_pydf.sh;./tools/build_pydf.sh python;$SHELL'
+  PREPARE='yum update;yum install -y rsync;curl -L -o /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-amd64;chmod +x /usr/local/bin/bazel;PYTHON=python3.11;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate;export COMPILERS="gcc"'
 
-  # Only get a shell, uncomment the following line.
+  # Only the shell
   CMD='$SHELL'
+  # Compile PYDF and give a shell
+  # CMD='./tools/test_pydf.sh;./tools/build_pydf.sh python;$SHELL'
 
+  # In the shell, you can:
+  #
   # If the test fails, you can restart it with:
   # ./tools/test_pydf.sh
   #
-  # To build a pip package, run:
+  # To build a single pip package, run:
   # ./tools/build_pydf.sh python
+  #
+  # To create the full PYDF release, with all the versions, run:
+  # ./tools/build_linux_release.sh
   #
   # To start a notebook instance, run:
   # ./tools/start_notebook.sh
@@ -76,7 +83,7 @@ run_test() {
   # sudo sudo docker stop [ID]
   # sudo docker system prune -a
 
-  sudo docker exec -it ${DOCKER_CONTAINER} /bin/bash -c "${CMD}"
+  sudo docker exec -it ${DOCKER_CONTAINER} /bin/bash -c "${PREPARE};${CMD}"
 }
 
 run_export
