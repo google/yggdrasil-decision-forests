@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstddef>
 #include <random>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -27,6 +28,7 @@
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizer_interface.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers/random.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -108,7 +110,9 @@ absl::StatusOr<NextCandidateStatus> RandomOptimizer::NextCandidate(
       RETURN_IF_ERROR(BuildRandomSet(field, candidate));
     }
 
-    if (already_proposed_candidates_.find(candidate->ShortDebugString()) ==
+    ASSIGN_OR_RETURN(std::string candidate_textproto,
+                     utils::SerializeTextProto(*candidate, true));
+    if (already_proposed_candidates_.find(candidate_textproto) ==
         already_proposed_candidates_.end()) {
       break;
     }
@@ -123,7 +127,9 @@ absl::StatusOr<NextCandidateStatus> RandomOptimizer::NextCandidate(
     }
   }
 
-  already_proposed_candidates_.insert(candidate->ShortDebugString());
+  ASSIGN_OR_RETURN(std::string candidate_textproto,
+                     utils::SerializeTextProto(*candidate, true));
+  already_proposed_candidates_.insert(candidate_textproto);
   pending_evaluations_++;
   return NextCandidateStatus::kNewCandidateAvailable;
 }

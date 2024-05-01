@@ -16,6 +16,7 @@ cc_library_ydf(
         ":random_cc_proto",
         "//yggdrasil_decision_forests/learner/hyperparameters_optimizer:optimizer_interface",
         "//yggdrasil_decision_forests/utils:compatibility",
+        "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/container:node_hash_set",

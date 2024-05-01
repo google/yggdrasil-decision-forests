@@ -24,11 +24,19 @@
 
 namespace yggdrasil_decision_forests::utils {
 
-absl::StatusOr<std::string> SerializeTextProto(const google::protobuf::Message& message) {
+absl::StatusOr<std::string> SerializeTextProto(const google::protobuf::Message& message,
+                                               bool single_line_mode) {
   std::string serialized_message;
   google::protobuf::TextFormat::Printer printer;
+  if (single_line_mode) {
+    printer.SetSingleLineMode(true);
+  }
   if (!printer.PrintToString(message, &serialized_message)) {
     return absl::InvalidArgumentError("Cannot serialize proto message.");
+  }
+  if (single_line_mode && !serialized_message.empty() &&
+      serialized_message.back() == ' ') {
+    serialized_message.pop_back();
   }
   return serialized_message;
 }

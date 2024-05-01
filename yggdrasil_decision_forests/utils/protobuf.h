@@ -80,8 +80,10 @@ class ProtoWriterInterface {
 
 // This method should be used instead of "message.DebugString()" whenever
 // the full message (unredacted) is to be serialized in a way that can be
-// deserialized with ParseTextProto().
-absl::StatusOr<std::string> SerializeTextProto(const google::protobuf::Message& message);
+// deserialized with ParseTextProto(). single_line_mode controls whether the
+// output is in single-line or multi-line (default).
+absl::StatusOr<std::string> SerializeTextProto(const google::protobuf::Message& message,
+                                               bool single_line_mode = false);
 
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
