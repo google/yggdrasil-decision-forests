@@ -41,6 +41,7 @@ cc_binary(
         "-s EXIT_RUNTIME=0",
         "-s MALLOC=emmalloc",
         "-s MODULARIZE=1",
+        "-s EXPORT_ES6=0",
         "-s DYNAMIC_EXECUTION=0",
         "-s EXPORT_NAME=YggdrasilDecisionForests",
         "-s FILESYSTEM=1",  # Link filesystem (should be automatic in some cases).

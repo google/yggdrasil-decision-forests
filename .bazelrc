@@ -62,6 +62,8 @@ build:linux --copt=-w
 build:linux --host_copt=-w
 build:macos --copt=-w
 build:windows --copt=/W0
+build:wasm --copt=-w
+build:wasm --host_copt=-w
 
 # Build mode.
 build:linux_cpp17 --cxxopt=-std=c++17
@@ -126,6 +128,7 @@ build:wasm --copt="-Wno-deprecated-declarations"
 build:wasm --copt="-Wno-unused-lambda-capture"
 build:wasm --spawn_strategy=local
 build:wasm --cxxopt=-std=c++17
+build:wasm --host_cxxopt=-std=c++17
 build:wasm --host_cxxopt="-fno-exceptions"
 
 # Use absl::anyInvocable. This breaks builds with TF <= 2.12 but is required 

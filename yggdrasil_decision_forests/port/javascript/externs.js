@@ -169,3 +169,8 @@ let Module;
  * }}
  */
 let JSZip;
+
+/**
+ * NodeJs require build-in function.
+ */
+let require;

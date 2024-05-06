@@ -133,12 +133,12 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
       std::unordered_map<int32_t, int64_t>* feature_usage) const;
 
   const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
-  decision_trees() const {
+  decision_trees() const override {
     return decision_trees_;
   }
 
   std::vector<std::unique_ptr<decision_tree::DecisionTree>>*
-  mutable_decision_trees() {
+  mutable_decision_trees() override {
     return &decision_trees_;
   }
 

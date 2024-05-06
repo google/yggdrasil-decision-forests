@@ -538,6 +538,7 @@ class Model {
  * @param {!Object} serializedModel Model zip blob.
  * @param {!LoadModelOptions=} options Loading model options.
  * @return {!Promise<!Model>} The loaded model.
+ * @suppress {missingProperties}
  */
 Module['loadModelFromZipBlob'] =
     async function loadModelFromZipBlob(serializedModel, options) {
@@ -563,6 +564,14 @@ Module['loadModelFromZipBlob'] =
   Module.FS.mkdirTree(modelPath);
 
   // Unzip Model
+  if (typeof window === 'undefined' && typeof module !== 'undefined' &&
+      module.exports) {
+    // In Nodejs
+    var JSZip = require('jszip');
+  } else {
+    // In a browser
+    var JSZip = window.JSZip;
+  }
   const zippedModel = await JSZip.loadAsync(serializedModel);
 
   // Extract model
