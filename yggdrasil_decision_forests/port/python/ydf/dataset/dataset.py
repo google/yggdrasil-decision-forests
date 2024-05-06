@@ -524,6 +524,7 @@ def create_vertical_dataset_from_dict_of_values(
         data, data_spec.columns, required_columns
     )
 
+  columns_to_check = []
   for column_idx, column in enumerate(normalized_columns):
     effective_column = copy.deepcopy(column)
     if column.name not in data:
@@ -535,6 +536,7 @@ def create_vertical_dataset_from_dict_of_values(
     if column.semantic is None:
       infered_semantic = infer_semantic(column.name, column_data)
       effective_column.semantic = infered_semantic
+      columns_to_check.append(column_idx)
 
     dataset._add_column(  # pylint: disable=protected-access
         effective_column,
@@ -547,8 +549,63 @@ def create_vertical_dataset_from_dict_of_values(
     assert effective_unroll_feature_info is not None
     dataset._dataset.SetMultiDimDataspec(effective_unroll_feature_info)  # pylint: disable=protected-access
 
+    warnings = validate_dataspec(dataset.data_spec(), columns_to_check)
+    for warning in warnings:
+      log.warning("%s", warning)
+
   dataset._finalize(set_num_rows_in_data_spec=(data_spec is None))  # pylint: disable=protected-access
   return dataset
+
+
+def validate_dataspec(
+    data_spec: data_spec_pb2.DataSpecification,
+    to_check: Sequence[int],
+) -> List[str]:
+  """Validates a dataspec.
+
+  Can raise an error or return a warning (as list of strings). If return None,
+  the dataspec is correctly.
+
+  Args:
+    data_spec: A dataspec to check.
+    to_check: List of columns to check.
+
+  Returns:
+    List of warnings.
+  """
+  warnings = []
+  for column_idx in to_check:
+    column = data_spec.columns[column_idx]
+    if column.is_manual_type:
+      continue
+    if column.type != data_spec_pb2.CATEGORICAL:
+      continue
+    if len(column.categorical.items) < 3:
+      continue
+
+    count_look_numerical = 0
+    count_total = 0
+    for k, v in column.categorical.items.items():
+      count_total += v.count
+      if look_numerical(k):
+        count_look_numerical += v.count
+
+    if count_look_numerical >= 0.8 * count_total:
+      warnings.append(
+          f"Column {column.name!r} is CATEGORICAL but most of its values look"
+          " like numbers. Should the column not be NUMERICAL? If"
+          " so, feed numerical values instead of string or objects."
+      )
+  return warnings
+
+
+def look_numerical(v: str) -> bool:
+  """Tests if a string look like a numerical value."""
+  try:
+    float(v)
+    return True
+  except ValueError:
+    return False
 
 
 def infer_semantic(name: str, data: Any) -> dataspec.Semantic:

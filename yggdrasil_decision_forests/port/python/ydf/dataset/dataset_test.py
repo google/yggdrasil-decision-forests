@@ -1105,6 +1105,66 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
 """
     self.assertEqual(expected_dataset_content, ds._dataset.DebugString())
 
+  def test_warnings(self):
+    # No issues.
+    self.assertEmpty(
+        dataset.validate_dataspec(
+            ds_pb.DataSpecification(
+                columns=(
+                    ds_pb.Column(
+                        name="f",
+                        type=ds_pb.ColumnType.CATEGORICAL,
+                        categorical=ds_pb.CategoricalSpec(
+                            items={
+                                "<OOD>": VocabValue(index=0, count=0),
+                                "A": VocabValue(index=1, count=1),
+                                "B": VocabValue(index=2, count=1),
+                                "C.": VocabValue(index=2, count=1),
+                                "1.": VocabValue(index=2, count=1),
+                            },
+                        ),
+                    ),
+                ),
+            ),
+            [0],
+        ),
+    )
+
+    # Look like a number
+    bad_dataspec = ds_pb.DataSpecification(
+        columns=(
+            ds_pb.Column(
+                name="f",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "0": VocabValue(index=1, count=1),
+                        "1": VocabValue(index=2, count=1),
+                        "3.": VocabValue(index=2, count=1),
+                        "4.": VocabValue(index=2, count=1),
+                        "": VocabValue(index=3, count=1),
+                    },
+                ),
+            ),
+        ),
+    )
+    self.assertStartsWith(
+        dataset.validate_dataspec(bad_dataspec, [0])[0],
+        "Column 'f' is CATEGORICAL but",
+    )
+
+    # Bad column not selected
+    self.assertEmpty(dataset.validate_dataspec(bad_dataspec, []))
+
+  @parameterized.parameters("1", "1.", "1.0")
+  def test_look_numerical(self, value: str):
+    self.assertTrue(dataset.look_numerical(value))
+
+  @parameterized.parameters("", "a", "hello")
+  def test_does_not_look_numerical(self, value: str):
+    self.assertFalse(dataset.look_numerical(value))
+
 
 class CategoricalSetTest(absltest.TestCase):
 

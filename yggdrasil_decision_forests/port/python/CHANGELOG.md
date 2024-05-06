@@ -6,6 +6,7 @@
 
 -   Add `model.to_jax_function()` function to convert a YDF model into a JAX
     function that can be combined with other JAX operations.
+-   Print warnings when categorical features look like numbers.
 
 ### Fix
 

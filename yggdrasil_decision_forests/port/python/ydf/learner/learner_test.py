@@ -25,7 +25,6 @@ import numpy as np
 import numpy.testing as npt
 import pandas as pd
 
-from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
@@ -219,7 +218,7 @@ class RandomForestLearnerTest(LearnerTest):
         "adult_test_binary_class_rf.csv",
     )
     predictions_df = pd.read_csv(predictions_path)
-    data_spec = data_spec_pb2.DataSpecification()
+    data_spec = ds_pb.DataSpecification()
     with open(data_spec_path, "rb") as f:
       data_spec.ParseFromString(f.read())
 
@@ -517,12 +516,12 @@ class RandomForestLearnerTest(LearnerTest):
     model = learner.train(data)
 
     expected_columns = [
-        data_spec_pb2.Column(
+        ds_pb.Column(
             name="feature.0_of_4",
-            type=data_spec_pb2.ColumnType.NUMERICAL,
+            type=ds_pb.ColumnType.NUMERICAL,
             dtype=ds_pb.DType.DTYPE_INT64,
             count_nas=0,
-            numerical=data_spec_pb2.NumericalSpec(
+            numerical=ds_pb.NumericalSpec(
                 mean=2,
                 standard_deviation=2,
                 min_value=0,
@@ -530,12 +529,12 @@ class RandomForestLearnerTest(LearnerTest):
             ),
             is_unstacked=True,
         ),
-        data_spec_pb2.Column(
+        ds_pb.Column(
             name="feature.1_of_4",
-            type=data_spec_pb2.ColumnType.NUMERICAL,
+            type=ds_pb.ColumnType.NUMERICAL,
             dtype=ds_pb.DType.DTYPE_INT64,
             count_nas=0,
-            numerical=data_spec_pb2.NumericalSpec(
+            numerical=ds_pb.NumericalSpec(
                 mean=3,
                 standard_deviation=2,
                 min_value=1,
@@ -543,12 +542,12 @@ class RandomForestLearnerTest(LearnerTest):
             ),
             is_unstacked=True,
         ),
-        data_spec_pb2.Column(
+        ds_pb.Column(
             name="feature.2_of_4",
-            type=data_spec_pb2.ColumnType.NUMERICAL,
+            type=ds_pb.ColumnType.NUMERICAL,
             dtype=ds_pb.DType.DTYPE_INT64,
             count_nas=0,
-            numerical=data_spec_pb2.NumericalSpec(
+            numerical=ds_pb.NumericalSpec(
                 mean=4,
                 standard_deviation=2,
                 min_value=2,
@@ -556,12 +555,12 @@ class RandomForestLearnerTest(LearnerTest):
             ),
             is_unstacked=True,
         ),
-        data_spec_pb2.Column(
+        ds_pb.Column(
             name="feature.3_of_4",
-            type=data_spec_pb2.ColumnType.NUMERICAL,
+            type=ds_pb.ColumnType.NUMERICAL,
             dtype=ds_pb.DType.DTYPE_INT64,
             count_nas=0,
-            numerical=data_spec_pb2.NumericalSpec(
+            numerical=ds_pb.NumericalSpec(
                 mean=5,
                 standard_deviation=2,
                 min_value=3,
@@ -662,6 +661,16 @@ class RandomForestLearnerTest(LearnerTest):
     )
     model = learner.train(self.adult.train)
     logging.info("Trained model: %s", model)
+
+  def test_warning_categorical_numerical(self):
+    ds = {
+        "label": np.array([0, 1, 0, 1] * 5, dtype=np.int64),
+        "f": np.array([0, 1, "", ""] * 5, dtype=np.object_),
+    }
+    learner = specialized_learners.RandomForestLearner(
+        label="label", num_trees=4
+    )
+    _ = learner.train(ds)
 
 
 class CARTLearnerTest(LearnerTest):
