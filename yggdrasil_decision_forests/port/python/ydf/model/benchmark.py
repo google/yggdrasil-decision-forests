@@ -318,8 +318,8 @@ def run_jax_engine(
     with jax.default_device(device):
 
       jax_model = model.to_jax_function()
-      if jax_model.encode is not None:
-        input_values = jax_model.encode(dataset_without_labels)
+      if jax_model.encoder is not None:
+        input_values = jax_model.encoder(dataset_without_labels)
       else:
         input_values = np_dict_to_jax_dict(dataset_without_labels)
 
@@ -513,6 +513,7 @@ def run_preconfigured(
 
   Args:
     profiler: If true, enables the profiler. See RunConfiguration.profiler.
+    show_logs: Prints logs about the benchmark during its execution.
     models: Set of model names to run. If None, runs all the avilable models.
 
   Returns:

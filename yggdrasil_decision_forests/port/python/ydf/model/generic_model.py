@@ -843,14 +843,16 @@ Use `model.describe()` for more details
     })
 
     # Convert model to a JAX function.
-    jax_model, feature_encoding = model.o_jax_function()
+    jax_model = model.o_jax_function()
 
     # Make predictions with the TF module.
-    jax_predictions = jax_model({
+    jax_predictions = jax_model.predict({
         "f1": jnp.array([0, 0.5, 1]),
         "f2": jnp.array([1, 0, 0.5]),
     })
     ```
+
+    TODO: Document the encoder and jax params.
 
     Args:
       jit: If true, compiles the function with @jax.jit.
@@ -861,9 +863,9 @@ Use `model.describe()` for more details
         should be passed to `predict(feature_values, params)`.
 
     Returns:
-      A Jax function and optionnaly a FeatureEncoding object to encode
-      features. If the model does not need any special feature
-      encoding, the second returned value is None.
+      A dataclass containing the JAX prediction function (`predict`) and
+      optionnaly the model parameteres (`params`) and feature encoder
+      (`encoder`).
     """
 
     return _get_export_jax().to_jax_function(

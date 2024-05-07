@@ -121,8 +121,8 @@ class JaxModelTest(parameterized.TestCase):
     with self.assertRaisesRegex(ValueError, "No supported compact dtype"):
       to_jax.compact_dtype((0x80000000,))
 
-  def test_feature_encoding_basic(self):
-    feature_encoding = to_jax.FeatureEncoding.build(
+  def test_feature_encoder_basic(self):
+    feature_encoder = to_jax.FeatureEncoder.build(
         [
             generic_model.InputFeature(
                 "f1", dataspec_lib.Semantic.NUMERICAL, 0
@@ -173,12 +173,12 @@ class JaxModelTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertIsNotNone(feature_encoding)
+    self.assertIsNotNone(feature_encoder)
     self.assertDictEqual(
-        feature_encoding.categorical, {"f2": {"<OOD>": 0, "A": 1, "B": 2}}
+        feature_encoder.categorical, {"f2": {"<OOD>": 0, "A": 1, "B": 2}}
     )
 
-  def test_feature_encoding_on_model(self):
+  def test_feature_encoder_on_model(self):
     columns = ["f1", "i1", "c1", "b1", "cs1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
         label="label_class_binary",
@@ -186,19 +186,19 @@ class JaxModelTest(parameterized.TestCase):
         features=[("cs1", dataspec_lib.Semantic.CATEGORICAL_SET)],
         include_all_columns=True,
     ).train(create_dataset(columns))
-    feature_encoding = to_jax.FeatureEncoding.build(
+    feature_encoder = to_jax.FeatureEncoder.build(
         model.input_features(), model.data_spec()
     )
-    self.assertIsNotNone(feature_encoding)
+    self.assertIsNotNone(feature_encoder)
     self.assertDictEqual(
-        feature_encoding.categorical,
+        feature_encoder.categorical,
         {
             "c1": {"<OOD>": 0, "x": 1, "y": 2, "z": 3},
             "cs1": {"<OOD>": 0, "a": 1, "b": 2, "c": 3},
         },
     )
 
-    encoded_features = feature_encoding.encode(
+    encoded_features = feature_encoder.encode(
         {"f1": [1, 2, 3], "c1": ["x", "y", "other"]}
     )
     np.testing.assert_array_equal(
@@ -208,15 +208,15 @@ class JaxModelTest(parameterized.TestCase):
         encoded_features["c1"], jnp.asarray([1, 2, 0])
     )
 
-  def test_feature_encoding_is_none(self):
+  def test_feature_encoder_is_none(self):
     columns = ["f1", "i1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
         label="label_class_binary", num_trees=2
     ).train(create_dataset(columns))
-    feature_encoding = to_jax.FeatureEncoding.build(
+    feature_encoder = to_jax.FeatureEncoder.build(
         model.input_features(), model.data_spec()
     )
-    self.assertIsNone(feature_encoding)
+    self.assertIsNone(feature_encoder)
 
 
 class InternalFeatureSpecTest(parameterized.TestCase):
@@ -588,7 +588,7 @@ class InternalForestTest(parameterized.TestCase):
     )
 
     self.assertEqual(internal_forest.num_trees(), 2)
-    self.assertIsNotNone(internal_forest.feature_encoding)
+    self.assertIsNotNone(internal_forest.feature_encoder)
 
     self.assertEqual(
         internal_forest.leaf_outputs,
@@ -658,7 +658,7 @@ class InternalForestTest(parameterized.TestCase):
 
     internal_forest = to_jax.InternalForest(model)
     self.assertEqual(internal_forest.num_trees(), 10)
-    self.assertIsNotNone(internal_forest.feature_encoding)
+    self.assertIsNotNone(internal_forest.feature_encoder)
 
 
 class ToJaxTest(parameterized.TestCase):
@@ -747,12 +747,12 @@ class ToJaxTest(parameterized.TestCase):
 
     # Convert model to tf function
     jax_model = to_jax.to_jax_function(model)
-    assert (jax_model.encode is not None) == has_encoding
+    assert (jax_model.encoder is not None) == has_encoding
 
     # Generate Jax predictions
     del test_ds[label]
-    if jax_model.encode is not None:
-      input_values = jax_model.encode(test_ds)
+    if jax_model.encoder is not None:
+      input_values = jax_model.encoder(test_ds)
     else:
       input_values = {
           k: jnp.asarray(v) for k, v in test_ds.items() if k != label

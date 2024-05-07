@@ -92,9 +92,8 @@ def to_compact_jax_array(values: Sequence[int]) -> jax.Array:
   return jnp.asarray(values, dtype=compact_dtype(values))
 
 
-# TODO: Rename to "FeatureEncoder".
 @dataclasses.dataclass
-class FeatureEncoding:
+class FeatureEncoder:
   """Utility to prepare feature values before being fed into the Jax model.
 
   Does the following:
@@ -115,8 +114,8 @@ class FeatureEncoding:
       cls,
       input_features: Sequence[generic_model.InputFeature],
       dataspec: ds_pb.DataSpecification,
-  ) -> Optional["FeatureEncoding"]:
-    """Creates a FeatureEncoding object.
+  ) -> Optional["FeatureEncoder"]:
+    """Creates a FeatureEncoder object.
 
     If the input feature does not require feature encoding, returns None.
 
@@ -125,7 +124,7 @@ class FeatureEncoding:
       dataspec: Dataspec of the model.
 
     Returns:
-      A FeatureEncoding or None.
+      A FeatureEncoder or None.
     """
 
     categorical = {}
@@ -145,7 +144,7 @@ class FeatureEncoding:
         }
     if not categorical:
       return None
-    return FeatureEncoding(categorical=categorical)
+    return FeatureEncoder(categorical=categorical)
 
   def __call__(self, feature_values: Dict[str, Any]) -> Dict[str, jax.Array]:
     """Alias for "encode"."""
@@ -175,7 +174,7 @@ class JaxModel:
     predict: Jitted JAX function that computes the model predictions. The
       signature is `predict(feature_values)` if `params` is None, and
       `predict(feature_values, params)` if `params` is set.
-    encode: Optional object to encode features before the JAX model. Is None if
+    encoder: Optional object to encode features before the JAX model. Is None if
       the model does not need special feature encoding. For instance, used to
       encode categorical string values.
     params: Learnable parameters of the model. If set, "params" should be passed
@@ -183,7 +182,7 @@ class JaxModel:
   """
 
   predict: Union[Callable[[Any], Any], Callable[[Any, Dict[str, Any]], Any]]
-  encode: Optional[FeatureEncoding]  # TODO: Rename to "encoder".
+  encoder: Optional[FeatureEncoder]
   params: Optional[Dict[str, Any]]
 
 
@@ -422,7 +421,7 @@ class InternalForest:
   Attributes:
     model: Input decision forest model.
     feature_spec: Internal feature indexing.
-    feature_encoding: How to encode features before feeding them to the model.
+    feature_encoder: How to encode features before feeding them to the model.
     dataspec: Dataspec.
     leaf_outputs: Prediction values for each leaf node.
     split_features: Internal idx of the feature being tested for each non-leaf
@@ -451,7 +450,7 @@ class InternalForest:
 
   model: dataclasses.InitVar[generic_model.GenericModel]
   feature_spec: InternalFeatureSpec = dataclasses.field(init=False)
-  feature_encoding: Optional[FeatureEncoding] = dataclasses.field(init=False)
+  feature_encoder: Optional[FeatureEncoder] = dataclasses.field(init=False)
   dataspec: ds_pb.DataSpecification = dataclasses.field(repr=False, init=False)
   leaf_outputs: ArrayFloat = dataclasses.field(
       default_factory=lambda: array.array("f", [])
@@ -509,7 +508,7 @@ class InternalForest:
 
     input_features = model.input_features()
     self.dataspec = model.data_spec()
-    self.feature_encoding = FeatureEncoding.build(input_features, self.dataspec)
+    self.feature_encoder = FeatureEncoder.build(input_features, self.dataspec)
     self.feature_spec = InternalFeatureSpec(input_features, self.dataspec)
 
     if isinstance(
@@ -720,17 +719,12 @@ def to_jax_function(
 
   Args:
     model: A YDF model.
-    jit: If true, compiles the function with @jax.jit.
-    apply_activation: Should the activation function, if any, be applied on the
-      model output.
-    leaves_as_params: If true, exports the leaf values as learnable parameters.
-      In this case, `params` is set in the returned value, and it should be
-      passed to `predict(feature_values, params)`.
+    jit: See "to_jax_function" in generic_model.py.
+    apply_activation: See "to_jax_function" in generic_model.py.
+    leaves_as_params: See "to_jax_function" in generic_model.py.
 
   Returns:
-    A Jax function and optionally a FeatureEncoding object to encode
-    features. If the model does not need any special feature
-    encoding, the second returned value is None.
+    See "to_jax_function" in generic_model.py.
   """
 
   # TODO: Add support for Random Forest models.
@@ -794,7 +788,7 @@ def to_jax_function(
     predict = jax.jit(predict)
   return JaxModel(
       predict=predict,
-      encode=forest.feature_encoding,
+      encoder=forest.feature_encoder,
       params=params if params else None,
   )
 
