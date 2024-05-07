@@ -36,6 +36,9 @@ from ydf.model import generic_model
 from ydf.model import tree as tree_lib
 
 
+InternalFeatureItem = to_jax.InternalFeatureItem
+
+
 def create_dataset(columns: List[str], n: int = 1000) -> Dict[str, Any]:
   """Creates a dataset with random values."""
   data = {
@@ -220,30 +223,112 @@ class InternalFeatureSpecTest(parameterized.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.basic_mapping = to_jax.InternalFeatureSpec([
-        generic_model.InputFeature("n1", dataspec_lib.Semantic.NUMERICAL, 0),
-        generic_model.InputFeature("n2", dataspec_lib.Semantic.NUMERICAL, 1),
-        generic_model.InputFeature("c1", dataspec_lib.Semantic.CATEGORICAL, 2),
-        generic_model.InputFeature("c2", dataspec_lib.Semantic.CATEGORICAL, 3),
-        generic_model.InputFeature("b1", dataspec_lib.Semantic.BOOLEAN, 4),
-        generic_model.InputFeature("b2", dataspec_lib.Semantic.BOOLEAN, 5),
-    ])
+    self.basic_mapping = to_jax.InternalFeatureSpec(
+        [
+            generic_model.InputFeature(
+                "n1", dataspec_lib.Semantic.NUMERICAL, 0
+            ),
+            generic_model.InputFeature(
+                "n2", dataspec_lib.Semantic.NUMERICAL, 1
+            ),
+            generic_model.InputFeature(
+                "multidim_n3", dataspec_lib.Semantic.NUMERICAL, 2
+            ),
+            generic_model.InputFeature(
+                "c1", dataspec_lib.Semantic.CATEGORICAL, 4
+            ),
+            generic_model.InputFeature(
+                "c2", dataspec_lib.Semantic.CATEGORICAL, 5
+            ),
+            generic_model.InputFeature("b1", dataspec_lib.Semantic.BOOLEAN, 6),
+            generic_model.InputFeature("b2", dataspec_lib.Semantic.BOOLEAN, 7),
+        ],
+        ds_pb.DataSpecification(
+            created_num_rows=3,
+            columns=(
+                ds_pb.Column(
+                    name="n1",
+                    type=ds_pb.ColumnType.NUMERICAL,
+                ),
+                ds_pb.Column(
+                    name="n2",
+                    type=ds_pb.ColumnType.NUMERICAL,
+                ),
+                ds_pb.Column(
+                    name="multidim_n3.0",
+                    type=ds_pb.ColumnType.NUMERICAL,
+                    is_unstacked=True,
+                ),
+                ds_pb.Column(
+                    name="multidim_n3.1",
+                    type=ds_pb.ColumnType.NUMERICAL,
+                    is_unstacked=True,
+                ),
+                ds_pb.Column(
+                    name="c1",
+                    type=ds_pb.ColumnType.CATEGORICAL,
+                ),
+                ds_pb.Column(
+                    name="c2",
+                    type=ds_pb.ColumnType.CATEGORICAL,
+                ),
+                ds_pb.Column(
+                    name="b1",
+                    type=ds_pb.ColumnType.BOOLEAN,
+                ),
+                ds_pb.Column(
+                    name="b2",
+                    type=ds_pb.ColumnType.BOOLEAN,
+                ),
+            ),
+            unstackeds=(
+                ds_pb.Unstacked(
+                    original_name="multidim_n3",
+                    begin_column_idx=2,
+                    size=2,
+                ),
+            ),
+        ),
+    )
 
   def test_basic(self):
-    self.assertEqual(self.basic_mapping.numerical, ["n1", "n2"])
-    self.assertEqual(self.basic_mapping.categorical, ["c1", "c2"])
-    self.assertEqual(self.basic_mapping.boolean, ["b1", "b2"])
-    self.assertEqual(self.basic_mapping.inv_numerical, {0: 0, 1: 1})
-    self.assertEqual(self.basic_mapping.inv_categorical, {2: 0, 3: 1})
-    self.assertEqual(self.basic_mapping.inv_boolean, {4: 0, 5: 1})
     self.assertEqual(
-        self.basic_mapping.feature_names, {"n1", "n2", "c1", "c2", "b1", "b2"}
+        self.basic_mapping.numerical,
+        [
+            InternalFeatureItem(name="multidim_n3", dim=2),
+            InternalFeatureItem(name="n1", dim=1),
+            InternalFeatureItem(name="n2", dim=1),
+        ],
+    )
+    self.assertEqual(
+        self.basic_mapping.categorical,
+        [
+            InternalFeatureItem(name="c1", dim=1),
+            InternalFeatureItem(name="c2", dim=1),
+        ],
+    )
+    self.assertEqual(
+        self.basic_mapping.boolean,
+        [
+            InternalFeatureItem(name="b1", dim=1),
+            InternalFeatureItem(name="b2", dim=1),
+        ],
+    )
+    self.assertEqual(self.basic_mapping.inv_numerical, {0: 2, 1: 3, 2: 0, 3: 1})
+    self.assertEqual(self.basic_mapping.inv_categorical, {4: 0, 5: 1})
+    self.assertEqual(self.basic_mapping.inv_boolean, {6: 0, 7: 1})
+    self.assertEqual(
+        self.basic_mapping.feature_names,
+        {"multidim_n3", "n1", "n2", "c1", "c2", "b1", "b2"},
     )
 
   def test_non_supported_type(self):
     with self.assertRaisesRegex(ValueError, "is not supported"):
       to_jax.InternalFeatureSpec(
-          [generic_model.InputFeature("n", dataspec_lib.Semantic.HASH, 0)]
+          [generic_model.InputFeature("n", dataspec_lib.Semantic.HASH, 0)],
+          ds_pb.DataSpecification(
+              columns=(ds_pb.Column(name="n", type=ds_pb.ColumnType.HASH),)
+          ),
       )
 
   def test_mapping_convert_empty(self):
@@ -251,14 +336,19 @@ class InternalFeatureSpecTest(parameterized.TestCase):
       self.basic_mapping.convert_features({})
 
   def test_mapping_convert_missing(self):
-    with self.assertRaisesRegex(ValueError, "Expecting values with keys"):
+    with self.assertRaisesRegex(
+        ValueError, "Expecting dictionary of values with keys"
+    ):
       self.basic_mapping.convert_features({"n1": jnp.array([1, 2])})
 
   def test_mapping_convert_unused(self):
-    with self.assertRaisesRegex(ValueError, "Expecting values with keys"):
+    with self.assertRaisesRegex(
+        ValueError, "Expecting dictionary of values with keys"
+    ):
       self.basic_mapping.convert_features({
           "n1": jnp.array([1, 2]),
           "n2": jnp.array([3, 4]),
+          "multidim_n3": jnp.array([[9, 10], [11, 12]]),
           "c1": jnp.array([5, 6]),
           "c2": jnp.array([7, 8]),
           "b1": jnp.array([True, False]),
@@ -266,17 +356,47 @@ class InternalFeatureSpecTest(parameterized.TestCase):
           "other": jnp.array([1, 2]),
       })
 
+  def test_mapping_convert_wrong_shape_1(self):
+    with self.assertRaisesRegex(ValueError, "Expecting dimension"):
+      self.basic_mapping.convert_features({
+          "n1": jnp.array([1, 2]),
+          "n2": jnp.array([3, 4]),
+          # multidim_n3 is a 3-dimensional feature, but 1-dimentional values are
+          # fed (taking into account the batch size).
+          "multidim_n3": jnp.array([9, 10]),
+          "c1": jnp.array([5, 6]),
+          "c2": jnp.array([7, 8]),
+          "b1": jnp.array([True, False]),
+          "b2": jnp.array([False, True]),
+      })
+
+  def test_mapping_convert_wrong_shape_2(self):
+    with self.assertRaisesRegex(ValueError, "Expecting dimension"):
+      self.basic_mapping.convert_features({
+          "n1": jnp.array([1, 2]),
+          "n2": jnp.array([[9, 10], [11, 12]]),
+          # multidim_n3 is a 3-dimensional feature, but 2-dimentional values are
+          # fed (taking into account the batch size).
+          "multidim_n3": jnp.array([[9, 10], [11, 12]]),
+          "c1": jnp.array([5, 6]),
+          "c2": jnp.array([7, 8]),
+          "b1": jnp.array([True, False]),
+          "b2": jnp.array([False, True]),
+      })
+
   def test_mapping_convert(self):
     internal_values = self.basic_mapping.convert_features({
         "n1": jnp.array([1, 2]),
         "n2": jnp.array([3, 4]),
+        "multidim_n3": jnp.array([[9, 10], [11, 12]]),
         "c1": jnp.array([5, 6]),
         "c2": jnp.array([7, 8]),
         "b1": jnp.array([True, False]),
         "b2": jnp.array([False, True]),
     })
     np.testing.assert_array_equal(
-        internal_values.numerical, jnp.array([[1.0, 3.0], [2.0, 4.0]])
+        internal_values.numerical,
+        jnp.array([[9.0, 10.0, 1.0, 3.0], [11.0, 12.0, 2.0, 4.0]]),
     )
     np.testing.assert_array_equal(
         internal_values.categorical, jnp.array([[5, 7], [6, 8]])
@@ -448,8 +568,17 @@ class InternalForestTest(parameterized.TestCase):
 
     internal_forest = to_jax.InternalForest(model)
 
-    self.assertEqual(internal_forest.feature_spec.numerical, ["f1", "f2"])
-    self.assertEqual(internal_forest.feature_spec.categorical, ["c1"])
+    self.assertEqual(
+        internal_forest.feature_spec.numerical,
+        [
+            InternalFeatureItem(name="f1", dim=1),
+            InternalFeatureItem(name="f2", dim=1),
+        ],
+    )
+    self.assertEqual(
+        internal_forest.feature_spec.categorical,
+        [InternalFeatureItem(name="c1", dim=1)],
+    )
     self.assertEqual(internal_forest.feature_spec.boolean, [])
     self.assertEqual(internal_forest.feature_spec.inv_numerical, {1: 0, 3: 1})
     self.assertEqual(internal_forest.feature_spec.inv_categorical, {2: 0})
@@ -579,6 +708,14 @@ class ToJaxTest(parameterized.TestCase):
           "label_class_multi",
           generic_learner.Task.CLASSIFICATION,
           True,
+          specialized_learners.GradientBoostedTreesLearner,
+      ),
+      (
+          "gbt_regression_num_multidim",
+          ["f1", "multi_f1"],
+          "label_regress",
+          generic_learner.Task.REGRESSION,
+          False,
           specialized_learners.GradientBoostedTreesLearner,
       ),
   )
