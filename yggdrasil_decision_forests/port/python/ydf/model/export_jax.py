@@ -14,20 +14,19 @@
 
 """Utilities to export JAX models."""
 
+import array
 import dataclasses
 import enum
 import functools
-import array
 from typing import Any, Sequence, Dict, Optional, List, Set, Tuple
-import logging
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
+from ydf.learner import custom_loss
 from ydf.model import generic_model
 from ydf.model import tree as tree_lib
 from ydf.model.decision_forest_model import decision_forest_model
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
-from ydf.learner import custom_loss
 
 # pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
@@ -89,6 +88,7 @@ def to_compact_jax_array(values: Sequence[int]) -> jax.Array:
   return jnp.asarray(values, dtype=compact_dtype(values))
 
 
+# TODO: Rename to "FeatureEncoder".
 @dataclasses.dataclass
 class FeatureEncoding:
   """Utility to prepare feature values before being fed into the Jax model.
@@ -143,6 +143,10 @@ class FeatureEncoding:
       return None
     return FeatureEncoding(categorical=categorical)
 
+  def __call__(self, feature_values: Dict[str, Any]) -> Dict[str, jax.Array]:
+    """Alias for "encode"."""
+    return self.encode(feature_values)
+
   def encode(self, feature_values: Dict[str, Any]) -> Dict[str, jax.Array]:
     """Encodes feature values for a model."""
 
@@ -157,6 +161,22 @@ class FeatureEncoding:
       return jax.numpy.asarray(value)
 
     return {k: encode_item(k, v) for k, v in feature_values.items()}
+
+
+@dataclasses.dataclass
+class JaxModel:
+  """A YDF model converted in JAX with to_jax_function.
+
+  Attributes:
+    predict: Jitted JAX function that compute the model predictions.
+    encode: Optional object to encode features before the JAX model. Is None if
+      the model does not need special feature encoding. For instance, used to
+      encode categorical string values.
+  """
+
+  predict: Any
+  # TODO: Rename to "encoder".
+  encode: Optional[FeatureEncoding]
 
 
 @dataclasses.dataclass
@@ -621,7 +641,7 @@ class InternalForestJaxArrays:
 def to_jax_function(
     model: generic_model.GenericModel,
     jit: bool = True,
-) -> Tuple[Any, Optional[FeatureEncoding]]:
+) -> JaxModel:
   """Converts a model into a JAX function.
 
   Args:
@@ -671,7 +691,7 @@ def to_jax_function(
 
   if jit:
     predict = jax.jit(predict)
-  return predict, forest.feature_encoding
+  return JaxModel(predict=predict, encode=forest.feature_encoding)
 
 
 def _predict_fn(

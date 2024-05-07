@@ -217,7 +217,7 @@ class ApiTest(absltest.TestCase):
         test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
     )
     model = ydf.load_model(model_path)
-    _, _ = model.to_jax_function()
+    _ = model.to_jax_function()
 
 
 if __name__ == "__main__":

@@ -317,15 +317,15 @@ def run_jax_engine(
   for device in devices:
     with jax.default_device(device):
 
-      jax_model, feature_encoding = model.to_jax_function()
-      if feature_encoding is not None:
-        input_values = feature_encoding.encode(dataset_without_labels)
+      jax_model = model.to_jax_function()
+      if jax_model.encode is not None:
+        input_values = jax_model.encode(dataset_without_labels)
       else:
         input_values = np_dict_to_jax_dict(dataset_without_labels)
 
       for _ in range(run_config.num_warmup_rounds):
         for batch in gen_batch(input_values, batch_size):
-          _ = jax_model(batch).block_until_ready()
+          _ = jax_model.predict(batch).block_until_ready()
 
       begin_time = Time.now()
       for round_idx in range(run_config.num_rounds):
@@ -334,10 +334,10 @@ def run_jax_engine(
               "inference", step_num=round_idx
           ):
             for batch in gen_batch(input_values, batch_size):
-              _ = jax_model(batch).block_until_ready()
+              _ = jax_model.predict(batch).block_until_ready()
         else:
           for batch in gen_batch(input_values, batch_size):
-            _ = jax_model(batch).block_until_ready()
+            _ = jax_model.predict(batch).block_until_ready()
 
       end_time = Time.now()
       benchmark = Benchmark(

@@ -584,18 +584,18 @@ class ToJaxTest(parameterized.TestCase):
     ydf_predictions = model.predict(test_ds)
 
     # Convert model to tf function
-    jax_model, feature_encoding = to_jax.to_jax_function(model)
-    assert (feature_encoding is not None) == has_encoding
+    jax_model = to_jax.to_jax_function(model)
+    assert (jax_model.encode is not None) == has_encoding
 
     # Generate Jax predictions
     del test_ds[label]
-    if feature_encoding is not None:
-      input_values = feature_encoding.encode(test_ds)
+    if jax_model.encode is not None:
+      input_values = jax_model.encode(test_ds)
     else:
       input_values = {
           k: jnp.asarray(v) for k, v in test_ds.items() if k != label
       }
-    jax_predictions = jax_model(input_values)
+    jax_predictions = jax_model.predict(input_values)
 
     # Test predictions
     np.testing.assert_allclose(
@@ -608,7 +608,7 @@ class ToJaxTest(parameterized.TestCase):
     # Convert to a TensorFlow function
     tf_model = tf.Module()
     tf_model.my_call = tf.function(
-        jax2tf.convert(jax_model, with_gradient=False),
+        jax2tf.convert(jax_model.predict, with_gradient=False),
         jit_compile=True,
         autograph=False,
     )

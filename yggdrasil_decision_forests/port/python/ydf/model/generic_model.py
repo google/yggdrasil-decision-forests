@@ -820,9 +820,7 @@ Use `model.describe()` for more details
         squeeze_binary_classification=squeeze_binary_classification,
     )
 
-  def to_jax_function(
-      self, jit: bool = True
-  ) -> Tuple[Any, Optional["export_jax.FeatureEncoding"]]:  # pytype: disable=name-error
+  def to_jax_function(self, jit: bool = True) -> "export_jax.JaxModel":  # pytype: disable=name-error
     """Converts the YDF model into a JAX function.
 
     Usage example:
