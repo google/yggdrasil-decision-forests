@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import array
+import logging
 import sys
 import tempfile
 from typing import Any, Dict, List, Optional, Sequence
@@ -22,6 +23,7 @@ from absl.testing import parameterized
 import jax
 from jax.experimental import jax2tf
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
@@ -36,7 +38,6 @@ from ydf.model import tree as tree_lib
 
 def create_dataset(columns: List[str], n: int = 1000) -> Dict[str, Any]:
   """Creates a dataset with random values."""
-  np.random.seed(10)
   data = {
       # Single-dim features
       "f1": np.random.random(size=n),
@@ -55,11 +56,35 @@ def create_dataset(columns: List[str], n: int = 1000) -> Dict[str, Any]:
       "multi_c1": np.random.choice(["x", "y", "z"], size=(n, 5)),
       "multi_b1": np.random.randint(2, size=(n, 5)).astype(np.bool_),
       # Labels
-      "label_class_binary": np.random.choice(["l1", "l2"], size=n),
+      "label_class_binary": np.random.choice([False, True], size=n),
       "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=n),
       "label_regress": np.random.random(size=n),
   }
   return {k: data[k] for k in columns}
+
+
+def create_dataset_ellipse(
+    num_examples: int = 1000,
+    num_features: int = 3,
+    plot_path: Optional[str] = None,
+):
+  """Create a binary classification dataset classifying ellipses."""
+  features = np.random.uniform(-1, 1, size=[num_examples, num_features])
+  scales = np.array([1.0 + i * 0.1 for i in range(num_features)])
+  labels = (
+      np.sqrt(np.sum(np.multiply(np.square(features), scales), axis=1)) <= 0.80
+  )
+
+  if plot_path:
+    colors = ["blue" if l else "red" for l in labels]
+    plt.scatter(features[:, 0], features[:, 1], color=colors, s=1.5)
+    plt.axis("off")
+    plt.savefig(plot_path)
+
+  data = {"label": labels}
+  for i in range(num_features):
+    data[f"f_{i}"] = features[:, i]
+  return data
 
 
 class JaxModelTest(parameterized.TestCase):
@@ -634,6 +659,113 @@ class ToJaxTest(parameterized.TestCase):
         ydf_predictions,
         rtol=1e-5,
         atol=1e-5,
+    )
+
+  def test_fine_tune_model(self):
+
+    # Note: Optax cannot be imported in python 3.8.
+    import optax
+
+    # Make datasets
+    label = "label"
+    train_ds = create_dataset_ellipse(1000)
+    test_ds = create_dataset_ellipse(10000)
+    finetune_ds = create_dataset_ellipse(10000)
+
+    # Train a model with YDF
+    model = specialized_learners.GradientBoostedTreesLearner(label=label).train(
+        train_ds
+    )
+
+    # Evaluate the YDF model
+    pre_tuned_ydf_accuracy = model.evaluate(test_ds).accuracy
+    logging.info("pre_tuned_ydf_accuracy: %s", pre_tuned_ydf_accuracy)
+
+    # Convert the model to JAX and evaluate it
+    jax_model = to_jax.to_jax_function(
+        model,
+        apply_activation=False,
+        leaves_as_params=True,
+    )
+
+    def to_jax_array(d):
+      """Converts a numpy array into a jax array."""
+      return {k: jnp.asarray(v) for k, v in d.items()}
+
+    jax_test_ds = to_jax_array(test_ds)
+    jax_finetune_ds = to_jax_array(finetune_ds)
+
+    @jax.jit
+    def compute_accuracy(state, batch):
+      batch = batch.copy()
+      labels = batch.pop(label)
+      features = batch
+      predictions = jax_model.predict(features, state)
+      return jnp.mean((predictions >= 0.0) == labels)
+
+    @jax.jit
+    def compute_loss(state, batch):
+      batch = batch.copy()
+      labels = batch.pop(label)
+      features = batch
+      logits = jax_model.predict(features, state)
+      loss = optax.sigmoid_binary_cross_entropy(logits, labels).mean()
+      return loss
+
+    pre_tuned_jax_test_accuracy = float(
+        compute_accuracy(jax_model.params, jax_test_ds)
+    )
+    logging.info("pre_tuned_jax_test_accuracy: %s", pre_tuned_jax_test_accuracy)
+    self.assertAlmostEqual(pre_tuned_jax_test_accuracy, pre_tuned_ydf_accuracy)
+
+    # Finetune the JAX model
+    assert jax_model.params is not None
+    self.assertSetEqual(
+        set(jax_model.params), set(["leaf_values", "initial_predictions"])
+    )
+
+    # Evaluate the fine-tuned JAX model
+    optimizer = optax.adam(0.001)
+
+    @jax.jit
+    def train_step(opt_state, mdl_state, batch):
+      loss, grads = jax.value_and_grad(compute_loss)(mdl_state, batch)
+      updates, opt_state = optimizer.update(grads, opt_state)
+      mdl_state = optax.apply_updates(mdl_state, updates)
+      return opt_state, mdl_state, loss
+
+    tf_finetune_ds = tf.data.Dataset.from_tensor_slices(finetune_ds).batch(100)
+
+    mdl_state = jax_model.params
+    opt_state = optimizer.init(mdl_state)
+    for epoch_idx in range(10):
+
+      test_loss = compute_loss(mdl_state, jax_test_ds)
+      finetune_loss = compute_loss(mdl_state, jax_finetune_ds)
+      test_accuracy = compute_accuracy(mdl_state, jax_test_ds)
+      finetune_accuracy = compute_accuracy(mdl_state, jax_finetune_ds)
+
+      logging.info("epoch_idx: %s", epoch_idx)
+      logging.info("\ttest_loss: %s", test_loss)
+      logging.info("\tfinetune_loss: %s", finetune_loss)
+      logging.info("\ttest_accuracy: %s", test_accuracy)
+      logging.info("\tfinetune_accuracy: %s", finetune_accuracy)
+
+      for batch in tf_finetune_ds:
+        opt_state, mdl_state, loss = train_step(
+            opt_state, mdl_state, to_jax_array(batch)
+        )
+        del loss
+
+    post_tuned_jax_test_accuracy = float(
+        compute_accuracy(mdl_state, jax_test_ds)
+    )
+    logging.info(
+        "post_tuned_jax_test_accuracy: %s", post_tuned_jax_test_accuracy
+    )
+    # The model quality improve by at least 0.01 of accuracy.
+    self.assertGreaterEqual(
+        post_tuned_jax_test_accuracy, pre_tuned_jax_test_accuracy + 0.01
     )
 
 

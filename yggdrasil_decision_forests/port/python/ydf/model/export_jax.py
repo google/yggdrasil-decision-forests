@@ -18,7 +18,7 @@ import array
 import dataclasses
 import enum
 import functools
-from typing import Any, Sequence, Dict, Optional, List, Set, Tuple
+from typing import Any, Sequence, Dict, Optional, List, Set, Tuple, Callable, Union
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
@@ -42,6 +42,10 @@ except ImportError as exc:
 ArrayFloat = array.array
 ArrayInt = array.array
 ArrayBool = array.array
+
+# Names of the learnable parameters of the model.
+_PARAM_LEAF_VALUES = "leaf_values"
+_PARAM_INITIAL_PREDICTIONS = "initial_predictions"
 
 
 # Index of the type of conditions in the intermediate tree representation.
@@ -168,15 +172,19 @@ class JaxModel:
   """A YDF model converted in JAX with to_jax_function.
 
   Attributes:
-    predict: Jitted JAX function that compute the model predictions.
+    predict: Jitted JAX function that computes the model predictions. The
+      signature is `predict(feature_values)` if `params` is None, and
+      `predict(feature_values, params)` if `params` is set.
     encode: Optional object to encode features before the JAX model. Is None if
       the model does not need special feature encoding. For instance, used to
       encode categorical string values.
+    params: Learnable parameters of the model. If set, "params" should be passed
+      as an argument to the "predict" function.
   """
 
-  predict: Any
-  # TODO: Rename to "encoder".
-  encode: Optional[FeatureEncoding]
+  predict: Union[Callable[[Any], Any], Callable[[Any, Dict[str, Any]], Any]]
+  encode: Optional[FeatureEncoding]  # TODO: Rename to "encoder".
+  params: Optional[Dict[str, Any]]
 
 
 @dataclasses.dataclass
@@ -592,7 +600,7 @@ class InternalForestJaxArrays:
   """Jax arrays for each of the data fields in InternalForest."""
 
   forest: dataclasses.InitVar[InternalForest]
-  leaf_outputs: jax.Array = dataclasses.field(init=False)
+  leaf_outputs: Optional[jax.Array] = dataclasses.field(init=False)
   split_features: jax.Array = dataclasses.field(init=False)
   split_parameters: jax.Array = dataclasses.field(init=False)
   negative_children: jax.Array = dataclasses.field(init=False)
@@ -603,7 +611,7 @@ class InternalForestJaxArrays:
   begin_non_leaf_nodes: jax.Array = dataclasses.field(init=False)
   begin_leaf_nodes: jax.Array = dataclasses.field(init=False)
   catgorical_mask: Optional[jax.Array] = dataclasses.field(init=False)
-  initial_predictions: jax.Array = dataclasses.field(init=False)
+  initial_predictions: Optional[jax.Array] = dataclasses.field(init=False)
 
   def __post_init__(self, forest: InternalForest):
     asarray = jax.numpy.asarray
@@ -641,12 +649,19 @@ class InternalForestJaxArrays:
 def to_jax_function(
     model: generic_model.GenericModel,
     jit: bool = True,
+    apply_activation: bool = True,
+    leaves_as_params: bool = False,
 ) -> JaxModel:
   """Converts a model into a JAX function.
 
   Args:
     model: A YDF model.
     jit: If true, compiles the function with @jax.jit.
+    apply_activation: Should the activation function, if any, be applied on the
+      model output.
+    leaves_as_params: If true, exports the leaf values as learnable parameters.
+      In this case, `params` is set in the returned value, and it should be
+      passed to `predict(feature_values, params)`.
 
   Returns:
     A Jax function and optionally a FeatureEncoding object to encode
@@ -687,15 +702,43 @@ def to_jax_function(
   jax_arrays = InternalForestJaxArrays(forest)
   forest.clear_array_data()
 
-  predict = functools.partial(_predict_fn, forest=forest, jax_arrays=jax_arrays)
+  if not apply_activation:
+    # Force no activation fuction.
+    forest.activation = custom_loss.Activation.IDENTITY
+
+  # All the learnable parameters of the model
+  params = {}
+
+  if leaves_as_params:
+    params = {_PARAM_LEAF_VALUES: jax_arrays.leaf_outputs}
+    jax_arrays.leaf_outputs = None
+
+    if len(forest.initial_predictions) == 1:
+      # Note: Initial predictions can only be non-null for single dimension
+      # trees. This is checked in the initialization phrase. See "JAX conversion
+      # does not support non-zero multi-dimensional..." exception.
+      params[_PARAM_INITIAL_PREDICTIONS] = jax_arrays.initial_predictions
+      jax_arrays.initial_predictions = None
+
+  predict = functools.partial(
+      _predict_fn,
+      forest=forest,
+      jax_arrays=jax_arrays,
+  )
 
   if jit:
     predict = jax.jit(predict)
-  return JaxModel(predict=predict, encode=forest.feature_encoding)
+  return JaxModel(
+      predict=predict,
+      encode=forest.feature_encoding,
+      params=params if params else None,
+  )
 
 
 def _predict_fn(
     feature_values: Dict[str, jax.Array],
+    params: Optional[Dict[str, jax.Array]] = None,
+    *,
     forest: InternalForest,
     jax_arrays: InternalForestJaxArrays,
 ) -> jax.Array:
@@ -719,6 +762,7 @@ def _predict_fn(
 
   Args:
     feature_values: Dictionary of input feature values.
+    params: Learnable parameters of the model.
     forest: Forest data.
     jax_arrays: JAX array data.
 
@@ -747,7 +791,12 @@ def _predict_fn(
           unroll=True,
       )
       value_idx = begin_leaf_node - 1 - node_offset_idx
-      return jax_arrays.leaf_outputs[value_idx]
+
+      if jax_arrays.leaf_outputs is None:
+        leaf_outputs = params[_PARAM_LEAF_VALUES]
+      else:
+        leaf_outputs = jax_arrays.leaf_outputs
+      return leaf_outputs[value_idx]
 
     # Compute forest prediction.
     all_predictions = jax.vmap(predict_one_example_one_tree)(
@@ -757,8 +806,13 @@ def _predict_fn(
     )
 
     if len(forest.initial_predictions) == 1:
+      if jax_arrays.initial_predictions is None:
+        initial_predictions = params[_PARAM_INITIAL_PREDICTIONS]
+      else:
+        initial_predictions = jax_arrays.initial_predictions
+
       raw_output = jax.numpy.sum(
-          all_predictions, initial=jax_arrays.initial_predictions[0]
+          all_predictions, initial=initial_predictions[0]
       )
     else:
       shaped_predictions = jax.numpy.reshape(

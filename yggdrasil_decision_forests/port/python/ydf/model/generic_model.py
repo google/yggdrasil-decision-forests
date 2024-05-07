@@ -820,7 +820,12 @@ Use `model.describe()` for more details
         squeeze_binary_classification=squeeze_binary_classification,
     )
 
-  def to_jax_function(self, jit: bool = True) -> "export_jax.JaxModel":  # pytype: disable=name-error
+  def to_jax_function(  # pytype: disable=name-error
+      self,
+      jit: bool = True,
+      apply_activation: bool = True,
+      leaves_as_params: bool = False,
+  ) -> "export_jax.JaxModel":
     """Converts the YDF model into a JAX function.
 
     Usage example:
@@ -849,6 +854,11 @@ Use `model.describe()` for more details
 
     Args:
       jit: If true, compiles the function with @jax.jit.
+      apply_activation: Should the activation function, if any, be applied on
+        the model output.
+      leaves_as_params: If true, exports the leaf values as learnable
+        parameters. In this case, `params` is set in the returned value, and it
+        should be passed to `predict(feature_values, params)`.
 
     Returns:
       A Jax function and optionnaly a FeatureEncoding object to encode
@@ -856,7 +866,12 @@ Use `model.describe()` for more details
       encoding, the second returned value is None.
     """
 
-    return _get_export_jax().to_jax_function(model=self, jit=jit)
+    return _get_export_jax().to_jax_function(
+        model=self,
+        jit=jit,
+        apply_activation=apply_activation,
+        leaves_as_params=leaves_as_params,
+    )
 
   def hyperparameter_optimizer_logs(
       self,
