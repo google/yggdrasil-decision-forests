@@ -150,9 +150,9 @@ class EvaluationTest(absltest.TestCase):
     evaluation = metric.Evaluation(proto_eval)
     print(evaluation)
     dict_eval = evaluation.to_dict()
-    self.assertDictContainsSubset(
-        {"accuracy": (1 + 4) / (1 + 2 + 3 + 4), "loss": 2.0, "num_examples": 1},
-        dict_eval,
+    self.assertLessEqual(
+        {"accuracy": (1 + 4) / (1 + 2 + 3 + 4), "loss": 2.0, "num_examples": 1}.items(),
+        dict_eval.items(),
     )
 
     self.assertEqual(dict_eval["confusion_matrix"].classes, ("1", "2"))

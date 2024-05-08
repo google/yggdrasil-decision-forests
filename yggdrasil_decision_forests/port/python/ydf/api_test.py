@@ -198,6 +198,11 @@ class ApiTest(absltest.TestCase):
           "TFDF is not supported anymore on python <= 3.8. Skipping TFDF tests."
       )
       return
+    if not sys.version_info < (3, 12):
+      print(
+          "TFDF is not yet supported for python >= 3.12. Skipping TFDF tests."
+      )
+      return
 
     model_path = os.path.join(
         test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"

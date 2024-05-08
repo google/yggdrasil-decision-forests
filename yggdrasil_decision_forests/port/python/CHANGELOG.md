@@ -1,17 +1,19 @@
 # Changelog
 
-## HEAD
+## 0.4.3- 2024-05-07
 
 ### Feature
 
 -   Add `model.to_jax_function()` function to convert a YDF model into a JAX
     function that can be combined with other JAX operations.
 -   Print warnings when categorical features look like numbers.
+-   Add support for Python 3.12.
 
 ### Fix
 
 -   Fix cross-validation for non-classification learners.
 -   Fix missing ydf/model/tree/plotter.js
+-   Solve dependency collision of YDF Proto between PYDF and TF-DF.
 
 ## 0.4.2- 2024-04-22
 

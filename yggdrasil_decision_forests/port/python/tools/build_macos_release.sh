@@ -16,7 +16,7 @@
 
 set -vex
 
-declare -a python_versions=("3.8" "3.9" "3.10" "3.11")
+declare -a python_versions=("3.8" "3.9" "3.10" "3.11" "3.12")
 
 for pyver in "${python_versions[@]}"
 do

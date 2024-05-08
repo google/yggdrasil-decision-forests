@@ -20,7 +20,7 @@
 # Usage example:
 #   third_party/yggdrasil_decision_forests/tools/run_e2e_pydf_test.sh
 
-set -ex
+set -vex
 
 LOCAL_DIR="/usr/local/google/home/${USER}/git/yggdrasil-decision-forests"
 CL=$(hg exportedcl)
@@ -57,22 +57,26 @@ run_test() {
   sudo docker start ${DOCKER_CONTAINER}
   set -e
 
-  PREPARE='yum update;yum install -y rsync;curl -L -o /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-amd64;chmod +x /usr/local/bin/bazel;PYTHON=python3.11;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate;export COMPILERS="gcc"'
+  # Install the build dependencies
+  CMD="yum update;yum install -y rsync;curl -L -o /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-amd64;chmod +x /usr/local/bin/bazel;export COMPILERS=gcc"
 
-  # Only the shell
-  CMD='$SHELL'
-  # Compile PYDF and give a shell
-  # CMD='./tools/test_pydf.sh;./tools/build_pydf.sh python;$SHELL'
+  # Only start a shell
+  CMD="${CMD};/bin/bash"
+
+  # Or, compile PYDF and give a shell
+  # CMD="${CMD};PYTHON=python3.11;\$PYTHON -m venv /tmp/venv_\$PYTHON;source /tmp/venv_\$PYTHON/bin/activate"
+  # CMD="${CMD};./tools/test_pydf.sh;./tools/build_pydf.sh python;/bin/bash"
 
   # In the shell, you can:
   #
-  # If the test fails, you can restart it with:
+  # Build and run the units tests:
+  # PYTHON=python3.9;$PYTHON -m venv /tmp/venv_$PYTHON;source /tmp/venv_$PYTHON/bin/activate
   # ./tools/test_pydf.sh
   #
-  # To build a single pip package, run:
+  # To build a pip package from the artefacts of the previous command:
   # ./tools/build_pydf.sh python
   #
-  # To create the full PYDF release, with all the versions, run:
+  # Comile, test, and build the pip packages for all the python versions:
   # ./tools/build_linux_release.sh
   #
   # To start a notebook instance, run:
@@ -83,7 +87,7 @@ run_test() {
   # sudo sudo docker stop [ID]
   # sudo docker system prune -a
 
-  sudo docker exec -it ${DOCKER_CONTAINER} /bin/bash -c "${PREPARE};${CMD}"
+  sudo docker exec -it ${DOCKER_CONTAINER} /bin/bash -c "${CMD}"
 }
 
 run_export
