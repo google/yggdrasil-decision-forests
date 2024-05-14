@@ -653,6 +653,8 @@ class RandomForestLearnerTest(LearnerTest):
         sparse_oblique_weights="CONTINUOUS",
     )
     model = learner.train(self.adult.train)
+    assert isinstance(model, decision_forest_model.DecisionForestModel)
+    model.plot_tree().html()
     logging.info("Trained model: %s", model)
 
   def test_adult_mhld_oblique(self):
@@ -798,6 +800,17 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     evaluation = model.evaluate(self.synthetic_ranking.test_path)
     self.assertGreaterEqual(evaluation.ndcg, 0.70)
     self.assertLessEqual(evaluation.ndcg, 0.74)
+
+  def test_adult_sparse_oblique(self):
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        num_trees=5,
+        split_axis="SPARSE_OBLIQUE",
+    )
+    model = learner.train(self.adult.train)
+    assert isinstance(model, decision_forest_model.DecisionForestModel)
+    model.plot_tree().html()
+    logging.info("Trained model: %s", model)
 
   def test_adult_num_threads(self):
     learner = specialized_learners.GradientBoostedTreesLearner(

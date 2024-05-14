@@ -1,5 +1,11 @@
 # Changelog
 
+## HEAD
+
+### Fix
+
+-   Fix error when plotting oblique trees (`model.plot_tree`) in colab.
+
 ## 0.4.3- 2024-05-07
 
 ### Feature
