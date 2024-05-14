@@ -69,6 +69,14 @@ class DecisionForestModelTest(parameterized.TestCase):
     )
     self.assertTrue(np.all(leaves >= 0))
 
+  def test_print_api(self):
+    self.adult_binary_class_gbdt.print_tree()
+    self.adult_binary_class_gbdt.print_tree(tree_idx=0, max_depth=None)
+
+  def test_plot_api(self):
+    self.adult_binary_class_gbdt.plot_tree().html()
+    self.adult_binary_class_gbdt.plot_tree(tree_idx=0, max_depth=None).html()
+
   @parameterized.parameters(x for x in generic_model.NodeFormat)
   def test_node_format(self, node_format: generic_model.NodeFormat):
     """Test that the node format is saved correctly."""

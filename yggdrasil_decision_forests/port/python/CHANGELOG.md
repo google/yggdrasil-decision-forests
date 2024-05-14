@@ -2,6 +2,10 @@
 
 ## HEAD
 
+### Feature
+
+-   Add `max_depth` argument to `model.print_tree`.
+
 ### Fix
 
 -   Fix error when plotting oblique trees (`model.plot_tree`) in colab.
