@@ -14,9 +14,10 @@
 
 import array
 import logging
+import os
 import sys
 import tempfile
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -66,28 +67,119 @@ def create_dataset(columns: List[str], n: int = 1000) -> Dict[str, Any]:
   return {k: data[k] for k in columns}
 
 
+def create_dataset_mnist(
+    num_examples: int, begin_example_idx: int = 0
+) -> Dict[str, Any]:
+  """Creates a binary classification dataset based on MNIST.
+
+  This function cannot be executed in a sandbox test as it downloads a  dataset.
+
+  Args:
+    num_examples: Number of examples to extract from the training dataset.
+    begin_example_idx: Index of the first example in the training dataset.
+
+  Returns:
+    The binary mnist dataset.
+  """
+
+  import tensorflow_datasets as tfds  # pylint: disable=import-error,g-import-not-at-top
+
+  tf_ds = tfds.load("mnist", split="train")
+  raw_ds = (
+      tf_ds.skip(begin_example_idx)
+      .batch(num_examples)
+      .take(1)
+      .as_numpy_iterator()
+      .next()
+  )
+  raw_image_shape = raw_ds["image"].shape
+  return {
+      "label": raw_ds["label"] >= 5,
+      "image": raw_ds["image"].reshape([raw_image_shape[0], -1]),
+  }
+
+
 def create_dataset_ellipse(
     num_examples: int = 1000,
     num_features: int = 3,
     plot_path: Optional[str] = None,
-):
-  """Create a binary classification dataset classifying ellipses."""
+) -> Dict[str, np.ndarray]:
+  """Creates a binary classification dataset classifying ellipses.
+
+  Args:
+    num_examples: Number of generated examples.
+    num_features: Number of features.
+    plot_path: If set, saves a plot of the examples to this file.
+
+  Returns:
+    An ellipse dataset.
+  """
+
   features = np.random.uniform(-1, 1, size=[num_examples, num_features])
-  scales = np.array([1.0 + i * 0.1 for i in range(num_features)])
+  scales = np.array([1.0 + i * 0.4 for i in range(num_features)])
   labels = (
       np.sqrt(np.sum(np.multiply(np.square(features), scales), axis=1)) <= 0.80
   )
 
   if plot_path:
     colors = ["blue" if l else "red" for l in labels]
-    plt.scatter(features[:, 0], features[:, 1], color=colors, s=1.5)
-    plt.axis("off")
-    plt.savefig(plot_path)
+    fig, ax = plt.subplots(1, 1)
+    ax.scatter(features[:, 0], features[:, 1], color=colors, s=1.5)
+    ax.set_axis_off()
+    ax.set_aspect("equal")
+    fig.savefig(plot_path)
 
   data = {"label": labels}
   for i in range(num_features):
     data[f"f_{i}"] = features[:, i]
   return data
+
+
+def plot_ellipse_predictions(
+    prediction_fn: Callable[[Dict[str, jax.Array]], jax.Array],
+    path: str,
+    resolution: int = 200,
+    num_features: int = 3,
+) -> None:
+  """Plots the predictions of a model on the ellipse dataset.
+
+  Args:
+    prediction_fn: A function taking a batch of examples, and returning
+      predictions.
+    path: Save to save the plot.
+    resolution: Plotting resolution, for each axis.
+    num_features: Number of features.
+  """
+
+  # Compute feature values
+  vs = np.linspace(-1, 1, resolution)
+  tuple_features = np.meshgrid(*((vs,) * num_features))
+  raw_features = np.stack([np.reshape(f, [-1]) for f in tuple_features], axis=1)
+  dict_features = {
+      f"f_{i}": jnp.asarray(raw_features[:, i]) for i in range(num_features)
+  }
+
+  # Generate predictions
+  predictions = prediction_fn(dict_features)
+
+  disp_predictions = np.reshape(predictions, [resolution] * num_features)
+  if len(disp_predictions.shape) > 2:
+    disp_predictions = np.mean(
+        disp_predictions,
+        axis=[i for i in range(2, len(disp_predictions.shape))],
+    )
+
+  # Plot predictions
+  fig, ax = plt.subplots(1, 1)
+  ax.imshow(
+      disp_predictions,
+      interpolation="none",
+      resample=False,
+      cmap="coolwarm",
+  )
+  ax.set_axis_off()
+  ax.set_aspect("equal")
+  fig.savefig(path)
 
 
 class JaxModelTest(parameterized.TestCase):
@@ -798,16 +890,41 @@ class ToJaxTest(parameterized.TestCase):
         atol=1e-5,
     )
 
-  def test_fine_tune_model(self):
+  def test_dataset_ellipse(self):
+    with tempfile.TemporaryDirectory() as tempdir:
+      _ = create_dataset_ellipse(
+          1000, plot_path=os.path.join(tempdir, "ds.png")
+      )
+
+      def prediction_fn(features: Dict[str, jax.Array]) -> jax.Array:
+        return features["f_0"] >= 0.1
+
+      plot_ellipse_predictions(
+          prediction_fn, os.path.join(tempdir, "predictions.png")
+      )
+
+  @parameterized.named_parameters(
+      ("leaves_ellipse", "ellipse", True),
+      # ("leaves_mnist", "mnist", True),  # Not compatible with test sandbox
+  )
+  def test_fine_tune_model(self, dataset: str, leaves_as_params: bool):
 
     # Note: Optax cannot be imported in python 3.8.
-    import optax
+    import optax  # pylint: disable=import-error,g-import-not-at-top
 
     # Make datasets
     label = "label"
-    train_ds = create_dataset_ellipse(1000)
-    test_ds = create_dataset_ellipse(10000)
-    finetune_ds = create_dataset_ellipse(10000)
+
+    if dataset == "ellipse":
+      train_ds = create_dataset_ellipse(1000)
+      test_ds = create_dataset_ellipse(10000)
+      finetune_ds = create_dataset_ellipse(10000)
+    elif dataset == "mnist":
+      train_ds = create_dataset_mnist(1000)
+      test_ds = create_dataset_mnist(10000, 1000)
+      finetune_ds = create_dataset_mnist(10000, 1000 + 10000)
+    else:
+      assert False
 
     # Train a model with YDF
     model = specialized_learners.GradientBoostedTreesLearner(label=label).train(
@@ -822,8 +939,14 @@ class ToJaxTest(parameterized.TestCase):
     jax_model = to_jax.to_jax_function(
         model,
         apply_activation=False,
-        leaves_as_params=True,
+        leaves_as_params=leaves_as_params,
     )
+
+    # Check parameter values
+    if leaves_as_params:
+      self.assertContainsSubset(
+          ["leaf_values", "initial_predictions"], jax_model.params
+      )
 
     def to_jax_array(d):
       """Converts a numpy array into a jax array."""

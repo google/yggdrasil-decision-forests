@@ -341,6 +341,7 @@ py_test(
         # numpy dep,
         # optax dep,
         # tensorflow dep,
+        # tensorflow_datasets dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/learner:generic_learner",
