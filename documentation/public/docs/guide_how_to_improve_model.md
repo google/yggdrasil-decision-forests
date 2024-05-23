@@ -102,7 +102,7 @@ for more details.
 learner = ydf.RandomForestLearner(
   split_axis="SPARSE_OBLIQUE",
   sparse_oblique_normalization="MIN_MAX",
-  sparse_oblique_num_projections_exponent=1,
+  sparse_oblique_num_projections_exponent=1.0,
   ...)
 ```
 
