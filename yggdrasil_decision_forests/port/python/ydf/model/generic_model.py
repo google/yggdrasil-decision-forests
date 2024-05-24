@@ -944,7 +944,7 @@ Use `model.describe()` for more details
     return self.data_spec().columns[self.label_col_idx()].name
 
   def label_classes(self) -> List[str]:
-    """Returns the label classes for classification tasks, None otherwise."""
+    """Returns the label classes for a classification model; fails otherwise."""
     if self.task() != Task.CLASSIFICATION:
       raise ValueError(
           "Label classes are only available for classification models. This"

@@ -339,6 +339,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
           inference_args=effective_data_spec_args,
           required_columns=None,  # All columns in the dataspec are required.
           dont_unroll_columns=dont_unroll_columns,
+          label=self._label,
       )
 
   def cross_validation(

@@ -56,6 +56,7 @@ class VerticalDataset:
       column_data: Any,
       inference_args: Optional[dataspec.DataSpecInferenceArgs],
       column_idx: Optional[int],
+      is_label: bool,
   ):
     """Adds a column to the dataset and computes the column statistics."""
     assert (column_idx is None) != (inference_args is None)
@@ -112,7 +113,7 @@ class VerticalDataset:
 
     elif column.semantic == dataspec.Semantic.CATEGORICAL:
 
-      from_boolean = False
+      force_dictionary = None
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, dtype=np.bytes_)
       ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
@@ -121,7 +122,16 @@ class VerticalDataset:
         bool_column_data = column_data
         column_data = np.full_like(bool_column_data, b"false", "|S5")
         column_data[bool_column_data] = b"true"
-        from_boolean = True
+        force_dictionary = [dataspec.YDF_OOD_BYTES, b"false", b"true"]
+      elif (
+          is_label
+          and column_data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE
+          and (dictionary_size := dense_integer_dictionary_size(column_data))
+      ):
+        column_data = column_data.astype(np.bytes_)
+        force_dictionary = [dataspec.YDF_OOD_BYTES] + [
+            str(i).encode("utf-8") for i in range(dictionary_size)
+        ]
       elif (
           column_data.dtype.type
           in [
@@ -145,10 +155,8 @@ class VerticalDataset:
       if column_data.dtype.type == np.bytes_:
         if inference_args is not None:
           guide = dataspec.categorical_column_guide(column, inference_args)
-          if from_boolean:
-            guide["dictionary"] = np.array(
-                [b"<OOV>", b"false", b"true"], dtype=np.bytes_
-            )
+          if force_dictionary:
+            guide["dictionary"] = np.array(force_dictionary, dtype=np.bytes_)
           self._dataset.PopulateColumnCategoricalNPBytes(
               column.name, column_data, **guide, ydf_dtype=ydf_dtype
           )
@@ -259,6 +267,7 @@ def create_vertical_dataset(
     data_spec: Optional[data_spec_pb2.DataSpecification] = None,
     required_columns: Optional[Sequence[str]] = None,
     dont_unroll_columns: Optional[Sequence[str]] = None,
+    label: Optional[str] = None,
 ) -> VerticalDataset:
   """Creates a VerticalDataset from various sources of data.
 
@@ -342,6 +351,7 @@ def create_vertical_dataset(
       mentioned in the data spec or `columns` are required.
     dont_unroll_columns: List of columns that cannot be unrolled. If one such
       column needs to be unrolled, raise an error.
+    label: Name of the label column, if any.
 
   Returns:
     Dataset to be ingested by the learner algorithms.
@@ -364,6 +374,7 @@ def create_vertical_dataset(
         data_spec=data_spec,
         inference_args=None,
         dont_unroll_columns=dont_unroll_columns,
+        label=label,
     )
   else:
     inference_args = dataspec.DataSpecInferenceArgs(
@@ -382,6 +393,7 @@ def create_vertical_dataset(
         inference_args=inference_args,
         data_spec=None,
         dont_unroll_columns=dont_unroll_columns,
+        label=label,
     )
 
 
@@ -391,6 +403,7 @@ def create_vertical_dataset_with_spec_or_args(
     inference_args: Optional[dataspec.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
     dont_unroll_columns: Optional[Sequence[str]] = None,
+    label: Optional[str] = None,
 ) -> VerticalDataset:
   """Returns a vertical dataset from inference args or data spec (not both!)."""
   assert (data_spec is None) != (inference_args is None)
@@ -416,6 +429,7 @@ def create_vertical_dataset_with_spec_or_args(
         required_columns,
         inference_args=inference_args,
         data_spec=data_spec,
+        label=label,
     )
 
 
@@ -447,6 +461,7 @@ def create_vertical_dataset_from_dict_of_values(
     required_columns: Optional[Sequence[str]],
     inference_args: Optional[dataspec.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
+    label: Optional[str] = None,
 ) -> VerticalDataset:
   """Specialization of create_vertical_dataset to dictionary of values.
 
@@ -461,6 +476,7 @@ def create_vertical_dataset_from_dict_of_values(
       is set.
     data_spec: Data spec of the given data. Must be None if inference_args is
       set.
+    label: Name of the label column, if any.
 
   Returns:
     A Vertical dataset with the given properties.
@@ -543,6 +559,7 @@ def create_vertical_dataset_from_dict_of_values(
         column_data,
         inference_args=inference_args,  # Might be None
         column_idx=column_idx if data_spec is not None else None,
+        is_label=label == column.name,
     )
 
   if data_spec is None:
@@ -667,3 +684,24 @@ def _type(value: Any) -> str:
     return f"numpy's array of '{value.dtype.name}'"
   else:
     return str(type(value))
+
+
+def dense_integer_dictionary_size(values: np.ndarray) -> Optional[int]:
+  """Gets the number of items in a dense and zero-indexed array of integers.
+
+  If the array is not dense or not zero-indexed, returns None.
+
+  Args:
+    values: Numpy array of integer values.
+
+  Returns:
+    Number of unique dense values, or None.
+  """
+  unique_values = np.unique(values).tolist()
+  if (
+      unique_values
+      and unique_values[0] == 0
+      and unique_values[-1] + 1 == len(unique_values)
+  ):
+    return len(unique_values)
+  return None

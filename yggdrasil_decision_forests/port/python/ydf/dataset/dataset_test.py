@@ -571,7 +571,7 @@ four entries,4,8,4.4,0
                 count_nas=count_nas,
                 categorical=ds_pb.CategoricalSpec(
                     items={
-                        "<OOV>": VocabValue(index=0, count=expected_counts[0]),
+                        "<OOD>": VocabValue(index=0, count=expected_counts[0]),
                         "false": VocabValue(index=1, count=expected_counts[1]),
                         "true": VocabValue(index=2, count=expected_counts[2]),
                     },
@@ -582,31 +582,38 @@ four entries,4,8,4.4,0
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
-  @parameterized.parameters(
-      ([True, True, True], (0, 0, 3), 0),
-      ([False, False, False], (0, 3, 0), 0),
-      ([True, False, False], (0, 2, 1), 0),
-  )
-  def test_order_boolean(self, values, expected_counts, count_nas):
+  def test_order_integers(self):
     ds = dataset.create_vertical_dataset(
-        {"col": np.array(values)},
+        {"col": np.array([0, 1, 4, 3, 1, 2, 3, 4, 12, 11, 10, 9, 8, 7, 6, 5])},
         columns=[Column("col", dataspec.Semantic.CATEGORICAL)],
+        label="col",
     )
     expected_data_spec = ds_pb.DataSpecification(
-        created_num_rows=3,
+        created_num_rows=16,
         columns=(
             ds_pb.Column(
                 name="col",
                 type=ds_pb.ColumnType.CATEGORICAL,
-                dtype=ds_pb.DType.DTYPE_BOOL,
-                count_nas=count_nas,
+                dtype=ds_pb.DType.DTYPE_INT64,
+                count_nas=0,
                 categorical=ds_pb.CategoricalSpec(
                     items={
-                        "<OOV>": VocabValue(index=0, count=expected_counts[0]),
-                        "false": VocabValue(index=1, count=expected_counts[1]),
-                        "true": VocabValue(index=2, count=expected_counts[2]),
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "0": VocabValue(index=1, count=1),
+                        "1": VocabValue(index=2, count=2),
+                        "2": VocabValue(index=3, count=1),
+                        "3": VocabValue(index=4, count=2),
+                        "4": VocabValue(index=5, count=2),
+                        "5": VocabValue(index=6, count=1),
+                        "6": VocabValue(index=7, count=1),
+                        "7": VocabValue(index=8, count=1),
+                        "8": VocabValue(index=9, count=1),
+                        "9": VocabValue(index=10, count=1),
+                        "10": VocabValue(index=11, count=1),
+                        "11": VocabValue(index=12, count=1),
+                        "12": VocabValue(index=13, count=1),
                     },
-                    number_of_unique_values=3,
+                    number_of_unique_values=14,
                 ),
             ),
         ),
@@ -1883,6 +1890,30 @@ class MissingColumnsTest(parameterized.TestCase):
         self.get_inferred_dataspec_file_f1only(column_type),
     )
     self.assertEqual(ds._dataset.DebugString(), "f1\n1\n2\n3\n")
+
+
+class DenseDictionaryTest(parameterized.TestCase):
+
+  @parameterized.parameters(
+      ([0], 1),
+      ([0, 1], 2),
+      ([0, 1, 1, 0], 2),
+      ([1, 0], 2),
+      ([4, 3, 4, 1, 2, 0, 1, 2, 4], 5),
+  )
+  def test_dense_integer_dictionary_size(self, values, expected):
+    self.assertEqual(
+        dataset.dense_integer_dictionary_size(np.array(values)), expected
+    )
+
+  @parameterized.parameters(
+      ([],),
+      ([-1, 0, 1],),
+      ([1, 2, 3, 4],),
+      ([0, 1, 3, 4],),
+  )
+  def test_dense_integer_dictionary_size_is_none(self, values):
+    self.assertIsNone(dataset.dense_integer_dictionary_size(np.array(values)))
 
 
 if __name__ == "__main__":
