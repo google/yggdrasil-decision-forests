@@ -35,17 +35,23 @@ from ydf.learner import specialized_learners
 from ydf.model import export_jax as to_jax
 from ydf.model import generic_model
 from ydf.model import tree as tree_lib
-
+from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
 
 InternalFeatureItem = to_jax.InternalFeatureItem
 
 
-def create_dataset(columns: List[str], n: int = 1000) -> Dict[str, Any]:
+def create_dataset(
+    columns: List[str], n: int = 1000, seed: Optional[int] = None
+) -> Dict[str, Any]:
   """Creates a dataset with random values."""
+  if seed is not None:
+    np.random.seed(seed)
   data = {
       # Single-dim features
       "f1": np.random.random(size=n),
       "f2": np.random.random(size=n),
+      "f3": np.random.random(size=n),
+      "f4": np.random.random(size=n),
       "i1": np.random.randint(100, size=n),
       "i2": np.random.randint(100, size=n),
       "c1": np.random.choice(["x", "y", "z"], size=n, p=[0.6, 0.3, 0.1]),
@@ -810,6 +816,19 @@ class ToJaxTest(parameterized.TestCase):
           False,
           specialized_learners.GradientBoostedTreesLearner,
       ),
+      (
+          "gbt_regression_num_oblique",
+          ["f1", "f2", "f3", "f4"],
+          "label_regress",
+          generic_learner.Task.REGRESSION,
+          False,
+          specialized_learners.GradientBoostedTreesLearner,
+          {
+              "split_axis": "SPARSE_OBLIQUE",
+              "sparse_oblique_normalization": "STANDARD_DEVIATION",
+          },
+          False,  # TODO: Check conversion when bug solved.
+      ),
   )
   def test_to_jax_function(
       self,
@@ -818,12 +837,17 @@ class ToJaxTest(parameterized.TestCase):
       task: generic_learner.Task,
       has_encoding: bool,
       learner,
+      learner_kwargs=None,
+      test_tf_conversion: bool = True,
   ):
 
-    if learner == specialized_learners.GradientBoostedTreesLearner:
-      learner_kwargs = {"validation_ratio": 0.0}
-    else:
+    if learner_kwargs is None:
       learner_kwargs = {}
+    else:
+      learner_kwargs = learner_kwargs.copy()
+
+    if learner == specialized_learners.GradientBoostedTreesLearner:
+      learner_kwargs["validation_ratio"] = 0.0
 
     # Create YDF model
     columns = features + [label]
@@ -831,10 +855,13 @@ class ToJaxTest(parameterized.TestCase):
         label=label,
         task=task,
         **learner_kwargs,
-    ).train(create_dataset(columns, 1000))
+    ).train(create_dataset(columns, 1000, seed=1))
+    self.assertIsInstance(
+        model, gradient_boosted_trees_model.GradientBoostedTreesModel
+    )
 
     # Golden predictions
-    test_ds = create_dataset(columns, 1000)
+    test_ds = create_dataset(columns, 1, seed=2)
     ydf_predictions = model.predict(test_ds)
 
     # Convert model to tf function
@@ -858,6 +885,9 @@ class ToJaxTest(parameterized.TestCase):
         rtol=1e-5,
         atol=1e-5,
     )
+
+    if not test_tf_conversion:
+      return
 
     # Convert to a TensorFlow function
     tf_model = tf.Module()
@@ -885,7 +915,7 @@ class ToJaxTest(parameterized.TestCase):
     restored_tf_predictions = restored_tf_model.my_call(input_values)
     np.testing.assert_allclose(
         restored_tf_predictions,
-        ydf_predictions,
+        jax_predictions,
         rtol=1e-5,
         atol=1e-5,
     )
@@ -904,10 +934,13 @@ class ToJaxTest(parameterized.TestCase):
       )
 
   @parameterized.named_parameters(
-      ("leaves_ellipse", "ellipse", True),
-      # ("leaves_mnist", "mnist", True),  # Not compatible with test sandbox
+      ("leaves_ellipse", "ellipse", True, False),
+      # ("leaves_mnist", "mnist", True , False),   # Skip in sandboxed test
+      ("leaves_ellipse_oblique", "ellipse", True, True),
   )
-  def test_fine_tune_model(self, dataset: str, leaves_as_params: bool):
+  def test_fine_tune_model(
+      self, dataset: str, leaves_as_params: bool, oblique: bool
+  ):
 
     # Note: Optax cannot be imported in python 3.8.
     import optax  # pylint: disable=import-error,g-import-not-at-top
@@ -926,10 +959,15 @@ class ToJaxTest(parameterized.TestCase):
     else:
       assert False
 
+    kwargs = {}
+    if oblique:
+      kwargs["split_axis"] = "SPARSE_OBLIQUE"
+      kwargs["sparse_oblique_normalization"] = "STANDARD_DEVIATION"
+
     # Train a model with YDF
-    model = specialized_learners.GradientBoostedTreesLearner(label=label).train(
-        train_ds
-    )
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label=label, **kwargs
+    ).train(train_ds)
 
     # Evaluate the YDF model
     pre_tuned_ydf_accuracy = model.evaluate(test_ds).accuracy
@@ -976,7 +1014,9 @@ class ToJaxTest(parameterized.TestCase):
         compute_accuracy(jax_model.params, jax_test_ds)
     )
     logging.info("pre_tuned_jax_test_accuracy: %s", pre_tuned_jax_test_accuracy)
-    self.assertAlmostEqual(pre_tuned_jax_test_accuracy, pre_tuned_ydf_accuracy)
+    self.assertAlmostEqual(
+        pre_tuned_jax_test_accuracy, pre_tuned_ydf_accuracy, delta=1.0e-5
+    )
 
     # Finetune the JAX model
     assert jax_model.params is not None

@@ -346,6 +346,7 @@ py_test(
         "//ydf/dataset:dataspec",
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
+        "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/tree:all",
     ],
 )
