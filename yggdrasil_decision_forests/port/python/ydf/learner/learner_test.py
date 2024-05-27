@@ -994,13 +994,19 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
 
 class LoggingTest(parameterized.TestCase):
 
-  @parameterized.parameters(0, 1, 2)
-  def test_logging(self, verbose):
+  @parameterized.parameters(0, 1, 2, False, True)
+  def test_logging_function(self, verbose):
     save_verbose = log.verbose(verbose)
     learner = specialized_learners.RandomForestLearner(label="label")
     ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
     _ = learner.train(ds)
     log.verbose(save_verbose)
+
+  @parameterized.parameters(0, 1, 2, False, True)
+  def test_logging_arg(self, verbose):
+    learner = specialized_learners.RandomForestLearner(label="label")
+    ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
+    _ = learner.train(ds, verbose=verbose)
 
 
 class UtilityTest(LearnerTest):

@@ -618,6 +618,7 @@ $4
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
+      verbose: Optional[Union[int, bool]] = None,
   ) -> $7:
     """Trains a model on the given dataset.
 
@@ -648,11 +649,15 @@ $4
         do not need validation dataset. Some learners, such as
         GradientBoostedTrees, automatically extract a validation dataset from
         the training dataset if the validation dataset is not provided.
+      verbose: Verbose level during training. If None, uses the global verbose
+        level of `ydf.verbose`. Levels are: 0 of False: No logs, 1 or True:
+        Print a few logs in a notebook; prints all the logs in a terminal. 2:
+        Prints all the logs on all surfaces.
 
     Returns:
       A trained model.
     """
-    return super().train(ds, valid)
+    return super().train(ds=ds, valid=valid, verbose=verbose)
 )",
                               /*$0*/ class_name, /*$1*/ learner_key,
                               /*$2*/ fields_documentation,

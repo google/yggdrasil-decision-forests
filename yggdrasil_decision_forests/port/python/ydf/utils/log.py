@@ -32,7 +32,7 @@ import contextlib
 import enum
 import io
 import sys
-from typing import Any, Optional, Set
+from typing import Any, Optional, Set, Union
 
 from ydf.cc import ydf
 
@@ -59,13 +59,13 @@ class WarningMessage(enum.Enum):
 _ALREADY_DISPLAYED_WARNING_IDS: Set[WarningMessage] = set()
 
 
-def verbose(level: int = 2) -> int:
+def verbose(level: Union[int, bool] = 2) -> int:
   """Sets the verbose level of YDF.
 
   The verbose levels are:
-    0: Print no logs.
-    1: Print a few logs in a colab or notebook cell. Print all the logs in the
-        console. This is the default verbose level.
+    0 or False: Print no logs.
+    1 or True: Print a few logs in a colab or notebook cell. Print all the logs
+      in the console. This is the default verbose level.
     2: Prints all the logs on all surfaces.
 
   Usage example:
@@ -85,6 +85,10 @@ def verbose(level: int = 2) -> int:
   Returns:
     The previous verbose level.
   """
+
+  if isinstance(level, bool):
+    level = 1 if level else 0
+
   global _VERBOSE_LEVEL
   old = _VERBOSE_LEVEL
   _VERBOSE_LEVEL = level
