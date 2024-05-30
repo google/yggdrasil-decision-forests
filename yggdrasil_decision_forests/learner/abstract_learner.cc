@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <numeric>
 #include <set>
@@ -32,7 +33,8 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/time/time.h"
+#include "absl/time/clock.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -53,6 +55,7 @@
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
+#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -271,21 +274,85 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   return absl::OkStatus();
 }
 
+// Non status; dataset in memory.
 std::unique_ptr<AbstractModel> AbstractLearner::Train(
     const dataset::VerticalDataset& train_dataset) const {
   return TrainWithStatus(train_dataset).value();
 }
 
+// Non status; dataset on disk.
 std::unique_ptr<AbstractModel> AbstractLearner::Train(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec) const {
   return TrainWithStatus(typed_path, data_spec).value();
 }
 
+// API; dataset in memory.
 absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
-    const absl::string_view typed_path,
+    const dataset::VerticalDataset& train_dataset,
+    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        valid_dataset) const {
+  utils::usage::OnTrainingStart(train_dataset.data_spec(), training_config(),
+                                train_dataset.nrow());
+  const auto begin_training = absl::Now();
+
+  ASSIGN_OR_RETURN(auto model,
+                   TrainWithStatusImpl(train_dataset, valid_dataset));
+
+  utils::usage::OnTrainingEnd(train_dataset.data_spec(), training_config(),
+                              train_dataset.nrow(), *model,
+                              absl::Now() - begin_training);
+
+  if (training_config().pure_serving_model()) {
+    RETURN_IF_ERROR(model->MakePureServing());
+  }
+  return model;
+}
+
+// Impl; dataset in memory.
+absl::StatusOr<std::unique_ptr<AbstractModel>>
+AbstractLearner::TrainWithStatusImpl(
+    const dataset::VerticalDataset& train_dataset,
+    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        valid_dataset) const {
+  // This method should always be implemented by learners.
+  return absl::UnimplementedError(
+      "The learner does not implement TrainWithStatusImpl (recommended) "
+      "TrainWithStatus and "
+      "TrainWithStatusImpl (deprecated).");
+}
+
+// API; dataset on disk.
+absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
+    absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
     const absl::optional<std::string>& typed_valid_path) const {
+  utils::usage::OnTrainingStart(data_spec, training_config(),
+                                /*num_examples=*/-1);
+  const auto begin_training = absl::Now();
+
+  ASSIGN_OR_RETURN(
+      auto model, TrainWithStatusImpl(typed_path, data_spec, typed_valid_path));
+
+  utils::usage::OnTrainingEnd(data_spec, training_config(),
+                              /*num_examples=*/-1, *model,
+                              absl::Now() - begin_training);
+
+  if (training_config().pure_serving_model()) {
+    RETURN_IF_ERROR(model->MakePureServing());
+  }
+  return model;
+}
+
+// Impl; dataset on disk.
+absl::StatusOr<std::unique_ptr<AbstractModel>>
+AbstractLearner::TrainWithStatusImpl(
+    absl::string_view typed_path,
+    const dataset::proto::DataSpecification& data_spec,
+    const absl::optional<std::string>& typed_valid_path) const {
+  // If training on disk is not implemented, we load the dataset and use
+  // training from memory.
+
   // List the columns used for the training.
   // Only these columns will be loaded.
   proto::TrainingConfigLinking link_config;
@@ -310,7 +377,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
         /*required_columns=*/{}, dataset_loading_config));
     valid_dataset = valid_dataset_data;
   }
-  return TrainWithStatus(train_dataset, valid_dataset);
+  return TrainWithStatusImpl(train_dataset, valid_dataset);
 }
 
 absl::Status CheckGenericHyperParameterSpecification(

@@ -69,7 +69,6 @@
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/snapshot.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
-#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -608,7 +607,7 @@ GradientBoostedTreesLearner::InitializeModel(
 }
 
 absl::StatusOr<std::unique_ptr<AbstractModel>>
-GradientBoostedTreesLearner::TrainWithStatus(
+GradientBoostedTreesLearner::TrainWithStatusImpl(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
     const absl::optional<std::string>& typed_valid_path) const {
@@ -616,8 +615,8 @@ GradientBoostedTreesLearner::TrainWithStatus(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   if (!gbt_config.has_sample_with_shards()) {
     // Regular training.
-    return AbstractLearner::TrainWithStatus(typed_path, data_spec,
-                                            typed_valid_path);
+    return AbstractLearner::TrainWithStatusImpl(typed_path, data_spec,
+                                                typed_valid_path);
   }
 
   return ShardedSamplingTrain(typed_path, data_spec, typed_valid_path);
@@ -643,10 +642,6 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   // Initialize the configuration.
   internal::AllTrainingConfiguration config;
   RETURN_IF_ERROR(BuildAllTrainingConfiguration(data_spec, &config));
-
-  utils::usage::OnTrainingStart(data_spec, config.train_config,
-                                config.train_config_link,
-                                /*num_examples=*/-1);
 
   // Initialize the model.
   auto mdl = InitializeModel(config, data_spec);
@@ -1124,22 +1119,12 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         config, early_stopping, validation->dataset, deployment().num_threads(),
         mdl.get()));
   }
-
   RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
-
-  if (config.train_config.pure_serving_model()) {
-    RETURN_IF_ERROR(mdl->MakePureServing());
-  }
-
-  utils::usage::OnTrainingEnd(
-      data_spec, config.train_config, config.train_config_link,
-      /*num_examples=*/-1, *mdl, absl::Now() - begin_training);
-
   return mdl;
 }
 
 absl::StatusOr<std::unique_ptr<AbstractModel>>
-GradientBoostedTreesLearner::TrainWithStatus(
+GradientBoostedTreesLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
@@ -1171,9 +1156,6 @@ GradientBoostedTreesLearner::TrainWithStatus(
   YDF_LOG(INFO) << "Training gradient boosted tree on " << train_dataset.nrow()
                 << " example(s) and "
                 << config.train_config_link.features().size() << " feature(s).";
-
-  utils::usage::OnTrainingStart(train_dataset.data_spec(), config.train_config,
-                                config.train_config_link, train_dataset.nrow());
 
   if (config.gbt_config->has_sample_with_shards()) {
     return absl::InvalidArgumentError(
@@ -1658,15 +1640,7 @@ GradientBoostedTreesLearner::TrainWithStatus(
 
   RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
 
-  utils::usage::OnTrainingEnd(train_dataset.data_spec(), training_config(),
-                              config.train_config_link, train_dataset.nrow(),
-                              *mdl, absl::Now() - begin_training);
-
   decision_tree::SetLeafIndices(mdl->mutable_decision_trees());
-
-  if (config.train_config.pure_serving_model()) {
-    RETURN_IF_ERROR(mdl->MakePureServing());
-  }
   return std::move(mdl);
 }
 

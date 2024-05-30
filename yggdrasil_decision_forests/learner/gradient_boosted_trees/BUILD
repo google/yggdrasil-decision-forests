@@ -56,7 +56,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:snapshot",
         "//yggdrasil_decision_forests/utils:status_macros",
-        "//yggdrasil_decision_forests/utils:usage",
         "@com_google_absl//absl/container:fixed_array",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",

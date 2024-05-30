@@ -75,6 +75,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "//yggdrasil_decision_forests/utils:uid",
+        "//yggdrasil_decision_forests/utils:usage",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -180,8 +181,10 @@ cc_test(
         ":abstract_learner",
         ":abstract_learner_cc_proto",
         ":export_doc",
+        "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -41,7 +41,7 @@ class FakeLearner1 : public model::AbstractLearner {
   explicit FakeLearner1(const model::proto::TrainingConfig& training_config)
       : AbstractLearner(training_config) {}
 
-  absl::StatusOr<std::unique_ptr<model::AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<model::AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
       std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override {

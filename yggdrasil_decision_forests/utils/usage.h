@@ -37,14 +37,12 @@ namespace usage {
 void OnTrainingStart(
     const dataset::proto::DataSpecification& data_spec,
     const model::proto::TrainingConfig& train_config,
-    const model::proto::TrainingConfigLinking& train_config_link,
     int64_t num_examples);
 
 // Complete a model training.
 // Should be called at the end of the "Train" methods of learners.
 void OnTrainingEnd(const dataset::proto::DataSpecification& data_spec,
                    const model::proto::TrainingConfig& train_config,
-                   const model::proto::TrainingConfigLinking& train_config_link,
                    int64_t num_examples, const model::AbstractModel& model,
                    absl::Duration training_duration);
 

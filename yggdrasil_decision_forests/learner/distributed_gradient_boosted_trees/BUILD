@@ -37,7 +37,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:snapshot",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:uid",
-        "//yggdrasil_decision_forests/utils:usage",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",

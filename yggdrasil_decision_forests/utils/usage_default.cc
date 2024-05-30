@@ -22,14 +22,12 @@ namespace usage {
 void OnTrainingStart(
     const dataset::proto::DataSpecification& data_spec,
     const model::proto::TrainingConfig& train_config,
-    const model::proto::TrainingConfigLinking& train_config_link,
     int64_t num_examples) {
   // Add usage tracking here.
 }
 
 void OnTrainingEnd(const dataset::proto::DataSpecification& data_spec,
                    const model::proto::TrainingConfig& train_config,
-                   const model::proto::TrainingConfigLinking& train_config_link,
                    int64_t num_examples, const model::AbstractModel& model,
                    absl::Duration training_duration) {
   // Add usage tracking here.

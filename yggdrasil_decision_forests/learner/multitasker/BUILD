@@ -27,7 +27,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:regex",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
-        "//yggdrasil_decision_forests/utils:usage",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",

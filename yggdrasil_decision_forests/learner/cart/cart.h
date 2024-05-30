@@ -49,10 +49,10 @@ class CartLearner : public AbstractLearner {
   // Generic hyper parameter names.
   static constexpr char kHParamValidationRatio[] = "validation_ratio";
 
-  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset = {}) const override;
+          valid_dataset) const override;
 
   // Sets the hyper-parameters of the learning algorithm from "generic hparams".
   absl::Status SetHyperParametersImpl(

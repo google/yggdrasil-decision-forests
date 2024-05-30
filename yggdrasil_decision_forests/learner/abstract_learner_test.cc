@@ -212,7 +212,7 @@ TEST(AbstractLearner, EvaluateLearner) {
     explicit FakeLearner(const proto::TrainingConfig& training_config)
         : AbstractLearner(training_config) {}
 
-    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
         const dataset::VerticalDataset& train_dataset,
         absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
             valid_dataset = {}) const override {
@@ -274,7 +274,7 @@ TEST(AbstractLearner, MaximumModelSizeInMemoryInBytes) {
     explicit FakeLearner(const proto::TrainingConfig& training_config)
         : AbstractLearner(training_config) {}
 
-    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
         const dataset::VerticalDataset& train_dataset,
         absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
             valid_dataset = {}) const override {
