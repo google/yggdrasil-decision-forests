@@ -63,6 +63,8 @@ class GradientBoostedTreesCCModel : public DecisionForestCCModel {
 
   py::array_t<float> initial_predictions() const;
 
+  void set_initial_predictions(const py::array_t<float>& values);
+
   ::yggdrasil_decision_forests::model::gradient_boosted_trees::proto::Loss
   loss() const {
     return gbt_model_->loss();

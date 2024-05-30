@@ -351,9 +351,9 @@ class InternalFeatureSpec:
     )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class BeginNodeIdx:
-  """Index of the first leaf and non leaf node in a tree."""
+  """Index of leaf and non leaf node in a tree."""
 
   leaf_node: int
   non_leaf_node: int
@@ -1052,3 +1052,58 @@ def _get_leaf_idx(
       new_node_offset_if_non_leaf,  # Non-leaf
       node_offset,  # Leaf
   )
+
+
+def update_with_jax_params(
+    model: generic_model.GenericModel,
+    params: Dict[str, Any],
+):
+  """Updates the model with JAX params as created by `to_jax_function`.
+
+  Args:
+    model: A YDF model.
+    params: See "update_with_jax_params" in generic_model.py.
+  """
+
+  if not isinstance(model, decision_forest_model.DecisionForestModel):
+    raise ValueError("The model is not a decision forest")
+
+  if isinstance(
+      model, gradient_boosted_trees_model.GradientBoostedTreesModel
+  ) and (initial_predictions := params.get(_PARAM_INITIAL_PREDICTIONS)):
+    model.set_initial_predictions(initial_predictions)
+
+  leaf_values = params.get(_PARAM_LEAF_VALUES)
+
+  # Only scan the trees if the user updates node parameters.
+  # Note: Add other node parameters here.
+  if leaf_values is not None:
+    cur_node = BeginNodeIdx(leaf_node=0, non_leaf_node=0)
+
+    for tree_idx, tree in enumerate(model.iter_trees()):
+      _update_node_with_jax_param(tree.root, cur_node, leaf_values)
+      model.set_tree(tree_idx, tree)
+
+
+def _update_node_with_jax_param(
+    node: tree_lib.AbstractNode,
+    cur_node: BeginNodeIdx,
+    leaf_values: Optional[jax.Array],
+):
+  """Updates recursively the node values."""
+
+  if node.is_leaf:
+    assert isinstance(node, tree_lib.Leaf)
+    # TODO: Add support for other types of leaf nodes.
+    if not isinstance(node.value, tree_lib.RegressionValue):
+      raise ValueError(
+          "The YDF Jax exporter does not support this leaf value:"
+          f" {node.value!r}"
+      )
+    node.value.value = leaf_values[cur_node.leaf_node]
+    cur_node.leaf_node += 1
+  else:
+    cur_node.non_leaf_node += 1
+    assert isinstance(node, tree_lib.NonLeaf)
+    _update_node_with_jax_param(node.neg_child, cur_node, leaf_values)
+    _update_node_with_jax_param(node.pos_child, cur_node, leaf_values)

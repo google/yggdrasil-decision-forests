@@ -836,16 +836,16 @@ Use `model.describe()` for more details
     import jax.numpy as jnp
 
     # Train a model.
-    model = ydf.RandomForestLearner(label="l").train({
+    model = ydf.GradientBoostedTreesLearner(label="l").train({
         "f1": np.random.random(size=100),
         "f2": np.random.random(size=100),
         "l": np.random.randint(2, size=100),
     })
 
     # Convert model to a JAX function.
-    jax_model = model.o_jax_function()
+    jax_model = model.to_jax_function()
 
-    # Make predictions with the TF module.
+    # Make predictions with the JAX function.
     jax_predictions = jax_model.predict({
         "f1": jnp.array([0, 0.5, 1]),
         "f2": jnp.array([1, 0, 0.5]),
@@ -874,6 +874,48 @@ Use `model.describe()` for more details
         apply_activation=apply_activation,
         leaves_as_params=leaves_as_params,
     )
+
+  def update_with_jax_params(self, params: Dict[str, Any]):
+    """Updates the model with JAX params as created by `to_jax_function`.
+
+    Usage example:
+
+    ```python
+    import ydf
+    import numpy as np
+    import jax.numpy as jnp
+
+    # Train a model with YDF
+    dataset = {
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    }
+    model = ydf.GradientBoostedTreesLearner(label="l").train(dataset)
+
+    # Convert model to a JAX function with leave values as parameters.
+    jax_model = model.to_jax_function(
+        leaves_as_params=True,
+        apply_activation=True)
+    # Note: The learnable model parameter are in `jax_model.params`.
+
+    # Finetune the model parameters with your own logic.
+    jax_model.params = fine_tune_model(jax_model.params, ...)
+
+    # Update the YDF model with the finetuned parameters
+    model.update_with_jax_params(jax_model.params)
+
+    # Make predictions with the finetuned YDF model
+    predictions = model.predict(dataset)
+
+    # Save the YDF model
+    model.save("/tmp/my_ydf_model")
+    ```
+
+    Args:
+      params: Learnable parameter of the model generated with `to_jax_function`.
+    """
+    _get_export_jax().update_with_jax_params(model=self, params=params)
 
   def hyperparameter_optimizer_logs(
       self,

@@ -209,6 +209,8 @@ void init_model(py::module_& m) {
       .def("validation_loss", &GradientBoostedTreesCCModel::validation_loss)
       .def("initial_predictions",
            &GradientBoostedTreesCCModel::initial_predictions)
+      .def("set_initial_predictions",
+           &GradientBoostedTreesCCModel::set_initial_predictions)
       .def("validation_evaluation",
            &GradientBoostedTreesCCModel::validation_evaluation)
       .def("loss", &GradientBoostedTreesCCModel::loss)

@@ -188,6 +188,116 @@ def plot_ellipse_predictions(
   fig.savefig(path)
 
 
+def check_toy_model(test_self, model):
+  test_self.assertEqual(
+      model.get_tree(0).pretty(model.data_spec()),
+      """\
+'f1' >= 2 [score=0 missing=False]
+    ├─(pos)─ 'c1' in ['x', 'y'] [score=0 missing=False]
+    │        ├─(pos)─ 'c1' in ['x'] [score=0 missing=False]
+    │        │        ├─(pos)─ value=1
+    │        │        └─(neg)─ value=2
+    │        └─(neg)─ value=3
+    └─(neg)─ 'f1' >= 1 [score=0 missing=False]
+             ├─(pos)─ value=4
+             └─(neg)─ value=5
+""",
+  )
+
+  test_self.assertEqual(
+      model.get_tree(1).pretty(model.data_spec()),
+      """\
+'f2' >= 1.5 [score=0 missing=False]
+    ├─(pos)─ value=6
+    └─(neg)─ value=7
+""",
+  )
+
+
+def create_toy_model(test_self):
+  columns = ["f1", "c1", "f2", "label_regress"]
+  model = specialized_learners.GradientBoostedTreesLearner(
+      label="label_regress",
+      task=generic_learner.Task.REGRESSION,
+      num_trees=1,
+  ).train(create_dataset(columns))
+  model.set_initial_predictions([0])
+  model.remove_tree(0)
+
+  # pylint: disable=invalid-name
+  RegressionValue = tree_lib.RegressionValue
+  Leaf = tree_lib.Leaf
+  NonLeaf = tree_lib.NonLeaf
+  NumericalHigherThanCondition = tree_lib.NumericalHigherThanCondition
+  CategoricalIsInCondition = tree_lib.CategoricalIsInCondition
+  Tree = tree_lib.Tree
+  # pylint: enable=invalid-name
+
+  model.add_tree(
+      Tree(
+          root=NonLeaf(
+              condition=NumericalHigherThanCondition(
+                  missing=False, score=0.0, attribute=1, threshold=2.0
+              ),
+              pos_child=NonLeaf(
+                  condition=CategoricalIsInCondition(
+                      missing=False,
+                      score=0.0,
+                      attribute=2,
+                      mask=[1, 2],
+                  ),
+                  pos_child=NonLeaf(
+                      condition=CategoricalIsInCondition(
+                          missing=False,
+                          score=0.0,
+                          attribute=2,
+                          mask=[1],
+                      ),
+                      pos_child=Leaf(
+                          value=RegressionValue(num_examples=0.0, value=1.0)
+                      ),
+                      neg_child=Leaf(
+                          value=RegressionValue(num_examples=0.0, value=2.0)
+                      ),
+                  ),
+                  neg_child=Leaf(
+                      value=RegressionValue(num_examples=0.0, value=3.0)
+                  ),
+              ),
+              neg_child=NonLeaf(
+                  condition=NumericalHigherThanCondition(
+                      missing=False, score=0.0, attribute=1, threshold=1.0
+                  ),
+                  pos_child=Leaf(
+                      value=RegressionValue(num_examples=0.0, value=4.0)
+                  ),
+                  neg_child=Leaf(
+                      value=RegressionValue(num_examples=0.0, value=5.0)
+                  ),
+              ),
+          )
+      )
+  )
+
+  model.add_tree(
+      Tree(
+          root=NonLeaf(
+              condition=NumericalHigherThanCondition(
+                  missing=False, score=0.0, attribute=3, threshold=1.5
+              ),
+              pos_child=Leaf(
+                  value=RegressionValue(num_examples=0.0, value=6.0)
+              ),
+              neg_child=Leaf(
+                  value=RegressionValue(num_examples=0.0, value=7.0)
+              ),
+          )
+      )
+  )
+  check_toy_model(test_self, model)
+  return model
+
+
 class JaxModelTest(parameterized.TestCase):
 
   @parameterized.parameters(
@@ -561,109 +671,7 @@ class InternalForestTest(parameterized.TestCase):
       )
 
   def test_internal_forest_on_manual(self):
-    columns = ["f1", "c1", "f2", "label_regress"]
-    model = specialized_learners.RandomForestLearner(
-        label="label_regress",
-        task=generic_learner.Task.REGRESSION,
-        num_trees=1,
-    ).train(create_dataset(columns))
-    model.remove_tree(0)
-
-    # pylint: disable=invalid-name
-    RegressionValue = tree_lib.RegressionValue
-    Leaf = tree_lib.Leaf
-    NonLeaf = tree_lib.NonLeaf
-    NumericalHigherThanCondition = tree_lib.NumericalHigherThanCondition
-    CategoricalIsInCondition = tree_lib.CategoricalIsInCondition
-    Tree = tree_lib.Tree
-    # pylint: enable=invalid-name
-
-    model.add_tree(
-        Tree(
-            root=NonLeaf(
-                condition=NumericalHigherThanCondition(
-                    missing=False, score=0.0, attribute=1, threshold=2.0
-                ),
-                pos_child=NonLeaf(
-                    condition=CategoricalIsInCondition(
-                        missing=False,
-                        score=0.0,
-                        attribute=2,
-                        mask=[1, 2],
-                    ),
-                    pos_child=NonLeaf(
-                        condition=CategoricalIsInCondition(
-                            missing=False,
-                            score=0.0,
-                            attribute=2,
-                            mask=[1],
-                        ),
-                        pos_child=Leaf(
-                            value=RegressionValue(num_examples=0.0, value=1.0)
-                        ),
-                        neg_child=Leaf(
-                            value=RegressionValue(num_examples=0.0, value=2.0)
-                        ),
-                    ),
-                    neg_child=Leaf(
-                        value=RegressionValue(num_examples=0.0, value=3.0)
-                    ),
-                ),
-                neg_child=NonLeaf(
-                    condition=NumericalHigherThanCondition(
-                        missing=False, score=0.0, attribute=1, threshold=1.0
-                    ),
-                    pos_child=Leaf(
-                        value=RegressionValue(num_examples=0.0, value=4.0)
-                    ),
-                    neg_child=Leaf(
-                        value=RegressionValue(num_examples=0.0, value=5.0)
-                    ),
-                ),
-            )
-        )
-    )
-
-    model.add_tree(
-        Tree(
-            root=NonLeaf(
-                condition=NumericalHigherThanCondition(
-                    missing=False, score=0.0, attribute=3, threshold=1.5
-                ),
-                pos_child=Leaf(
-                    value=RegressionValue(num_examples=0.0, value=6.0)
-                ),
-                neg_child=Leaf(
-                    value=RegressionValue(num_examples=0.0, value=7.0)
-                ),
-            )
-        )
-    )
-
-    self.assertEqual(
-        model.get_tree(0).pretty(model.data_spec()),
-        """\
-'f1' >= 2 [score=0 missing=False]
-    ├─(pos)─ 'c1' in ['x', 'y'] [score=0 missing=False]
-    │        ├─(pos)─ 'c1' in ['x'] [score=0 missing=False]
-    │        │        ├─(pos)─ value=1
-    │        │        └─(neg)─ value=2
-    │        └─(neg)─ value=3
-    └─(neg)─ 'f1' >= 1 [score=0 missing=False]
-             ├─(pos)─ value=4
-             └─(neg)─ value=5
-""",
-    )
-
-    self.assertEqual(
-        model.get_tree(1).pretty(model.data_spec()),
-        """\
-'f2' >= 1.5 [score=0 missing=False]
-    ├─(pos)─ value=6
-    └─(neg)─ value=7
-""",
-    )
-
+    model = create_toy_model(self)
     internal_forest = to_jax.InternalForest(model)
 
     self.assertEqual(
@@ -934,7 +942,7 @@ class ToJaxTest(parameterized.TestCase):
       )
 
   @parameterized.named_parameters(
-      ("leaves_ellipse", "ellipse", True, False),
+      ("leaves_ellipse_axis_aligned", "ellipse", True, False),
       # ("leaves_mnist", "mnist", True , False),   # Skip in sandboxed test
       ("leaves_ellipse_oblique", "ellipse", True, True),
   )
@@ -994,19 +1002,23 @@ class ToJaxTest(parameterized.TestCase):
     jax_finetune_ds = to_jax_array(finetune_ds)
 
     @jax.jit
+    def compute_predictions(state, batch):
+      batch = batch.copy()
+      batch.pop(label)
+      return jax_model.predict(batch, state)
+
+    @jax.jit
     def compute_accuracy(state, batch):
       batch = batch.copy()
       labels = batch.pop(label)
-      features = batch
-      predictions = jax_model.predict(features, state)
+      predictions = jax_model.predict(batch, state)
       return jnp.mean((predictions >= 0.0) == labels)
 
     @jax.jit
     def compute_loss(state, batch):
       batch = batch.copy()
       labels = batch.pop(label)
-      features = batch
-      logits = jax_model.predict(features, state)
+      logits = jax_model.predict(batch, state)
       loss = optax.sigmoid_binary_cross_entropy(logits, labels).mean()
       return loss
 
@@ -1066,6 +1078,113 @@ class ToJaxTest(parameterized.TestCase):
     # The model quality improve by at least 0.01 of accuracy.
     self.assertGreaterEqual(
         post_tuned_jax_test_accuracy, pre_tuned_jax_test_accuracy + 0.01
+    )
+
+    # Update the YDF model with the finetuned parameters
+    model.update_with_jax_params(mdl_state)
+
+    # Check the weights have been updated
+    new_jax_model = to_jax.to_jax_function(
+        model, leaves_as_params=leaves_as_params
+    )
+    np.testing.assert_allclose(
+        mdl_state["initial_predictions"],
+        new_jax_model.params["initial_predictions"],
+        rtol=1e-5,
+        atol=1e-5,
+    )
+    np.testing.assert_allclose(
+        mdl_state["leaf_values"],
+        new_jax_model.params["leaf_values"],
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+    # Check the predictions of the updated YDF model
+    finetuned_ydf_predictions = model.predict(
+        test_ds,
+    )
+    finetuned_jax_predictions = compute_predictions(mdl_state, jax_test_ds)
+    np.testing.assert_allclose(
+        jax.nn.sigmoid(finetuned_jax_predictions),
+        finetuned_ydf_predictions,
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+  def test_update_with_jax_params_manual(self):
+    model = create_toy_model(self)
+    check_toy_model(self, model)
+
+    jax_model = to_jax.to_jax_function(model, leaves_as_params=True)
+    to_jax.update_with_jax_params(model, jax_model.params)
+
+    # Nothing have changed yet
+    check_toy_model(self, model)
+
+    np.testing.assert_allclose(
+        jax_model.params["leaf_values"],
+        [5.0, 4.0, 3.0, 2.0, 1.0, 7.0, 6.0],
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+    np.testing.assert_allclose(
+        jax_model.params["initial_predictions"],
+        [0.0],
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+    jax_model.params["leaf_values"] = jnp.asarray(
+        [1.0, 2.0, 3.0, 4.0, 5, 6.0, 7.0], jnp.float32
+    )
+    jax_model.params["initial_predictions"] = jnp.asarray([1.0], jnp.float32)
+    to_jax.update_with_jax_params(model, jax_model.params)
+
+    np.testing.assert_allclose(
+        model.initial_predictions(),
+        jax_model.params["initial_predictions"],
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+    new_jax_model = to_jax.to_jax_function(model, leaves_as_params=True)
+    np.testing.assert_allclose(
+        jax_model.params["initial_predictions"],
+        new_jax_model.params["initial_predictions"],
+        rtol=1e-5,
+        atol=1e-5,
+    )
+    np.testing.assert_allclose(
+        jax_model.params["leaf_values"],
+        new_jax_model.params["leaf_values"],
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+    self.assertEqual(
+        model.get_tree(0).pretty(model.data_spec()),
+        """\
+'f1' >= 2 [score=0 missing=False]
+    ├─(pos)─ 'c1' in ['x', 'y'] [score=0 missing=False]
+    │        ├─(pos)─ 'c1' in ['x'] [score=0 missing=False]
+    │        │        ├─(pos)─ value=5
+    │        │        └─(neg)─ value=4
+    │        └─(neg)─ value=3
+    └─(neg)─ 'f1' >= 1 [score=0 missing=False]
+             ├─(pos)─ value=2
+             └─(neg)─ value=1
+""",
+    )
+
+    self.assertEqual(
+        model.get_tree(1).pretty(model.data_spec()),
+        """\
+'f2' >= 1.5 [score=0 missing=False]
+    ├─(pos)─ value=7
+    └─(neg)─ value=6
+""",
     )
 
 
