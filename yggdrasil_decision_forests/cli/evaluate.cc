@@ -31,6 +31,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/evaluate_on_disk.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -83,7 +84,9 @@ void Evaluate() {
     options.set_task(model->task());
   }
   // evaluate model.
-  evaluation = model->Evaluate(absl::GetFlag(FLAGS_dataset), options, &rnd);
+  evaluation =
+      model::EvaluateOnDisk(*model, absl::GetFlag(FLAGS_dataset), options, &rnd)
+          .value();
 
   const auto format = absl::GetFlag(FLAGS_format);
   if (format == "text") {

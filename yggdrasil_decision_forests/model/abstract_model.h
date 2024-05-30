@@ -21,8 +21,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_MODEL_ABSTRACT_MODEL_H_
 #define YGGDRASIL_DECISION_FORESTS_MODEL_ABSTRACT_MODEL_H_
 
+#include <cstddef>
 #include <memory>
-#include <random>
 #include <string>
 #include <vector>
 
@@ -221,25 +221,6 @@ class AbstractModel {
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
       std::vector<model::proto::Prediction>* predictions = nullptr) const;
-
-  // Evaluates the model on a dataset stored in disk. `typed_path` defines
-  // the type and the path pattern of the files, as described in
-  // `yggdrasil_decision_forests/datasets/format.h` file.
-  // This method is preferable when the number of examples is large since they
-  // do not have to be all first loaded into memory.
-  // Returns a finalized EvaluationResults.
-  // Evaluates the model on a dataset. Returns a finalized EvaluationResults.
-  // The random generator "rnd" is used bootstrapping of confidence intervals
-  // and sub-sampling evaluation (if configured in "option").
-  absl::StatusOr<metric::proto::EvaluationResults> EvaluateWithStatus(
-      const absl::string_view typed_path,
-      const metric::proto::EvaluationOptions& option,
-      utils::RandomEngine* rnd) const;
-
-  metric::proto::EvaluationResults Evaluate(
-      const absl::string_view typed_path,
-      const metric::proto::EvaluationOptions& option,
-      utils::RandomEngine* rnd) const;
 
   // Similar to "Evaluate", but allow to override the evaluation objective.
   absl::StatusOr<metric::proto::EvaluationResults> EvaluateOverrideType(
@@ -472,9 +453,6 @@ class AbstractModel {
         "SaveModel/LoadModel instead.");
   }
 
- protected:
-  explicit AbstractModel(const absl::string_view name) : name_(name) {}
-
   absl::Status AppendEvaluationWithEngine(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& option,
@@ -482,6 +460,9 @@ class AbstractModel {
       const serving::FastEngine& engine, utils::RandomEngine* rnd,
       std::vector<model::proto::Prediction>* predictions,
       metric::proto::EvaluationResults* eval) const;
+
+ protected:
+  explicit AbstractModel(const absl::string_view name) : name_(name) {}
 
   // Prints information about the hyper-parameter optimizer logs.
   void AppendHyperparameterOptimizerLogs(std::string* description) const;

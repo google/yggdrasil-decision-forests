@@ -57,6 +57,7 @@ cc_library_ydf(
         ":abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:formats",
         "//yggdrasil_decision_forests/dataset:types",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",

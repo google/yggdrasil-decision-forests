@@ -33,6 +33,7 @@
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -44,6 +45,8 @@ absl::StatusOr<std::unique_ptr<ExampleWriterInterface>> CreateExampleWriter(
   proto::DatasetFormat format;
   ASSIGN_OR_RETURN(std::tie(sharded_path, format),
                    GetDatasetPathAndTypeOrStatus(typed_path));
+
+  utils::usage::OnSaveDataset(sharded_path);
 
   const std::string& format_name = proto::DatasetFormat_Name(format);
   ASSIGN_OR_RETURN(

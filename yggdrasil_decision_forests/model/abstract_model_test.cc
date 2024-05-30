@@ -29,6 +29,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/evaluate_on_disk.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/model_testing.h"
@@ -420,10 +421,13 @@ TEST(Evaluate, FromDisk) {
       &model));
 
   utils::RandomEngine rnd;
-  const auto evaluation = model->Evaluate(
-      absl::StrCat("csv:",
-                   file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
-      {}, &rnd);
+  const auto evaluation =
+      EvaluateOnDisk(
+          *model,
+          absl::StrCat("csv:", file::JoinPath(TestDataDir(), "dataset",
+                                              "adult_test.csv")),
+          {}, &rnd)
+          .value();
   EXPECT_NEAR(metric::Accuracy(evaluation), 0.8723513, 0.000001);
 }
 

@@ -494,6 +494,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
     ],
 )
@@ -507,6 +508,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
     ],
 )

@@ -23,6 +23,7 @@
 #include <numeric>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -37,6 +38,7 @@
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -327,6 +329,11 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
     absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
     const absl::optional<std::string>& typed_valid_path) const {
+  std::string path;
+  ASSIGN_OR_RETURN(std::tie(std::ignore, path),
+                   dataset::SplitTypeAndPath(typed_path));
+  utils::usage::OnLoadDataset(path);
+
   utils::usage::OnTrainingStart(data_spec, training_config(),
                                 /*num_examples=*/-1);
   const auto begin_training = absl::Now();

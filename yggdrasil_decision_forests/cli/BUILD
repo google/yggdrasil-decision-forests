@@ -149,6 +149,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/metric:report",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:all_models",
+        "//yggdrasil_decision_forests/model:evaluate_on_disk",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/model:prediction_cc_proto",
         "//yggdrasil_decision_forests/serving/decision_forest:register_engines",
