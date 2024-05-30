@@ -491,7 +491,7 @@ def create_vertical_dataset_from_dict_of_values(
     for column_spec in columns:
       if column_spec.name not in data and column_spec.name in required_columns:
         raise ValueError(
-            f"The data spec expects columns {column_spec.name} which was not"
+            f"The data spec expects columns {column_spec.name!r} which was not"
             f" found in the data. Available columns: {list(data)}. Required"
             f" columns: {required_columns}"
         )
