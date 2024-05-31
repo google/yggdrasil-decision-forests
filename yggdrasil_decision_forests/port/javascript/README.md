@@ -3,7 +3,6 @@
 The JavaScript API makes it possible to run an Yggdrasil Decision Forests model
 or a TensorFlow Decision Forests model in a webpage.
 
-## Documentation
-
-Check the [documentation](https://ydf.readthedocs.io/en/latest/js_serving.html)
+Check the
+[yggdrasil-decision-forests npm package](https://www.npmjs.com/package/yggdrasil-decision-forests)
 for details.

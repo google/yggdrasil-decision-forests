@@ -1,0 +1,36 @@
+{
+  "name": "yggdrasil-decision-forests",
+  "version": "0.0.2",
+  "description": "With this package, you can generate predictions of machine learning models trained with YDF in browser and with NodeJS.",
+  "main": "dist/inference.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google/yggdrasil-decision-forests.git"
+  },
+  "keywords": [
+    "ydf",
+    "machine-learning",
+    "random-forest",
+    "gradient-boosting",
+    "tabular-data",
+    "interpretable",
+    "decision-forest",
+    "decision-tree",
+    "tensorflow-decision-forest"
+  ],
+  "author": "Mathieu Guillame-Bert",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/google/yggdrasil-decision-forests/issues"
+  },
+  "homepage": "https://ydf.readthedocs.io",
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
