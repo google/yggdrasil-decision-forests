@@ -141,7 +141,15 @@ py_library(
 py_library(
     name = "export_sklearn",
     srcs = ["export_sklearn.py"],
-    deps = [":generic_model"],
+    deps = [
+        ":generic_model",
+        # numpy dep,
+        "//ydf/learner:generic_learner",
+        "//ydf/learner:specialized_learners",
+        "//ydf/model/gradient_boosted_trees_model",
+        "//ydf/model/random_forest_model",
+        "//ydf/model/tree:all",
+    ],
 )
 
 py_library(
@@ -369,6 +377,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # sklearn dep,
+        "//ydf/model/decision_forest_model",
     ],
 )
 

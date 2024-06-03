@@ -20,6 +20,7 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import tree
 from ydf.model import export_sklearn
+from ydf.model.decision_forest_model import decision_forest_model
 
 
 class ScikitLearnModelConverterTest(parameterized.TestCase):
@@ -42,7 +43,7 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
           ),
       ),
   )
-  def DISABLED_test_import_regression_model(
+  def test_import_regression_model(
       self,
       sklearn_model,
   ):
@@ -55,8 +56,25 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
     sklearn_predictions = sklearn_model.predict(features).astype(np.float32)
 
     ydf_model = export_sklearn.from_sklearn(sklearn_model)
-    ydf_predictions = ydf_model.predict(features)
+    assert isinstance(ydf_model, decision_forest_model.DecisionForestModel)
+    self.assertSequenceEqual(
+        ydf_model.input_feature_names(),
+        [
+            "features.00_of_10",
+            "features.01_of_10",
+            "features.02_of_10",
+            "features.03_of_10",
+            "features.04_of_10",
+            "features.05_of_10",
+            "features.06_of_10",
+            "features.07_of_10",
+            "features.08_of_10",
+            "features.09_of_10",
+        ],
+    )
+    self.assertEqual(ydf_model.label(), "label")
 
+    ydf_predictions = ydf_model.predict({"features": features})
     np.testing.assert_allclose(sklearn_predictions, ydf_predictions, rtol=1e-4)
 
   @parameterized.parameters(
@@ -65,7 +83,7 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
       (ensemble.RandomForestClassifier(random_state=42),),
       (ensemble.ExtraTreesClassifier(random_state=42),),
   )
-  def DISABLED_test_import_classification_model(
+  def test_import_classification_model(
       self,
       sklearn_model,
   ):
@@ -82,10 +100,11 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
     )
 
     ydf_model = export_sklearn.from_sklearn(sklearn_model)
-    ydf_predictions = ydf_model.predict(features)
+    ydf_features = {"features": features}
+    ydf_predictions = ydf_model.predict(ydf_features)
     np.testing.assert_allclose(sklearn_predictions, ydf_predictions, rtol=1e-5)
 
-  def DISABLED_test_import_raises_when_unrecognised_model_provided(self):
+  def test_import_raises_when_unrecognised_model_provided(self):
     features, labels = datasets.make_regression(
         n_samples=100,
         n_features=10,
@@ -95,14 +114,14 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
     with self.assertRaises(NotImplementedError):
       export_sklearn.from_sklearn(sklearn_model)
 
-  def DISABLED_test_import_raises_when_sklearn_model_is_not_fit(self):
-    with self.assertRaises(
+  def test_import_raises_when_sklearn_model_is_not_fit(self):
+    with self.assertRaisesRegex(
         ValueError,
-        msg="Scikit-learn model must be fit to data before converting to TF.",
+        "Scikit-Learn model must be fit to data before converting",
     ):
       _ = export_sklearn.from_sklearn(tree.DecisionTreeRegressor())
 
-  def DISABLED_test_import_raises_when_regression_target_is_multivariate(self):
+  def test_import_raises_when_regression_target_is_multivariate(self):
     features, labels = datasets.make_regression(
         n_samples=100,
         n_features=10,
@@ -117,7 +136,7 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
     ):
       _ = export_sklearn.from_sklearn(sklearn_model)
 
-  def DISABLED_test_import_raises_when_classification_target_is_multilabel(
+  def test_import_raises_when_classification_target_is_multilabel(
       self,
   ):
     features, labels = datasets.make_multilabel_classification(
@@ -134,7 +153,7 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
     ):
       _ = export_sklearn.from_sklearn(sklearn_model)
 
-  def DISABLED_test_convert_raises_when_gbt_initial_estimator_is_not_tree_or_constant(
+  def test_convert_raises_when_gbt_initial_estimator_is_not_tree_or_constant(
       self,
   ):
     features, labels = datasets.make_regression(
