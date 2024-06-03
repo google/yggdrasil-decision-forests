@@ -136,6 +136,14 @@ py_library(
     ],
 )
 
+# Note: This build rule does not depends on SKLearn. To use its functionalities, SKLearn needs to be
+# imported manually by the call i.e. //third_party/py/sklearn.
+py_library(
+    name = "export_sklearn",
+    srcs = ["export_sklearn.py"],
+    deps = [":generic_model"],
+)
+
 py_library(
     name = "model_lib",
     srcs = ["model_lib.py"],
@@ -348,6 +356,19 @@ py_test(
         "//ydf/learner:specialized_learners",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/tree:all",
+    ],
+)
+
+py_test(
+    name = "sklearn_model_test",
+    srcs = ["sklearn_model_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":export_sklearn",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # sklearn dep,
     ],
 )
 
