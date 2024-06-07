@@ -7,6 +7,7 @@
 -   Add `max_depth` argument to `model.print_tree`.
 -   Add `verbose` argument to `train` method which is equivalent but sometime
     more convenient than`ydf.verbose`.
+-   Add SKLearn to YDF model converter: `ydf.from_sklearn`.
 
 ### Fix
 

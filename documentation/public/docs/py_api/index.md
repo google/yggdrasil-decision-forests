@@ -65,6 +65,8 @@ and evaluation.
     e.g. training date, uid.
 -   [from_tensorflow_decision_forests](utilities.md#ydf.from_tensorflow_decision_forests):
     Load a TensorFlow Decision Forests model from disk.
+-   [from_sklearn](utilities.md#ydf.from_sklearn): Convert a scikit-learn model
+    into a YDF model.
 
 ## Custom Loss
 

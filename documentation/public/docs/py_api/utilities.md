@@ -26,6 +26,8 @@
 
 ::: ydf.from_tensorflow_decision_forests
 
+::: ydf.from_sklearn
+
 ::: ydf.RegressionLoss
 
 ::: ydf.BinaryClassificationLoss

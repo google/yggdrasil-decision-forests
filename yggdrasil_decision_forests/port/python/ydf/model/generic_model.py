@@ -1089,6 +1089,53 @@ Use `model.describe()` for more details
     self._model.ForceEngine(engine_name)
 
 
+def from_sklearn(sklearn_model: Any) -> GenericModel:
+  """Converts a tree-based scikit-learn model to a YDF model.
+
+  Usage example:
+
+  ```python
+  import ydf
+  from sklearn import datasets
+  from sklearn import tree
+
+  # Train a SKLearn model
+  X, y = datasets.make_classification()
+  skl_model = tree.DecisionTreeClassifier().fit(X, y)
+
+  # Convert the SKLearn model to a YDF model
+  ydf_model = ydf.from_sklearn(skl_model)
+
+  # Make predictions with the YDF model
+  ydf_predictions = ydf_model.predict({"features": X})
+
+  # Analyse the YDF model
+  ydf_model.analyze({"features": X})
+  ```
+
+  Currently supported models are:
+  *   sklearn.tree.DecisionTreeClassifier
+  *   sklearn.tree.DecisionTreeRegressor
+  *   sklearn.tree.ExtraTreeClassifier
+  *   sklearn.tree.ExtraTreeRegressor
+  *   sklearn.ensemble.RandomForestClassifier
+  *   sklearn.ensemble.RandomForestRegressor
+  *   sklearn.ensemble.ExtraTreesClassifier
+  *   sklearn.ensemble.ExtraTreesRegressor
+  *   sklearn.ensemble.GradientBoostingRegressor
+
+  Additionally, only single-label classification and scalar regression are
+  supported (e.g. multivariate regression models will not convert).
+
+  Args:
+    sklearn_model: the scikit-learn tree based model to be converted.
+
+  Returns:
+    a YDF Model that emulates the provided scikit-learn model.
+  """
+  return _get_export_sklearn().from_sklearn(sklearn_model)
+
+
 def _get_export_jax():
   try:
     from ydf.model import export_jax  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
@@ -1111,6 +1158,19 @@ def _get_export_tf():
         '"tensorflow_decision_forests" is needed by this function. Make sure '
         "it installed and try again. If using pip, run `pip install"
         " tensorflow_decision_forests`."
+    ) from exc
+
+
+def _get_export_sklearn():
+  try:
+    from ydf.model import export_sklearn  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+
+    return export_sklearn
+  except ImportError as exc:
+    raise ValueError(
+        '"scikit-learn" is needed by this function. Make sure '
+        "it installed and try again. If using pip, run `pip install"
+        " scikit-learn`."
     ) from exc
 
 

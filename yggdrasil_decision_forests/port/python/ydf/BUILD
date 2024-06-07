@@ -22,6 +22,7 @@ py_library(
         "//ydf/learner:tuner",
         "//ydf/learner:worker",
         "//ydf/model:export_jax",  # buildcleaner: keep
+        "//ydf/model:export_sklearn",  # buildcleaner: keep
         "//ydf/model:export_tf",  # buildcleaner: keep
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
@@ -98,6 +99,7 @@ py_test(
         # absl/testing:absltest dep,
         # jax dep,  # buildcleaner: keep
         # pandas dep,
+        # sklearn dep,  # buildcleaner: keep
         # tensorflow dep,  # buildcleaner: keep
         # tensorflow_decision_forests dep,  # buildcleaner: keep
         "//ydf/utils:test_utils",

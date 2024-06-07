@@ -74,7 +74,7 @@ from ydf.model.generic_model import ModelIOOptions
 from ydf.dataset.dataset import create_vertical_dataset
 from ydf.model.model_metadata import ModelMetadata
 from ydf.model.model_lib import from_tensorflow_decision_forests
-
+from ydf.model.generic_model import from_sklearn
 
 # Custom Loss
 from ydf.learner.custom_loss import RegressionLoss
