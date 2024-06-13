@@ -45,6 +45,7 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace {
 
+using test::ApproximatelyEqualsProto;
 using test::EqualsProto;
 using test::StatusIs;
 
@@ -336,20 +337,39 @@ TEST(ChangePredictionType, ClassificationToRanking) {
   }
 }
 
+TEST(ChangePredictionType, AnomalyDetectionToClassification) {
+  const proto::Prediction src_pred =
+      PARSE_TEST_PROTO(R"pb(anomaly_detection { value: 0.8 })pb");
+  proto::Prediction dst_pred;
+  ASSERT_OK(ChangePredictionType(proto::Task::ANOMALY_DETECTION,
+                                 proto::Task::CLASSIFICATION, src_pred,
+                                 &dst_pred));
+  EXPECT_THAT(dst_pred,
+              ApproximatelyEqualsProto(PARSE_TEST_PROTO_WITH_TYPE(
+                  proto::Prediction,
+                  R"pb(
+                    classification {
+                      value: 2
+                      distribution { counts: 0 counts: 0.2 counts: 0.8 sum: 1 }
+                    }
+                  )pb")));
+}
+
 TEST(FloatToProtoPrediction, Base) {
   proto::Prediction prediction;
 
   FloatToProtoPrediction({0, 0.5, 1}, /*example_idx=*/0,
                          proto::Task::CLASSIFICATION,
                          /*num_prediction_dimensions=*/1, &prediction);
-  EXPECT_THAT(prediction,
-              EqualsProto(utils::ParseTextProto<proto::Prediction>(R"(
-                classification {
-                  value: 1
-                  distribution { counts: 0 counts: 1 counts: 0 sum: 1 }
-                }
-              )")
-                              .value()));
+  EXPECT_THAT(
+      prediction,
+      EqualsProto(utils::ParseTextProto<proto::Prediction>(R"pb(
+                    classification {
+                      value: 1
+                      distribution { counts: 0 counts: 1 counts: 0 sum: 1 }
+                    }
+                  )pb")
+                      .value()));
 
   FloatToProtoPrediction({0, 0.5, 1}, /*example_idx=*/1,
                          proto::Task::CLASSIFICATION,

@@ -513,6 +513,13 @@ cc_library_ydf(
     ],
 )
 
+cc_library(
+    name = "documentation_cc",
+    srcs = ["documentation.cc"],
+    hdrs = ["documentation.h"],
+    deps = ["@com_google_absl//absl/strings"],
+)
+
 cc_library_ydf(
     name = "feature_importance",
     srcs = ["feature_importance.cc"],
@@ -550,6 +557,7 @@ cc_library_ydf(
         ":filesystem",
         ":logging",
         ":random",
+        ":sharded_io",
         ":test",
         ":testing_macros",
         ":uid",
@@ -579,12 +587,13 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:fast_engine",
         "//yggdrasil_decision_forests/serving/decision_forest",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/random",
-        "@com_google_absl//absl/random:distributions",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest",
     ],
 )

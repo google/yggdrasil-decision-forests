@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/log/check.h"
 #include "absl/types/span.h"
 
 namespace yggdrasil_decision_forests::model::decision_tree {
@@ -70,6 +71,14 @@ std::pair<TreeBuilder, TreeBuilder> TreeBuilder::ConditionContains(
 
 void TreeBuilder::LeafRegression(const float value) {
   node_->mutable_node()->mutable_regressor()->set_top_value(value);
+}
+
+void TreeBuilder::LeafAnomalyDetection(const int num_examples_without_weight) {
+  node_->mutable_node()
+      ->mutable_anomaly_detection()
+      ->set_num_examples_without_weight(num_examples_without_weight);
+  node_->mutable_node()->set_num_pos_training_examples_without_weight(
+      num_examples_without_weight);
 }
 
 }  // namespace yggdrasil_decision_forests::model::decision_tree

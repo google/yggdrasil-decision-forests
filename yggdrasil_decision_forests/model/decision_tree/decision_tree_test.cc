@@ -811,6 +811,27 @@ TEST(DecisionTree, DebugCompare) {
   EXPECT_TRUE(tree1.DebugCompare(dataspec, 0, tree2).empty());
 }
 
+TEST(DecisionTree, Depth) {
+  dataset::proto::DataSpecification dataspec;
+  dataset::AddColumn("f", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+
+  DecisionTree tree;
+  TreeBuilder builder(&tree);
+
+  auto [pos, l1] = builder.ConditionIsGreater(1, 1);
+  auto [l2, l3] = pos.ConditionIsGreater(1, 2);
+  l1.LeafRegression(1);
+  l2.LeafRegression(2);
+  l3.LeafRegression(3);
+  tree.SetLeafIndices();
+
+  EXPECT_EQ(tree.root().depth(), 0);
+  EXPECT_EQ(tree.root().pos_child()->depth(), 1);
+  EXPECT_EQ(tree.root().neg_child()->depth(), 1);
+  EXPECT_EQ(tree.root().pos_child()->pos_child()->depth(), 2);
+  EXPECT_EQ(tree.root().pos_child()->neg_child()->depth(), 2);
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

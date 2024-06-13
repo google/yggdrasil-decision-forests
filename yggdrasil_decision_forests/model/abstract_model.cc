@@ -484,15 +484,18 @@ absl::Status AbstractModel::AppendEvaluationOverrideType(
            sub_example_idx++) {
         FloatToProtoPrediction(batch_of_predictions, sub_example_idx, task(),
                                num_prediction_dimensions, &original_prediction);
+
         RETURN_IF_ERROR(ChangePredictionType(task(), override_task,
                                              original_prediction,
                                              &overridden_prediction));
+
         RETURN_IF_ERROR(model::SetGroundTruth(
             dataset, begin_example_idx + sub_example_idx,
             model::GroundTruthColumnIndices(override_label_col_idx,
                                             override_group_col_idx,
                                             uplift_treatment_col_idx_),
             override_task, &overridden_prediction));
+
         if (option.has_weights()) {
           ASSIGN_OR_RETURN(
               const float weight,
@@ -558,6 +561,17 @@ absl::Status ChangePredictionType(proto::Task src_task, proto::Task dst_task,
   } else if (src_task == proto::Task::RANKING &&
              dst_task == proto::Task::REGRESSION) {
     dst_pred->mutable_regression()->set_value(src_pred.ranking().relevance());
+  } else if (src_task == proto::Task::ANOMALY_DETECTION &&
+             dst_task == proto::Task::CLASSIFICATION) {
+    const float value = src_pred.anomaly_detection().value();
+    auto* dst_clas = dst_pred->mutable_classification();
+    // Assume the positive class is the abnormal one.
+    dst_clas->set_value(value >= 0.5f ? 2 : 1);
+    dst_clas->mutable_distribution()->clear_counts();
+    dst_clas->mutable_distribution()->set_sum(1.f);
+    dst_clas->mutable_distribution()->add_counts(0.f);
+    dst_clas->mutable_distribution()->add_counts(1.f - value);
+    dst_clas->mutable_distribution()->add_counts(value);
   } else {
     STATUS_FATALS("Non supported override of task from ",
                   proto::Task_Name(src_task), " to ",

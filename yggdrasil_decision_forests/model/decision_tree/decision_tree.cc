@@ -21,13 +21,13 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
-#include <iterator>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "absl/base/optimization.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/memory/memory.h"
@@ -48,7 +48,6 @@
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
-#include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -150,6 +149,11 @@ void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
                       "] examples_per_treatment_and_outcome:[",
                       sum_weights_per_treatment_and_outcome_str, "]");
     } break;
+
+    case proto::Node::OutputCase::kAnomalyDetection:
+      absl::StrAppend(description, "count:",
+                      node.anomaly_detection().num_examples_without_weight());
+      break;
   }
 }
 
@@ -543,6 +547,8 @@ void NodeWithChildren::ClearLabelDistributionDetails() {
       break;
     case proto::Node::OutputCase::kUplift:
       break;
+    case proto::Node::OutputCase::kAnomalyDetection:
+      break;
   }
 }
 
@@ -895,7 +901,7 @@ const proto::Node& DecisionTree::GetLeafWithSwappedAttribute(
   return current_node->node();
 }
 
-const proto::Node& DecisionTree::GetLeaf(
+const NodeWithChildren& DecisionTree::GetLeafAlt(
     const dataset::proto::Example& example) const {
   // Go down the tree according to an observation attribute values.
   CHECK(root_ != nullptr);
@@ -906,7 +912,12 @@ const proto::Node& DecisionTree::GetLeaf(
     current_node = condition_result ? current_node->pos_child()
                                     : current_node->neg_child();
   }
-  return current_node->node();
+  return *current_node;
+}
+
+const proto::Node& DecisionTree::GetLeaf(
+    const dataset::proto::Example& example) const {
+  return GetLeafAlt(example).node();
 }
 
 void DecisionTree::GetPath(const dataset::VerticalDataset& dataset,
@@ -1247,6 +1258,7 @@ void DecisionTree::SetLeafIndices() {
         if (node->IsLeaf()) {
           node->set_leaf_idx(next_leaf_idx++);
         }
+        node->set_depth(depth);
       },
       /*neg_before_pos_child=*/true);
 }

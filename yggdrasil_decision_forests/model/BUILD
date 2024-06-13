@@ -151,7 +151,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:html_content",
         "//yggdrasil_decision_forests/utils:plot",
         "//yggdrasil_decision_forests/utils:protobuf",
-        "//yggdrasil_decision_forests/utils:uid",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -208,6 +207,7 @@ cc_test(
     deps = [
         ":abstract_model",
         ":abstract_model_cc_proto",
+        ":evaluate_on_disk",
         ":model_library",
         ":model_testing",
         ":prediction_cc_proto",
@@ -216,7 +216,6 @@ cc_test(
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/metric",
-        "//yggdrasil_decision_forests/model:evaluate_on_disk",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving:example_set",

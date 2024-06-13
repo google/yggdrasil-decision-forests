@@ -1,0 +1,3 @@
+    "f1">=1 [s:0 n:0 np:0 miss:0]
+        ├─(pos)─ count:2
+        └─(neg)─ count:3
