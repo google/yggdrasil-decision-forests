@@ -16,6 +16,7 @@ cc_binary_ydf(
         ":export_doc",
         ":learner_library",
         "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
     ],
 )
