@@ -1200,19 +1200,20 @@ void AppendModelStructureHeader(
     const DecisionForest& trees,
     const dataset::proto::DataSpecification& data_spec, const int label_col_idx,
     std::string* description) {
-  const auto& label_col_spec = data_spec.columns(label_col_idx);
-
-  // Print the label values.
-  if (label_col_spec.type() == dataset::proto::CATEGORICAL &&
-      !label_col_spec.categorical().is_already_integerized()) {
-    absl::StrAppend(description, "Label values:\n");
-    for (int value = 1;
-         value < label_col_spec.categorical().number_of_unique_values();
-         value++) {
-      absl::StrAppend(
-          description, "\t",
-          dataset::CategoricalIdxToRepresentation(label_col_spec, value, true),
-          "\n");
+  if (label_col_idx != -1) {
+    const auto& label_col_spec = data_spec.columns(label_col_idx);
+    // Print the label values.
+    if (label_col_spec.type() == dataset::proto::CATEGORICAL &&
+        !label_col_spec.categorical().is_already_integerized()) {
+      absl::StrAppend(description, "Label values:\n");
+      for (int value = 1;
+           value < label_col_spec.categorical().number_of_unique_values();
+           value++) {
+        absl::StrAppend(description, "\t",
+                        dataset::CategoricalIdxToRepresentation(label_col_spec,
+                                                                value, true),
+                        "\n");
+      }
     }
   }
 

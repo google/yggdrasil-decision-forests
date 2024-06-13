@@ -154,6 +154,7 @@ cc_test(
         "//yggdrasil_decision_forests/model:model_testing",
         "//yggdrasil_decision_forests/model:prediction_cc_proto",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",

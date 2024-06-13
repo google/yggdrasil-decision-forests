@@ -83,7 +83,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
     label: Label of the dataset. The label column should not be identified as a
       feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
-      Task.RANKING, Task.CATEGORICAL_UPLIFT, Task.NUMERICAL_UPLIFT).
+      Task.RANKING, Task.CATEGORICAL_UPLIFT, Task.NUMERICAL_UPLIFT,
+      Task.ANOMALY_DETECTION).
     weights: Name of a feature that identifies the weight of each example. If
       weights are not specified, unit weights are assumed. The weight column
       should not be identified as a feature in the `features` parameter.

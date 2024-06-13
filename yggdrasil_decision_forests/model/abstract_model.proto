@@ -39,6 +39,12 @@ enum Task {
   // Predicts the incremental impact of a treatment on a numerical outcome.
   // See https://en.wikipedia.org/wiki/Uplift_modelling.
   NUMERICAL_UPLIFT = 5;
+
+  // Predicts if an instance is similar to the majority of the training data or
+  // anomalous (a.k.a. an outlier). An anomaly detection prediction is a value
+  // between 0 and 1, where 0 indicates the possible most normal instance and 1
+  // indicates the most possible anomalous instance.
+  ANOMALY_DETECTION = 6;
 }
 
 // Contains the same information as a model::AbstractModel (without the

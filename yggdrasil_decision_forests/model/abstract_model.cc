@@ -131,6 +131,14 @@ AbstractModel::EvaluateWithStatus(
   if (option.task() != task()) {
     STATUS_FATAL("The evaluation and the model tasks differ.");
   }
+  if (label_col_idx_ == -1) {
+    if (task() == proto::Task::ANOMALY_DETECTION) {
+      STATUS_FATAL(
+          "Cannot evaluate an anomaly detection model without a label.");
+    } else {
+      STATUS_FATAL("A model cannot be evaluated without a label.");
+    }
+  }
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
       metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
@@ -146,6 +154,14 @@ AbstractModel::EvaluateWithEngine(
     std::vector<model::proto::Prediction>* predictions) const {
   if (option.task() != task()) {
     STATUS_FATAL("The evaluation and the model tasks differ.");
+  }
+  if (label_col_idx_ == -1) {
+    if (task() == proto::Task::ANOMALY_DETECTION) {
+      STATUS_FATAL(
+          "Cannot evaluate an anomaly detection model without a label.");
+    } else {
+      STATUS_FATAL("A model cannot be evaluated without a label.");
+    }
   }
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
@@ -312,6 +328,12 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
           src_prediction.begin() + example_idx * num_prediction_dimensions,
           src_prediction.begin() +
               (example_idx + 1) * num_prediction_dimensions};
+      break;
+
+    case proto::ANOMALY_DETECTION:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction->mutable_anomaly_detection()->set_value(
+          src_prediction[example_idx]);
       break;
   }
 }
@@ -660,6 +682,9 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
               ->values();
       prediction->mutable_uplift()->set_treatment(treatments[row_idx]);
     } break;
+    case proto::Task::ANOMALY_DETECTION:
+      // No ground truth to set.
+      break;
 
     default:
       STATUS_FATAL("Non supported task.");
@@ -707,6 +732,10 @@ absl::Status SetGroundTruth(const dataset::proto::Example& example,
           break;
       }
     } break;
+    case proto::Task::ANOMALY_DETECTION:
+      // No ground truth to set.
+      break;
+
     default:
       STATUS_FATAL("Non supported task.");
       break;
@@ -725,8 +754,10 @@ void AbstractModel::AppendDescriptionAndStatistics(
     const bool full_definition, std::string* description) const {
   absl::StrAppendFormat(description, "Type: \"%s\"\n", name());
   absl::StrAppendFormat(description, "Task: %s\n", proto::Task_Name(task()));
-  absl::StrAppendFormat(description, "Label: \"%s\"\n",
-                        data_spec().columns(label_col_idx_).name());
+  if (label_col_idx_ != -1) {
+    absl::StrAppendFormat(description, "Label: \"%s\"\n",
+                          data_spec().columns(label_col_idx_).name());
+  }
   if (ranking_group_col_idx_ != -1) {
     absl::StrAppendFormat(description, "Rank group: \"%s\"\n",
                           data_spec().columns(ranking_group_col_idx_).name());
@@ -1041,6 +1072,11 @@ void PredictionMerger::Add(const proto::Prediction& src,
       dst_->mutable_ranking()->set_relevance(
           dst_->ranking().relevance() + src_factor * src.ranking().relevance());
       break;
+    case proto::Prediction::kAnomalyDetection:
+      dst_->mutable_anomaly_detection()->set_value(
+          dst_->anomaly_detection().value() +
+          src_factor * src.anomaly_detection().value());
+      break;
     default:
       CHECK(false);
   }
@@ -1065,6 +1101,10 @@ void PredictionMerger::ScalePrediction(const float scale,
       break;
     case proto::Prediction::kRanking:
       dst->mutable_ranking()->set_relevance(dst->ranking().relevance() * scale);
+      break;
+    case proto::Prediction::kAnomalyDetection:
+      dst->mutable_anomaly_detection()->set_value(
+          dst->anomaly_detection().value() * scale);
       break;
     default:
       break;
@@ -1092,7 +1132,7 @@ void AbstractModel::CopyAbstractModelMetaData(AbstractModel* dst) const {
 }
 
 absl::Status AbstractModel::Validate() const {
-  if (label_col_idx_ < 0 || label_col_idx_ >= data_spec().columns_size()) {
+  if (label_col_idx_ < -1 || label_col_idx_ >= data_spec().columns_size()) {
     return absl::InvalidArgumentError("Invalid label column");
   }
 
@@ -1146,6 +1186,9 @@ absl::Status AbstractModel::Validate() const {
             "Invalid label type for regressive uplift: ",
             dataset::proto::ColumnType_Name(label_col_spec().type())));
       }
+      break;
+    case model::proto::Task::ANOMALY_DETECTION:
+      // Nothing to check
       break;
     default:
       return absl::InvalidArgumentError("Unknown task");

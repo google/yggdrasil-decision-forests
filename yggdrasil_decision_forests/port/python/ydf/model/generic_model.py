@@ -64,6 +64,10 @@ class Task(enum.Enum):
       categorical outcome.
     NUMERICAL_UPLIFT: Predicts the incremental impact of a treatment on a
       numerical outcome.
+    ANOMALY_DETECTION: Predicts if an instance is similar to the majority of the
+      training data or anomalous (a.k.a. an outlier). An anomaly detection
+      prediction is a value between 0 and 1, where 0 indicates the possible most
+      normal instance and 1 indicates the most possible anomalous instance.
   """
 
   CLASSIFICATION = "CLASSIFICATION"
@@ -71,6 +75,7 @@ class Task(enum.Enum):
   RANKING = "RANKING"
   CATEGORICAL_UPLIFT = "CATEGORICAL_UPLIFT"
   NUMERICAL_UPLIFT = "NUMERICAL_UPLIFT"
+  ANOMALY_DETECTION = "ANOMALY_DETECTION"
 
   def _to_proto_type(self) -> abstract_model_pb2.Task:
     if self in TASK_TO_PROTO:
@@ -93,6 +98,7 @@ TASK_TO_PROTO = {
     Task.RANKING: abstract_model_pb2.RANKING,
     Task.CATEGORICAL_UPLIFT: abstract_model_pb2.CATEGORICAL_UPLIFT,
     Task.NUMERICAL_UPLIFT: abstract_model_pb2.NUMERICAL_UPLIFT,
+    Task.ANOMALY_DETECTION: abstract_model_pb2.ANOMALY_DETECTION,
 }
 PROTO_TO_TASK = {v: k for k, v in TASK_TO_PROTO.items()}
 

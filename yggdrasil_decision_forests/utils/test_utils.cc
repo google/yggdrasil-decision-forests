@@ -308,6 +308,9 @@ void TrainAndTestTester::TrainAndEvaluateModel(
             EXPECT_NEAR(metric::AUUC(e1), metric::AUUC(e2), 0.001);
             EXPECT_NEAR(metric::Qini(e1), metric::Qini(e2), 0.001);
             break;
+          case model::proto::Task::ANOMALY_DETECTION:
+            // No metrics
+            break;
           default:
             YDF_LOG(FATAL) << "Not implemented";
         }
@@ -644,6 +647,11 @@ void ExpectEqualPredictions(const model::proto::Task task,
       }
     } break;
 
+    case model::proto::Task::ANOMALY_DETECTION:
+      EXPECT_NEAR(a.anomaly_detection().value(), b.anomaly_detection().value(),
+                  epsilon);
+      break;
+
     default:
       YDF_LOG(FATAL) << "Not supported task";
   }
@@ -742,6 +750,12 @@ void ExpectEqualPredictions(
               << "Predictions don't match.";
         }
       } break;
+
+      case model::proto::Task::ANOMALY_DETECTION:
+        EXPECT_NEAR(generic_prediction.anomaly_detection().value(),
+                    predictions[prediction_idx], epsilon)
+            << "Predictions don't match.";
+        break;
 
       default:
         YDF_LOG(FATAL) << "Not supported task";

@@ -77,7 +77,7 @@ class GenericLearner:
     self._deployment_config = deployment_config
     self._tuner = tuner
 
-    if not self._label:
+    if task != Task.ANOMALY_DETECTION and not self._label:
       raise ValueError("Constructing the learner requires a non-empty label.")
     if self._ranking_group is not None and task != Task.RANKING:
       raise ValueError(
@@ -276,6 +276,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
     # Apply monotonic constraints.
     if self._data_spec_args.columns:
       for feature in self._data_spec_args.columns:
+        assert feature is not None
         if not feature.normalized_monotonic:
           continue
 
@@ -457,7 +458,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
       column are specified as features.
     """
 
-    def create_label_column(name: str, task: Task) -> dataspec.Column:
+    def create_label_column(name: str, task: Task) -> Optional[dataspec.Column]:
       if task in [Task.CLASSIFICATION, Task.CATEGORICAL_UPLIFT]:
         return dataspec.Column(
             name=name,
@@ -467,6 +468,9 @@ Hyper-parameters: ydf.{self._hyperparameters}
         )
       elif task in [Task.REGRESSION, Task.RANKING, Task.NUMERICAL_UPLIFT]:
         return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
+      elif task in [Task.ANOMALY_DETECTION]:
+        # No label column
+        return None
       else:
         raise ValueError(f"Unsupported task {task.name} for label column")
 
@@ -485,7 +489,10 @@ Hyper-parameters: ydf.{self._hyperparameters}
           f"Label column {self._label} is also an input feature. A column"
           " cannot be both a label and input feature."
       )
-    column_defs.append(create_label_column(self._label, self._task))
+    if (
+        label_column := create_label_column(self._label, self._task)
+    ) is not None:
+      column_defs.append(label_column)
     if self._weights is not None:
       if dataspec.column_defs_contains_column(self._weights, column_defs):
         raise ValueError(

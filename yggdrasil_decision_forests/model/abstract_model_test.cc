@@ -254,6 +254,28 @@ TEST(AbstractLearner, MergeAddPredictionsClassification) {
                       .value()));
 }
 
+TEST(AbstractLearner, MergeAddPredictionsAnomalyDetection) {
+  proto::Prediction src =
+      PARSE_TEST_PROTO(R"pb(anomaly_detection { value: 1 })pb");
+  proto::Prediction dst;
+  PredictionMerger merger(&dst);
+
+  merger.Add(src, 0.25f);
+  EXPECT_THAT(dst, EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                                   "anomaly_detection {value:0.25 }")
+                                   .value()));
+
+  merger.Add(src, 0.25f);
+  EXPECT_THAT(dst, EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                                   "anomaly_detection { value: 0.5 }")
+                                   .value()));
+
+  merger.Add(src, 0.50f);
+  EXPECT_THAT(dst, EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                                   "anomaly_detection { value: 1.0 }")
+                                   .value()));
+}
+
 TEST(AbstractModel, BuildFastEngine) {
   FakeModelWithoutEngine model_without_engine;
   EXPECT_THAT(model_without_engine.BuildFastEngine().status(),
@@ -394,6 +416,13 @@ TEST(FloatToProtoPrediction, Base) {
                          /*num_prediction_dimensions=*/1, &prediction);
   EXPECT_THAT(prediction, EqualsProto(utils::ParseTextProto<proto::Prediction>(
                                           R"(uplift { treatment_effect: 0.4 })")
+                                          .value()));
+
+  FloatToProtoPrediction({0.2, 0.4}, /*example_idx=*/0,
+                         proto::Task::ANOMALY_DETECTION,
+                         /*num_prediction_dimensions=*/1, &prediction);
+  EXPECT_THAT(prediction, EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                                          R"(anomaly_detection { value: 0.2 })")
                                           .value()));
 }
 

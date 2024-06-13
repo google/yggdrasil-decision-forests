@@ -71,16 +71,22 @@ message Prediction {
     }
   }
 
+  message AnomalyDetection {
+    // Value between 0 (normal) and 1 (anomaly).
+    optional float value = 1;
+  }
+
   oneof type {
     Classification classification = 1;
     Regression regression = 2;
     Ranking ranking = 5;
     Uplift uplift = 6;
+    AnomalyDetection anomaly_detection = 7;
   }
   optional float weight = 3 [default = 1];
 
   // Identifier about the example.
   optional string example_key = 4;
 
-  // Next ID: 6
+  // Next ID: 8
 }

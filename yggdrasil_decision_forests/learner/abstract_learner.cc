@@ -67,23 +67,27 @@ absl::Status AbstractLearner::LinkTrainingConfig(
     const dataset::proto::DataSpecification& data_spec,
     proto::TrainingConfigLinking* config_link) {
   // Label.
-  int32_t label;
-  if (!training_config.has_label()) {
-    STATUS_FATAL("No label specified in the training config. Aborting.");
+  int32_t label = -1;
+  // Anomaly detection is the only task that can have or not have labels.
+  if (training_config.task() != proto::ANOMALY_DETECTION &&
+      !training_config.has_label()) {
+    STATUS_FATAL("No label specified in the training config.");
   }
-  RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
-      training_config.label(), data_spec, &label,
-      "Retrieving label column failed. "));
+  if (training_config.has_label()) {
+    RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
+        training_config.label(), data_spec, &label,
+        "Retrieving label column failed."));
+    config_link->set_num_label_classes(
+        data_spec.columns(label).categorical().number_of_unique_values());
+  }
   config_link->set_label(label);
-  config_link->set_num_label_classes(
-      data_spec.columns(label).categorical().number_of_unique_values());
 
   // CV group.
   int32_t cv_group = -1;
   if (training_config.has_cv_group()) {
     RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
         training_config.cv_group(), data_spec, &cv_group,
-        "Retrieving cross-validation group column failed. "));
+        "Retrieving cross-validation group column failed."));
   }
   config_link->set_cv_group(cv_group);
 
@@ -475,6 +479,15 @@ absl::Status AbstractLearner::CheckConfiguration(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const model::proto::DeploymentConfig& deployment) {
+  if (deployment.num_threads() < 0) {
+    return absl::InvalidArgumentError("The number of threads should be >= 0");
+  }
+
+  if (config.task() == model::proto::Task::ANOMALY_DETECTION) {
+    // Note: ANOMALY_DETECTION is the only task that does not need a label.
+    return absl::OkStatus();
+  }
+
   const auto& label_col_spec = data_spec.columns(config_link.label());
   // Check the type of the label column.
   switch (config.task()) {
@@ -487,7 +500,8 @@ absl::Status AbstractLearner::CheckConfiguration(
         return absl::InvalidArgumentError(absl::StrCat(
             "The label column \"", config.label(),
             "\" should be CATEGORICAL for a CLASSIFICATION "
-            "Task. Note: BOOLEAN columns should be set as CATEGORICAL using a "
+            "Task. Note: BOOLEAN columns should be set as CATEGORICAL using "
+            "a "
             "dataspec guide, even for a binary classification task."));
       }
       break;
@@ -535,7 +549,8 @@ absl::Status AbstractLearner::CheckConfiguration(
           return absl::InvalidArgumentError(
               "The \"ranking_group\" column must have a "
               "\"max_number_of_unique_values\" "
-              "of -1 in the dataspec guide. This ensures that rare groups are "
+              "of -1 in the dataspec guide. This ensures that rare groups "
+              "are "
               "not pruned.");
         }
       }
@@ -543,7 +558,8 @@ absl::Status AbstractLearner::CheckConfiguration(
     case model::proto::Task::CATEGORICAL_UPLIFT: {
       if (label_col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
         return absl::InvalidArgumentError(
-            "The label column should be CATEGORICAL for an CATEGORICAL_UPLIFT "
+            "The label column should be CATEGORICAL for an "
+            "CATEGORICAL_UPLIFT "
             "task.");
       }
       if (!config_link.has_uplift_treatment() ||
@@ -592,6 +608,8 @@ absl::Status AbstractLearner::CheckConfiguration(
             "Uplift only supports binary treatments.");
       }
     } break;
+    case model::proto::Task::ANOMALY_DETECTION:
+      return absl::InternalError("ANOMALY_DETECTION has no labels");
   }
   // Check the label don't contains NaN.
   if (label_col_spec.count_nas() != 0) {
@@ -600,9 +618,7 @@ absl::Status AbstractLearner::CheckConfiguration(
                          "missing values. $1 missing values are found.",
                          config.label(), label_col_spec.count_nas()));
   }
-  if (deployment.num_threads() < 0) {
-    return absl::InvalidArgumentError("The number of threads should be >= 0");
-  }
+
   return absl::OkStatus();
 }
 
@@ -818,7 +834,9 @@ void InitializeModelWithAbstractTrainingConfig(
     const proto::TrainingConfig& training_config,
     const proto::TrainingConfigLinking& training_config_linking,
     AbstractModel* model) {
-  model->set_label_col_idx(training_config_linking.label());
+  if (training_config.task() != proto::Task::ANOMALY_DETECTION) {
+    model->set_label_col_idx(training_config_linking.label());
+  }
 
   if (training_config.task() == proto::Task::RANKING) {
     model->set_ranking_group_col(training_config_linking.ranking_group());

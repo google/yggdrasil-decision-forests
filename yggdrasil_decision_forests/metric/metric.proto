@@ -68,6 +68,8 @@ message EvaluationOptions {
 
   message Uplift {}
 
+  message AnomalyDetection {}
+
   // Task of the model.
   optional model.proto.Task task = 1 [default = CLASSIFICATION];
   // Evaluation configuration depending on the type of problem.
@@ -76,6 +78,7 @@ message EvaluationOptions {
     Regression regression = 3;
     Ranking ranking = 7;
     Uplift uplift = 8;
+    AnomalyDetection anomaly_detection = 9;
   }
   // Percentage of sampled predictions. If no predictions need to be sampled
   // (i.e. no part of the configuration needs it), this parameter is ignored and
@@ -97,7 +100,7 @@ message EvaluationOptions {
   // however.
   optional dataset.proto.WeightDefinition weights = 6;
 
-  // Next ID: 8
+  // Next ID: 10
 }
 
 // Evaluation results of a model.
@@ -204,6 +207,8 @@ message EvaluationResults {
     optional double cate_calibration = 4;
   }
 
+  message AnomalyDetection {}
+
   // Number of predictions (weighted by example weight).
   optional double count_predictions = 1 [default = 0];
   // Number of predictions (without weights).
@@ -220,6 +225,7 @@ message EvaluationResults {
     Regression regression = 7;
     Ranking ranking = 12;
     Uplift uplift = 14;
+    AnomalyDetection anomaly_detection = 16;
   }
   // The dataspec of the label column. This field can contain information such
   // as: The possible label values, the distribution of the label values, the
@@ -245,7 +251,7 @@ message EvaluationResults {
 
   // User can use this field to store value for any customized metrics.
   map<string, double> user_metrics = 15;
-  // Next ID: 16
+  // Next ID: 17
 }
 
 // Reference a metric."MetricAccessor" is used as a parameter of the function
@@ -262,6 +268,7 @@ message MetricAccessor {
     Loss loss = 3;
     Ranking ranking = 4;
     Uplift uplift = 5;
+    AnomalyDetection anomaly_detection = 7;
     UserMetric user_metric = 6;
   }
 
@@ -334,6 +341,8 @@ message MetricAccessor {
     message Qini {}
     message CateCalibration {}
   }
+
+  message AnomalyDetection {}
 
   message UserMetric {
     optional string metrics_name = 1;

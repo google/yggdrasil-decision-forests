@@ -953,7 +953,6 @@ absl::StatusOr<proto::FeatureVariationItem> FeatureVariationNumerical(
   return item;
 }
 
-
 absl::StatusOr<proto::FeatureVariationItem> FeatureVariationBoolean(
     const model::AbstractModel& model, const int column_idx,
     const dataset::proto::Example& example,
@@ -1085,6 +1084,14 @@ absl::StatusOr<std::vector<FeatureVariationOutput>> ListOutputs(
              return prediction.uplift().treatment_effect(0);
            }});
       break;
+    case model::proto::Task::ANOMALY_DETECTION:
+      outputs.push_back(
+          {.label = "output",
+           .compute = [](const model::proto::Prediction& prediction) -> float {
+             return prediction.anomaly_detection().value();
+           }});
+      break;
+
     default:
       return absl::InvalidArgumentError(
           "Non supported model task for feature variation");
