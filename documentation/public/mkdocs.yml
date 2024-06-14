@@ -66,6 +66,7 @@ nav:
     # TODO: boolean, and text
   - Deep learning:
     - with TensorFlow: tutorial/compose_with_tf.ipynb
+    - with Jax: tutorial/compose_with_jax.ipynb
   - Dataset:
     - Pandas Dataframe: tutorial/pandas.ipynb
     - TensorFlow Dataset: tutorial/tf_dataset.ipynb
