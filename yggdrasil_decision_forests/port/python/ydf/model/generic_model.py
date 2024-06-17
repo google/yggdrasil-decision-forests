@@ -1095,7 +1095,11 @@ Use `model.describe()` for more details
     self._model.ForceEngine(engine_name)
 
 
-def from_sklearn(sklearn_model: Any) -> GenericModel:
+def from_sklearn(
+    sklearn_model: Any,
+    label_name: str = "label",
+    feature_name: str = "features",
+) -> GenericModel:
   """Converts a tree-based scikit-learn model to a YDF model.
 
   Usage example:
@@ -1129,17 +1133,28 @@ def from_sklearn(sklearn_model: Any) -> GenericModel:
   *   sklearn.ensemble.ExtraTreesClassifier
   *   sklearn.ensemble.ExtraTreesRegressor
   *   sklearn.ensemble.GradientBoostingRegressor
+  *   sklearn.ensemble.IsolationForest
+
+  Unlike YDF, Scikit-learn does not name features and labels. Use the fields
+  `label_name` and `feature_name` to specify the name of the columns in the YDF
+  model.
 
   Additionally, only single-label classification and scalar regression are
   supported (e.g. multivariate regression models will not convert).
 
   Args:
     sklearn_model: the scikit-learn tree based model to be converted.
+    label_name: Name of the multi-dimensional feature in the output YDF model.
+    feature_name: Name of the label in the output YDF model.
 
   Returns:
     a YDF Model that emulates the provided scikit-learn model.
   """
-  return _get_export_sklearn().from_sklearn(sklearn_model)
+  return _get_export_sklearn().from_sklearn(
+      sklearn_model=sklearn_model,
+      label_name=label_name,
+      feature_name=feature_name,
+  )
 
 
 def _get_export_jax():

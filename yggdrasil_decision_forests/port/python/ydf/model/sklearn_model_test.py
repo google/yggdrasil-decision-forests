@@ -12,15 +12,50 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Tuple
 from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 from sklearn import datasets
 from sklearn import ensemble
 from sklearn import linear_model
+from sklearn import metrics
 from sklearn import tree
 from ydf.model import export_sklearn
 from ydf.model.decision_forest_model import decision_forest_model
+
+
+def gen_anomaly_detection_dataset(
+    n_samples: int = 120,
+    n_outliers: int = 40,
+    seed: int = 0,
+) -> Tuple[np.ndarray, np.ndarray]:
+  """Generates a two-gaussians anomaly detection dataset.
+
+  This function is similar to the example in:
+  https://scikit-learn.org/stable/auto_examples/ensemble/plot_isolation_forest.html
+
+  Args:
+    n_samples: Number of samples to generate in each gaussian.
+    n_outliers: Number of outliers to generate.
+    seed: Seed to use for random number generation.
+
+  Returns:
+    The features and labels for the dataset.
+  """
+  np.random.seed(seed)
+  covariance = np.array([[0.5, -0.1], [0.7, 0.4]])
+  cluster_1 = 0.4 * np.random.randn(n_samples, 2) @ covariance + np.array(
+      [2, 2]
+  )
+  cluster_2 = 0.3 * np.random.randn(n_samples, 2) + np.array([-2, -2])
+  outliers = np.random.uniform(low=-4, high=4, size=(n_outliers, 2))
+  features = np.concatenate([cluster_1, cluster_2, outliers])
+  labels = np.concatenate([
+      np.zeros((2 * n_samples), dtype=bool),
+      np.ones((n_outliers), dtype=bool),
+  ])
+  return features, labels
 
 
 class ScikitLearnModelConverterTest(parameterized.TestCase):
@@ -104,6 +139,44 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
     ydf_predictions = ydf_model.predict(ydf_features)
     np.testing.assert_allclose(sklearn_predictions, ydf_predictions, rtol=1e-5)
 
+  def test_import_anomaly_detection_model(
+      self,
+  ):
+    train_features, _ = gen_anomaly_detection_dataset(seed=0)
+    test_features, test_labels = gen_anomaly_detection_dataset(seed=1)
+
+    # Train isolation forest
+    sklearn_model = ensemble.IsolationForest(max_samples=100, random_state=0)
+    sklearn_model.fit(train_features)
+
+    # Generate golden predictions
+    sklearn_predictions = -sklearn_model.score_samples(test_features)
+    # Note: This is different from "sklearn_model.predict" and
+    # "sklearn_model.decision_function".
+
+    # Test quality of model
+    auc = metrics.roc_auc_score(test_labels, sklearn_predictions)
+    self.assertAlmostEqual(auc, 0.99333, delta=0.0001)
+
+    ydf_model = export_sklearn.from_sklearn(sklearn_model)
+    self.assertSequenceEqual(
+        ydf_model.input_feature_names(),
+        [
+            "features.0_of_2",
+            "features.1_of_2",
+        ],
+    )
+    ydf_features = {"features": test_features}
+    ydf_predictions = ydf_model.predict(ydf_features)
+
+    _ = ydf_model.describe("text")
+    _ = ydf_model.describe("html")
+    _ = ydf_model.analyze_prediction({"features": test_features[:1]})
+    _ = ydf_model.analyze(ydf_features)
+
+    # YDF Predictions match SKLearn predictions
+    np.testing.assert_allclose(sklearn_predictions, ydf_predictions, rtol=1e-5)
+
   def test_import_raises_when_unrecognised_model_provided(self):
     features, labels = datasets.make_regression(
         n_samples=100,
@@ -132,7 +205,7 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
     sklearn_model = tree.DecisionTreeRegressor().fit(features, labels)
     with self.assertRaisesRegex(
         ValueError,
-        "Only scalar regression and single-label classification are supported.",
+        "This model type if not supported",
     ):
       _ = export_sklearn.from_sklearn(sklearn_model)
 
@@ -149,7 +222,7 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
     sklearn_model = tree.DecisionTreeClassifier().fit(features, labels)
     with self.assertRaisesRegex(
         ValueError,
-        "Only scalar regression and single-label classification are supported.",
+        "This model type if not supported",
     ):
       _ = export_sklearn.from_sklearn(sklearn_model)
 
