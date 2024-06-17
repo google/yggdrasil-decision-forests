@@ -15,8 +15,11 @@
 
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
 
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -39,11 +42,15 @@
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
+#include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/register_engines.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"  // IWYU pragma: keep
+#include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -57,6 +64,7 @@ namespace decision_forest {
 namespace {
 
 using model::gradient_boosted_trees::GradientBoostedTreesModel;
+using model::isolation_forest::IsolationForestModel;
 using model::random_forest::RandomForestModel;
 using testing::ElementsAre;
 
@@ -483,6 +491,19 @@ TEST(SimPTECategoricalupliftRF, ManualGeneric) {
   auto* rf_model = dynamic_cast<RandomForestModel*>(model.get());
   RandomForestCategoricalUplift engine;
   CHECK_OK(GenericToSpecializedModel(*rf_model, &engine));
+
+  utils::ExpectEqualPredictionsTemplate<decltype(engine), Predict>(
+      dataset, *model, engine);
+}
+
+TEST(GaussiansIF, ManualGeneric) {
+  const auto model = LoadModel("gaussians_anomaly_if");
+  const auto dataset =
+      LoadDataset(model->data_spec(), "gaussians_test.csv", "csv");
+
+  auto* if_model = dynamic_cast<IsolationForestModel*>(model.get());
+  IsolationForest engine;
+  CHECK_OK(GenericToSpecializedModel(*if_model, &engine));
 
   utils::ExpectEqualPredictionsTemplate<decltype(engine), Predict>(
       dataset, *model, engine);

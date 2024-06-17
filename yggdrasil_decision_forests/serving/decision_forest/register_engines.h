@@ -18,8 +18,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_REGISTER_ENGINE_DECISION_FOREST_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_REGISTER_ENGINE_DECISION_FOREST_H_
 
-#include "yggdrasil_decision_forests/model/abstract_model.h"
-#include "yggdrasil_decision_forests/serving/fast_engine.h"
 
 namespace yggdrasil_decision_forests {
 namespace serving {
@@ -35,6 +33,10 @@ namespace random_forest {
 constexpr char kGeneric[] = "RandomForestGeneric";
 constexpr char kOptPred[] = "RandomForestOptPred";
 }  // namespace random_forest
+
+namespace isolation_forest {
+constexpr char kGeneric[] = "IsolationForestGeneric";
+}  // namespace isolation_forest
 
 }  // namespace serving
 }  // namespace yggdrasil_decision_forests

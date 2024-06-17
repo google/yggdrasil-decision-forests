@@ -37,8 +37,10 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
+#include "yggdrasil_decision_forests/serving/decision_forest/utils.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -54,6 +56,7 @@ using dataset::proto::ColumnType;
 using model::decision_tree::NodeWithChildren;
 using model::gradient_boosted_trees::GradientBoostedTreesModel;
 using model::gradient_boosted_trees::proto::Loss;
+using model::isolation_forest::IsolationForestModel;
 using model::random_forest::RandomForestModel;
 using ConditionType = model::decision_tree::proto::Condition::TypeCase;
 typedef absl::flat_hash_map<int, FeatureDef> FeatureDefMap;
@@ -634,6 +637,30 @@ absl::Status SetLeafNodeRandomForestNumericalUplift(
   return absl::OkStatus();
 }
 
+template <typename SpecializedModel>
+absl::Status SetLeafNodeIsolationForest(
+    const IsolationForestModel& src_model, const NodeWithChildren& src_node,
+    SpecializedModel* dst_model,
+    typename SpecializedModel::NodeType* dst_node) {
+  using Node = typename SpecializedModel::NodeType;
+  static_assert(std::is_same<Node, GenericNode<uint16_t>>::value ||
+                    std::is_same<Node, GenericNode<uint32_t>>::value,
+                "Non supported node type.");
+
+  const float value =
+      (src_node.depth() +
+       model::isolation_forest::PreissAveragePathLength(
+           src_node.node().anomaly_detection().num_examples_without_weight())) /
+      src_model.NumTrees();
+
+  *dst_node = Node::Leaf(
+      /*.right_idx =*/0,
+      /*.feature_idx =*/0,
+      /*.label =*/
+      value);
+  return absl::OkStatus();
+}
+
 // Set the leaf of a binary classification Gradient Boosted Trees.
 template <typename SpecializedModel>
 absl::Status SetLeafGradientBoostedTreesClassification(
@@ -1049,6 +1076,26 @@ absl::Status GenericToSpecializedModel(
   using DstType = std::remove_pointer<decltype(dst)>::type;
   return GenericToSpecializedGenericModelHelper(
       SetLeafNodeRandomForestNumericalUplift<DstType>, src, dst);
+}
+
+template <>
+absl::Status GenericToSpecializedModel(const IsolationForestModel& src,
+                                       IsolationForest* dst) {
+  using DstType = std::remove_pointer<decltype(dst)>::type;
+  dst->denominator = model::isolation_forest::PreissAveragePathLength(
+      src.num_examples_per_trees());
+  return GenericToSpecializedGenericModelHelper(
+      SetLeafNodeIsolationForest<DstType>, src, dst);
+}
+
+template <>
+absl::Status GenericToSpecializedModel(const IsolationForestModel& src,
+                                       GenericIsolationForest<uint32_t>* dst) {
+  using DstType = std::remove_pointer<decltype(dst)>::type;
+  dst->denominator = model::isolation_forest::PreissAveragePathLength(
+      src.num_examples_per_trees());
+  return GenericToSpecializedGenericModelHelper(
+      SetLeafNodeIsolationForest<DstType>, src, dst);
 }
 
 template <>
