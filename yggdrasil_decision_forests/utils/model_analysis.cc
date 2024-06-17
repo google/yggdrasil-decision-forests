@@ -188,6 +188,19 @@ absl::Status Set1DCurveData(
         }
         break;
 
+      case model::proto::Task::ANOMALY_DETECTION:
+        STATUS_CHECK_EQ(label_value_idx, -1);
+        switch (target_type) {
+          case CurveTargetType::kPrediction:
+            target_dst->push_back(
+                bin.prediction().sum_of_anomaly_detection_predictions() /
+                pdp.num_observations());
+            break;
+          default:
+            return absl::InvalidArgumentError("Not implemented.");
+        }
+        break;
+
       default:
         return absl::InvalidArgumentError("Not implemented.");
     }
@@ -207,7 +220,6 @@ absl::Status PlotPartialDependencePlot1DNumerical(
                   pdp.pdp_bins_size());
 
   const auto& attr_spec = data_spec.columns(attribute_idx);
-  const auto& label_spec = data_spec.columns(label_col_idx);
 
   STATUS_CHECK_EQ(attr_spec.type(), dataset::proto::ColumnType::NUMERICAL);
 
@@ -226,6 +238,7 @@ absl::Status PlotPartialDependencePlot1DNumerical(
   // PDP
   switch (task) {
     case model::proto::Task::CLASSIFICATION: {
+      const auto& label_spec = data_spec.columns(label_col_idx);
       for (int label_value_idx =
                FirstCategoricalLabelValueForPdpPlot(label_spec);
            label_value_idx < label_spec.categorical().number_of_unique_values();
@@ -306,6 +319,15 @@ absl::Status PlotPartialDependencePlot1DNumerical(
       RETURN_IF_ERROR(Set1DCurveData(
           pdp, CurveTargetType::kPrediction, false, model::proto::Task::RANKING,
           -1, dataset::proto::ColumnType::NUMERICAL, prediction_curve));
+    } break;
+
+    case model::proto::Task::ANOMALY_DETECTION: {
+      auto* prediction_curve = AddCurve(pdp_plot);
+      prediction_curve->style = plot::LineStyle::SOLID;
+      RETURN_IF_ERROR(Set1DCurveData(pdp, CurveTargetType::kPrediction, false,
+                                     model::proto::Task::ANOMALY_DETECTION, -1,
+                                     dataset::proto::ColumnType::NUMERICAL,
+                                     prediction_curve));
     } break;
 
     default:
@@ -735,7 +757,8 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
                          options.cep().example_sampling()));
   }
 
-  if (options.permuted_variable_importance().enabled()) {
+  if (options.permuted_variable_importance().enabled() &&
+      model.label_col_idx() != -1) {
     RETURN_IF_ERROR(ComputePermutationFeatureImportance(
         dataset, &model, analysis.mutable_variable_importances(),
         {options.num_threads(),
@@ -1041,10 +1064,10 @@ absl::StatusOr<std::vector<FeatureVariationOutput>> ListOutputs(
     const proto::PredictionAnalysisResult& analysis,
     const proto::PredictionAnalysisOptions& options) {
   std::vector<FeatureVariationOutput> outputs;
-  const auto& label_column =
-      analysis.data_spec().columns(analysis.label_col_idx());
   switch (analysis.task()) {
     case model::proto::Task::CLASSIFICATION: {
+      const auto& label_column =
+          analysis.data_spec().columns(analysis.label_col_idx());
       const int first_class_idx =
           (label_column.categorical().number_of_unique_values() == 3) ? 2 : 1;
       for (int class_idx = first_class_idx;

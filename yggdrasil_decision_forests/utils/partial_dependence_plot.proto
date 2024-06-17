@@ -38,9 +38,13 @@ message PartialDependencePlotSet {
         // num_observations to obtain the mean prediction.
         double sum_of_regression_predictions = 2 [default = 0];
 
-        // sum_of_regression_predictions should be normalized with
+        // sum_of_ranking_predictions should be normalized with
         // num_observations to obtain the mean prediction.
         double sum_of_ranking_predictions = 3 [default = 0];
+
+        // sum_of_anomaly_detection_predictions should be normalized with
+        // num_observations to obtain the mean prediction.
+        double sum_of_anomaly_detection_predictions = 4 [default = 0];
       }
     }
     // Represent the accumulation of evaluation metrics.

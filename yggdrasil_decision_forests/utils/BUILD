@@ -1219,6 +1219,7 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:builder",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/isolation_forest",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/memory",

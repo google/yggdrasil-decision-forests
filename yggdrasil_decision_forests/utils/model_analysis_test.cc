@@ -56,7 +56,7 @@ std::string ModelDir() {
       "yggdrasil_decision_forests/test_data/model");
 }
 
-TEST(ModelAnalysis, Basic) {
+TEST(ModelAnalysis, Classification) {
   const std::string dataset_path =
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult_test.csv"));
   const std::string model_path =
@@ -70,7 +70,7 @@ TEST(ModelAnalysis, Basic) {
   dataset::VerticalDataset dataset;
   CHECK_OK(dataset::LoadVerticalDataset(
       dataset_path, model->data_spec(), &dataset,
-      /*ensure_non_missing=*/model->input_features()));
+      /*required_columns=*/model->input_features()));
 
   proto::Options options;
   options.mutable_pdp()->set_example_sampling(0.01f);
@@ -82,6 +82,35 @@ TEST(ModelAnalysis, Basic) {
 
   ASSERT_OK_AND_ASSIGN(const auto analysis,
                        Analyse(*model.get(), dataset, options));
+  ASSERT_OK_AND_ASSIGN(const auto report,
+                       CreateHtmlReport(*model.get(), dataset, "MODEL_PATH",
+                                        "DATASET_PATH", analysis, options));
+}
+
+TEST(ModelAnalysis, AnomalyDetection) {
+  const std::string dataset_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "gaussians_test.csv"));
+  const std::string model_path =
+      file::JoinPath(ModelDir(), "gaussians_anomaly_if");
+
+  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(model_path));
+
+  dataset::VerticalDataset dataset;
+  ASSERT_OK(dataset::LoadVerticalDataset(
+      dataset_path, model->data_spec(), &dataset,
+      /*required_columns=*/model->input_features()));
+
+  proto::Options options;
+  options.mutable_pdp()->set_example_sampling(0.01f);
+  options.mutable_cep()->set_example_sampling(0.1f);
+  options.set_num_threads(1);
+  options.set_html_id_prefix("my_report");
+  options.mutable_report_header()->set_enabled(false);
+  const auto report_path = file::JoinPath(test::TmpDirectory(), "analysis");
+
+  ASSERT_OK_AND_ASSIGN(const auto analysis,
+                       Analyse(*model.get(), dataset, options));
+
   ASSERT_OK_AND_ASSIGN(const auto report,
                        CreateHtmlReport(*model.get(), dataset, "MODEL_PATH",
                                         "DATASET_PATH", analysis, options));
@@ -202,7 +231,7 @@ TEST(ModelAnalysis, PDPPlot) {
   // TODO: Add a more extensive unit test with a golden report.
 }
 
-TEST(PredictionAnalysis, Basic) {
+TEST(PredictionAnalysis, Classification) {
   const std::string dataset_path =
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult_test.csv"));
   const std::string model_path =
@@ -216,7 +245,29 @@ TEST(PredictionAnalysis, Basic) {
   dataset::VerticalDataset dataset;
   ASSERT_OK(dataset::LoadVerticalDataset(
       dataset_path, model->data_spec(), &dataset,
-      /*ensure_non_missing=*/model->input_features()));
+      /*required_columns=*/model->input_features()));
+
+  proto::PredictionAnalysisOptions options;
+  options.set_html_id_prefix("my_prefix");
+  dataset::proto::Example example;
+  dataset.ExtractExample(0, &example);
+  ASSERT_OK_AND_ASSIGN(const auto analysis,
+                       AnalyzePrediction(*model, example, options));
+  ASSERT_OK_AND_ASSIGN(const auto report, CreateHtmlReport(analysis, options));
+}
+
+TEST(PredictionAnalysis, AnomalyDetection) {
+  const std::string dataset_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "gaussians_test.csv"));
+  const std::string model_path =
+      file::JoinPath(ModelDir(), "gaussians_anomaly_if");
+
+  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(model_path));
+
+  dataset::VerticalDataset dataset;
+  ASSERT_OK(dataset::LoadVerticalDataset(
+      dataset_path, model->data_spec(), &dataset,
+      /*required_columns=*/model->input_features()));
 
   proto::PredictionAnalysisOptions options;
   options.set_html_id_prefix("my_prefix");
