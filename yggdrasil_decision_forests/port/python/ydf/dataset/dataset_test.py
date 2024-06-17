@@ -1172,6 +1172,18 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
   def test_does_not_look_numerical(self, value: str):
     self.assertFalse(dataset.look_numerical(value))
 
+  def test_from_numpy(self):
+    with self.assertRaisesRegex(
+        ValueError, "Numpy arrays cannot be fed directly"
+    ):
+      dataset.create_vertical_dataset(np.array([1, 2, 3]))
+
+  def test_from_column_less_pandas(self):
+    with self.assertRaisesRegex(
+        ValueError, "The pandas DataFrame must have string column names"
+    ):
+      dataset.create_vertical_dataset(pd.DataFrame([[1, 2, 3], [4, 5, 6]]))
+
 
 class CategoricalSetTest(absltest.TestCase):
 

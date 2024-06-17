@@ -77,8 +77,11 @@ class GenericLearner:
     self._deployment_config = deployment_config
     self._tuner = tuner
 
+    if self._label is not None and not isinstance(label, str):
+      raise ValueError("The 'label' should be a string")
     if task != Task.ANOMALY_DETECTION and not self._label:
       raise ValueError("Constructing the learner requires a non-empty label.")
+
     if self._ranking_group is not None and task != Task.RANKING:
       raise ValueError(
           "The ranking group should only be specified for ranking tasks."

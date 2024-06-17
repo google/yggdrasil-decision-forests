@@ -676,6 +676,10 @@ class RandomForestLearnerTest(LearnerTest):
     )
     _ = learner.train(ds)
 
+  def test_label_is_dataset(self):
+    with self.assertRaisesRegex(ValueError, "should be a string"):
+      _ = specialized_learners.RandomForestLearner(label=np.array([1, 0]))  # pytype: disable=wrong-arg-types
+
 
 class CARTLearnerTest(LearnerTest):
 
