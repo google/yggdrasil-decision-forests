@@ -13,6 +13,7 @@ cc_library_ydf(
     name = "all_models",
     deps = [
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/isolation_forest",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving/decision_forest:register_engines",
     ],

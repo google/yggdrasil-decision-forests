@@ -150,7 +150,10 @@ class AbstractModel {
   // Get the model target column.
   int label_col_idx() const { return label_col_idx_; }
 
-  // Name of the label column.
+  // Tests if the model has a label.
+  bool has_label() const { return label_col_idx_ != -1; }
+
+  // Name of the label column. Should only be called if "has_label()" is true.
   std::string label() const {
     DCHECK_GE(label_col_idx_, 0);
     DCHECK_LT(label_col_idx_, data_spec_.columns_size());

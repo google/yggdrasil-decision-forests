@@ -68,7 +68,9 @@ utils::html::Html Model(const model::AbstractModel& model) {
   h::Html content;
   AddKeyValue(&content, "Name", model.name());
   AddKeyValue(&content, "Task", proto::Task_Name(model.task()));
-  AddKeyValue(&content, "Label", model.label());
+  if (model.has_label()) {
+    AddKeyValue(&content, "Label", model.label());
+  }
 
   if (model.ranking_group_col_idx() != -1) {
     AddKeyValue(
