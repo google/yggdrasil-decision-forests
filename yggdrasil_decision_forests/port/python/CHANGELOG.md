@@ -4,6 +4,7 @@
 
 ### Feature
 
+-   Add support for Isolation Forests model.
 -   Add `max_depth` argument to `model.print_tree`.
 -   Add `verbose` argument to `train` method which is equivalent but sometime
     more convenient than`ydf.verbose`.
