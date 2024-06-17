@@ -35,6 +35,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -54,6 +55,7 @@
 #include "yggdrasil_decision_forests/utils/fold_generator.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
@@ -834,7 +836,7 @@ void InitializeModelWithAbstractTrainingConfig(
     const proto::TrainingConfig& training_config,
     const proto::TrainingConfigLinking& training_config_linking,
     AbstractModel* model) {
-  if (training_config.task() != proto::Task::ANOMALY_DETECTION) {
+  if (training_config_linking.has_label()) {
     model->set_label_col_idx(training_config_linking.label());
   }
 
@@ -888,11 +890,11 @@ void InitializeModelMetadataWithAbstractTrainingConfig(
 }
 
 absl::Status AbstractLearner::CheckCapabilities() const {
-  // All the learners require a label.
-  if (training_config().label().empty()) {
+  const auto capabilities = Capabilities();
+
+  if (capabilities.require_label() && training_config().label().empty()) {
     return absl::InvalidArgumentError("\"label\" field required.");
   }
-  const auto capabilities = Capabilities();
 
   // Maximum training duration.
   if (!capabilities.support_max_training_duration() &&

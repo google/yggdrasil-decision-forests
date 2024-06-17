@@ -263,6 +263,10 @@ message LearnerCapabilities {
   // If true, the algorithm supports monotonic constraints over numerical
   // features.
   optional bool support_monotonic_constraints = 6 [default = false];
+
+  // If true, the learner requires a label. If false, the learner does not
+  // require a label.
+  optional bool require_label = 7 [default = true];
 }
 
 // Monotonic constraints between model's output and numerical input features.
