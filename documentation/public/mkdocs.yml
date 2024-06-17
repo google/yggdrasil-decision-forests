@@ -56,6 +56,7 @@ nav:
     - Regression: tutorial/regression.ipynb
     - Ranking: tutorial/ranking.ipynb
     - Uplifting: tutorial/uplifting.ipynb
+    - Anomaly detection: tutorial/anomaly_detection.ipynb
   - Input feature:
     - numerical: tutorial/numerical_feature.ipynb
     - categorical: tutorial/categorical_feature.ipynb
