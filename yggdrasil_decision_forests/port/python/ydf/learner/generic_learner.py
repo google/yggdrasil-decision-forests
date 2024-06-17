@@ -53,7 +53,7 @@ class GenericLearner:
       self,
       learner_name: str,
       task: Task,
-      label: str,
+      label: Optional[str],
       weights: Optional[str],
       ranking_group: Optional[str],
       uplift_treatment: Optional[str],

@@ -39,6 +39,7 @@ from ydf.model.tree.value import AbstractValue
 from ydf.model.tree.value import RegressionValue
 from ydf.model.tree.value import ProbabilityValue
 from ydf.model.tree.value import UpliftValue
+from ydf.model.tree.value import AnomalyDetectionValue
 
 # Plotting
 from ydf.model.tree.plot import PlotOptions

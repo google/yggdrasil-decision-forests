@@ -24,6 +24,7 @@ from absl.testing import parameterized
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
+from sklearn import metrics
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
@@ -66,6 +67,7 @@ class LearnerTest(parameterized.TestCase):
             Column("treat", semantic=dataspec.Semantic.CATEGORICAL),
         ],
     )
+    self.gaussians = test_utils.load_datasets("gaussians")
 
   def _check_adult_model(
       self,
@@ -1007,6 +1009,42 @@ class LoggingTest(parameterized.TestCase):
     learner = specialized_learners.RandomForestLearner(label="label")
     ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
     _ = learner.train(ds, verbose=verbose)
+
+
+class IsolationForestLearnerTest(LearnerTest):
+
+  @parameterized.parameters(False, True)
+  def test_gaussians(self, with_labels: bool):
+    if with_labels:
+      learner = specialized_learners.IsolationForestLearner(label="label")
+    else:
+      learner = specialized_learners.IsolationForestLearner(
+          features=["f1", "f2"]
+      )
+    model = learner.train(self.gaussians.train)
+    predictions = model.predict(self.gaussians.test)
+
+    auc = metrics.roc_auc_score(self.gaussians.test_pd["label"], predictions)
+    logging.info("auc:%s", auc)
+    self.assertGreaterEqual(auc, 0.99)
+
+    _ = model.describe("text")
+    _ = model.describe("html")
+    _ = model.analyze_prediction(self.gaussians.test_pd.iloc[:1])
+    _ = model.analyze(self.gaussians.test)
+
+    if with_labels:
+      evaluation = model.evaluate(self.gaussians.test)
+      self.assertDictEqual(
+          evaluation.to_dict(),
+          {"num_examples": 280, "num_examples_weighted": 280.0},
+      )
+    else:
+      with self.assertRaisesRegex(
+          ValueError,
+          "Cannot evaluate an anomaly detection model without a label",
+      ):
+        _ = model.evaluate(self.gaussians.test)
 
 
 class UtilityTest(LearnerTest):

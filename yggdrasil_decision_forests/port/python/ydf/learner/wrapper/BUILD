@@ -27,6 +27,7 @@ cc_library_ydf(
     srcs = ["wrapper_generator.cc"],
     hdrs = ["wrapper_generator.h"],
     deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -36,6 +37,7 @@ cc_library_ydf(
         "@ydf_cc//yggdrasil_decision_forests/learner:learner_library",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:hyper_parameters",
+        "@ydf_cc//yggdrasil_decision_forests/utils:logging",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
     ],
 )
@@ -55,6 +57,7 @@ cc_test(
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees",
+        "@ydf_cc//yggdrasil_decision_forests/learner/isolation_forest",
         "@ydf_cc//yggdrasil_decision_forests/learner/random_forest",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_cc_proto",

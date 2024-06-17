@@ -29,7 +29,7 @@ class AbstractValue(metaclass=abc.ABCMeta):
   """A generic value/prediction/output.
 
   Attrs:
-    num_examples: Number of example in the node.
+    num_examples: Number of examples in the node with weight.
   """
 
   num_examples: float
@@ -100,6 +100,20 @@ class UpliftValue(AbstractValue):
     return f"value={self.treatment_effect}"
 
 
+@dataclasses.dataclass
+class AnomalyDetectionValue(AbstractValue):
+  """The value of an anomaly detection tree.
+
+  Attrs:
+    num_examples_without_weight: Number of examples reaching this node.
+  """
+
+  num_examples_without_weight: int
+
+  def pretty(self) -> str:
+    return f"count={self.num_examples_without_weight}"
+
+
 def to_value(proto_node: decision_tree_pb2.Node) -> AbstractValue:
   """Extracts the "value" part of a proto node."""
 
@@ -128,6 +142,12 @@ def to_value(proto_node: decision_tree_pb2.Node) -> AbstractValue:
     return UpliftValue(
         treatment_effect=proto_node.uplift.treatment_effect[:],
         num_examples=proto_node.uplift.sum_weights,
+    )
+
+  if proto_node.HasField("anomaly_detection"):
+    return AnomalyDetectionValue(
+        num_examples_without_weight=proto_node.anomaly_detection.num_examples_without_weight,
+        num_examples=-1.0,  # The number of weighted examples is not tracked.
     )
 
   raise ValueError("Unsupported value")
@@ -175,6 +195,15 @@ def _to_json_uplift(value: UpliftValue) -> Dict[str, Any]:
   return {
       "type": "UPLIFT",
       "treatment_effect": value.treatment_effect,
+      "num_examples": value.num_examples,
+  }
+
+
+@to_json.register
+def _to_json_uplift(value: AnomalyDetectionValue) -> Dict[str, Any]:
+  return {
+      "type": "ANOMALY_DETECTION",
+      "num_examples_without_weight": value.num_examples_without_weight,
       "num_examples": value.num_examples,
   }
 
@@ -227,3 +256,12 @@ def _set_proto_node_from_uplift(
 ):
   proto_node.uplift.treatment_effect[:] = value.treatment_effect
   proto_node.uplift.sum_weights = value.num_examples
+
+
+@set_proto_node.register
+def _set_proto_node_from_anomaly_detection(
+    value: AnomalyDetectionValue, proto_node: decision_tree_pb2.Node
+):
+  proto_node.anomaly_detection.num_examples_without_weight = (
+      value.num_examples_without_weight
+  )
