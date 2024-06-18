@@ -42,10 +42,10 @@ class MultitaskerLearner : public AbstractLearner {
 
   static constexpr char kRegisteredName[] = "MULTITASKER";
 
-  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset = {}) const override;
+          valid_dataset) const override;
 
   absl::Status SetHyperParameters(
       const proto::GenericHyperParameters& generic_hyper_params) override;

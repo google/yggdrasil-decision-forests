@@ -20,6 +20,7 @@
 #include <cstring>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -54,6 +55,15 @@ py::array_t<float> GradientBoostedTreesCCModel::initial_predictions() const {
               gbt_initial_predictions.data(),
               initial_predictions.size() * sizeof(float));
   return initial_predictions;
+}
+
+void GradientBoostedTreesCCModel::set_initial_predictions(
+    const py::array_t<float>& values) {
+  std::vector<float> std_values(values.size(), 0.0f);
+  for (int i = 0; i < values.size(); i++) {
+    std_values[i] = values.at(i);
+  }
+  gbt_model_->set_initial_predictions(std::move(std_values));
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

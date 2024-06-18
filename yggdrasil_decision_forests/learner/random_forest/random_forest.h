@@ -74,10 +74,10 @@ class RandomForestLearner : public AbstractLearner {
   static constexpr char kHParamSamplingWithReplacement[] =
       "sampling_with_replacement";
 
-  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset = {}) const override;
+          valid_dataset) const override;
 
   // Detects configuration errors and warnings.
   static absl::Status CheckConfiguration(

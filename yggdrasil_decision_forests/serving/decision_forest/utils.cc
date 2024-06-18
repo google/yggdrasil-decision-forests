@@ -15,16 +15,23 @@
 
 #include "yggdrasil_decision_forests/serving/decision_forest/utils.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <unordered_map>
+#include <vector>
+
 #include "absl/status/status.h"
-#include "absl/strings/str_format.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
 namespace serving {
 namespace decision_forest {
-
 
 // Get the list of input features used by the model.
 //
@@ -46,10 +53,15 @@ absl::Status GetInputFeatures(
   const auto* gbt_model = dynamic_cast<
       const model::gradient_boosted_trees::GradientBoostedTreesModel*>(
       &src_model);
+  const auto* if_model =
+      dynamic_cast<const model::isolation_forest::IsolationForestModel*>(
+          &src_model);
   if (rf_model) {
     rf_model->CountFeatureUsage(&feature_usage);
   } else if (gbt_model) {
     gbt_model->CountFeatureUsage(&feature_usage);
+  } else if (if_model) {
+    if_model->CountFeatureUsage(&feature_usage);
   } else {
     return absl::InvalidArgumentError("Unsupported decision forest model type");
   }

@@ -19,6 +19,7 @@ from typing import Dict, Tuple
 
 from absl import logging
 from absl.testing import absltest
+from absl.testing import parameterized
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
@@ -42,17 +43,18 @@ NumericalHigherThanCondition = condition_lib.NumericalHigherThanCondition
 Tree = tree_lib.Tree
 
 
-class GradientBoostedTreesTest(absltest.TestCase):
+def load_model(
+    name: str,
+    directory: str = "model",
+) -> gradient_boosted_trees_model.GradientBoostedTreesModel:
+  path = os.path.join(test_utils.ydf_test_data_path(), directory, name)
+  return model_lib.load_model(path)
+
+
+class GradientBoostedTreesTest(parameterized.TestCase):
 
   def setUp(self):
     super().setUp()
-
-    def load_model(
-        name: str,
-        directory: str = "model",
-    ) -> gradient_boosted_trees_model.GradientBoostedTreesModel:
-      path = os.path.join(test_utils.ydf_test_data_path(), directory, name)
-      return model_lib.load_model(path)
 
     # This model is a classification model for pure serving.
     self.adult_binary_class_gbdt = load_model("adult_binary_class_gbdt")
@@ -139,6 +141,19 @@ class GradientBoostedTreesTest(absltest.TestCase):
   def test_initial_predictions(self):
     initial_predictions = self.adult_binary_class_gbdt.initial_predictions()
     np.testing.assert_allclose(initial_predictions, [-1.1630996])
+
+  @parameterized.parameters(
+      "adult_binary_class_gbdt",
+      "iris_multi_class_gbdt",
+      "abalone_regression_gbdt",
+  )
+  def test_set_initial_predictions(self, model_name):
+    model = load_model(model_name)
+    initial_predictions = model.initial_predictions()
+    model.set_initial_predictions(initial_predictions * 2.0)
+    np.testing.assert_allclose(
+        initial_predictions * 2, model.initial_predictions()
+    )
 
   def test_validation_evaluation_empty(self):
     dataset = {

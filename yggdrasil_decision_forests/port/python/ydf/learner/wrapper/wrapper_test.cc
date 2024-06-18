@@ -41,7 +41,7 @@ class FakeLearner1 : public model::AbstractLearner {
   explicit FakeLearner1(const model::proto::TrainingConfig& training_config)
       : AbstractLearner(training_config) {}
 
-  absl::StatusOr<std::unique_ptr<model::AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<model::AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
       std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override {
@@ -271,6 +271,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
+      verbose: Optional[Union[int, bool]] = None,
   ) -> generic_model.GenericModel:
     """Trains a model on the given dataset.
 
@@ -301,11 +302,15 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
         do not need validation dataset. Some learners, such as
         GradientBoostedTrees, automatically extract a validation dataset from
         the training dataset if the validation dataset is not provided.
+      verbose: Verbose level during training. If None, uses the global verbose
+        level of `ydf.verbose`. Levels are: 0 of False: No logs, 1 or True:
+        Print a few logs in a notebook; prints all the logs in a terminal. 2:
+        Prints all the logs on all surfaces.
 
     Returns:
       A trained model.
     """
-    return super().train(ds, valid)
+    return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:

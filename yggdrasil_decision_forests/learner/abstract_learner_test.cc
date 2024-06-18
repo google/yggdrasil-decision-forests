@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/model/model_testing.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -57,8 +58,8 @@ TEST(AbstractModel, LinkTrainingConfig) {
   data_spec.add_columns()->set_name("D");
 
   proto::TrainingConfigLinking config_link;
-  CHECK_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
-                                               &config_link));
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
 
   EXPECT_EQ(config_link.label(), 0);
   EXPECT_THAT(config_link.features(), ElementsAre(1, 3));
@@ -76,8 +77,8 @@ TEST(AbstractModel, LinkTrainingConfigNoInputFeatures) {
   data_spec.add_columns()->set_name("D");
 
   proto::TrainingConfigLinking config_link;
-  CHECK_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
-                                               &config_link));
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
 
   EXPECT_EQ(config_link.label(), 0);
   EXPECT_THAT(config_link.features(), ElementsAre(1, 2, 3));
@@ -100,8 +101,8 @@ TEST(AbstractModel, LinkTrainingConfigFullyMissingFeatures) {
       std::numeric_limits<float>::quiet_NaN());
 
   proto::TrainingConfigLinking config_link;
-  CHECK_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
-                                               &config_link));
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
 
   EXPECT_EQ(config_link.label(), 0);
   EXPECT_THAT(config_link.features(), ElementsAre(3));
@@ -120,7 +121,44 @@ TEST(AbstractModel, LinkTrainingConfigMissingLabel) {
   EXPECT_THAT(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
                                                   &config_link),
               StatusIs(absl::StatusCode::kInvalidArgument,
-                       "No label specified in the training config. Aborting."));
+                       "No label specified in the training config."));
+}
+
+TEST(AbstractModel, LinkTrainingConfigAnomalyDetection) {
+  proto::TrainingConfig training_config;
+  training_config.set_task(proto::Task::ANOMALY_DETECTION);
+  training_config.add_features(".*");
+
+  dataset::proto::DataSpecification data_spec;
+  data_spec.add_columns()->set_name("A");
+  data_spec.add_columns()->set_name("B");
+  data_spec.add_columns()->set_name("C");
+
+  proto::TrainingConfigLinking config_link;
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
+
+  EXPECT_EQ(config_link.label(), -1);
+  EXPECT_THAT(config_link.features(), ElementsAre(0, 1, 2));
+}
+
+TEST(AbstractModel, LinkTrainingConfigAnomalyDetectionWithLabel) {
+  proto::TrainingConfig training_config;
+  training_config.set_task(proto::Task::ANOMALY_DETECTION);
+  training_config.set_label("A");
+  training_config.add_features(".*");
+
+  dataset::proto::DataSpecification data_spec;
+  data_spec.add_columns()->set_name("A");
+  data_spec.add_columns()->set_name("B");
+  data_spec.add_columns()->set_name("C");
+
+  proto::TrainingConfigLinking config_link;
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
+
+  EXPECT_EQ(config_link.label(), 0);
+  EXPECT_THAT(config_link.features(), ElementsAre(1, 2));
 }
 
 TEST(AbstractLearner, GenericHyperParameters) {
@@ -212,13 +250,13 @@ TEST(AbstractLearner, EvaluateLearner) {
     explicit FakeLearner(const proto::TrainingConfig& training_config)
         : AbstractLearner(training_config) {}
 
-    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
         const dataset::VerticalDataset& train_dataset,
         absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
             valid_dataset = {}) const override {
       auto model = absl::make_unique<FakeClassificationModel>();
       model::proto::TrainingConfigLinking config_link;
-      CHECK_OK(AbstractLearner::LinkTrainingConfig(
+      RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
           training_config(), train_dataset.data_spec(), &config_link));
       InitializeModelWithAbstractTrainingConfig(training_config(), config_link,
                                                 model.get());
@@ -246,12 +284,12 @@ TEST(AbstractLearner, EvaluateLearner) {
 
   dataset::VerticalDataset dataset;
   dataset.set_data_spec(data_spec);
-  CHECK_OK(dataset.CreateColumnsFromDataspec());
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
   for (int i = 0; i < 1000; i++) {
-    CHECK_OK(dataset.AppendExampleWithStatus({{"a", "1"}}));
-    CHECK_OK(dataset.AppendExampleWithStatus({{"a", "2"}}));
-    CHECK_OK(dataset.AppendExampleWithStatus({{"a", "1"}}));
-    CHECK_OK(dataset.AppendExampleWithStatus({{"a", "2"}}));
+    ASSERT_OK(dataset.AppendExampleWithStatus({{"a", "1"}}));
+    ASSERT_OK(dataset.AppendExampleWithStatus({{"a", "2"}}));
+    ASSERT_OK(dataset.AppendExampleWithStatus({{"a", "1"}}));
+    ASSERT_OK(dataset.AppendExampleWithStatus({{"a", "2"}}));
   }
 
   const metric::proto::EvaluationOptions evaluation_options =
@@ -274,7 +312,7 @@ TEST(AbstractLearner, MaximumModelSizeInMemoryInBytes) {
     explicit FakeLearner(const proto::TrainingConfig& training_config)
         : AbstractLearner(training_config) {}
 
-    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
         const dataset::VerticalDataset& train_dataset,
         absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
             valid_dataset = {}) const override {

@@ -73,6 +73,14 @@ message NodeUpliftOutput {
   repeated int64 num_examples_per_treatment = 5 [packed = true];
 }
 
+// Output of a node in an anomaliy detection tree.
+message NodeAnomalyDetectionOutput {
+  // Next ID: 2
+
+  // Number of examples that reached this node.
+  optional int64 num_examples_without_weight = 1;
+}
+
 // The sub-messages of "ConditionParams" are the different types of condition
 // that can be attached to a node.
 message Condition {
@@ -161,17 +169,19 @@ message NodeCondition {
 
 // Node in a decision tree (without the information about the children).
 message Node {
-  // Next ID: 6
+  // Next ID: 7
   // Label value. Might be unspecified for non-leaf nodes.
   oneof output {
     NodeClassifierOutput classifier = 1;
     NodeRegressorOutput regressor = 2;
     NodeUpliftOutput uplift = 5;
+    NodeAnomalyDetectionOutput anomaly_detection = 6;
   }
   // Branching condition to the children. If not specified, this node is a leaf.
   optional NodeCondition condition = 3;
 
-  // Number of positive examples (non-weighted) that reached this node during
-  // training.
+  // Number of examples (non-weighted) that reached this node during
+  // training. Warning: Contrary to what the name suggest, this is not the count
+  // of examples branched to the positive child.
   optional int64 num_pos_training_examples_without_weight = 4;
 }

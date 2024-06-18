@@ -35,7 +35,6 @@
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
-#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -165,7 +164,7 @@ HyperParameterOptimizerLearner::TrainFromFileOnMemoryDataset(
 }
 
 absl::StatusOr<std::unique_ptr<AbstractModel>>
-HyperParameterOptimizerLearner::TrainWithStatus(
+HyperParameterOptimizerLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
@@ -184,8 +183,6 @@ HyperParameterOptimizerLearner::TrainWithStatus(
         "deployment configs.");
   }
 
-  const auto begin_training = absl::Now();
-
   // The effective configuration is the user configuration + the default value +
   // the automatic configuration (if enabled) + the copy of the non-specified
   // training configuration field from the learner to the sub-learner (e.g. copy
@@ -196,9 +193,6 @@ HyperParameterOptimizerLearner::TrainWithStatus(
                                             &effective_config, &config_link));
   const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config =
       effective_config.GetExtension(proto::hyperparameters_optimizer_config);
-
-  utils::usage::OnTrainingStart(train_dataset.data_spec(), effective_config,
-                                config_link, train_dataset.nrow());
 
   // Initialize the learner with the base hyperparameters.
   ASSIGN_OR_RETURN(auto base_learner,
@@ -231,9 +225,6 @@ HyperParameterOptimizerLearner::TrainWithStatus(
     RETURN_IF_ERROR(base_learner->SetHyperParameters(best_params));
     ASSIGN_OR_RETURN(
         auto mdl, base_learner->TrainWithStatus(train_dataset, valid_dataset));
-    utils::usage::OnTrainingEnd(train_dataset.data_spec(), training_config(),
-                                config_link, train_dataset.nrow(), *mdl,
-                                absl::Now() - begin_training);
     *mdl->mutable_hyperparameter_optimizer_logs() = logs;
     return mdl;
   } else {
@@ -265,7 +256,7 @@ absl::Status HyperParameterOptimizerLearner::GetEffectiveConfiguration(
 }
 
 absl::StatusOr<std::unique_ptr<AbstractModel>>
-HyperParameterOptimizerLearner::TrainWithStatus(
+HyperParameterOptimizerLearner::TrainWithStatusImpl(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
     const absl::optional<std::string>& typed_valid_path) const {
@@ -274,8 +265,8 @@ HyperParameterOptimizerLearner::TrainWithStatus(
       deployment().execution_case() ==
           model::proto::DeploymentConfig::ExecutionCase::kLocal) {
     // Load the dataset in memory and run the in-memory training.
-    return AbstractLearner::TrainWithStatus(typed_path, data_spec,
-                                            typed_valid_path);
+    return AbstractLearner::TrainWithStatusImpl(typed_path, data_spec,
+                                                typed_valid_path);
   }
 
   if (!deployment().has_distribute()) {
@@ -283,8 +274,6 @@ HyperParameterOptimizerLearner::TrainWithStatus(
         "The HyperParameterOptimizerLearner only support local or distributed "
         "deployment configs.");
   }
-
-  const auto begin_training = absl::Now();
 
   // The effective configuration is the user configuration + the default value +
   // the automatic configuration (if enabled) + the copy of the non-specified
@@ -299,8 +288,6 @@ HyperParameterOptimizerLearner::TrainWithStatus(
 
   // Initialize the remote workers.
   ASSIGN_OR_RETURN(auto manager, CreateDistributeManager(spe_config));
-
-  utils::usage::OnTrainingStart(data_spec, effective_config, config_link, -1);
 
   // Initialize the learner with the base hyperparameters.
   ASSIGN_OR_RETURN(auto base_learner,
@@ -337,8 +324,6 @@ HyperParameterOptimizerLearner::TrainWithStatus(
                                       best_params, typed_path, data_spec,
                                       typed_valid_path, manager.get()));
 
-    utils::usage::OnTrainingEnd(data_spec, training_config(), config_link, -1,
-                                *model, absl::Now() - begin_training);
     *model->mutable_hyperparameter_optimizer_logs() = logs;
 
     RETURN_IF_ERROR(manager->Done());

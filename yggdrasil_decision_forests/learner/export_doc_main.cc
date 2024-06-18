@@ -18,6 +18,7 @@
 //
 #include <iostream>
 
+#include "absl/flags/flag.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/learner/export_doc.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"

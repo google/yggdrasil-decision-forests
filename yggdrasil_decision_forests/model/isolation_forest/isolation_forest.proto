@@ -1,0 +1,54 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.isolation_forest.proto;
+
+import "yggdrasil_decision_forests/model/abstract_model.proto";
+
+// An isolation forest as defined in "Isolation-Based Anomaly Detection" by Liu
+// et al. (2012). In this case, the prediction value is the node depth.
+message IsolationForestAnomalityScore {}
+
+// Header for the isolation forest model.
+message Header {
+  // Next ID: 6
+
+  // Number of shards used to store the nodes.
+  optional int32 num_node_shards = 1;
+
+  // Number of trees.
+  optional int64 num_trees = 2;
+
+  // Container used to store the trees' nodes.
+  optional string node_format = 3 [default = "TFE_RECORDIO"];
+
+  // Number of examples used to grow each tree.
+  optional int64 num_examples_per_trees = 4;
+
+  oneof anomality_score {
+    IsolationForestAnomalityScore isolation_forest = 5;
+  }
+}
+
+message IsolationForestSerializedModel {
+  optional Header header = 1;
+}
+
+extend model.proto.SerializedModel {
+  optional IsolationForestSerializedModel isolation_forest_serialized_model =
+      1003;
+}

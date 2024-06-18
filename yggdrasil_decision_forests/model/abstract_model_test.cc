@@ -29,6 +29,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/evaluate_on_disk.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/model_testing.h"
@@ -44,6 +45,7 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace {
 
+using test::ApproximatelyEqualsProto;
 using test::EqualsProto;
 using test::StatusIs;
 
@@ -253,6 +255,28 @@ TEST(AbstractLearner, MergeAddPredictionsClassification) {
                       .value()));
 }
 
+TEST(AbstractLearner, MergeAddPredictionsAnomalyDetection) {
+  proto::Prediction src =
+      PARSE_TEST_PROTO(R"pb(anomaly_detection { value: 1 })pb");
+  proto::Prediction dst;
+  PredictionMerger merger(&dst);
+
+  merger.Add(src, 0.25f);
+  EXPECT_THAT(dst, EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                                   "anomaly_detection {value:0.25 }")
+                                   .value()));
+
+  merger.Add(src, 0.25f);
+  EXPECT_THAT(dst, EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                                   "anomaly_detection { value: 0.5 }")
+                                   .value()));
+
+  merger.Add(src, 0.50f);
+  EXPECT_THAT(dst, EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                                   "anomaly_detection { value: 1.0 }")
+                                   .value()));
+}
+
 TEST(AbstractModel, BuildFastEngine) {
   FakeModelWithoutEngine model_without_engine;
   EXPECT_THAT(model_without_engine.BuildFastEngine().status(),
@@ -313,20 +337,39 @@ TEST(ChangePredictionType, ClassificationToRanking) {
   }
 }
 
+TEST(ChangePredictionType, AnomalyDetectionToClassification) {
+  const proto::Prediction src_pred =
+      PARSE_TEST_PROTO(R"pb(anomaly_detection { value: 0.8 })pb");
+  proto::Prediction dst_pred;
+  ASSERT_OK(ChangePredictionType(proto::Task::ANOMALY_DETECTION,
+                                 proto::Task::CLASSIFICATION, src_pred,
+                                 &dst_pred));
+  EXPECT_THAT(dst_pred,
+              ApproximatelyEqualsProto(PARSE_TEST_PROTO_WITH_TYPE(
+                  proto::Prediction,
+                  R"pb(
+                    classification {
+                      value: 2
+                      distribution { counts: 0 counts: 0.2 counts: 0.8 sum: 1 }
+                    }
+                  )pb")));
+}
+
 TEST(FloatToProtoPrediction, Base) {
   proto::Prediction prediction;
 
   FloatToProtoPrediction({0, 0.5, 1}, /*example_idx=*/0,
                          proto::Task::CLASSIFICATION,
                          /*num_prediction_dimensions=*/1, &prediction);
-  EXPECT_THAT(prediction,
-              EqualsProto(utils::ParseTextProto<proto::Prediction>(R"(
-                classification {
-                  value: 1
-                  distribution { counts: 0 counts: 1 counts: 0 sum: 1 }
-                }
-              )")
-                              .value()));
+  EXPECT_THAT(
+      prediction,
+      EqualsProto(utils::ParseTextProto<proto::Prediction>(R"pb(
+                    classification {
+                      value: 1
+                      distribution { counts: 0 counts: 1 counts: 0 sum: 1 }
+                    }
+                  )pb")
+                      .value()));
 
   FloatToProtoPrediction({0, 0.5, 1}, /*example_idx=*/1,
                          proto::Task::CLASSIFICATION,
@@ -394,6 +437,13 @@ TEST(FloatToProtoPrediction, Base) {
   EXPECT_THAT(prediction, EqualsProto(utils::ParseTextProto<proto::Prediction>(
                                           R"(uplift { treatment_effect: 0.4 })")
                                           .value()));
+
+  FloatToProtoPrediction({0.2, 0.4}, /*example_idx=*/0,
+                         proto::Task::ANOMALY_DETECTION,
+                         /*num_prediction_dimensions=*/1, &prediction);
+  EXPECT_THAT(prediction, EqualsProto(utils::ParseTextProto<proto::Prediction>(
+                                          R"(anomaly_detection { value: 0.2 })")
+                                          .value()));
 }
 
 TEST(Evaluate, FromVerticalDataset) {
@@ -420,10 +470,13 @@ TEST(Evaluate, FromDisk) {
       &model));
 
   utils::RandomEngine rnd;
-  const auto evaluation = model->Evaluate(
-      absl::StrCat("csv:",
-                   file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
-      {}, &rnd);
+  const auto evaluation =
+      EvaluateOnDisk(
+          *model,
+          absl::StrCat("csv:", file::JoinPath(TestDataDir(), "dataset",
+                                              "adult_test.csv")),
+          {}, &rnd)
+          .value();
   EXPECT_NEAR(metric::Accuracy(evaluation), 0.8723513, 0.000001);
 }
 

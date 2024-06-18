@@ -23,12 +23,14 @@
 
 #include <stddef.h>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
@@ -37,7 +39,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/sharded_io.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -203,6 +205,9 @@ class NodeWithChildren {
   int32_t leaf_idx() const { return leaf_idx_; }
   void set_leaf_idx(const int32_t v) { leaf_idx_ = v; }
 
+  int32_t depth() const { return depth_; }
+  void set_depth(const int32_t v) { depth_ = v; }
+
   // Compare a tree to another tree. If they are equal, return an empty string.
   // If they are different, returns an explanation of the differences.
   std::string DebugCompare(const dataset::proto::DataSpecification& dataspec,
@@ -219,6 +224,10 @@ class NodeWithChildren {
   // Index of the leaf (if the node is a leaf) in the tree in a depth first
   // exploration. It is set by calling "SetLeafIndices()".
   int32_t leaf_idx_ = -1;
+
+  // Depth of the node. Assuming that the root node has depth 0. It is set by
+  // calling "SetLeafIndices()".
+  int32_t depth_ = -1;
 };
 
 // A generic decision tree. This class is designed for cheap modification (by
@@ -269,6 +278,9 @@ class DecisionTree {
   const NodeWithChildren& GetLeafAlt(
       const dataset::VerticalDataset& dataset,
       dataset::VerticalDataset::row_t row_idx) const;
+
+  const NodeWithChildren& GetLeafAlt(
+      const dataset::proto::Example& example) const;
 
   // Apply the decision tree on an example and returns the path.
   void GetPath(const dataset::VerticalDataset& dataset,

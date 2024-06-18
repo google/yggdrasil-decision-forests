@@ -15,6 +15,15 @@
 
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
 
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <type_traits>
+#include <vector>
+
+#include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
@@ -59,6 +68,12 @@ void ActivationGradientBoostedTreesMultinomialLogLikelihood(
   for (int i = 0; i < num_values; i++) {
     values[i] = cache[i] * noramlize;
   }
+}
+
+template <typename Model>
+float IsolationForestActivation(const Model& model, const float value) {
+  return model::isolation_forest::IsolationForestPredictionFromDenominator(
+      value, model.denominator);
 }
 
 // Identity transformation for the output of a decision forest model.
@@ -645,6 +660,25 @@ void Predict(
     int num_examples, std::vector<float>* predictions) {
   PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
       model, examples, num_examples, predictions);
+}
+
+template <>
+void Predict(
+    const GenericIsolationForest<uint32_t>& model,
+    const typename GenericIsolationForest<uint32_t>::ExampleSet& examples,
+    int num_examples, std::vector<float>* predictions) {
+  PredictHelper<std::remove_reference<decltype(model)>::type,
+                IsolationForestActivation>(model, examples, num_examples,
+                                           predictions);
+}
+
+template <>
+void Predict(const IsolationForest& model,
+             const typename IsolationForest::ExampleSet& examples,
+             int num_examples, std::vector<float>* predictions) {
+  PredictHelper<std::remove_reference<decltype(model)>::type,
+                IsolationForestActivation>(model, examples, num_examples,
+                                           predictions);
 }
 
 template <>

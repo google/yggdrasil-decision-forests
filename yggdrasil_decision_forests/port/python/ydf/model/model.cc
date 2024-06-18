@@ -30,10 +30,12 @@
 #include "pybind11_protobuf/native_proto_caster.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "ydf/model/decision_forest_model/decision_forest_wrapper.h"
 #include "ydf/model/gradient_boosted_trees_model/gradient_boosted_trees_wrapper.h"
+#include "ydf/model/isolation_forest_model/isolation_forest_wrapper.h"
 #include "ydf/model/model_wrapper.h"
 #include "ydf/model/random_forest_model/random_forest_wrapper.h"
 #include "ydf/utils/custom_casters.h"
@@ -83,6 +85,11 @@ std::unique_ptr<GenericCCModel> CreateCCModel(
   if (gbt_model.ok()) {
     // `model_ptr` is now invalid.
     return std::move(gbt_model.value());
+  }
+  auto if_model = IsolationForestCCModel::Create(model_ptr);
+  if (if_model.ok()) {
+    // `model_ptr` is now invalid.
+    return std::move(if_model.value());
   }
   // `model_ptr` is still valid.
   return std::make_unique<GenericCCModel>(std::move(model_ptr));
@@ -198,6 +205,20 @@ void init_model(py::module_& m) {
             return model::random_forest::RandomForestModel::kRegisteredName;
           });
 
+  py::class_<IsolationForestCCModel,
+             /*parent class*/ DecisionForestCCModel>(m,
+                                                     "IsolationForestCCModel")
+      .def("__repr__",
+           [](const GenericCCModel& a) {
+             return absl::Substitute(
+                 "<model_cc.IsolationForestCCModel of type $0.", a.name());
+           })
+      .def_property_readonly_static("kRegisteredName",
+                                    [](py::object /* self */) {
+                                      return model::isolation_forest::
+                                          IsolationForestModel::kRegisteredName;
+                                    });
+
   py::class_<GradientBoostedTreesCCModel,
              /*parent class*/ DecisionForestCCModel>(
       m, "GradientBoostedTreesCCModel")
@@ -209,6 +230,8 @@ void init_model(py::module_& m) {
       .def("validation_loss", &GradientBoostedTreesCCModel::validation_loss)
       .def("initial_predictions",
            &GradientBoostedTreesCCModel::initial_predictions)
+      .def("set_initial_predictions",
+           &GradientBoostedTreesCCModel::set_initial_predictions)
       .def("validation_evaluation",
            &GradientBoostedTreesCCModel::validation_evaluation)
       .def("loss", &GradientBoostedTreesCCModel::loss)

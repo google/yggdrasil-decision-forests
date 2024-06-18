@@ -12,7 +12,8 @@ Donors: Ronny Kohavi and Barry Becker
 
 Full name: Molecular Biology (Splice-junction Gene Sequences) Data Set
 
-Url: https://archive.ics.uci.edu/ml/datasets/Molecular+Biology+(Splice-junction+Gene+Sequences)
+Url:
+https://archive.ics.uci.edu/ml/datasets/Molecular+Biology+(Splice-junction+Gene+Sequences)
 
 Donors: G. Towell, M. Noordewier, and J. Shavlik
 
@@ -74,7 +75,6 @@ bazel run -c opt --copt=-mavx2 //third_party/yggdrasil_decision_forests/cli/util
     --ratio_test=0.2
 ```
 
-
 ## Sim PTE
 
 Full name: Simulations for Personalized Treatment Effects
@@ -105,4 +105,26 @@ test$ts = NULL
 
 write.csv(train,"yggdrasil_decision_forests/test_data/dataset/sim_pte_train.csv", row.names=F, quote=F)
 write.csv(test,"yggdrasil_decision_forests/test_data/dataset/sim_pte_test.csv", row.names=F, quote=F)
+```
+
+## Gaussians
+
+Generate two gaussians for anomaly detection similarly as:
+https://scikit-learn.org/stable/auto_examples/ensemble/plot_isolation_forest.html
+
+```python
+def gen_ds(n_samples: int = 120, n_outliers: int = 40, seed: int = 0):
+    np.random.seed(seed)
+    covariance = np.array([[0.5, -0.1], [0.7, 0.4]])
+    cluster_1 = 0.4 * np.random.randn(n_samples, 2) @ covariance + np.array(
+        [2, 2]
+    )
+    cluster_2 = 0.3 * np.random.randn(n_samples, 2) + np.array([-2, -2])
+    outliers = np.random.uniform(low=-4, high=4, size=(n_outliers, 2))
+    features = np.concatenate([cluster_1, cluster_2, outliers])
+    labels = np.concatenate([
+        np.zeros((2 * n_samples), dtype=bool),
+        np.ones((n_outliers), dtype=bool),
+    ])
+    return features, labels
 ```

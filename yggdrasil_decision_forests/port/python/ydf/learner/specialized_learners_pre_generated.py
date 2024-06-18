@@ -83,7 +83,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
     label: Label of the dataset. The label column should not be identified as a
       feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
-      Task.RANKING, Task.CATEGORICAL_UPLIFT, Task.NUMERICAL_UPLIFT).
+      Task.RANKING, Task.CATEGORICAL_UPLIFT, Task.NUMERICAL_UPLIFT,
+      Task.ANOMALY_DETECTION).
     weights: Name of a feature that identifies the weight of each example. If
       weights are not specified, unit weights are assumed. The weight column
       should not be identified as a feature in the `features` parameter.
@@ -239,6 +240,18 @@ class RandomForestLearner(generic_learner.GenericLearner):
       expressed in seconds. Each learning algorithm is free to use this
       parameter at it sees fit. Enabling maximum training duration makes the
       model training non-deterministic. Default: -1.0.
+    mhld_oblique_max_num_attributes: For MHLD oblique splits i.e.
+      `split_axis=MHLD_OBLIQUE`. Maximum number of attributes in the projection.
+      Increasing this value increases the training time. Decreasing this value
+      acts as a regularization. The value should be in [2,
+      num_numerical_features]. If the value is above the total number of
+      numerical features, the value is capped automatically. The value 1 is
+      allowed but results in ordinary (non-oblique) splits. Default: None.
+    mhld_oblique_sample_attributes: For MHLD oblique splits i.e.
+      `split_axis=MHLD_OBLIQUE`. If true, applies the attribute sampling
+      controlled by the "num_candidate_attributes" or
+      "num_candidate_attributes_ratio" parameters. If false, all the attributes
+      are tested. Default: None.
     min_examples: Minimum number of examples in a node. Default: 5.
     missing_value_policy: Method used to handle missing attribute values. -
       `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean
@@ -293,6 +306,16 @@ class RandomForestLearner(generic_learner.GenericLearner):
       IN_NODE. - IN_NODE: The features are sorted just before being used in the
       node. This solution is slow but consumes little amount of memory. .
       Default: "PRESORT".
+    sparse_oblique_max_num_projections: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after
+      the num_projections_exponent). Oblique splits try out
+      max(p^num_projections_exponent, max_num_projections) random projections
+      for choosing a split, where p is the number of numerical features.
+      Increasing "max_num_projections" increases the training time but not the
+      inference time. In late stage model development, if every bit of accuracy
+      if important, increase this value. The paper "Sparse Projection Oblique
+      Random Forests" (Tomita et al, 2020) does not define this hyperparameter.
+      Default: None.
     sparse_oblique_normalization: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before
       applying the sparse oblique projections. - `NONE`: No normalization. -
@@ -302,12 +325,28 @@ class RandomForestLearner(generic_learner.GenericLearner):
       max-min) estimated on the entire train dataset. Default: None.
     sparse_oblique_num_projections_exponent: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
-      to test at each node as `num_features^num_projections_exponent`. Default:
-      None.
-    sparse_oblique_projection_density_factor: For sparse oblique splits i.e.
-      `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
-      to test at each node as `num_features^num_projections_exponent`. Default:
-      None.
+      to test at each node. Increasing this value very likely improves the
+      quality of the model, drastically increases the training time, and doe not
+      impact the inference time. Oblique splits try out
+      max(p^num_projections_exponent, max_num_projections) random projections
+      for choosing a split, where p is the number of numerical features.
+      Therefore, increasing this `num_projections_exponent` and possibly
+      `max_num_projections` may improve model quality, but will also
+      significantly increase training time. Note that the complexity of
+      (classic) Random Forests is roughly proportional to
+      `num_projections_exponent=0.5`, since it considers sqrt(num_features) for
+      a split. The complexity of (classic) GBDT is roughly proportional to
+      `num_projections_exponent=1`, since it considers all features for a split.
+      The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020)
+      recommends values in [1/4, 2]. Default: None.
+    sparse_oblique_projection_density_factor: Density of the projections as an
+      exponent of the number of features. Independently for each projection,
+      each feature has a probability "projection_density_factor / num_features"
+      to be considered in the projection. The paper "Sparse Projection Oblique
+      Random Forests" (Tomita et al, 2020) calls this parameter `lambda` and
+      recommends values in [1, 5]. Increasing this value increases training and
+      inference time (on average). This value is best tuned for each dataset.
+      Default: None.
     sparse_oblique_weights: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Possible values: - `BINARY`: The oblique
       weights are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique
@@ -315,9 +354,11 @@ class RandomForestLearner(generic_learner.GenericLearner):
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
-      Sparse oblique splits (i.e. splits one a small number of features) from
-      "Sparse Projection Oblique Random Forests", Tomita et al., 2020. Default:
-      "AXIS_ALIGNED".
+      Sparse oblique splits (i.e. random splits one a small number of features)
+      from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
+      `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
+      "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
+      et al., 2029 Default: "AXIS_ALIGNED".
     uplift_min_examples_in_treatment: For uplift models only. Minimum number of
       examples per treatment in a node. Default: 5.
     uplift_split_score: For uplift models only. Splitter score i.e. score
@@ -401,6 +442,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
       max_num_nodes: Optional[int] = None,
       maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
       maximum_training_duration_seconds: Optional[float] = -1.0,
+      mhld_oblique_max_num_attributes: Optional[int] = None,
+      mhld_oblique_sample_attributes: Optional[bool] = None,
       min_examples: Optional[int] = 5,
       missing_value_policy: Optional[str] = "GLOBAL_IMPUTATION",
       num_candidate_attributes: Optional[int] = 0,
@@ -411,6 +454,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
       random_seed: Optional[int] = 123456,
       sampling_with_replacement: Optional[bool] = True,
       sorting_strategy: Optional[str] = "PRESORT",
+      sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_num_projections_exponent: Optional[float] = None,
       sparse_oblique_projection_density_factor: Optional[float] = None,
@@ -458,6 +502,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
             maximum_model_size_in_memory_in_bytes
         ),
         "maximum_training_duration_seconds": maximum_training_duration_seconds,
+        "mhld_oblique_max_num_attributes": mhld_oblique_max_num_attributes,
+        "mhld_oblique_sample_attributes": mhld_oblique_sample_attributes,
         "min_examples": min_examples,
         "missing_value_policy": missing_value_policy,
         "num_candidate_attributes": num_candidate_attributes,
@@ -470,6 +516,9 @@ class RandomForestLearner(generic_learner.GenericLearner):
         "random_seed": random_seed,
         "sampling_with_replacement": sampling_with_replacement,
         "sorting_strategy": sorting_strategy,
+        "sparse_oblique_max_num_projections": (
+            sparse_oblique_max_num_projections
+        ),
         "sparse_oblique_normalization": sparse_oblique_normalization,
         "sparse_oblique_num_projections_exponent": (
             sparse_oblique_num_projections_exponent
@@ -521,6 +570,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
+      verbose: Optional[Union[int, bool]] = None,
   ) -> random_forest_model.RandomForestModel:
     """Trains a model on the given dataset.
 
@@ -551,11 +601,15 @@ class RandomForestLearner(generic_learner.GenericLearner):
         do not need validation dataset. Some learners, such as
         GradientBoostedTrees, automatically extract a validation dataset from
         the training dataset if the validation dataset is not provided.
+      verbose: Verbose level during training. If None, uses the global verbose
+        level of `ydf.verbose`. Levels are: 0 of False: No logs, 1 or True:
+        Print a few logs in a notebook; prints all the logs in a terminal. 2:
+        Prints all the logs on all surfaces.
 
     Returns:
       A trained model.
     """
-    return super().train(ds, valid)
+    return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
@@ -617,271 +671,6 @@ class RandomForestLearner(generic_learner.GenericLearner):
             },
         ),
     }
-
-
-class HyperparameterOptimizerLearner(generic_learner.GenericLearner):
-  r"""Hyperparameter Optimizer learning algorithm.
-
-  Usage example:
-
-  ```python
-  import ydf
-  import pandas as pd
-
-  dataset = pd.read_csv("project/dataset.csv")
-
-  model = ydf.HyperparameterOptimizerLearner().train(dataset)
-
-  print(model.summary())
-  ```
-
-  Hyperparameters are configured to give reasonable results for typical
-  datasets. Hyperparameters can also be modified manually (see descriptions)
-  below or by applying the hyperparameter templates available with
-  `HyperparameterOptimizerLearner.hyperparameter_templates()` (see this
-  function's documentation for
-  details).
-
-  Attributes:
-    label: Label of the dataset. The label column should not be identified as a
-      feature in the `features` parameter.
-    task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
-      Task.RANKING, Task.CATEGORICAL_UPLIFT, Task.NUMERICAL_UPLIFT).
-    weights: Name of a feature that identifies the weight of each example. If
-      weights are not specified, unit weights are assumed. The weight column
-      should not be identified as a feature in the `features` parameter.
-    ranking_group: Only for `task=Task.RANKING`. Name of a feature that
-      identifies queries in a query/document ranking task. The ranking group
-      should not be identified as a feature in the `features` parameter.
-    uplift_treatment: Only for `task=Task.CATEGORICAL_UPLIFT` and `task=Task`.
-      NUMERICAL_UPLIFT. Name of a numerical feature that identifies the
-      treatment in an uplift problem. The value 0 is reserved for the control
-      treatment. Currently, only 0/1 binary treatments are supported.
-    features: If None, all columns are used as features. The semantic of the
-      features is determined automatically. Otherwise, if
-      include_all_columns=False (default) only the column listed in `features`
-      are imported. If include_all_columns=True, all the columns are imported as
-      features and only the semantic of the columns NOT in `columns` is
-      determined automatically. If specified,  defines the order of the features
-      - any non-listed features are appended in-order after the specified
-      features (if include_all_columns=True). The label, weights, uplift
-      treatment and ranking_group columns should not be specified as features.
-    include_all_columns: See `features`.
-    max_vocab_count: Maximum size of the vocabulary of CATEGORICAL and
-      CATEGORICAL_SET columns stored as strings. If more unique values exist,
-      only the most frequent values are kept, and the remaining values are
-      considered as out-of-vocabulary.
-    min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
-      and CATEGORICAL_SET columns. Value observed less than
-      `min_vocab_frequency` are considered as out-of-vocabulary.
-    discretize_numerical_columns: If true, discretize all the numerical columns
-      before training. Discretized numerical columns are faster to train with,
-      but they can have a negative impact on the model quality. Using
-      `discretize_numerical_columns=True` is equivalent as setting the column
-      semantic DISCRETIZED_NUMERICAL in the `column` argument. See the
-      definition of DISCRETIZED_NUMERICAL for more details.
-    num_discretized_numerical_bins: Number of bins used when disretizing
-      numerical columns.
-    max_num_scanned_rows_to_infer_semantic: Number of rows to scan when
-      inferring the column's semantic if it is not explicitly specified. Only
-      used when reading from file, in-memory datasets are always read in full.
-      Setting this to a lower number will speed up dataset reading, but might
-      result in incorrect column semantics. Set to -1 to scan the entire
-      dataset.
-    max_num_scanned_rows_to_compute_statistics: Number of rows to scan when
-      computing a column's statistics. Only used when reading from file,
-      in-memory datasets are always read in full. A column's statistics include
-      the dictionary for categorical features and the mean / min / max for
-      numerical features. Setting this to a lower number will speed up dataset
-      reading, but skew statistics in the dataspec, which can hurt model quality
-      (e.g. if an important category of a categorical feature is considered
-      OOV). Set to -1 to scan the entire dataset.
-    data_spec: Dataspec to be used (advanced). If a data spec is given,
-      `columns`, `include_all_columns`, `max_vocab_count`,
-      `min_vocab_frequency`, `discretize_numerical_columns` and
-      `num_discretized_numerical_bins` will be ignored.
-    maximum_model_size_in_memory_in_bytes: Limit the size of the model when
-      stored in ram. Different algorithms can enforce this limit differently.
-      Note that when models are compiled into an inference, the size of the
-      inference engine is generally much smaller than the original model.
-      Default: -1.0.
-    maximum_training_duration_seconds: Maximum training duration of the model
-      expressed in seconds. Each learning algorithm is free to use this
-      parameter at it sees fit. Enabling maximum training duration makes the
-      model training non-deterministic. Default: -1.0.
-    pure_serving_model: Clear the model from any information that is not
-      required for model serving. This includes debugging, model interpretation
-      and other meta-data. The size of the serialized model can be reduced
-      significatively (50% model size reduction is common). This parameter has
-      no impact on the quality, serving speed or RAM usage of model serving.
-      Default: False.
-    random_seed: Random seed for the training of the model. Learners are
-      expected to be deterministic by the random seed. Default: 123456.
-    num_threads: Number of threads used to train the model. Different learning
-      algorithms use multi-threading differently and with different degree of
-      efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
-      default value logic might change in the future.
-    resume_training: If true, the model training resumes from the checkpoint
-      stored in the `working_dir` directory. If `working_dir` does not contain
-      any model checkpoint, the training starts from the beginning. Resuming
-      training is useful in the following situations: (1) The training was
-      interrupted by the user (e.g. ctrl+c or "stop" button in a notebook) or
-      rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
-      increasing the number of trees.
-    working_dir: Path to a directory available for the learning algorithm to
-      store intermediate computation results. Depending on the learning
-      algorithm and parameters, the working_dir might be optional, required, or
-      ignored. For instance, distributed training algorithm always need a
-      "working_dir", and the gradient boosted tree and hyper-parameter tuners
-      will export artefacts to the "working_dir" if provided.
-    resume_training_snapshot_interval_seconds: Indicative number of seconds in
-      between snapshots when `resume_training=True`. Might be ignored by some
-      learners.
-    tuner: If set, automatically select the best hyperparameters using the
-      provided tuner. When using distributed training, the tuning is
-      distributed.
-    workers: If set, enable distributed training. "workers" is the list of IP
-      addresses of the workers. A worker is a process running
-      `ydf.start_worker(port)`.
-  """
-
-  def __init__(
-      self,
-      label: str,
-      task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
-      weights: Optional[str] = None,
-      ranking_group: Optional[str] = None,
-      uplift_treatment: Optional[str] = None,
-      features: dataspec.ColumnDefs = None,
-      include_all_columns: bool = False,
-      max_vocab_count: int = 2000,
-      min_vocab_frequency: int = 5,
-      discretize_numerical_columns: bool = False,
-      num_discretized_numerical_bins: int = 255,
-      max_num_scanned_rows_to_infer_semantic: int = 10000,
-      max_num_scanned_rows_to_compute_statistics: int = 10000,
-      data_spec: Optional[data_spec_pb2.DataSpecification] = None,
-      maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
-      maximum_training_duration_seconds: Optional[float] = -1.0,
-      pure_serving_model: Optional[bool] = False,
-      random_seed: Optional[int] = 123456,
-      num_threads: Optional[int] = None,
-      working_dir: Optional[str] = None,
-      resume_training: bool = False,
-      resume_training_snapshot_interval_seconds: int = 1800,
-      tuner: Optional[tuner_lib.AbstractTuner] = None,
-      workers: Optional[Sequence[str]] = None,
-  ):
-
-    hyper_parameters = {
-        "maximum_model_size_in_memory_in_bytes": (
-            maximum_model_size_in_memory_in_bytes
-        ),
-        "maximum_training_duration_seconds": maximum_training_duration_seconds,
-        "pure_serving_model": pure_serving_model,
-        "random_seed": random_seed,
-    }
-
-    data_spec_args = dataspec.DataSpecInferenceArgs(
-        columns=dataspec.normalize_column_defs(features),
-        include_all_columns=include_all_columns,
-        max_vocab_count=max_vocab_count,
-        min_vocab_frequency=min_vocab_frequency,
-        discretize_numerical_columns=discretize_numerical_columns,
-        num_discretized_numerical_bins=num_discretized_numerical_bins,
-        max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
-        max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
-    )
-
-    deployment_config = self._build_deployment_config(
-        num_threads=num_threads,
-        resume_training=resume_training,
-        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
-        working_dir=working_dir,
-        workers=workers,
-    )
-
-    super().__init__(
-        learner_name="HYPERPARAMETER_OPTIMIZER",
-        task=task,
-        label=label,
-        weights=weights,
-        ranking_group=ranking_group,
-        uplift_treatment=uplift_treatment,
-        data_spec_args=data_spec_args,
-        data_spec=data_spec,
-        hyper_parameters=hyper_parameters,
-        deployment_config=deployment_config,
-        tuner=tuner,
-    )
-
-  def train(
-      self,
-      ds: dataset.InputDataset,
-      valid: Optional[dataset.InputDataset] = None,
-  ) -> generic_model.GenericModel:
-    """Trains a model on the given dataset.
-
-    Options for dataset reading are given on the learner. Consult the
-    documentation of the learner or ydf.create_vertical_dataset() for additional
-    information on dataset reading in YDF.
-
-    Usage example:
-
-    ```
-    import ydf
-    import pandas as pd
-
-    train_ds = pd.read_csv(...)
-
-    learner = ydf.HyperparameterOptimizerLearner(label="label")
-    model = learner.train(train_ds)
-    print(model.summary())
-    ```
-
-    If training is interrupted (for example, by interrupting the cell execution
-    in Colab), the model will be returned to the state it was in at the moment
-    of interruption.
-
-    Args:
-      ds: Training dataset.
-      valid: Optional validation dataset. Some learners, such as Random Forest,
-        do not need validation dataset. Some learners, such as
-        GradientBoostedTrees, automatically extract a validation dataset from
-        the training dataset if the validation dataset is not provided.
-
-    Returns:
-      A trained model.
-    """
-    return super().train(ds, valid)
-
-  @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
-    return abstract_learner_pb2.LearnerCapabilities(
-        support_max_training_duration=True,
-        resume_training=False,
-        support_validation_dataset=False,
-        support_partial_cache_dataset_format=False,
-        support_max_model_size_in_memory=False,
-        support_monotonic_constraints=False,
-    )
-
-  @classmethod
-  def hyperparameter_templates(
-      cls,
-  ) -> Dict[str, hyperparameters.HyperparameterTemplate]:
-    r"""Hyperparameter templates for this Learner.
-
-    This learner currently does not provide any hyperparameter templates, this
-    method is provided for consistency with other learners.
-
-    Returns:
-      Empty dictionary.
-    """
-    return {}
 
 
 class GradientBoostedTreesLearner(generic_learner.GenericLearner):
@@ -1135,6 +924,18 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       expressed in seconds. Each learning algorithm is free to use this
       parameter at it sees fit. Enabling maximum training duration makes the
       model training non-deterministic. Default: -1.0.
+    mhld_oblique_max_num_attributes: For MHLD oblique splits i.e.
+      `split_axis=MHLD_OBLIQUE`. Maximum number of attributes in the projection.
+      Increasing this value increases the training time. Decreasing this value
+      acts as a regularization. The value should be in [2,
+      num_numerical_features]. If the value is above the total number of
+      numerical features, the value is capped automatically. The value 1 is
+      allowed but results in ordinary (non-oblique) splits. Default: None.
+    mhld_oblique_sample_attributes: For MHLD oblique splits i.e.
+      `split_axis=MHLD_OBLIQUE`. If true, applies the attribute sampling
+      controlled by the "num_candidate_attributes" or
+      "num_candidate_attributes_ratio" parameters. If false, all the attributes
+      are tested. Default: None.
     min_examples: Minimum number of examples in a node. Default: 5.
     missing_value_policy: Method used to handle missing attribute values. -
       `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean
@@ -1195,6 +996,16 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       IN_NODE. - IN_NODE: The features are sorted just before being used in the
       node. This solution is slow but consumes little amount of memory. .
       Default: "PRESORT".
+    sparse_oblique_max_num_projections: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after
+      the num_projections_exponent). Oblique splits try out
+      max(p^num_projections_exponent, max_num_projections) random projections
+      for choosing a split, where p is the number of numerical features.
+      Increasing "max_num_projections" increases the training time but not the
+      inference time. In late stage model development, if every bit of accuracy
+      if important, increase this value. The paper "Sparse Projection Oblique
+      Random Forests" (Tomita et al, 2020) does not define this hyperparameter.
+      Default: None.
     sparse_oblique_normalization: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before
       applying the sparse oblique projections. - `NONE`: No normalization. -
@@ -1204,12 +1015,28 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       max-min) estimated on the entire train dataset. Default: None.
     sparse_oblique_num_projections_exponent: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
-      to test at each node as `num_features^num_projections_exponent`. Default:
-      None.
-    sparse_oblique_projection_density_factor: For sparse oblique splits i.e.
-      `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
-      to test at each node as `num_features^num_projections_exponent`. Default:
-      None.
+      to test at each node. Increasing this value very likely improves the
+      quality of the model, drastically increases the training time, and doe not
+      impact the inference time. Oblique splits try out
+      max(p^num_projections_exponent, max_num_projections) random projections
+      for choosing a split, where p is the number of numerical features.
+      Therefore, increasing this `num_projections_exponent` and possibly
+      `max_num_projections` may improve model quality, but will also
+      significantly increase training time. Note that the complexity of
+      (classic) Random Forests is roughly proportional to
+      `num_projections_exponent=0.5`, since it considers sqrt(num_features) for
+      a split. The complexity of (classic) GBDT is roughly proportional to
+      `num_projections_exponent=1`, since it considers all features for a split.
+      The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020)
+      recommends values in [1/4, 2]. Default: None.
+    sparse_oblique_projection_density_factor: Density of the projections as an
+      exponent of the number of features. Independently for each projection,
+      each feature has a probability "projection_density_factor / num_features"
+      to be considered in the projection. The paper "Sparse Projection Oblique
+      Random Forests" (Tomita et al, 2020) calls this parameter `lambda` and
+      recommends values in [1, 5]. Increasing this value increases training and
+      inference time (on average). This value is best tuned for each dataset.
+      Default: None.
     sparse_oblique_weights: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Possible values: - `BINARY`: The oblique
       weights are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique
@@ -1217,9 +1044,11 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
-      Sparse oblique splits (i.e. splits one a small number of features) from
-      "Sparse Projection Oblique Random Forests", Tomita et al., 2020. Default:
-      "AXIS_ALIGNED".
+      Sparse oblique splits (i.e. random splits one a small number of features)
+      from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
+      `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
+      "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
+      et al., 2029 Default: "AXIS_ALIGNED".
     subsample: Ratio of the dataset (sampling without replacement) used to train
       individual trees for the random sampling method. If \\"subsample\\" is set
       and if \\"sampling_method\\" is NOT set or set to \\"NONE\\", then
@@ -1330,6 +1159,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       max_num_nodes: Optional[int] = None,
       maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
       maximum_training_duration_seconds: Optional[float] = -1.0,
+      mhld_oblique_max_num_attributes: Optional[int] = None,
+      mhld_oblique_sample_attributes: Optional[bool] = None,
       min_examples: Optional[int] = 5,
       missing_value_policy: Optional[str] = "GLOBAL_IMPUTATION",
       num_candidate_attributes: Optional[int] = -1,
@@ -1341,6 +1172,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       selective_gradient_boosting_ratio: Optional[float] = 0.01,
       shrinkage: Optional[float] = 0.1,
       sorting_strategy: Optional[str] = "PRESORT",
+      sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_num_projections_exponent: Optional[float] = None,
       sparse_oblique_projection_density_factor: Optional[float] = None,
@@ -1407,6 +1239,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
             maximum_model_size_in_memory_in_bytes
         ),
         "maximum_training_duration_seconds": maximum_training_duration_seconds,
+        "mhld_oblique_max_num_attributes": mhld_oblique_max_num_attributes,
+        "mhld_oblique_sample_attributes": mhld_oblique_sample_attributes,
         "min_examples": min_examples,
         "missing_value_policy": missing_value_policy,
         "num_candidate_attributes": num_candidate_attributes,
@@ -1418,6 +1252,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         "selective_gradient_boosting_ratio": selective_gradient_boosting_ratio,
         "shrinkage": shrinkage,
         "sorting_strategy": sorting_strategy,
+        "sparse_oblique_max_num_projections": (
+            sparse_oblique_max_num_projections
+        ),
         "sparse_oblique_normalization": sparse_oblique_normalization,
         "sparse_oblique_num_projections_exponent": (
             sparse_oblique_num_projections_exponent
@@ -1472,6 +1309,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
+      verbose: Optional[Union[int, bool]] = None,
   ) -> gradient_boosted_trees_model.GradientBoostedTreesModel:
     """Trains a model on the given dataset.
 
@@ -1502,11 +1340,15 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         do not need validation dataset. Some learners, such as
         GradientBoostedTrees, automatically extract a validation dataset from
         the training dataset if the validation dataset is not provided.
+      verbose: Verbose level during training. If None, uses the global verbose
+        level of `ydf.verbose`. Levels are: 0 of False: No logs, 1 or True:
+        Print a few logs in a notebook; prints all the logs in a terminal. 2:
+        Prints all the logs on all surfaces.
 
     Returns:
       A trained model.
     """
-    return super().train(ds, valid)
+    return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
@@ -1845,6 +1687,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
+      verbose: Optional[Union[int, bool]] = None,
   ) -> gradient_boosted_trees_model.GradientBoostedTreesModel:
     """Trains a model on the given dataset.
 
@@ -1875,11 +1718,15 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
         do not need validation dataset. Some learners, such as
         GradientBoostedTrees, automatically extract a validation dataset from
         the training dataset if the validation dataset is not provided.
+      verbose: Verbose level during training. If None, uses the global verbose
+        level of `ydf.verbose`. Levels are: 0 of False: No logs, 1 or True:
+        Print a few logs in a notebook; prints all the logs in a terminal. 2:
+        Prints all the logs on all surfaces.
 
     Returns:
       A trained model.
     """
-    return super().train(ds, valid)
+    return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
@@ -2074,6 +1921,18 @@ class CartLearner(generic_learner.GenericLearner):
       expressed in seconds. Each learning algorithm is free to use this
       parameter at it sees fit. Enabling maximum training duration makes the
       model training non-deterministic. Default: -1.0.
+    mhld_oblique_max_num_attributes: For MHLD oblique splits i.e.
+      `split_axis=MHLD_OBLIQUE`. Maximum number of attributes in the projection.
+      Increasing this value increases the training time. Decreasing this value
+      acts as a regularization. The value should be in [2,
+      num_numerical_features]. If the value is above the total number of
+      numerical features, the value is capped automatically. The value 1 is
+      allowed but results in ordinary (non-oblique) splits. Default: None.
+    mhld_oblique_sample_attributes: For MHLD oblique splits i.e.
+      `split_axis=MHLD_OBLIQUE`. If true, applies the attribute sampling
+      controlled by the "num_candidate_attributes" or
+      "num_candidate_attributes_ratio" parameters. If false, all the attributes
+      are tested. Default: None.
     min_examples: Minimum number of examples in a node. Default: 5.
     missing_value_policy: Method used to handle missing attribute values. -
       `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean
@@ -2114,6 +1973,16 @@ class CartLearner(generic_learner.GenericLearner):
       IN_NODE. - IN_NODE: The features are sorted just before being used in the
       node. This solution is slow but consumes little amount of memory. .
       Default: "PRESORT".
+    sparse_oblique_max_num_projections: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after
+      the num_projections_exponent). Oblique splits try out
+      max(p^num_projections_exponent, max_num_projections) random projections
+      for choosing a split, where p is the number of numerical features.
+      Increasing "max_num_projections" increases the training time but not the
+      inference time. In late stage model development, if every bit of accuracy
+      if important, increase this value. The paper "Sparse Projection Oblique
+      Random Forests" (Tomita et al, 2020) does not define this hyperparameter.
+      Default: None.
     sparse_oblique_normalization: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before
       applying the sparse oblique projections. - `NONE`: No normalization. -
@@ -2123,12 +1992,28 @@ class CartLearner(generic_learner.GenericLearner):
       max-min) estimated on the entire train dataset. Default: None.
     sparse_oblique_num_projections_exponent: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
-      to test at each node as `num_features^num_projections_exponent`. Default:
-      None.
-    sparse_oblique_projection_density_factor: For sparse oblique splits i.e.
-      `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
-      to test at each node as `num_features^num_projections_exponent`. Default:
-      None.
+      to test at each node. Increasing this value very likely improves the
+      quality of the model, drastically increases the training time, and doe not
+      impact the inference time. Oblique splits try out
+      max(p^num_projections_exponent, max_num_projections) random projections
+      for choosing a split, where p is the number of numerical features.
+      Therefore, increasing this `num_projections_exponent` and possibly
+      `max_num_projections` may improve model quality, but will also
+      significantly increase training time. Note that the complexity of
+      (classic) Random Forests is roughly proportional to
+      `num_projections_exponent=0.5`, since it considers sqrt(num_features) for
+      a split. The complexity of (classic) GBDT is roughly proportional to
+      `num_projections_exponent=1`, since it considers all features for a split.
+      The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020)
+      recommends values in [1/4, 2]. Default: None.
+    sparse_oblique_projection_density_factor: Density of the projections as an
+      exponent of the number of features. Independently for each projection,
+      each feature has a probability "projection_density_factor / num_features"
+      to be considered in the projection. The paper "Sparse Projection Oblique
+      Random Forests" (Tomita et al, 2020) calls this parameter `lambda` and
+      recommends values in [1, 5]. Increasing this value increases training and
+      inference time (on average). This value is best tuned for each dataset.
+      Default: None.
     sparse_oblique_weights: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Possible values: - `BINARY`: The oblique
       weights are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique
@@ -2136,9 +2021,11 @@ class CartLearner(generic_learner.GenericLearner):
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
-      Sparse oblique splits (i.e. splits one a small number of features) from
-      "Sparse Projection Oblique Random Forests", Tomita et al., 2020. Default:
-      "AXIS_ALIGNED".
+      Sparse oblique splits (i.e. random splits one a small number of features)
+      from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
+      `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
+      "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
+      et al., 2029 Default: "AXIS_ALIGNED".
     uplift_min_examples_in_treatment: For uplift models only. Minimum number of
       examples per treatment in a node. Default: 5.
     uplift_split_score: For uplift models only. Splitter score i.e. score
@@ -2214,6 +2101,8 @@ class CartLearner(generic_learner.GenericLearner):
       max_num_nodes: Optional[int] = None,
       maximum_model_size_in_memory_in_bytes: Optional[float] = -1.0,
       maximum_training_duration_seconds: Optional[float] = -1.0,
+      mhld_oblique_max_num_attributes: Optional[int] = None,
+      mhld_oblique_sample_attributes: Optional[bool] = None,
       min_examples: Optional[int] = 5,
       missing_value_policy: Optional[str] = "GLOBAL_IMPUTATION",
       num_candidate_attributes: Optional[int] = 0,
@@ -2221,6 +2110,7 @@ class CartLearner(generic_learner.GenericLearner):
       pure_serving_model: Optional[bool] = False,
       random_seed: Optional[int] = 123456,
       sorting_strategy: Optional[str] = "PRESORT",
+      sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_num_projections_exponent: Optional[float] = None,
       sparse_oblique_projection_density_factor: Optional[float] = None,
@@ -2261,6 +2151,8 @@ class CartLearner(generic_learner.GenericLearner):
             maximum_model_size_in_memory_in_bytes
         ),
         "maximum_training_duration_seconds": maximum_training_duration_seconds,
+        "mhld_oblique_max_num_attributes": mhld_oblique_max_num_attributes,
+        "mhld_oblique_sample_attributes": mhld_oblique_sample_attributes,
         "min_examples": min_examples,
         "missing_value_policy": missing_value_policy,
         "num_candidate_attributes": num_candidate_attributes,
@@ -2268,6 +2160,9 @@ class CartLearner(generic_learner.GenericLearner):
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
         "sorting_strategy": sorting_strategy,
+        "sparse_oblique_max_num_projections": (
+            sparse_oblique_max_num_projections
+        ),
         "sparse_oblique_normalization": sparse_oblique_normalization,
         "sparse_oblique_num_projections_exponent": (
             sparse_oblique_num_projections_exponent
@@ -2319,6 +2214,7 @@ class CartLearner(generic_learner.GenericLearner):
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
+      verbose: Optional[Union[int, bool]] = None,
   ) -> random_forest_model.RandomForestModel:
     """Trains a model on the given dataset.
 
@@ -2349,18 +2245,22 @@ class CartLearner(generic_learner.GenericLearner):
         do not need validation dataset. Some learners, such as
         GradientBoostedTrees, automatically extract a validation dataset from
         the training dataset if the validation dataset is not provided.
+      verbose: Verbose level during training. If None, uses the global verbose
+        level of `ydf.verbose`. Levels are: 0 of False: No logs, 1 or True:
+        Print a few logs in a notebook; prints all the logs in a terminal. 2:
+        Prints all the logs on all surfaces.
 
     Returns:
       A trained model.
     """
-    return super().train(ds, valid)
+    return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
         support_max_training_duration=True,
         resume_training=False,
-        support_validation_dataset=False,
+        support_validation_dataset=True,
         support_partial_cache_dataset_format=False,
         support_max_model_size_in_memory=False,
         support_monotonic_constraints=False,

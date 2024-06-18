@@ -216,6 +216,15 @@ absl::Status UpdateBin(
       // truth does not have the same scale/range as the predictions.
     } break;
 
+    case model::proto::Task::ANOMALY_DETECTION: {
+      STATUS_CHECK(
+          bin->prediction().has_sum_of_anomaly_detection_predictions());
+      // Prediction.
+      bin->mutable_prediction()->set_sum_of_anomaly_detection_predictions(
+          bin->prediction().sum_of_anomaly_detection_predictions() +
+          prediction.anomaly_detection().value() * prediction.weight());
+    } break;
+
     default:
       return absl::InvalidArgumentError("Invalid model task");
   }
@@ -320,6 +329,11 @@ absl::Status InitializePartialDependence(
 
       case model::proto::Task::RANKING:
         bin->mutable_prediction()->set_sum_of_ranking_predictions(0.0);
+        break;
+
+      case model::proto::Task::ANOMALY_DETECTION:
+        bin->mutable_prediction()->set_sum_of_anomaly_detection_predictions(
+            0.0);
         break;
 
       default:

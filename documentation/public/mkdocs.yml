@@ -56,6 +56,7 @@ nav:
     - Regression: tutorial/regression.ipynb
     - Ranking: tutorial/ranking.ipynb
     - Uplifting: tutorial/uplifting.ipynb
+    - Anomaly detection: tutorial/anomaly_detection.ipynb
   - Input feature:
     - numerical: tutorial/numerical_feature.ipynb
     - categorical: tutorial/categorical_feature.ipynb
@@ -66,6 +67,7 @@ nav:
     # TODO: boolean, and text
   - Deep learning:
     - with TensorFlow: tutorial/compose_with_tf.ipynb
+    - with Jax: tutorial/compose_with_jax.ipynb
   - Dataset:
     - Pandas Dataframe: tutorial/pandas.ipynb
     - TensorFlow Dataset: tutorial/tf_dataset.ipynb
@@ -91,14 +93,14 @@ nav:
   #  - example distance: tutorial/example_distance.ipynb
     # TODO: model inspection, manual tree creation, custom loss.
   - Other APIs:
-    - TensorFlow Decision Forests: https://www.tensorflow.org/decision_forests
     - CLI quickstart: cli_quickstart.md
+    - JavaScript: https://www.npmjs.com/package/yggdrasil-decision-forests
     - CLI & C++ user manual: cli_user_manual.md
     - CLI commands: cli_commands.md
     - CLI examples: https://github.com/google/yggdrasil-decision-forests/tree/main/examples
     - C++ examples: https://github.com/google/yggdrasil-decision-forests/tree/main/examples/standalone
+    - TensorFlow Decision Forests: https://www.tensorflow.org/decision_forests
     - Go: https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/go
-    - JavaScript: https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/javascript
   - Changelog: changelog.md
   - Long-time support: lts.md
   - Contact: contact.md

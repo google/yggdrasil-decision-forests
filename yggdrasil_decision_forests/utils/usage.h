@@ -22,6 +22,9 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_TOOL_USAGE_H_
 #define YGGDRASIL_DECISION_FORESTS_TOOL_USAGE_H_
 
+#include <cstdint>
+
+#include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -34,17 +37,14 @@ namespace usage {
 
 // Start a new model training.
 // Should be called at the start of the "Train" methods of learners.
-void OnTrainingStart(
-    const dataset::proto::DataSpecification& data_spec,
-    const model::proto::TrainingConfig& train_config,
-    const model::proto::TrainingConfigLinking& train_config_link,
-    int64_t num_examples);
+void OnTrainingStart(const dataset::proto::DataSpecification& data_spec,
+                     const model::proto::TrainingConfig& train_config,
+                     int64_t num_examples);
 
 // Complete a model training.
 // Should be called at the end of the "Train" methods of learners.
 void OnTrainingEnd(const dataset::proto::DataSpecification& data_spec,
                    const model::proto::TrainingConfig& train_config,
-                   const model::proto::TrainingConfigLinking& train_config_link,
                    int64_t num_examples, const model::AbstractModel& model,
                    absl::Duration training_duration);
 
@@ -57,6 +57,18 @@ void OnTrainingEnd(const dataset::proto::DataSpecification& data_spec,
 // TODO: Merge the two functions when model::Metadata is removed.
 void OnInference(int64_t num_examples, const model::proto::Metadata& metadata);
 void OnInference(int64_t num_examples, const model::MetaData& metadata);
+
+// When a dataset is loaded for training, inference, or other operations.
+void OnLoadDataset(absl::string_view path);
+
+// When a dataset is saved.
+void OnSaveDataset(absl::string_view path);
+
+// When a model is loaded for training, inference, or other operations.
+void OnLoadModel(absl::string_view path);
+
+// When a model is saved.
+void OnSaveModel(absl::string_view path);
 
 // Enables / disable usage tracking.
 void EnableUsage(bool usage);

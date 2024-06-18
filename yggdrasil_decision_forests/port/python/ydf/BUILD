@@ -22,11 +22,13 @@ py_library(
         "//ydf/learner:tuner",
         "//ydf/learner:worker",
         "//ydf/model:export_jax",  # buildcleaner: keep
+        "//ydf/model:export_sklearn",  # buildcleaner: keep
         "//ydf/model:export_tf",  # buildcleaner: keep
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
         "//ydf/model:model_metadata",
         "//ydf/model/gradient_boosted_trees_model",
+        "//ydf/model/isolation_forest_model",
         "//ydf/model/random_forest_model",
         "//ydf/model/tree:all",
         "//ydf/utils:log",
@@ -55,6 +57,7 @@ py_library(
         "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping:early_stopping_snapshot_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer:hyperparameters_optimizer_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers:random_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner/isolation_forest:isolation_forest_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/multitasker:multitasker_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/random_forest:random_forest_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
@@ -63,6 +66,7 @@ py_library(
         "@ydf_cc//yggdrasil_decision_forests/model:prediction_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model/isolation_forest:isolation_forest_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/multitasker:multitasker_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest:random_forest_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/serving:serving_py_proto",
@@ -98,6 +102,7 @@ py_test(
         # absl/testing:absltest dep,
         # jax dep,  # buildcleaner: keep
         # pandas dep,
+        # sklearn dep,  # buildcleaner: keep
         # tensorflow dep,  # buildcleaner: keep
         # tensorflow_decision_forests dep,  # buildcleaner: keep
         "//ydf/utils:test_utils",

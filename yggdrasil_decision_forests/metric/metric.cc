@@ -395,6 +395,12 @@ void MergeEvaluationUplift(const proto::EvaluationResults::Uplift& src,
       std::max(dst->num_treatments(), src.num_treatments()));
 }
 
+void MergeEvaluationAnomalyDetection(
+    const proto::EvaluationResults::AnomalyDetection& src,
+    proto::EvaluationResults::AnomalyDetection* dst) {
+  // No merging to be done.
+}
+
 }  // namespace
 
 float PValueMeanIsGreaterThanZero(const std::vector<float>& sample) {
@@ -835,6 +841,9 @@ absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
       RETURN_IF_ERROR(uplift::InitializeNumericalUpliftEvaluation(
           option, label_column, eval));
       break;
+    case model::proto::Task::ANOMALY_DETECTION:
+      eval->mutable_anomaly_detection();
+      break;
     default:
       STATUS_FATALS("Non supported task type: ",
                     model::proto::Task_Name(option.task()));
@@ -917,6 +926,9 @@ absl::Status AddPrediction(const proto::EvaluationOptions& option,
       need_prediction_sampling = true;
       break;
 
+    case model::proto::Task::ANOMALY_DETECTION:
+      break;
+
     default:
       break;
   }
@@ -970,6 +982,10 @@ absl::Status FinalizeEvaluation(const proto::EvaluationOptions& option,
       RETURN_IF_ERROR(uplift::FinalizeUpliftMetricsFromSampledPredictions(
           option, label_column, eval));
       break;
+
+    case model::proto::Task::ANOMALY_DETECTION:
+      break;
+
     default:
       break;
   }
@@ -1295,6 +1311,10 @@ absl::Status MergeEvaluation(const proto::EvaluationOptions& option,
       break;
     case proto::EvaluationResults::kUplift:
       MergeEvaluationUplift(src.uplift(), dst->mutable_uplift());
+      break;
+    case proto::EvaluationResults::kAnomalyDetection:
+      MergeEvaluationAnomalyDetection(src.anomaly_detection(),
+                                      dst->mutable_anomaly_detection());
       break;
     case proto::EvaluationResults::TYPE_NOT_SET:
       return absl::InvalidArgumentError("Non initialized evaluation");
@@ -1658,6 +1678,11 @@ absl::StatusOr<double> GetMetricUplift(
       return absl::InvalidArgumentError("Not implemented");
   }
 }
+absl::StatusOr<double> GetMetricAnomalyDetection(
+    const proto::EvaluationResults& evaluation,
+    const proto::MetricAccessor::AnomalyDetection& metric) {
+  return absl::InvalidArgumentError("No AnomalyDetection metric");
+}
 
 absl::StatusOr<double> GetUserCustomizedMetrics(
     const proto::EvaluationResults& evaluation,
@@ -1714,6 +1739,11 @@ absl::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
         return GetMetricFatalMissing("uplift", evaluation, metric);
       }
       return GetMetricUplift(evaluation, metric.uplift());
+    case proto::MetricAccessor::kAnomalyDetection:
+      if (!evaluation.has_anomaly_detection()) {
+        return GetMetricFatalMissing("anomaly_detection", evaluation, metric);
+      }
+      return GetMetricAnomalyDetection(evaluation, metric.anomaly_detection());
     case proto::MetricAccessor::kUserMetric:
       return GetUserCustomizedMetrics(evaluation, metric.user_metric());
     case proto::MetricAccessor::TASK_NOT_SET:

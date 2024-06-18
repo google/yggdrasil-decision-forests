@@ -809,6 +809,20 @@ TEST(Metric, GetMetricRegression) {
   EXPECT_NEAR(mae, MAE(results_regression), 0.0001);
 }
 
+TEST(Metric, GetMetricAnomalyDetection) {
+  const proto::EvaluationResults results = PARSE_TEST_PROTO(R"pb(
+    task: ANOMALY_DETECTION
+    label_column { type: CATEGORICAL }
+    anomaly_detection {}
+    count_predictions: 10
+  )pb");
+
+  EXPECT_THAT(
+      GetMetric(results, PARSE_TEST_PROTO(R"pb(anomaly_detection {})pb"))
+          .status(),
+      StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST(Metric, GetMetricClassification) {
   const proto::EvaluationResults results_classification = PARSE_TEST_PROTO(R"pb(
     task: CLASSIFICATION
@@ -1696,6 +1710,42 @@ TEST(Metric, MergeEvaluationUplifting) {
         training_duration_in_seconds: 44
         num_folds: 55
         uplift { num_treatments: 2 }
+      )pb");
+  EXPECT_THAT(dst, EqualsProto(expected_dst));
+}
+
+TEST(Metric, MergeEvaluationAnomalyDetection) {
+  const proto::EvaluationResults src = PARSE_TEST_PROTO(
+      R"pb(
+        count_predictions: 1
+        count_predictions_no_weight: 2
+        sampled_predictions { example_key: "a" }
+        count_sampled_predictions: 3
+        training_duration_in_seconds: 4
+        num_folds: 5
+        anomaly_detection {}
+      )pb");
+  proto::EvaluationResults dst = PARSE_TEST_PROTO(
+      R"pb(
+        count_predictions: 10
+        count_predictions_no_weight: 20
+        sampled_predictions { example_key: "b" }
+        count_sampled_predictions: 30
+        training_duration_in_seconds: 40
+        num_folds: 50
+        anomaly_detection {}
+      )pb");
+  EXPECT_OK(MergeEvaluation({}, src, &dst));
+  proto::EvaluationResults expected_dst = PARSE_TEST_PROTO(
+      R"pb(
+        count_predictions: 11
+        count_predictions_no_weight: 22
+        sampled_predictions { example_key: "b" }
+        sampled_predictions { example_key: "a" }
+        count_sampled_predictions: 33
+        training_duration_in_seconds: 44
+        num_folds: 55
+        anomaly_detection {}
       )pb");
   EXPECT_THAT(dst, EqualsProto(expected_dst));
 }

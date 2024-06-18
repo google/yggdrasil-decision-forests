@@ -17,6 +17,7 @@ cc_library_ydf(
     deps = [
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "@ydf_cc//yggdrasil_decision_forests/model/isolation_forest",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
     ],
 )
@@ -65,6 +66,7 @@ pybind_library(
         ":model_wrapper",
         "//ydf/model/decision_forest_model:decision_forest_wrapper",
         "//ydf/model/gradient_boosted_trees_model:gradient_boosted_trees_wrapper",
+        "//ydf/model/isolation_forest_model:isolation_forest_wrapper",
         "//ydf/model/random_forest_model:random_forest_wrapper",
         "//ydf/utils:custom_casters",
         "//ydf/utils:status_casters",
@@ -74,6 +76,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model:model_library",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "@ydf_cc//yggdrasil_decision_forests/model/isolation_forest",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
@@ -136,6 +139,24 @@ py_library(
     ],
 )
 
+# Note: This build rule does not depends on SKLearn. To use its functionalities, SKLearn needs to be
+# imported manually by the call i.e. //third_party/py/sklearn.
+py_library(
+    name = "export_sklearn",
+    srcs = ["export_sklearn.py"],
+    deps = [
+        ":generic_model",
+        # numpy dep,
+        # sklearn dep,
+        "//ydf/learner:generic_learner",
+        "//ydf/learner:specialized_learners",
+        "//ydf/model/gradient_boosted_trees_model",
+        "//ydf/model/isolation_forest_model",
+        "//ydf/model/random_forest_model",
+        "//ydf/model/tree:all",
+    ],
+)
+
 py_library(
     name = "model_lib",
     srcs = ["model_lib.py"],
@@ -146,6 +167,7 @@ py_library(
         "//ydf/cc:ydf",
         "//ydf/dataset:dataspec",
         "//ydf/model/gradient_boosted_trees_model",
+        "//ydf/model/isolation_forest_model",
         "//ydf/model/random_forest_model",
         "//ydf/utils:log",
     ],
@@ -230,6 +252,7 @@ py_test(
         # pandas dep,
         "//ydf/dataset",
         "//ydf/model/gradient_boosted_trees_model",
+        "//ydf/model/isolation_forest_model",
         "//ydf/model/random_forest_model",
         "//ydf/utils:test_utils",
     ],
@@ -341,11 +364,27 @@ py_test(
         # numpy dep,
         # optax dep,
         # tensorflow dep,
+        # tensorflow_datasets dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
+        "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/tree:all",
+    ],
+)
+
+py_test(
+    name = "sklearn_model_test",
+    srcs = ["sklearn_model_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":export_sklearn",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # sklearn dep,
+        "//ydf/model/decision_forest_model",
     ],
 )
 

@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -83,6 +84,8 @@ absl::Status SaveModel(absl::string_view directory, const AbstractModel& mdl,
 absl::Status SaveModel(absl::string_view directory,
                        const AbstractModel* const mdl,
                        ModelIOOptions io_options) {
+  utils::usage::OnSaveModel(directory);
+
   RETURN_IF_ERROR(mdl->Validate());
   RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
   proto::AbstractModel header;
@@ -115,6 +118,8 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> LoadModel(
 absl::Status LoadModel(absl::string_view directory,
                        std::unique_ptr<AbstractModel>* model,
                        ModelIOOptions io_options) {
+  utils::usage::OnLoadModel(directory);
+
   proto::AbstractModel header;
   std::string effective_directory = ImproveModelReadingPath(directory);
 

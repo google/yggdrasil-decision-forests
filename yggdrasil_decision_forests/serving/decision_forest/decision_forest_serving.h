@@ -16,6 +16,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_DECISION_FOREST_SERVING_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_DECISION_FOREST_SERVING_H_
 
+#include <cstdint>
 #include <vector>
 
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -385,6 +386,17 @@ struct GenericRandomForestNumericalUplift : ExampleSetModel<NodeOffsetRep> {
       model::proto::Task::NUMERICAL_UPLIFT;
 };
 using RandomForestNumericalUplift = GenericRandomForestNumericalUplift<>;
+
+// Isolation Forest model.
+template <typename NodeOffsetRep = uint16_t>
+struct GenericIsolationForest : ExampleSetModel<NodeOffsetRep> {
+  static constexpr model::proto::Task kTask =
+      model::proto::Task::ANOMALY_DETECTION;
+
+  // Denominator / normalizer of the prediction output.
+  float denominator;
+};
+using IsolationForest = GenericIsolationForest<>;
 
 // GBDT model for binary classification.
 template <typename NodeOffsetRep = uint16_t>

@@ -13,6 +13,7 @@ A **Learner** trains models and can be cross-validated.
 -   [DecisionTreeLearner](CartLearner.md): Alias to
     [CartLearner](CartLearner.md).
 -   [DistributedGradientBoostedTreesLearner](DistributedGradientBoostedTreesLearner.md)
+-   [IsolationForestLearner](IsolationForestLearner.md)
 
 All learners derive from [GenericLearner](GenericLearner.md).
 
@@ -29,6 +30,7 @@ arguments of learner classes.
 -   [RandomForestModel](RandomForestModel.md)
 -   [CARTModel](RandomForestModel.md): Alias to
     [RandomForestModel](RandomForestModel.md).
+-   [IsolationForestModel](IsolationForestModel.md)
 
 All models derive from [GenericModel](GenericModel.md).
 
@@ -65,6 +67,8 @@ and evaluation.
     e.g. training date, uid.
 -   [from_tensorflow_decision_forests](utilities.md#ydf.from_tensorflow_decision_forests):
     Load a TensorFlow Decision Forests model from disk.
+-   [from_sklearn](utilities.md#ydf.from_sklearn): Convert a scikit-learn model
+    into a YDF model.
 
 ## Custom Loss
 

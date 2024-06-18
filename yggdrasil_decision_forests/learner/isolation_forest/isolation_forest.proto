@@ -1,0 +1,48 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.isolation_forest.proto;
+
+import "yggdrasil_decision_forests/learner/abstract_learner.proto";
+import "yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto";
+
+option java_outer_classname = "IsolationForestLearner";
+
+// Training configuration for the Isolation Forest algorithm.
+message IsolationForestTrainingConfig {
+  // Next ID: 5
+
+  // Decision tree specific parameters.
+  optional decision_tree.proto.DecisionTreeTrainingConfig decision_tree = 1;
+
+  // Number of trees in the forest.
+  optional int32 num_trees = 2 [default = 300];
+
+  // Number of examples used to grow each tree. Only one of "subsample_ratio"
+  // and "subsample_count" can be set. If neither is set, "subsample_count" is
+  // assumed to be equal to 256. This is the default value recommended in the
+  // isolation forest paper
+  // (https://ieeexplore.ieee.org/abstract/document/4781136).
+  oneof sampling_method {
+    float subsample_ratio = 3;
+    int32 subsample_count = 4 [default = 256];
+  }
+}
+
+extend model.proto.TrainingConfig {
+  optional IsolationForestTrainingConfig isolation_forest_config = 1007;
+}

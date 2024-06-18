@@ -64,6 +64,10 @@ class Task(enum.Enum):
       categorical outcome.
     NUMERICAL_UPLIFT: Predicts the incremental impact of a treatment on a
       numerical outcome.
+    ANOMALY_DETECTION: Predicts if an instance is similar to the majority of the
+      training data or anomalous (a.k.a. an outlier). An anomaly detection
+      prediction is a value between 0 and 1, where 0 indicates the possible most
+      normal instance and 1 indicates the most possible anomalous instance.
   """
 
   CLASSIFICATION = "CLASSIFICATION"
@@ -71,6 +75,7 @@ class Task(enum.Enum):
   RANKING = "RANKING"
   CATEGORICAL_UPLIFT = "CATEGORICAL_UPLIFT"
   NUMERICAL_UPLIFT = "NUMERICAL_UPLIFT"
+  ANOMALY_DETECTION = "ANOMALY_DETECTION"
 
   def _to_proto_type(self) -> abstract_model_pb2.Task:
     if self in TASK_TO_PROTO:
@@ -93,6 +98,7 @@ TASK_TO_PROTO = {
     Task.RANKING: abstract_model_pb2.RANKING,
     Task.CATEGORICAL_UPLIFT: abstract_model_pb2.CATEGORICAL_UPLIFT,
     Task.NUMERICAL_UPLIFT: abstract_model_pb2.NUMERICAL_UPLIFT,
+    Task.ANOMALY_DETECTION: abstract_model_pb2.ANOMALY_DETECTION,
 }
 PROTO_TO_TASK = {v: k for k, v in TASK_TO_PROTO.items()}
 
@@ -836,16 +842,16 @@ Use `model.describe()` for more details
     import jax.numpy as jnp
 
     # Train a model.
-    model = ydf.RandomForestLearner(label="l").train({
+    model = ydf.GradientBoostedTreesLearner(label="l").train({
         "f1": np.random.random(size=100),
         "f2": np.random.random(size=100),
         "l": np.random.randint(2, size=100),
     })
 
     # Convert model to a JAX function.
-    jax_model = model.o_jax_function()
+    jax_model = model.to_jax_function()
 
-    # Make predictions with the TF module.
+    # Make predictions with the JAX function.
     jax_predictions = jax_model.predict({
         "f1": jnp.array([0, 0.5, 1]),
         "f2": jnp.array([1, 0, 0.5]),
@@ -874,6 +880,48 @@ Use `model.describe()` for more details
         apply_activation=apply_activation,
         leaves_as_params=leaves_as_params,
     )
+
+  def update_with_jax_params(self, params: Dict[str, Any]):
+    """Updates the model with JAX params as created by `to_jax_function`.
+
+    Usage example:
+
+    ```python
+    import ydf
+    import numpy as np
+    import jax.numpy as jnp
+
+    # Train a model with YDF
+    dataset = {
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    }
+    model = ydf.GradientBoostedTreesLearner(label="l").train(dataset)
+
+    # Convert model to a JAX function with leave values as parameters.
+    jax_model = model.to_jax_function(
+        leaves_as_params=True,
+        apply_activation=True)
+    # Note: The learnable model parameter are in `jax_model.params`.
+
+    # Finetune the model parameters with your own logic.
+    jax_model.params = fine_tune_model(jax_model.params, ...)
+
+    # Update the YDF model with the finetuned parameters
+    model.update_with_jax_params(jax_model.params)
+
+    # Make predictions with the finetuned YDF model
+    predictions = model.predict(dataset)
+
+    # Save the YDF model
+    model.save("/tmp/my_ydf_model")
+    ```
+
+    Args:
+      params: Learnable parameter of the model generated with `to_jax_function`.
+    """
+    _get_export_jax().update_with_jax_params(model=self, params=params)
 
   def hyperparameter_optimizer_logs(
       self,
@@ -944,7 +992,7 @@ Use `model.describe()` for more details
     return self.data_spec().columns[self.label_col_idx()].name
 
   def label_classes(self) -> List[str]:
-    """Returns the label classes for classification tasks, None otherwise."""
+    """Returns the label classes for a classification model; fails otherwise."""
     if self.task() != Task.CLASSIFICATION:
       raise ValueError(
           "Label classes are only available for classification models. This"
@@ -1047,6 +1095,68 @@ Use `model.describe()` for more details
     self._model.ForceEngine(engine_name)
 
 
+def from_sklearn(
+    sklearn_model: Any,
+    label_name: str = "label",
+    feature_name: str = "features",
+) -> GenericModel:
+  """Converts a tree-based scikit-learn model to a YDF model.
+
+  Usage example:
+
+  ```python
+  import ydf
+  from sklearn import datasets
+  from sklearn import tree
+
+  # Train a SKLearn model
+  X, y = datasets.make_classification()
+  skl_model = tree.DecisionTreeClassifier().fit(X, y)
+
+  # Convert the SKLearn model to a YDF model
+  ydf_model = ydf.from_sklearn(skl_model)
+
+  # Make predictions with the YDF model
+  ydf_predictions = ydf_model.predict({"features": X})
+
+  # Analyse the YDF model
+  ydf_model.analyze({"features": X})
+  ```
+
+  Currently supported models are:
+  *   sklearn.tree.DecisionTreeClassifier
+  *   sklearn.tree.DecisionTreeRegressor
+  *   sklearn.tree.ExtraTreeClassifier
+  *   sklearn.tree.ExtraTreeRegressor
+  *   sklearn.ensemble.RandomForestClassifier
+  *   sklearn.ensemble.RandomForestRegressor
+  *   sklearn.ensemble.ExtraTreesClassifier
+  *   sklearn.ensemble.ExtraTreesRegressor
+  *   sklearn.ensemble.GradientBoostingRegressor
+  *   sklearn.ensemble.IsolationForest
+
+  Unlike YDF, Scikit-learn does not name features and labels. Use the fields
+  `label_name` and `feature_name` to specify the name of the columns in the YDF
+  model.
+
+  Additionally, only single-label classification and scalar regression are
+  supported (e.g. multivariate regression models will not convert).
+
+  Args:
+    sklearn_model: the scikit-learn tree based model to be converted.
+    label_name: Name of the multi-dimensional feature in the output YDF model.
+    feature_name: Name of the label in the output YDF model.
+
+  Returns:
+    a YDF Model that emulates the provided scikit-learn model.
+  """
+  return _get_export_sklearn().from_sklearn(
+      sklearn_model=sklearn_model,
+      label_name=label_name,
+      feature_name=feature_name,
+  )
+
+
 def _get_export_jax():
   try:
     from ydf.model import export_jax  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
@@ -1069,6 +1179,19 @@ def _get_export_tf():
         '"tensorflow_decision_forests" is needed by this function. Make sure '
         "it installed and try again. If using pip, run `pip install"
         " tensorflow_decision_forests`."
+    ) from exc
+
+
+def _get_export_sklearn():
+  try:
+    from ydf.model import export_sklearn  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+
+    return export_sklearn
+  except ImportError as exc:
+    raise ValueError(
+        '"scikit-learn" is needed by this function. Make sure '
+        "it installed and try again. If using pip, run `pip install"
+        " scikit-learn`."
     ) from exc
 
 

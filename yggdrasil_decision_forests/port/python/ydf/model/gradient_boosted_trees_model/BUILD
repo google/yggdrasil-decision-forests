@@ -53,6 +53,7 @@ py_test(
         ":gradient_boosted_trees_model",
         # absl/logging dep,
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
         "//ydf/dataset:dataspec",

@@ -18,9 +18,9 @@
 #include <stddef.h>
 
 #include <algorithm>
-#include <iterator>
+#include <cmath>
+#include <cstdint>
 #include <memory>
-#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -34,12 +34,11 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
-#include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -51,13 +50,11 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
-#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/random.h"
-#include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -126,14 +123,6 @@ metric::proto::EvaluationResults AbstractModel::Evaluate(
   return EvaluateWithStatus(dataset, option, rnd, predictions).value();
 }
 
-metric::proto::EvaluationResults AbstractModel::Evaluate(
-    const absl::string_view typed_path,
-    const metric::proto::EvaluationOptions& option,
-    utils::RandomEngine* rnd) const {
-  // TODO: Fix.
-  return EvaluateWithStatus(typed_path, option, rnd).value();
-}
-
 absl::StatusOr<metric::proto::EvaluationResults>
 AbstractModel::EvaluateWithStatus(
     const dataset::VerticalDataset& dataset,
@@ -142,26 +131,18 @@ AbstractModel::EvaluateWithStatus(
   if (option.task() != task()) {
     STATUS_FATAL("The evaluation and the model tasks differ.");
   }
-  metric::proto::EvaluationResults eval;
-  RETURN_IF_ERROR(
-      metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
-  RETURN_IF_ERROR(AppendEvaluation(dataset, option, rnd, &eval, predictions));
-  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
-  return eval;
-}
-
-absl::StatusOr<metric::proto::EvaluationResults>
-AbstractModel::EvaluateWithStatus(
-    const absl::string_view typed_path,
-    const metric::proto::EvaluationOptions& option,
-    utils::RandomEngine* rnd) const {
-  if (option.task() != task()) {
-    STATUS_FATAL("The evaluation and the model tasks differ.");
+  if (label_col_idx_ == -1) {
+    if (task() == proto::Task::ANOMALY_DETECTION) {
+      STATUS_FATAL(
+          "Cannot evaluate an anomaly detection model without a label.");
+    } else {
+      STATUS_FATAL("A model cannot be evaluated without a label.");
+    }
   }
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
       metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
-  RETURN_IF_ERROR(AppendEvaluation(typed_path, option, rnd, &eval));
+  RETURN_IF_ERROR(AppendEvaluation(dataset, option, rnd, &eval, predictions));
   RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
   return eval;
 }
@@ -173,6 +154,14 @@ AbstractModel::EvaluateWithEngine(
     std::vector<model::proto::Prediction>* predictions) const {
   if (option.task() != task()) {
     STATUS_FATAL("The evaluation and the model tasks differ.");
+  }
+  if (label_col_idx_ == -1) {
+    if (task() == proto::Task::ANOMALY_DETECTION) {
+      STATUS_FATAL(
+          "Cannot evaluate an anomaly detection model without a label.");
+    } else {
+      STATUS_FATAL("A model cannot be evaluated without a label.");
+    }
   }
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
@@ -340,6 +329,12 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
           src_prediction.begin() +
               (example_idx + 1) * num_prediction_dimensions};
       break;
+
+    case proto::ANOMALY_DETECTION:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction->mutable_anomaly_detection()->set_value(
+          src_prediction[example_idx]);
+      break;
   }
 }
 
@@ -444,96 +439,6 @@ absl::Status AbstractModel::AppendEvaluation(
   return absl::OkStatus();
 }
 
-absl::Status AbstractModel::AppendEvaluation(
-    const absl::string_view typed_path,
-    const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
-    metric::proto::EvaluationResults* eval) const {
-  dataset::proto::LinkedWeightDefinition weight_links;
-  if (option.has_weights()) {
-    RETURN_IF_ERROR(dataset::GetLinkedWeightDefinition(
-        option.weights(), data_spec_, &weight_links));
-  }
-
-  auto engine_or_status = BuildFastEngine();
-  if (engine_or_status.ok()) {
-    const auto engine = std::move(engine_or_status.value());
-    // Extract the shards from the dataset path.
-    std::string path, prefix;
-    std::tie(prefix, path) = dataset::SplitTypeAndPath(typed_path).value();
-    std::vector<std::string> shards;
-    RETURN_IF_ERROR(utils::ExpandInputShards(path, &shards));
-
-    // Evaluate each shard in a separate thread.
-    utils::concurrency::Mutex
-        mutex;  // Guards "num_evaluated_shards" and "eval".
-    int num_evaluated_shards = 0;
-    absl::Status worker_status;
-
-    const auto process_shard = [&option, eval, &mutex, &prefix, &engine,
-                                &weight_links, &num_evaluated_shards, &shards,
-                                this](absl::string_view shard,
-                                      int sub_rnd_seed) -> absl::Status {
-      utils::RandomEngine sub_rnd(sub_rnd_seed);
-
-      dataset::VerticalDataset dataset;
-      RETURN_IF_ERROR(dataset::LoadVerticalDataset(
-          absl::StrCat(prefix, ":", shard), data_spec_, &dataset));
-
-      metric::proto::EvaluationResults sub_evaluation;
-      RETURN_IF_ERROR(metric::InitializeEvaluation(option, LabelColumnSpec(),
-                                                   &sub_evaluation));
-
-      RETURN_IF_ERROR(AppendEvaluationWithEngine(dataset, option, weight_links,
-                                                 *engine, &sub_rnd, nullptr,
-                                                 &sub_evaluation));
-
-      utils::concurrency::MutexLock lock(&mutex);
-      RETURN_IF_ERROR(metric::MergeEvaluation(option, sub_evaluation, eval));
-      num_evaluated_shards++;
-      LOG_INFO_EVERY_N_SEC(30, _ << num_evaluated_shards << "/" << shards.size()
-                                 << " shards evaluated");
-      return absl::OkStatus();
-    };
-
-    {
-      const int num_threads = std::min<int>(shards.size(), 20);
-      utils::concurrency::ThreadPool thread_pool("evaluation", num_threads);
-      thread_pool.StartWorkers();
-      for (const auto& shard : shards) {
-        thread_pool.Schedule([&shard, &mutex, &process_shard, &worker_status,
-                              sub_rnd_seed = (*rnd)()]() -> void {
-          {
-            utils::concurrency::MutexLock lock(&mutex);
-            if (!worker_status.ok()) {
-              return;
-            }
-          }
-          auto sub_status = process_shard(shard, sub_rnd_seed);
-          {
-            utils::concurrency::MutexLock lock(&mutex);
-            worker_status.Update(sub_status);
-          }
-        });
-      }
-    }
-
-    RETURN_IF_ERROR(worker_status);
-
-  } else {
-    // Evaluate using the (slow) generic inference.
-    YDF_LOG(WARNING)
-        << "Evaluation with the slow generic engine without distribution";
-    dataset::VerticalDataset dataset;
-    RETURN_IF_ERROR(
-        dataset::LoadVerticalDataset(typed_path, data_spec_, &dataset));
-    RETURN_IF_ERROR(AppendEvaluation(dataset, option, rnd, eval));
-    return absl::OkStatus();
-  }
-
-  eval->set_num_folds(eval->num_folds() + 1);
-  return absl::OkStatus();
-}
-
 absl::Status AbstractModel::AppendEvaluationOverrideType(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option,
@@ -579,15 +484,18 @@ absl::Status AbstractModel::AppendEvaluationOverrideType(
            sub_example_idx++) {
         FloatToProtoPrediction(batch_of_predictions, sub_example_idx, task(),
                                num_prediction_dimensions, &original_prediction);
+
         RETURN_IF_ERROR(ChangePredictionType(task(), override_task,
                                              original_prediction,
                                              &overridden_prediction));
+
         RETURN_IF_ERROR(model::SetGroundTruth(
             dataset, begin_example_idx + sub_example_idx,
             model::GroundTruthColumnIndices(override_label_col_idx,
                                             override_group_col_idx,
                                             uplift_treatment_col_idx_),
             override_task, &overridden_prediction));
+
         if (option.has_weights()) {
           ASSIGN_OR_RETURN(
               const float weight,
@@ -653,6 +561,17 @@ absl::Status ChangePredictionType(proto::Task src_task, proto::Task dst_task,
   } else if (src_task == proto::Task::RANKING &&
              dst_task == proto::Task::REGRESSION) {
     dst_pred->mutable_regression()->set_value(src_pred.ranking().relevance());
+  } else if (src_task == proto::Task::ANOMALY_DETECTION &&
+             dst_task == proto::Task::CLASSIFICATION) {
+    const float value = src_pred.anomaly_detection().value();
+    auto* dst_clas = dst_pred->mutable_classification();
+    // Assume the positive class is the abnormal one.
+    dst_clas->set_value(value >= 0.5f ? 2 : 1);
+    dst_clas->mutable_distribution()->clear_counts();
+    dst_clas->mutable_distribution()->set_sum(1.f);
+    dst_clas->mutable_distribution()->add_counts(0.f);
+    dst_clas->mutable_distribution()->add_counts(1.f - value);
+    dst_clas->mutable_distribution()->add_counts(value);
   } else {
     STATUS_FATALS("Non supported override of task from ",
                   proto::Task_Name(src_task), " to ",
@@ -777,6 +696,9 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
               ->values();
       prediction->mutable_uplift()->set_treatment(treatments[row_idx]);
     } break;
+    case proto::Task::ANOMALY_DETECTION:
+      // No ground truth to set.
+      break;
 
     default:
       STATUS_FATAL("Non supported task.");
@@ -824,6 +746,10 @@ absl::Status SetGroundTruth(const dataset::proto::Example& example,
           break;
       }
     } break;
+    case proto::Task::ANOMALY_DETECTION:
+      // No ground truth to set.
+      break;
+
     default:
       STATUS_FATAL("Non supported task.");
       break;
@@ -842,8 +768,10 @@ void AbstractModel::AppendDescriptionAndStatistics(
     const bool full_definition, std::string* description) const {
   absl::StrAppendFormat(description, "Type: \"%s\"\n", name());
   absl::StrAppendFormat(description, "Task: %s\n", proto::Task_Name(task()));
-  absl::StrAppendFormat(description, "Label: \"%s\"\n",
-                        data_spec().columns(label_col_idx_).name());
+  if (label_col_idx_ != -1) {
+    absl::StrAppendFormat(description, "Label: \"%s\"\n",
+                          data_spec().columns(label_col_idx_).name());
+  }
   if (ranking_group_col_idx_ != -1) {
     absl::StrAppendFormat(description, "Rank group: \"%s\"\n",
                           data_spec().columns(ranking_group_col_idx_).name());
@@ -1158,6 +1086,11 @@ void PredictionMerger::Add(const proto::Prediction& src,
       dst_->mutable_ranking()->set_relevance(
           dst_->ranking().relevance() + src_factor * src.ranking().relevance());
       break;
+    case proto::Prediction::kAnomalyDetection:
+      dst_->mutable_anomaly_detection()->set_value(
+          dst_->anomaly_detection().value() +
+          src_factor * src.anomaly_detection().value());
+      break;
     default:
       CHECK(false);
   }
@@ -1182,6 +1115,10 @@ void PredictionMerger::ScalePrediction(const float scale,
       break;
     case proto::Prediction::kRanking:
       dst->mutable_ranking()->set_relevance(dst->ranking().relevance() * scale);
+      break;
+    case proto::Prediction::kAnomalyDetection:
+      dst->mutable_anomaly_detection()->set_value(
+          dst->anomaly_detection().value() * scale);
       break;
     default:
       break;
@@ -1209,7 +1146,7 @@ void AbstractModel::CopyAbstractModelMetaData(AbstractModel* dst) const {
 }
 
 absl::Status AbstractModel::Validate() const {
-  if (label_col_idx_ < 0 || label_col_idx_ >= data_spec().columns_size()) {
+  if (label_col_idx_ < -1 || label_col_idx_ >= data_spec().columns_size()) {
     return absl::InvalidArgumentError("Invalid label column");
   }
 
@@ -1263,6 +1200,9 @@ absl::Status AbstractModel::Validate() const {
             "Invalid label type for regressive uplift: ",
             dataset::proto::ColumnType_Name(label_col_spec().type())));
       }
+      break;
+    case model::proto::Task::ANOMALY_DETECTION:
+      // Nothing to check
       break;
     default:
       return absl::InvalidArgumentError("Unknown task");

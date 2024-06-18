@@ -53,6 +53,9 @@ class TreeBuilder {
   // Creates a regression leaf.
   void LeafRegression(float value);
 
+  // Creates an anomaly detection leaf.
+  void LeafAnomalyDetection(int num_examples_without_weight);
+
  private:
   NodeWithChildren* node_;
 };

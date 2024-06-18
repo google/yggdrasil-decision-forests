@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.0 - 2024-06-17
+
+### Feature
+
+-   Add support for Isolation Forests model.
+-   Add `max_depth` argument to `model.print_tree`.
+-   Add `verbose` argument to `train` method which is equivalent but sometime
+    more convenient than`ydf.verbose`.
+-   Add SKLearn to YDF model converter: `ydf.from_sklearn`.
+-   Improve error messages when calling the model with non supported data.
+-   Add support for numpy 2.0.
+
+### Tutorials
+
+-   Add anomaly detection tutorial.
+-   Add YDF and JAX model composition tutorial.
+
+### Fix
+
+-   Fix error when plotting oblique trees (`model.plot_tree`) in colab.
+
 ## 0.4.3- 2024-05-07
 
 ### Feature

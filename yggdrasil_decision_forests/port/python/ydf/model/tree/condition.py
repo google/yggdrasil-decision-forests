@@ -377,7 +377,7 @@ def _to_json_numerical_sparse_oblique(
   return {
       "type": "NUMERICAL_SPARSE_OBLIQUE",
       "attributes": [dataspec.columns[f].name for f in condition.attributes],
-      "weights": condition.weights,
+      "weights": list(condition.weights),
       "threshold": condition.threshold,
   }
 

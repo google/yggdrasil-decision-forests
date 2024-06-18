@@ -235,7 +235,8 @@ absl::Status ComputePermutationFeatureImportance(
   utils::RandomEngine rng;
   utils::concurrency::Mutex rng_mutex;
 
-  const auto base_evaluation = model->Evaluate(dataset, eval_options, &rng);
+  ASSIGN_OR_RETURN(const auto base_evaluation,
+                   model->EvaluateWithStatus(dataset, eval_options, &rng));
 
   const auto permutation_evaluation = [&dataset, &eval_options, &rng,
                                        &rng_mutex, model](const int feature_idx)

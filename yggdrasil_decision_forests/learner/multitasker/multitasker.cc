@@ -30,7 +30,6 @@
 #include "yggdrasil_decision_forests/utils/regex.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
-#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -112,7 +111,7 @@ MultitaskerLearner::MultitaskerLearner(
     : AbstractLearner(training_config) {}
 
 absl::StatusOr<std::unique_ptr<AbstractModel>>
-MultitaskerLearner::TrainWithStatus(
+MultitaskerLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {

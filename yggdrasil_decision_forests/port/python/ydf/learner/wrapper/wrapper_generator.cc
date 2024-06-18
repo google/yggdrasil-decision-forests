@@ -24,6 +24,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
@@ -40,9 +41,52 @@
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
+
+// Configuration data for each individual learner.
+struct LearnerConfig {
+  // Name of the python class of the model.
+  std::string model_class_name = "generic_model.GenericModel";
+
+  // Default value of the "task" learner constructor argument.
+  std::string default_task = "CLASSIFICATION";
+
+  // If true, the learner requires a "label" constructor argument.
+  bool require_label = true;
+};
+
+absl::flat_hash_map<std::string, LearnerConfig> LearnerConfigs() {
+  absl::flat_hash_map<std::string, LearnerConfig> configs;
+
+  configs["RANDOM_FOREST"] = {
+      .model_class_name = "random_forest_model.RandomForestModel",
+  };
+
+  configs["CART"] = {
+      .model_class_name = "random_forest_model.RandomForestModel",
+  };
+
+  configs["GRADIENT_BOOSTED_TREES"] = {
+      .model_class_name =
+          "gradient_boosted_trees_model.GradientBoostedTreesModel",
+  };
+
+  configs["DISTRIBUTED_GRADIENT_BOOSTED_TREES"] = {
+      .model_class_name =
+          "gradient_boosted_trees_model.GradientBoostedTreesModel",
+  };
+
+  configs["ISOLATION_FOREST"] = {
+      .model_class_name = "isolation_forest_model.IsolationForestModel",
+      .default_task = "ANOMALY_DETECTION",
+      .require_label = false,
+  };
+
+  return configs;
+}  // namespace yggdrasil_decision_forests
 
 // Gets the number of prefix spaces.
 int NumLeadingSpaces(const absl::string_view text) {
@@ -65,18 +109,6 @@ std::string LearnerKeyToClassName(const absl::string_view key) {
     }
   }
   return absl::StrCat(absl::StrReplaceAll(value, {{"_", ""}}), "Learner");
-}
-
-// Converts a learner name into the model class associated with it.
-std::string LearnerKeyToModelClassName(const absl::string_view key) {
-  if (key == "RANDOM_FOREST" || key == "CART") {
-    return "random_forest_model.RandomForestModel";
-  } else if (key == "GRADIENT_BOOSTED_TREES" ||
-             key == "DISTRIBUTED_GRADIENT_BOOSTED_TREES") {
-    return "gradient_boosted_trees_model.GradientBoostedTreesModel";
-  } else {
-    return "generic_model.GenericModel";
-  }
 }
 
 // Converts a learner name into a nice name.
@@ -264,6 +296,7 @@ from $1learner import tuner as tuner_lib
 from $1model import generic_model
 from $1model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from $1model.random_forest_model import random_forest_model
+from $1model.isolation_forest_model import isolation_forest_model
 )",
                                          prefix, pydf_prefix);
 
@@ -292,9 +325,20 @@ $0
 )",
                        imports);
 
+  const auto learner_configs = LearnerConfigs();
+
   for (const auto& learner_key : model::AllRegisteredLearners()) {
+    // Get the learner configuration.
+    LearnerConfig learner_config;
+    const auto learner_config_it = learner_configs.find(learner_key);
+    if (learner_config_it != learner_configs.end()) {
+      learner_config = learner_config_it->second;
+    } else {
+      YDF_LOG(INFO) << "No learner config for " << learner_key
+                    << ". Using default config.";
+    }
+
     const auto class_name = LearnerKeyToClassName(learner_key);
-    const auto model_class_name = LearnerKeyToModelClassName(learner_key);
 
     // Get a learner instance.
     std::unique_ptr<model::AbstractLearner> learner;
@@ -439,7 +483,8 @@ $0
       FixGBTDefinition(&fields_documentation, &fields_constructor);
     }
     // TODO: Add support for hyperparameter templates.
-    absl::SubstituteAndAppend(&wrapper, R"(
+    absl::SubstituteAndAppend(
+        &wrapper, R"(
 class $0(generic_learner.GenericLearner):
   r"""$6 learning algorithm.
 
@@ -555,8 +600,8 @@ $2
   """
 
   def __init__(self,
-      label: str,
-      task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
+      label: $9,
+      task: generic_learner.Task = generic_learner.Task.$8,
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
@@ -618,6 +663,7 @@ $4
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
+      verbose: Optional[Union[int, bool]] = None,
   ) -> $7:
     """Trains a model on the given dataset.
 
@@ -648,18 +694,24 @@ $4
         do not need validation dataset. Some learners, such as
         GradientBoostedTrees, automatically extract a validation dataset from
         the training dataset if the validation dataset is not provided.
+      verbose: Verbose level during training. If None, uses the global verbose
+        level of `ydf.verbose`. Levels are: 0 of False: No logs, 1 or True:
+        Print a few logs in a notebook; prints all the logs in a terminal. 2:
+        Prints all the logs on all surfaces.
 
     Returns:
       A trained model.
     """
-    return super().train(ds, valid)
+    return super().train(ds=ds, valid=valid, verbose=verbose)
 )",
-                              /*$0*/ class_name, /*$1*/ learner_key,
-                              /*$2*/ fields_documentation,
-                              /*$3*/ fields_constructor, /*$4*/ fields_dict,
-                              /*$5*/ free_text_documentation,
-                              /*$6*/ nice_learner_name,
-                              /*$7*/ model_class_name);
+        /*$0*/ class_name, /*$1*/ learner_key,
+        /*$2*/ fields_documentation,
+        /*$3*/ fields_constructor, /*$4*/ fields_dict,
+        /*$5*/ free_text_documentation,
+        /*$6*/ nice_learner_name,
+        /*$7*/ learner_config.model_class_name,
+        /*$8*/ learner_config.default_task,
+        /*$9*/ learner_config.require_label ? "str" : "Optional[str] = None");
 
     const auto bool_rep = [](const bool value) -> std::string {
       return value ? "True" : "False";

@@ -13,23 +13,23 @@
  * limitations under the License.
  */
 
+#include <cstdint>
+
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
 namespace usage {
 
-void OnTrainingStart(
-    const dataset::proto::DataSpecification& data_spec,
-    const model::proto::TrainingConfig& train_config,
-    const model::proto::TrainingConfigLinking& train_config_link,
-    int64_t num_examples) {
+void OnTrainingStart(const dataset::proto::DataSpecification& data_spec,
+                     const model::proto::TrainingConfig& train_config,
+                     int64_t num_examples) {
   // Add usage tracking here.
 }
 
 void OnTrainingEnd(const dataset::proto::DataSpecification& data_spec,
                    const model::proto::TrainingConfig& train_config,
-                   const model::proto::TrainingConfigLinking& train_config_link,
                    int64_t num_examples, const model::AbstractModel& model,
                    absl::Duration training_duration) {
   // Add usage tracking here.
@@ -43,6 +43,14 @@ void OnInference(const int64_t num_examples,
 void OnInference(int64_t num_examples, const model::MetaData& metadata) {
   // Add usage tracking here.
 }
+
+void OnLoadDataset(absl::string_view path) {}
+
+void OnSaveDataset(absl::string_view path) {}
+
+void OnLoadModel(absl::string_view path) {}
+
+void OnSaveModel(absl::string_view path) {}
 
 void EnableUsage(bool usage) {}
 

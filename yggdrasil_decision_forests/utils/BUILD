@@ -494,6 +494,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
     ],
 )
@@ -507,8 +508,16 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
     ],
+)
+
+cc_library(
+    name = "documentation_cc",
+    srcs = ["documentation.cc"],
+    hdrs = ["documentation.h"],
+    deps = ["@com_google_absl//absl/strings"],
 )
 
 cc_library_ydf(
@@ -548,6 +557,7 @@ cc_library_ydf(
         ":filesystem",
         ":logging",
         ":random",
+        ":sharded_io",
         ":test",
         ":testing_macros",
         ":uid",
@@ -577,12 +587,13 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:fast_engine",
         "//yggdrasil_decision_forests/serving/decision_forest",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/random",
-        "@com_google_absl//absl/random:distributions",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest",
     ],
 )
@@ -1208,6 +1219,7 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:builder",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/isolation_forest",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/memory",

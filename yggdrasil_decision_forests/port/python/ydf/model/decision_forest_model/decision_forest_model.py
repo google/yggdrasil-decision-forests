@@ -57,7 +57,9 @@ class DecisionForestModel(generic_model.GenericModel):
 
     return (self.get_tree(tree_idx) for tree_idx in range(self.num_trees()))
 
-  def print_tree(self, tree_idx: int = 0, file=sys.stdout) -> None:
+  def print_tree(
+      self, tree_idx: int = 0, max_depth: Optional[int] = 6, file=sys.stdout
+  ) -> None:
     """Prints a tree in the terminal.
 
     Usage example:
@@ -78,11 +80,14 @@ class DecisionForestModel(generic_model.GenericModel):
 
     Args:
       tree_idx: Index of the tree. Should be in [0, self.num_trees()).
+      max_depth: Maximum tree depth of the plot. Set to None for full depth.
       file: Where to print the tree. By default, prints on the terminal standard
         output.
     """
 
-    file.write(self.get_tree(tree_idx).pretty(self.data_spec()))
+    file.write(
+        self.get_tree(tree_idx).pretty(self.data_spec(), max_depth=max_depth)
+    )
 
   def plot_tree(
       self,

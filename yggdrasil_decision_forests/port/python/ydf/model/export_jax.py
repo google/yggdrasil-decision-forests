@@ -18,7 +18,7 @@ import array
 import dataclasses
 import enum
 import functools
-from typing import Any, Sequence, Dict, Optional, List, Set, Tuple, Callable, Union
+from typing import Any, Sequence, Dict, Optional, List, Set, Tuple, Callable, Union, MutableSequence
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
@@ -39,9 +39,9 @@ except ImportError as exc:
 # pytype: enable=import-error
 
 # Typehint for arrays
-ArrayFloat = array.array
-ArrayInt = array.array
-ArrayBool = array.array
+ArrayFloat = MutableSequence[float]
+ArrayInt = MutableSequence[int]
+ArrayBool = MutableSequence[int]
 
 # Names of the learnable parameters of the model.
 _PARAM_LEAF_VALUES = "leaf_values"
@@ -52,6 +52,7 @@ _PARAM_INITIAL_PREDICTIONS = "initial_predictions"
 class ConditionType(enum.IntEnum):
   GREATER_THAN = 0
   IS_IN = 1
+  SPARSE_OBLIQUE = 2
 
 
 def compact_dtype(values: Sequence[int]) -> Any:
@@ -350,9 +351,9 @@ class InternalFeatureSpec:
     )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class BeginNodeIdx:
-  """Index of the first leaf and non leaf node in a tree."""
+  """Index of leaf and non leaf node in a tree."""
 
   leaf_node: int
   non_leaf_node: int
@@ -425,13 +426,15 @@ class InternalForest:
     dataspec: Dataspec.
     leaf_outputs: Prediction values for each leaf node.
     split_features: Internal idx of the feature being tested for each non-leaf
-      node.
+      node. For oblique splits, "split_features" contains the number of weights.
     split_parameters: Parameter of the condition for each non-leaf nodes. (1)
       For "greather than" condition (i.e., feature >= threshold),
       "split_parameter" is the threshold. (2) For "is in" condition (i.e.,
       feature in mask), "split_parameter" is an uint32 offset in the mask
       "catgorical_mask" wheret the condition is evaluated as
-      "catgorical_mask[split_parameter + attribute_value]".
+      "catgorical_mask[split_parameter + attribute_value]". (3) for oblique
+      splits, "split_parameter" an uint32 offset for the first weight and
+      attribute in "oblique_weights" and "oblique_attributes" respectively.
     negative_children: Node offset of the negative children for each non-leaf
       node in the forest.
     positive_children: Node offset of the positive children for each non-leaf
@@ -442,6 +445,9 @@ class InternalForest:
       trees.
     begin_leaf_nodes: Index of the first leaf node for each of the trees.
     catgorical_mask: Boolean mask used in "is in" conditions.
+    oblique_weights: Buffer of weights for the oblique splits.
+    oblique_attributes: Buffer of attributes for the oblique splits. Has the
+      same size as "oblique_weights".
     initial_predictions: Initial predictions of the forest (before any tree is
       applied).
     max_depth: Maximum depth of the trees.
@@ -482,6 +488,12 @@ class InternalForest:
   catgorical_mask: ArrayBool = dataclasses.field(
       default_factory=lambda: array.array("b", [])
   )
+  oblique_weights: ArrayFloat = dataclasses.field(
+      default_factory=lambda: array.array("f", [])
+  )
+  oblique_attributes: ArrayInt = dataclasses.field(
+      default_factory=lambda: array.array("l", [])
+  )
   initial_predictions: ArrayFloat = dataclasses.field(
       default_factory=lambda: array.array("f", [])
   )
@@ -500,6 +512,8 @@ class InternalForest:
     self.begin_non_leaf_nodes = array.array("l", [])
     self.begin_leaf_nodes = array.array("l", [])
     self.catgorical_mask = array.array("l", [])
+    self.oblique_weights = array.array("f", [])
+    self.oblique_attributes = array.array("l", [])
     # Note: We don't release "initial_predictions".
 
   def __post_init__(self, model: generic_model.GenericModel):
@@ -614,6 +628,32 @@ class InternalForest:
       self.split_parameters.append(float_offset)
       self.condition_types.append(ConditionType.IS_IN)
       self.catgorical_mask.extend(bitmap)
+
+    elif isinstance(node.condition, tree_lib.NumericalSparseObliqueCondition):
+      offset = len(self.oblique_weights)
+      num_weights = len(node.condition.weights)
+
+      # Add the weights
+      self.oblique_weights.extend(node.condition.weights)
+      self.oblique_attributes.extend([
+          self.feature_spec.inv_numerical[attribute]
+          for attribute in node.condition.attributes
+      ])
+      # Add the bias
+      self.oblique_weights.append(node.condition.threshold)
+      self.oblique_attributes.append(0)
+
+      # Encode the offset as a float32
+      float_offset = float(
+          jax.lax.bitcast_convert_type(
+              jnp.array(offset, dtype=jnp.int32), jnp.float32
+          )
+      )
+
+      self.split_features.append(num_weights)
+      self.split_parameters.append(float_offset)
+      self.condition_types.append(ConditionType.SPARSE_OBLIQUE)
+
     else:
       # TODO: Add support for other types of conditions.
       raise ValueError(
@@ -674,6 +714,8 @@ class InternalForestJaxArrays:
   begin_non_leaf_nodes: jax.Array = dataclasses.field(init=False)
   begin_leaf_nodes: jax.Array = dataclasses.field(init=False)
   catgorical_mask: Optional[jax.Array] = dataclasses.field(init=False)
+  oblique_weights: Optional[jax.Array] = dataclasses.field(init=False)
+  oblique_attributes: Optional[jax.Array] = dataclasses.field(init=False)
   initial_predictions: Optional[jax.Array] = dataclasses.field(init=False)
 
   def __post_init__(self, forest: InternalForest):
@@ -703,6 +745,16 @@ class InternalForestJaxArrays:
       self.catgorical_mask = asarray(forest.catgorical_mask, dtype=jnp.bool_)
     else:
       self.catgorical_mask = None
+
+    if forest.oblique_weights:
+      self.oblique_weights = asarray(forest.oblique_weights, dtype=jnp.float32)
+    else:
+      self.oblique_weights = None
+
+    if forest.oblique_attributes:
+      self.oblique_attributes = to_compact_jax_array(forest.oblique_attributes)
+    else:
+      self.oblique_attributes = None
 
     self.initial_predictions = asarray(
         forest.initial_predictions, dtype=jnp.float32
@@ -937,6 +989,27 @@ def _get_leaf_idx(
     )
     return jax_arrays.catgorical_mask[categorical_mask_offset]
 
+  def condition_sparse_oblique(node_idx):
+    """Evaluates a sparse oblique condition."""
+    num_weights = jax_arrays.split_features[node_idx]
+    offset = jax.lax.bitcast_convert_type(
+        jax_arrays.split_parameters[node_idx], jnp.int32
+    )
+    bias = jax_arrays.oblique_weights[offset + num_weights]
+    numerical_features = intern_feature_values["numerical"]
+
+    def sum_iter(i, a):
+      return (
+          a
+          + numerical_features[jax_arrays.oblique_attributes[i]]
+          * jax_arrays.oblique_weights[i]
+      )
+
+    weighted_sum = jax.lax.fori_loop(
+        offset, num_weights + offset, sum_iter, -bias
+    )
+    return weighted_sum >= 0
+
   # Assemble the condition map.
   condition_fns = [None] * len(jax_arrays.dense_condition_mapping)
   if ConditionType.GREATER_THAN in jax_arrays.dense_condition_mapping:
@@ -947,6 +1020,10 @@ def _get_leaf_idx(
     condition_fns[jax_arrays.dense_condition_mapping[ConditionType.IS_IN]] = (
         condition_is_in
     )
+  if ConditionType.SPARSE_OBLIQUE in jax_arrays.dense_condition_mapping:
+    condition_fns[
+        jax_arrays.dense_condition_mapping[ConditionType.SPARSE_OBLIQUE]
+    ] = condition_sparse_oblique
 
   if len(condition_fns) == 1:
     # Since there is only one type of conditions, there is not need for a
@@ -975,3 +1052,58 @@ def _get_leaf_idx(
       new_node_offset_if_non_leaf,  # Non-leaf
       node_offset,  # Leaf
   )
+
+
+def update_with_jax_params(
+    model: generic_model.GenericModel,
+    params: Dict[str, Any],
+):
+  """Updates the model with JAX params as created by `to_jax_function`.
+
+  Args:
+    model: A YDF model.
+    params: See "update_with_jax_params" in generic_model.py.
+  """
+
+  if not isinstance(model, decision_forest_model.DecisionForestModel):
+    raise ValueError("The model is not a decision forest")
+
+  if isinstance(
+      model, gradient_boosted_trees_model.GradientBoostedTreesModel
+  ) and (initial_predictions := params.get(_PARAM_INITIAL_PREDICTIONS)):
+    model.set_initial_predictions(initial_predictions)
+
+  leaf_values = params.get(_PARAM_LEAF_VALUES)
+
+  # Only scan the trees if the user updates node parameters.
+  # Note: Add other node parameters here.
+  if leaf_values is not None:
+    cur_node = BeginNodeIdx(leaf_node=0, non_leaf_node=0)
+
+    for tree_idx, tree in enumerate(model.iter_trees()):
+      _update_node_with_jax_param(tree.root, cur_node, leaf_values)
+      model.set_tree(tree_idx, tree)
+
+
+def _update_node_with_jax_param(
+    node: tree_lib.AbstractNode,
+    cur_node: BeginNodeIdx,
+    leaf_values: Optional[jax.Array],
+):
+  """Updates recursively the node values."""
+
+  if node.is_leaf:
+    assert isinstance(node, tree_lib.Leaf)
+    # TODO: Add support for other types of leaf nodes.
+    if not isinstance(node.value, tree_lib.RegressionValue):
+      raise ValueError(
+          "The YDF Jax exporter does not support this leaf value:"
+          f" {node.value!r}"
+      )
+    node.value.value = leaf_values[cur_node.leaf_node]
+    cur_node.leaf_node += 1
+  else:
+    cur_node.non_leaf_node += 1
+    assert isinstance(node, tree_lib.NonLeaf)
+    _update_node_with_jax_param(node.neg_child, cur_node, leaf_values)
+    _update_node_with_jax_param(node.pos_child, cur_node, leaf_values)

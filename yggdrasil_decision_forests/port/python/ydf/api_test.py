@@ -21,6 +21,8 @@ import sys
 from absl import logging
 from absl.testing import absltest
 import pandas as pd
+from sklearn import ensemble as skl_ensemble
+import sklearn.datasets
 
 import ydf  # In the world, use "import ydf"
 from ydf.utils import test_utils
@@ -223,6 +225,12 @@ class ApiTest(absltest.TestCase):
     )
     model = ydf.load_model(model_path)
     _ = model.to_jax_function()
+
+  def test_import_sklearn_model(self):
+    X, y = sklearn.datasets.make_classification()
+    skl_model = skl_ensemble.RandomForestClassifier().fit(X, y)
+    ydf_model = ydf.from_sklearn(skl_model)
+    _ = ydf_model.predict({"features": X})
 
 
 if __name__ == "__main__":

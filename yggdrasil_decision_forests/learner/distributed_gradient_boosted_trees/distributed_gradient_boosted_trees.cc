@@ -29,10 +29,10 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/snapshot.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
-#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -54,7 +54,7 @@ DistributedGradientBoostedTreesLearner::Capabilities() const {
 }
 
 absl::StatusOr<std::unique_ptr<AbstractModel>>
-DistributedGradientBoostedTreesLearner::TrainWithStatus(
+DistributedGradientBoostedTreesLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
@@ -199,12 +199,10 @@ DistributedGradientBoostedTreesLearner::GetGenericHyperParameterSpecification()
 }
 
 absl::StatusOr<std::unique_ptr<AbstractModel>>
-DistributedGradientBoostedTreesLearner::TrainWithStatus(
+DistributedGradientBoostedTreesLearner::TrainWithStatusImpl(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
     const absl::optional<std::string>& typed_valid_path) const {
-  const auto begin_training = absl::Now();
-
   internal::Monitoring monitoring;
 
   // Extract and check the configuration.
@@ -217,9 +215,6 @@ DistributedGradientBoostedTreesLearner::TrainWithStatus(
   RETURN_IF_ERROR(internal::SetDefaultHyperParameters(config, config_link,
                                                       data_spec, &spe_config));
   RETURN_IF_ERROR(internal::CheckConfiguration(deployment_));
-
-  utils::usage::OnTrainingStart(data_spec, config, config_link,
-                                /*num_examples=*/-1);
 
   // Working directory.
   auto work_directory = deployment().cache_path();
@@ -269,15 +264,6 @@ DistributedGradientBoostedTreesLearner::TrainWithStatus(
                        updated_deployment, config, config_link, spe_config,
                        dataset_cache_path, typed_valid_path, work_directory,
                        data_spec, log_directory(), &monitoring));
-
-  if (config.pure_serving_model()) {
-    RETURN_IF_ERROR(model->MakePureServing());
-  }
-
-  utils::usage::OnTrainingEnd(data_spec, config, config_link,
-                              /*num_examples=*/-1, *model,
-                              absl::Now() - begin_training);
-
   return std::move(model);
 }
 

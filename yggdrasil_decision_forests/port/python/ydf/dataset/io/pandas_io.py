@@ -53,6 +53,10 @@ def to_dict(
     raise ValueError("The pandas DataFrame must be two-dimensional.")
   data_dict = data.to_dict("series")
 
+  for k in data_dict:
+    if not isinstance(k, str):
+      raise ValueError("The pandas DataFrame must have string column names.")
+
   def clean(values):
     if values.dtype == "object":
       return values.to_numpy(copy=False, na_value="")

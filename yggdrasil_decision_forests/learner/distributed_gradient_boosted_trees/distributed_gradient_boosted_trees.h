@@ -77,12 +77,12 @@ class DistributedGradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamForceNumericalDiscretization[] =
       "force_numerical_discretization";
 
-  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset = {}) const override;
+          valid_dataset) const override;
 
-  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path) const override;

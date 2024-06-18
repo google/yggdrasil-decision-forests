@@ -62,14 +62,22 @@ cc_library_ydf(
     ],
     deps = [
         ":decision_forest",
+        ":decision_forest_serving",
         ":quick_scorer_extended",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
+        "//yggdrasil_decision_forests/model/isolation_forest",
+        "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving:example_set_model_wrapper",
         "//yggdrasil_decision_forests/serving:fast_engine",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
     ],
     alwayslink = 1,
 )
@@ -91,6 +99,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/isolation_forest",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/utils:bitmap",
@@ -103,6 +112,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
     ],
+    alwayslink = 1,
 )
 
 cc_library_ydf(
@@ -115,10 +125,13 @@ cc_library_ydf(
     ],
     deps = [
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model/isolation_forest",
         "//yggdrasil_decision_forests/serving:example_set",
+        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:usage",
     ],
+    alwayslink = 1,
 )
 
 cc_library_ydf(
@@ -157,10 +170,12 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/isolation_forest",
         "//yggdrasil_decision_forests/model/random_forest",
+        "//yggdrasil_decision_forests/serving:example_set",
+        "//yggdrasil_decision_forests/utils:logging",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings:str_format",
     ],
 )
 
@@ -209,6 +224,9 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
+        "//yggdrasil_decision_forests/model/isolation_forest",
+        "//yggdrasil_decision_forests/model/random_forest",
+        "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:csv",
         "//yggdrasil_decision_forests/utils:filesystem",

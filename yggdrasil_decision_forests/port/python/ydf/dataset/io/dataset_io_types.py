@@ -37,13 +37,26 @@ UnrolledFeaturesInfo = Dict[str, List[str]]
 # Supported types of datasets.
 IODataset = Union[Dict[str, InputValues], "pd.DataFrame", str, Sequence[str]]
 
+HOW_TO_FEED_NUMPY = """
+Numpy arrays cannot be fed directly. Instead, feed them in a dictionary i.e.
+Instead of:
+  model.predict(np.array([[1,2],[3,4]]))
+Do:
+  model.predict({"features":np.array([[1,2],[3,4]])})
+"""
+
 
 SUPPORTED_INPUT_DATA_DESCRIPTION = """\
 A dataset can be one of the following:
-- A Pandas DataFrame.
-- A dictionary of column names (str) to values. Values can be lists of int, float, bool, str or bytes. Values can also be Numpy arrays.
-- A YDF VerticalDataset
-- A TensorFlow Batched Dataset.
-- A typed (possibly sharded) path to a CSV file (e.g. csv:mydata).
-- A list of typed paths (e.g. ["csv:mydata1", "csv:mydata2"]).
+  1. A dictionary of string (column names) to column values. The values of a column can be a list of int, float, bool, str, bytes, or a numpy array. A 2D numpy array is treated as a multi-dimensional column.
+  2. A Pandas DataFrame.
+  3. A YDF VerticalDataset created with `ydf.create_vertical_dataset`. This option is the most efficient when the same dataset is used multiple times.
+  4. A batched TensorFlow Dataset.
+  5. A typed path to a csv file e.g. "csv:/tmp/dataset.csv". See supported types below. The path can be sharded (e.g. "csv:/tmp/dataset@10") or globbed ("csv:/tmp/dataset*").
+  6. A list of typed paths e.g. ["csv:/tmp/data1.csv", "csv:/tmp/data2.csv"]. See supported types below.
+
+The supported file formats and corresponding prefixes are:
+  - CSV file. prefix 'csv:'
+  - Non-compressed TFRecord of Tensorflow Examples. prefix 'tfrecordv2+tfe:'
+  - Compressed TFRecord of Tensorflow Examples. prefix 'tfrecord+tfe:'; not available in default public build.
 """

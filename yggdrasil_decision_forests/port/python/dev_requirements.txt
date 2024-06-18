@@ -3,7 +3,9 @@ tensorflow_decision_forests; platform_machine != 'aarch64' and python_version >=
 tensorflow; platform_machine != 'aarch64'
 portpicker
 matplotlib
+scikit-learn
 jax; platform_machine != 'aarch64' and platform_system != 'Windows'
 jaxlib; platform_machine != 'aarch64' and platform_system != 'Windows'
 optax; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.9'
 flatbuffers; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.12'
+tensorflow-datasets; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.9'

@@ -18,10 +18,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <numeric>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -32,9 +34,12 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -50,9 +55,11 @@
 #include "yggdrasil_decision_forests/utils/fold_generator.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
+#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -62,23 +69,27 @@ absl::Status AbstractLearner::LinkTrainingConfig(
     const dataset::proto::DataSpecification& data_spec,
     proto::TrainingConfigLinking* config_link) {
   // Label.
-  int32_t label;
-  if (!training_config.has_label()) {
-    STATUS_FATAL("No label specified in the training config. Aborting.");
+  int32_t label = -1;
+  // Anomaly detection is the only task that can have or not have labels.
+  if (training_config.task() != proto::ANOMALY_DETECTION &&
+      !training_config.has_label()) {
+    STATUS_FATAL("No label specified in the training config.");
   }
-  RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
-      training_config.label(), data_spec, &label,
-      "Retrieving label column failed. "));
+  if (training_config.has_label()) {
+    RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
+        training_config.label(), data_spec, &label,
+        "Retrieving label column failed."));
+    config_link->set_num_label_classes(
+        data_spec.columns(label).categorical().number_of_unique_values());
+  }
   config_link->set_label(label);
-  config_link->set_num_label_classes(
-      data_spec.columns(label).categorical().number_of_unique_values());
 
   // CV group.
   int32_t cv_group = -1;
   if (training_config.has_cv_group()) {
     RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
         training_config.cv_group(), data_spec, &cv_group,
-        "Retrieving cross-validation group column failed. "));
+        "Retrieving cross-validation group column failed."));
   }
   config_link->set_cv_group(cv_group);
 
@@ -271,21 +282,90 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   return absl::OkStatus();
 }
 
+// Non status; dataset in memory.
 std::unique_ptr<AbstractModel> AbstractLearner::Train(
     const dataset::VerticalDataset& train_dataset) const {
   return TrainWithStatus(train_dataset).value();
 }
 
+// Non status; dataset on disk.
 std::unique_ptr<AbstractModel> AbstractLearner::Train(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec) const {
   return TrainWithStatus(typed_path, data_spec).value();
 }
 
+// API; dataset in memory.
 absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
-    const absl::string_view typed_path,
+    const dataset::VerticalDataset& train_dataset,
+    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        valid_dataset) const {
+  utils::usage::OnTrainingStart(train_dataset.data_spec(), training_config(),
+                                train_dataset.nrow());
+  const auto begin_training = absl::Now();
+
+  ASSIGN_OR_RETURN(auto model,
+                   TrainWithStatusImpl(train_dataset, valid_dataset));
+
+  utils::usage::OnTrainingEnd(train_dataset.data_spec(), training_config(),
+                              train_dataset.nrow(), *model,
+                              absl::Now() - begin_training);
+
+  if (training_config().pure_serving_model()) {
+    RETURN_IF_ERROR(model->MakePureServing());
+  }
+  return model;
+}
+
+// Impl; dataset in memory.
+absl::StatusOr<std::unique_ptr<AbstractModel>>
+AbstractLearner::TrainWithStatusImpl(
+    const dataset::VerticalDataset& train_dataset,
+    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        valid_dataset) const {
+  // This method should always be implemented by learners.
+  return absl::UnimplementedError(
+      "The learner does not implement TrainWithStatusImpl (recommended) "
+      "TrainWithStatus and "
+      "TrainWithStatusImpl (deprecated).");
+}
+
+// API; dataset on disk.
+absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
+    absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
     const absl::optional<std::string>& typed_valid_path) const {
+  std::string path;
+  ASSIGN_OR_RETURN(std::tie(std::ignore, path),
+                   dataset::SplitTypeAndPath(typed_path));
+  utils::usage::OnLoadDataset(path);
+
+  utils::usage::OnTrainingStart(data_spec, training_config(),
+                                /*num_examples=*/-1);
+  const auto begin_training = absl::Now();
+
+  ASSIGN_OR_RETURN(
+      auto model, TrainWithStatusImpl(typed_path, data_spec, typed_valid_path));
+
+  utils::usage::OnTrainingEnd(data_spec, training_config(),
+                              /*num_examples=*/-1, *model,
+                              absl::Now() - begin_training);
+
+  if (training_config().pure_serving_model()) {
+    RETURN_IF_ERROR(model->MakePureServing());
+  }
+  return model;
+}
+
+// Impl; dataset on disk.
+absl::StatusOr<std::unique_ptr<AbstractModel>>
+AbstractLearner::TrainWithStatusImpl(
+    absl::string_view typed_path,
+    const dataset::proto::DataSpecification& data_spec,
+    const absl::optional<std::string>& typed_valid_path) const {
+  // If training on disk is not implemented, we load the dataset and use
+  // training from memory.
+
   // List the columns used for the training.
   // Only these columns will be loaded.
   proto::TrainingConfigLinking link_config;
@@ -310,7 +390,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
         /*required_columns=*/{}, dataset_loading_config));
     valid_dataset = valid_dataset_data;
   }
-  return TrainWithStatus(train_dataset, valid_dataset);
+  return TrainWithStatusImpl(train_dataset, valid_dataset);
 }
 
 absl::Status CheckGenericHyperParameterSpecification(
@@ -401,6 +481,15 @@ absl::Status AbstractLearner::CheckConfiguration(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const model::proto::DeploymentConfig& deployment) {
+  if (deployment.num_threads() < 0) {
+    return absl::InvalidArgumentError("The number of threads should be >= 0");
+  }
+
+  if (config.task() == model::proto::Task::ANOMALY_DETECTION) {
+    // Note: ANOMALY_DETECTION is the only task that does not need a label.
+    return absl::OkStatus();
+  }
+
   const auto& label_col_spec = data_spec.columns(config_link.label());
   // Check the type of the label column.
   switch (config.task()) {
@@ -413,7 +502,8 @@ absl::Status AbstractLearner::CheckConfiguration(
         return absl::InvalidArgumentError(absl::StrCat(
             "The label column \"", config.label(),
             "\" should be CATEGORICAL for a CLASSIFICATION "
-            "Task. Note: BOOLEAN columns should be set as CATEGORICAL using a "
+            "Task. Note: BOOLEAN columns should be set as CATEGORICAL using "
+            "a "
             "dataspec guide, even for a binary classification task."));
       }
       break;
@@ -461,7 +551,8 @@ absl::Status AbstractLearner::CheckConfiguration(
           return absl::InvalidArgumentError(
               "The \"ranking_group\" column must have a "
               "\"max_number_of_unique_values\" "
-              "of -1 in the dataspec guide. This ensures that rare groups are "
+              "of -1 in the dataspec guide. This ensures that rare groups "
+              "are "
               "not pruned.");
         }
       }
@@ -469,7 +560,8 @@ absl::Status AbstractLearner::CheckConfiguration(
     case model::proto::Task::CATEGORICAL_UPLIFT: {
       if (label_col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
         return absl::InvalidArgumentError(
-            "The label column should be CATEGORICAL for an CATEGORICAL_UPLIFT "
+            "The label column should be CATEGORICAL for an "
+            "CATEGORICAL_UPLIFT "
             "task.");
       }
       if (!config_link.has_uplift_treatment() ||
@@ -518,6 +610,8 @@ absl::Status AbstractLearner::CheckConfiguration(
             "Uplift only supports binary treatments.");
       }
     } break;
+    case model::proto::Task::ANOMALY_DETECTION:
+      return absl::InternalError("ANOMALY_DETECTION has no labels");
   }
   // Check the label don't contains NaN.
   if (label_col_spec.count_nas() != 0) {
@@ -526,9 +620,7 @@ absl::Status AbstractLearner::CheckConfiguration(
                          "missing values. $1 missing values are found.",
                          config.label(), label_col_spec.count_nas()));
   }
-  if (deployment.num_threads() < 0) {
-    return absl::InvalidArgumentError("The number of threads should be >= 0");
-  }
+
   return absl::OkStatus();
 }
 
@@ -744,7 +836,9 @@ void InitializeModelWithAbstractTrainingConfig(
     const proto::TrainingConfig& training_config,
     const proto::TrainingConfigLinking& training_config_linking,
     AbstractModel* model) {
-  model->set_label_col_idx(training_config_linking.label());
+  if (training_config_linking.has_label()) {
+    model->set_label_col_idx(training_config_linking.label());
+  }
 
   if (training_config.task() == proto::Task::RANKING) {
     model->set_ranking_group_col(training_config_linking.ranking_group());
@@ -796,11 +890,11 @@ void InitializeModelMetadataWithAbstractTrainingConfig(
 }
 
 absl::Status AbstractLearner::CheckCapabilities() const {
-  // All the learners require a label.
-  if (training_config().label().empty()) {
+  const auto capabilities = Capabilities();
+
+  if (capabilities.require_label() && training_config().label().empty()) {
     return absl::InvalidArgumentError("\"label\" field required.");
   }
-  const auto capabilities = Capabilities();
 
   // Maximum training duration.
   if (!capabilities.support_max_training_duration() &&

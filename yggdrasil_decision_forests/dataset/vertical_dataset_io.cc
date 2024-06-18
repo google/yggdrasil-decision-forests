@@ -35,6 +35,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -124,6 +125,8 @@ absl::Status LoadVerticalDataset(
   ASSIGN_OR_RETURN(std::tie(prefix, path), SplitTypeAndPath(typed_path));
   std::vector<std::string> shards;
   RETURN_IF_ERROR(utils::ExpandInputShards(path, &shards));
+
+  utils::usage::OnLoadDataset(path);
 
   if (shards.size() <= 1 || config.num_threads <= 1) {
     // Loading in a single thread.
@@ -240,6 +243,7 @@ absl::Status SaveVerticalDataset(const VerticalDataset& dataset,
   ASSIGN_OR_RETURN(auto writer,
                    CreateExampleWriter(typed_path, dataset.data_spec(),
                                        num_records_by_shard));
+
   proto::Example example;
   for (VerticalDataset::row_t row = 0; row < dataset.nrow(); row++) {
     dataset.ExtractExample(row, &example);

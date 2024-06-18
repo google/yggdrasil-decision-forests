@@ -17,15 +17,33 @@
 //
 #include "yggdrasil_decision_forests/serving/decision_forest/register_engines.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "absl/memory/memory.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
-#include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
+#include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
+#include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
+#include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"  // IWYU pragma: keep
+#include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended.h"
 #include "yggdrasil_decision_forests/serving/example_set_model_wrapper.h"
+#include "yggdrasil_decision_forests/serving/fast_engine.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -608,6 +626,66 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
 
 REGISTER_FastEngineFactory(RandomForestGenericFastEngineFactory,
                            serving::random_forest::kGeneric);
+
+class IsolationForestGenericFastEngineFactory
+    : public model::FastEngineFactory {
+ public:
+  using SourceModel = isolation_forest::IsolationForestModel;
+
+  std::string name() const override {
+    return serving::isolation_forest::kGeneric;
+  }
+
+  bool IsCompatible(const AbstractModel* const model) const override {
+    auto* if_model = dynamic_cast<const SourceModel*>(model);
+    // This implementation is the most generic and least efficient engine.
+    if (if_model == nullptr) {
+      return false;
+    }
+    return if_model->CheckStructure({/*.global_imputation_is_higher =*/false});
+  }
+
+  std::vector<std::string> IsBetterThan() const override { return {}; }
+
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
+      const AbstractModel* const model) const override {
+    auto* if_model = dynamic_cast<const SourceModel*>(model);
+    if (!if_model) {
+      return absl::InvalidArgumentError("The model is not an IF.");
+    }
+
+    if (!if_model->CheckStructure({/*.global_imputation_is_higher =*/false})) {
+      return NoGlobalImputationError("IsolationForestGenericFastEngineFactory");
+    }
+
+    const bool need_uint32_node_index =
+        MaxNumberOfNodesPerTree(if_model->decision_trees()) >=
+        std::numeric_limits<uint16_t>::max();
+
+    switch (if_model->task()) {
+      case model::proto::ANOMALY_DETECTION: {
+        if (need_uint32_node_index) {
+          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+              serving::decision_forest::GenericIsolationForest<uint32_t>,
+              serving::decision_forest::Predict>>();
+          RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*if_model));
+          return engine;
+        } else {
+          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+              serving::decision_forest::GenericIsolationForest<uint16_t>,
+              serving::decision_forest::Predict>>();
+          RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*if_model));
+          return engine;
+        }
+      }
+      default:
+        return absl::InvalidArgumentError("Non supported RF model");
+    }
+  }
+};
+
+REGISTER_FastEngineFactory(IsolationForestGenericFastEngineFactory,
+                           serving::isolation_forest::kGeneric);
 
 class RandomForestOptPredFastEngineFactory : public model::FastEngineFactory {
  public:

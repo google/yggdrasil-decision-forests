@@ -140,6 +140,50 @@ TEST(Report, HtmlReportRegression) {
   CHECK_OK(file::SetContent(path, html_report));
 }
 
+TEST(Report, HtmlReportAnomalyDetection) {
+  // Create a fake column specification.
+  dataset::proto::Column label_column;
+  label_column.set_type(dataset::proto::ColumnType::CATEGORICAL);
+  label_column.set_name("label");
+  label_column.mutable_categorical()->set_number_of_unique_values(3);
+  label_column.mutable_categorical()->set_most_frequent_value(1);
+  label_column.mutable_categorical()->set_is_already_integerized(false);
+  auto& vocab = *label_column.mutable_categorical()->mutable_items();
+  vocab["a"].set_index(0);
+  vocab["b"].set_index(1);
+  vocab["c"].set_index(2);
+
+  // Configure the evaluation.
+  utils::RandomEngine rnd;
+  proto::EvaluationOptions option;
+  option.set_task(model::proto::Task::ANOMALY_DETECTION);
+
+  // Initialize.
+  proto::EvaluationResults eval;
+  ASSERT_OK(InitializeEvaluation(option, label_column, &eval));
+  model::proto::Prediction pred;
+  auto* pred_proba = pred.mutable_classification()->mutable_distribution();
+  pred_proba->mutable_counts()->Resize(3, 0);
+  pred_proba->set_sum(1);
+
+  // Add some predictions.
+  pred.mutable_anomaly_detection()->set_value(0.5);
+  ASSERT_OK(AddPrediction(option, pred, &rnd, &eval));
+
+  pred.mutable_anomaly_detection()->set_value(0.1);
+  ASSERT_OK(AddPrediction(option, pred, &rnd, &eval));
+
+  // Finalize.
+  ASSERT_OK(FinalizeEvaluation(option, label_column, &eval));
+
+  std::string html_report;
+  ASSERT_OK(AppendHtmlReport(eval, &html_report));
+
+  const auto path =
+      file::JoinPath(test::TmpDirectory(), "report_anomaly_detection.html");
+  YDF_LOG(INFO) << "path: " << path;
+  ASSERT_OK(file::SetContent(path, html_report));
+}
 }  // namespace
 }  // namespace metric
 }  // namespace yggdrasil_decision_forests

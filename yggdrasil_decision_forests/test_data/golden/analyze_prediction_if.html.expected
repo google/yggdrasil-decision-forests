@@ -1,0 +1,231 @@
+
+<style>
+
+.tab_block .header {
+    flex-direction: row;
+    display: flex;
+}
+
+.tab_block .header .tab {
+    cursor: pointer;
+    background-color: #F6F5F5;
+    text-decoration: none;
+    text-align: center;
+    padding: 4px 12px;
+    color: black;
+}
+
+.tab_block .header .tab.selected {
+    border-bottom: 2px solid #2F80ED;
+}
+
+.tab_block .header .tab:hover {
+    text-decoration: none;
+    background-color: #DCDCDC;
+}
+
+.tab_block .body .tab_content {
+    display: none;
+    padding: 5px;
+}
+
+.tab_block .body .tab_content.selected {
+    display: block;
+}
+
+.ydf_pre {
+    font-size: medium;
+}
+
+
+
+.variable_importance {
+}
+
+.variable_importance select {
+}
+
+.variable_importance .content {
+  display: none;
+}
+
+.variable_importance .content.selected {
+  display: block;
+}
+
+.ydf_tuning_table {
+  border-collapse: collapse;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table th {
+  background-color: #ededed;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table td {
+  text-align: right;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table .best {
+  background-color: khaki;
+}
+
+</style>
+
+<script>
+
+function ydfShowTab(block_id, item) {
+    const block = document.getElementById(block_id);
+    
+    
+    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
+    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
+    
+    block.getElementsByClassName("tab selected")[0].classList.remove("selected");
+    block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_" + item).classList.add("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+  
+
+function ydfShowVariableImportance(block_id) {
+    const block = document.getElementById(block_id);
+    const item = block.getElementsByTagName("select")[0].value;
+    block.getElementsByClassName("content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+
+</script>
+  <div class="tab_block" id="my_prefix"><div class="header"><a id="my_prefix_fvar" class="tab selected" onclick="ydfShowTab('my_prefix', 'fvar')">Feature Variation</a></div><div class="body"><div id="my_prefix_body_fvar" class="tab_content selected"><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chart_my_prefix_feature_variation_0" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_prefix_feature_variation_0',
+    [{
+x: [0,0.0439506,0.0879011,0.131852,0.175802,0.219753,0.263703,0.307654,0.351604,0.395555,0.439506,0.483456,0.527407,0.571357,0.615308,0.659258,0.703209,0.747159,0.79111,0.835061,0.879011,0.922962,0.966912,1.01086,1.05481,1.09876,1.14271,1.18667,1.23062,1.27457,1.31852,1.36247,1.40642,1.45037,1.49432,1.53827,1.58222,1.62617,1.67012,1.71407,1.75802,1.80197,1.84592,1.88987,1.93382,1.97778,2.02173,2.06568,2.10963,2.15358],
+y: [0.592681,0.593665,0.5917,0.59121,0.589146,0.585308,0.583855,0.583855,0.575067,0.565064,0.565532,0.565532,0.565532,0.565064,0.561756,0.561291,0.559433,0.558496,0.553563,0.553563,0.54592,0.544565,0.544113,0.539612,0.536936,0.535067,0.532855,0.528749,0.521067,0.519343,0.515823,0.507425,0.498563,0.484235,0.472362,0.465741,0.441512,0.432086,0.422337,0.412505,0.404108,0.400547,0.400272,0.401485,0.404166,0.40571,0.40549,0.409016,0.41446,0.419287],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'output',
+},
+{
+x: [2.15358,2.15358],
+y: [0.400272,0.593665],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'selected',
+},
+],
+    {
+      width: 400,
+      height: 300,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'features.0_of_2',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+<script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
+<div id="chart_my_prefix_feature_variation_1" style="display: inline-block;" ></div>
+<script>
+  Plotly.newPlot(
+    'chart_my_prefix_feature_variation_1',
+    [{
+x: [0,0.0374928,0.0749855,0.112478,0.149971,0.187464,0.224957,0.262449,0.299942,0.337435,0.374928,0.41242,0.449913,0.487406,0.524899,0.562391,0.599884,0.637377,0.67487,0.712362,0.749855,0.787348,0.824841,0.862333,0.899826,0.937319,0.974812,1.0123,1.0498,1.08729,1.12478,1.16228,1.19977,1.23726,1.27475,1.31225,1.34974,1.38723,1.42472,1.46222,1.49971,1.5372,1.5747,1.61219,1.64968,1.68717,1.72467,1.76216,1.79965,1.83715],
+y: [0.595164,0.595164,0.595164,0.593093,0.596049,0.596049,0.596049,0.593584,0.591518,0.595618,0.585124,0.585124,0.582182,0.581217,0.579435,0.57477,0.57477,0.574294,0.573819,0.565123,0.560197,0.553748,0.551458,0.546237,0.5401,0.537997,0.538443,0.536662,0.536662,0.537106,0.532999,0.531531,0.524985,0.524985,0.522218,0.520922,0.520059,0.51305,0.505561,0.503347,0.496101,0.492517,0.482859,0.479344,0.469354,0.463886,0.452366,0.444177,0.432159,0.419287],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'output',
+},
+{
+x: [1.83715,1.83715],
+y: [0.419287,0.596049],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'dot',
+  width: 1
+},
+name: 'selected',
+},
+],
+    {
+      width: 400,
+      height: 300,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'features.1_of_2',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'prediction',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+</script>
+</div></div></div>

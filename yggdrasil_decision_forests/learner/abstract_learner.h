@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_ABSTRACT_LEARNER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_ABSTRACT_LEARNER_H_
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -46,6 +47,9 @@ class AbstractLearner {
 
   // Trains a model using the dataset stored on disk at the path "typed_path".
   //
+  // A learner might use distributed training, or load the dataset in memory and
+  // fallback to in-memory training.
+  //
   // A typed path is a dataset with a format prefix. prefix format. For example,
   // "csv:/tmp/dataset.csv". The path supports sharding, globbing and comma
   // separation. See the "Dataset path and format" section of the user manual
@@ -56,8 +60,11 @@ class AbstractLearner {
   // for validation. If "typed_valid_path" is not provided, a validation dataset
   // will be extracted from the training dataset. If the algorithm does not have
   // the "use_validation_dataset" capability, "typed_valid_path" is ignored.
+  //
+  // This method is virtual for historical reasons with external codebase.
+  // Internally or in any new code, this method should not be overridden.
   virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
-      const absl::string_view typed_path,
+      absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string>& typed_valid_path = {}) const;
 
@@ -68,19 +75,22 @@ class AbstractLearner {
   // for validation. If "valid_dataset" is not provided, a validation dataset
   // will be extracted from the training dataset. If the algorithm does not have
   // the "use_validation_dataset" capability, "valid_dataset" is ignored.
+  //
+  // This method is virtual for historical reasons with external codebase.
+  // Internally or in any new code, this method should not be overridden.
   virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset = {}) const = 0;
+          valid_dataset = {}) const;
 
-  // Similar as TrainWithStatus, but crash in case of error.
-  // [Deprecated]
+  // [Deprecated] Similar as TrainWithStatus, but fails (CHECK) in case of
+  // error.
   virtual std::unique_ptr<AbstractModel> Train(
-      const absl::string_view typed_path,
+      absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec) const;
 
-  // Trains and returns a model from a training dataset stored on drive.
-  // [Deprecated]
+  // [Deprecated] Similar as TrainWithStatus, but fails (CHECK) in case of
+  // error.
   virtual std::unique_ptr<AbstractModel> Train(
       const dataset::VerticalDataset& train_dataset) const;
 
@@ -163,6 +173,25 @@ class AbstractLearner {
   void set_stop_training_trigger(std::atomic<bool>* trigger) {
     stop_training_trigger_ = trigger;
   }
+
+  // Implementation of the "TrainWithStatus" function. Callers should call
+  // "TrainWithStatus". Learners should implement "TrainWithStatusImpl" (either
+  // both versions, to support both distributed and in-memory training) or only
+  // the in-memory version below.
+  virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
+      absl::string_view typed_path,
+      const dataset::proto::DataSpecification& data_spec,
+      const absl::optional<std::string>& typed_valid_path) const;
+
+  // Implementation of the "TrainWithStatus" function. Callers should call
+  // "TrainWithStatus". Learners should implement this "TrainWithStatusImpl"
+  // function.
+  //
+  // This method is not a pure virtual function for historical reasons.
+  virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
+      const dataset::VerticalDataset& train_dataset,
+      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+          valid_dataset) const;
 
  protected:
   // Training configuration. Contains the hyper parameters of the learner.

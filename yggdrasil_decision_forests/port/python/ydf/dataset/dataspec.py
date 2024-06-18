@@ -16,7 +16,6 @@
 
 import dataclasses
 import enum
-import logging
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -35,6 +34,7 @@ NormalizedColumnDefs = Optional[List["Column"]]
 # Must match kOutOfDictionaryItemKey in
 # yggdrasil_decision_forests/dataset/data_spec.h
 YDF_OOD = "<OOD>"
+YDF_OOD_BYTES = b"<OOD>"
 
 # Mapping between Numpy dtypes and YDF dtypes.
 _NP_DTYPE_TO_YDF_DTYPE = {
@@ -50,7 +50,6 @@ _NP_DTYPE_TO_YDF_DTYPE = {
     np.float32: ds_pb.DType.DTYPE_FLOAT32,
     np.float64: ds_pb.DType.DTYPE_FLOAT64,
     np.bool_: ds_pb.DType.DTYPE_BOOL,
-    np.string_: ds_pb.DType.DTYPE_BYTES,
     np.str_: ds_pb.DType.DTYPE_BYTES,
     np.bytes_: ds_pb.DType.DTYPE_BYTES,
     np.object_: ds_pb.DType.DTYPE_BYTES,

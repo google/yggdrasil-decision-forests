@@ -48,6 +48,9 @@ message Options {
   optional PermutedVariableImportance permuted_variable_importance = 7;
 
   message PermutedVariableImportance {
+    // If the model does not have labels (e.g., anomaly detection without
+    // labels), permutation variable importances are not computed, even if
+    // enabled=True.
     optional bool enabled = 1 [default = true];
 
     // Number of repetitions of the estimation. More repetitions increase the

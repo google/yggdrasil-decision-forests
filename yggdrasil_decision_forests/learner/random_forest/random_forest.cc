@@ -34,6 +34,7 @@
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
@@ -43,7 +44,6 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.pb.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -61,7 +61,6 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
-#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -362,7 +361,7 @@ absl::Status RandomForestLearner::CheckConfiguration(
 }
 
 absl::StatusOr<std::unique_ptr<AbstractModel>>
-RandomForestLearner::TrainWithStatus(
+RandomForestLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
@@ -419,8 +418,6 @@ RandomForestLearner::TrainWithStatus(
   RETURN_IF_ERROR(CheckConfiguration(train_dataset.data_spec(),
                                      config_with_default, config_link,
                                      rf_config, deployment()));
-  utils::usage::OnTrainingStart(train_dataset.data_spec(), config_with_default,
-                                config_link, train_dataset.nrow());
 
   std::vector<float> weights;
 
@@ -891,10 +888,6 @@ RandomForestLearner::TrainWithStatus(
         deployment().num_threads(), mdl.get()));
   }
 
-  utils::usage::OnTrainingEnd(train_dataset.data_spec(), config_with_default,
-                              config_link, train_dataset.nrow(), *mdl,
-                              absl::Now() - begin_training);
-
   if (!rf_config.export_oob_prediction_path().empty()) {
     RETURN_IF_ERROR(ExportOOBPredictions(
         config_with_default, config_link, train_dataset.data_spec(),
@@ -906,10 +899,6 @@ RandomForestLearner::TrainWithStatus(
       mdl->AvailableStructuralVariableImportances()));
 
   decision_tree::SetLeafIndices(mdl->mutable_decision_trees());
-
-  if (config_with_default.pure_serving_model()) {
-    RETURN_IF_ERROR(mdl->MakePureServing());
-  }
 
   return std::move(mdl);
 }

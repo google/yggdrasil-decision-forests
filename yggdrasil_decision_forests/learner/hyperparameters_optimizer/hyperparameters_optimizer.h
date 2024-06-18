@@ -52,15 +52,15 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
   // Unique identifier of the learning algorithm.
   static constexpr char kRegisteredName[] = "HYPERPARAMETER_OPTIMIZER";
 
-  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset = {}) const override;
+          valid_dataset) const override;
 
-  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path = {}) const override;
+      const absl::optional<std::string>& typed_valid_path) const override;
 
   // Sets the hyper-parameters of the learning algorithm from "generic hparams".
   absl::Status SetHyperParametersImpl(

@@ -15,8 +15,9 @@
 """Definitions for Gradient Boosted Trees models."""
 
 import math
-from typing import Optional
+from typing import Optional, Sequence
 
+import numpy as np
 import numpy.typing as npt
 
 from yggdrasil_decision_forests.metric import metric_pb2
@@ -40,6 +41,12 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
   def initial_predictions(self) -> npt.NDArray[float]:
     """Returns the model's initial predictions (i.e. the model bias)."""
     return self._model.initial_predictions()
+
+  def set_initial_predictions(self, initial_predictions: Sequence[float]):
+    """Sets the model's initial predictions (i.e. the model bias)."""
+    return self._model.set_initial_predictions(
+        np.asarray(initial_predictions, np.float32)
+    )
 
   def validation_evaluation(self) -> Optional[metric.Evaluation]:
     """Returns the validation evaluation of the model, if available.

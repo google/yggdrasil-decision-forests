@@ -166,7 +166,13 @@ def cast_input_dataset_to_dict(
     return _unroll_dict(data, **unroll_dict_kwargs)
 
   # TODO: Maybe this error should be raised at a layer above this one?
+
   raise ValueError(
-      "Cannot import dataset from"
-      f" {type(data)}.\n{dataset_io_types.SUPPORTED_INPUT_DATA_DESCRIPTION}"
+      "Non supported dataset type: "
+      f"{type(data)}\n\n{dataset_io_types.SUPPORTED_INPUT_DATA_DESCRIPTION}"
+      + (
+          dataset_io_types.HOW_TO_FEED_NUMPY
+          if isinstance(data, np.ndarray)
+          else ""
+      )
   )

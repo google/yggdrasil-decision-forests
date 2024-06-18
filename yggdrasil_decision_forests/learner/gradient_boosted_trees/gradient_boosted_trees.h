@@ -132,15 +132,15 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamFocalLossGamma[] = "focal_loss_gamma";
   static constexpr char kHParamFocalLossAlpha[] = "focal_loss_alpha";
 
-  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
       absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset = {}) const override;
+          valid_dataset) const override;
 
-  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
+  absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path = {}) const override;
+      const absl::optional<std::string>& typed_valid_path) const override;
 
   // Detects configuration errors and warnings.
   static absl::Status CheckConfiguration(

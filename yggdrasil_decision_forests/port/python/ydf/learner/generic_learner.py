@@ -37,6 +37,7 @@ from ydf.metric import metric
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.utils import log
+from ydf.utils import log
 from yggdrasil_decision_forests.utils import fold_generator_pb2
 from yggdrasil_decision_forests.utils.distribute.implementations.grpc import grpc_pb2
 
@@ -52,7 +53,7 @@ class GenericLearner:
       self,
       learner_name: str,
       task: Task,
-      label: str,
+      label: Optional[str],
       weights: Optional[str],
       ranking_group: Optional[str],
       uplift_treatment: Optional[str],
@@ -76,8 +77,11 @@ class GenericLearner:
     self._deployment_config = deployment_config
     self._tuner = tuner
 
-    if not self._label:
+    if self._label is not None and not isinstance(label, str):
+      raise ValueError("The 'label' should be a string")
+    if task != Task.ANOMALY_DETECTION and not self._label:
       raise ValueError("Constructing the learner requires a non-empty label.")
+
     if self._ranking_group is not None and task != Task.RANKING:
       raise ValueError(
           "The ranking group should only be specified for ranking tasks."
@@ -116,6 +120,7 @@ class GenericLearner:
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset] = None,
+      verbose: Optional[Union[int, bool]] = None,
   ) -> generic_model.ModelType:
     """Trains a model on the given dataset.
 
@@ -162,6 +167,10 @@ class GenericLearner:
         do not need validation dataset. Some learners, such as
         GradientBoostedTrees, automatically extract a validation dataset from
         the training dataset if the validation dataset is not provided.
+      verbose: Verbose level during training. If None, uses the global verbose
+        level of `ydf.verbose`. Levels are: 0 of False: No logs, 1 or True:
+        Print a few logs in a notebook; prints all the logs in a terminal. 2:
+        Prints all the logs on all surfaces.
 
     Returns:
       A trained model.
@@ -187,7 +196,15 @@ class GenericLearner:
           "The validation dataset may only be a path if the training dataset is"
           " a path."
       )
-    return self._train_from_dataset(ds, valid)
+
+    saved_verbose = log.verbose(verbose) if verbose is not None else None
+    try:
+      model = self._train_from_dataset(ds, valid)
+    finally:
+      if saved_verbose is not None:
+        log.verbose(saved_verbose)
+
+    return model
 
   def __str__(self) -> str:
     return f"""\
@@ -262,6 +279,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
     # Apply monotonic constraints.
     if self._data_spec_args.columns:
       for feature in self._data_spec_args.columns:
+        assert feature is not None
         if not feature.normalized_monotonic:
           continue
 
@@ -339,6 +357,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
           inference_args=effective_data_spec_args,
           required_columns=None,  # All columns in the dataspec are required.
           dont_unroll_columns=dont_unroll_columns,
+          label=self._label,
       )
 
   def cross_validation(
@@ -442,7 +461,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
       column are specified as features.
     """
 
-    def create_label_column(name: str, task: Task) -> dataspec.Column:
+    def create_label_column(name: str, task: Task) -> Optional[dataspec.Column]:
       if task in [Task.CLASSIFICATION, Task.CATEGORICAL_UPLIFT]:
         return dataspec.Column(
             name=name,
@@ -452,6 +471,9 @@ Hyper-parameters: ydf.{self._hyperparameters}
         )
       elif task in [Task.REGRESSION, Task.RANKING, Task.NUMERICAL_UPLIFT]:
         return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
+      elif task in [Task.ANOMALY_DETECTION]:
+        # No label column
+        return None
       else:
         raise ValueError(f"Unsupported task {task.name} for label column")
 
@@ -470,7 +492,10 @@ Hyper-parameters: ydf.{self._hyperparameters}
           f"Label column {self._label} is also an input feature. A column"
           " cannot be both a label and input feature."
       )
-    column_defs.append(create_label_column(self._label, self._task))
+    if (
+        label_column := create_label_column(self._label, self._task)
+    ) is not None:
+      column_defs.append(label_column)
     if self._weights is not None:
       if dataspec.column_defs_contains_column(self._weights, column_defs):
         raise ValueError(

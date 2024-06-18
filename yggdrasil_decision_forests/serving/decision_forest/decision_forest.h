@@ -47,11 +47,17 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_H_
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
-#include "yggdrasil_decision_forests/serving/decision_forest/utils.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
 
 namespace yggdrasil_decision_forests {
 namespace serving {

@@ -47,7 +47,6 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
-#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -136,7 +135,7 @@ CartLearner::GetGenericHyperParameterSpecification() const {
   return hparam_def;
 }
 
-absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
+absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
     absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
@@ -177,8 +176,6 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
   YDF_LOG(INFO) << "Training CART on " << train_dataset.nrow()
                 << " example(s) and " << config_link.features().size()
                 << " feature(s).";
-  utils::usage::OnTrainingStart(train_dataset.data_spec(), config, config_link,
-                                train_dataset.nrow());
 
   std::vector<float> weights;
   RETURN_IF_ERROR(dataset::GetWeights(train_dataset, config_link, &weights));
@@ -271,20 +268,11 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatus(
     mdl->mutable_out_of_bag_evaluations()->push_back(oob_evaluation);
   }
 
-  utils::usage::OnTrainingEnd(train_dataset.data_spec(), config, config_link,
-                              train_dataset.nrow(), *mdl,
-                              absl::Now() - begin_training);
-
   // Cache the structural variable importance in the model data.
   RETURN_IF_ERROR(mdl->PrecomputeVariableImportances(
       mdl->AvailableStructuralVariableImportances()));
 
   decision_tree::SetLeafIndices(mdl->mutable_decision_trees());
-
-  if (config.pure_serving_model()) {
-    RETURN_IF_ERROR(mdl->MakePureServing());
-  }
-
   return std::move(mdl);
 }
 

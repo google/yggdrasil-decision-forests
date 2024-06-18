@@ -23,6 +23,7 @@ from ydf.cc import ydf
 from ydf.dataset import dataspec
 from ydf.model import generic_model
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
+from ydf.model.isolation_forest_model import isolation_forest_model
 from ydf.model.random_forest_model import random_forest_model
 from ydf.utils import log
 
@@ -156,6 +157,8 @@ def load_cc_model(cc_model: ydf.GenericCCModel) -> generic_model.ModelType:
     return random_forest_model.RandomForestModel(cc_model)
   if model_name == ydf.GradientBoostedTreesCCModel.kRegisteredName:
     return gradient_boosted_trees_model.GradientBoostedTreesModel(cc_model)
+  if model_name == ydf.IsolationForestCCModel.kRegisteredName:
+    return isolation_forest_model.IsolationForestModel(cc_model)
   logging.info(
       "This model has type %s, which is not fully supported. Only generic model"
       " tasks (e.g. inference) are possible",

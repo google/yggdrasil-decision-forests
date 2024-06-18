@@ -53,6 +53,24 @@ TEST(TreeBuilder, Base) {
                           "golden/build_decision_tree.txt.expected");
 }
 
+TEST(TreeBuilder, AnomalyDetection) {
+  DecisionTree tree;
+  TreeBuilder builder(&tree);
+
+  dataset::proto::DataSpecification dataspec;
+  dataset::AddColumn("f1", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+
+  auto [l1, l2] = builder.ConditionIsGreater(/*attribute=*/0, /*threshold=*/1);
+  l1.LeafAnomalyDetection(2);
+  l2.LeafAnomalyDetection(3);
+
+  std::string description;
+  tree.AppendModelStructure(dataspec, 0, &description);
+  test::ExpectEqualGolden(description,
+                          "yggdrasil_decision_forests/test_data/"
+                          "golden/build_decision_tree_anomaly.txt.expected");
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

@@ -43,6 +43,7 @@ from ydf.learner.specialized_learners import CartLearner
 from ydf.learner.specialized_learners import RandomForestLearner
 from ydf.learner.specialized_learners import GradientBoostedTreesLearner
 from ydf.learner.specialized_learners import DistributedGradientBoostedTreesLearner
+from ydf.learner.specialized_learners import IsolationForestLearner
 
 DecisionTreeLearner = CartLearner
 
@@ -50,6 +51,7 @@ DecisionTreeLearner = CartLearner
 from ydf.model.generic_model import GenericModel
 from ydf.model.random_forest_model.random_forest_model import RandomForestModel
 from ydf.model.gradient_boosted_trees_model.gradient_boosted_trees_model import GradientBoostedTreesModel
+from ydf.model.isolation_forest_model.isolation_forest_model import IsolationForestModel
 # A CART model is a Random Forest with a single tree
 CARTModel = RandomForestModel
 
@@ -74,7 +76,7 @@ from ydf.model.generic_model import ModelIOOptions
 from ydf.dataset.dataset import create_vertical_dataset
 from ydf.model.model_metadata import ModelMetadata
 from ydf.model.model_lib import from_tensorflow_decision_forests
-
+from ydf.model.generic_model import from_sklearn
 
 # Custom Loss
 from ydf.learner.custom_loss import RegressionLoss
