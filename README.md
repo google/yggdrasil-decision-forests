@@ -1,59 +1,42 @@
 <p align="center">
-<img src="documentation/public/docs/image/logo.png"  />
+<img src="documentation/public/docs/image/logo_v2.png"  />
 </p>
 
-**Yggdrasil Decision Forests** (YDF) is a production-grade collection of
-algorithms developed in Google Switzerland 🏔️ since 2018 for the training,
-serving, and interpretation of decision forest models. YDF is available in
-Python, C++, CLI, in TensorFlow under the name
-[TensorFlow Decision Forests](https://github.com/tensorflow/decision-forests),
-JavaScript (inference only), and Go (inference only).
+[![PyPI](https://img.shields.io/pypi/v/ydf.svg?style=flat-square)](https://pypi.org/project/ydf/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+[![Static](https://img.shields.io/static/v1?label=docs&message=stable&style=flat-square)](https://ydf.readthedocs.io/)
+[![Static](https://img.shields.io/static/v1?label=docs&message=dev&style=flat-square)](https://ydf.readthedocs.io/en/latest/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/ydf?style=flat-square)](https://pepy.tech/project/ydf)
 
-To learn more about YDF, see [the documentation](https://ydf.readthedocs.org/).
+**YDF** (Yggdrasil Decision Forests) is a library to train, evaluate, interpret,
+and serve Random Forest, Gradient Boosted Decision Trees, and CART decision
+forest models.
 
-For more information on the design of YDF, see our paper at KDD 2023:
-[Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://doi.org/10.1145/3580305.3599933).
-
-## Key features
-
--   A simple API for training, evaluation and serving of decision forests
-    models.
--   Supports Random Forest, Gradient Boosted Trees and Carts, and advanced
-    learning algorithm such as oblique splits, honest trees, hessian and
-    non-hessian scores, and global tree optimizations.
--   Train classification, regression, ranking, and uplifting models.
--   Fast model inference in cpu (microseconds / example / cpu-core).
--   Supports distributed training over billions of examples.
--   Serving in Python, C++, TensorFlow Serving, Go, JavaScript, and CLI.
--   Rich report for model description (e.g., training logs, plot trees),
-    analysis (e.g., variable importances, partial dependence plots, conditional
-    dependence plots), evaluation (e.g., accuracy, AUC, ROC plots, RMSE,
-    confidence intervals), tuning (trials configuration and scores), and
-    cross-validation.
--   Natively consumes numerical, categorical, boolean, text, and missing values.
--   Backward compatibility for model and learners since 2018.
--   Consumes Pandas Dataframes, Numpy arrays, TensorFlow Dataset and CSV files.
+See the [documentation](https://ydf.readthedocs.org/) for more information on
+YDF.
 
 ## Installation
 
-To install YDF in Python from [PyPi](https://pypi.org/project/ydf/), run:
+To install YDF from [PyPI](https://pypi.org/project/ydf/), run:
 
 ```shell
-pip install ydf
+pip install ydf -U
 ```
 
 ## Usage example
 
-Example with the Python API.
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/yggdrasil-decision-forests/blob/main/documentation/public/docs/tutorial/usage_example.ipynb)
 
 ```python
 import ydf
 import pandas as pd
 
-train_ds = pd.read_csv("adult_train.csv")
-test_ds = pd.read_csv("adult_test.csv")
+# Load dataset with Pandas
+ds_path = "https://raw.githubusercontent.com/google/yggdrasil-decision-forests/main/yggdrasil_decision_forests/test_data/dataset/"
+train_ds = pd.read_csv(ds_path + "adult_train.csv")
+test_ds = pd.read_csv(ds_path + "adult_test.csv")
 
-# Train a model
+# Train a Gradient Boosted Trees model
 model = ydf.GradientBoostedTreesLearner(label="income").train(train_ds)
 
 # Look at a model (input features, training logs, structure, etc.)
@@ -124,17 +107,8 @@ model.save("project/model")
 
 ## Next steps
 
-Check the [Getting Started tutorial 🧭](tutorial/getting_started.ipynb).
-
-## Google I/O Presentation
-
-Yggdrasil Decision Forests powers TensorFlow Decision Forests.
-
-<div align="center">
-    <a href="https://youtu.be/5qgk9QJ4rdQ">
-        <img src="https://img.youtube.com/vi/5qgk9QJ4rdQ/0.jpg"></img>
-    </a>
-</div>
+Check the
+[Getting Started tutorial 🧭](https://ydf.readthedocs.io/en/stable/tutorial/getting_started/).
 
 ## Citation
 

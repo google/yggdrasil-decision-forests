@@ -85,23 +85,25 @@ Source: <a href="https://doi.org/10.1145/3580305.3599933">A Comparison of Decisi
 
 ## Key features
 
-*Read our KDD 2023 paper:
-[Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://doi.org/10.1145/3580305.3599933).
-YDF is developed by Google since 2018 and powers TensorFlow Decision Forests.*
-
 **Modeling**
 
--   Train [Random Forest](py_api/RandomForestLearner), [Gradient Boosted Trees](py_api/GradientBoostedTreesLearner) and [Cart](py_api/CartLearner) models.
+-   Train [Random Forest](py_api/RandomForestLearner),
+    [Gradient Boosted Trees](py_api/GradientBoostedTreesLearner),
+    [Cart](py_api/CartLearner), and
+    [Isolation Forest](py_api/IsolationForestLearner) models.
 -   Train [classification](tutorial/classification.ipynb),
     [regression](tutorial/regression.ipynb), [ranking](tutorial/ranking.ipynb),
-    and [uplifting](tutorial/uplifting.ipynb) models.
--   [Plotting of decision trees](tutorial/inspecting_trees.ipynb).
--   [Model interpretation](tutorial/model_understanding.ipynb) (variable importances, partial dependence plots,
-    conditional dependence plots).
--   Prediction interpretation ([counter factual](tutorial/counterfactual.ipynb), [feature variation](tutorial/prediction_understanding.ipynb)).
--   [Model evaluation](tutorial/train_and_test.ipynb) (accuracy, AUC, ROC plots, RMSE, confidence intervals,
+    [uplifting](tutorial/uplifting.ipynb), and
+    [anomaly detection](tutorial/anomaly_detection.ipynb) models.
+-   [Plot of decision trees](tutorial/inspecting_trees.ipynb).
+-   [Interpret model](tutorial/model_understanding.ipynb) (variable importances,
+    partial dependence plots, conditional dependence plots).
+-   Interpret predictions ([counter factual](tutorial/counterfactual.ipynb),
+    [feature variation](tutorial/prediction_understanding.ipynb)).
+-   [Evaluate models](tutorial/train_and_test.ipynb) (accuracy, AUC, ROC plots,
+    RMSE, confidence intervals,
     [cross-validation](tutorial/cross_validation.ipynb)).
--   Model [hyper-parameter tuning](tutorial/tuning.ipynb).
+-   [Hyper-parameter tune models](tutorial/tuning.ipynb).
 -   Consume natively [numerical](tutorial/numerical_feature.ipynb),
     [categorical](tutorial/categorical_feature.ipynb), boolean, tags, text, and
     missing values.
@@ -111,26 +113,31 @@ YDF is developed by Google since 2018 and powers TensorFlow Decision Forests.*
 
 **Serving**
 
--   [Benchmark](tutorial/getting_started/#benchmark-model-speed) model inference.
--   Call models in Python, [C++](tutorial/cpp.ipynb), [Go](https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/go), [JavaScript](https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/javascript), and [CLI](cli_commands).
+-   [Benchmark](tutorial/getting_started/#benchmark-model-speed) model
+    inference.
+-   Run models in Python, [C++](tutorial/cpp.ipynb),
+    [Go](https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/go),
+    [JavaScript](https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/javascript),
+    and [CLI](cli_commands).
 -   Online inference with REST API with
     [TensorFlow Serving and Vertex AI](tutorial/tf_serving.ipynb).
 
 **Advanced modeling**
 
--   Model composition with [TensorFlow, Keras](tutorial/compose_with_tf.ipynb),
-    and Jax (coming soon).
+-   Compose YDF models with Neural Network models in
+    [TensorFlow, Keras](tutorial/compose_with_tf.ipynb), and
+    [JAX](compose_with_jax.ipynb).
 -   [Distributed training](tutorial/distributed_training.ipynb) over billions of
     examples and hundreds of machines.
--   Cutting-edge learning algorithm such as oblique splits, honest trees,
+-   Use cutting-edge learning algorithm such as oblique splits, honest trees,
     hessian scores, global tree optimizations, optimal categorical splits,
     categorical-set inputs, dart, extremely randomized trees.
--   [Monotonic constraints](tutorial/monotonic_feature.ipynb).
+-   Apply [monotonic constraints](tutorial/monotonic_feature.ipynb).
 -   Consumes [multi-dimensional](tutorial/multidimensional_feature.ipynb)
     features.
--   Backward compatibility for model and learners since 2018.
+-   Enjoy backward compatibility for model and learners since 2018.
 -   [Edits trees](tutorial/editing_trees.ipynb) in Python.
--   [Custom loss](tutorial/custom_loss.ipynb) in Python.
+-   Define [custom loss](tutorial/custom_loss.ipynb) in Python.
 
 ## Installation
 
