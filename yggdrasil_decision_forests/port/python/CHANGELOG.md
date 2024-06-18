@@ -1,6 +1,6 @@
 # Changelog
 
-## HEAD
+## 0.5.0 - 2024-06-17
 
 ### Feature
 
@@ -10,6 +10,12 @@
     more convenient than`ydf.verbose`.
 -   Add SKLearn to YDF model converter: `ydf.from_sklearn`.
 -   Improve error messages when calling the model with non supported data.
+-   Add support for numpy 2.0.
+
+### Tutorials
+
+-   Add anomaly detection tutorial.
+-   Add YDF and JAX model composition tutorial.
 
 ### Fix
 

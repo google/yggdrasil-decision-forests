@@ -136,7 +136,7 @@ class VerticalDataset:
           column_data.dtype.type
           in [
               np.object_,
-              np.string_,
+              np.bytes_,
               np.str_,
           ]
           or column_data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE
@@ -215,7 +215,7 @@ class VerticalDataset:
 
       if column_data.dtype.type in [
           np.object_,
-          np.string_,
+          np.bytes_,
           np.bool_,
       ] or np.issubdtype(column_data.dtype, np.integer):
         column_data = column_data.astype(np.bytes_)
@@ -648,7 +648,7 @@ def infer_semantic(name: str, data: Any) -> dataspec.Semantic:
     ):
       return dataspec.Semantic.NUMERICAL
 
-    if data.dtype.type in [np.string_, np.bytes_, np.str_]:
+    if data.dtype.type in [np.bytes_, np.str_]:
       return dataspec.Semantic.CATEGORICAL
 
     if data.dtype.type in [np.object_]:

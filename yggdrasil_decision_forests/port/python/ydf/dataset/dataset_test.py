@@ -48,7 +48,6 @@ class GenericDatasetTest(parameterized.TestCase):
       (np.array([1], np.float64), Semantic.NUMERICAL),
       (np.array([1], np.bool_), Semantic.BOOLEAN),
       (np.array(["a"], np.bytes_), Semantic.CATEGORICAL),
-      (np.array(["a"], np.string_), Semantic.CATEGORICAL),
       (np.array(["a", np.nan], np.object_), Semantic.CATEGORICAL),
   )
   def test_infer_semantic(self, value, expected_semantic):

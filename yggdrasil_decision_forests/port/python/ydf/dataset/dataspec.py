@@ -50,7 +50,6 @@ _NP_DTYPE_TO_YDF_DTYPE = {
     np.float32: ds_pb.DType.DTYPE_FLOAT32,
     np.float64: ds_pb.DType.DTYPE_FLOAT64,
     np.bool_: ds_pb.DType.DTYPE_BOOL,
-    np.string_: ds_pb.DType.DTYPE_BYTES,
     np.str_: ds_pb.DType.DTYPE_BYTES,
     np.bytes_: ds_pb.DType.DTYPE_BYTES,
     np.object_: ds_pb.DType.DTYPE_BYTES,
