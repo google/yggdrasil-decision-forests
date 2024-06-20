@@ -1,9 +1,6 @@
 # pytype binary, test, library
 
-package(
-    default_visibility = ["//visibility:public"],
-    licenses = ["notice"],
-)
+package(licenses = ["notice"])
 
 py_library(
     name = "benchmark",
