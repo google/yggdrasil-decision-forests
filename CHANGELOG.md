@@ -3,11 +3,21 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
+## Head
+
+### Features
+
+-   Add support for Isolation Forests model.
+-   The default value of `num_candidate_attributes` in the CART learner is
+    changed from 0 (Random Forest style sampling) to -1 (no sampling). This is
+    the generally accepted logic of CART.
+
 ## 1.9.0 - 2024-03-12
 
 ### Feature
 
--   Add "parallel_trials" parameter in the hyper-parameter tuner to control the number of trials to run in parallel.
+-   Add "parallel_trials" parameter in the hyper-parameter tuner to control the
+    number of trials to run in parallel.
 -   Add support for custom losses.
 
 ## 1.8.0 - 2023-11-17

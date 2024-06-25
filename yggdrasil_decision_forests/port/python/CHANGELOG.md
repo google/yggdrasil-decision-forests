@@ -1,5 +1,13 @@
 # Changelog
 
+## Head
+
+### Feature
+
+-   The default value of `num_candidate_attributes` in the CART learner is
+    changed from 0 (Random Forest style sampling) to -1 (no sampling). This is
+    the generally accepted logic of CART.
+
 ## 0.5.0 - 2024-06-17
 
 ### Feature

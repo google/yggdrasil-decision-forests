@@ -71,6 +71,28 @@ void GenTrainAndValidIndices(const float validation_ratio,
   }
 }
 
+absl::Status SetDefaultHyperParameters(
+    cart::proto::CartTrainingConfig* cart_config) {
+  // The basic definition of CART does not have any attribute sampling.
+  if (!cart_config->decision_tree().has_num_candidate_attributes() &&
+      !cart_config->decision_tree().has_num_candidate_attributes_ratio()) {
+    cart_config->mutable_decision_tree()->set_num_candidate_attributes(-1);
+  }
+
+  // There is no need for pre-sorting.
+  cart_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_sorting_strategy(
+          decision_tree::proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  // Set the default generic decision tree hyper-parameter which might have not
+  // be set by this CART specific function.
+  decision_tree::SetDefaultHyperParameters(
+      cart_config->mutable_decision_tree());
+
+  return absl::OkStatus();
+}
+
 }  // namespace
 
 CartLearner::CartLearner(const model::proto::TrainingConfig& training_config)
@@ -116,7 +138,8 @@ CartLearner::GetGenericHyperParameterSpecification() const {
 
   model::proto::TrainingConfig config;
   const auto proto_path = "learner/cart/cart.proto";
-  const auto& cart_config = config.GetExtension(cart::proto::cart_config);
+  auto& cart_config = *config.MutableExtension(cart::proto::cart_config);
+  RETURN_IF_ERROR(SetDefaultHyperParameters(&cart_config));
 
   {
     auto& param =
@@ -152,10 +175,9 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
   // Assemble and check the training configuration.
   auto config = training_config();
   auto& cart_config = *config.MutableExtension(cart::proto::cart_config);
-  decision_tree::SetDefaultHyperParameters(cart_config.mutable_decision_tree());
-  // There is no need for pre-sorting.
-  cart_config.mutable_decision_tree()->mutable_internal()->set_sorting_strategy(
-      decision_tree::proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  RETURN_IF_ERROR(SetDefaultHyperParameters(&cart_config));
+
   model::proto::TrainingConfigLinking config_link;
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
       config, train_dataset.data_spec(), &config_link));
