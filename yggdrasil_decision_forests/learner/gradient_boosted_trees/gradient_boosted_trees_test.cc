@@ -543,8 +543,28 @@ class GradientBoostedTreesOnAdult : public utils::TrainAndTestTester {
   }
 };
 
-// Train and test a model on the adult dataset.
-TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
+TEST_F(GradientBoostedTreesOnAdult, Base) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+
+  TrainAndEvaluateModel();
+
+  // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
+  // is significantly better (which is expected as, unlike RF,  GBT is
+  // calibrated).
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8644, 0.0099, 0.8664);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2979, 0.0127, 0.2942);
+
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+  EXPECT_TRUE(gbt_model->CheckStructure(
+      decision_tree::CheckStructureOptions::GlobalImputation()));
+
+  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_base");
+}
+
+TEST_F(GradientBoostedTreesOnAdult, SubsamplingDeprecatedParam) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_num_trees(100);
@@ -563,7 +583,31 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
   EXPECT_TRUE(gbt_model->CheckStructure(
       decision_tree::CheckStructureOptions::GlobalImputation()));
 
-  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_base_deprecated");
+  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_subsampling");
+}
+
+// Train and test a model on the adult dataset.
+TEST_F(GradientBoostedTreesOnAdult, SubsamplingNewParam) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
+  TrainAndEvaluateModel();
+
+  // Note: Accuracy is similar as RF (see :random_forest_test). However, logloss
+  // is significantly better (which is expected as, unlike RF, GBT is
+  // calibrated).
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8647, 0.0099, 0.8658);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2984, 0.0162, 0.294);
+
+  auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
+  EXPECT_TRUE(gbt_model->CheckStructure(
+      decision_tree::CheckStructureOptions::GlobalImputation()));
+
+  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_subsampling");
 }
 
 // Train and test a model on the adult dataset.
@@ -587,28 +631,6 @@ TEST_F(GradientBoostedTreesOnAdult, BaseWithNAConditions) {
       decision_tree::CheckStructureOptions::GlobalImputation()));
 
   utils::ExpectEqualGoldenModel(*model_, "gbt_adult_base_with_na");
-}
-
-// Train and test a model on the adult dataset.
-TEST_F(GradientBoostedTreesOnAdult, Base) {
-  auto* gbt_config = train_config_.MutableExtension(
-      gradient_boosted_trees::proto::gradient_boosted_trees_config);
-  gbt_config->set_num_trees(100);
-  gbt_config->mutable_decision_tree()->set_max_depth(4);
-  gbt_config->set_shrinkage(0.1f);
-  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
-  TrainAndEvaluateModel();
-
-  // Note: Accuracy is similar as RF (see :random_forest_test). However, logloss
-  // is significantly better (which is expected as, unlike RF, GBT is
-  // calibrated).
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8647, 0.0099, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2984, 0.0162, 0.294);
-
-  auto* gbt_model =
-      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
-  EXPECT_TRUE(gbt_model->CheckStructure(
-      decision_tree::CheckStructureOptions::GlobalImputation()));
 }
 
 TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraints) {
