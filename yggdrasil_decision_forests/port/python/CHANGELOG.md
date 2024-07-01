@@ -7,6 +7,8 @@
 -   The default value of `num_candidate_attributes` in the CART learner is
     changed from 0 (Random Forest style sampling) to -1 (no sampling). This is
     the generally accepted logic of CART.
+-   `model.to_tensorflow_saved_model` support preprocessing functions which have
+    a different signature than the YDF model.
 
 ## 0.5.0 - 2024-06-17
 

@@ -914,6 +914,155 @@ class TfModelTest(parameterized.TestCase):
 
     _ = tf.saved_model.load(tmp_dir)
 
+  @parameterized.parameters(
+      (False,),
+      (True,),
+  )
+  def test_to_tensorflow_saved_model_with_tf_function_processing(
+      self, serialized_input: bool
+  ):
+    """Use a @tf.function to process model inputs and export the model."""
+
+    # Creates a dataset.
+    columns = ["f1", "f2", "label_class_binary"]
+    raw_dict_ds = self.create_dataset_v2(columns)
+
+    # Define a preprocessing TensorFlow function for the dataset.
+    @tf.function
+    def preprocessing(raw_features: Dict[str, tf.Tensor]):
+      features = {**raw_features}
+      # Create a new feature.
+      features["sin_f1"] = tf.sin(features["f1"])
+      # Remove a feature
+      del features["f1"]
+      return features
+
+    # Create a TF dataset containing the raw Numpy dataset and the preprocessing
+    # function.
+    processed_tf_dataset = (
+        tf.data.Dataset.from_tensor_slices(raw_dict_ds)
+        .batch(128)  # The batch size has no impact on the model.
+        .map(preprocessing)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+
+    # Train a model on the preprocessed dataset.
+    learner = specialized_learners.RandomForestLearner(
+        label="label_class_binary",
+        num_trees=10,
+        task=generic_learner.Task.CLASSIFICATION,
+    )
+    ydf_model = learner.train(processed_tf_dataset)
+
+    # Generate the golden predictions.
+    ydf_predictions = ydf_model.predict(processed_tf_dataset)
+
+    # Check that the model has been trained on the pre-processed features.
+    self.assertSequenceEqual(ydf_model.input_feature_names(), ["f2", "sin_f1"])
+
+    model_path = self.create_tempdir().full_path
+
+    if not serialized_input:
+      ydf_model.to_tensorflow_saved_model(
+          path=model_path,
+          mode="tf",
+          pre_processing=preprocessing,
+          tensor_specs={
+              "f1": tf.TensorSpec(shape=[None], name="f1", dtype=tf.float64),
+              "f2": tf.TensorSpec(shape=[None], name="f2", dtype=tf.float64),
+          },
+      )
+
+      # Check that the exported model works.
+      tf_model = tf.saved_model.load(model_path)
+      tf_dataset = {
+          k: tf.constant(v) for k, v in raw_dict_ds.items() if "label" not in k
+      }
+      tf_predictions = tf_model(tf_dataset)
+    else:
+      ydf_model.to_tensorflow_saved_model(
+          path=model_path,
+          mode="tf",
+          pre_processing=preprocessing,
+          feed_example_proto=True,
+          feature_specs={
+              "f1": tf.io.FixedLenFeature(
+                  shape=[], dtype=tf.float32, default_value=math.nan
+              ),
+              "f2": tf.io.FixedLenFeature(
+                  shape=[], dtype=tf.float32, default_value=math.nan
+              ),
+          },
+      )
+
+      tf_model = tf.saved_model.load(model_path)
+      tf_dataset = [
+          tf.train.Example(
+              features=tf.train.Features(
+                  feature={
+                      "f1": tf.train.Feature(
+                          float_list=tf.train.FloatList(
+                              value=[raw_dict_ds["f1"][i]]
+                          )
+                      ),
+                      "f2": tf.train.Feature(
+                          float_list=tf.train.FloatList(
+                              value=[raw_dict_ds["f2"][i]]
+                          )
+                      ),
+                  }
+              )
+          ).SerializeToString()
+          for i in range(100)
+      ]
+      tf_predictions = tf_model.signatures["serving_default"](
+          inputs=tf_dataset
+      )["output"]
+
+    npt.assert_equal(ydf_predictions, tf_predictions)
+
+  def test_to_tensorflow_saved_model_with_processing_and_wrong_spec(self):
+
+    columns = ["f1", "label_class_binary"]
+    raw_dict_dataset = self.create_dataset_v2(columns)
+
+    # Define a preprocessing tensorflow function for the dataset.
+    @tf.function
+    def preprocessing(raw_features: Dict[str, tf.Tensor]):
+      features = {**raw_features}
+      # Create a new feature.
+      features["sin_f1"] = tf.sin(features["f1"])
+      # Remove a feature.
+      del features["f1"]
+      return features
+
+    processed_tf_dataset = (
+        tf.data.Dataset.from_tensor_slices(raw_dict_dataset)
+        .batch(128)
+        .map(preprocessing)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+
+    learner = specialized_learners.RandomForestLearner(
+        label="label_class_binary",
+        num_trees=10,
+        task=generic_learner.Task.CLASSIFICATION,
+    )
+    ydf_model = learner.train(processed_tf_dataset)
+
+    model_path = self.create_tempdir().full_path
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "This error might be caused by the feature spec",
+    ):
+      ydf_model.to_tensorflow_saved_model(
+          path=model_path,
+          mode="tf",
+          pre_processing=preprocessing,
+          feed_example_proto=True,
+      )
+
   def test_to_tensorflow_saved_model_adult_classify_api_serialized_examples(
       self,
   ):

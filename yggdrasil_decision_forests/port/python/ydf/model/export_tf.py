@@ -14,6 +14,7 @@
 
 """Utilities to export TF models."""
 
+import logging
 import math
 import shutil
 import tempfile
@@ -111,6 +112,8 @@ def ydf_model_to_tensorflow_saved_model(
     pre_processing: Optional[Callable],  # pylint: disable=g-bare-generic
     post_processing: Optional[Callable],  # pylint: disable=g-bare-generic
     temp_dir: Optional[str],
+    tensor_specs: Optional[Dict[str, Any]] = None,
+    feature_specs: Optional[Dict[str, Any]] = None,
 ):  # pylint: disable=g-doc-args
   """Exports the model as a TensorFlow Saved model.
 
@@ -123,6 +126,8 @@ def ydf_model_to_tensorflow_saved_model(
         (feed_example_proto, "feed_example_proto", False),
         (pre_processing, "pre_processing", None),
         (post_processing, "post_processing", None),
+        (tensor_specs, "tensor_specs", None),
+        (feature_specs, "feature_specs", None),
     ]:
       if value != expected:
         raise ValueError(f"{name!r} is not supported for `keras` mode.")
@@ -147,6 +152,8 @@ def ydf_model_to_tensorflow_saved_model(
         pre_processing=pre_processing,
         post_processing=post_processing,
         temp_dir=temp_dir,
+        tensor_specs=tensor_specs,
+        feature_specs=feature_specs,
     )
   else:
     raise ValueError(f"Invalid mode: {mode}")
@@ -182,6 +189,8 @@ def ydf_model_to_tensorflow_saved_model_tf_mode(
     pre_processing: Optional[Callable],  # pylint: disable=g-bare-generic
     post_processing: Optional[Callable],  # pylint: disable=g-bare-generic
     temp_dir: Optional[str],
+    tensor_specs: Optional[Dict[str, Any]] = None,
+    feature_specs: Optional[Dict[str, Any]] = None,
 ):  # pylint: disable=g-doc-args
 
   # The temporary files should remain available until the call to
@@ -212,11 +221,47 @@ def ydf_model_to_tensorflow_saved_model_tf_mode(
 
     # Trace the call function.
     # Note: "tf.saved_model.save" can only export functions that have been
-    # traced.
-    raw_input_signature = tensorflow_raw_input_signature(
-        ydf_model, feature_dtypes
-    )
-    tf_module.__call__.get_concrete_function(raw_input_signature)
+    # traced. However, the function will be traced automatically when
+    # "feed_example_proto=True" (i.e., it is okay to skip this block).
+    raw_input_signature = None
+    if not (
+        pre_processing is not None
+        and feed_example_proto
+        and tensor_specs is None
+        and not feature_dtypes
+    ):
+      if tensor_specs is not None:
+        # Use user provided signature.
+        raw_input_signature = tensor_specs
+      else:
+        # Get input signature from the YDF model.
+        raw_input_signature = tensorflow_raw_input_signature(
+            ydf_model, feature_dtypes
+        )
+
+      try:
+        tf_module.__call__.get_concrete_function(raw_input_signature)
+      # Note: We are really looking for KeyError, but TF wrapps them into
+      # interal staging errors.
+      except Exception as e:
+        if (
+            pre_processing is not None
+            and tensor_specs is None
+            and feature_dtypes is None
+        ):
+          raise ValueError(
+              "Since `tensor_specs` and `feature_dtypes` are not specified, the"
+              " tensor specs of `pre_processing` uses the tensor spec of the"
+              " model. If `pre_processing` consumes features that are different"
+              " (e.g. new features, removed features, change the dtype of the"
+              " features) than the features consumed by the model, you need to"
+              " set `tensor_specs` or `feature_dtypes` with the tensor spec of"
+              " `pre_processing`.\n\nFor example, if `pre_processing` expects a"
+              " float32 numerical feature called `f1`, set `tensor_specs ="
+              ' {"f1": tf.TensorSpec(shape=[None], name="f1",'
+              " dtype=tf.float64)}`."
+          ) from e
+        raise e
 
     # Output format
     if servo_api:
@@ -256,6 +301,7 @@ def ydf_model_to_tensorflow_saved_model_tf_mode(
 
     # Input feature formats
     if not feed_example_proto:
+      assert raw_input_signature is not None
 
       # Feed raw feature values.
 
@@ -273,7 +319,10 @@ def ydf_model_to_tensorflow_saved_model_tf_mode(
 
     else:
       # Feed binary serialized TensorFlow Example protos.
-      feature_spec = tensorflow_feature_spec(ydf_model, feature_dtypes)
+      if feature_specs is None:
+        # If not provided by the user, generate the feature specs using the
+        # model.
+        feature_specs = tensorflow_feature_spec(ydf_model, feature_dtypes)
 
       @tf.function(
           input_signature=[
@@ -284,12 +333,33 @@ def ydf_model_to_tensorflow_saved_model_tf_mode(
           serialized_examples: tf.Tensor,
       ):
         batch_size = tf.shape(serialized_examples)[0]
-        features = tf.io.parse_example(serialized_examples, feature_spec)
+        features = tf.io.parse_example(serialized_examples, feature_specs)
         return predict_output_format(features, batch_size)
 
       signatures = {"serving_default": predict_input_format}
 
-    tf.saved_model.save(tf_module, path, signatures=signatures)
+    try:
+      tf.saved_model.save(tf_module, path, signatures=signatures)
+      # Note: We are really looking for KeyError, but TF wrapps them into
+      # interal staging errors.
+    except Exception as e:
+      if pre_processing is not None and feed_example_proto:
+        raise ValueError(
+            "This error might be caused by the feature spec (i.e.,"
+            " the parsing feature specs of `tf.io.parse_example`) of"
+            " the `pre_processing` tf.function argument beeing"
+            " different from the specs of the model. If"
+            " `pre_processing` consumes features that are different (e.g. new"
+            " features, removed features, change the dtype of the features)"
+            " than the features consumed by the model, set the"
+            " `feature_specs` argument with the feature spec expected by"
+            " `pre_processing` and ensure that the output of `pre_processing`"
+            " is compatible with the model.\n\nFor example, if"
+            " `pre_processing` expects a float32 numerical feature called"
+            ' `f1`, set `feature_specs = {"f1": tf.io.FixedLenFeature('
+            " shape=[], dtype=tf.float32, default_value=math.nan)}`."
+        ) from e
+      raise e
 
 
 def ydf_model_to_tf_function(  # pytype: disable=name-error

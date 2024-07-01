@@ -616,6 +616,8 @@ Use `model.describe()` for more details
       pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
       post_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
       temp_dir: Optional[str] = None,
+      tensor_specs: Optional[Dict[str, Any]] = None,
+      feature_specs: Optional[Dict[str, Any]] = None,
   ) -> None:
     """Exports the model as a TensorFlow Saved model.
 
@@ -673,25 +675,97 @@ Use `model.describe()` for more details
     )
     ```
 
-    The SavedModel format allows for custom preprocessing and postprocessing
-    computation in addition to the model inference. Such computation can be
-    specified with the `pre_processing` and `post_processing` arguments:
+    Some TensorFlow Serving or Servomatic pipelines rely on feed examples as
+    serialized TensorFlow Example proto (instead of raw tensor values) and/or
+    wrap the model raw output (e.g. probability predictions) into a special
+    structure (called the Serving API). You can create models compatible with
+    those two convensions with `feed_example_proto=True` and `servo_api=True`
+    respectively:
 
     ```python
-    def pre_processing(features):
-      features = features.copy()
-      features["f1"] = features["f1"] * 2
-      return features
-
     model.to_tensorflow_saved_model(
         path="/tmp/my_model",
         mode="tf",
-        pre_processing=pre_processing,
+        feed_example_proto=True,
+        servo_api=True
     )
     ```
 
-    For more complex combinations, such as composing multiple models, use the
-    method `to_tensorflow_function` instead of `to_tensorflow_saved_model`.
+    If your model requires some data preprocessing or post-processing, you can
+    express them as a @tf.function or a tf module and pass them to the
+    `pre_processing` and `post_processing` arguments respectively.
+
+    Warning: When exporting a SavedModel, YDF infers the model signature using
+    the dtype of the features observed during training. If the signature of the
+    pre_processing function is different than the signature of the model (e.g.,
+    the processing creates a new feature), you need to specify the tensor specs
+    (`tensor_specs`; if `feed_example_proto=False`) or feature spec
+    (`feature_specs`; if `feed_example_proto=True`) argument:
+
+    ```python
+    # Define a pre-processing function
+    @tf.function
+    def pre_processing(raw_features):
+      features = {**raw_features}
+      # Create a new feature.
+      features["sin_f1"] = tf.sin(features["f1"])
+      # Remove a feature
+      del features["f1"]
+      return features
+
+    # Create Numpy dataset
+    raw_dataset = {
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    }
+
+    # Apply the preprocessing on the training dataset.
+    processed_dataset = (
+        tf.data.Dataset.from_tensor_slices(raw_dataset)
+        .batch(128)  # The batch size has no impact on the model.
+        .map(preprocessing)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+
+    # Train a model on the pre-processed dataset.
+    ydf_model = specialized_learners.RandomForestLearner(
+        label="l",
+        task=generic_learner.Task.CLASSIFICATION,
+    ).train(processed_dataset)
+
+    # Export the model to a raw SavedModel model with the pre-processing
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model",
+        mode="tf",
+        feed_example_proto=False,
+        pre_processing=pre_processing,
+        tensor_specs{
+            "f1": tf.TensorSpec(shape=[None], name="f1", dtype=tf.float64),
+            "f2": tf.TensorSpec(shape=[None], name="f2", dtype=tf.float64),
+        }
+    )
+
+    # Export the model to a SavedModel consuming serialized tf examples with the
+    # pre-processing
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model",
+        mode="tf",
+        feed_example_proto=True,
+        pre_processing=pre_processing,
+        feature_specs={
+            "f1": tf.io.FixedLenFeature(
+                shape=[], dtype=tf.float32, default_value=math.nan
+            ),
+            "f2": tf.io.FixedLenFeature(
+                shape=[], dtype=tf.float32, default_value=math.nan
+            ),
+        }
+    )
+    ```
+
+    For more flexibility, use the method `to_tensorflow_function` instead of
+    `to_tensorflow_saved_model`.
 
     Args:
       path: Path to store the Tensorflow Decision Forests model.
@@ -712,8 +786,10 @@ Use `model.describe()` for more details
       feature_dtypes: Mapping from feature name to TensorFlow dtype. Use this
         mapping to feature dtype. For instance, numerical features are encoded
         with tf.float32 by default. If you plan on feeding tf.float64 or
-        tf.int32, use `feature_dtype` to specify it. Only compatible with
-        mode="tf".
+        tf.int32, use `feature_dtype` to specify it. `feature_dtypes` is ignored
+        if `tensor_specs` is set. If set, disables the automatic signature
+        extraction on `pre_processing` (if `pre_processing` is also set). Only
+        compatible with mode="tf".
       servo_api: If true, adds a SavedModel signature to make the model
         compatible with the `Classify` or `Regress` servo APIs. Only compatible
         with mode="tf". If false, outputs the raw model predictions.
@@ -723,12 +799,32 @@ Use `model.describe()` for more details
         provided as a binary serialized TensorFlow Example proto. This is the
         format expected by VertexAI and most TensorFlow Serving pipelines.
       pre_processing: Optional TensorFlow function or module to apply on the
-        input features before applying the model. Only compatible with
-        mode="tf".
+        input features before applying the model. If the `pre_processing`
+        function has been traced (i.e., the function has been called once with
+        actual data and contains a concrete instance in its cache), this
+        signature is extracted and used as signature of the SavedModel. Only
+        compatible with mode="tf".
       post_processing: Optional TensorFlow function or module to apply on the
         model predictions. Only compatible with mode="tf".
       temp_dir: Temporary directory used during the conversion. If None
         (default), uses `tempfile.mkdtemp` default temporary directory.
+      tensor_specs: Optional dictionary of `tf.TensorSpec` that define the input
+        features of the model to export. If not provided, the TensorSpecs are
+        automatically generated based on the model features seen during
+        training. This means that "tensor_specs" is only necessary when using a
+        "pre_processing" argument that expects different features than what the
+        model was trained with. This argument is ignored when exporting model
+        with `feed_example_proto=True` as in this case, the TensorSpecs are
+        defined by the `tf.io.parse_example` parsing feature specs. Only
+        compatible with mode="tf".
+      feature_specs: Optional dictionary of `tf.io.parse_example` parsing
+        feature specs e.g. `tf.io.FixedLenFeature` or `tf.io.RaggedFeature`. If
+        not provided, the praising feature specs are automatically generated
+        based on the model features seen during training. This means that
+        "feature_specs" is only necessary when using a "pre_processing" argument
+        that expects different features than what the model was trained with.
+        This argument is ignored when exporting model with
+        `feed_example_proto=False`. Only compatible with mode="tf".
     """
 
     if mode == "keras":
@@ -751,6 +847,8 @@ Use `model.describe()` for more details
         pre_processing=pre_processing,
         post_processing=post_processing,
         temp_dir=temp_dir,
+        tensor_specs=tensor_specs,
+        feature_specs=feature_specs,
     )
 
   def to_tensorflow_function(  # pytype: disable=name-error
