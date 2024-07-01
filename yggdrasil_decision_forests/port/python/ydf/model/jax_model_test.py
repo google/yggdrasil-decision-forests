@@ -381,7 +381,6 @@ class JaxModelTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertIsNotNone(feature_encoder)
     self.assertDictEqual(
         feature_encoder.categorical, {"f2": {"<OOD>": 0, "A": 1, "B": 2}}
     )
@@ -397,7 +396,6 @@ class JaxModelTest(parameterized.TestCase):
     feature_encoder = to_jax.FeatureEncoder.build(
         model.input_features(), model.data_spec()
     )
-    self.assertIsNotNone(feature_encoder)
     self.assertDictEqual(
         feature_encoder.categorical,
         {
@@ -416,7 +414,7 @@ class JaxModelTest(parameterized.TestCase):
         encoded_features["c1"], jnp.asarray([1, 2, 0])
     )
 
-  def test_feature_encoder_is_none(self):
+  def test_feature_encoder_categorical_is_empty(self):
     columns = ["f1", "i1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
         label="label_class_binary", num_trees=2
@@ -424,7 +422,7 @@ class JaxModelTest(parameterized.TestCase):
     feature_encoder = to_jax.FeatureEncoder.build(
         model.input_features(), model.data_spec()
     )
-    self.assertIsNone(feature_encoder)
+    self.assertEmpty(feature_encoder.categorical)
 
 
 class InternalFeatureSpecTest(parameterized.TestCase):
@@ -694,7 +692,7 @@ class InternalForestTest(parameterized.TestCase):
     )
 
     self.assertEqual(internal_forest.num_trees(), 2)
-    self.assertIsNotNone(internal_forest.feature_encoder)
+    self.assertNotEmpty(internal_forest.feature_encoder.categorical)
 
     self.assertEqual(
         internal_forest.leaf_outputs,
@@ -764,7 +762,7 @@ class InternalForestTest(parameterized.TestCase):
 
     internal_forest = to_jax.InternalForest(model)
     self.assertEqual(internal_forest.num_trees(), 10)
-    self.assertIsNotNone(internal_forest.feature_encoder)
+    self.assertNotEmpty(internal_forest.feature_encoder.categorical)
 
 
 class ToJaxTest(parameterized.TestCase):
@@ -874,16 +872,11 @@ class ToJaxTest(parameterized.TestCase):
 
     # Convert model to tf function
     jax_model = to_jax.to_jax_function(model)
-    assert (jax_model.encoder is not None) == has_encoding
+    assert bool(jax_model.encoder.categorical) == has_encoding
 
     # Generate Jax predictions
     del test_ds[label]
-    if jax_model.encoder is not None:
-      input_values = jax_model.encoder(test_ds)
-    else:
-      input_values = {
-          k: jnp.asarray(v) for k, v in test_ds.items() if k != label
-      }
+    input_values = jax_model.encoder(test_ds)
     jax_predictions = jax_model.predict(input_values)
 
     # Test predictions

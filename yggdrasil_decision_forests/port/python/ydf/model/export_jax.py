@@ -99,6 +99,8 @@ class FeatureEncoder:
 
   Does the following:
   - Encodes categorical strings into categorical integers.
+  - If the model does not need special feature encoding, it only converts the
+    values into the expected format (e.g. numpy arrays into Jax arrays).
 
   Attributes:
     categorical: Mapping between categorical-string feature to the dictionary of
@@ -115,17 +117,15 @@ class FeatureEncoder:
       cls,
       input_features: Sequence[generic_model.InputFeature],
       dataspec: ds_pb.DataSpecification,
-  ) -> Optional["FeatureEncoder"]:
+  ) -> "FeatureEncoder":
     """Creates a FeatureEncoder object.
-
-    If the input feature does not require feature encoding, returns None.
 
     Args:
       input_features: All the input features of a model.
       dataspec: Dataspec of the model.
 
     Returns:
-      A FeatureEncoder or None.
+      A FeatureEncoder.
     """
 
     categorical = {}
@@ -143,8 +143,6 @@ class FeatureEncoder:
             key: item.index
             for key, item in column_spec.categorical.items.items()
         }
-    if not categorical:
-      return None
     return FeatureEncoder(categorical=categorical)
 
   def __call__(self, feature_values: Dict[str, Any]) -> Dict[str, jax.Array]:
@@ -175,15 +173,16 @@ class JaxModel:
     predict: Jitted JAX function that computes the model predictions. The
       signature is `predict(feature_values)` if `params` is None, and
       `predict(feature_values, params)` if `params` is set.
-    encoder: Optional object to encode features before the JAX model. Is None if
-      the model does not need special feature encoding. For instance, used to
-      encode categorical string values.
+    encoder: Utility object that encodes the features into a format compatible
+      with the JAX model. It converts compatible objects such as numpy arrays
+      into JAX arrays. If the examples contain categorical string values, it
+      replaces these with integers that the JAX model can handle.
     params: Learnable parameters of the model. If set, "params" should be passed
       as an argument to the "predict" function.
   """
 
   predict: Union[Callable[[Any], Any], Callable[[Any, Dict[str, Any]], Any]]
-  encoder: Optional[FeatureEncoder]
+  encoder: FeatureEncoder
   params: Optional[Dict[str, Any]]
 
 
@@ -456,7 +455,7 @@ class InternalForest:
 
   model: dataclasses.InitVar[generic_model.GenericModel]
   feature_spec: InternalFeatureSpec = dataclasses.field(init=False)
-  feature_encoder: Optional[FeatureEncoder] = dataclasses.field(init=False)
+  feature_encoder: FeatureEncoder = dataclasses.field(init=False)
   dataspec: ds_pb.DataSpecification = dataclasses.field(repr=False, init=False)
   leaf_outputs: ArrayFloat = dataclasses.field(
       default_factory=lambda: array.array("f", [])

@@ -145,11 +145,6 @@ class Benchmark:
 """
 
 
-def np_dict_to_jax_dict(df: Dict[str, np.ndarray]) -> Dict[str, jax.Array]:
-  """Converts a dictionary of numpy array into a dictionary of jax arrays."""
-  return {k: jax.numpy.asarray(v) for k, v in df.items()}
-
-
 def build_synthetic_dataset(
     num_examples: int,
     seed: int,
@@ -318,10 +313,7 @@ def run_jax_engine(
     with jax.default_device(device):
 
       jax_model = model.to_jax_function()
-      if jax_model.encoder is not None:
-        input_values = jax_model.encoder(dataset_without_labels)
-      else:
-        input_values = np_dict_to_jax_dict(dataset_without_labels)
+      input_values = jax_model.encoder(dataset_without_labels)
 
       for _ in range(run_config.num_warmup_rounds):
         for batch in gen_batch(input_values, batch_size):

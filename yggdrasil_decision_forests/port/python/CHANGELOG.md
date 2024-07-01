@@ -4,6 +4,8 @@
 
 ### Feature
 
+-   `model.to_jax_function` now always outputs a FeatureEncoder to help feeding
+    data to the JAX model.
 -   The default value of `num_candidate_attributes` in the CART learner is
     changed from 0 (Random Forest style sampling) to -1 (no sampling). This is
     the generally accepted logic of CART.
