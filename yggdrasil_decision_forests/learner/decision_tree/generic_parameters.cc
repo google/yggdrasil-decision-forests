@@ -440,6 +440,13 @@ absl::Status SetHyperParameters(
     const auto hparam = generic_hyper_params->Get(kHParamMaxDepth);
     if (hparam.has_value()) {
       dt_config->set_max_depth(hparam.value().value().integer());
+      if (dt_config->max_depth() < 2) {
+        YDF_LOG(WARNING)
+            << "Setting max_depth=" << dt_config->max_depth()
+            << " for a training model will not result in any learning (i.e. "
+               "root tree without conditions). To learn stumps (i.e., decision "
+               "trees with a single condition), use max_depth=2.";
+      }
     }
   }
 
