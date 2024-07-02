@@ -14,7 +14,9 @@
 
 """Common functionality for all dataset I/O connectors."""
 
+import dataclasses
 import math
+import re
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -42,6 +44,16 @@ def unrolled_feature_names(name: str, num_dims: int) -> Sequence[str]:
       f"{name}.{dim_idx:0{num_leading_zeroes}}{postfix}"
       for dim_idx in range(num_dims)
   ]
+
+
+def parse_unrolled_feature_name(name: str) -> Optional[Tuple[str, int, int]]:
+  """Splits the components of an unrolled feature name."""
+  match = re.fullmatch(
+      r"(?P<base>.*)\.(?P<idx>[0-9]+)_of_(?P<num>[0-9]+)", name
+  )
+  if match is None:
+    return None
+  return match["base"], int(match["idx"]), int(match["num"])
 
 
 def _unroll_column(
@@ -167,12 +179,13 @@ def cast_input_dataset_to_dict(
 
   # TODO: Maybe this error should be raised at a layer above this one?
 
-  raise ValueError(
-      "Non supported dataset type: "
-      f"{type(data)}\n\n{dataset_io_types.SUPPORTED_INPUT_DATA_DESCRIPTION}"
-      + (
-          dataset_io_types.HOW_TO_FEED_NUMPY
-          if isinstance(data, np.ndarray)
-          else ""
-      )
-  )
+  if isinstance(data, np.ndarray):
+    raise ValueError(
+        "Unsupported dataset type:"
+        f" {type(data)}\n{dataset_io_types.HOW_TO_FEED_NUMPY}\n\n{dataset_io_types.SUPPORTED_INPUT_DATA_DESCRIPTION}"
+    )
+  else:
+    raise ValueError(
+        "Unsupported dataset type: "
+        f"{type(data)}\n{dataset_io_types.SUPPORTED_INPUT_DATA_DESCRIPTION}"
+    )

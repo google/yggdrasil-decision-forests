@@ -15,7 +15,7 @@
 """Dataset implementations of PYDF."""
 
 import copy
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, Union
 
 import numpy as np
 
@@ -455,6 +455,61 @@ def create_vertical_dataset_from_path(
   return dataset
 
 
+def _create_missing_feature_error_message(
+    data: Dict[str, dataset_io_types.InputValues],
+    column_spec: data_spec_pb2.Column,
+    shapes_of_given_columns: Dict[str, int],
+) -> Optional[str]:
+  """Builds an error message explaining why a feature/column is be missing."""
+
+  if column_spec.is_unstacked:
+    # The missing feature is multi-dimensional.
+
+    # Find the baseline of the requested feature.
+    feature_components = dataset_io.parse_unrolled_feature_name(
+        column_spec.name
+    )
+    # Note: feature_components is guaranteed to be set since column_spec
+    # is_unstacked=True (i.e. is multi-dimensional).
+    assert feature_components is not None
+    expected_shape = feature_components[2]
+
+    if feature_components[0] in shapes_of_given_columns:
+      # There is a miss-match of shape.
+      provided_shape = shapes_of_given_columns[feature_components[0]]
+      return (
+          "Unexpected shape for multi-dimensional column"
+          f" {feature_components[0]!r}. Column has shape"
+          f" {provided_shape} but is expected to have shape"
+          f" {expected_shape}."
+      )
+    else:
+      if feature_components[0] in data:
+        # The base-name of the missing (multi-dimensional) feature is equal to
+        # the name of a single-dimensional feature.
+        return (
+            f"Column {feature_components[0]!r} is expected to be"
+            f" multi-dimensional with shape {expected_shape} but it is"
+            " single-dimensional. If you use Numpy arrays, the column is"
+            " expected to be an array of shape [num_examples,"
+            f" {expected_shape}]."
+        )
+  else:
+    # The missing feature is single-dimensional.
+
+    if column_spec.name in shapes_of_given_columns:
+      provided_shape = shapes_of_given_columns[column_spec.name]
+      # The name of the missing (single-dimensional) feature is equal to the
+      # base name of a multi-dimensional feature.
+      return (
+          f"Column {column_spec.name!r} is expected to single-dimensional but"
+          f" it is multi-dimensional with shape {provided_shape}."
+      )
+
+  # The feature is simply missing.
+  return None
+
+
 def create_vertical_dataset_from_dict_of_values(
     data: Dict[str, dataset_io_types.InputValues],
     unroll_feature_info: dataset_io_types.UnrolledFeaturesInfo,
@@ -484,17 +539,37 @@ def create_vertical_dataset_from_dict_of_values(
 
   def dataspec_to_normalized_columns(
       data: Dict[str, dataset_io_types.InputValues],
-      columns,
+      data_spec: data_spec_pb2.DataSpecification,
       required_columns: Sequence[str],
   ):
+    # Index the multi-dim feature provided by the user.
+    shapes_of_given_columns = {}
+    for name in data:
+      components = dataset_io.parse_unrolled_feature_name(name)
+      if components is not None:
+        # The provided value is part of a multi-dim feature.
+        shapes_of_given_columns[components[0]] = components[2]
+
     normalized_columns = []
-    for column_spec in columns:
+    for column_spec in data_spec.columns:
       if column_spec.name not in data and column_spec.name in required_columns:
-        raise ValueError(
-            f"The data spec expects columns {column_spec.name!r} which was not"
-            f" found in the data. Available columns: {list(data)}. Required"
-            f" columns: {required_columns}"
+
+        # Try to generate a helpful message about the missing feature.
+        error_prefix = _create_missing_feature_error_message(
+            data,
+            column_spec,
+            shapes_of_given_columns,
         )
+
+        if error_prefix is not None:
+          error_prefix = f"{error_prefix}\n\nDetails: "
+
+        raise ValueError(
+            f"{error_prefix}Missing required column {column_spec.name!r}.\nThe"
+            f" available unrolled  columns are: {list(data)}.\nThe required"
+            f" unrolled columns are: {required_columns}"
+        )
+
       if (
           column_spec.type == data_spec_pb2.CATEGORICAL_SET
           and column_spec.HasField("tokenizer")
@@ -537,7 +612,7 @@ def create_vertical_dataset_from_dict_of_values(
         else [c.name for c in data_spec.columns]
     )
     normalized_columns = dataspec_to_normalized_columns(
-        data, data_spec.columns, required_columns
+        data, data_spec, required_columns
     )
 
   columns_to_check = []

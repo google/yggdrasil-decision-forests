@@ -1173,7 +1173,7 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
 
   def test_from_numpy(self):
     with self.assertRaisesRegex(
-        ValueError, "Numpy arrays cannot be fed directly"
+        ValueError, "YDF does not consume Numpy arrays directly"
     ):
       dataset.create_vertical_dataset(np.array([1, 2, 3]))
 

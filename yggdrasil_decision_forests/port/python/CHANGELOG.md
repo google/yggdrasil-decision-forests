@@ -11,6 +11,7 @@
     the generally accepted logic of CART.
 -   `model.to_tensorflow_saved_model` support preprocessing functions which have
     a different signature than the YDF model.
+-   Improve error messages when feeding wrong size numpy arrays.
 
 ## 0.5.0 - 2024-06-17
 

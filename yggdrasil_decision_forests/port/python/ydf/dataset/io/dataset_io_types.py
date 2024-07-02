@@ -38,11 +38,32 @@ UnrolledFeaturesInfo = Dict[str, List[str]]
 IODataset = Union[Dict[str, InputValues], "pd.DataFrame", str, Sequence[str]]
 
 HOW_TO_FEED_NUMPY = """
-Numpy arrays cannot be fed directly. Instead, feed them in a dictionary i.e.
+YDF does not consume Numpy arrays directly. Instead, use a dictionary of Numpy arrays. For example:
+
 Instead of:
-  model.predict(np.array([[1,2],[3,4]]))
+  ```python
+  dataset = np.array([[1, 2, 3], [4, 5, 6]])
+  model = ydf.RandomForestLearner(label="label").train(dataset)
+  ```
+
 Do:
-  model.predict({"features":np.array([[1,2],[3,4]])})
+  ```python
+  dataset = {
+      "label": np.array([1, 4]),
+      "features": np.array([[2, 3], [5, 6]]),  # A two dimensional feature
+  }
+  model = ydf.RandomForestLearner(label="label").train(dataset)
+  ```
+
+And instead of:
+  ```python
+  model.predict(np.array([[2, 3], [5, 6]]))
+  ```
+
+Do:
+  ```python
+  model.predict({"features": np.array([[2, 3], [5, 6]])})
+  ```
 """
 
 

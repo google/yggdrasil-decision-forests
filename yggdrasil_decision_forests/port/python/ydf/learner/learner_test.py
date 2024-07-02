@@ -680,6 +680,63 @@ class RandomForestLearnerTest(LearnerTest):
     with self.assertRaisesRegex(ValueError, "should be a string"):
       _ = specialized_learners.RandomForestLearner(label=np.array([1, 0]))  # pytype: disable=wrong-arg-types
 
+  def test_wrong_shape_multidim_model(self):
+    model = specialized_learners.RandomForestLearner(
+        label="label", num_trees=5
+    ).train({
+        "feature": np.array([[0, 1], [3, 4]]),
+        "label": np.array([0, 1]),
+    })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Column 'feature' is expected to be multi-dimensional with shape 2 but"
+        r" it is single-dimensional. If you use Numpy arrays, the column is"
+        r" expected to be an array of shape \[num_examples, 2\].",
+    ):
+      _ = model.predict({
+          "feature": np.array([0, 1]),
+      })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Unexpected shape for multi-dimensional column 'feature'. Column has"
+        r" shape 1 but is expected to have shape 2.",
+    ):
+      _ = model.predict({
+          "feature": np.array([[0], [1]]),
+      })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Unexpected shape for multi-dimensional column 'feature'. Column has"
+        r" shape 3 but is expected to have shape 2.",
+    ):
+      _ = model.predict({
+          "feature": np.array([[0, 1, 2], [3, 4, 5]]),
+      })
+
+  def test_wrong_shape_singledim_model(self):
+    model = specialized_learners.RandomForestLearner(
+        label="label", num_trees=5
+    ).train({
+        "feature": np.array([0, 1]),
+        "label": np.array([0, 1]),
+    })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Column 'feature' is expected to single-dimensional but it is"
+        r" multi-dimensional with shape 2.",
+    ):
+      _ = model.predict({
+          "feature": np.array([[0, 1]]),
+      })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Column 'feature' is expected to single-dimensional but it is"
+        r" multi-dimensional with shape 1.",
+    ):
+      _ = model.predict({
+          "feature": np.array([[0], [1]]),
+      })
+
 
 class CARTLearnerTest(LearnerTest):
 
