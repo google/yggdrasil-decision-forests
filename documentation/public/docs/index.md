@@ -1,8 +1,10 @@
----
+--------------------------------------------------------------------------------
+
 title: YDF documentation
-hide: toc
----
-#
+
+## hide: toc
+
+\#
 
 ![](image/logo_v2.png){: .center .logo}
 
@@ -23,7 +25,7 @@ Started 🧭 </a>
 <div class="reason">
 <div class="title">A concise and modern API</div>
 
-<div class="text">YDF allows for for rapid prototyping and development while minimizing risk of modeling errors.</div>
+<div class="text">YDF allows for rapid prototyping and development while minimizing risk of modeling errors.</div>
 </div>
 </div>
 
@@ -138,6 +140,11 @@ Source: <a href="https://doi.org/10.1145/3580305.3599933">A Comparison of Decisi
 -   Enjoy backward compatibility for model and learners since 2018.
 -   [Edits trees](tutorial/editing_trees.ipynb) in Python.
 -   Define [custom loss](tutorial/custom_loss.ipynb) in Python.
+
+## Supported platforms
+
+YDF is available on Python 3.8, 3.9, 3.11 and 3.12, on Windows x86-64, Linux
+x86-64, and macOS ARM64.
 
 ## Installation
 

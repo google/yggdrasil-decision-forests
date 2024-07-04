@@ -78,7 +78,7 @@ nav:
   - Evaluation:
     - Train & test: tutorial/train_and_test.ipynb
     - Cross-validation: tutorial/cross_validation.ipynb
-  - Interpretation:
+  - Explainability:
     - Counterfactual: tutorial/counterfactual.ipynb
     - Model understanding: tutorial/model_understanding.ipynb
     - Prediction understanding: tutorial/prediction_understanding.ipynb
