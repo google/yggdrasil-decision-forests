@@ -1,6 +1,6 @@
 {
   "name": "yggdrasil-decision-forests",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "With this package, you can generate predictions of machine learning models trained with YDF in browser and with NodeJS.",
   "main": "dist/inference.js",
   "scripts": {

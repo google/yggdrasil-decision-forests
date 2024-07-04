@@ -69,6 +69,8 @@ and evaluation.
     Load a TensorFlow Decision Forests model from disk.
 -   [from_sklearn](utilities.md#ydf.from_sklearn): Convert a scikit-learn model
     into a YDF model.
+-   [NodeFormat](utilities.md#ydf.NodeFormat): Format used to serialize the tree
+    nodes.
 
 ## Custom Loss
 

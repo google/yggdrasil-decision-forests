@@ -28,6 +28,8 @@
 
 ::: ydf.from_sklearn
 
+::: ydf.NodeFormat
+
 ::: ydf.RegressionLoss
 
 ::: ydf.BinaryClassificationLoss

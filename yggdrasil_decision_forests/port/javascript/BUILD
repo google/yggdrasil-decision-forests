@@ -35,6 +35,7 @@ cc_binary(
     defines = [],
     linkopts = [
         "--bind",
+        "--minify=0",
         "-s USE_PTHREADS=0",
         "-s EXPORTED_RUNTIME_METHODS=FS",  # To access YDF output file from JS.
         "-s ALLOW_MEMORY_GROWTH=1",

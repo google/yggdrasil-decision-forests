@@ -30,6 +30,7 @@ const ColumnType = {
   NUMERICAL: 'NUMERICAL',
   CATEGORICAL: 'CATEGORICAL',
   CATEGORICAL_SET: 'CATEGORICAL_SET',
+  BOOLEAN: 'BOOLEAN',
 };
 
 /**
@@ -311,6 +312,12 @@ class Model {
             this.internalModel.setCategoricalInt(
                 exampleIdx, featureDef.internalIdx, value);
           }
+        }
+      } else if (featureDef.type === ColumnType.BOOLEAN) {
+        for (const [exampleIdx, value] of values.entries()) {
+          if (value === null) continue;
+          this.internalModel.setBoolean(
+              exampleIdx, featureDef.internalIdx, value);
         }
       } else if (featureDef.type === ColumnType.CATEGORICAL_SET) {
         for (const [exampleIdx, value] of values.entries()) {

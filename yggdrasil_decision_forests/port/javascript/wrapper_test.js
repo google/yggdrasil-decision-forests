@@ -27,6 +27,14 @@ describe('YDF Inference', () => {
   const modelUrl3 =
       '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_3.zip';
 
+  let model4 = null;
+  const modelUrl4 =
+      '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_4.zip';
+
+  let model5 = null;
+  const modelUrl5 =
+      '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_5.zip';
+
   let modelSmallSST = null;
   const modelSmallSSTUrl =
       '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_small_sst.zip';
@@ -72,6 +80,16 @@ describe('YDF Inference', () => {
       console.log('Model 2 loaded');
     });
 
+    await ydf.loadModelFromUrl(modelUrl4, modelOptions).then((loadedModel) => {
+      model4 = loadedModel;
+      console.log('Model 4 loaded');
+    });
+
+    await ydf.loadModelFromUrl(modelUrl5, modelOptions).then((loadedModel) => {
+      model5 = loadedModel;
+      console.log('Model 5 loaded');
+    });
+
     await ydf.loadModelFromUrl(modelSmallSSTUrl, modelOptions)
         .then((loadedModel) => {
           modelSmallSST = loadedModel;
@@ -82,6 +100,8 @@ describe('YDF Inference', () => {
   it('loadModelFromUrl', () => {
     expect(model).not.toBeNull();
     expect(model2).not.toBeNull();
+    expect(model4).not.toBeNull();
+    expect(model5).not.toBeNull();
     expect(modelSmallSST).not.toBeNull();
   });
 
@@ -212,6 +232,62 @@ describe('YDF Inference', () => {
       0.47678571939468384,
       0.818461537361145,
       0.4974619150161743,
+    ]);
+  });
+
+  it('predict_model4', async () => {
+    let predictions = model4.predict({
+      'bool_0': [false, false, false, true],
+      'bool_1': [false, false, false, false],
+      'cat_int_0': [26, 27, null, 26],
+      'cat_int_1': [27, 13, 23, 28],
+      'cat_str_0': ['V_26', 'V_28', 'V_12', 'V_4'],
+      'cat_str_1': ['V_25', 'V_4', 'V_23', 'V_8'],
+      'num_0': [
+        0.32558467984199524,
+        0.49324947595596313,
+        0.2573581039905548,
+        0.37812310457229614,
+      ],
+      'num_1': [
+        0.43964460492134094,
+        0.014039650559425354,
+        0.4379676282405853,
+        0.6223933100700378,
+      ]
+    });
+    console.log('Predictions:', predictions);
+
+    expect(predictions).toEqual([
+      0.7430754899978638,
+      0.5412710309028625,
+      0.6691915392875671,
+      0.7506580352783203,
+    ]);
+  });
+
+  it('predict_model5', async () => {
+    let predictions = model5.predict({
+      'num_0': [
+        0.32558467984199524,
+        0.49324947595596313,
+        0.2573581039905548,
+        0.37812310457229614,
+      ],
+      'num_1': [
+        0.43964460492134094,
+        0.014039650559425354,
+        0.4379676282405853,
+        0.6223933100700378,
+      ]
+    });
+    console.log('Predictions:', predictions);
+
+    expect(predictions).toEqual([
+      0.4168531000614166,
+      0.5973348021507263,
+      0.4078332185745239,
+      0.537090539932251,
     ]);
   });
 
@@ -409,6 +485,8 @@ describe('YDF Inference', () => {
   afterAll(async () => {
     model.unload();
     model2.unload();
+    model4.unload();
+    model5.unload();
     modelSmallSST.unload();
   });
 });
