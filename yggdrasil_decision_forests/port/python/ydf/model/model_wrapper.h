@@ -102,7 +102,7 @@ class GenericCCModel {
 
   absl::StatusOr<metric::proto::EvaluationResults> Evaluate(
       const dataset::VerticalDataset& dataset,
-      const metric::proto::EvaluationOptions& options);
+      const metric::proto::EvaluationOptions& options, bool weighted);
 
   absl::StatusOr<utils::model_analysis::proto::StandaloneAnalysisResult>
   Analyze(const dataset::VerticalDataset& dataset,

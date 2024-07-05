@@ -26,6 +26,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -524,62 +525,69 @@ absl::Status IntegersConfusionMatrix<T>::AppendTextReport(
   STATUS_CHECK_EQ(column_labels.size(), ncol());
   STATUS_CHECK_EQ(row_labels.size(), nrow());
 
-  // Minimum margin (expressed in spaces) between displayed elements.
+  // Margin, in spaces, between items.
   const int margin = 2;
 
-  // Maximum length of the values' string representation i.e. maximum of
-  // "row_labels".
-  int max_row_label_length = 0;
+  // Maximum string length of the row labels.
+  int max_length_row_labels = 0;
   for (const auto& label : row_labels) {
-    if (label.size() > max_row_label_length) {
-      max_row_label_length = label.size();
+    if (label.size() > max_length_row_labels) {
+      max_length_row_labels = label.size();
     }
   }
 
-  // Maximum string length of the elements in each column.
+  // Converts a value (double) in the confusion matrix into a string to display.
+  const auto value_to_str = [](const double value) {
+    return absl::StrFormat("%.16g", value);
+  };
+
+  // Maximum string length of items per columns.
   std::vector<int> max_length_per_col(ncol_);
   for (int col = begin_col_idx; col < ncol_; col++) {
-    // Counts.
-    T max_value = 1;
+    // Values
+    int max_length = 0;
     for (int row = begin_row_idx; row < nrow_; row++) {
-      const auto value = at(row, col);
-      if (value > max_value) {
-        max_value = value;
+      const auto value_length = value_to_str(at(row, col)).size();
+      if (value_length > max_length) {
+        max_length = value_length;
       }
     }
-    // Column header.
-    max_length_per_col[col] =
-        std::max(static_cast<int>(column_labels[col].size()),
-                 static_cast<int>(std::floor(std::log10(max_value))) + 1);
+    // Column label
+    max_length =
+        std::max(max_length, static_cast<int>(column_labels[col].size()));
+
+    max_length_per_col[col] = max_length + margin;
   }
 
-  // Print "value" to the end of "result" using a left margin (similar to
-  // "std::setw").
-  const auto print_string = [&](int length, absl::string_view value) {
-    const int preceding_spaces =
-        std::max(length - static_cast<int>(value.size()), 0);
-    absl::StrAppend(result, std::string(preceding_spaces, ' '), value);
+  // Appends "value" to the"result" using a left margin (similar to std::setw).
+  const auto append_string = [&](int length, absl::string_view value) {
+    const int num_spaces = std::max(length - static_cast<int>(value.size()), 0);
+    absl::StrAppend(result, std::string(num_spaces, ' '), value);
   };
-  const auto print_value = [&](int length, T value) {
-    print_string(length, absl::StrCat(value));
+  const auto append_value = [&](int length, T value) {
+    append_string(length, value_to_str(value));
   };
 
   // Print header.
-  print_string(max_row_label_length, "");
+
+  // Empty top-left cell
+  append_string(max_length_row_labels, "");
+
+  // Column labels
   for (int col = begin_col_idx; col < ncol_; col++) {
-    print_string(max_length_per_col[col] + margin, column_labels[col]);
+    append_string(max_length_per_col[col], column_labels[col]);
   }
   absl::StrAppend(result, "\n");
 
   // Print body.
   for (int row = begin_row_idx; row < nrow_; row++) {
-    print_string(max_row_label_length, row_labels[row]);
+    append_string(max_length_row_labels, row_labels[row]);
     for (int col = begin_col_idx; col < ncol_; col++) {
-      print_value(max_length_per_col[col] + margin, at(row, col));
+      append_value(max_length_per_col[col], at(row, col));
     }
     absl::StrAppend(result, "\n");
   }
-  absl::StrAppend(result, "Total: ", sum_, "\n");
+  absl::StrAppend(result, "Total: ", value_to_str(sum_), "\n");
   return absl::OkStatus();
 }
 

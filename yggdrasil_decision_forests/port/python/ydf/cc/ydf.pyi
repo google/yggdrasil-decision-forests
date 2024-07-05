@@ -119,6 +119,7 @@ class GenericCCModel:
       self,
       dataset: VerticalDataset,
       options: metric_pb2.EvaluationOptions,
+      weighted: bool,
   ) -> metric_pb2.EvaluationResults: ...
   def Analyze(
       self,

@@ -364,7 +364,9 @@ Use `model.describe()` for more details
   def evaluate(
       self,
       data: dataset.InputDataset,
+      *,
       bootstrapping: Union[bool, int] = False,
+      weighted: bool = False,
   ) -> metric.Evaluation:
     """Evaluates the quality of a model on a dataset.
 
@@ -400,6 +402,9 @@ Use `model.describe()` for more details
         to an integer, it specifies the number of bootstrapping samples to use.
         In this case, if the number is less than 100, an error is raised as
         bootstrapping will not yield useful results.
+      weighted: If true, the evaluation is weighted according to the training
+        weights. If false, the evaluation is non-weighted. b/351279797: Change
+        default to weights=True.
 
     Returns:
       Model evaluation.
@@ -426,7 +431,9 @@ Use `model.describe()` for more details
           task=self.task()._to_proto_type(),  # pylint: disable=protected-access
       )
 
-      evaluation_proto = self._model.Evaluate(ds._dataset, options_proto)  # pylint: disable=protected-access
+      evaluation_proto = self._model.Evaluate(
+          ds._dataset, options_proto, weighted=weighted
+      )  # pylint: disable=protected-access
     return metric.Evaluation(evaluation_proto)
 
   def analyze_prediction(

@@ -623,6 +623,60 @@ class RandomForestLearnerTest(LearnerTest):
     ):
       _ = learner.train(ds)
 
+  def test_weighted_training_and_evaluation(self):
+
+    def gen_ds(seed, n=10000):
+      np.random.seed(seed)
+      f1 = np.random.uniform(size=n)
+      f2 = np.random.uniform(size=n)
+      f3 = np.random.uniform(size=n)
+      weights = np.random.uniform(size=n)
+      return {
+          "f1": f1,
+          "f2": f2,
+          "f3": f3,
+          "label": (
+              # Make the examples with high weights harder to predict.
+              f1 + f2 * 0.5 + f3 * 0.5 + np.random.uniform(size=n) * weights
+              >= 1.5
+          ),
+          "weights": weights,
+      }
+
+    model = specialized_learners.RandomForestLearner(
+        label="label",
+        weights="weights",
+        num_trees=300,
+        winner_take_all=False,
+    ).train(gen_ds(0))
+
+    test_ds = gen_ds(1)
+
+    self_evaluation = model.self_evaluation()
+    non_weighted_evaluation = model.evaluate(test_ds, weighted=False)
+    weighted_evaluation = model.evaluate(test_ds, weighted=True)
+
+    self.assertIsNotNone(self_evaluation)
+    self.assertAlmostEqual(self_evaluation.accuracy, 0.824501, delta=0.005)
+    self.assertAlmostEqual(
+        non_weighted_evaluation.accuracy, 0.8417, delta=0.005
+    )
+    self.assertAlmostEqual(weighted_evaluation.accuracy, 0.8172290, delta=0.005)
+    predictions = model.predict(test_ds)
+
+    manual_non_weighted_evaluation = np.mean(
+        (predictions >= 0.5) == test_ds["label"]
+    )
+    manual_weighted_evaluation = np.sum(
+        ((predictions >= 0.5) == test_ds["label"]) * test_ds["weights"]
+    ) / np.sum(test_ds["weights"])
+    self.assertAlmostEqual(
+        manual_non_weighted_evaluation, non_weighted_evaluation.accuracy
+    )
+    self.assertAlmostEqual(
+        manual_weighted_evaluation, weighted_evaluation.accuracy
+    )
+
   def test_learn_and_predict_when_label_is_not_last_column(self):
     label = "age"
     learner = specialized_learners.RandomForestLearner(

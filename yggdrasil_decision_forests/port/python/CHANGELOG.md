@@ -12,6 +12,11 @@
 -   `model.to_tensorflow_saved_model` support preprocessing functions which have
     a different signature than the YDF model.
 -   Improve error messages when feeding wrong size numpy arrays.
+-   Add option for weighted evaluation in `model.evaluate`.
+
+### Fix
+
+-   Fix display of confusion matrix with floating point weights.
 
 ## 0.5.0 - 2024-06-17
 

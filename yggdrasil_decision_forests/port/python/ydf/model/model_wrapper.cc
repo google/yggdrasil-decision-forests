@@ -34,6 +34,7 @@
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/describe.h"
@@ -115,12 +116,21 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
 
 absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
     const dataset::VerticalDataset& dataset,
-    const metric::proto::EvaluationOptions& options) {
+    const metric::proto::EvaluationOptions& options, const bool weighted) {
   py::gil_scoped_release release;
+
+  auto effective_options = options;
+  if (weighted && model_->weights().has_value()) {
+    ASSIGN_OR_RETURN(*effective_options.mutable_weights(),
+                     dataset::GetUnlinkedWeightDefinition(
+                         model_->weights().value(), model_->data_spec()));
+  }
+
   ASSIGN_OR_RETURN(const auto engine, GetEngine());
   utils::RandomEngine rnd;
-  ASSIGN_OR_RETURN(const auto evaluation,
-                   model_->EvaluateWithEngine(*engine, dataset, options, &rnd));
+  ASSIGN_OR_RETURN(
+      const auto evaluation,
+      model_->EvaluateWithEngine(*engine, dataset, effective_options, &rnd));
   return evaluation;
 }
 

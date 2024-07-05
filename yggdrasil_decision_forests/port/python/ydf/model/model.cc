@@ -116,7 +116,7 @@ void init_model(py::module_& m) {
            py::arg("dataset"))
       // WARNING: This method releases the Global Interpreter Lock.
       .def("Evaluate", WithStatusOr(&GenericCCModel::Evaluate),
-           py::arg("dataset"), py::arg("options"))
+           py::arg("dataset"), py::arg("options"), py::arg("weighted"))
       // WARNING: This method releases the Global Interpreter Lock.
       .def("Analyze", WithStatusOr(&GenericCCModel::Analyze),
            py::arg("dataset"), py::arg("options"))

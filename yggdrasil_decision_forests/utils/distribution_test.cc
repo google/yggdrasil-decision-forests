@@ -311,6 +311,35 @@ Total: 2436
 )");
 }
 
+TEST(Distribution, IntegersConfusionMatrix_AppendTextReport_with_floats) {
+  IntegersConfusionMatrixDouble confusion;
+  confusion.SetSize(4, 4);
+  dataset::proto::Column column;
+  column.mutable_categorical()->set_is_already_integerized(false);
+  column.mutable_categorical()->set_number_of_unique_values(4);
+  auto& items = *column.mutable_categorical()->mutable_items();
+  items["a"].set_index(0);
+  items["bb"].set_index(1);
+  items["ccc"].set_index(2);
+  items["dddd"].set_index(3);
+  for (int col = 0; col < confusion.ncol(); col++) {
+    for (int row = 0; row < confusion.nrow(); row++) {
+      double value = 0.00000123456789 * std::pow(10, (col + row) * 2);
+      confusion.Add(row, col, value);
+    }
+  }
+  std::string representation;
+  CHECK_OK(confusion.AppendTextReport(column, &representation));
+  EXPECT_EQ(representation, R"(truth\prediction
+                   a              bb           ccc        dddd
+   a  1.23456789e-06  0.000123456789  0.0123456789  1.23456789
+  bb  0.000123456789    0.0123456789    1.23456789  123.456789
+ ccc    0.0123456789      1.23456789    123.456789  12345.6789
+dddd      1.23456789      123.456789    12345.6789  1234567.89
+Total: 1259634.593723745
+)");
+}
+
 TEST(Distribution, IntegersConfusionMatrix_AppendTextReportAlreadyIntegerized) {
   IntegersConfusionMatrixDouble confusion;
   confusion.SetSize(4, 4);
