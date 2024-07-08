@@ -1,10 +1,8 @@
---------------------------------------------------------------------------------
-
+---
 title: YDF documentation
-
-## hide: toc
-
-\#
+hide: toc
+---
+#
 
 ![](image/logo_v2.png){: .center .logo}
 
