@@ -34,7 +34,7 @@ build_and_maybe_test () {
 
     BAZEL=bazel
     ${BAZEL} version
-    local ARCHITECTURE=$(uname --machine)
+    local ARCHITECTURE=$(uname --m)
 
     local flags="--config=linux_cpp17 --features=-fully_static_link"
     if [ "$ARCHITECTURE" == "x86_64" ]; then

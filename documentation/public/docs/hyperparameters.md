@@ -1095,7 +1095,7 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 #### [num_candidate_attributes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
--   **Type:** Integer **Default:** 0 **Possible values:** min:-1
+-   **Type:** Integer **Default:** -1 **Possible values:** min:-1
 
 -   Number of unique valid attributes tested for each node. An attribute is
     valid if it has at least a valid split. If `num_candidate_attributes=0`, the
@@ -1133,7 +1133,7 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 #### [sorting_strategy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
--   **Type:** Categorical **Default:** PRESORT **Possible values:** IN_NODE,
+-   **Type:** Categorical **Default:** IN_NODE **Possible values:** IN_NODE,
     PRESORT
 
 -   How are sorted the numerical features in order to find the splits<br>- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>.
@@ -1340,6 +1340,307 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 -   **Type:** Categorical **Default:** true **Possible values:** true, false
 
 -   If true, workers will print training logs.
+
+## ISOLATION_FOREST
+
+An Isolation Forest (https://ieeexplore.ieee.org/abstract/document/4781136) is a
+collection of decision trees trained without labels and independently to
+partition the feature space. The Isolation Forest prediction is an anomaly score
+that indicates whether an example originates from a same distribution to the
+training examples. We refer to Isolation Forest as both the original algorithm
+by Liu et al. and its extensions.
+
+### Protobuffer training configuration
+
+The hyper-parameter protobuffers are used with the C++ and CLI APIs.
+
+-   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto">learner/abstract_learner.proto</a>
+-   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto">learner/decision_tree/decision_tree.proto</a>
+-   <a href="https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.proto">learner/isolation_forest/isolation_forest.proto</a>
+
+### Hyper-parameters
+
+#### [allow_na_conditions](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   If true, the tree training evaluates conditions of the type `X is NA` i.e.
+    `X is missing`.
+
+#### [categorical_algorithm](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** CART **Possible values:** CART, ONE_HOT,
+    RANDOM
+
+-   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
+
+#### [categorical_set_split_greedy_sampling](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
+
+-   For categorical set splits e.g. texts. Probability for a categorical value
+    to be a candidate for the positive set. The sampling is applied once per
+    node (i.e. not at every step of the greedy optimization).
+
+#### [categorical_set_split_max_num_items](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** -1 **Possible values:** min:-1
+
+-   For categorical set splits e.g. texts. Maximum number of items (prior to the
+    sampling). If more items are available, the least frequent items are
+    ignored. Changing this value is similar to change the "max_vocab_count"
+    before loading the dataset, with the following exception: With
+    `max_vocab_count`, all the remaining items are grouped in a special
+    Out-of-vocabulary item. With `max_num_items`, this is not the case.
+
+#### [categorical_set_split_min_item_frequency](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** 1 **Possible values:** min:1
+
+-   For categorical set splits e.g. texts. Minimum number of occurrences of an
+    item to be considered.
+
+#### [growing_strategy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** LOCAL **Possible values:** LOCAL,
+    BEST_FIRST_GLOBAL
+
+-   How to grow the tree.<br>- `LOCAL`: Each node is split independently of the other nodes. In other words, as long as a node satisfy the splits "constraints (e.g. maximum depth, minimum number of observations), the node will be split. This is the "classical" way to grow decision trees.<br>- `BEST_FIRST_GLOBAL`: The node with the best loss reduction among all the nodes of the tree is selected for splitting. This method is also called "best first" or "leaf-wise growth". See "Best-first decision tree learning", Shi and "Additive logistic regression : A statistical view of boosting", Friedman for more details.
+
+#### [honest](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   In honest trees, different training examples are used to infer the structure
+    and the leaf values. This regularization technique trades examples for bias
+    estimates. It might increase or reduce the quality of the model. See
+    "Generalized Random Forests", Athey et al. In this paper, Honest trees are
+    trained with the Random Forest algorithm with a sampling without
+    replacement.
+
+#### [honest_fixed_separation](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   For honest trees only i.e. honest=true. If true, a new random separation is
+    generated for each tree. If false, the same separation is used for all the
+    trees (e.g., in Gradient Boosted Trees containing multiple trees).
+
+#### [honest_ratio_leaf_examples](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Real **Default:** 0.5 **Possible values:** min:0 max:1
+
+-   For honest trees only i.e. honest=true. Ratio of examples used to set the
+    leaf values.
+
+#### [in_split_min_examples_check](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   Whether to check the `min_examples` constraint in the split search (i.e.
+    splits leading to one child having less than `min_examples` examples are
+    considered invalid) or before the split search (i.e. a node can be derived
+    only if it contains more than `min_examples` examples). If false, there can
+    be nodes with less than `min_examples` training examples.
+
+#### [keep_non_leaf_label_distribution](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   Whether to keep the node value (i.e. the distribution of the labels of the
+    training examples) of non-leaf nodes. This information is not used during
+    serving, however it can be used for model interpretation as well as hyper
+    parameter tuning. This can take lots of space, sometimes accounting for half
+    of the model size.
+
+#### [max_depth](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** 16 **Possible values:** min:-1
+
+-   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
+    `max_depth=-1` means that tree depth is not restricted by this parameter.
+    Values <= -2 will be ignored.
+
+#### [max_num_nodes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** 31 **Possible values:** min:-1
+
+-   Maximum number of nodes in the tree. Set to -1 to disable this limit. Only
+    available for `growing_strategy=BEST_FIRST_GLOBAL`.
+
+#### [maximum_model_size_in_memory_in_bytes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto)
+
+-   **Type:** Real **Default:** -1
+
+-   Limit the size of the model when stored in ram. Different algorithms can
+    enforce this limit differently. Note that when models are compiled into an
+    inference, the size of the inference engine is generally much smaller than
+    the original model.
+
+#### [maximum_training_duration_seconds](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto)
+
+-   **Type:** Real **Default:** -1
+
+-   Maximum training duration of the model expressed in seconds. Each learning
+    algorithm is free to use this parameter at it sees fit. Enabling maximum
+    training duration makes the model training non-deterministic.
+
+#### [mhld_oblique_max_num_attributes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** 4 **Possible values:** min:1
+
+-   For MHLD oblique splits i.e. `split_axis=MHLD_OBLIQUE`. Maximum number of
+    attributes in the projection. Increasing this value increases the training
+    time. Decreasing this value acts as a regularization. The value should be in
+    [2, num_numerical_features]. If the value is above the total number of
+    numerical features, the value is capped automatically. The value 1 is
+    allowed but results in ordinary (non-oblique) splits.
+
+#### [mhld_oblique_sample_attributes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   For MHLD oblique splits i.e. `split_axis=MHLD_OBLIQUE`. If true, applies the
+    attribute sampling controlled by the "num_candidate_attributes" or
+    "num_candidate_attributes_ratio" parameters. If false, all the attributes
+    are tested.
+
+#### [min_examples](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** 5 **Possible values:** min:1
+
+-   Minimum number of examples in a node.
+
+#### [missing_value_policy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** GLOBAL_IMPUTATION **Possible values:**
+    GLOBAL_IMPUTATION, LOCAL_IMPUTATION, RANDOM_LOCAL_IMPUTATION
+
+-   Method used to handle missing attribute values.<br>- `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean (in case of numerical attribute) or the most-frequent-item (in case of categorical attribute) computed on the entire dataset (i.e. the information contained in the data spec).<br>- `LOCAL_IMPUTATION`: Missing attribute values are imputed with the mean (numerical attribute) or most-frequent-item (in the case of categorical attribute) evaluated on the training examples in the current node.<br>- `RANDOM_LOCAL_IMPUTATION`: Missing attribute values are imputed from randomly sampled values from the training examples in the current node. This method was proposed by Clinic et al. in "Random Survival Forests" (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
+
+#### [num_candidate_attributes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** 0 **Possible values:** min:-1
+
+-   Number of unique valid attributes tested for each node. An attribute is
+    valid if it has at least a valid split. If `num_candidate_attributes=0`, the
+    value is set to the classical default value for Random Forest: `sqrt(number
+    of input attributes)` in case of classification and
+    `number_of_input_attributes / 3` in case of regression. If
+    `num_candidate_attributes=-1`, all the attributes are tested.
+
+#### [num_candidate_attributes_ratio](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Real **Default:** -1 **Possible values:** min:-1 max:1
+
+-   Ratio of attributes tested at each node. If set, it is equivalent to
+    `num_candidate_attributes = number_of_input_features x
+    num_candidate_attributes_ratio`. The possible values are between ]0, and 1]
+    as well as -1. If not set or equal to -1, the `num_candidate_attributes` is
+    used.
+
+#### [num_trees](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.proto)
+
+-   **Type:** Integer **Default:** 300 **Possible values:** min:0
+
+-   Number of individual decision trees. Increasing the number of trees can
+    increase the quality of the model at the expense of size, training speed,
+    and inference latency.
+
+#### [pure_serving_model](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   Clear the model from any information that is not required for model serving.
+    This includes debugging, model interpretation and other meta-data. The size
+    of the serialized model can be reduced significatively (50% model size
+    reduction is common). This parameter has no impact on the quality, serving
+    speed or RAM usage of model serving.
+
+#### [random_seed](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto)
+
+-   **Type:** Integer **Default:** 123456
+
+-   Random seed for the training of the model. Learners are expected to be
+    deterministic by the random seed.
+
+#### [sorting_strategy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** PRESORT **Possible values:** IN_NODE,
+    PRESORT
+
+-   How are sorted the numerical features in order to find the splits<br>- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>.
+
+#### [sparse_oblique_max_num_projections](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** 6000 **Possible values:** min:1
+
+-   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after the num_projections_exponent).<br>Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Increasing "max_num_projections" increases the training time but not the inference time. In late stage model development, if every bit of accuracy if important, increase this value.<br>The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does not define this hyperparameter.
+
+#### [sparse_oblique_normalization](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** NONE **Possible values:** NONE,
+    STANDARD_DEVIATION, MIN_MAX
+
+-   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before applying the sparse oblique projections.<br>- `NONE`: No normalization.<br>- `STANDARD_DEVIATION`: Normalize the feature by the estimated standard deviation on the entire train dataset. Also known as Z-Score normalization.<br>- `MIN_MAX`: Normalize the feature by the range (i.e. max-min) estimated on the entire train dataset.
+
+#### [sparse_oblique_num_projections_exponent](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Real **Default:** 2 **Possible values:** min:0
+
+-   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections to test at each node.<br>Increasing this value very likely improves the quality of the model, drastically increases the training time, and doe not impact the inference time.<br>Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Therefore, increasing this `num_projections_exponent` and possibly `max_num_projections` may improve model quality, but will also significantly increase training time.<br>Note that the complexity of (classic) Random Forests is roughly proportional to `num_projections_exponent=0.5`, since it considers sqrt(num_features) for a split. The complexity of (classic) GBDT is roughly proportional to `num_projections_exponent=1`, since it considers all features for a split.<br>The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) recommends values in [1/4, 2].
+
+#### [sparse_oblique_projection_density_factor](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Real **Default:** 2 **Possible values:** min:0
+
+-   Density of the projections as an exponent of the number of features. Independently for each projection, each feature has a probability "projection_density_factor / num_features" to be considered in the projection.<br>The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) calls this parameter `lambda` and recommends values in [1, 5].<br>Increasing this value increases training and inference time (on average). This value is best tuned for each dataset.
+
+#### [sparse_oblique_weights](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** BINARY **Possible values:** BINARY,
+    CONTINUOUS
+
+-   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Possible values:<br>- `BINARY`: The oblique weights are sampled in {-1,1} (default).<br>- `CONTINUOUS`: The oblique weights are be sampled in [-1,1].
+
+#### [split_axis](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
+    AXIS_ALIGNED, SPARSE_OBLIQUE, MHLD_OBLIQUE
+
+-   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.<br>- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029
+
+#### [subsample_count](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.proto)
+
+-   **Type:** Integer **Default:** 300 **Possible values:** min:0
+
+-   Number of examples used to grow each tree. Only one of "subsample_ratio" and
+    "subsample_count" can be set. If neither is set, "subsample_count" is
+    assumed to be equal to 256. This is the default value recommended in the
+    isolation forest paper.
+
+#### [subsample_ratio](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.proto)
+
+-   **Type:** Integer **Default:** 300 **Possible values:** min:0
+
+-   Ratio of number of training examples used to grow each tree. Only one of
+    "subsample_ratio" and "subsample_count" can be set. If neither is set,
+    "subsample_count" is assumed to be equal to 256. This is the default value
+    recommended in the isolation forest paper.
+
+#### [uplift_min_examples_in_treatment](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** 5 **Possible values:** min:0
+
+-   For uplift models only. Minimum number of examples per treatment in a node.
+
+#### [uplift_split_score](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** KULLBACK_LEIBLER **Possible values:**
+    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS,
+    CONSERVATIVE_EUCLIDEAN_DISTANCE, CED
+
+-   For uplift models only. Splitter score i.e. score optimized by the splitters. The scores are introduced in "Decision trees for uplift modeling with single and multiple treatments", Rzepakowski et al. Notation: `p` probability / average value of the positive outcome, `q` probability / average value in the control group.<br>- `KULLBACK_LEIBLER` or `KL`: - p log (p/q)<br>- `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2<br>- `CHI_SQUARED` or `CS`: (p-q)^2/q<br>
 
 ## HYPERPARAMETER_OPTIMIZER
 

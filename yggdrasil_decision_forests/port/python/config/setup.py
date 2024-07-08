@@ -17,17 +17,18 @@
 This file is used by tools/build_pip_package.sh.
 """
 import platform
+import sys
 import setuptools
 from setuptools.command.install import install
 from setuptools.dist import Distribution
 
-_VERSION = "0.5.0"
+_VERSION = "0.6.0"
 
 with open("README.md", "r", encoding="utf-8") as fh:
   long_description = fh.read()
 
 REQUIRED_PACKAGES = [
-    "numpy",
+    "numpy<2.0.0",
     "absl_py",
     "protobuf>=3.14",
 ]
@@ -54,32 +55,36 @@ class BinaryDistribution(Distribution):
     return False
 
 
-try:
-  from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
-
-  class bdist_wheel(_bdist_wheel):
-
-    def finalize_options(self):
-      _bdist_wheel.finalize_options(self)
-      self.root_is_pure = False
-
-    def get_tag(self):
-      python, abi, plat = _bdist_wheel.get_tag(self)
-      if platform.system() == "Darwin" and MAC_CROSS_COMPILED:
+if "bdist_wheel" in sys.argv:
+  if "--plat-name" not in sys.argv:
+    if platform.system() == "Darwin":
+      if MAC_CROSS_COMPILED:
+        idx = sys.argv.index("bdist_wheel") + 1
+        sys.argv.insert(idx, "--plat-name")
         if platform.processor() == "arm":
-          plat = "macosx_10_15_x86_64"
+          sys.argv.insert(idx + 1, "macosx_10_15_x86_64")
         elif platform.processor() == "i386":
-          plat = "macosx_12_0_arm64"
+          sys.argv.insert(idx + 1, "macosx_12_0_arm64")
         else:
           raise ValueError(f"Unknown processor {platform.processor()}")
-      return python, abi, plat
-
-except ImportError:
-  bdist_wheel = None
+      else:
+        idx = sys.argv.index("bdist_wheel") + 1
+        sys.argv.insert(idx, "--plat-name")
+        if platform.processor() == "arm":
+          sys.argv.insert(idx + 1, "macosx_12_0_arm64")
+        elif platform.processor() == "i386":
+          sys.argv.insert(idx + 1, "macosx_10_15_x86_64")
+        else:
+          raise ValueError(f"Unknown processor {platform.processor()}")
+    else:
+      print("Not on MacOS")
+  else:
+    print("--plat-name supplied")
+else:
+  print("Not using bdist_wheel")
 
 setuptools.setup(
     cmdclass={
-        "bdist_wheel": bdist_wheel,
         "install": InstallPlatlib,
     },
     name="ydf",

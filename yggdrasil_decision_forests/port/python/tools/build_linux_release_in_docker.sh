@@ -25,7 +25,6 @@ docker pull $DOCKER
 # Start the container
 docker run -it -v $YDF_PATH:/working_dir -w /working_dir/yggdrasil_decision_forests/port/python \
   $DOCKER /bin/bash -c " \
-  yum update && yum install -y rsync && \
   curl -L -o /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/${BAZELISK_VERSION}/bazelisk-linux-amd64 && \
   chmod +x /usr/local/bin/bazel && \
   ./tools/build_linux_release.sh "
