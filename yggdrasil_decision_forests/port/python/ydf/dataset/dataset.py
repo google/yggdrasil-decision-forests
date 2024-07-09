@@ -175,11 +175,12 @@ class VerticalDataset:
           and column_data.dtype.type != np.object_
       ):
         raise ValueError("Categorical Set columns must be a list of lists.")
-      if len(column_data) > 0:
-        if column_data[0] and not isinstance(
-            column_data[0], (list, np.ndarray)
-        ):
-          raise ValueError("Categorical Set columns must be a list of lists.")
+      if (
+          len(column_data) > 0
+          and not isinstance(column_data[0], (list, np.ndarray))
+          and column_data[0]
+      ):
+        raise ValueError("Categorical Set columns must be a list of lists.")
       # TODO: b/313414785 - Consider speeding this up by moving logic to C++.
       # np.unique also sorts the unique elements, which is expected by YDF.
       column_data = [np.unique(row).astype(np.bytes_) for row in column_data]

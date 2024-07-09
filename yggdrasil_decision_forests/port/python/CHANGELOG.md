@@ -1,5 +1,11 @@
 # Changelog
 
+## Head
+
+### Fix
+
+-   Fix parsing of multidimensional ragged inputs.
+
 ## 0.6.0 - 2024-07-04
 
 ### Feature
