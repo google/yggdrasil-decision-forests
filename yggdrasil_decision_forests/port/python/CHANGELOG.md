@@ -2,6 +2,10 @@
 
 ## Head
 
+### Feature
+
+-   Add support in JAX FeatureEncoder for non-string categorical feature values.
+
 ### Fix
 
 -   Fix parsing of multidimensional ragged inputs.

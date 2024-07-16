@@ -20,6 +20,8 @@ import enum
 import functools
 from typing import Any, Sequence, Dict, Optional, List, Set, Tuple, Callable, Union, MutableSequence
 
+import numpy as np
+
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
 from ydf.learner import custom_loss
@@ -98,7 +100,7 @@ class FeatureEncoder:
   """Utility to prepare feature values before being fed into the Jax model.
 
   Does the following:
-  - Encodes categorical strings into categorical integers.
+  - Encodes categorical values into categorical integers.
   - If the model does not need special feature encoding, it only converts the
     values into the expected format (e.g. numpy arrays into Jax arrays).
 
@@ -150,19 +152,53 @@ class FeatureEncoder:
     return self.encode(feature_values)
 
   def encode(self, feature_values: Dict[str, Any]) -> Dict[str, jax.Array]:
-    """Encodes feature values for a model."""
+    """Encodes feature values into the format expected by the Jax model.
 
-    def encode_item(key: str, value: Any) -> jax.Array:
-      categorical_map = self.categorical.get(key)
+    Args:
+      feature_values: Dictionary of feature name to batch of feature values. The
+        feature names must match the unrolled feature names of the vertical
+        dataset.
+
+    Returns:
+      Dictionary of feature name to feature values in the format expected by the
+      Jax model.
+    """
+
+    def encode_feature(name: str, values: Any) -> jax.Array:
+      """Encodes the values of a feature."""
+      categorical_map = self.categorical.get(name)
+
       if categorical_map is not None:
-        # Categorical string encoding.
-        value = [
-            categorical_map.get(x, self.categorical_out_of_vocab_item)
-            for x in value
-        ]
-      return jax.numpy.asarray(value)
 
-    return {k: encode_item(k, v) for k, v in feature_values.items()}
+        def to_key(value: Any) -> str:
+          """Converts a feature value to the format of a categorical map key."""
+          if isinstance(value, str):
+            return value
+          if isinstance(value, (bytes, np.bytes_)):
+            return value.decode("utf-8")
+          if isinstance(value, (bool, np.bool_)):
+            return str(value).lower()
+          if isinstance(value, (int, np.integer)):
+            return str(value)
+          # The YDF to Jax exporter does not support categorical sets, hence the
+          # value cannot be a list or a numpy array.
+          raise ValueError(
+              f"Unexpected categorical value type for feature {name!r}."
+              " Categorical features can be strings, bytes literals, integers,"
+              f" or booleans. Got {type(value)}."
+          )
+
+        values = [
+            categorical_map.get(to_key(v), self.categorical_out_of_vocab_item)
+            for v in values
+        ]
+
+      return jax.numpy.asarray(values)
+
+    return {
+        name: encode_feature(name, values)
+        for name, values in feature_values.items()
+    }
 
 
 @dataclasses.dataclass
