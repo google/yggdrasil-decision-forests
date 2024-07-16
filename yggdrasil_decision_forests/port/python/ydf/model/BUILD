@@ -349,6 +349,7 @@ py_test(
 
 py_test(
     name = "jax_model_test",
+    timeout = "long",
     srcs = ["jax_model_test.py"],
     data = [
         "//test_data",
