@@ -104,11 +104,11 @@ absl::StatusOr<std::unique_ptr<BlockOfExamples>> LoadShard(
   ASSIGN_OR_RETURN(auto reader,
                    CreateExampleReader(absl::StrCat(prefix, ":", shard),
                                        data_spec, required_columns));
-  auto* example = google::protobuf::Arena::CreateMessage<proto::Example>(&block->arena);
+  auto* example = google::protobuf::Arena::Create<proto::Example>(&block->arena);
   absl::StatusOr<bool> status;
   while ((status = reader->Next(example)).ok() && status.value()) {
     block->examples.push_back(example);
-    example = google::protobuf::Arena::CreateMessage<proto::Example>(&block->arena);
+    example = google::protobuf::Arena::Create<proto::Example>(&block->arena);
   }
   return block;
 }
