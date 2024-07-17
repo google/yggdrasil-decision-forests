@@ -35,6 +35,11 @@ describe('YDF Inference', () => {
   const modelUrl5 =
       '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_5.zip';
 
+  let model6 = null;
+  const modelUrl6 =
+      '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_6.zip';
+
+
   let modelSmallSST = null;
   const modelSmallSSTUrl =
       '/base/third_party/yggdrasil_decision_forests/port/javascript/test_data/model_small_sst.zip';
@@ -90,6 +95,11 @@ describe('YDF Inference', () => {
       console.log('Model 5 loaded');
     });
 
+    await ydf.loadModelFromUrl(modelUrl6, modelOptions).then((loadedModel) => {
+      model6 = loadedModel;
+      console.log('Model 6 loaded');
+    });
+
     await ydf.loadModelFromUrl(modelSmallSSTUrl, modelOptions)
         .then((loadedModel) => {
           modelSmallSST = loadedModel;
@@ -102,6 +112,7 @@ describe('YDF Inference', () => {
     expect(model2).not.toBeNull();
     expect(model4).not.toBeNull();
     expect(model5).not.toBeNull();
+    expect(model6).not.toBeNull();
     expect(modelSmallSST).not.toBeNull();
   });
 
@@ -186,6 +197,22 @@ describe('YDF Inference', () => {
 
     expect(my_model).not.toBeNull();
     my_model.unload();
+  });
+
+  it('getLabelClasses', async () => {
+    expect(model.getLabelClasses()).toEqual(['1', '2']);
+  });
+
+  it('getLabelClasses_model2', async () => {
+    expect(model2.getLabelClasses()).toEqual(['1', '2']);
+  });
+
+  it('getLabelClasses_model5', async () => {
+    expect(model5.getLabelClasses()).toEqual([]);
+  });
+
+  it('getLabelClasses_model6', async () => {
+    expect(model6.getLabelClasses()).toEqual(['Z', 'X', 'W', 'Y']);
   });
 
   it('predict', async () => {
@@ -487,6 +514,7 @@ describe('YDF Inference', () => {
     model2.unload();
     model4.unload();
     model5.unload();
+    model6.unload();
     modelSmallSST.unload();
   });
 });

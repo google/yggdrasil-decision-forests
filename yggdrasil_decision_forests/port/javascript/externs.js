@@ -137,6 +137,7 @@ let TFDFInput;
  *   setCategoricalSetString: function(number,number,!CCVector),
  *   setCategoricalSetInt: function(number,number,!CCVector),
  *   getInputFeatures: function(): !InternalInputFeatures,
+ *   getLabelClasses: function(): !CCVector,
  *   getProtoInputFeatures: function(): !InternalInputFeatures,
  *   delete: function(),
  * }}

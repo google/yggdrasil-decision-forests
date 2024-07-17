@@ -188,6 +188,13 @@ class Model {
             .map((unused, index) => rawInputFeatures.get(index));
 
     /**
+     * List of the label classes of the model.
+     * @const @private @type {!Array<string>}
+     */
+    this.labelClasses =
+        ccVectorToJSVector(this.internalModel.getLabelClasses());
+
+    /**
      * Index of the numerical input features for the TF-DF signature.
      * @private @type {?Array<number>}
      */
@@ -246,6 +253,16 @@ class Model {
   }
 
   /**
+   * Lists the label classes for a classification model. Empty otherwise.
+   * In case of multi-class classification, "getLabelClasses" maps to the second
+   * dimension of the probablity array returned by "predict".
+   * @return {!Array<string>} List of label classes.
+   */
+  getLabelClasses() {
+    return this.labelClasses;
+  }
+
+  /**
    * Applies the model on a list of examples and returns the predictions.
    *
    * Usage example:
@@ -258,10 +275,18 @@ class Model {
    *    };
    *
    *  const predictions = model.predict(examples);
-   *  // If the model's output dimension is 1 (e.g. the model is a binary
-   *  // classifier configured to return the probability of the "positive"
-   *  // class), "predictions[0]" and "predictions[1]" are respectively the
-   *  // probability predictions of the first and second examples.
+   *
+   * In case of a regression, binary-classification, ranking, anomaly detection
+   * , or uplifting model, the prediction is an array of shape [num_examples].
+   * For example, predictions[0] is the prediction for the first example, and
+   * predictions[1] is the prediction for the second example.
+   *
+   * For a binary classification model, the prediction is the probability of
+   * the positive class i.e. `getLabelClasses()[1]`.
+   *
+   * For a multi-class classification model, the prediction is an array of shape
+   * [num_examples, num_classes] where the num_classes dimension is mapped to
+   * the label classes "getLabelClasses()".
    *
    * @param {!Examples} examples A list of examples represented by a single
    *     object containing one attribute for each of the input features of the

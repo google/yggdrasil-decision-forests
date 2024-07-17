@@ -87,11 +87,15 @@ std::vector<InputFeature> BuildProtoInputFeatures(
 class Model {
  public:
   Model() {}
+
   Model(std::unique_ptr<ydf::serving::FastEngine>&& engine,
         const ydf::model::AbstractModel* model,
-        const bool created_tfdf_signature)
+        const bool created_tfdf_signature,
+        std::vector<std::string> label_classes)
       : engine_(std::move(engine)) {
     DCHECK(engine_);
+
+    label_classes_ = std::move(label_classes);
 
     if (created_tfdf_signature) {
       proto_input_features_ = BuildProtoInputFeatures(model);
@@ -130,6 +134,9 @@ class Model {
       dense_col_representation_.resize(1);
     }
   }
+
+  // Lists the label classes of the model.
+  std::vector<std::string> GetLabelClasses() { return label_classes_; }
 
   // Lists the input features of the model.
   std::vector<InputFeature> GetInputFeatures() {
@@ -309,7 +316,33 @@ class Model {
 
   // Number of examples allocated in "examples_".
   int num_examples_ = -1;
+
+  // Label classes of the model. Only used for classification models. Otherwise,
+  // is empty.
+  std::vector<std::string> label_classes_;
 };
+
+// Extracts the classification labels of a model.
+absl::StatusOr<std::vector<std::string>> ExtractLabelClasses(
+    const ydf::model::AbstractModel& model) {
+  const auto& col_spec = model.data_spec().columns(model.label_col_idx());
+  STATUS_CHECK_EQ(col_spec.type(),
+                  ydf::dataset::proto::ColumnType::CATEGORICAL);
+  std::vector<std::string> label_classes(
+      col_spec.categorical().number_of_unique_values() - 1);
+  if (col_spec.categorical().is_already_integerized()) {
+    for (int i = 1; i < col_spec.categorical().number_of_unique_values(); i++) {
+      label_classes[i - 1] = absl::StrCat(i);
+    }
+  } else {
+    for (const auto& item : col_spec.categorical().items()) {
+      if (item.second.index() > 0) {
+        label_classes[item.second.index() - 1] = item.first;
+      }
+    }
+  }
+  return label_classes;
+}
 
 // Loads a model from a path.
 std::shared_ptr<Model> LoadModel(std::string path,
@@ -334,8 +367,20 @@ std::shared_ptr<Model> LoadModel(std::string path,
     return {};
   }
 
+  // Extract the label classes, if any.
+  std::vector<std::string> label_classes;
+  if (ydf_model->task() == ydf::model::proto::Task::CLASSIFICATION) {
+    auto label_classes_or = ExtractLabelClasses(*ydf_model);
+    if (!label_classes_or.ok()) {
+      YDF_LOG(WARNING) << label_classes_or.status().message();
+      return {};
+    }
+    label_classes = std::move(label_classes_or.value());
+  }
+
   return std::make_shared<Model>(std::move(engine_or).value(), ydf_model.get(),
-                                 created_tfdf_signature);
+                                 created_tfdf_signature,
+                                 std::move(label_classes));
 }
 
 std::vector<std::string> CreateVectorString(size_t reserved) {
@@ -366,6 +411,7 @@ EMSCRIPTEN_BINDINGS(my_module) {
       .function("setCategoricalSetString", &Model::SetCategoricalSetString)
       .function("setCategoricalSetInt", &Model::SetCategoricalSetInt)
       .function("getInputFeatures", &Model::GetInputFeatures)
+      .function("getLabelClasses", &Model::GetLabelClasses)
       .function("getProtoInputFeatures", &Model::GetProtoInputFeatures);
 
   emscripten::value_object<InputFeature>("InputFeature")

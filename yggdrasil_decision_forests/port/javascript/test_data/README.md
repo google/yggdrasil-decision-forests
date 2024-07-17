@@ -5,3 +5,4 @@
 -   model_4.zip: A model trained with numerical, categorical and boolean
     features.
 -   model_5.zip: An isolation forest model trained on numerical features.
+-   model_6.zip: A multi-class classification model.
