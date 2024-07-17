@@ -2,10 +2,9 @@
 
 ## Head
 
-### Feature
 
 -   Add support in JAX FeatureEncoder for non-string categorical feature values.
-
+-   Improve performance of Isolation Forests.
 ### Fix
 
 -   Fix parsing of multidimensional ragged inputs.

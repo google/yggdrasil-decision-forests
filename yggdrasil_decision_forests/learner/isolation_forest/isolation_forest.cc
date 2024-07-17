@@ -26,8 +26,10 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/memory/memory.h"
+#include "absl/random/distributions.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -284,6 +286,23 @@ int DefaultMaximumDepth(UnsignedExampleIdx num_examples_per_trees) {
 std::vector<UnsignedExampleIdx> SampleExamples(
     const UnsignedExampleIdx num_examples,
     const UnsignedExampleIdx num_examples_to_sample, utils::RandomEngine* rnd) {
+  if (num_examples_to_sample < num_examples / 2) {
+    // If the number of examples is not too large, use Floyd's algorithm for
+    // sampling `num_examples_to_sample` examples from range [0, num_examples).
+    // https://doi.org/10.1145/30401.315746
+
+    absl::btree_set<UnsignedExampleIdx> sampled_examples;
+    for (UnsignedExampleIdx j = num_examples - num_examples_to_sample;
+         j < num_examples; j++) {
+      UnsignedExampleIdx t = absl::Uniform<UnsignedExampleIdx>(*rnd, 0, j + 1);
+      if (!sampled_examples.insert(t).second) {
+        sampled_examples.insert(j);
+      }
+    }
+    std::vector<UnsignedExampleIdx> examples(sampled_examples.begin(),
+                                             sampled_examples.end());
+    return {sampled_examples.begin(), sampled_examples.end()};
+  }
   std::vector<UnsignedExampleIdx> examples(num_examples);
   std::iota(examples.begin(), examples.end(), 0);
   std::shuffle(examples.begin(), examples.end(), *rnd);
@@ -441,6 +460,9 @@ IsolationForestLearner::TrainWithStatusImpl(
         const auto selected_examples = internal::SampleExamples(
             train_dataset.nrow(), model->num_examples_per_trees(),
             &local_random);
+        DCHECK(
+            std::is_sorted(selected_examples.begin(), selected_examples.end()));
+        DCHECK_EQ(selected_examples.size(), model->num_examples_per_trees());
         auto tree_or =
             GrowTree(config, train_dataset, selected_examples, &local_random);
         if (!tree_or.ok()) {
