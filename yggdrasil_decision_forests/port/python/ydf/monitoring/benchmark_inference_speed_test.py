@@ -20,15 +20,13 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 
-from ydf.model import benchmark
+from ydf.monitoring import benchmark_inference_speed as benchmark
 
 
 class ToJaxTest(parameterized.TestCase):
 
   def test_benchmark(self):
-    benchmark.run_preconfigured(
-        models=["reg gbt; num feat"]
-    )
+    benchmark.run_preconfigured(models=["reg gbt; num feat"])
 
   def test_get_num_examples(self):
     self.assertEqual(

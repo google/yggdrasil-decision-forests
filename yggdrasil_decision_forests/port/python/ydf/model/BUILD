@@ -214,24 +214,6 @@ py_library(
     ],
 )
 
-py_library(
-    name = "benchmark",
-    srcs = ["benchmark.py"],
-    deps = [
-        ":export_jax",  # buildcleaner: keep
-        ":export_tf",  # buildcleaner: keep
-        ":generic_model",
-        # jax dep,
-        # numpy dep,
-        # tensorflow:tensorflow_no_contrib dep,
-        # tensorflow_decision_forests dep,
-        # ydf dep,
-        "//ydf/dataset",
-        "//ydf/learner:specialized_learners",
-        "//ydf/utils:string_lib",
-    ],
-)
-
 # Tests
 # =====
 
@@ -388,17 +370,5 @@ py_test(
         # numpy dep,
         # sklearn dep,
         "//ydf/model/decision_forest_model",
-    ],
-)
-
-py_test(
-    name = "benchmark_test",
-    srcs = ["benchmark_test.py"],
-    python_version = "PY3",
-    deps = [
-        ":benchmark",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
     ],
 )

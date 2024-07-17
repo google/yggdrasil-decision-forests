@@ -28,13 +28,15 @@ You can run the benchmark locally with:
   sudo cpupower frequency-set --governor performance
 
   bazel run -c opt --copt=-mfma --copt=-mavx2 --copt=-mavx \
-      //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/model:benchmark_test\
+      //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/monitoring:benchmark_inference_speed_test\
           --test_filter=ToJaxTest.test_benchmark
 
 You can run the benchmark in a notebook / colab with:
 
-  from ydf.model import benchmark
+  from ydf.monitoring import benchmark_inference_speed as benchmark
   _ = benchmark.run_preconfigured(show_logs=True, models=["reg gbt; num feat"])
+
+Note that some inference engines can use GPU and TPU (if available).
 
 """
 

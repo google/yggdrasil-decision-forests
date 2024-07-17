@@ -12,19 +12,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Smoke test for Benchmarks."""
-
-from absl.testing import absltest
-
-from ydf.utils.benchmark import benchmark
-
-
-class BenchTest(absltest.TestCase):
-
-  def test_smoke(self):
-    runner = benchmark.Runner()
-    benchmark.bench_train("iris", "default", "cart", "ydf", runner, 1, 1)
-
-
-if __name__ == "__main__":
-  absltest.main()
