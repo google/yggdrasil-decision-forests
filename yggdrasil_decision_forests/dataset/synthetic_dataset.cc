@@ -55,14 +55,15 @@
 #include <random>
 
 #include "absl/strings/str_replace.h"
-#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hash.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
@@ -683,10 +684,12 @@ absl::StatusOr<GeneratorState> CreateState(
 absl::Status GenerateSyntheticDataset(
     const proto::SyntheticDatasetOptions& options,
     absl::string_view typed_path) {
+  YDF_LOG(INFO) << "Create examples";
   auto rnd = CreateRandomGenerator(options);
   ASSIGN_OR_RETURN(auto state, CreateState(options, &rnd));
   ASSIGN_OR_RETURN(auto examples, CreateFeatures(options, state, &rnd));
   RETURN_IF_ERROR(CreateLabels(options, state, &examples, &rnd));
+  YDF_LOG(INFO) << "Write examples";
   return WriteExamples(examples, typed_path, options.num_examples_per_shards());
 }
 
@@ -696,6 +699,7 @@ absl::Status GenerateSyntheticDatasetTrainValidTest(
     const absl::string_view typed_path_valid,
     const absl::string_view typed_path_test, const float ratio_valid,
     const float ratio_test) {
+  YDF_LOG(INFO) << "Create examples";
   DCHECK_GE(ratio_valid, 0.0);
   DCHECK_LE(ratio_valid, 1.0);
   DCHECK_GE(ratio_test, 0.0);
@@ -747,6 +751,8 @@ absl::Status GenerateSyntheticDatasetTrainValidTest(
       example_train.push_back(example);
     }
   }
+
+  YDF_LOG(INFO) << "Write examples";
 
   RETURN_IF_ERROR(WriteExamples(example_train, typed_path_train,
                                 options.num_examples_per_shards()));

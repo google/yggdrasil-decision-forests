@@ -42,7 +42,16 @@ def main(argv) -> None:
   data["delta"] = data["new"] - data["old"]
   data["delta%"] = data["delta"] / data["old"]
 
-  with pd.option_context("display.float_format", "{:0.3f}".format):
+  with pd.option_context(
+      "display.float_format",
+      "{:0.3f}".format,
+      "display.max_rows",
+      None,
+      "display.max_columns",
+      None,
+      "display.width",
+      100000,
+  ):
     print(data)
 
 
