@@ -89,7 +89,6 @@ class VerticalDataset:
       unrolling: Dict[str, List[str]],
   ) -> None: ...
 
-
 # Model bindings
 # ================
 
@@ -223,7 +222,6 @@ def PredictionAnalysisCreateHtmlReport(
     options: model_analysis_pb2.PredictionAnalysisOptions,
 ) -> str: ...
 
-
 # Learner bindings
 # ================
 
@@ -326,19 +324,16 @@ def GetLearner(
     custom_loss: Optional[CCRegressionLoss],
 ) -> GenericCCLearner: ...
 
-
 # Metric bindings
 # ================
 
 def EvaluationToStr(evaluation: metric_pb2.EvaluationResults) -> str: ...
 def EvaluationPlotToHtml(evaluation: metric_pb2.EvaluationResults) -> str: ...
 
-
 # Log bindings
 # ================
 
 def SetLoggingLevel(level: int, print_file: bool) -> None: ...
-
 
 # Worker bindings
 # ================
@@ -346,4 +341,3 @@ def SetLoggingLevel(level: int, print_file: bool) -> None: ...
 def StartWorkerBlocking(port: int) -> None: ...
 def StartWorkerNonBlocking(port: int) -> int: ...
 def StopWorkerNonBlocking(uid: int) -> None: ...
-
