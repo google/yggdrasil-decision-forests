@@ -354,8 +354,18 @@ message DecisionTreeTrainingConfig {
       // Always use the presorted index, even if the result would be slower.
       // For testing only.
       FORCE_PRESORTED = 2;
+
+      // Select automatically the best method (The quickest method that does not
+      // consume excessive RAM).
+      AUTO = 3;
     }
-    optional SortingStrategy sorting_strategy = 21 [default = PRESORTED];
+    optional SortingStrategy sorting_strategy = 21 [default = AUTO];
+
+    // If set, ensures that the effective strategy is
+    // "ensure_effective_strategy". "ensure_effective_strategy" is only used in
+    // unit test when the sorting strategy is not manually set i.e.
+    // sorting_strategy = AUTO.
+    optional SortingStrategy ensure_effective_sorting_strategy = 1;
 
     // If false, the score of a hessian split is:
     //   score \approx \sum_{children} sum_grad^2/sum_hessian

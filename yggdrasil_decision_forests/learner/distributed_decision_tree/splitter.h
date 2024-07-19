@@ -72,6 +72,9 @@ struct FindBestSplitsCommonArgs {
   const bool has_multiple_node_idxs_;
   dataset_cache::DatasetCacheReader* const dataset;
   SplitPerOpenNode* best_splits;
+
+  const std::vector<std::vector<FeatureIndex>>* const
+      attribute_priority_per_node = nullptr;
 };
 
 // Accumulators and other data for the learning of numerical split.
@@ -178,10 +181,10 @@ absl::Status FillNumericalAccumulator(
       auto example_it,
       common.dataset->PresortedNumericalFeatureExampleIterator(feature));
 
-  const auto mask_delta_bit =
-      dataset_cache::MaskDeltaBit(common.dataset->num_examples());
-  const auto mask_examples_idx =
-      dataset_cache::MaskExampleIdx(common.dataset->num_examples());
+  const auto mask_delta_bit = dataset_cache::MaskDeltaBitFromDeltaBitIdx(
+      common.dataset->delta_bit_idx());
+  const auto mask_examples_idx = dataset_cache::MaskExampleIdxFromDeltaBitIdx(
+      common.dataset->delta_bit_idx());
 
   const auto has_multiple_node_idxs = common.has_multiple_node_idxs_;
 
@@ -283,7 +286,7 @@ template <typename LabelFiller, typename ExampleBucketSet>
 absl::Status FillCategoricalFeatureBuckets(
     const FindBestSplitsCommonArgs& common, FeatureIndex feature,
     const std::vector<bool>& is_target_node, const LabelFiller& label_filler,
-    const int num_feature_values,
+    const int num_feature_values, const int replacement_missing_value,
     std::vector<ExampleBucketSet>* example_bucket_set_per_node) {
   ASSIGN_OR_RETURN(
       auto value_it,
@@ -300,6 +303,10 @@ absl::Status FillCategoricalFeatureBuckets(
     }
 
     for (auto value : values) {
+      if (value == -1) {
+        value = replacement_missing_value;
+      }
+
       DCHECK_GE(value, 0);
       DCHECK_LT(value, num_feature_values);
 
@@ -1155,6 +1162,10 @@ absl::Status TemplatedFindBestSplitsWithClassificationAndCategoricalFeature(
       decision_tree::ExampleBucket<decision_tree::FeatureCategoricalBucket,
                                    typename LabelFiller::LabelBucket>>;
 
+  const auto replacement_missing_value = common.dataset->meta_data()
+                                             .columns(feature)
+                                             .categorical()
+                                             .replacement_missing_value();
   typename ExampleBucketSet::FeatureBucketType::Filler feature_filler(
       num_feature_values,
       common.dataset->meta_data()
@@ -1174,7 +1185,7 @@ absl::Status TemplatedFindBestSplitsWithClassificationAndCategoricalFeature(
   // Aggregate the label values per bucket and open node.
   RETURN_IF_ERROR(FillCategoricalFeatureBuckets(
       common, feature, is_target_node, label_filler, num_feature_values,
-      &example_bucket_set_per_node));
+      replacement_missing_value, &example_bucket_set_per_node));
 
   return OneVsOtherClassificationAndCategoricalFeatureBuckets<>(
       common, feature, is_target_node, label_filler, accumulator_initializers,
@@ -1240,6 +1251,11 @@ absl::Status TemplatedFindBestSplitsWithRegressionAndCategoricalFeature(
       decision_tree::ExampleBucket<decision_tree::FeatureCategoricalBucket,
                                    typename LabelFiller::LabelBucket>>;
 
+  const auto replacement_missing_value = common.dataset->meta_data()
+                                             .columns(feature)
+                                             .categorical()
+                                             .replacement_missing_value();
+
   typename ExampleBucketSet::FeatureBucketType::Filler feature_filler(
       num_feature_values,
       common.dataset->meta_data()
@@ -1259,7 +1275,7 @@ absl::Status TemplatedFindBestSplitsWithRegressionAndCategoricalFeature(
   // Aggregate the label values per bucket and open node.
   RETURN_IF_ERROR(FillCategoricalFeatureBuckets(
       common, feature, is_target_node, label_filler, num_feature_values,
-      &example_bucket_set_per_node));
+      replacement_missing_value, &example_bucket_set_per_node));
 
   return InOrderRegressionAndCategoricalFeatureBuckets<>(
       common, feature, is_target_node, label_filler, accumulator_initializers,

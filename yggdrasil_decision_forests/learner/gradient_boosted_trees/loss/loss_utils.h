@@ -16,16 +16,17 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_UTILS_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_UTILS_H_
 
-#include <math.h>
 #include <stdint.h>
 
 #include <vector>
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -81,7 +82,7 @@ template <bool weighted>
 absl::Status SetLeafValueWithNewtonRaphsonStep(
     const proto::GradientBoostedTreesTrainingConfig& gbt_config,
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const GradientData& gradients,
+    const absl::Span<const float> weights, const GradientData& gradients,
     decision_tree::NodeWithChildren* node);
 
 absl::Status UpdatePredictions(

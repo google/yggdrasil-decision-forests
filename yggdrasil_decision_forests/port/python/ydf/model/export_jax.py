@@ -463,7 +463,7 @@ class InternalForest:
     split_features: Internal idx of the feature being tested for each non-leaf
       node. For oblique splits, "split_features" contains the number of weights.
     split_parameters: Parameter of the condition for each non-leaf nodes. (1)
-      For "greather than" condition (i.e., feature >= threshold),
+      For "greater than" condition (i.e., feature >= threshold),
       "split_parameter" is the threshold. (2) For "is in" condition (i.e.,
       feature in mask), "split_parameter" is an uint32 offset in the mask
       "catgorical_mask" wheret the condition is evaluated as
@@ -1008,7 +1008,7 @@ def _get_leaf_idx(
   # Implementation of the various conditions.
 
   def condition_greater_than(node_idx):
-    """Evaluates a "greather-than" condition."""
+    """Evaluates a "greater-than" condition."""
     feature_value = intern_feature_values["numerical"][
         jax_arrays.split_features[node_idx]
     ]

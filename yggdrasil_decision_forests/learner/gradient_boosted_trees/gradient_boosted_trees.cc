@@ -55,6 +55,8 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping/early_stopping.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
@@ -208,13 +210,6 @@ void ConfigureTrainingConfigForGradients(
 model::proto::Task SubTask(const proto::Loss loss) {
   // GBT trees are always (so far) regression trees.
   return model::proto::REGRESSION;
-}
-
-// Set the default value of non-specified hyper-parameters.
-absl::Status SetDefaultHyperParameters(model::proto::TrainingConfig* config) {
-  auto* gbt_config = config->MutableExtension(
-      gradient_boosted_trees::proto::gradient_boosted_trees_config);
-  return internal::SetDefaultHyperParameters(gbt_config);
 }
 
 // Splits the training shards between effective training and validation.
@@ -531,13 +526,17 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
     const dataset::proto::DataSpecification& data_spec,
     internal::AllTrainingConfiguration* all_config) const {
   all_config->train_config = training_config();
-  RETURN_IF_ERROR(SetDefaultHyperParameters(&all_config->train_config));
 
   all_config->gbt_config = all_config->train_config.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  RETURN_IF_ERROR(internal::SetDefaultHyperParameters(all_config->gbt_config));
 
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
       all_config->train_config, data_spec, &all_config->train_config_link));
+
+  decision_tree::SetInternalDefaultHyperParameters(
+      all_config->train_config, all_config->train_config_link, data_spec,
+      all_config->gbt_config->mutable_decision_tree());
 
   RETURN_IF_ERROR(CheckConfiguration(data_spec, all_config->train_config,
                                      all_config->train_config_link,
@@ -2091,9 +2090,9 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
       "learner/gradient_boosted_trees/gradient_boosted_trees.proto";
 
   model::proto::TrainingConfig config;
-  RETURN_IF_ERROR(SetDefaultHyperParameters(&config));
-  const auto& gbt_config = config.GetExtension(
+  auto& gbt_config = *config.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  RETURN_IF_ERROR(internal::SetDefaultHyperParameters(&gbt_config));
 
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamLoss);
@@ -2428,6 +2427,7 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
   internal_config.set_leaf_value_functor =
       SetLeafValueWithNewtonRaphsonStepFunctor(*config.gbt_config,
                                                gradients[grad_idx]);
+
   internal_config.hessian_score = config.gbt_config->use_hessian_gain();
   internal_config.hessian_leaf = true;
   internal_config.gradient_col_idx = gradients[grad_idx].gradient_col_idx;
@@ -3039,14 +3039,6 @@ absl::Status SetDefaultHyperParameters(
         gbt_config) {
   decision_tree::SetDefaultHyperParameters(gbt_config->mutable_decision_tree());
 
-  if (gbt_config->has_sample_with_shards()) {
-    gbt_config->mutable_decision_tree()
-        ->mutable_internal()
-        ->set_sorting_strategy(
-            decision_tree::proto::DecisionTreeTrainingConfig::Internal::
-                IN_NODE);
-  }
-
   if (!gbt_config->decision_tree().has_max_depth()) {
     if (gbt_config->decision_tree().has_growing_strategy_best_first_global()) {
       gbt_config->mutable_decision_tree()->set_max_depth(-1);
@@ -3054,11 +3046,13 @@ absl::Status SetDefaultHyperParameters(
       gbt_config->mutable_decision_tree()->set_max_depth(6);
     }
   }
+
   if (!gbt_config->decision_tree().has_num_candidate_attributes() &&
       !gbt_config->decision_tree().has_num_candidate_attributes_ratio()) {
     // The basic definition of GBT does not have any attribute sampling.
     gbt_config->mutable_decision_tree()->set_num_candidate_attributes(-1);
   }
+
   if (!gbt_config->has_shrinkage()) {
     if (gbt_config->forest_extraction_case() ==
         proto::GradientBoostedTreesTrainingConfig::kDart) {
@@ -3111,6 +3105,9 @@ absl::Status SetDefaultHyperParameters(
 
     // Clear deprecated fields.
     gbt_config->clear_subsample();
+  } else {
+    // No sub-sampling.
+    gbt_config->mutable_stochastic_gradient_boosting();
   }
 
   if (gbt_config->early_stopping() !=
@@ -3125,6 +3122,17 @@ absl::Status SetDefaultHyperParameters(
     gbt_config->set_early_stopping(
         proto::GradientBoostedTreesTrainingConfig::NONE);
   }
+
+  // Select sorting strategy.
+
+  using DTInternal = decision_tree::proto::DecisionTreeTrainingConfig::Internal;
+
+  if (gbt_config->has_sample_with_shards()) {
+    gbt_config->mutable_decision_tree()
+        ->mutable_internal()
+        ->set_sorting_strategy(DTInternal::IN_NODE);
+  }
+
   return absl::OkStatus();
 }
 

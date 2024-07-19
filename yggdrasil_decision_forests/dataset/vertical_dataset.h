@@ -326,7 +326,7 @@ class VerticalDataset {
     static constexpr float kNaValue = std::numeric_limits<float>::quiet_NaN();
   };
 
-  class BooleanColumn : public TemplateScalarStorage<char> {
+  class BooleanColumn : public TemplateScalarStorage<int8_t> {
    public:
     proto::ColumnType type() const override {
       return proto::ColumnType::BOOLEAN;
@@ -363,11 +363,11 @@ class VerticalDataset {
     bool IsTrue(const row_t row) const { return values()[row] == kTrueValue; }
 
     // Special value used to represent NA.
-    static constexpr char kNaValue = 2;
+    static constexpr int8_t kNaValue = 2;
     // Value representing "true".
-    static constexpr char kTrueValue = 1;
+    static constexpr int8_t kTrueValue = 1;
     // Value representing "false".
-    static constexpr char kFalseValue = 0;
+    static constexpr int8_t kFalseValue = 0;
   };
 
   class DiscretizedNumericalColumn
@@ -688,6 +688,19 @@ class VerticalDataset {
   // the type is not compatible.
   template <typename T>
   T* MutableColumnWithCastOrNull(int col);
+
+  // Easy cast + access to column data.
+  absl::StatusOr<const CategoricalColumn*> categorical_column(
+      int col_idx) const;
+  absl::StatusOr<CategoricalColumn*> mutable_categorical_column(int col_idx);
+  absl::StatusOr<const NumericalColumn*> numerical_column(int col_idx) const;
+  absl::StatusOr<NumericalColumn*> mutable_numerical_column(int col_idx);
+  absl::StatusOr<const BooleanColumn*> boolean_column(int col_idx) const;
+  absl::StatusOr<BooleanColumn*> mutable_boolean_column(int col_idx);
+  absl::StatusOr<const DiscretizedNumericalColumn*>
+  discretized_numerical_column(int col_idx) const;
+  absl::StatusOr<DiscretizedNumericalColumn*>
+  mutable_discretized_numerical_column(int col_idx);
 
   const proto::DataSpecification& data_spec() const { return data_spec_; }
 

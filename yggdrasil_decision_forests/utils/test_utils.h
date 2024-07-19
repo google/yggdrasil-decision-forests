@@ -39,14 +39,23 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_TOOL_TEST_UTILS_H_
 #define YGGDRASIL_DECISION_FORESTS_TOOL_TEST_UTILS_H_
 
+#include <cxxabi.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <cstdlib>
+#include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "absl/random/random.h"
+#include "absl/log/check.h"
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -59,6 +68,7 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
+#include "yggdrasil_decision_forests/serving/fast_engine.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {

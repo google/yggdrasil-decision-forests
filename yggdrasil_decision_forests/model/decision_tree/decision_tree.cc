@@ -1475,14 +1475,29 @@ std::string DebugCompare(
     absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> a,
     absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> b) {
   if (a.size() != b.size()) {
-    return absl::StrCat("The number of trees don't match. ", a.size(),
-                        " != ", b.size());
+    const int min_tree_count = std::min(a.size(), b.size());
+    for (int tree_idx = 0; tree_idx < min_tree_count; tree_idx++) {
+      const std::string sub_compare =
+          a[tree_idx]->DebugCompare(dataspec, label_idx, *b[tree_idx]);
+      if (!sub_compare.empty()) {
+        return absl::StrCat("The number of trees doesn't match. ", a.size(),
+                            " != ", b.size(),
+                            ". The first different tree is the tree #",
+                            tree_idx, "\n", sub_compare);
+      }
+    }
+
+    return absl::StrCat(
+        "The number of trees doesn't match. ", a.size(), " != ", b.size(),
+        ". There is no difference in tree structure in the first ",
+        min_tree_count, " trees");
   }
+
   for (int tree_idx = 0; tree_idx < a.size(); tree_idx++) {
     const std::string sub_compare =
         a[tree_idx]->DebugCompare(dataspec, label_idx, *b[tree_idx]);
     if (!sub_compare.empty()) {
-      return sub_compare;
+      return absl::StrCat("In the tree #", tree_idx, ":\n", sub_compare);
     }
   }
   return {};
@@ -1504,7 +1519,7 @@ std::string DecisionTree::DebugCompare(
     std::string other_tree_description;
     AppendModelStructure(dataspec, label_idx, &tree_description);
     other.AppendModelStructure(dataspec, label_idx, &other_tree_description);
-    return absl::StrCat(result, "\n==========\nFull trees:\n\n",
+    return absl::StrCat(result, "\n==========\nFull trees (me vs other):\n\n",
                         tree_description, "\nvs\n\n", other_tree_description);
   }
   return {};

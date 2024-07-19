@@ -16,32 +16,25 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_binary_focal.h"
 
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <string>
 #include <type_traits>
-#include <utility>
 #include <vector>
 
-#include "absl/container/inlined_vector.h"
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/substitute.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_binomial.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
-#include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
@@ -143,7 +136,7 @@ float CalculateFocalLossHessian(FocalLossGradientData gradient_data,
 
 template <typename T>
 absl::Status BinaryFocalLoss::TemplatedUpdateGradients(
-    const std::vector<T>& labels, const std::vector<float>& predictions,
+    const absl::Span<T> labels, const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -179,7 +172,8 @@ absl::Status BinaryFocalLoss::TemplatedUpdateGradients(
 }
 
 absl::Status BinaryFocalLoss::UpdateGradients(
-    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+    const absl::Span<const int32_t> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -188,7 +182,8 @@ absl::Status BinaryFocalLoss::UpdateGradients(
 }
 
 absl::Status BinaryFocalLoss::UpdateGradients(
-    const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+    const absl::Span<const int16_t> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -198,7 +193,7 @@ absl::Status BinaryFocalLoss::UpdateGradients(
 
 template <typename T>
 void BinaryFocalLoss::TemplatedUpdateGradientsImp(
-    const std::vector<T>& labels, const std::vector<float>& predictions,
+    const absl::Span<T> labels, const absl::Span<const float> predictions,
     size_t begin_example_idx, size_t end_example_idx, float gamma, float alpha,
     std::vector<float>* gradient_data, std::vector<float>* hessian_data) {
   DCHECK_EQ(gradient_data->size(), hessian_data->size());
@@ -225,15 +220,14 @@ void BinaryFocalLoss::TemplatedUpdateGradientsImp(
   }
 }
 
-
 std::vector<std::string> BinaryFocalLoss::SecondaryMetricNames() const {
   return {"accuracy"};
 }
 
 template <bool use_weights, typename T>
 void BinaryFocalLoss::TemplatedLossImp(
-    const std::vector<T>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights, size_t begin_example_idx,
+    const absl::Span<T> labels, const absl::Span<const float> predictions,
+    const absl::Span<const float> weights, size_t begin_example_idx,
     size_t end_example_idx, float gamma, float alpha,
     double* __restrict sum_loss, double* __restrict count_correct_predictions,
     double* __restrict sum_weights) {
@@ -268,8 +262,8 @@ void BinaryFocalLoss::TemplatedLossImp(
 
 template <typename T>
 absl::StatusOr<LossResults> BinaryFocalLoss::TemplatedLoss(
-    const std::vector<T>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<T> labels, const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
@@ -337,8 +331,9 @@ absl::StatusOr<LossResults> BinaryFocalLoss::TemplatedLoss(
 }
 
 absl::StatusOr<LossResults> BinaryFocalLoss::Loss(
-    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<const int32_t> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   return TemplatedLoss(labels, predictions, weights, ranking_index,
@@ -346,8 +341,9 @@ absl::StatusOr<LossResults> BinaryFocalLoss::Loss(
 }
 
 absl::StatusOr<LossResults> BinaryFocalLoss::Loss(
-    const std::vector<int16_t>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<const int16_t> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   return TemplatedLoss(labels, predictions, weights, ranking_index,

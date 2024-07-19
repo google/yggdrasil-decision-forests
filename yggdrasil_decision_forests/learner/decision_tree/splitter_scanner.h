@@ -63,8 +63,9 @@
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -1044,31 +1045,24 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   SignedExampleIdx best_sorted_example_idx = -1;
   SignedExampleIdx best_previous_sorted_example_idx = -1;
 
-  constexpr auto new_value_mask = ((SparseItem::ExampleIdx)1)
-                                  << (sizeof(SparseItem::ExampleIdx) * 8 - 1);
-  constexpr auto example_idx_mask = new_value_mask - 1;
-
   // A new (i.e. different) attribute value was observed in the scan since the
   // last score test.
   bool new_attribute_value = false;
 
   // Index of the nearest previous example with a  value different from the
   // current example (i.e. the "sorted_example_idx" example).
-  SparseItem::ExampleIdx previous_sorted_example_idx = 0;
+  SparseItemMeta::ExampleIdx previous_sorted_example_idx = 0;
 
   // Iterate over the attribute values in increasing order.
   // Note: For some reasons, the iterator for-loop is faster than the
   // for(auto:sorted_attributes) for loop (test on 10 different compiled
   // binaries).
-  for (SparseItem::ExampleIdx sorted_example_idx = 0;
+  for (SparseItemMeta::ExampleIdx sorted_example_idx = 0;
        sorted_example_idx < sorted_attributes.size(); sorted_example_idx++) {
     const auto& sorted_attribute = sorted_attributes[sorted_example_idx];
 
-    auto example_idx =
-        sorted_attribute.example_idx_and_extra & example_idx_mask;
-
-    const bool is_new_value =
-        sorted_attribute.example_idx_and_extra & new_value_mask;
+    auto example_idx = sorted_attribute & SparseItemMeta::kMaskExampleIdx;
+    const bool is_new_value = sorted_attribute & SparseItemMeta::kMaskDeltaBit;
     new_attribute_value |= is_new_value;
 
     // Skip non selected examples.
@@ -1128,12 +1122,11 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   if (found_split) {
     // Finalize the best found split.
     const auto best_previous_feature_value = feature_filler.GetValue(
-        sorted_attributes[best_previous_sorted_example_idx]
-            .example_idx_and_extra &
-        example_idx_mask);
-    const auto best_feature_value = feature_filler.GetValue(
-        sorted_attributes[best_sorted_example_idx].example_idx_and_extra &
-        example_idx_mask);
+        sorted_attributes[best_previous_sorted_example_idx] &
+        SparseItemMeta::kMaskExampleIdx);
+    const auto best_feature_value =
+        feature_filler.GetValue(sorted_attributes[best_sorted_example_idx] &
+                                SparseItemMeta::kMaskExampleIdx);
     // TODO: Experiment with random splits in ]best_previous_feature_value,
     // best_feature_value[.
 

@@ -18,9 +18,17 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_SPLITTER_ACCUMULATOR_UPLIFT_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_SPLITTER_ACCUMULATOR_UPLIFT_H_
 
-#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
+#include <type_traits>
+#include <vector>
+
+#include "absl/container/inlined_vector.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 

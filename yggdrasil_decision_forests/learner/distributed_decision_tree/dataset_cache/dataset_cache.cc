@@ -15,17 +15,33 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <numeric>
+#include <string>
+#include <tuple>
+#include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/check.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
+#include "absl/time/clock.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
-#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
-#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/math.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -150,6 +166,7 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
       &partial_meta_data, file::Defaults()));
   metadata.set_num_examples(data_spec.created_num_rows());
   metadata.set_num_shards_in_feature_cache(partial_meta_data.num_shards());
+  metadata.set_delta_bit_idx(DeltaBitIdx(metadata.num_examples()));
 
   // TODO: Index the categorical-string features.
 
@@ -467,6 +484,8 @@ absl::Status SeparateDatasetColumns(
     cache_metadata->set_num_examples(cache_metadata->num_examples() +
                                      metadata.num_examples());
   }
+  cache_metadata->set_delta_bit_idx(
+      DeltaBitIdx(cache_metadata->num_examples()));
 
   RETURN_IF_ERROR(distribute_manager->SetParallelExecutionPerWorker(
       kNumParallelQueriesPerWorker));
@@ -562,6 +581,7 @@ absl::Status SortNumericalColumns(
   request.set_output_base_directory(
       file::JoinPath(cache_directory, kFilenameTmp));
   request.set_num_examples(cache_metadata->num_examples());
+  request.set_delta_bit_idx(cache_metadata->delta_bit_idx());
   request.set_cache_directory(std::string(cache_directory));
 
   // We assume that a cache entry takes 4 bytes.

@@ -17,7 +17,8 @@
 
 #include <algorithm>
 #include <atomic>
-#include <iterator>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <numeric>
 #include <random>
@@ -29,9 +30,13 @@
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -42,6 +47,8 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -59,6 +66,7 @@
 #include "yggdrasil_decision_forests/utils/feature_importance.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
@@ -231,8 +239,9 @@ The algorithm is unique in that it is robust to overfitting, even in extreme cas
 
 It is probably the most well-known of the Decision Forest training algorithms.)");
 
-  const auto& rf_config =
-      config.GetExtension(random_forest::proto::random_forest_config);
+  auto& rf_config =
+      *config.MutableExtension(random_forest::proto::random_forest_config);
+  RETURN_IF_ERROR(internal::SetDefaultHyperParameters(&rf_config));
 
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamNumTrees);
@@ -387,7 +396,7 @@ RandomForestLearner::TrainWithStatusImpl(
   auto config_with_default = training_config();
   auto& rf_config = *config_with_default.MutableExtension(
       random_forest::proto::random_forest_config);
-  decision_tree::SetDefaultHyperParameters(rf_config.mutable_decision_tree());
+  RETURN_IF_ERROR(internal::SetDefaultHyperParameters(&rf_config));
 
   // If the maximum model size is limited, "keep_non_leaf_label_distribution"
   // defaults to false.
@@ -405,11 +414,15 @@ RandomForestLearner::TrainWithStatusImpl(
     rf_config.set_compute_oob_performances(false);
   }
 
-  auto mdl = absl::make_unique<RandomForestModel>();
-  mdl->set_data_spec(train_dataset.data_spec());
   model::proto::TrainingConfigLinking config_link;
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
       config_with_default, train_dataset.data_spec(), &config_link));
+  decision_tree::SetInternalDefaultHyperParameters(
+      config_with_default, config_link, train_dataset.data_spec(),
+      rf_config.mutable_decision_tree());
+
+  auto mdl = absl::make_unique<RandomForestModel>();
+  mdl->set_data_spec(train_dataset.data_spec());
   internal::InitializeModelWithTrainingConfig(config_with_default, config_link,
                                               mdl.get());
   YDF_LOG(INFO) << "Training random forest on " << train_dataset.nrow()
@@ -1272,6 +1285,18 @@ absl::Status ExportOOBPredictions(
         return absl::InvalidArgumentError("Unsupported task");
     }
     RETURN_IF_ERROR(writer->Write(example));
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status SetDefaultHyperParameters(
+    random_forest::proto::RandomForestTrainingConfig* rf_config) {
+  decision_tree::SetDefaultHyperParameters(rf_config->mutable_decision_tree());
+
+  if (rf_config->decision_tree().internal().sorting_strategy() ==
+      decision_tree::proto::DecisionTreeTrainingConfig::Internal::AUTO) {
+    return absl::InvalidArgumentError("sorting_strategy not set");
   }
 
   return absl::OkStatus();

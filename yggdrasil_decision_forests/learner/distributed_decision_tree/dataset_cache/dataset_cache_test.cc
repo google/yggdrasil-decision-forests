@@ -241,7 +241,7 @@ TEST_F(End2End, SortedNumericalColumn) {
   const auto mask_delta_bit = MaskDeltaBit(meta_data_.num_examples());
   const auto mask_example_idx = MaskExampleIdx(meta_data_.num_examples());
 
-  int delta_bit_idx = 0;
+  int num_delta_bit_idx = 0;
   size_t num_examples = 0;
   while (true) {
     CHECK_OK(example_idx_reader.Next());
@@ -254,9 +254,10 @@ TEST_F(End2End, SortedNumericalColumn) {
       EXPECT_EQ(ground_truth_values[example_idx],
                 sorted_ground_truth_values[num_examples]);
       if (value & mask_delta_bit) {
-        delta_bit_idx++;
+        num_delta_bit_idx++;
       }
-      EXPECT_EQ(delta_values[delta_bit_idx], ground_truth_values[example_idx]);
+      EXPECT_EQ(delta_values[num_delta_bit_idx],
+                ground_truth_values[example_idx]);
       num_examples++;
     }
   }
@@ -616,6 +617,7 @@ TEST_F(TestCreateDatasetCacheFromPartialDatasetCache, Base) {
         num_examples: 10
         num_shards_in_feature_cache: 2
         num_shards_in_index_cache: 1
+        delta_bit_idx: 4
         columns {
           available: true
           numerical {

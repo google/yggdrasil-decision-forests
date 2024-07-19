@@ -71,6 +71,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
@@ -270,7 +271,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   // Print the model evaluation.
   const auto evaluation_description = metric::TextReport(evaluation_).value();
-  YDF_LOG(INFO) << "Evaluation:\n" << evaluation_description;
+  // YDF_LOG(INFO) << "Evaluation:\n" << evaluation_description;
 
   // Export the evaluation to a html file.
   std::string html_evaluation_report;
@@ -289,8 +290,9 @@ void TrainAndTestTester::TrainAndEvaluateModel(
       file::JoinPath(test::TmpDirectory(), test_dir_, "model");
   EXPECT_OK(SaveModel(model_path, model_.get(), model_io));
 
-  YDF_LOG(INFO) << "Description:\n"
-                << model_->DescriptionAndStatistics(show_full_model_structure_);
+  // YDF_LOG(INFO) << "Description:\n"
+  //               <<
+  //               model_->DescriptionAndStatistics(show_full_model_structure_);
 
   const auto check_evaluation_is_equal =
       [this](const metric::proto::EvaluationResults& e1,
@@ -411,8 +413,8 @@ dataset::proto::DataSpecification TrainAndTestTester::BuildDataspec(
   }
   dataset::proto::DataSpecification data_spec;
   dataset::CreateDataSpec(dataset_path, false, guide_, &data_spec);
-  YDF_LOG(INFO) << "Dataspec:\n"
-                << dataset::PrintHumanReadable(data_spec, false);
+  // YDF_LOG(INFO) << "Dataspec:\n"
+  //               << dataset::PrintHumanReadable(data_spec, false);
   return data_spec;
 }
 

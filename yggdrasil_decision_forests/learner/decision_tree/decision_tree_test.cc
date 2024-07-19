@@ -17,7 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iterator>
+#include <cstdint>
 #include <limits>
 #include <numeric>
 #include <random>
@@ -29,8 +29,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/container/flat_hash_set.h"
-#include "absl/status/status.h"
+#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -41,7 +42,10 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
@@ -50,6 +54,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -135,6 +140,7 @@ TEST(DecisionTree, FakeTrain) {
 
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.set_internal_error_on_wrong_splitter_statistics(true);
+  dt_config.mutable_growing_strategy_local();
 
   utils::RandomEngine random;
   DecisionTree dt;
@@ -1017,6 +1023,10 @@ TYPED_TEST(FindBestSplitWithDuplicatesTest,
   const float na_replacement = 2;
   const UnsignedExampleIdx min_num_obs = 1;
 
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
+
   // Computes the preprocessing.
   Preprocessing preprocessing;
   {
@@ -1041,13 +1051,11 @@ TYPED_TEST(FindBestSplitWithDuplicatesTest,
     }
     model::proto::TrainingConfigLinking config_link;
     config_link.add_features(0);
-    CHECK_OK(PresortNumericalFeatures(dataset, config_link, 6, &preprocessing));
+    CHECK_OK(PresortNumericalFeatures(dataset, config_link, dt_config, 6,
+                                      &preprocessing));
     preprocessing.set_num_examples(dataset.nrow());
   }
 
-  proto::DecisionTreeTrainingConfig dt_config;
-  dt_config.mutable_internal()->set_sorting_strategy(
-      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
   utils::NormalDistributionDouble label_distribution;
   for (const auto example_idx : selected_examples) {
     if constexpr (TestFixture::kWeighted) {
@@ -1105,6 +1113,10 @@ TYPED_TEST(FindBestSplitTest,
   const float na_replacement = 2;
   const UnsignedExampleIdx min_num_obs = 1;
 
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
+
   // Computes the preprocessing.
   Preprocessing preprocessing;
   {
@@ -1125,13 +1137,11 @@ TYPED_TEST(FindBestSplitTest,
     }
     model::proto::TrainingConfigLinking config_link;
     config_link.add_features(0);
-    CHECK_OK(PresortNumericalFeatures(dataset, config_link, 6, &preprocessing));
+    CHECK_OK(PresortNumericalFeatures(dataset, config_link, dt_config, 6,
+                                      &preprocessing));
     preprocessing.set_num_examples(dataset.nrow());
   }
 
-  proto::DecisionTreeTrainingConfig dt_config;
-  dt_config.mutable_internal()->set_sorting_strategy(
-      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
   utils::NormalDistributionDouble label_distribution;
   for (const auto example_idx : selected_examples) {
     if constexpr (TestFixture::kWeighted) {
@@ -1255,7 +1265,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
 TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
   // Small basic dataset.
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
-  std::vector<char> attributes = {0, 1, 0, 1, 0, 0};
+  std::vector<int8_t> attributes = {0, 1, 0, 1, 0, 0};
   const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
   const std::vector<int32_t> labels = {1, 0, 0, 0, 0, 1};
   const int32_t num_label_classes = 2;
@@ -1301,7 +1311,7 @@ TYPED_TEST(FindBestSplitTest,
            FindBestCategoricalSplitCartBooleanForRegression) {
   // Small basic dataset.
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
-  std::vector<char> attributes = {0, 1, 0, 1, 0, 0};
+  std::vector<int8_t> attributes = {0, 1, 0, 1, 0, 0};
   std::vector<float> weights;
   if constexpr (TestFixture::kWeighted) {
     weights = {1., 2., 3., 4., 5., 6.};
@@ -1496,8 +1506,8 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
 TEST(DecisionTree, LocalImputationForBooleanAttribute) {
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
-  const char na = dataset::VerticalDataset::BooleanColumn::kNaValue;
-  std::vector<char> attributes = {0, 1, 0, 0, na, na};
+  const int8_t na = dataset::VerticalDataset::BooleanColumn::kNaValue;
+  std::vector<int8_t> attributes = {0, 1, 0, 0, na, na};
   const std::vector<int32_t> labels = {1, 1, 0, 0, 1, 0};
   const int32_t num_label_classes = 2;
 

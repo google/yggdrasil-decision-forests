@@ -18,15 +18,29 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_DATASET_CACHE_READER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_DATASET_CACHE_READER_H_
 
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/time/time.h"
+#include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
-#include "yggdrasil_decision_forests/utils/distribute/distribute.h"
-#include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"
+#include "yggdrasil_decision_forests/utils/own_or_borrow.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -60,11 +74,14 @@ class DatasetCacheReader {
   // Number of examples in the cache.
   uint64_t num_examples() const;
 
+  // Index of the deltabit in an example-idx.
+  int delta_bit_idx() const;
+
   // Classification labels. Empty if there is not classification labels.
-  const std::vector<ClassificationLabelType>& categorical_labels() const;
+  absl::Span<const ClassificationLabelType> categorical_labels() const;
 
   // Regression labels. Empty if there is not regression labels.
-  const std::vector<RegressionLabelType>& regression_labels() const;
+  absl::Span<const RegressionLabelType> regression_labels() const;
 
   // Trainings weights. Empty if the training examples are not weighted.
   const std::vector<float>& weights() const;
@@ -82,28 +99,29 @@ class DatasetCacheReader {
   absl::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
   PresortedNumericalFeatureValueIterator(int column_idx) const;
 
-  // Iterator over the "column_idx"-th numerical column ordedd by example index.
+  // Iterator over the "column_idx"-th numerical column ordered by example
+  // index.
   absl::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
   InOrderNumericalFeatureValueIterator(int column_idx) const;
 
-  // Iterator over the "column_idx"-th categorical column ordedd by example
+  // Iterator over the "column_idx"-th categorical column ordered by example
   // index.
   absl::StatusOr<
       std::unique_ptr<AbstractIntegerColumnIterator<CategoricalType>>>
   InOrderCategoricalFeatureValueIterator(int column_idx) const;
 
-  // Iterator over the "column_idx"-th boolean column ordedd by example index.
+  // Iterator over the "column_idx"-th boolean column ordered by example index.
   absl::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<BooleanType>>>
   InOrderBooleanFeatureValueIterator(int column_idx) const;
 
-  // Iterator over the "column_idx"-th discretized numerical column ordedd by
+  // Iterator over the "column_idx"-th discretized numerical column ordered by
   // example index.
   absl::StatusOr<std::unique_ptr<
       AbstractIntegerColumnIterator<DiscretizedIndexedNumericalType>>>
   InOrderDiscretizedNumericalFeatureValueIterator(int column_idx) const;
 
   // Iterator over a subset of the "column_idx"-th discretized numerical column
-  // ordedd by example index.
+  // ordered by example index.
   absl::StatusOr<std::unique_ptr<
       AbstractIntegerColumnIterator<DiscretizedIndexedNumericalType>>>
   InOrderDiscretizedNumericalFeatureValueIterator(int column_idx,
@@ -158,7 +176,7 @@ class DatasetCacheReader {
   //
   absl::Status NonBlockingLoadingAndUnloadingFeatures(
       const std::vector<int>& load_features,
-      const std::vector<int>& unload_features, const int num_threads = 10);
+      const std::vector<int>& unload_features, int num_threads = 10);
 
   // Indicates if features are currently loaded with
   // "NonBlockingLoadingAndUnloadingFeatures". This value is updated by
@@ -190,6 +208,8 @@ class DatasetCacheReader {
                      const proto::DatasetCacheReaderOptions& options)
       : path_(path), options_(options) {}
 
+  DatasetCacheReader() {}
+
   // Initialize the internal structure and load the feature columns in RAM.
   absl::Status InitializeAndLoadInMemoryCache();
 
@@ -216,11 +236,11 @@ class DatasetCacheReader {
 
   // Classification label values. Empty if the dataset does not have a
   // classification label.
-  std::vector<ClassificationLabelType> classification_labels_;
+  utils::VectorOwnOrBorrow<ClassificationLabelType> classification_labels_;
 
   // Regression label values. Empty if the dataset does not have a
   // regression label.
-  std::vector<RegressionLabelType> regression_labels_;
+  utils::VectorOwnOrBorrow<RegressionLabelType> regression_labels_;
 
   // List of the features available for reading. Sorted in increasing order.
   std::vector<int> features_;

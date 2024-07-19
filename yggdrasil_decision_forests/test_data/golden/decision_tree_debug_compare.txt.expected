@@ -21,7 +21,7 @@ condition {
 }
 
 ==========
-Full trees:
+Full trees (me vs other):
 
     "f1">=1 [s:0 n:0 np:0 miss:0]
         ├─(pos)─ "f1">=2 [s:0 n:0 np:0 miss:0]

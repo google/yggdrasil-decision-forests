@@ -15,13 +15,26 @@
 
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 
+#include <string>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/utils/distribution.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
@@ -34,6 +47,7 @@ using test::StatusIs;
 using ::testing::DoubleNear;
 using ::testing::ElementsAre;
 using ::testing::Pointwise;
+using ::yggdrasil_decision_forests::dataset::proto::ColumnType;
 
 // Margin of error for numerical tests.
 constexpr float kTestPrecision = 0.000001f;
@@ -67,13 +81,11 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyGradientDataset() {
 dataset::VerticalDataset CreateMHDLDataset() {
   dataset::VerticalDataset dataset;
   const auto label_col =
-      dataset.AddColumn("l", dataset::proto::ColumnType::CATEGORICAL).value();
+      dataset.AddColumn("l", ColumnType::CATEGORICAL).value();
   label_col->mutable_categorical()->set_is_already_integerized(true);
   label_col->mutable_categorical()->set_number_of_unique_values(3);
-  EXPECT_OK(
-      dataset.AddColumn("f1", dataset::proto::ColumnType::NUMERICAL).status());
-  EXPECT_OK(
-      dataset.AddColumn("f2", dataset::proto::ColumnType::NUMERICAL).status());
+  EXPECT_OK(dataset.AddColumn("f1", ColumnType::NUMERICAL).status());
+  EXPECT_OK(dataset.AddColumn("f2", ColumnType::NUMERICAL).status());
   EXPECT_OK(dataset.CreateColumnsFromDataspec());
 
   // Those values are similar to the section 3.2 of the "Linear Discriminant
@@ -93,19 +105,187 @@ dataset::VerticalDataset CreateMHDLDataset() {
   return dataset;
 }
 
+struct TrainTreeParam {
+  std::string name;
+  proto::DecisionTreeTrainingConfig::Internal::SortingStrategy sorting_strategy;
+};
+
+using TrainTree = testing::TestWithParam<TrainTreeParam>;
+
+TEST_P(TrainTree, Base) {
+  const TrainTreeParam& params = GetParam();
+  // Dataset
+
+  // We want:
+  // "f1">=2.5 [s:0.347222 n:6 np:4 miss:0] ; pred:0.833333
+  //     ├─(pos)─ "f2">=1.5 [s:0.0625 n:4 np:2 miss:0] ; pred:1.25
+  //     |        ├─(pos)─ pred:1.5
+  //     |        └─(neg)─ pred:1
+  //     └─(neg)─ pred:0
+  dataset::VerticalDataset dataset;
+  ASSERT_OK(dataset.AddColumn("l", ColumnType::NUMERICAL).status());
+  ASSERT_OK(dataset.AddColumn("f1", ColumnType::NUMERICAL).status());
+  ASSERT_OK(dataset.AddColumn("f2", ColumnType::NUMERICAL).status());
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  dataset.AppendExample({{"l", "0"}, {"f1", "1"}, {"f2", "1"}});
+  dataset.AppendExample({{"l", "0"}, {"f1", "2"}, {"f2", "2"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "3"}, {"f2", "1"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "4"}, {"f2", "1"}});
+  dataset.AppendExample({{"l", "1.5"}, {"f1", "3"}, {"f2", "2"}});
+  dataset.AppendExample({{"l", "1.5"}, {"f1", "4"}, {"f2", "2"}});
+
+  // Training configuration
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<float> weights = {};
+  model::proto::TrainingConfig config;
+  model::proto::TrainingConfigLinking config_link;
+  proto::DecisionTreeTrainingConfig dt_config;
+  const model::proto::DeploymentConfig deployment;
+  utils::RandomEngine random;
+
+  config.set_task(model::proto::Task::REGRESSION);
+  config_link.set_label(0);
+  config_link.add_features(1);
+  config_link.add_features(2);
+  dt_config.set_min_examples(1);
+  dt_config.mutable_axis_aligned_split();
+  dt_config.mutable_internal()->set_sorting_strategy(params.sorting_strategy);
+  dt_config.mutable_growing_strategy_local();
+  dt_config.mutable_categorical()->mutable_cart();
+  dt_config.set_num_candidate_attributes(-1);
+
+  // Train a tree
+
+  // Note: preprocessing is required for sorting_strategy=PRESORTED. For
+  // sorting_strategy=IN_NODE, preprocessing is ignored.
+  ASSERT_OK_AND_ASSIGN(const auto preprocessing,
+                       decision_tree::PreprocessTrainingDataset(
+                           dataset, config, config_link, dt_config, 1));
+
+  DecisionTree tree;
+  ASSERT_OK(DecisionTreeTrain(dataset, selected_examples, config, config_link,
+                              dt_config, deployment, weights, &random, &tree,
+                              {
+                                  .preprocessing = &preprocessing,
+                                  .duplicated_selected_examples = false,
+                              }));
+
+  std::string description;
+  tree.AppendModelStructure(dataset.data_spec(), 0, &description);
+  YDF_LOG(INFO) << "tree:\n" << description;
+
+  EXPECT_EQ(description,
+            R"(    "f1">=2.5 [s:0.347222 n:6 np:4 miss:0] ; pred:0.833333
+        ├─(pos)─ "f2">=1.5 [s:0.0625 n:4 np:2 miss:0] ; pred:1.25
+        |        ├─(pos)─ pred:1.5
+        |        └─(neg)─ pred:1
+        └─(neg)─ pred:0
+)");
+}
+
+TEST_P(TrainTree, DiscretizedNumerical) {
+  const TrainTreeParam& params = GetParam();
+  // Dataset
+  dataset::VerticalDataset dataset;
+  ASSERT_OK(dataset.AddColumn("l", ColumnType::NUMERICAL).status());
+  ASSERT_OK_AND_ASSIGN(
+      auto* col_f1, dataset.AddColumn("f1", ColumnType::DISCRETIZED_NUMERICAL));
+  ASSERT_OK_AND_ASSIGN(
+      auto* col_f2, dataset.AddColumn("f2", ColumnType::DISCRETIZED_NUMERICAL));
+
+  col_f1->mutable_discretized_numerical()->add_boundaries(0.5);
+  col_f1->mutable_discretized_numerical()->add_boundaries(1.5);
+  col_f1->mutable_discretized_numerical()->add_boundaries(2.5);
+  col_f1->mutable_discretized_numerical()->add_boundaries(3.5);
+
+  col_f2->mutable_discretized_numerical()->add_boundaries(0.5);
+  col_f2->mutable_discretized_numerical()->add_boundaries(1.5);
+
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  dataset.AppendExample({{"l", "0"}, {"f1", "1"}, {"f2", "1"}});
+  dataset.AppendExample({{"l", "0"}, {"f1", "2"}, {"f2", "2"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "3"}, {"f2", "1"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "4"}, {"f2", "1"}});
+  dataset.AppendExample({{"l", "1.5"}, {"f1", "3"}, {"f2", "2"}});
+  dataset.AppendExample({{"l", "1.5"}, {"f1", "4"}, {"f2", "2"}});
+
+  // Training configuration
+  const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
+  const std::vector<float> weights = {};
+  model::proto::TrainingConfig config;
+  model::proto::TrainingConfigLinking config_link;
+  proto::DecisionTreeTrainingConfig dt_config;
+  const model::proto::DeploymentConfig deployment;
+  utils::RandomEngine random;
+
+  config.set_task(model::proto::Task::REGRESSION);
+  config_link.set_label(0);
+  config_link.add_features(1);
+  config_link.add_features(2);
+  dt_config.set_min_examples(1);
+  dt_config.mutable_axis_aligned_split();
+  dt_config.mutable_internal()->set_sorting_strategy(params.sorting_strategy);
+  dt_config.mutable_growing_strategy_local();
+  dt_config.mutable_categorical()->mutable_cart();
+  dt_config.set_num_candidate_attributes(-1);
+
+  // Train a tree
+
+  // Note: preprocessing is required for sorting_strategy=PRESORTED. For
+  // sorting_strategy=IN_NODE, preprocessing is ignored.
+  ASSERT_OK_AND_ASSIGN(const auto preprocessing,
+                       decision_tree::PreprocessTrainingDataset(
+                           dataset, config, config_link, dt_config, 1));
+
+  DecisionTree tree;
+  ASSERT_OK(DecisionTreeTrain(dataset, selected_examples, config, config_link,
+                              dt_config, deployment, weights, &random, &tree,
+                              {
+                                  .preprocessing = &preprocessing,
+                                  .duplicated_selected_examples = false,
+                              }));
+
+  std::string description;
+  tree.AppendModelStructure(dataset.data_spec(), 0, &description);
+  YDF_LOG(INFO) << "tree:\n" << description;
+
+  EXPECT_EQ(
+      description,
+      R"(    "f1".index >= 3 i.e. "f1" >= 2.5 [s:0.347222 n:6 np:4 miss:0] ; pred:0.833333
+        ├─(pos)─ "f2".index >= 2 i.e. "f2" >= 1.5 [s:0.0625 n:4 np:2 miss:0] ; pred:1.25
+        |        ├─(pos)─ pred:1.5
+        |        └─(neg)─ pred:1
+        └─(neg)─ pred:0
+)");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    TrainTrees, TrainTree,
+    testing::ValuesIn<TrainTreeParam>({
+        {"presorted", proto::DecisionTreeTrainingConfig::Internal::PRESORTED},
+        {"in_node", proto::DecisionTreeTrainingConfig::Internal::IN_NODE},
+        {"forced_presorted",
+         proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED},
+    }),
+    [](const testing::TestParamInfo<TrainTree::ParamType>& info) {
+      return info.param.name;
+    });
+
 TEST(DecisionTreeTrainingTest, SetRegressionLabelDistributionWeighted) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyGradientDataset());
   std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3};
   std::vector<float> weights = {2.f, 4.f, 6.f, 8.f};
   model::proto::TrainingConfig config;
+  config.set_task(model::proto::Task::REGRESSION);
   model::proto::TrainingConfigLinking config_link;
   config_link.set_label(2);  // Gradient column.
 
-  proto::Node node;
+  NodeWithChildren node_with_children;
+  auto& node = *node_with_children.mutable_node();
 
-  ASSERT_OK(SetRegressionLabelDistribution</*weighted=*/true>(
-      dataset, selected_examples, weights, config_link, &node));
+  ASSERT_OK(SetLabelDistribution(dataset, selected_examples, weights, config,
+                                 config_link, &node_with_children));
   EXPECT_NEAR(node.regressor().top_value(), 2.8f, kTestPrecision);
   // // Distribution of the gradients:
   EXPECT_EQ(node.regressor().distribution().sum(), 56);
@@ -120,13 +300,15 @@ TEST(DecisionTreeTrainingTest, SetRegressionLabelDistributionUnweighted) {
   std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3};
   std::vector<float> weights;
   model::proto::TrainingConfig config;
+  config.set_task(model::proto::Task::REGRESSION);
   model::proto::TrainingConfigLinking config_link;
   config_link.set_label(2);  // Gradient column.
 
-  proto::Node node;
+  NodeWithChildren node_with_children;
+  auto& node = *node_with_children.mutable_node();
 
-  ASSERT_OK(SetRegressionLabelDistribution</*weighted=*/false>(
-      dataset, selected_examples, weights, config_link, &node));
+  ASSERT_OK(SetLabelDistribution(dataset, selected_examples, weights, config,
+                                 config_link, &node_with_children));
   EXPECT_NEAR(node.regressor().top_value(), 2.f, kTestPrecision);
   // // Distribution of the gradients:
   EXPECT_EQ(node.regressor().distribution().sum(), 8);
@@ -140,11 +322,13 @@ TEST(DecisionTreeTrainingTest,
                        CreateToyGradientDataset());
   std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3};
   std::vector<float> weights = {2.f, 4.f, 6.f};
+  model::proto::TrainingConfig config;
+  config.set_task(model::proto::Task::REGRESSION);
   model::proto::TrainingConfigLinking config_link;
-  proto::Node node;
 
-  EXPECT_THAT(SetRegressionLabelDistribution</*weighted=*/true>(
-                  dataset, selected_examples, weights, config_link, &node),
+  NodeWithChildren node_with_children;
+  EXPECT_THAT(SetLabelDistribution(dataset, selected_examples, weights, config,
+                                   config_link, &node_with_children),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 

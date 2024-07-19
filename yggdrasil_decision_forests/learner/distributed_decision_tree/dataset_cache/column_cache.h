@@ -25,9 +25,17 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_COLUMN_CACHE_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_COLUMN_CACHE_H_
 
-#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/utils/distribute/core.h"
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "absl/status/status.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/own_or_borrow.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -249,9 +257,14 @@ class InMemoryIntegerColumnReaderFactory {
   constexpr static auto kUserNumBytes = sizeof(Value);
 
   absl::Status Load(absl::string_view base_path, int64_t max_value,
-                    int max_num_values, int begin_shard_idx, int end_shard_idx);
+                    int max_num_values, int begin_shard_idx, int end_shard_idx,
+                    size_t reserve = 0);
 
-  void Reserve(size_t num_values, int64_t max_value);
+  // Reference to data in "values". "values" should not be destroyed before
+  // "InMemoryFloatColumnReaderFactory".
+  absl::Status Borrow(absl::Span<const Value> values);
+
+  // void Reserve(size_t num_values, int64_t max_value);
 
   // Creates an iterator over the values. The factory owns the data and
   // should not be destroyed during the life of the iterator. Multiple iterators
@@ -262,11 +275,11 @@ class InMemoryIntegerColumnReaderFactory {
 
   // Amount of memory used by the container. Excludes the fixed size elements (a
   // few 100s of bytes).
-  size_t MemoryUsage() { return file_buffer_.capacity() * sizeof(char); }
+  size_t MemoryUsage() { return file_buffer_.values().size() * sizeof(char); }
 
  private:
   // Values stored in file format.
-  std::vector<char> file_buffer_;
+  utils::VectorOwnOrBorrow<char> file_buffer_;
 
   // Are the file and user formats the same?
   bool same_user_and_file_precision_ = false;
@@ -360,8 +373,7 @@ class InMemoryFloatColumnReaderFactory {
  public:
   class InMemoryFloatColumnReader : public AbstractFloatColumnIterator {
    public:
-    InMemoryFloatColumnReader(
-        const InMemoryFloatColumnReaderFactory* const parent);
+    InMemoryFloatColumnReader(const InMemoryFloatColumnReaderFactory* parent);
 
     ~InMemoryFloatColumnReader() = default;
 
@@ -379,16 +391,19 @@ class InMemoryFloatColumnReaderFactory {
     const InMemoryFloatColumnReaderFactory* const parent_ = nullptr;
   };
 
-  void Reserve(size_t num_values);
   absl::Status Load(absl::string_view base_path, int max_num_values,
-                    int begin_shard_idx, int end_shard_idx);
+                    int begin_shard_idx, int end_shard_idx, size_t reserve = 0);
+
+  // Reference to data in "values". "values" should not be destroyed before
+  // "InMemoryFloatColumnReaderFactory".
+  absl::Status Borrow(absl::Span<const float> values);
 
   std::unique_ptr<InMemoryFloatColumnReader> CreateIterator() const;
-  size_t MemoryUsage() { return buffer_.capacity() * sizeof(float); }
+  size_t MemoryUsage() { return buffer_.values().size() * sizeof(float); }
 
  private:
   // All the values.
-  std::vector<float> buffer_;
+  utils::VectorOwnOrBorrow<float> buffer_;
 
   // Maximum number of values returned in a single "Next" call.
   int max_num_values_ = 0;

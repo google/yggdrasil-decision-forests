@@ -85,6 +85,8 @@ using test::EqualsProto;
 using ::testing::ElementsAre;
 using ::testing::SizeIs;
 using ::testing::UnorderedElementsAre;
+using Internal = ::yggdrasil_decision_forests::model::decision_tree::proto::
+    DecisionTreeTrainingConfig::Internal;
 
 std::string DatasetDir() {
   return file::JoinPath(
@@ -323,6 +325,21 @@ CustomMultiClassificationLossFunctions Multinomial3CustomLoss() {
                                                 gradient_and_hessian};
 }
 
+// Utility to set the configured and expected sorting strategy.
+void SetSortingStrategy(Internal::SortingStrategy set,
+                        absl::optional<Internal::SortingStrategy> expected,
+                        model::proto::TrainingConfig* train_config) {
+  auto* gbt_config = train_config->MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_decision_tree()->mutable_internal()->set_sorting_strategy(
+      set);
+  if (expected.has_value()) {
+    gbt_config->mutable_decision_tree()
+        ->mutable_internal()
+        ->set_ensure_effective_sorting_strategy(*expected);
+  }
+}
+
 TEST(GradientBoostedTrees, ExtractValidationDataset) {
   const std::string ds_typed_path =
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult.csv"));
@@ -540,6 +557,9 @@ class GradientBoostedTreesOnAdult : public utils::TrainAndTestTester {
         gradient_boosted_trees::proto::gradient_boosted_trees_config);
     gbt_config->mutable_decision_tree()
         ->set_internal_error_on_wrong_splitter_statistics(true);
+
+    // By default, we expect all the learners to use pre-sortings.
+    SetSortingStrategy(Internal::AUTO, Internal::PRESORTED, &train_config_);
   }
 };
 
@@ -749,6 +769,8 @@ TEST_F(GradientBoostedTreesOnAdult, DecreasingMonotonicConstraints) {
 }
 
 TEST_F(GradientBoostedTreesOnAdult, ObliqueMonotonicConstraints) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
+
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
 
@@ -1140,8 +1162,8 @@ TEST_F(GradientBoostedTreesOnAdult, GossDeprecated) {
   gbt_config->set_use_goss(true);
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86, 0.012, 0.86);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3106, 0.0168, 0.3074);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86640, 0.0127, 0.86640);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.29422, 0.0138, 0.29422);
 }
 
 // Train and test a model on the adult dataset with Goss sampling.
@@ -1154,8 +1176,8 @@ TEST_F(GradientBoostedTreesOnAdult, Goss) {
   gbt_config->mutable_gradient_one_side_sampling();
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8601, 0.0127, 0.86);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3095, 0.0138, 0.3074);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86640, 0.0127, 0.86640);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.29422, 0.0138, 0.29422);
 }
 
 // Train and test a model on the adult dataset.
@@ -1341,6 +1363,7 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDuration) {
 }
 
 TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeLocalGrowth) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
   dataset_sampling_ = 1.0f;
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1368,6 +1391,7 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeLocalGrowth) {
 }
 
 TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeGlobalGrowth) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
   dataset_sampling_ = 1.0f;
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1443,7 +1467,7 @@ TEST_F(GradientBoostedTreesOnAdult, Dart) {
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3293, 0.0727, nan);
 }
 
-TEST_F(GradientBoostedTreesOnAdult, Hessian) {
+TEST_F(GradientBoostedTreesOnAdult, HessianAndSubsampling) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_num_trees(100);
@@ -1596,6 +1620,7 @@ TEST_F(GradientBoostedTreesOnAbalone, L2Regularization) {
 }
 
 TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
   deployment_config_.set_num_threads(5);
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);

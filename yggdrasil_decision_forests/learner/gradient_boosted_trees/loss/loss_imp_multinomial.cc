@@ -16,32 +16,27 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_multinomial.h"
 
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "absl/container/fixed_array.h"
-#include "absl/container/inlined_vector.h"
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/substitute.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
-#include "yggdrasil_decision_forests/utils/distribution.pb.h"
+#include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
@@ -60,7 +55,7 @@ absl::Status MultinomialLogLikelihoodLoss::Status() const {
 absl::StatusOr<std::vector<float>>
 MultinomialLogLikelihoodLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& weights) const {
+    const absl::Span<const float> weights) const {
   // YDF follows Friedman's paper "Greedy Function Approximation: A Gradient
   // Boosting Machine" (https://statweb.stanford.edu/~jhf/ftp/trebst.pdf),
   // setting the initial prediction to 0 for multi-class classification
@@ -77,7 +72,7 @@ MultinomialLogLikelihoodLoss::InitialPredictions(
 
 template <typename T>
 absl::Status MultinomialLogLikelihoodLoss::TemplatedUpdateGradients(
-    const std::vector<T>& labels, const std::vector<float>& predictions,
+    const absl::Span<T> labels, const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -126,7 +121,8 @@ absl::Status MultinomialLogLikelihoodLoss::TemplatedUpdateGradients(
 }
 
 absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
-    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+    const absl::Span<const int32_t> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -135,14 +131,14 @@ absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
 }
 
 absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
-    const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+    const absl::Span<const int16_t> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   return TemplatedUpdateGradients(labels, predictions, ranking_index, gradients,
                                   random, thread_pool);
 }
-
 
 std::vector<std::string> MultinomialLogLikelihoodLoss::SecondaryMetricNames()
     const {
@@ -151,8 +147,8 @@ std::vector<std::string> MultinomialLogLikelihoodLoss::SecondaryMetricNames()
 
 template <bool weighted, typename T>
 void MultinomialLogLikelihoodLoss::TemplatedLossImp(
-    const std::vector<T>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights, size_t begin_example_idx,
+    const absl::Span<T> labels, const absl::Span<const float> predictions,
+    const absl::Span<const float> weights, size_t begin_example_idx,
     size_t end_example_idx, double* __restrict sum_loss,
     utils::IntegersConfusionMatrixDouble* confusion_matrix) {
   const int dimension = confusion_matrix->ncol() - 1;
@@ -209,8 +205,8 @@ void MultinomialLogLikelihoodLoss::TemplatedLossImp(
 
 template <typename T>
 absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
-    const std::vector<T>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<T> labels, const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
@@ -276,8 +272,9 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
 }
 
 absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::Loss(
-    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<const int32_t> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   return TemplatedLoss(labels, predictions, weights, ranking_index,
@@ -285,8 +282,9 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::Loss(
 }
 
 absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::Loss(
-    const std::vector<int16_t>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<const int16_t> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   return TemplatedLoss(labels, predictions, weights, ranking_index,

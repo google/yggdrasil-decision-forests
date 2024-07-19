@@ -15,11 +15,16 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_mean_square_error.h"
 
+#include <cstddef>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
@@ -32,6 +37,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -49,7 +55,7 @@ absl::Status MeanSquaredErrorLoss::Status() const {
 
 absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& weights) const {
+    const absl::Span<const float> weights) const {
   // Note: The initial value is the weighted mean of the labels.
   double weighted_sum_values = 0;
   double sum_weights = 0;
@@ -88,7 +94,8 @@ absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
 }
 
 absl::Status MeanSquaredErrorLoss::UpdateGradients(
-    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -113,7 +120,6 @@ absl::Status MeanSquaredErrorLoss::UpdateGradients(
   return absl::OkStatus();
 }
 
-
 std::vector<std::string> MeanSquaredErrorLoss::SecondaryMetricNames() const {
   if (task_ == model::proto::Task::RANKING) {
     return {"rmse", "NDCG@5"};
@@ -123,8 +129,9 @@ std::vector<std::string> MeanSquaredErrorLoss::SecondaryMetricNames() const {
 }
 
 absl::StatusOr<LossResults> MeanSquaredErrorLoss::Loss(
-    const std::vector<float>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   float loss_value;

@@ -16,7 +16,10 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_DATASET_CACHE_COMMON_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_DATASET_CACHE_COMMON_H_
 
+#include <cstdint>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -28,7 +31,7 @@ namespace distributed_decision_tree {
 namespace dataset_cache {
 
 // How to represent a label.
-typedef int16_t ClassificationLabelType;
+typedef int32_t ClassificationLabelType;
 typedef float RegressionLabelType;
 
 // How to index an example.
@@ -118,8 +121,18 @@ bool HasAllRequiredFiles(absl::string_view cache_path, int num_columns,
 //   MaskDeltaBit(1000) == 0b10000
 //   MaskExampleIdx(1000) == 0b01111
 //
+
+// Index of the delta bit.
+int DeltaBitIdx(uint64_t num_examples);
+// Mask to extract the delta bit.
 uint64_t MaskDeltaBit(uint64_t num_examples);
+// Mask to extract the example index.
 uint64_t MaskExampleIdx(uint64_t num_examples);
+
+// Mask to extract the delta bit.
+uint64_t MaskDeltaBitFromDeltaBitIdx(int deltabit);
+// Mask to extract the example index.
+uint64_t MaskExampleIdxFromDeltaBitIdx(int deltabit);
 
 // Maximum possible value of an "example index with delta bit" where the example
 // index (without the delta bit) is in [0,num_examples).
@@ -128,6 +141,7 @@ uint64_t MaskExampleIdx(uint64_t num_examples);
 //   num_examples = 10 = 0b00001010
 //   MaxValueWithDeltaBit(num_examples) = 0b00011010 = 26
 uint64_t MaxValueWithDeltaBit(uint64_t num_examples);
+uint64_t MaxValueWithDeltaBitFromDeltaBitIdx(int deltabit);
 
 // Converts a numerical value into a discretized numerical value.
 // This function is not compatible with

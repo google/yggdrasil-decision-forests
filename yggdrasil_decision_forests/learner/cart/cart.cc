@@ -15,18 +15,25 @@
 
 #include "yggdrasil_decision_forests/learner/cart/cart.h"
 
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <numeric>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -34,6 +41,7 @@
 #include "yggdrasil_decision_forests/learner/cart/cart.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -42,7 +50,6 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
-#include "yggdrasil_decision_forests/utils/adaptive_work.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -181,6 +188,9 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
   model::proto::TrainingConfigLinking config_link;
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
       config, train_dataset.data_spec(), &config_link));
+  decision_tree::SetInternalDefaultHyperParameters(
+      config, config_link, train_dataset.data_spec(),
+      cart_config.mutable_decision_tree());
   RETURN_IF_ERROR(CheckConfiguration(train_dataset.data_spec(), config,
                                      config_link, deployment()));
 

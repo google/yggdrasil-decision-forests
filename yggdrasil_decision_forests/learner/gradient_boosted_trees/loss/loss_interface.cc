@@ -25,6 +25,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
@@ -40,7 +41,7 @@ namespace gradient_boosted_trees {
 
 absl::Status AbstractLoss::UpdateGradients(
     const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index,
     std::vector<GradientData>* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -74,7 +75,8 @@ absl::Status AbstractLoss::UpdateGradients(
 
 absl::StatusOr<LossResults> AbstractLoss::Loss(
     const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& predictions, const std::vector<float>& weights,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   const auto* categorical_labels =
@@ -172,8 +174,8 @@ absl::Status RankingGroupsIndices::Initialize(
   return absl::OkStatus();
 }
 
-double RankingGroupsIndices::NDCG(const std::vector<float>& predictions,
-                                  const std::vector<float>& weights,
+double RankingGroupsIndices::NDCG(const absl::Span<const float> predictions,
+                                  const absl::Span<const float> weights,
                                   const int truncation) const {
   DCHECK_EQ(predictions.size(), num_items_);
   DCHECK(weights.empty() || weights.size() == num_items_);
@@ -211,7 +213,7 @@ double RankingGroupsIndices::NDCG(const std::vector<float>& predictions,
 }
 
 void RankingGroupsIndices::ExtractPredAndLabelRelevance(
-    const std::vector<Item>& group, const std::vector<float>& predictions,
+    const std::vector<Item>& group, const absl::Span<const float> predictions,
     std::vector<metric::RankingLabelAndPrediction>* pred_and_label_relevance) {
   pred_and_label_relevance->resize(group.size());
   for (int item_idx = 0; item_idx < group.size(); item_idx++) {

@@ -15,18 +15,38 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_reader.h"
 
-#include <limits>
-#include <numeric>
+#include <stdint.h>
 
+#include <algorithm>
+#include <atomic>
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <numeric>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
-#include "yggdrasil_decision_forests/dataset/formats.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
+#include "absl/types/optional.h"
+#include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
-#include "yggdrasil_decision_forests/utils/sharded_io.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -93,7 +113,8 @@ absl::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
     switch (label_column_metadata.type_case()) {
       case proto::CacheMetadata_Column::kCategorical: {
         // Load the categorical label values.
-        cache->classification_labels_.reserve(cache->meta_data_.num_examples());
+        std::vector<ClassificationLabelType> data;
+        data.reserve(cache->meta_data_.num_examples());
         RETURN_IF_ERROR(
             ShardedIntegerColumnReader<ClassificationLabelType>::ReadAndAppend(
                 file::JoinPath(path, kFilenameRaw,
@@ -103,21 +124,22 @@ absl::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
                 label_column_metadata.categorical().num_values(),
                 /*begin_shard_idx=*/0,
                 /*end_shard_idx=*/
-                cache->meta_data_.num_shards_in_feature_cache(),
-                &cache->classification_labels_));
+                cache->meta_data_.num_shards_in_feature_cache(), &data));
+        cache->classification_labels_.own(std::move(data));
       } break;
 
       case proto::CacheMetadata_Column::kNumerical: {
         // Load the numerical label values.
-        cache->regression_labels_.reserve(cache->meta_data_.num_examples());
+        std::vector<float> data;
+        data.reserve(cache->meta_data_.num_examples());
         RETURN_IF_ERROR(ShardedFloatColumnReader::ReadAndAppend(
             file::JoinPath(path, kFilenameRaw,
                            absl::StrCat(kFilenameColumn, label_column_idx),
                            kFilenameShardNoUnderscore),
             /*begin_shard_idx=*/0,
             /*end_shard_idx=*/
-            cache->meta_data_.num_shards_in_feature_cache(),
-            &cache->regression_labels_));
+            cache->meta_data_.num_shards_in_feature_cache(), &data));
+        cache->regression_labels_.own(std::move(data));
       } break;
 
       case proto::CacheMetadata_Column::kBoolean:
@@ -380,16 +402,16 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
           InMemoryIntegerColumnReaderFactory<CategoricalType>>();
       const auto max_value =
           meta_data_.columns(column_idx).categorical().num_values();
-      dst->Reserve(meta_data_.num_examples(), max_value);
-      RETURN_IF_ERROR(dst->Load(
-          file::JoinPath(path_, kFilenameRaw,
-                         absl::StrCat(kFilenameColumn, column_idx),
-                         kFilenameShardNoUnderscore),
-          /*max_value=*/
-          max_value,
-          /*max_num_values=*/options_.reading_buffer(),
-          /*begin_shard_idx=*/0,
-          /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache()));
+      RETURN_IF_ERROR(
+          dst->Load(file::JoinPath(path_, kFilenameRaw,
+                                   absl::StrCat(kFilenameColumn, column_idx),
+                                   kFilenameShardNoUnderscore),
+                    /*max_value=*/
+                    max_value,
+                    /*max_num_values=*/options_.reading_buffer(),
+                    /*begin_shard_idx=*/0,
+                    /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache(),
+                    /*reserve=*/meta_data_.num_examples()));
       *memory_usage += dst->MemoryUsage();
     } break;
 
@@ -416,23 +438,20 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
       // Raw numerical value.
       // TODO: Do not load the raw value if they are discretized.
       dst_in_order = absl::make_unique<InMemoryFloatColumnReaderFactory>();
-      dst_in_order->Reserve(meta_data_.num_examples());
       RETURN_IF_ERROR(dst_in_order->Load(
           file::JoinPath(path_, kFilenameRaw,
                          absl::StrCat(kFilenameColumn, column_idx),
                          kFilenameShardNoUnderscore),
           /*max_num_values=*/options_.reading_buffer(),
           /*begin_shard_idx=*/0,
-          /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache()));
+          /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache(),
+          /*reserve=*/meta_data_.num_examples()));
       *memory_usage += dst_in_order->MemoryUsage();
 
       if (column.numerical().discretized()) {
         dst_discretized_values =
             absl::make_unique<InMemoryIntegerColumnReaderFactory<
                 DiscretizedIndexedNumericalType>>();
-        dst_discretized_values->Reserve(
-            meta_data_.num_examples(),
-            column.numerical().num_discretized_values());
         RETURN_IF_ERROR(dst_discretized_values->Load(
             file::JoinPath(path_, kFilenameIndexed,
                            absl::StrCat(kFilenameColumn, column_idx),
@@ -440,7 +459,8 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
             /*max_value=*/column.numerical().num_discretized_values(),
             /*max_num_values=*/options_.reading_buffer(),
             /*begin_shard_idx=*/0,
-            /*end_shard_idx=*/column.numerical().num_discretized_shards()));
+            /*end_shard_idx=*/column.numerical().num_discretized_shards(),
+            /*reserve=*/meta_data_.num_examples()));
         *memory_usage += dst_discretized_values->MemoryUsage();
 
         dst_discretized_boundaries.reserve(
@@ -455,9 +475,6 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
       } else {
         dst_presorted_example_idxs = absl::make_unique<
             InMemoryIntegerColumnReaderFactory<ExampleIdxType>>();
-        dst_presorted_example_idxs->Reserve(
-            meta_data_.num_examples(),
-            MaxValueWithDeltaBit(meta_data_.num_examples()));
         RETURN_IF_ERROR(dst_presorted_example_idxs->Load(
             file::JoinPath(path_, kFilenameIndexed,
                            absl::StrCat(kFilenameColumn, column_idx),
@@ -465,20 +482,21 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
             /*max_value=*/MaxValueWithDeltaBit(meta_data_.num_examples()),
             /*max_num_values=*/options_.reading_buffer(),
             /*begin_shard_idx=*/0,
-            /*end_shard_idx=*/meta_data_.num_shards_in_index_cache()));
+            /*end_shard_idx=*/meta_data_.num_shards_in_index_cache(),
+            /*reserve=*/meta_data_.num_examples()));
         *memory_usage += dst_presorted_example_idxs->MemoryUsage();
 
         dst_presorted_unique_values =
             absl::make_unique<InMemoryFloatColumnReaderFactory>();
-        dst_presorted_unique_values->Reserve(
-            column.numerical().num_unique_values());
+
         RETURN_IF_ERROR(dst_presorted_unique_values->Load(
             file::JoinPath(path_, kFilenameIndexed,
                            absl::StrCat(kFilenameColumn, column_idx),
                            kFilenameDeltaValueNoUnderscore),
             /*max_num_values=*/options_.reading_buffer(),
             /*begin_shard_idx=*/0,
-            /*end_shard_idx=*/1));
+            /*end_shard_idx=*/1,
+            /*reserve=*/column.numerical().num_unique_values()));
         *memory_usage += dst_presorted_unique_values->MemoryUsage();
       }
     } break;
@@ -489,15 +507,15 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
 
       dst =
           absl::make_unique<InMemoryIntegerColumnReaderFactory<BooleanType>>();
-      dst->Reserve(meta_data_.num_examples(), 2);
-      RETURN_IF_ERROR(dst->Load(
-          file::JoinPath(path_, kFilenameRaw,
-                         absl::StrCat(kFilenameColumn, column_idx),
-                         kFilenameShardNoUnderscore),
-          /*max_value=*/2,
-          /*max_num_values=*/options_.reading_buffer(),
-          /*begin_shard_idx=*/0,
-          /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache()));
+      RETURN_IF_ERROR(
+          dst->Load(file::JoinPath(path_, kFilenameRaw,
+                                   absl::StrCat(kFilenameColumn, column_idx),
+                                   kFilenameShardNoUnderscore),
+                    /*max_value=*/2,
+                    /*max_num_values=*/options_.reading_buffer(),
+                    /*begin_shard_idx=*/0,
+                    /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache(),
+                    /*reserve=*/meta_data_.num_examples()));
       *memory_usage += dst->MemoryUsage();
     } break;
 
@@ -558,14 +576,19 @@ uint64_t DatasetCacheReader::num_examples() const {
   return meta_data_.num_examples();
 }
 
-const std::vector<ClassificationLabelType>&
-DatasetCacheReader::categorical_labels() const {
-  return classification_labels_;
+int DatasetCacheReader::delta_bit_idx() const {
+  DCHECK(meta_data_.has_delta_bit_idx());
+  return meta_data_.delta_bit_idx();
 }
 
-const std::vector<RegressionLabelType>& DatasetCacheReader::regression_labels()
+absl::Span<const ClassificationLabelType>
+DatasetCacheReader::categorical_labels() const {
+  return classification_labels_.values();
+}
+
+absl::Span<const RegressionLabelType> DatasetCacheReader::regression_labels()
     const {
-  return regression_labels_;
+  return regression_labels_.values();
 }
 
 const std::vector<float>& DatasetCacheReader::weights() const {

@@ -18,115 +18,34 @@
 
 #include <cstdint>
 #include <functional>
-#include <limits>
 #include <memory>
 #include <random>
 #include <utility>
 #include <vector>
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/time/time.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator_uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_scanner.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/circular_buffer.h"
-#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
-#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
-
-// Label statistics.
-struct LabelStats {
-  virtual ~LabelStats() = default;
-};
-
-// Label statistics for Classification.
-struct ClassificationLabelStats : LabelStats {
-  explicit ClassificationLabelStats(const std::vector<int32_t>& label_data)
-      : label_data(label_data) {}
-
-  const std::vector<int32_t>& label_data;
-  int32_t num_label_classes;
-  utils::IntegerDistributionDouble label_distribution;
-};
-
-// Label statistics for Regression.
-struct RegressionLabelStats : LabelStats {
-  explicit RegressionLabelStats(const std::vector<float>& label_data)
-      : label_data(label_data) {}
-
-  const std::vector<float>& label_data;
-  utils::NormalDistributionDouble label_distribution;
-};
-
-// Label statistics for Regression with hessian.
-struct RegressionHessianLabelStats : LabelStats {
-  RegressionHessianLabelStats(const std::vector<float>& gradient_data,
-                              const std::vector<float>& hessian_data)
-      : gradient_data(gradient_data), hessian_data(hessian_data) {}
-
-  const std::vector<float>& gradient_data;
-  const std::vector<float>& hessian_data;
-  double sum_gradient;
-  double sum_hessian;
-  double sum_weights;
-};
-
-// Label statistics for uplift with categorical treatment and categorical
-// outcome.
-struct CategoricalUpliftLabelStats : LabelStats {
-  explicit CategoricalUpliftLabelStats(
-      const std::vector<int32_t>& outcome_values,
-      const int num_unique_in_outcomes_column,
-      const std::vector<int32_t>& treatment_values,
-      const int num_unique_values_in_treatments_column)
-      : outcome_values(outcome_values),
-        treatment_values(treatment_values),
-        num_unique_values_in_treatments_column(
-            num_unique_values_in_treatments_column),
-        num_unique_in_outcomes_column(num_unique_in_outcomes_column) {}
-
-  const std::vector<int32_t>& outcome_values;
-  const std::vector<int32_t>& treatment_values;
-  int32_t num_unique_values_in_treatments_column;
-  int32_t num_unique_in_outcomes_column;
-
-  UpliftLabelDistribution label_distribution;
-};
-
-// Label statistics for uplift with categorical treatment and numerical outcome.
-struct NumericalUpliftLabelStats : LabelStats {
-  explicit NumericalUpliftLabelStats(
-      const std::vector<float>& outcome_values,
-      const std::vector<int32_t>& treatment_values,
-      const int num_unique_values_in_treatments_column)
-      : outcome_values(outcome_values),
-        treatment_values(treatment_values),
-        num_unique_values_in_treatments_column(
-            num_unique_values_in_treatments_column) {}
-
-  const std::vector<float>& outcome_values;
-  const std::vector<int32_t>& treatment_values;
-  int32_t num_unique_values_in_treatments_column;
-
-  UpliftLabelDistribution label_distribution;
-};
 
 // A collection of objects used by split-finding methods.
 //
@@ -291,147 +210,10 @@ struct SplitterConcurrencySetup {
 };
 
 // Signature of a function that sets the value (i.e. the prediction) of a leaf
-// from the gradient data.
-typedef std::function<absl::Status(
-    const dataset::VerticalDataset&, const std::vector<UnsignedExampleIdx>&,
-    const std::vector<float>&, const model::proto::TrainingConfig&,
-    const model::proto::TrainingConfigLinking&, NodeWithChildren* node)>
-    CreateSetLeafValueFunctor;
-
-// Signature of a function that sets the value (i.e. the prediction) of a leaf
 // from the gradient label statistics.
 typedef std::function<absl::Status(const decision_tree::proto::LabelStatistics&,
                                    decision_tree::proto::Node*)>
     SetLeafValueFromLabelStatsFunctor;
-
-// Pre-computation on the training dataset used for the training of individual
-// trees. The pre-processing is computed before any tree is trained.
-class Preprocessing {
- public:
-  struct PresortedNumericalFeature {
-    // Feature value and example index sorted by feature values.
-    // Missing values are replaced using the GLOBAL_IMPUTATION strategy.
-    std::vector<SparseItem> items;
-  };
-
-  std::vector<PresortedNumericalFeature>*
-  mutable_presorted_numerical_features() {
-    return &presorted_numerical_features_;
-  }
-
-  const std::vector<PresortedNumericalFeature>& presorted_numerical_features()
-      const {
-    return presorted_numerical_features_;
-  }
-
-  uint64_t num_examples() const { return num_examples_; }
-
-  void set_num_examples(const uint64_t value) { num_examples_ = value; }
-
- private:
-  // List of presorted numerical features, indexed by feature index.
-  // If feature "i" is not numerical or not presorted,
-  // "presorted_numerical_features_[i]" will be an empty index.
-  std::vector<PresortedNumericalFeature> presorted_numerical_features_;
-
-  // Total number of examples.
-  uint64_t num_examples_ = -1;
-};
-
-// The default policy to set the value of a leaf.
-// - Distribution of the labels for classification.
-// - Mean of the labels for regression.
-absl::Status SetLabelDistribution(
-    const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    NodeWithChildren* node);
-
-// Set the label value for a regression label on a vertical dataset.
-//
-// Default policy to set the label value of a leaf in a regression tree i.e. set
-// the value to the mean of the labels.
-// `weights` may be empty, corresponding to unit weights.
-template <bool weighted>
-absl::Status SetRegressionLabelDistribution(
-    const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
-  if constexpr (weighted) {
-    STATUS_CHECK(weights.size() == dataset.nrow());
-  } else {
-    STATUS_CHECK(weights.empty());
-  }
-  ASSIGN_OR_RETURN(
-      const auto* const labels,
-      dataset
-          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
-              config_link.label()));
-  utils::NormalDistributionDouble label_distribution;
-  if constexpr (weighted) {
-    for (const UnsignedExampleIdx example_idx : selected_examples) {
-      label_distribution.Add(labels->values()[example_idx],
-                             weights[example_idx]);
-    }
-  } else {
-    for (const UnsignedExampleIdx example_idx : selected_examples) {
-      label_distribution.Add(labels->values()[example_idx]);
-    }
-  }
-  label_distribution.Save(node->mutable_regressor()->mutable_distribution());
-  node->mutable_regressor()->set_top_value(label_distribution.Mean());
-  return absl::OkStatus();
-}
-
-// Training configuration for internal parameters not available to the user
-// directly.
-struct InternalTrainConfig {
-  CreateSetLeafValueFunctor set_leaf_value_functor = SetLabelDistribution;
-
-  // If true, the split score relies on a hessian: ~gradient^2/hessian (+
-  // regularization). This is only possible for regression. Require
-  // hessian_leaf=true.
-  //
-  // If false, the split score is a classical decision tree score. e.g.,
-  // reduction of variance in the case of regression.
-  bool hessian_score = false;
-
-  // If true, the leaf relies on the hessian. This is only possible for
-  // regression.
-  bool hessian_leaf = false;
-
-  // Index of the hessian column in the dataset. Only used if hessian_leaf=true.
-  int hessian_col_idx = -1;
-
-  // Index of the gradient column in the dataset.  Only used if
-  // hessian_leaf=true.
-  int gradient_col_idx = -1;
-
-  // Regularization terms for hessian_score=true.
-  float hessian_l1 = 0.f;
-  float hessian_l2_numerical = 0.f;
-  float hessian_l2_categorical = 0.f;
-
-  // Number of attributes tested in parallel (using fiber threads).
-  int num_threads = 1;
-
-  // Non owning, pointer to pre-processing information.
-  // Depending on the decision tree configuration this field might be required.
-  const Preprocessing* preprocessing = nullptr;
-
-  // If true, the list of selected example index ("selected_examples") can
-  // contain duplicated values. If false, all selected examples are expected to
-  // be unique.
-  bool duplicated_selected_examples = true;
-
-  // If set, the training of the tree will stop after this time, leading to an
-  // under-grow but valid decision tree. The growing strategy defines how the
-  // tree is "under-grown".
-  absl::optional<absl::Time> timeout;
-};
 
 // Find the best condition for this node. Return true iff a good condition has
 // been found.
@@ -634,7 +416,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
 // Search for the best split of the type Boolean for classification.
 SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<int32_t>& labels, int32_t num_label_classes,
     bool na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -646,7 +428,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
 template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<float>& labels, bool na_replacement,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -657,7 +439,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
 template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
     bool na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
@@ -1075,22 +857,17 @@ absl::Status NodeTrain(
     const NodeConstraints& constraints, bool set_leaf_already_set,
     NodeWithChildren* node, utils::RandomEngine* random, PerThreadCache* cache);
 
-// Preprocess the dataset before any tree training.
-absl::StatusOr<Preprocessing> PreprocessTrainingDataset(
-    const dataset::VerticalDataset& train_dataset,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const proto::DecisionTreeTrainingConfig& dt_config, int num_threads);
-
-// Component of "PreprocessTrainingDataset". Computes pre-sorted numerical
-// features.
-absl::Status PresortNumericalFeatures(
-    const dataset::VerticalDataset& train_dataset,
-    const model::proto::TrainingConfigLinking& config_link, int num_threads,
-    Preprocessing* preprocessing);
-
 // Set the default values of the hyper-parameters.
 void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config);
+
+// Set the default values of the internal hyper-parameters. Should be called
+// after "SetDefaultHyperParameters". Does not change user visible
+// hyper-parameters.
+void SetInternalDefaultHyperParameters(
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& link_config,
+    const dataset::proto::DataSpecification& data_spec,
+    proto::DecisionTreeTrainingConfig* dt_config);
 
 // Number of attributes to test when looking for an optimal split.
 int NumAttributesToTest(const proto::DecisionTreeTrainingConfig& dt_config,
@@ -1142,14 +919,6 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
                            std::vector<UnsignedExampleIdx>* positive_examples,
                            std::vector<UnsignedExampleIdx>* negative_examples,
                            const bool examples_are_training_examples = true);
-
-// Copies the content on uplift categorical leaf output to a label distribution.
-void UpliftLeafToLabelDist(const decision_tree::proto::NodeUpliftOutput& leaf,
-                           UpliftLabelDistribution* dist);
-
-// Copies the content on uplift categorical label distribution to the leafs.
-void UpliftLabelDistToLeaf(const UpliftLabelDistribution& dist,
-                           decision_tree::proto::NodeUpliftOutput* leaf);
 
 }  // namespace internal
 

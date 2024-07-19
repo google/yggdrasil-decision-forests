@@ -559,6 +559,7 @@ cc_library_ydf(
         ":logging",
         ":random",
         ":sharded_io",
+        ":status_macros",
         ":test",
         ":testing_macros",
         ":uid",
@@ -588,6 +589,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:fast_engine",
         "//yggdrasil_decision_forests/serving/decision_forest",
+        "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/random",
         "@com_google_absl//absl/status",
@@ -831,6 +833,12 @@ cc_library_ydf(
     name = "documentation",
     hdrs = ["documentation.h"],
     deps = ["@com_google_absl//absl/strings"],
+)
+
+cc_library_ydf(
+    name = "own_or_borrow",
+    hdrs = ["own_or_borrow.h"],
+    deps = ["@com_google_absl//absl/types:span"],
 )
 
 # Bzl Libraries
@@ -1254,6 +1262,15 @@ cc_test(
     deps = [
         ":html_content",
         ":test",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "own_or_borrow_test",
+    srcs = ["own_or_borrow_test.cc"],
+    deps = [
+        ":own_or_borrow",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -124,6 +124,9 @@ message WorkerRequest {
     // Total number of example in the column.
     optional int64 num_examples = 2;
 
+    // Delta bit.
+    optional int32 delta_bit_idx = 11;
+
     // Index of the column.
     optional int32 column_idx = 3;
 
@@ -231,6 +234,10 @@ message SortedColumnMetadata {
 message CacheMetadata {
   // Number of examples in the entire cache.
   optional int64 num_examples = 1;
+
+  // Index of the bit used to encode change in between successive values in
+  // example idxs.
+  optional int32 delta_bit_idx = 7;
 
   // Number of shards i.e. the data of each features is divided into
   // "num_shards" files.

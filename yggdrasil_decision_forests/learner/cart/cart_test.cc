@@ -31,6 +31,17 @@ namespace model {
 namespace cart {
 namespace {
 
+using Internal = ::yggdrasil_decision_forests::model::decision_tree::proto::
+    DecisionTreeTrainingConfig::Internal;
+
+void SetExpectedSortingStrategy(Internal::SortingStrategy expected,
+                                model::proto::TrainingConfig* train_config) {
+  auto* cart_config = train_config->MutableExtension(cart::proto::cart_config);
+  cart_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_ensure_effective_sorting_strategy(expected);
+}
+
 class CartOnAdult : public utils::TrainAndTestTester {
   void SetUp() override {
     train_config_.set_learner(CartLearner::kRegisteredName);
@@ -38,6 +49,9 @@ class CartOnAdult : public utils::TrainAndTestTester {
     train_config_.set_label("income");
     train_config_.add_features(".*");
     dataset_filename_ = "adult.csv";
+
+    // CART only uses IN_NODE sorting.
+    SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   }
 };
 
@@ -65,6 +79,9 @@ class CartOnAdultPreSplit : public utils::TrainAndTestTester {
     train_config_.add_features(".*");
     dataset_filename_ = "adult_train.csv";
     dataset_test_filename_ = "adult_test.csv";
+
+    // CART only use IN_NODE sorting.
+    SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   }
 };
 
@@ -80,6 +97,15 @@ class CartOnAbalone : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::REGRESSION);
     train_config_.set_label("Rings");
     dataset_filename_ = "abalone.csv";
+
+    // CART only use IN_NODE sorting.
+    auto* cart_config =
+        train_config_.MutableExtension(cart::proto::cart_config);
+    cart_config->mutable_decision_tree()
+        ->mutable_internal()
+        ->set_ensure_effective_sorting_strategy(
+            decision_tree::proto::DecisionTreeTrainingConfig::Internal::
+                IN_NODE);
   }
 };
 
@@ -103,6 +129,9 @@ class CartOnIris : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::CLASSIFICATION);
     train_config_.set_label("class");
     dataset_filename_ = "iris.csv";
+
+    // CART only uses IN_NODE sorting.
+    SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   }
 };
 
@@ -245,6 +274,9 @@ class CartOnSimPTE : public utils::TrainAndTestTester {
 
     dataset_filename_ = "sim_pte_train.csv";
     dataset_test_filename_ = "sim_pte_test.csv";
+
+    // CART only use IN_NODE sorting.
+    SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   }
 };
 

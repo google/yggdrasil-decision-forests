@@ -19,6 +19,7 @@ cc_library_ydf(
     ],
     deps = [
         ":random_forest_cc_proto",
+        "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_writer",
         "//yggdrasil_decision_forests/dataset:types",
@@ -29,6 +30,8 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:generic_parameters",
+        "//yggdrasil_decision_forests/learner/decision_tree:label",
+        "//yggdrasil_decision_forests/learner/decision_tree:preprocessing",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",
@@ -53,8 +56,10 @@ cc_library_ydf(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
     ],
     alwayslink = 1,
 )

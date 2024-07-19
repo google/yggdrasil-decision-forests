@@ -21,19 +21,21 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_RANDOM_FOREST_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_RANDOM_FOREST_H_
 
+#include <functional>
 #include <memory>
-#include <random>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.pb.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -185,6 +187,9 @@ absl::Status ExportOOBPredictions(
     const dataset::proto::DataSpecification& dataspec,
     const std::vector<PredictionAccumulator>& oob_predictions,
     absl::string_view typed_path);
+
+absl::Status SetDefaultHyperParameters(
+    random_forest::proto::RandomForestTrainingConfig* rf_config);
 
 }  // namespace internal
 

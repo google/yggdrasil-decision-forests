@@ -15,9 +15,26 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "absl/log/check.h"
+#include "absl/memory/memory.h"
+#include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -301,20 +318,18 @@ template class ShardedIntegerColumnReader<int32_t>;
 template class ShardedIntegerColumnReader<int64_t>;
 
 template <typename Value>
-void InMemoryIntegerColumnReaderFactory<Value>::Reserve(size_t num_values,
-                                                        int64_t max_value) {
-  file_buffer_.reserve(NumBytes(max_value) * num_values);
-}
-
-template <typename Value>
 absl::Status InMemoryIntegerColumnReaderFactory<Value>::Load(
     absl::string_view base_path, int64_t max_value, int max_num_values,
-    int begin_shard_idx, int end_shard_idx) {
+    int begin_shard_idx, int end_shard_idx, size_t reserve) {
   ShardedIntegerColumnReader<Value> file_reader;
   constexpr int buffer_size = kIOBufferSizeInBytes / sizeof(Value);
   RETURN_IF_ERROR(file_reader.Open(base_path, max_value, buffer_size,
                                    begin_shard_idx, end_shard_idx));
 
+  std::vector<char> data;
+  data.reserve(NumBytes(max_value) * reserve);
+
+  STATUS_CHECK(file_buffer_.owner());
   while (true) {
     RETURN_IF_ERROR(file_reader.Next());
     auto file_buffer = file_reader.ActiveFileBuffer();
@@ -322,11 +337,10 @@ absl::Status InMemoryIntegerColumnReaderFactory<Value>::Load(
       break;
     }
     // TODO: Estimate the final buffer size and pre-allocate it.
-
-    file_buffer_.insert(file_buffer_.end(), file_buffer.begin(),
-                        file_buffer.end());
+    data.insert(data.end(), file_buffer.begin(), file_buffer.end());
   }
-  file_buffer_.shrink_to_fit();
+  data.shrink_to_fit();
+  file_buffer_.own(std::move(data));
 
   file_num_bytes_ = file_reader.file_num_bytes();
   total_num_values_ = file_buffer_.size() / file_num_bytes_;
@@ -334,6 +348,19 @@ absl::Status InMemoryIntegerColumnReaderFactory<Value>::Load(
   max_num_values_ = max_num_values;
 
   return file_reader.Close();
+}
+
+template <typename Value>
+absl::Status InMemoryIntegerColumnReaderFactory<Value>::Borrow(
+    absl::Span<const Value> values) {
+  const char* char_data = reinterpret_cast<const char*>(values.data());
+  file_buffer_.borrow(
+      absl::Span<const char>(char_data, values.size() * kUserNumBytes));
+  file_num_bytes_ = kUserNumBytes;
+  total_num_values_ = values.size();
+  same_user_and_file_precision_ = true;
+  max_num_values_ = std::numeric_limits<int>::max();
+  return absl::OkStatus();
 }
 
 template <typename Value>
@@ -390,8 +417,8 @@ InMemoryIntegerColumnReaderFactory<Value>::InMemoryIntegerColumnReader::Next() {
   const auto num_values = std::min(
       end_idx_ - value_idx_, static_cast<size_t>(parent_->max_num_values_));
 
-  const char* begin_file_buffer =
-      parent_->file_buffer_.data() + value_idx_ * parent_->file_num_bytes_;
+  const char* begin_file_buffer = parent_->file_buffer_.values().data() +
+                                  value_idx_ * parent_->file_num_bytes_;
 
   if (parent_->same_user_and_file_precision_) {
     values_ = absl::Span<const Value>(
@@ -544,8 +571,8 @@ InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader::Next() {
   const auto num_values =
       std::min(parent_->buffer_.size() - value_idx_,
                static_cast<size_t>(parent_->max_num_values_));
-  values_ =
-      absl::Span<const float>(parent_->buffer_.data() + value_idx_, num_values);
+  values_ = absl::Span<const float>(
+      parent_->buffer_.values().data() + value_idx_, num_values);
   return absl::OkStatus();
 }
 
@@ -554,32 +581,42 @@ absl::Status InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader::
   return absl::OkStatus();
 }
 
-void InMemoryFloatColumnReaderFactory::Reserve(size_t num_values) {
-  buffer_.reserve(num_values);
-}
-
 absl::Status InMemoryFloatColumnReaderFactory::Load(absl::string_view base_path,
                                                     int max_num_values,
                                                     int begin_shard_idx,
-                                                    int end_shard_idx) {
+                                                    int end_shard_idx,
+                                                    size_t reserve) {
   ShardedFloatColumnReader file_reader;
   constexpr int buffer_size = kIOBufferSizeInBytes / sizeof(float);
   RETURN_IF_ERROR(
       file_reader.Open(base_path, buffer_size, begin_shard_idx, end_shard_idx));
 
+  std::vector<float> data;
+  data.reserve(reserve);
+
+  STATUS_CHECK(buffer_.owner());
   while (true) {
     RETURN_IF_ERROR(file_reader.Next());
     if (file_reader.Values().empty()) {
       break;
     }
     // TODO: Estimate the final buffer size and pre-allocate it.
-
-    buffer_.insert(buffer_.end(), file_reader.Values().begin(),
-                   file_reader.Values().end());
+    data.insert(data.end(), file_reader.Values().begin(),
+                file_reader.Values().end());
   }
-  buffer_.shrink_to_fit();
+  data.shrink_to_fit();
+
+  buffer_.own(std::move(data));
+
   max_num_values_ = max_num_values;
   return file_reader.Close();
+}
+
+absl::Status InMemoryFloatColumnReaderFactory::Borrow(
+    absl::Span<const float> values) {
+  buffer_.borrow(values);
+  max_num_values_ = std::numeric_limits<int>::max();
+  return absl::OkStatus();
 }
 
 std::unique_ptr<InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader>
