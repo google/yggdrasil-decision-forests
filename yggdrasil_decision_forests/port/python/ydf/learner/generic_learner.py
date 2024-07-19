@@ -226,7 +226,16 @@ Hyper-parameters: ydf.{self._hyperparameters}
       else:
         guide = self._build_data_spec_args().to_proto_guide()
         cc_model = self._get_learner().TrainFromPathWithGuide(ds, guide, valid)
-      return model_lib.load_cc_model(cc_model)
+      model = model_lib.load_cc_model(cc_model)
+
+      # Note: We don't know the number of training examples before the training
+      # call.
+      log.maybe_warning_large_dataset(
+          model.data_spec().created_num_rows,
+          distributed=True,
+          discretize_numerical_columns=self._data_spec_args.discretize_numerical_columns,
+      )
+      return model
 
   def _train_from_dataset(
       self,
@@ -237,6 +246,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
 
     with log.cc_log_context():
       train_ds = self._get_vertical_dataset(ds)._dataset  # pylint: disable=protected-access
+
       train_args = {"dataset": train_ds}
 
       if valid is not None:
@@ -252,6 +262,12 @@ Hyper-parameters: ydf.{self._hyperparameters}
             "Train model on %d examples",
             train_ds.nrow(),
         )
+
+      log.maybe_warning_large_dataset(
+          train_ds.nrow(),
+          distributed=False,
+          discretize_numerical_columns=self._data_spec_args.discretize_numerical_columns,
+      )
 
       time_begin_training_model = datetime.datetime.now()
       learner = self._get_learner()
