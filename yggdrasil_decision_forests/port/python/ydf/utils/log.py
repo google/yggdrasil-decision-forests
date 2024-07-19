@@ -55,6 +55,7 @@ class WarningMessage(enum.Enum):
   TO_TF_SAVED_MODEL_KERAS_MODE = 2
   USE_DISCRETIZED = 3
   USE_DISTRIBUTED = 4
+  DONT_USE_PICKLE = 5
 
 
 # List of already showed warning message that should not be displayed again.

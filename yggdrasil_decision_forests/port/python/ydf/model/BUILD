@@ -82,6 +82,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
+        "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
         "@ydf_cc//yggdrasil_decision_forests/utils/benchmark:inference",
     ],
 )

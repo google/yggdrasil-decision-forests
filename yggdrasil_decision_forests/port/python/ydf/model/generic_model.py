@@ -35,6 +35,7 @@ from ydf.model import optimizer_logs
 from ydf.model import template_cpp_export
 from ydf.utils import html
 from ydf.utils import log
+from ydf.utils import log
 from yggdrasil_decision_forests.utils import model_analysis_pb2
 
 
@@ -158,6 +159,19 @@ class GenericModel:
   def name(self) -> str:
     """Returns the name of the model type."""
     return self._model.name()
+
+  def __getstate__(self):
+    log.warning(
+        "Model pickling is discouraged. To save a model on disk, use"
+        " `model.save(path)` and `... = ydf.load_model(path)` instead. To"
+        " serialize a model to bytes, use `data = model.serialize()` and"
+        " `... = ydf.deserialize_model(data)` instead.",
+        message_id=log.WarningMessage.DONT_USE_PICKLE,
+    )
+    return self._model.Serialize()
+
+  def __setstate__(self, state):
+    self._model = ydf.DeserializeModel(state)
 
   def task(self) -> Task:
     """Task solved by the model."""
@@ -327,6 +341,43 @@ Use `model.describe()` for more details
 
     with log.cc_log_context():
       self._model.Save(path, advanced_options.file_prefix)
+
+  def serialize(self) -> bytes:
+    """Serializes a model to a sequence of bytes (i.e. `bytes`).
+
+    A serialized model is equivalent to model saved with `model.save`. It can
+    possibly contain meta-data related to model training and interpretation. To
+    minimize the size of a serialized model, removes this meta-data by passing
+    the argument `pure_serving_model=True` to the `train` method.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Create a model
+    dataset = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
+    learner = ydf.RandomForestLearner(label="label")
+    model = learner.train(dataset)
+
+    # Serialize model
+    # Note: serialized_model is a bytes.
+    serialized_model = model.serialize()
+
+    # Deserialize model
+    deserialized_model = ydf.deserialize_model(serialized_model)
+
+    # Make predictions
+    model.predict(dataset)
+    deserialized_model.predict(dataset)
+    ```
+
+    Returns:
+      The serialized model.
+    """
+    with log.cc_log_context():
+      return self._model.Serialize()
 
   def predict(self, data: dataset.InputDataset) -> np.ndarray:
     """Returns the predictions of the model on the given dataset.

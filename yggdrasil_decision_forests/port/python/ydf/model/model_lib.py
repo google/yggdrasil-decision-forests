@@ -19,7 +19,7 @@ import os
 from absl import logging
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
-from ydf.cc import ydf
+from ydf.cc import ydf as ydf_cc
 from ydf.dataset import dataspec
 from ydf.model import generic_model
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
@@ -137,13 +137,13 @@ def load_model(
         " model. For loading such models, use"
         " ydf.from_tensorflow_decision_forests()."
     )
-  cc_model: ydf.GenericCCModel = ydf.LoadModel(
+  cc_model: ydf_cc.GenericCCModel = ydf_cc.LoadModel(
       directory, advanced_options.file_prefix
   )
   return load_cc_model(cc_model)
 
 
-def load_cc_model(cc_model: ydf.GenericCCModel) -> generic_model.ModelType:
+def load_cc_model(cc_model: ydf_cc.GenericCCModel) -> generic_model.ModelType:
   """Convert a C++ model into the correct Python-wrapped model.
 
   Args:
@@ -153,11 +153,11 @@ def load_cc_model(cc_model: ydf.GenericCCModel) -> generic_model.ModelType:
     Python-wrapped model
   """
   model_name = cc_model.name()
-  if model_name == ydf.RandomForestCCModel.kRegisteredName:
+  if model_name == ydf_cc.RandomForestCCModel.kRegisteredName:
     return random_forest_model.RandomForestModel(cc_model)
-  if model_name == ydf.GradientBoostedTreesCCModel.kRegisteredName:
+  if model_name == ydf_cc.GradientBoostedTreesCCModel.kRegisteredName:
     return gradient_boosted_trees_model.GradientBoostedTreesModel(cc_model)
-  if model_name == ydf.IsolationForestCCModel.kRegisteredName:
+  if model_name == ydf_cc.IsolationForestCCModel.kRegisteredName:
     return isolation_forest_model.IsolationForestModel(cc_model)
   logging.info(
       "This model has type %s, which is not fully supported. Only generic model"
@@ -211,9 +211,49 @@ def from_tensorflow_decision_forests(directory: str) -> generic_model.ModelType:
         " just one of its subdirectories)."
     )
   directory = os.path.join(directory, TF_ASSETS_DIRECTORY_NAME)
-  cc_model: ydf.GenericCCModel = ydf.LoadModel(directory, file_prefix=None)
+  cc_model: ydf_cc.GenericCCModel = ydf_cc.LoadModel(
+      directory, file_prefix=None
+  )
 
   data_spec = cc_model.data_spec()
   transform_tfdf_categorical_columns(data_spec)
   cc_model.set_data_spec(data_spec)
+  return load_cc_model(cc_model)
+
+
+def deserialize_model(
+    data: bytes,
+) -> generic_model.ModelType:
+  """Loads a serialized YDF model.
+
+  Usage example:
+
+  ```python
+  import pandas as pd
+  import ydf
+
+  # Create a model
+  dataset = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
+  learner = ydf.RandomForestLearner(label="label")
+  model = learner.train(dataset)
+
+  # Serialize model
+  # Note: serialized_model is a bytes.
+  serialized_model = model.serialize()
+
+  # Deserialize model
+  deserialized_model = ydf.deserialize_model(serialized_model)
+
+  # Make predictions
+  model.predict(dataset)
+  deserialized_model.predict(dataset)
+  ```
+
+  Args:
+    data: Serialized model.
+
+  Returns:
+    Model to use for inference, evaluation or inspection
+  """
+  cc_model: ydf_cc.GenericCCModel = ydf_cc.DeserializeModel(data)
   return load_cc_model(cc_model)

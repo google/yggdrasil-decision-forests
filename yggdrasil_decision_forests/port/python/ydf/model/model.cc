@@ -44,6 +44,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace py = ::pybind11;
 
@@ -54,9 +55,14 @@ absl::StatusOr<std::unique_ptr<GenericCCModel>> LoadModel(
     const std::string& directory,
     const std::optional<std::string>& file_prefix) {
   py::gil_scoped_release release;
-  std::unique_ptr<model::AbstractModel> model_ptr;
-  RETURN_IF_ERROR(model::LoadModel(directory, &model_ptr, {file_prefix}));
-  return CreateCCModel(std::move(model_ptr));
+  ASSIGN_OR_RETURN(auto model, model::LoadModel(directory, {file_prefix}));
+  return CreateCCModel(std::move(model));
+}
+
+absl::StatusOr<std::unique_ptr<GenericCCModel>> DeserializeModel(
+    const py::bytes& data) {
+  ASSIGN_OR_RETURN(auto model, model::DeserializeModel(data));
+  return CreateCCModel(std::move(model));
 }
 
 absl::StatusOr<std::string> ModelAnalysisCreateHtmlReport(
@@ -99,6 +105,7 @@ void init_model(py::module_& m) {
   // WARNING: This method releases the Global Interpreter Lock.
   m.def("LoadModel", WithStatusOr(LoadModel), py::arg("directory"),
         py::arg("file_prefix"));
+  m.def("DeserializeModel", WithStatusOr(DeserializeModel), py::arg("data"));
   m.def("ModelAnalysisCreateHtmlReport",
         WithStatusOr(ModelAnalysisCreateHtmlReport), py::arg("analysis"),
         py::arg("options"));
@@ -127,6 +134,7 @@ void init_model(py::module_& m) {
       // WARNING: This method releases the Global Interpreter Lock.
       .def("Save", WithStatus(&GenericCCModel::Save), py::arg("directory"),
            py::arg("file_prefix"))
+      .def("Serialize", WithStatusOr(&GenericCCModel::Serialize))
       .def("name", &GenericCCModel::name)
       .def("task", &GenericCCModel::task)
       .def("data_spec", &GenericCCModel::data_spec)

@@ -2,9 +2,12 @@
 
 ## Head
 
-
 -   Add support in JAX FeatureEncoder for non-string categorical feature values.
 -   Improve performance of Isolation Forests.
+-   Models can be serialized/deserialized to/from bytes with `model.serialize()`
+    and `ydf.deserialize_model`.
+-   Models can be pickled safely.
+
 ### Fix
 
 -   Fix parsing of multidimensional ragged inputs.

@@ -168,6 +168,12 @@ absl::Status GenericCCModel::Save(
   return model::SaveModel(directory, model_.get(), {file_prefix});
 }
 
+absl::StatusOr<py::bytes> GenericCCModel::Serialize() const {
+  ASSIGN_OR_RETURN(std::string serialized_model,
+                   model::SerializeModel(*model_));
+  return py::bytes(serialized_model);
+}
+
 model::proto::Metadata GenericCCModel::metadata() const {
   model::proto::Metadata metadata;
   model_->metadata().Export(&metadata);

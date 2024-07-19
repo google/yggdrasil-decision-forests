@@ -6,6 +6,8 @@
 
 ::: ydf.load_model
 
+::: ydf.deserialize_model
+
 ::: ydf.Feature
 
 ::: ydf.Column
