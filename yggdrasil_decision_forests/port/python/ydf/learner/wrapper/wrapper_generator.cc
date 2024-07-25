@@ -293,10 +293,10 @@ from $1learner import custom_loss
 from $1learner import generic_learner
 from $1learner import hyperparameters
 from $1learner import tuner as tuner_lib
-from $1model import generic_model
 from $1model.gradient_boosted_trees_model import gradient_boosted_trees_model
-from $1model.random_forest_model import random_forest_model
 from $1model.isolation_forest_model import isolation_forest_model
+from $1model.random_forest_model import random_forest_model
+from $1utils import func_helpers
 )",
                                          prefix, pydf_prefix);
 
@@ -319,7 +319,7 @@ included for reference only. The actual wrappers are re-generated during
 compilation.
 """
 
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Optional, Sequence, Set, Union
 $0
 
 )",
@@ -418,10 +418,14 @@ $0
         }
       }
 
+      bool is_optional_field = false;
+
       // If the parameter is conditional on a parent parameter values, and the
       // default value of the parent parameter does not satisfy the condition,
       // the default value is set to None.
       if (field_def.has_conditional()) {
+        is_optional_field = true;
+
         const auto& conditional = field_def.conditional();
         const auto& parent_field =
             specifications.fields().find(conditional.control_field());
@@ -438,10 +442,25 @@ $0
         }
       }
 
+      if (field_def.has_mutual_exclusive()) {
+        is_optional_field = true;
+
+        if (!field_def.mutual_exclusive().is_default()) {
+          attr_py_default_value = "None";
+        }
+      }
+
       // Constructor argument.
-      absl::SubstituteAndAppend(&fields_constructor,
-                                "      $0: Optional[$1] = $2", field_name,
-                                attr_py_type, attr_py_default_value);
+      if (is_optional_field) {
+        absl::SubstituteAndAppend(&fields_constructor,
+                                  "      $0: Optional[$1] = $2", field_name,
+                                  attr_py_type, attr_py_default_value);
+
+      } else {
+        absl::SubstituteAndAppend(&fields_constructor, "      $0: $1 = $2",
+                                  field_name, attr_py_type,
+                                  attr_py_default_value);
+      }
 
       // Assignation to parameter dictionary.
       absl::SubstituteAndAppend(
@@ -597,15 +616,18 @@ $2
     workers: If set, enable distributed training. "workers" is the list of IP
       addresses of the workers. A worker is a process running
       `ydf.start_worker(port)`.
+    explicit_args: Helper argument for internal use. Throws if supplied
+      explicitly by the user.
   """
 
+  @func_helpers.list_explicit_arguments
   def __init__(self,
       label: $9,
       task: generic_learner.Task = generic_learner.Task.$8,
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
-      features: dataspec.ColumnDefs = None,
+      features: Optional[dataspec.ColumnDefs] = None,
       include_all_columns: bool = False,
       max_vocab_count: int = 2000,
       min_vocab_frequency: int = 5,
@@ -621,11 +643,14 @@ $3,
       resume_training_snapshot_interval_seconds: int = 1800,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
       workers: Optional[Sequence[str]] = None,
+      explicit_args: Optional[Set[str]] = None,
       ):
 
     hyper_parameters = {
 $4
       }
+    if explicit_args is None:
+      raise ValueError("`explicit_args` must not be set by the user")
 
     data_spec_args = dataspec.DataSpecInferenceArgs(
         columns=dataspec.normalize_column_defs(features),
@@ -655,6 +680,7 @@ $4
       data_spec_args=data_spec_args,
       data_spec=data_spec,
       hyper_parameters=hyper_parameters,
+      explicit_learner_arguments=explicit_args,
       deployment_config=deployment_config,
       tuner=tuner,
     )

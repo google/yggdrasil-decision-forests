@@ -2306,6 +2306,34 @@ TEST(DecisionTree, GenericHyperParameterCategorical) {
   EXPECT_TRUE(dt_config.categorical().has_random());
 }
 
+TEST(DecisionTree, GenericHyperParameterMutualExclusive) {
+  // Ensure the parameter is defined.
+  model::proto::GenericHyperParameterSpecification hparam_def;
+  EXPECT_OK(GetGenericHyperParameterSpecification({}, &hparam_def));
+
+  for (const auto& field : hparam_def.fields()) {
+    if (field.second.has_mutual_exclusive()) {
+      bool is_default = field.second.mutual_exclusive().is_default();
+      const auto& other_parameters =
+          field.second.mutual_exclusive().other_parameters();
+      for (const auto& other_parameter : other_parameters) {
+        auto other_param_it =
+            std::find_if(hparam_def.fields().begin(), hparam_def.fields().end(),
+                         [other_parameter](const auto& field) {
+                           return other_parameter == field.first;
+                         });
+        EXPECT_FALSE(other_param_it == hparam_def.fields().end());
+        EXPECT_THAT(
+            other_param_it->second.mutual_exclusive().other_parameters(),
+            testing::Contains(field.first));
+        if (is_default) {
+          EXPECT_FALSE(other_param_it->second.mutual_exclusive().is_default());
+        }
+      }
+    }
+  }
+}
+
 TEST(DecisionTree, MidThreshold) {
   const auto test = [](float a, float b) {
     CHECK_GT(b, a);

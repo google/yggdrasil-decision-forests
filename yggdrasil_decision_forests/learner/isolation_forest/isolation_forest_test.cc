@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -153,6 +154,20 @@ TEST(IsolationForest, BadTask) {
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST_F(IsolationForestOnMammographicMasses, MaxDepth) {
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_subsample_count(256);
+  TrainAndEvaluateModel();
+  auto* df_model = dynamic_cast<model::DecisionForestInterface*>(model_.get());
+  ASSERT_NE(df_model, nullptr);
+  int max_depth = -1;
+  for (const auto& tree : df_model->decision_trees()) {
+    max_depth = std::max(max_depth, tree->MaximumDepth());
+  }
+  EXPECT_EQ(max_depth, 8);
+}
+
 TEST(DefaultMaximumDepth, Base) {
   EXPECT_EQ(internal::DefaultMaximumDepth(254), 8);
   EXPECT_EQ(internal::DefaultMaximumDepth(255), 8);
@@ -238,6 +253,39 @@ TEST(GetGenericHyperParameterSpecification, Base) {
            IsolationForestLearner::kHParamSubsampleCount,
        }) {
     EXPECT_TRUE(hp_specs.fields().contains(field));
+  }
+}
+
+TEST(GetGenericHyperParameterSpecification,
+     GenericHyperParameterMutualExclusive) {
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(IsolationForestLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::ANOMALY_DETECTION);
+  ASSERT_OK_AND_ASSIGN(auto learner, model::GetLearner(train_config));
+
+  ASSERT_OK_AND_ASSIGN(const auto hparam_def,
+                       learner->GetGenericHyperParameterSpecification());
+
+  for (const auto& field : hparam_def.fields()) {
+    if (field.second.has_mutual_exclusive()) {
+      bool is_default = field.second.mutual_exclusive().is_default();
+      const auto& other_parameters =
+          field.second.mutual_exclusive().other_parameters();
+      for (const auto& other_parameter : other_parameters) {
+        auto other_param_it =
+            std::find_if(hparam_def.fields().begin(), hparam_def.fields().end(),
+                         [other_parameter](const auto& field) {
+                           return other_parameter == field.first;
+                         });
+        EXPECT_FALSE(other_param_it == hparam_def.fields().end());
+        EXPECT_THAT(
+            other_param_it->second.mutual_exclusive().other_parameters(),
+            testing::Contains(field.first));
+        if (is_default) {
+          EXPECT_FALSE(other_param_it->second.mutual_exclusive().is_default());
+        }
+      }
+    }
   }
 }
 

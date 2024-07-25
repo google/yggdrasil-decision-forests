@@ -70,6 +70,9 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_integer()->set_minimum(-1);
     param->mutable_integer()->set_default_value(
         config.num_candidate_attributes());
+    param->mutable_mutual_exclusive()->add_other_parameters(
+        kHParamNumCandidateAttributesRatio);
+    param->mutable_mutual_exclusive()->set_is_default(true);
     param->mutable_documentation()->set_description(
         R"(Number of unique valid attributes tested for each node. An attribute is valid if it has at least a valid split. If `num_candidate_attributes=0`, the value is set to the classical default value for Random Forest: `sqrt(number of input attributes)` in case of classification and `number_of_input_attributes / 3` in case of regression. If `num_candidate_attributes=-1`, all the attributes are tested.)");
   }
@@ -80,6 +83,9 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_real()->set_maximum(1.);
     param->mutable_real()->set_default_value(
         config.num_candidate_attributes_ratio());
+    param->mutable_mutual_exclusive()->add_other_parameters(
+        kHParamNumCandidateAttributes);
+    param->mutable_mutual_exclusive()->set_is_default(false);
     param->mutable_documentation()->set_description(
         R"(Ratio of attributes tested at each node. If set, it is equivalent to `num_candidate_attributes = number_of_input_features x num_candidate_attributes_ratio`. The possible values are between ]0, and 1] as well as -1. If not set or equal to -1, the `num_candidate_attributes` is used.)");
   }

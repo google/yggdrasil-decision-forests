@@ -79,6 +79,7 @@ cc_test(
         "//yggdrasil_decision_forests/metric:report",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/model/decision_tree",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
         "//yggdrasil_decision_forests/model/isolation_forest",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",

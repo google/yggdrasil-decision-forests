@@ -2,6 +2,10 @@
 
 ## Head
 
+### Feature
+
+-   Expose `validate_hyperparameters()` on the learner.
+-   Clarify which parameters in the learner are optional.
 -   Add support in JAX FeatureEncoder for non-string categorical feature values.
 -   Improve performance of Isolation Forests.
 -   Models can be serialized/deserialized to/from bytes with `model.serialize()`
@@ -11,6 +15,7 @@
 ### Fix
 
 -   Fix parsing of multidimensional ragged inputs.
+-   Fix isolation forest hyperparameter defaults.
 
 ## 0.6.0 - 2024-07-04
 

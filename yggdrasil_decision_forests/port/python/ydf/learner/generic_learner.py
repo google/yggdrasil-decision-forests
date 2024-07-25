@@ -18,7 +18,7 @@ import copy
 import datetime
 import os
 import re
-from typing import Optional, Sequence, Union
+from typing import Optional, Sequence, Set, Union
 
 from absl import logging
 
@@ -31,12 +31,11 @@ from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.learner import custom_loss
-from ydf.learner import hyperparameters
+from ydf.learner import hyperparameters as hp_lib
 from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
 from ydf.model import generic_model
 from ydf.model import model_lib
-from ydf.utils import log
 from ydf.utils import log
 from yggdrasil_decision_forests.utils import fold_generator_pb2
 from yggdrasil_decision_forests.utils.distribute.implementations.grpc import grpc_pb2
@@ -59,7 +58,8 @@ class GenericLearner:
       uplift_treatment: Optional[str],
       data_spec_args: dataspec.DataSpecInferenceArgs,
       data_spec: Optional[data_spec_pb2.DataSpecification],
-      hyper_parameters: hyperparameters.HyperParameters,
+      hyper_parameters: hp_lib.HyperParameters,
+      explicit_learner_arguments: Optional[Set[str]],
       deployment_config: abstract_learner_pb2.DeploymentConfig,
       tuner: Optional[tuner_lib.AbstractTuner],
   ):
@@ -112,9 +112,65 @@ class GenericLearner:
     if tuner:
       tuner.set_base_learner(learner_name)
 
+    if explicit_learner_arguments is not None:
+      self._hyperparameters = self._clean_up_hyperparameters(
+          explicit_learner_arguments
+      )
+
+    self.validate_hyperparameters()
+
   @property
-  def hyperparameters(self) -> hyperparameters.HyperParameters:
+  def hyperparameters(self) -> hp_lib.HyperParameters:
+    """A (mutable) dictionary of this learner's hyperparameters.
+
+    This object can be used to inspect or modify hyperparameters after creating
+    the learner. Modifying hyperparameters after constructing the learner is
+    suitable for some advanced use cases. Since this approach bypasses some
+    feasibility checks for the given set of hyperparameters, it generally better
+    to re-create the learner for each model. The current set of hyperparameters
+    can be validated manually with `validate_hyperparameters()`.
+    """
     return self._hyperparameters
+
+  def validate_hyperparameters(self):
+    """Returns None if the hyperparameters are valid, raises otherwise.
+
+    This method is called automatically before training, but users may call it
+    to fail early. It makes sense to call this method when changing manually the
+    hyper-paramters of the learner. This is a relatively advanced approach that
+    is not recommende (it is better to re-create the learner in most cases).
+
+    Usage example:
+
+    ```
+    import ydf
+    import pandas as pd
+
+    train_ds = pd.read_csv(...)
+
+    learner = ydf.GradientBoostedTreesLearner(label="label")
+    learner.hyperparameters["max_depth"] = 20
+    learner.validate_hyperparameters()
+    model = learner.train(train_ds)
+    evaluation = model.evaluate(test_ds)
+    ```
+    """
+    return hp_lib.validate_hyperparameters(
+        self._hyperparameters,
+        self._get_training_config(),
+        self._deployment_config,
+    )
+
+  def _clean_up_hyperparameters(
+      self, explicit_parameters: Set[str]
+  ) -> hp_lib.HyperParameters:
+    """Returns the hyperparameters purged from the mutually exlusive ones."""
+    return hp_lib.fix_hyperparameters(
+        self._hyperparameters,
+        explicit_parameters,
+        self._get_training_config(),
+        self._deployment_config,
+    )
 
   def train(
       self,
@@ -196,6 +252,8 @@ class GenericLearner:
           "The validation dataset may only be a path if the training dataset is"
           " a path."
       )
+
+    self.validate_hyperparameters()
 
     saved_verbose = log.verbose(verbose) if verbose is not None else None
     try:
@@ -339,9 +397,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
       else:
         self._hyperparameters["apply_link_function"] = True
 
-    hp_proto = hyperparameters.dict_to_generic_hyperparameter(
-        self._hyperparameters
-    )
+    hp_proto = hp_lib.dict_to_generic_hyperparameter(self._hyperparameters)
     return ydf.GetLearner(
         training_config, hp_proto, self._deployment_config, cc_custom_loss
     )

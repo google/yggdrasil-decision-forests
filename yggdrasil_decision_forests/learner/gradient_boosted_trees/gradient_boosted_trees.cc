@@ -2137,7 +2137,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_real()->set_default_value(gbt_config.shrinkage());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Coefficient applied to each tree prediction. A small value (0.02) tends to give more accurate results (assuming enough trees are trained), but results in larger models. Analogous to neural network learning rate.)");
+        R"(Coefficient applied to each tree prediction. A small value (0.02) tends to give more accurate results (assuming enough trees are trained), but results in larger models. Analogous to neural network learning rate. Fixed to 1.0 for DART models.)");
   }
   {
     auto& param =
@@ -2202,6 +2202,9 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_real()->set_minimum(0.f);
     param.mutable_real()->set_maximum(1.f);
     param.mutable_real()->set_default_value(gbt_config.dart().dropout_rate());
+    param.mutable_conditional()->set_control_field(kHParamForestExtraction);
+    param.mutable_conditional()->mutable_categorical()->add_values(
+        kHParamForestExtractionDart);
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_proto_field("dropout_rate");
     param.mutable_documentation()->set_description(

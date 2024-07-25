@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple, TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -325,6 +325,19 @@ def GetLearner(
     deployment_config: abstract_learner_pb2.DeploymentConfig,
     custom_loss: Optional[CCRegressionLoss],
 ) -> GenericCCLearner: ...
+
+def GetInvalidHyperparameters(
+    hp_names: Set[str],
+    explicit_hps: Set[str],
+    train_config: abstract_learner_pb2.TrainingConfig,
+    deployment_config: abstract_learner_pb2.DeploymentConfig,
+) -> Set[str]: ...
+def ValidateHyperparameters(
+    hyperparameters: Set[str],
+    train_config: abstract_learner_pb2.TrainingConfig,
+    deployment_config: abstract_learner_pb2.DeploymentConfig,
+) -> None: ...
+
 
 # Metric bindings
 # ================

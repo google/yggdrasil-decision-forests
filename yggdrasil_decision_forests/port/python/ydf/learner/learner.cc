@@ -27,11 +27,14 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/substitute.h"
 #include "absl/types/optional.h"
 #include "pybind11_protobuf/native_proto_caster.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -231,12 +234,60 @@ absl::StatusOr<std::unique_ptr<GenericCCLearner>> GetLearner(
   learner_ptr->set_stop_training_trigger(&stop_training);
   return std::make_unique<GenericCCLearner>(std::move(learner_ptr));
 }
+
+// Returns the set of hyperparameters that must be pruned from
+// `hp_names` in order to make it valid. Fails if
+// `explicit_hp_names` contains mutually exclusive hyperparameters.
+// Note that the returned list of invalid hyperparameter might contain
+// hyperparameters not contained in `hp_names`.
+absl::StatusOr<std::unordered_set<std::string>> GetInvalidHyperparameters(
+    const std::unordered_set<std::string>& hp_names,
+    const std::unordered_set<std::string>& explicit_hp_names,
+    const model::proto::TrainingConfig& train_config,
+    const model::proto::DeploymentConfig& deployment_config) {
+  ASSIGN_OR_RETURN(const auto learner,
+                   model::GetLearner(train_config, deployment_config));
+  ASSIGN_OR_RETURN(const auto hp_spec,
+                   learner->GetGenericHyperParameterSpecification());
+  std::unordered_set<std::string> invalid_hyperparameters;
+  for (const auto& explicit_hp : explicit_hp_names) {
+    auto it_field = hp_spec.fields().find(explicit_hp);
+    DCHECK(it_field != hp_spec.fields().end());
+    auto& other_hyperparameters =
+        it_field->second.mutual_exclusive().other_parameters();
+    if (invalid_hyperparameters.find(explicit_hp) !=
+        invalid_hyperparameters.end()) {
+      return absl::InvalidArgumentError(absl::Substitute(
+          "Only one of the following hyperparameters can be set: $0, $1",
+          explicit_hp, absl::StrJoin(other_hyperparameters, ", ")));
+    }
+    invalid_hyperparameters.insert(other_hyperparameters.begin(),
+                                   other_hyperparameters.end());
+  }
+  return invalid_hyperparameters;
+}
+
+// Fails if `hyperparameters` contains mutually exclusive hyperparameters.
+absl::Status ValidateHyperparameters(
+    const std::unordered_set<std::string>& hp_names,
+    const model::proto::TrainingConfig& train_config,
+    const model::proto::DeploymentConfig& deployment_config) {
+  return GetInvalidHyperparameters(hp_names, hp_names, train_config,
+                                   deployment_config)
+      .status();
+}
 }  // namespace
 
 void init_learner(py::module_& m) {
   m.def("GetLearner", WithStatusOr(GetLearner), py::arg("train_config"),
         py::arg("hyperparameters"), py::arg("deployment_config"),
         py::arg("custom_loss").noconvert() = std::monostate());
+  m.def("GetInvalidHyperparameters", WithStatusOr(GetInvalidHyperparameters),
+        py::arg("hp_names"), py::arg("explicit_hp_names"),
+        py::arg("train_config"), py::arg("deployment_config"));
+  m.def("ValidateHyperparameters", WithStatus(ValidateHyperparameters),
+        py::arg("hyperparamters"), py::arg("train_config"),
+        py::arg("deployment_config"));
   py::class_<CCRegressionLoss>(m, "CCRegressionLoss")
       .def(py::init<CCRegressionLoss::InitFunc, CCRegressionLoss::LossFunc,
                     CCRegressionLoss::GradFunc, bool>());

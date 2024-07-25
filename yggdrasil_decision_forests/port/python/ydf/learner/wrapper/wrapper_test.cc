@@ -55,8 +55,25 @@ class FakeLearner1 : public model::AbstractLearner {
     a.mutable_real()->set_minimum(1);
     a.mutable_real()->set_minimum(2);
     a.mutable_real()->set_default_value(1);
-    a.mutable_documentation()->set_description("b");
-    a.mutable_documentation()->set_proto_field("c");
+    a.mutable_documentation()->set_description("Documentation for a");
+    a.mutable_documentation()->set_proto_field("a_proto");
+
+    auto& b = (*spec.mutable_fields())["b"];
+    b.mutable_real()->set_minimum(3);
+    b.mutable_real()->set_minimum(5);
+    b.mutable_real()->set_default_value(4);
+    b.mutable_documentation()->set_description("Documentation for b");
+    b.mutable_documentation()->set_proto_field("b_proto");
+    b.mutable_mutual_exclusive()->mutable_other_parameters()->Add("c");
+    b.mutable_mutual_exclusive()->set_is_default(true);
+
+    auto& c = (*spec.mutable_fields())["c"];
+    c.mutable_real()->set_minimum(6);
+    c.mutable_real()->set_minimum(8);
+    c.mutable_real()->set_default_value(7);
+    c.mutable_documentation()->set_description("Documentation for c");
+    c.mutable_documentation()->set_proto_field("c_proto");
+    c.mutable_mutual_exclusive()->mutable_other_parameters()->Add("b");
     return spec;
   }
 
@@ -173,7 +190,9 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and 
       `num_discretized_numerical_bins` will be ignored.
-    a: b Default: 1.0.
+    a: Documentation for a Default: 1.0.
+    b: Documentation for b Default: 4.0.
+    c: Documentation for c Default: None.
 
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
@@ -204,15 +223,18 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
     workers: If set, enable distributed training. "workers" is the list of IP
       addresses of the workers. A worker is a process running
       `ydf.start_worker(port)`.
+    explicit_args: Helper argument for internal use. Throws if supplied
+      explicitly by the user.
   """
 
+  @func_helpers.list_explicit_arguments
   def __init__(self,
       label: str,
       task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
-      features: dataspec.ColumnDefs = None,
+      features: Optional[dataspec.ColumnDefs] = None,
       include_all_columns: bool = False,
       max_vocab_count: int = 2000,
       min_vocab_frequency: int = 5,
@@ -221,19 +243,26 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       max_num_scanned_rows_to_infer_semantic: int = 10000,
       max_num_scanned_rows_to_compute_statistics: int = 10000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
-      a: Optional[float] = 1.0,
+      a: float = 1.0,
+      b: Optional[float] = 4.0,
+      c: Optional[float] = None,
       num_threads: Optional[int] = None,
       working_dir: Optional[str] = None,
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
       workers: Optional[Sequence[str]] = None,
+      explicit_args: Optional[Set[str]] = None,
       ):
 
     hyper_parameters = {
                       "a" : a,
+                      "b" : b,
+                      "c" : c,
 
       }
+    if explicit_args is None:
+      raise ValueError("`explicit_args` must not be set by the user")
 
     data_spec_args = dataspec.DataSpecInferenceArgs(
         columns=dataspec.normalize_column_defs(features),
@@ -263,6 +292,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       data_spec_args=data_spec_args,
       data_spec=data_spec,
       hyper_parameters=hyper_parameters,
+      explicit_learner_arguments=explicit_args,
       deployment_config=deployment_config,
       tuner=tuner,
     )

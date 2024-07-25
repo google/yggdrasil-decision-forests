@@ -44,6 +44,18 @@ ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
 Column = dataspec.Column
 
 
+def get_tree_depth(
+    current_node: Any,
+    depth: int,
+):
+  if current_node.is_leaf:
+    return depth
+  return max(
+      get_tree_depth(current_node.neg_child, depth + 1),
+      get_tree_depth(current_node.pos_child, depth + 1),
+  )
+
+
 class LearnerTest(parameterized.TestCase):
 
   def setUp(self):
@@ -824,15 +836,13 @@ class CARTLearnerTest(LearnerTest):
     self.assertAlmostEqual(evaluation.rmse, 114.081, places=3)
 
   def test_monotonic_non_compatible_learner(self):
-    learner = specialized_learners.CartLearner(
-        label="label", features=[dataspec.Column("feature", monotonic=+1)]
-    )
-    ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
     with self.assertRaisesRegex(
         test_utils.AbslInvalidArgumentError,
         "The learner CART does not support monotonic constraints",
     ):
-      _ = learner.train(ds)
+      _ = specialized_learners.CartLearner(
+          label="label", features=[dataspec.Column("feature", monotonic=+1)]
+      )
 
   def test_tuner_manual(self):
     tuner = tuner_lib.RandomSearchTuner(num_trials=5)
@@ -1160,6 +1170,56 @@ class IsolationForestLearnerTest(LearnerTest):
           "Cannot evaluate an anomaly detection model without a label",
       ):
         _ = model.evaluate(self.gaussians.test)
+
+  def test_max_depth_gaussians_subsample_ratio(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"],
+        subsample_ratio=0.9,
+    )
+    self.assertEqual(learner.hyperparameters["subsample_ratio"], 0.9)
+    model = learner.train(self.gaussians.train)
+
+    max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
+    self.assertEqual(max_depth, 8)
+
+  def test_max_depth_gaussians_subsample_count(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"],
+        subsample_count=128,
+    )
+    self.assertEqual(learner.hyperparameters["subsample_count"], 128)
+    model = learner.train(self.gaussians.train)
+
+    max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
+    self.assertEqual(max_depth, 7)
+
+  def test_max_depth_gaussians_max_depth(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"], subsample_ratio=1.0, max_depth=10
+    )
+    model = learner.train(self.gaussians.train)
+
+    max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
+    self.assertEqual(max_depth, 10)
+
+  def test_illegal_agument_combination_constructor(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        ".*Only one of the following hyperparameters can be set:"
+        " (subsample_ratio, subsample_count|subsample_count,"
+        " subsample_ratio).*",
+    ):
+      _ = specialized_learners.IsolationForestLearner(
+          features=["f1", "f2"], subsample_count=128, subsample_ratio=0.5
+      )
+
+  def test_illegal_agument_combination_explicit_call(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"], subsample_count=128
+    )
+    learner.hyperparameters["subsample_ratio"] = 0.5
+    with self.assertRaises(ValueError):
+      learner.validate_hyperparameters()
 
 
 class UtilityTest(LearnerTest):
