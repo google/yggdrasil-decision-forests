@@ -15,6 +15,7 @@ py_library(
     deps = [
         # numpy dep,
         # pandas dep,
+        # xarray dep,
     ],
 )
 
@@ -25,6 +26,7 @@ py_library(
         ":dataset_io_types",
         ":pandas_io",
         ":tensorflow_io",
+        ":xarray_io",
         # numpy dep,
     ],
 )
@@ -36,6 +38,16 @@ py_library(
         ":dataset_io_types",
         # absl/logging dep,
         # pandas dep,
+    ],
+)
+
+py_library(
+    name = "xarray_io",
+    srcs = ["xarray_io.py"],
+    deps = [
+        ":dataset_io_types",
+        # absl/logging dep,
+        # xarray dep,
     ],
 )
 
@@ -55,6 +67,16 @@ py_test(
         ":pandas_io",
         # absl/testing:absltest dep,
         # pandas dep,
+    ],
+)
+
+py_test(
+    name = "xarray_io_test",
+    srcs = ["xarray_io_test.py"],
+    deps = [
+        ":xarray_io",
+        # absl/testing:absltest dep,
+        # xarray dep,
     ],
 )
 

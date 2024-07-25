@@ -11,6 +11,8 @@
 -   Models can be serialized/deserialized to/from bytes with `model.serialize()`
     and `ydf.deserialize_model`.
 -   Models can be pickled safely.
+-   Native support for Xarray as a dataset format for all operations (e.g.,
+    training, evaluation, predictions).
 
 ### Fix
 

@@ -14,16 +14,16 @@
 
 """Common functionality for all dataset I/O connectors."""
 
-import dataclasses
 import math
 import re
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Iterator, Optional, Sequence, Tuple
 
 import numpy as np
 
 from ydf.dataset.io import dataset_io_types
 from ydf.dataset.io import pandas_io
 from ydf.dataset.io import tensorflow_io
+from ydf.dataset.io import xarray_io
 
 
 def unrolled_feature_names(name: str, num_dims: int) -> Sequence[str]:
@@ -170,6 +170,8 @@ def cast_input_dataset_to_dict(
 
   if pandas_io.is_pandas_dataframe(data):
     return _unroll_dict(pandas_io.to_dict(data), **unroll_dict_kwargs)
+  elif xarray_io.is_xarray_dataset(data):
+    return _unroll_dict(xarray_io.to_dict(data), **unroll_dict_kwargs)
   elif tensorflow_io.is_tensorflow_dataset(data):
     return _unroll_dict(tensorflow_io.to_dict(data), **unroll_dict_kwargs)
 

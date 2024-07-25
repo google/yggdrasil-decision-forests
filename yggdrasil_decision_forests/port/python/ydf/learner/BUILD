@@ -323,6 +323,20 @@ py_test(
 )
 
 py_test(
+    name = "learner_with_xarray_test",
+    srcs = ["learner_with_xarray_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    python_version = "PY3",
+    deps = [
+        ":specialized_learners",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # xarray dep,
+        "//ydf/utils:test_utils",
+    ],
+)
+
+py_test(
     name = "tuner_test",
     srcs = ["tuner_test.py"],
     python_version = "PY3",
