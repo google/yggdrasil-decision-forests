@@ -119,8 +119,8 @@ class GenericDatasetTest(parameterized.TestCase):
   def test_create_vds_pd_numerical_with_nan(self, dtype):
     df = pd.DataFrame(
         {
-            "col_single_nan": [1, 2, np.NaN],
-            "col_nan_only": [np.NaN, np.NaN, np.NaN],
+            "col_single_nan": [1, 2, np.nan],
+            "col_nan_only": [np.nan, np.nan, np.nan],
         },
         dtype=dtype,
     )
@@ -356,7 +356,7 @@ class GenericDatasetTest(parameterized.TestCase):
 
   def test_memory_usage(self):
     df = pd.DataFrame({
-        "col1": [1.1, 21.1, np.NaN],
+        "col1": [1.1, 21.1, np.nan],
         "col2": [1, 2, 3],
     })
     ds = dataset.create_vertical_dataset(df)
