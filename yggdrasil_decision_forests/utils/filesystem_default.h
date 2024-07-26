@@ -113,7 +113,7 @@ class FileInputByteStream
   absl::Status Close();
 
  private:
-  std::FILE* file_;
+  std::ifstream file_stream_;
 };
 
 class FileOutputByteStream
@@ -124,7 +124,7 @@ class FileOutputByteStream
   absl::Status Close();
 
  private:
-  std::FILE* file_;
+  std::ofstream file_stream_;
 };
 
 // Exports a proto to disk in binary format.

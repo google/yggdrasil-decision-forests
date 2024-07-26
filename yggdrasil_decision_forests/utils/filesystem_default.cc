@@ -20,6 +20,7 @@
 #else
 #include <experimental/filesystem>
 #endif
+#include <ios>
 #include <regex>  // NOLINT
 
 #include "absl/status/status.h"
@@ -138,8 +139,8 @@ absl::Status RecursivelyDelete(absl::string_view path, int options) {
 }
 
 absl::Status FileInputByteStream::Open(absl::string_view path) {
-  file_ = std::fopen(std::string(path).c_str(), "rb");
-  if (!file_) {
+  file_stream_.open(std::string(path), std::ios::binary);
+  if (!file_stream_.is_open()) {
     return absl::Status(absl::StatusCode::kUnknown,
                         absl::StrCat("Failed to open ", path));
   }
@@ -147,31 +148,34 @@ absl::Status FileInputByteStream::Open(absl::string_view path) {
 }
 
 absl::StatusOr<int> FileInputByteStream::ReadUpTo(char* buffer, int max_read) {
-  const int num_read = std::fread(buffer, sizeof(char), max_read, file_);
-  if (num_read < 0) {
+  file_stream_.read(buffer, max_read);
+  if (file_stream_.bad()) {
     return absl::Status(absl::StatusCode::kUnknown, "Failed to read chunk");
   }
-  return num_read;
+  return file_stream_.gcount();
 }
 
 absl::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
                                                       int num_read) {
-  const int read_count = std::fread(buffer, sizeof(char), num_read, file_);
-  // read_count: -1=Error, 0=EOF, >0 & <num_read=Partial read, num_read=Success.
-  if (read_count < 0 || (read_count > 0 && read_count < num_read)) {
+  file_stream_.read(buffer, num_read);
+  const auto read_count = file_stream_.gcount();
+  if (file_stream_.bad() || (read_count > 0 && read_count < num_read)) {
     return absl::Status(absl::StatusCode::kUnknown, "Failed to read chunk");
   }
   return read_count > 0 || num_read == 0;
 }
 
 absl::Status FileInputByteStream::Close() {
-  std::fclose(file_);
+  file_stream_.close();
+  if (file_stream_.bad()) {
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to clsoe file");
+  }
   return absl::OkStatus();
 }
 
 absl::Status FileOutputByteStream::Open(absl::string_view path) {
-  file_ = std::fopen(std::string(path).c_str(), "wb");
-  if (!file_) {
+  file_stream_.open(std::string(path), std::ios::binary);
+  if (!file_stream_.is_open()) {
     return absl::Status(absl::StatusCode::kUnknown,
                         absl::StrCat("Failed to open ", path));
   }
@@ -179,12 +183,18 @@ absl::Status FileOutputByteStream::Open(absl::string_view path) {
 }
 
 absl::Status FileOutputByteStream::Write(absl::string_view chunk) {
-  std::fwrite(chunk.data(), sizeof chunk[0], chunk.size(), file_);
+  file_stream_.write(chunk.data(), chunk.size());
+  if (file_stream_.bad()) {
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to write chunk");
+  }
   return absl::OkStatus();
 }
 
 absl::Status FileOutputByteStream::Close() {
-  std::fclose(file_);
+  file_stream_.close();
+  if (file_stream_.bad()) {
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to clsoe file");
+  }
   return absl::OkStatus();
 }
 
