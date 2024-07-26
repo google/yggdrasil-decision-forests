@@ -31,11 +31,20 @@ TEST(Filesystem, JoinPath) {
   EXPECT_EQ(file::JoinPath("a", "b", "c"), "a/b/c");
   EXPECT_EQ(file::JoinPath("/a", "b"), "/a/b");
 }
+
 TEST(Filesystem, GenerateShardedFilenames) {
   std::vector<std::string> shards;
   EXPECT_TRUE(GenerateShardedFilenames("b/a@3", &shards));
   EXPECT_THAT(shards, ElementsAre("b/a-00000-of-00003", "b/a-00001-of-00003",
                                   "b/a-00002-of-00003"));
+}
+
+TEST(Filesystem, GenerateShardedFilenamesGCS) {
+  std::vector<std::string> shards;
+  EXPECT_TRUE(GenerateShardedFilenames("gs://my_bucket/b/a@3", &shards));
+  EXPECT_THAT(shards, ElementsAre("gs://my_bucket/b/a-00000-of-00003",
+                                  "gs://my_bucket/b/a-00001-of-00003",
+                                  "gs://my_bucket/b/a-00002-of-00003"));
 }
 
 TEST(Filesystem, Match) {
@@ -172,6 +181,8 @@ TEST(Filesystem, Basename) {
   EXPECT_EQ(GetBasename(file::JoinPath(dir_with_subdir, "file")), "file");
   EXPECT_EQ(GetBasename(file::JoinPath(dir_with_subdir, "file.txt")),
             "file.txt");
+  EXPECT_EQ(GetBasename("gs://my_bucket/file.txt"), "file.txt");
+  EXPECT_EQ(GetBasename("gs://my_bucket/dir/dir/file.txt"), "file.txt");
 }
 
 }  // namespace

@@ -35,6 +35,9 @@ build_and_maybe_test () {
     bazel version
     local ARCHITECTURE=$(uname --m)
 
+    # To discard the Bazel cache, uncomment the next line:
+    # bazel clean --expunge
+
     local flags="--config=linux_cpp17 --features=-fully_static_link"
     if [ "$ARCHITECTURE" == "x86_64" ]; then
         flags="$flags --config=linux_avx2"

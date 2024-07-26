@@ -90,3 +90,11 @@ config_setting(
     name = "example_idx_64bits",
     values = {"define": "ydf_example_idx_num_bits=64"},
 )
+
+# Compile with "--define=ydf_filesystem_support_gcs=1" to support Google Cloud Storage with the
+# default-public filesystem. Note that GCS is already supported when using the TensorFlow
+# Filesystem.
+config_setting(
+    name = "ydf_filesystem_support_gcs",
+    define_values = {"ydf_filesystem_support_gcs": "1"},
+)

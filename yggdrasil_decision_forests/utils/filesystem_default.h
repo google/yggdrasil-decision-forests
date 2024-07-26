@@ -24,13 +24,19 @@
 #endif
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
+
+#ifdef YGG_FILESYSTEM_USES_DEFAULT_WITH_GCS
+#include "google/cloud/storage/client.h"
+#endif
 
 #define EXTERNAL_FILESYSTEM
 
@@ -104,6 +110,13 @@ absl::Status Rename(absl::string_view from, absl::string_view to, int options);
 // Placeholder empty function used in the "options" argument of some functions.
 constexpr int Defaults() { return 0; }
 
+enum class FilesystemBackend {
+  kLocal,
+#ifdef YGG_FILESYSTEM_USES_DEFAULT_WITH_GCS
+  kGCS,
+#endif
+};
+
 class FileInputByteStream
     : public yggdrasil_decision_forests::utils::InputByteStream {
  public:
@@ -114,6 +127,11 @@ class FileInputByteStream
 
  private:
   std::ifstream file_stream_;
+#ifdef YGG_FILESYSTEM_USES_DEFAULT_WITH_GCS
+  ::google::cloud::storage::ObjectReadStream gcs_stream_;
+#endif
+  std::basic_istream<char>* stream_;
+  FilesystemBackend backend_;
 };
 
 class FileOutputByteStream
@@ -125,6 +143,11 @@ class FileOutputByteStream
 
  private:
   std::ofstream file_stream_;
+#ifdef YGG_FILESYSTEM_USES_DEFAULT_WITH_GCS
+  ::google::cloud::storage::ObjectWriteStream gcs_stream_;
+#endif
+  std::basic_ostream<char>* stream_;
+  FilesystemBackend backend_;
 };
 
 // Exports a proto to disk in binary format.
@@ -159,6 +182,17 @@ std::string GetBasename(absl::string_view path);
 //
 // For the default file system, "SetImmutable" is a no-op.
 absl::Status SetImmutable(absl::string_view path);
+
+// A Google Cloud Storage path.
+struct GCSPath {
+  static absl::optional<GCSPath> Parse(absl::string_view path);
+  std::string bucket;
+  std::string object;
+
+  bool operator==(const GCSPath& other) const {
+    return (bucket == other.bucket) && (object == other.object);
+  }
+};
 
 }  // namespace file
 
