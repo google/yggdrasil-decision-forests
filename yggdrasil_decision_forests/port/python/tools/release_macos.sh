@@ -14,17 +14,23 @@
 # limitations under the License.
 
 
-
 set -vex
 
-DOCKER=ubuntu:20.04
+declare -a python_versions=("3.8" "3.9" "3.10" "3.11" "3.12")
 
-# Current directory
-DIRNAME=${PWD##*/}
+for pyver in "${python_versions[@]}"
+do
+  pyenv install -s $pyver
+  export PYENV_VERSION=$pyver
+  rm -rf ${TMPDIR}venv
+  python -m venv ${TMPDIR}venv
+  source ${TMPDIR}venv/bin/activate
+  pip install --upgrade pip
 
-# Download docker
-docker pull ${DOCKER}
+  echo "Building with $(python3 -V 2>&1)"
 
-# Start docker
-docker run -it -v ${PWD}/..:/working_dir -w /working_dir/${DIRNAME} ${DOCKER} /bin/bash
-
+  bazel clean --expunge
+  RUN_TESTS=0 CC="clang" ./tools/build_test_linux.sh
+  ./tools/package_linux.sh
+  deactivate
+done

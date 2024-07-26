@@ -24,16 +24,15 @@
 # Usage example:
 #
 #   # Compilation with Clang 14, without tests
-#   CC="clang-14" RUN_TESTS=0 ./tools/test_pydf.sh
+#   CC="clang-14" RUN_TESTS=0 ./tools/build_test_linux.sh
 #
-set -xev
+set -vex
 
 build_and_maybe_test () {
    echo "Building PYDF the following settings:"
    echo "   Compiler : $CC"
 
-    BAZEL=bazel
-    ${BAZEL} version
+    bazel version
     local ARCHITECTURE=$(uname --m)
 
     local flags="--config=linux_cpp17 --features=-fully_static_link"
@@ -45,9 +44,9 @@ build_and_maybe_test () {
     python -m pip install -r requirements.txt
     python -m pip install -r dev_requirements.txt
 
-    time ${BAZEL} build ${flags} -- ${pydf_targets}
+    time bazel build ${flags} -- ${pydf_targets}
     if [[ "$RUN_TESTS" = 1 ]]; then
-      time ${BAZEL} test ${flags} --test_output=errors -- ${pydf_targets}
+      time bazel test ${flags} --test_output=errors -- ${pydf_targets}
     fi
     echo "PYDF build / test complete."
 } 

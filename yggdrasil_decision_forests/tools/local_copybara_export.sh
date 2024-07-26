@@ -19,7 +19,7 @@
 # run all the tests.
 #
 # Usage example:
-#   third_party/yggdrasil_decision_forests/tools/run_e2e_ydf_test.sh
+#   third_party/yggdrasil_decision_forests/tools/local_copybara_export.sh
 
 set -ex
 

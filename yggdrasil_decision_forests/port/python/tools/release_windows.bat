@@ -22,7 +22,7 @@
 ::
 :: Usage example:
 ::   :: Update "YDF_VERSION" and run
-::   tools\build_windows_release.bat
+::   tools\release_windows.bat
 ::   :: The output pip packages are put in "dist".
 ::
 :: Requirements:
@@ -61,7 +61,7 @@ set PYTHON=%PYTHON_DIR%/python.exe
 set PYTHON3_BIN_PATH=%PYTHON%
 set PYTHON3_LIB_PATH=%PYTHON_DIR%/Lib
 CALL :Compile %PYTHON% || goto :error
-%PYTHON% tools/assembly_pip_files.py || goto :error
+%PYTHON% tools/collect_pip_files.py || goto :error
 CALL :BuildPipPackage %PYTHON% || goto :error
 mkdir dist
 copy tmp_package\dist\ydf-%YDF_VERSION%-cp%PYTHON_VERSION%-cp%PYTHON_VERSION%-win_amd64.whl dist || goto :error
