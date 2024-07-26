@@ -81,11 +81,7 @@ cc_library_ydf(
         "filesystem_default.h",
     ],
     copts = ["-fexceptions"],  # The code does not rely on exceptions.
-    defines = ["YGG_FILESYSTEM_USES_DEFAULT"] +
-              select({
-                  "//yggdrasil_decision_forests:ydf_filesystem_support_gcs": ["YGG_FILESYSTEM_USES_DEFAULT_WITH_GCS"],
-                  "//conditions:default": [],
-              }),
+    defines = ["YGG_FILESYSTEM_USES_DEFAULT"],
     features = ["-use_header_modules"],  # Incompatible with -fexceptions.
     linkopts = select({
         "@platforms//os:linux": ["-lstdc++fs"],  # Required for gcc<=8.
@@ -102,16 +98,11 @@ cc_library_ydf(
         ":logging_default",
         ":protobuf",
         ":status_macros",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/types:optional",
-    ] + select({
-        "//yggdrasil_decision_forests:ydf_filesystem_support_gcs": ["@google_cloud_cpp//:storage"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 # TensorFlow::io based filesystem.
@@ -948,23 +939,6 @@ cc_test(
         # "@com_google_googletest//:gtest_main",  # When fixed
         "@com_google_googletest//:gtest_main",
         ":test",
-    ],
-)
-
-cc_test(
-    name = "filesystem_default_test",
-    srcs = ["filesystem_default_test.cc"],
-    tags = [
-        "manual",
-        "notap",
-    ],
-    deps = [
-        ":filesystem_default",
-        ":test",
-        ":uid",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
     ],
 )
 

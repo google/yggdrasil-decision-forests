@@ -13,8 +13,6 @@
 -   Models can be pickled safely.
 -   Native support for Xarray as a dataset format for all operations (e.g.,
     training, evaluation, predictions).
--   Support for Google Cloud Storage path gs://<project>/object for all disk
-    operations e.g. load a dataset, load a model, save a model.
 
 ### Fix
 

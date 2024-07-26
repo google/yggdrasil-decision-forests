@@ -31,10 +31,6 @@ function build_py() {
   # CMD="python$VERSION -m venv /tmp/venv && source /tmp/venv/bin/activate && /bin/bash"
   # In the interactive shell, you can run commands such as "RUN_TESTS=1 ./tools/build_test_linux.sh"
 
-  # You can also start an interactive shell with:
-  # CMD="python$VERSION -m venv /tmp/venv && source /tmp/venv/bin/activate && /bin/bash"
-  # In the interactive shell, you can run commands such as "RUN_TESTS=1 ./tools/build_test_linux.sh"
-
   docker run \
     -v pydf_venv_cache_$VERSION:/tmp/venv \
     -v pydf_bazel_cache_$VERSION:/root/.cache \
