@@ -37,7 +37,7 @@ def normalize_list_of_paths(paths: List[str]) -> str:
   if len(split_first_path) == 1:
     raise ValueError(
         "All typed paths to the dataset be typed with the same type, e.g.,"
-        " ['csv:/path/file1', 'csv:/path/file2']"
+        f" ['csv:/path/file1', 'csv:/path/file2']. Instead, got: {paths!r}"
     )
   else:
     # The first path is typed, remove types from all paths.
@@ -45,6 +45,6 @@ def normalize_list_of_paths(paths: List[str]) -> str:
     if not all(path.startswith(prefix) for path in paths):
       raise ValueError(
           "All typed paths to the dataset should have the same type, e.g.,"
-          " ['csv:/path/file1', 'csv:/path/file2']"
+          f" ['csv:/path/file1', 'csv:/path/file2']. Instead, got: {paths!r}"
       )
     return prefix + ",".join([path[len(prefix) :] for path in paths])

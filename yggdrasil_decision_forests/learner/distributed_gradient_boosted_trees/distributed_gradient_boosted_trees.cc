@@ -50,6 +50,7 @@ DistributedGradientBoostedTreesLearner::Capabilities() const {
   model::proto::LearnerCapabilities capabilities;
   capabilities.set_resume_training(true);
   capabilities.set_support_partial_cache_dataset_format(true);
+  capabilities.set_support_validation_dataset(true);
   return capabilities;
 }
 
