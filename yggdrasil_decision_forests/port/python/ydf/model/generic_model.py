@@ -35,7 +35,6 @@ from ydf.model import optimizer_logs
 from ydf.model import template_cpp_export
 from ydf.utils import html
 from ydf.utils import log
-from ydf.utils import log
 from yggdrasil_decision_forests.utils import model_analysis_pb2
 
 
@@ -1079,6 +1078,52 @@ Use `model.describe()` for more details
     """
     _get_export_jax().update_with_jax_params(model=self, params=params)
 
+  def to_docker(
+      self,
+      path: str,
+      exist_ok: bool = False,
+  ) -> None:
+    """Exports the model to a Docker endpoint deployable on Cloud.
+
+    This function creates a directory containing a Dockerfile, the model and
+    support files.
+
+    Usage example:
+
+    ```python
+    import ydf
+
+    # Train a model.
+    model = ydf.RandomForestLearner(label="l").train({
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    })
+
+    # Export the model to a Docker endpoint.
+    model.to_docker(path="/tmp/my_model")
+
+    # Print instructions on how to use the model
+    !cat /tmp/my_model/readme.md
+
+    # Test the end-point locally
+    docker build --platform linux/amd64 -t ydf_predict_image /tmp/my_model
+    docker run --rm -p 8080:8080 -d ydf_predict_image
+
+    # Deploy the model on Google Cloud
+    gcloud run deploy ydf-predict --source /tmp/my_model
+
+    # Check the automatically created utility scripts "test_locally.sh" and
+    # "deploy_in_google_cloud.sh" for more examples.
+    ```
+
+    Args:
+      path: Directory where to create the Docker endpoint
+      exist_ok: If false (default), fails if the directory already exist. If
+        true, override the directory content if any.
+    """
+    _get_export_docker().to_docker(model=self, path=path, exist_ok=exist_ok)
+
   def hyperparameter_optimizer_logs(
       self,
   ) -> Optional[optimizer_logs.OptimizerLogs]:
@@ -1349,6 +1394,15 @@ def _get_export_sklearn():
         "it installed and try again. If using pip, run `pip install"
         " scikit-learn`."
     ) from exc
+
+
+def _get_export_docker():
+  try:
+    from ydf.model import export_docker  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+
+    return export_docker
+  except ImportError as exc:
+    raise ValueError("Cannot import the export_docker utility") from exc
 
 
 ModelType = TypeVar("ModelType", bound=GenericModel)

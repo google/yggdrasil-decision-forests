@@ -215,6 +215,15 @@ py_library(
     ],
 )
 
+py_library(
+    name = "export_docker",
+    srcs = ["export_docker.py"],
+    deps = [
+        ":generic_model",
+        "//ydf/dataset:dataspec",
+    ],
+)
+
 # Tests
 # =====
 
@@ -371,5 +380,23 @@ py_test(
         # numpy dep,
         # sklearn dep,
         "//ydf/model/decision_forest_model",
+    ],
+)
+
+py_test(
+    name = "export_docker_test",
+    srcs = ["export_docker_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    python_version = "PY3",
+    deps = [
+        ":export_docker",
+        ":model_lib",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # fastapi dep,  # buildcleaner: keep
+        # pydantic dep,  # buildcleaner: keep
+        # requests dep,  # buildcleaner: keep
+        "//ydf:api",
+        "//ydf/utils:test_utils",
     ],
 )

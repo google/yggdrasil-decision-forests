@@ -175,7 +175,7 @@ absl::StatusOr<std::string> DetectFilePrefix(absl::string_view directory) {
   if (done_files.size() != 1) {
     return absl::FailedPreconditionError(
         absl::Substitute("File prefix cannot be autodetected: $0 models exist "
-                         "in $1",
+                         "in directory \"$1\"",
                          done_files.size(), directory));
   }
   return file::GetBasename(

@@ -1,5 +1,8 @@
 pandas
 xarray
+pydantic
+requests
+fastapi
 tensorflow_decision_forests; platform_machine != 'aarch64' and python_version >= '3.9' and python_version < '3.12'
 tensorflow; platform_machine != 'aarch64'
 portpicker
