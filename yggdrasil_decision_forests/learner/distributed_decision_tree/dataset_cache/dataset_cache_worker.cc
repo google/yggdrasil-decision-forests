@@ -523,6 +523,7 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
   int64_t remaining_examples_in_shard = 0;
   int next_output_shard_idx = 0;
 
+  int64_t num_read_examples = 0;
   while (true) {
     RETURN_IF_ERROR(values_reader.Next());
     const auto values = values_reader.Values();
@@ -559,6 +560,7 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
       }
 
       remaining_examples_in_shard--;
+      num_read_examples++;
     }
   }
 
@@ -571,6 +573,12 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
     indexed_value_buffer.clear();
 
     RETURN_IF_ERROR(indexed_values_writer.Close());
+  }
+
+  if (num_read_examples != request.num_examples()) {
+    return absl::InternalError(
+        absl::Substitute("Unexpected number of examples in cache. $0 != $1",
+                         num_read_examples, request.num_examples()));
   }
 
   if (next_output_shard_idx != request.num_shards_in_output_shards()) {

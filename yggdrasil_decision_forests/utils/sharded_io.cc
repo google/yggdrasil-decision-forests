@@ -20,11 +20,14 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -50,11 +53,15 @@ absl::Status ExpandInputShards(const absl::string_view sharded_path,
   std::vector<std::string> level_3;
   for (const auto& level_2_item : level_2) {
     std::vector<std::string> level_2_item_sharded;
-    if (file::Match(level_2_item, &level_2_item_sharded, file::Defaults())
-            .ok()) {
+    const auto match_status =
+        file::Match(level_2_item, &level_2_item_sharded, file::Defaults());
+
+    if (match_status.ok() && !level_2_item_sharded.empty()) {
       level_3.insert(level_3.end(), level_2_item_sharded.begin(),
                      level_2_item_sharded.end());
     } else {
+      YDF_LOG(WARNING) << "Path \"" << level_2_item
+                       << "\" does not match any file";
       level_3.push_back(level_2_item);
     }
   }
@@ -64,7 +71,9 @@ absl::Status ExpandInputShards(const absl::string_view sharded_path,
   std::sort(paths->begin(), paths->end());
   if (paths->empty()) {
     return absl::NotFoundError(
-        absl::StrCat("No files matching: ", sharded_path));
+        absl::StrCat("No files matching: ", sharded_path,
+                     ". If using file matching, make sure the parent "
+                     "directories have execution privileges."));
   }
   return absl::OkStatus();
 }

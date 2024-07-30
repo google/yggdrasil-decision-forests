@@ -15,11 +15,16 @@
     training, evaluation, predictions).
 -   The output of `model.to_jax_function` can then be converted to a TensorFlow
     Lite model.
+-   Change the default number of examples to scan when training on files to
+    determine the semantic and dictionaries of columns from 10k to 100k.
+-   Various improvements of error messages.
 
 ### Fix
 
 -   Fix parsing of multidimensional ragged inputs.
 -   Fix isolation forest hyperparameter defaults.
+-   Fix bug causing distributed training to fail on a sharded dataset containing
+    an empty shard.
 
 ## 0.6.0 - 2024-07-04
 

@@ -296,13 +296,14 @@ absl::Span<const Value> ShardedIntegerColumnReader<Value>::Values() {
 template <typename Value>
 absl::Status ShardedIntegerColumnReader<Value>::Next() {
   RETURN_IF_ERROR(sub_reader_.Next());
-  if (sub_reader_.Values().empty() && current_shard_idx_ + 1 < end_shard_idx_) {
+  while (sub_reader_.Values().empty() &&
+         current_shard_idx_ + 1 < end_shard_idx_) {
     RETURN_IF_ERROR(sub_reader_.Close());
     current_shard_idx_++;
     RETURN_IF_ERROR(sub_reader_.Open(
         ShardFilename(base_path_, current_shard_idx_, end_shard_idx_),
         max_value_, max_num_values_));
-    return sub_reader_.Next();
+    RETURN_IF_ERROR(sub_reader_.Next());
   }
   return absl::OkStatus();
 }
@@ -542,13 +543,14 @@ absl::Span<const float> ShardedFloatColumnReader::Values() {
 
 absl::Status ShardedFloatColumnReader::Next() {
   RETURN_IF_ERROR(sub_reader_.Next());
-  if (sub_reader_.Values().empty() && current_shard_idx_ + 1 < end_shard_idx_) {
+  while (sub_reader_.Values().empty() &&
+         current_shard_idx_ + 1 < end_shard_idx_) {
     RETURN_IF_ERROR(sub_reader_.Close());
     current_shard_idx_++;
     RETURN_IF_ERROR(sub_reader_.Open(
         ShardFilename(base_path_, current_shard_idx_, end_shard_idx_),
         max_num_values_));
-    return sub_reader_.Next();
+    RETURN_IF_ERROR(sub_reader_.Next());
   }
   return absl::OkStatus();
 }

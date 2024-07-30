@@ -886,10 +886,26 @@ std::string ShardDataset(const dataset::VerticalDataset& dataset,
   std::shuffle(examples.begin(), examples.end(), rnd);
   examples.resize(std::lround(sampling * dataset.nrow()));
 
+  // If "create_empty_shard=true", shard #4 is empty, and shard #5 contains
+  // twice the number of examples of other shards.
+  const bool create_empty_shard = num_shards >= 20;
+
   for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
     std::vector<dataset::VerticalDataset::row_t> idxs;
-    for (int i = shard_idx; i < examples.size(); i += num_shards) {
-      idxs.push_back(examples[i]);
+
+    if (create_empty_shard && shard_idx == 4) {
+      // Empty shard
+    } else if (create_empty_shard && shard_idx == 5) {
+      for (int i = 4; i < examples.size(); i += num_shards) {
+        idxs.push_back(examples[i]);
+      }
+      for (int i = 5; i < examples.size(); i += num_shards) {
+        idxs.push_back(examples[i]);
+      }
+    } else {
+      for (int i = shard_idx; i < examples.size(); i += num_shards) {
+        idxs.push_back(examples[i]);
+      }
     }
     CHECK_OK(dataset::SaveVerticalDataset(
         dataset.Extract(idxs).value(),

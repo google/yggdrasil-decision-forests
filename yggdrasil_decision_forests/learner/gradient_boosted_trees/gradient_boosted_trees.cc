@@ -2460,7 +2460,12 @@ absl::StatusOr<proto::Loss> DefaultLoss(
           "No default loss available for a categorical label with a single "
           "unique value. 1) Make sure you want classification (e.g. instead of "
           "regression), 2) Make sure your training dataset contains at least "
-          "two different categorical label values. 3) Alternatively, specify "
+          "two different categorical label values. Note: The number of label "
+          "categories is determined by scanning the first 100k examples in the "
+          "dataset. Set `max_num_scanned_rows_to_compute_statistics` to a "
+          "larget value (e.g., "
+          "`max_num_scanned_rows_to_compute_statistics=1_000_000`) to scan "
+          "more examples. 3) Alternatively, specify "
           "manually the loss e.g. loss=BINOMIAL_LOG_LIKELIHOOD.");
     }
   }
