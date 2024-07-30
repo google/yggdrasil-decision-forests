@@ -46,18 +46,23 @@ nav:
   - ❔ FAQ: faq.md
   - 📖 Glossary: glossary.md
   - 🤸 For Googlers: http://go/ydf
-  - Guides:
-    - What are decision forests?: https://developers.google.com/machine-learning/decision-forests
-    - Improve model quality: guide_how_to_improve_model.md
-    - Improve training speed: guide_how_to_improve_learner.md
-    - Migrating from TF-DF: tutorial/migrating_to_ydf.ipynb
-  - Task:
+  - Tasks solved by YDF:
     - Classification: tutorial/classification.ipynb
     - Regression: tutorial/regression.ipynb
     - Ranking: tutorial/ranking.ipynb
     - Uplifting: tutorial/uplifting.ipynb
     - Anomaly detection: tutorial/anomaly_detection.ipynb
-  - Input feature:
+  - Deploying a model:
+    - FastAPI + Docker: tutorial/to_docker.ipynb
+    - In C++: tutorial/cpp.ipynb
+    - In JavaScript: https://www.npmjs.com/package/yggdrasil-decision-forests
+    - With TF Serving: tutorial/tf_serving.ipynb
+    # TODO: Add Benchmarking, C++, Go, Cli, Python, F Serving, and Js
+  - Explainability / XAI:
+    - Model understanding: tutorial/model_understanding.ipynb
+    - Prediction understanding: tutorial/prediction_understanding.ipynb
+    - Counterfactual: tutorial/counterfactual.ipynb
+  - Types of input features:
     - numerical: tutorial/numerical_feature.ipynb
     - categorical: tutorial/categorical_feature.ipynb
     - monotonic: tutorial/monotonic_feature.ipynb
@@ -68,8 +73,10 @@ nav:
   - Deep learning:
     - with TensorFlow: tutorial/compose_with_tf.ipynb
     - with Jax: tutorial/compose_with_jax.ipynb
-  - Dataset:
+  - Dataset formats:
     - Pandas Dataframe: tutorial/pandas.ipynb
+    - Numpy Arrays: tutorial/numpy.ipynb
+    - XArray: tutorial/xarray.ipynb
     - TensorFlow Dataset: tutorial/tf_dataset.ipynb
     # TODO: Add Dictionary, CSV, TFRecord
   - Modeling:
@@ -78,14 +85,11 @@ nav:
   - Evaluation:
     - Train & test: tutorial/train_and_test.ipynb
     - Cross-validation: tutorial/cross_validation.ipynb
-  - Explainability:
-    - Counterfactual: tutorial/counterfactual.ipynb
-    - Model understanding: tutorial/model_understanding.ipynb
-    - Prediction understanding: tutorial/prediction_understanding.ipynb
-  - Serving:
-    - C++: tutorial/cpp.ipynb
-    - TF Serving: tutorial/tf_serving.ipynb
-    # TODO: Add Benchmarking, C++, Go, Cli, Python, F Serving, and Js
+  - Guides:
+    - What are decision forests?: https://developers.google.com/machine-learning/decision-forests
+    - How to improve a model?: guide_how_to_improve_model.md
+    - How to train a model faster?: guide_how_to_improve_learner.md
+    - Migrating from TF-DF: tutorial/migrating_to_ydf.ipynb
   - Advanced:
     - Inspecting trees: tutorial/inspecting_trees.ipynb
     - Editing trees: tutorial/editing_trees.ipynb
