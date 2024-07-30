@@ -916,6 +916,17 @@ class ToJaxTest(parameterized.TestCase):
           specialized_learners.GradientBoostedTreesLearner,
       ),
       (
+          "gbt_class_binary_num_cat_tfl",
+          ["f1", "f2", "c1", "c2", "label_class_binary1"],
+          "label_class_binary1",
+          generic_learner.Task.CLASSIFICATION,
+          True,
+          specialized_learners.GradientBoostedTreesLearner,
+          None,
+          True,
+          True,
+      ),
+      (
           "gbt_class_multi_num_cat1",
           ["f1", "f2", "c1", "c2", "label_class_multi1"],
           "label_class_multi1",
@@ -962,6 +973,7 @@ class ToJaxTest(parameterized.TestCase):
       learner,
       learner_kwargs=None,
       test_tf_conversion: bool = True,
+      test_tf_lite: bool = False,
   ):
 
     if learner_kwargs is None:
@@ -984,17 +996,21 @@ class ToJaxTest(parameterized.TestCase):
     )
 
     # Golden predictions
-    test_ds = create_dataset(columns, 1, seed=2)
+    test_ds = create_dataset(columns, 10, seed=2)
     ydf_predictions = model.predict(test_ds)
 
-    # Convert model to tf function
-    jax_model = to_jax.to_jax_function(model)
-    assert bool(jax_model.encoder.categorical) == has_encoding
+    # Convert model to a jax function
+    with jax.numpy_dtype_promotion("strict"):
+      kwargs = {}
+      if test_tf_lite:
+        kwargs["compatibility"] = "TFL"
+      jax_model = to_jax.to_jax_function(model, **kwargs)
+      assert bool(jax_model.encoder.categorical) == has_encoding
 
-    # Generate Jax predictions
-    del test_ds[label]
-    input_values = jax_model.encoder(test_ds)
-    jax_predictions = jax_model.predict(input_values)
+      # Generate Jax predictions
+      del test_ds[label]
+      input_values = jax_model.encoder(test_ds)
+      jax_predictions = jax_model.predict(input_values)
 
     # Test predictions
     np.testing.assert_allclose(
@@ -1037,6 +1053,43 @@ class ToJaxTest(parameterized.TestCase):
         rtol=1e-5,
         atol=1e-5,
     )
+
+    if test_tf_lite:
+      # Test TFLite conversion
+
+      # Generate the input specs.
+      # Note: TFL uses the spec names to generate the argument names.
+      # Note: "from_tensor" does not implement the automatic JAX->TF conversion.
+      tf_input_specs = {
+          k: tf.TensorSpec.from_tensor(tf.constant(v), name=k)
+          for k, v in input_values.items()
+      }
+
+      concrete_predict = tf_model.my_call.get_concrete_function(tf_input_specs)
+      converter = tf.lite.TFLiteConverter.from_concrete_functions(
+          [concrete_predict], tf_model
+      )
+      # TODO: Remove when TFL support all the YDF->JAX required ops.
+      converter.target_spec.supported_ops = [
+          tf.lite.OpsSet.TFLITE_BUILTINS,  # enable TensorFlow Lite ops.
+          tf.lite.OpsSet.SELECT_TF_OPS,  # enable TensorFlow ops.
+      ]
+      tflite_model = converter.convert()
+      interpreter = tf.lite.Interpreter(model_content=tflite_model)
+      interpreter.allocate_tensors()
+      tfl_predict = interpreter.get_signature_runner("serving_default")
+
+      logging.info("input_values:\n%s", input_values)
+      logging.info("tfl_predict:\n%s", tfl_predict)
+      logging.info("concrete_predict:\n%s", concrete_predict)
+
+      tfl_predictions = tfl_predict(**input_values)["output_0"]
+      np.testing.assert_allclose(
+          ydf_predictions,
+          tfl_predictions,
+          rtol=1e-5,
+          atol=1e-5,
+      )
 
   def test_dataset_ellipse(self):
     with tempfile.TemporaryDirectory() as tempdir:
@@ -1295,6 +1348,40 @@ class ToJaxTest(parameterized.TestCase):
     ├─(pos)─ value=7
     └─(neg)─ value=6
 """,
+    )
+
+
+class BitmapTest(parameterized.TestCase):
+
+  @parameterized.parameters(
+      ([], []),
+      ([1], [0b0001]),
+      ([0], [0b0000]),
+      ([0, 1], [0b0010]),
+      ([1, 0, 0, 1] * 8, [0b_1001_1001_1001_1001_1001_1001_1001_1001]),
+      (
+          [1, 0, 0, 1] * 8 + [1],
+          [0b_1001_1001_1001_1001_1001_1001_1001_1001, 0b0001],
+      ),
+  )
+  def test_compress_bitmap(self, src, expected):
+    np.testing.assert_equal(to_jax.compress_bitmap(src), expected)
+
+  @parameterized.parameters(
+      ([1], 0, True),
+      ([1, 0, 0, 1], 0, True),
+      ([1, 0, 0, 1], 1, False),
+      ([1, 0, 0, 1], 2, False),
+      ([1, 0, 0, 1], 3, True),
+      ([0] * 31 + [1], 31, True),
+      ([0] * 31 + [0], 31, False),
+      ([0] * 32 + [1], 32, True),
+      ([0] * 32 + [0], 32, False),
+  )
+  def test_get_bit(self, bitmap, query, expected):
+    np.testing.assert_equal(
+        to_jax.get_bit(jnp.array(to_jax.compress_bitmap(bitmap)), query),
+        jnp.bool_(expected),
     )
 
 

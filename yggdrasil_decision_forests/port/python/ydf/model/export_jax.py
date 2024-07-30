@@ -18,6 +18,7 @@ import array
 import dataclasses
 import enum
 import functools
+import math
 from typing import Any, Sequence, Dict, Optional, List, Set, Tuple, Callable, Union, MutableSequence
 
 import numpy as np
@@ -57,18 +58,34 @@ class ConditionType(enum.IntEnum):
   SPARSE_OBLIQUE = 2
 
 
-def compact_dtype(values: Sequence[int]) -> Any:
-  """Selects the most compact dtype to represent a list of signed integers.
+@enum.unique
+class Compatibility(enum.Enum):
+  """Constraint on the YDF->JAX conversion to runtime compatibility.
 
-  Only supports: int{8, 16, 32}.
+  Attributes:
+    XLA: Running on XLA.
+    TFL: Running on TensorFlow Lite.
+  """
+
+  XLA = "XLA"
+  TFL = "TFL"
+
+
+def compact_dtype(
+    values: Sequence[int], supported_dtypes: Optional[Sequence[Any]] = None
+) -> Any:
+  """Selects the first dtype in a list that can encode given signed integers.
+
+  If not provided, "supported_dtypes" defaults to int{8, 16, 32}.
 
   Note: Jax operations between unsigned and signed integers can be expensive.
 
   Args:
-    values: List of integer values.
+    values: Sequence of integer values that can be encoded.
+    supported_dtypes: Ordered candidate dtypes.
 
   Returns:
-    Dtype compatible with all the values.
+    First dtype in "supported_dtypes" compatible with "values".
   """
 
   if not values:
@@ -76,6 +93,22 @@ def compact_dtype(values: Sequence[int]) -> Any:
 
   min_value = min(values)
   max_value = max(values)
+
+  if supported_dtypes is None:
+    supported_dtypes = [jnp.int8, jnp.int16, jnp.int32]
+
+  for candidate in supported_dtypes:
+    info = jnp.iinfo(candidate)
+    if min_value >= info.min and max_value <= info.max:
+      return candidate
+  raise ValueError("No supported compact dtype")
+
+
+def compact_dtype_on_sequence_sequence(values: Sequence[Sequence[int]]) -> Any:
+  """Same as "compact_dtype", but operate on sequence of sequences."""
+
+  min_value = min(min(v) for v in values)
+  max_value = max(max(v) for v in values)
 
   for candidate in [jnp.int8, jnp.int16, jnp.int32]:
     info = jnp.iinfo(candidate)
@@ -109,10 +142,12 @@ class FeatureEncoder:
       categorical-string value to categorical-integer value.
     categorical_out_of_vocab_item: Integer value representing an out of
       vocabulary item.
+    categorical_missing_value: How to represent a missing categorical value.
   """
 
   categorical: Dict[str, Dict[str, int]]
   categorical_out_of_vocab_item: int = 0
+  categorical_missing_value: int = -1
 
   @classmethod
   def build(
@@ -169,27 +204,8 @@ class FeatureEncoder:
       categorical_map = self.categorical.get(name)
 
       if categorical_map is not None:
-
-        def to_key(value: Any) -> str:
-          """Converts a feature value to the format of a categorical map key."""
-          if isinstance(value, str):
-            return value
-          if isinstance(value, (bytes, np.bytes_)):
-            return value.decode("utf-8")
-          if isinstance(value, (bool, np.bool_)):
-            return str(value).lower()
-          if isinstance(value, (int, np.integer)):
-            return str(value)
-          # The YDF to Jax exporter does not support categorical sets, hence the
-          # value cannot be a list or a numpy array.
-          raise ValueError(
-              f"Unexpected categorical value type for feature {name!r}."
-              " Categorical features can be strings, bytes literals, integers,"
-              f" or booleans. Got {type(value)}."
-          )
-
         values = [
-            categorical_map.get(to_key(v), self.categorical_out_of_vocab_item)
+            self._encode_categorical_string_value(categorical_map, name, v)
             for v in values
         ]
 
@@ -199,6 +215,37 @@ class FeatureEncoder:
         name: encode_feature(name, values)
         for name, values in feature_values.items()
     }
+
+  def _normalize_categorical_string_value(self, name: str, value: Any) -> str:
+    """Normalizes a categorical string value into a str."""
+    if isinstance(value, str):
+      return value
+    if isinstance(value, (bytes, np.bytes_)):
+      return value.decode("utf-8")
+    if isinstance(value, (bool, np.bool_)):
+      return str(value).lower()
+    if isinstance(value, (int, np.integer)):
+      return str(value)
+    # The YDF to Jax exporter does not support categorical sets, hence the
+    # value cannot be a list or a numpy array.
+    raise ValueError(
+        f"Unexpected categorical value type for feature {name!r}."
+        " Categorical features can be strings, bytes literals, integers,"
+        f" or booleans. Got {type(value)}."
+    )
+
+  def _encode_categorical_string_value(
+      self, categorical_map: Dict[str, int], name: str, value: Any
+  ) -> int:
+    """Encodes a categorical string value into an integer."""
+    if isinstance(value, float) and math.isnan(value):
+      return self.categorical_missing_value
+    normalized_value = self._normalize_categorical_string_value(name, value)
+    if not normalized_value:
+      return self.categorical_missing_value
+    return categorical_map.get(
+        normalized_value, self.categorical_out_of_vocab_item
+    )
 
 
 @dataclasses.dataclass
@@ -475,7 +522,6 @@ class InternalForest:
     positive_children: Node offset of the positive children for each non-leaf
       node in the forest.
     condition_types: Condition type for each non-leaf nodes in the forest.
-    root_nodes: Index of the root node for each of the trees.
     begin_non_leaf_nodes: Index of the first non leaf node for each of the
       trees.
     begin_leaf_nodes: Index of the first leaf node for each of the trees.
@@ -511,9 +557,6 @@ class InternalForest:
   condition_types: ArrayInt = dataclasses.field(
       default_factory=lambda: array.array("l", [])
   )
-  root_nodes: ArrayInt = dataclasses.field(
-      default_factory=lambda: array.array("l", [])
-  )
   begin_non_leaf_nodes: ArrayInt = dataclasses.field(
       default_factory=lambda: array.array("l", [])
   )
@@ -543,10 +586,9 @@ class InternalForest:
     self.negative_children = array.array("l", [])
     self.positive_children = array.array("l", [])
     self.condition_types = array.array("l", [])
-    self.root_nodes = array.array("l", [])
     self.begin_non_leaf_nodes = array.array("l", [])
     self.begin_leaf_nodes = array.array("l", [])
-    self.catgorical_mask = array.array("l", [])
+    self.catgorical_mask = array.array("b", [])
     self.oblique_weights = array.array("f", [])
     self.oblique_attributes = array.array("l", [])
     # Note: We don't release "initial_predictions".
@@ -589,13 +631,12 @@ class InternalForest:
     self.begin_leaf_nodes.append(begin_node_idx.leaf_node)
     self.begin_non_leaf_nodes.append(begin_node_idx.non_leaf_node)
 
-    root_node = self._add_node(tree.root, begin_node_idx, depth=0)
-    self.root_nodes.append(root_node.offset(begin_node_idx))
+    self._add_node(tree.root, begin_node_idx, depth=0)
 
   def num_trees(self) -> int:
     """Number of trees in the forest."""
 
-    return len(self.root_nodes)
+    return len(self.begin_leaf_nodes)
 
   def num_non_leaf_nodes(self) -> int:
     """Number of non leaf nodes in the forest so far."""
@@ -738,6 +779,7 @@ class InternalForestJaxArrays:
   """Jax arrays for each of the data fields in InternalForest."""
 
   forest: dataclasses.InitVar[InternalForest]
+  compatibility: Compatibility = dataclasses.field(default=Compatibility.XLA)
   leaf_outputs: Optional[jax.Array] = dataclasses.field(init=False)
   split_features: jax.Array = dataclasses.field(init=False)
   split_parameters: jax.Array = dataclasses.field(init=False)
@@ -745,7 +787,6 @@ class InternalForestJaxArrays:
   positive_children: jax.Array = dataclasses.field(init=False)
   dense_condition_mapping: Dict[int, int] = dataclasses.field(init=False)
   dense_condition_types: Optional[jax.Array] = dataclasses.field(init=False)
-  root_nodes: jax.Array = dataclasses.field(init=False)
   begin_non_leaf_nodes: jax.Array = dataclasses.field(init=False)
   begin_leaf_nodes: jax.Array = dataclasses.field(init=False)
   catgorical_mask: Optional[jax.Array] = dataclasses.field(init=False)
@@ -753,14 +794,51 @@ class InternalForestJaxArrays:
   oblique_attributes: Optional[jax.Array] = dataclasses.field(init=False)
   initial_predictions: Optional[jax.Array] = dataclasses.field(init=False)
 
+  # The dtype used to do integer arithmetic operations (e.g., modulo, bitshift,
+  # array index). Only a few variables of this dtype are allocated i.e. this is
+  # not a storage type. Theoretically, `arithmetic_int_dtype` could be any dtype
+  # great or equal to `node_idx_dtype`. For simplicity, and to maximize the
+  # change for compatible arithmetic kernel to be available, we hardcode this
+  # dtype.
+  #
+  # Note: TFL has limited support for arithmetic operations with some dtypes.
+  arithmetic_int_dtype: Any = jnp.int32
+
+  def cast_arithmetic_array(self, value: jax.Array):
+    """Casts a value to "arithmetic_int_dtype"."""
+    return value.astype(dtype=self.arithmetic_int_dtype, copy=False)
+
+  def cast_gather_index(self, idx):
+    """Casts an index to be used for a gather."""
+    if self.compatibility == Compatibility.XLA:
+      return idx
+    elif self.compatibility == Compatibility.TFL:
+      return self.arithmetic_int_dtype(idx)
+    else:
+      raise ValueError(f"Unknown compatibility {self.compatibility!r}")
+
   def __post_init__(self, forest: InternalForest):
     asarray = jax.numpy.asarray
+
+    # Precision to store node offsets
+    node_offset_dtype = compact_dtype_on_sequence_sequence(
+        [forest.positive_children, forest.negative_children]
+    )
+
+    # Precision to store node absolute positions
+    node_idx_dtype = compact_dtype(
+        [len(forest.leaf_outputs), len(forest.split_features)]
+    )
 
     self.leaf_outputs = asarray(forest.leaf_outputs, dtype=jnp.float32)
     self.split_features = to_compact_jax_array(forest.split_features)
     self.split_parameters = asarray(forest.split_parameters, dtype=jnp.float32)
-    self.negative_children = to_compact_jax_array(forest.negative_children)
-    self.positive_children = to_compact_jax_array(forest.positive_children)
+    self.negative_children = jnp.array(
+        forest.negative_children, dtype=node_offset_dtype
+    )
+    self.positive_children = jnp.array(
+        forest.positive_children, dtype=node_offset_dtype
+    )
 
     self.dense_condition_mapping, dense_condition_types = _densify_conditions(
         forest.condition_types
@@ -770,14 +848,17 @@ class InternalForestJaxArrays:
     else:
       self.dense_condition_types = to_compact_jax_array(dense_condition_types)
 
-    self.root_nodes = to_compact_jax_array(forest.root_nodes)
-    self.begin_non_leaf_nodes = to_compact_jax_array(
-        forest.begin_non_leaf_nodes
+    self.begin_non_leaf_nodes = jnp.array(
+        forest.begin_non_leaf_nodes, dtype=node_idx_dtype
     )
-    self.begin_leaf_nodes = to_compact_jax_array(forest.begin_leaf_nodes)
+    self.begin_leaf_nodes = jnp.array(
+        forest.begin_leaf_nodes, dtype=node_idx_dtype
+    )
 
     if forest.catgorical_mask:
-      self.catgorical_mask = asarray(forest.catgorical_mask, dtype=jnp.bool_)
+      self.catgorical_mask = asarray(
+          compress_bitmap(forest.catgorical_mask), dtype=jnp.uint32
+      )
     else:
       self.catgorical_mask = None
 
@@ -801,6 +882,7 @@ def to_jax_function(
     jit: bool = True,
     apply_activation: bool = True,
     leaves_as_params: bool = False,
+    compatibility: Union[str, Compatibility] = Compatibility.XLA,
 ) -> JaxModel:
   """Converts a model into a JAX function.
 
@@ -844,7 +926,10 @@ def to_jax_function(
         f" initial_predictions. Got {forest.initial_predictions!r}"
     )
 
-  jax_arrays = InternalForestJaxArrays(forest)
+  if isinstance(compatibility, str):
+    compatibility = Compatibility[compatibility]
+
+  jax_arrays = InternalForestJaxArrays(forest, compatibility)
   forest.clear_array_data()
 
   if not apply_activation:
@@ -919,7 +1004,8 @@ def _predict_fn(
     """Compute model predictions on a single example."""
 
     def predict_one_example_one_tree(
-        root_node, begin_non_leaf_node, begin_leaf_node
+        begin_non_leaf_node,
+        begin_leaf_node,
     ):
       """Generates the prediction of a single tree on a single example."""
 
@@ -927,15 +1013,21 @@ def _predict_fn(
           0,
           forest.max_depth,
           functools.partial(
-              _get_leaf_idx,
+              _route_example_or_wait,
               begin_non_leaf_node=begin_non_leaf_node,
               intern_feature_values=intern_feature_values,
               jax_arrays=jax_arrays,
           ),
-          root_node,
+          jax_arrays.arithmetic_int_dtype(0),
           unroll=True,
       )
-      value_idx = begin_leaf_node - 1 - node_offset_idx
+
+      value_idx = (
+          jax_arrays.arithmetic_int_dtype(begin_leaf_node)
+          - jax_arrays.arithmetic_int_dtype(1)
+          - node_offset_idx
+      )
+      assert value_idx.dtype == jax_arrays.arithmetic_int_dtype
 
       if jax_arrays.leaf_outputs is None:
         leaf_outputs = params[_PARAM_LEAF_VALUES]
@@ -945,7 +1037,6 @@ def _predict_fn(
 
     # Compute forest prediction.
     all_predictions = jax.vmap(predict_one_example_one_tree)(
-        jax_arrays.root_nodes,
         jax_arrays.begin_non_leaf_nodes,
         jax_arrays.begin_leaf_nodes,
     )
@@ -982,18 +1073,16 @@ def _predict_fn(
   return jax.vmap(predict_one_example)(intern_feature_values)
 
 
-def _get_leaf_idx(
-    iter_idx,
+def _route_example(
     node_offset,
     begin_non_leaf_node,
     intern_feature_values: Dict[str, jax.Array],
     jax_arrays: InternalForestJaxArrays,
 ):
-  """Finds the leaf reached by an example using a routing algorithm.
+  """Returns the routed child node index.
 
   Args:
     iter_idx: Iterator index. Not used.
-    node_offset: Current node offset.
     begin_non_leaf_node: Index of the root node of the tree.
     intern_feature_values: Feature values.
     jax_arrays: JAX array data.
@@ -1001,28 +1090,30 @@ def _get_leaf_idx(
   Returns:
     Active child node offset.
   """
-  del iter_idx
 
-  node_idx = node_offset + begin_non_leaf_node
+  assert node_offset.dtype == jax_arrays.arithmetic_int_dtype
+  node_idx = node_offset + jax_arrays.arithmetic_int_dtype(begin_non_leaf_node)
 
   # Implementation of the various conditions.
 
   def condition_greater_than(node_idx):
     """Evaluates a "greater-than" condition."""
-    feature_value = intern_feature_values["numerical"][
-        jax_arrays.split_features[node_idx]
+    feature_values = intern_feature_values["numerical"]
+    feature_value = feature_values[
+        jax_arrays.cast_gather_index(jax_arrays.split_features[node_idx])
     ]
     return feature_value >= jax_arrays.split_parameters[node_idx]
 
   def condition_is_in(node_idx):
     """Evaluates a "is-in" condition."""
-    feature_value = intern_feature_values["categorical"][
-        jax_arrays.split_features[node_idx]
+    feature_values = intern_feature_values["categorical"]
+    feature_value = feature_values[
+        jax_arrays.cast_gather_index(jax_arrays.split_features[node_idx])
     ]
     categorical_mask_offset = feature_value + jax.lax.bitcast_convert_type(
-        jax_arrays.split_parameters[node_idx], jnp.uint32
+        jax_arrays.split_parameters[node_idx], jnp.int32
     )
-    return jax_arrays.catgorical_mask[categorical_mask_offset]
+    return get_bit(jax_arrays.catgorical_mask, categorical_mask_offset)
 
   def condition_sparse_oblique(node_idx):
     """Evaluates a sparse oblique condition."""
@@ -1030,7 +1121,8 @@ def _get_leaf_idx(
     offset = jax.lax.bitcast_convert_type(
         jax_arrays.split_parameters[node_idx], jnp.int32
     )
-    bias = jax_arrays.oblique_weights[offset + num_weights]
+    bias_offset = offset + jnp.int32(num_weights)
+    bias = jax_arrays.oblique_weights[bias_offset]
     numerical_features = intern_feature_values["numerical"]
 
     def sum_iter(i, a):
@@ -1040,10 +1132,8 @@ def _get_leaf_idx(
           * jax_arrays.oblique_weights[i]
       )
 
-    weighted_sum = jax.lax.fori_loop(
-        offset, num_weights + offset, sum_iter, -bias
-    )
-    return weighted_sum >= 0
+    weighted_sum = jax.lax.fori_loop(offset, bias_offset, sum_iter, -bias)
+    return weighted_sum >= 0.0
 
   # Assemble the condition map.
   condition_fns = [None] * len(jax_arrays.dense_condition_mapping)
@@ -1075,10 +1165,43 @@ def _get_leaf_idx(
         node_idx,
     )
 
-  new_node_offset_if_non_leaf = jax.lax.select(
-      condition_value,
-      jax_arrays.positive_children[node_idx],
-      jax_arrays.negative_children[node_idx],
+  return jax_arrays.arithmetic_int_dtype(
+      jax.lax.select(
+          condition_value,
+          jax_arrays.positive_children[node_idx],
+          jax_arrays.negative_children[node_idx],
+      )
+  )
+
+
+def _route_example_or_wait(
+    iter_idx,
+    node_offset,
+    begin_non_leaf_node,
+    intern_feature_values: Dict[str, jax.Array],
+    jax_arrays: InternalForestJaxArrays,
+):
+  """Returns the routed child node index.
+
+  If the node is a leaf, return "node_offset".
+
+  Args:
+    iter_idx: Iterator index. Not used.
+    node_offset: Current node offset.
+    begin_non_leaf_node: Index of the root node of the tree.
+    intern_feature_values: Feature values.
+    jax_arrays: JAX array data.
+
+  Returns:
+    Active child node offset.
+  """
+  del iter_idx
+
+  new_node_offset_if_non_leaf = _route_example(
+      node_offset=node_offset,
+      begin_non_leaf_node=begin_non_leaf_node,
+      intern_feature_values=intern_feature_values,
+      jax_arrays=jax_arrays,
   )
 
   # Repeats forever the leaf node if we are already in a leaf node.
@@ -1142,3 +1265,45 @@ def _update_node_with_jax_param(
     assert isinstance(node, tree_lib.NonLeaf)
     _update_node_with_jax_param(node.neg_child, cur_node, leaf_values)
     _update_node_with_jax_param(node.pos_child, cur_node, leaf_values)
+
+
+def get_bit(mask, i):
+  """Gets the i-th bit of a dense bitmap stored in a uint32 array."""
+  working_dtype = jnp.int32
+  ui = working_dtype(i)
+  item_idx = jax.lax.div(ui, working_dtype(32))
+  bit_idx = ui - item_idx * working_dtype(32)
+  # TODO: Use this next form when "remainder_v1" op is implemented in vhlo.
+  # bit_idx = jax.lax.rem(ui, np.uint32(32))
+  bit_mask = jax.lax.shift_left(working_dtype(1), bit_idx)
+  # TODO: Remove "jnp.int32" cast below once TFL supports uint32 indexing.
+  return (
+      jax.lax.bitwise_and(
+          mask[jnp.int32(item_idx)].astype(working_dtype), bit_mask
+      )
+      != 0
+  )
+
+
+def compress_bitmap(src_items: Sequence[int]) -> np.ndarray:
+  """Packs a one-uint8-per-item bitmap to one-uint32-per-32-items.
+
+  TFL does not represent bool array efficiently. Therefore, we need to pack them
+  manually.
+
+  Any other integer representation would work (e.g., int8, int16). However, TFL
+  have currently better support for int32 values.
+
+  Args:
+    src_items: Bool bitmap array.
+
+  Returns:
+    Bitmap array encoded as a sequence of uint32s.
+  """
+
+  num_output_elements = (len(src_items) + 31) // 32
+  dst_items = np.zeros(num_output_elements, dtype=np.uint32)
+  for idx, value in enumerate(src_items):
+    if value:
+      dst_items[idx // 32] |= 1 << idx % 32
+  return dst_items

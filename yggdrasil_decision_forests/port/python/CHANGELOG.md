@@ -13,6 +13,8 @@
 -   Models can be pickled safely.
 -   Native support for Xarray as a dataset format for all operations (e.g.,
     training, evaluation, predictions).
+-   The output of `model.to_jax_function` can then be converted to a TensorFlow
+    Lite model.
 
 ### Fix
 

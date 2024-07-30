@@ -986,6 +986,7 @@ Use `model.describe()` for more details
       jit: bool = True,
       apply_activation: bool = True,
       leaves_as_params: bool = False,
+      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",
   ) -> "export_jax.JaxModel":
     """Converts the YDF model into a JAX function.
 
@@ -1022,6 +1023,8 @@ Use `model.describe()` for more details
       leaves_as_params: If true, exports the leaf values as learnable
         parameters. In this case, `params` is set in the returned value, and it
         should be passed to `predict(feature_values, params)`.
+      compatibility: Constraint on the YDF->JAX conversion to runtime
+        compatibility. Can be "XLA" (default), and "TFL" (for TensorFlow Lite).
 
     Returns:
       A dataclass containing the JAX prediction function (`predict`) and
@@ -1034,6 +1037,7 @@ Use `model.describe()` for more details
         jit=jit,
         apply_activation=apply_activation,
         leaves_as_params=leaves_as_params,
+        compatibility=compatibility,
     )
 
   def update_with_jax_params(self, params: Dict[str, Any]):
