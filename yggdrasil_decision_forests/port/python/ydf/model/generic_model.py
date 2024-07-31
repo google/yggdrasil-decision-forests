@@ -17,6 +17,7 @@
 import dataclasses
 import enum
 import os
+import platform
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, TypeVar, Union
 
 from absl import logging
@@ -675,6 +676,7 @@ Use `model.describe()` for more details
       temp_dir: Optional[str] = None,
       tensor_specs: Optional[Dict[str, Any]] = None,
       feature_specs: Optional[Dict[str, Any]] = None,
+      force: bool = False,
   ) -> None:
     """Exports the model as a TensorFlow Saved model.
 
@@ -882,7 +884,15 @@ Use `model.describe()` for more details
         that expects different features than what the model was trained with.
         This argument is ignored when exporting model with
         `feed_example_proto=False`. Only compatible with mode="tf".
+      force: Try to export even in currently unsupported environments. WARNING:
+        Setting this to true may crash the Python runtime.
     """
+    if platform.system() == "Darwin" and not force:
+      raise ValueError(
+          "Exporting to TensorFlow is currently broken on MacOS and may crash"
+          " the current Python process. To proceed anyway, add parameter"
+          " `force=True`."
+      )
 
     if mode == "keras":
       log.warning(
@@ -913,6 +923,7 @@ Use `model.describe()` for more details
       temp_dir: Optional[str] = None,
       can_be_saved: bool = True,
       squeeze_binary_classification: bool = True,
+      force: bool = False,
   ) -> "tensorflow.Module":
     """Converts the YDF model into a @tf.function callable TensorFlow Module.
 
@@ -969,10 +980,18 @@ Use `model.describe()` for more details
         classification, outputs a tensorflow of shape [num examples, 2]
         containing the probability of both the negative and positive classes.
         Has no effect on non-binary classification models.
+      force: Try to export even in currently unsupported environments. WARNING:
+        Setting this to true may crash the Python runtime.
 
     Returns:
       A TensorFlow @tf.function.
     """
+    if platform.system() == "Darwin" and not force:
+      raise ValueError(
+          "Exporting to TensorFlow is currently broken on MacOS and may crash"
+          " the current Python process. To proceed anyway, add parameter"
+          " `force=True`."
+      )
 
     return _get_export_tf().ydf_model_to_tf_function(
         ydf_model=self,
