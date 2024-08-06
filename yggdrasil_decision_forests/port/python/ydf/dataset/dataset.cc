@@ -538,6 +538,7 @@ absl::Status PopulateColumnCategoricalSetNPBytes(
     const int min_vocab_frequency, std::optional<int> column_idx,
     const std::optional<py::array> dictionary) {
   ASSIGN_OR_RETURN(const auto bank, NPByteArray::Create(data_bank));
+  StridedSpan<int64_t> boundaries(data_boundaries);
 
   CategoricalSetColumn* column;
   if (!column_idx.has_value()) {
@@ -577,15 +578,16 @@ absl::Status PopulateColumnCategoricalSetNPBytes(
   }
 
   int bank_size = bank.size();
-  for (size_t boundary_idx = 0; boundary_idx < data_boundaries.size();
+  std::vector<int32_t> dst_values;
+  for (size_t boundary_idx = 0; boundary_idx < boundaries.size();
        boundary_idx++) {
-    const auto left_boundary = data_boundaries.at(boundary_idx);
+    const auto left_boundary = boundaries[boundary_idx];
     int right_boundary = bank_size;
 
-    if (boundary_idx + 1 < data_boundaries.size()) {
-      right_boundary = data_boundaries.at(boundary_idx + 1);
+    if (boundary_idx + 1 < boundaries.size()) {
+      right_boundary = boundaries[boundary_idx + 1];
     }
-    std::vector<int32_t> dst_values;
+    dst_values.clear();
     for (size_t value_idx = left_boundary; value_idx < right_boundary;
          value_idx++) {
       const auto value = bank[value_idx];
@@ -596,7 +598,8 @@ absl::Status PopulateColumnCategoricalSetNPBytes(
         dst_values.push_back(it->second.index());
       }
     }
-    column->Add(dst_values.begin(), dst_values.end());
+    std::sort(dst_values.begin(), dst_values.end());
+    column->AddVector(dst_values);
   }
 
   return absl::OkStatus();

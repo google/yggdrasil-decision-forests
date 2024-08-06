@@ -25,6 +25,7 @@
 -   Fix isolation forest hyperparameter defaults.
 -   Fix bug causing distributed training to fail on a sharded dataset containing
     an empty shard.
+-   Handle unordered categorical sets in training.
 
 ## 0.6.0 - 2024-07-04
 

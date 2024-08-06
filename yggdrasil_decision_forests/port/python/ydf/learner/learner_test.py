@@ -98,9 +98,10 @@ class LearnerTest(parameterized.TestCase):
       - Make sure predictions of original model and serialized model match.
 
     Args:
-      learner: A learner for on the adult dataset.
-      minimum_accuracy: minimum accuracy.
+      learner: A learner on the adult dataset.
+      minimum_accuracy: Minimum accuracy.
       check_serialization: If true, check the serialization of the model.
+      valid: Optional validation dataset.
 
     Returns:
       The model, its evaluation and the predictions on the test dataset.
@@ -258,6 +259,29 @@ class RandomForestLearnerTest(LearnerTest):
         learner.train(test_utils.toy_dataset()).task(),
         generic_learner.Task.REGRESSION,
     )
+
+  def test_model_type_regression_unordered_set_indices(self):
+    ds = pd.DataFrame({
+        "col_cat_set": [
+            ["A", "A"],
+            ["A", "B"],
+            ["A", "B"],
+            ["C", "B"],
+            ["C", "B"],
+        ],
+        "binary_int_label": [0, 0, 1, 1, 1],
+    })
+    learner = specialized_learners.RandomForestLearner(
+        label="binary_int_label",
+        num_trees=1,
+        task=generic_learner.Task.REGRESSION,
+        min_vocab_frequency=1,
+        num_candidate_attributes_ratio=1.0,
+        bootstrap_training_dataset=False,
+        min_examples=1,
+        categorical_set_split_greedy_sampling=1.0,
+    )
+    _ = learner.train(ds)
 
   def test_model_type_classification_string_label(self):
     learner = specialized_learners.RandomForestLearner(

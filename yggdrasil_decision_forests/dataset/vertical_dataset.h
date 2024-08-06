@@ -223,6 +223,9 @@ class VerticalDataset {
     // Add a value.
     template <typename Iter>
     void Add(Iter begin, Iter end) {
+      DCHECK((type() != proto::ColumnType::CATEGORICAL_SET &&
+              type() != proto::ColumnType::NUMERICAL_SET) ||
+             std::is_sorted(begin, end));
       const size_t begin_idx = bank_.size();
       bank_.insert(bank_.end(), begin, end);
       values_.emplace_back(begin_idx, bank_.size());
@@ -231,6 +234,9 @@ class VerticalDataset {
     // Set a value.
     template <typename Iter>
     void SetIter(const row_t row, Iter begin, Iter end) {
+      DCHECK((type() != proto::ColumnType::CATEGORICAL_SET &&
+              type() != proto::ColumnType::NUMERICAL_SET) ||
+             std::is_sorted(begin, end));
       const size_t begin_idx = bank_.size();
       bank_.insert(bank_.end(), begin, end);
       values_[row] = {begin_idx, bank_.size()};
