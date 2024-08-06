@@ -374,7 +374,7 @@ def create_vertical_dataset(
         required_columns,
         data_spec=data_spec,
         inference_args=None,
-        dont_unroll_columns=dont_unroll_columns,
+        single_dim_columns=dont_unroll_columns,
         label=label,
     )
   else:
@@ -393,7 +393,7 @@ def create_vertical_dataset(
         required_columns,
         inference_args=inference_args,
         data_spec=None,
-        dont_unroll_columns=dont_unroll_columns,
+        single_dim_columns=dont_unroll_columns,
         label=label,
     )
 
@@ -403,7 +403,7 @@ def create_vertical_dataset_with_spec_or_args(
     required_columns: Optional[Sequence[str]],
     inference_args: Optional[dataspec.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
-    dont_unroll_columns: Optional[Sequence[str]] = None,
+    single_dim_columns: Optional[Sequence[str]] = None,
     label: Optional[str] = None,
 ) -> VerticalDataset:
   """Returns a vertical dataset from inference args or data spec (not both!)."""
@@ -419,10 +419,22 @@ def create_vertical_dataset_with_spec_or_args(
         data, required_columns, inference_args, data_spec
     )
   else:
+    # Ignore unrolling for list or set features.
+    if inference_args is None or inference_args.columns is None:
+      not_unrolled_multi_dim_columns = None
+    else:
+      not_unrolled_multi_dim_columns = [
+          c.name
+          for c in inference_args.columns
+          if c.semantic == dataspec.Semantic.CATEGORICAL_SET
+      ]
+
     # Convert the data to an in-memory dictionary of numpy array.
     # Also unroll multi-dimensional features.
     data_dict, unroll_feature_info = dataset_io.cast_input_dataset_to_dict(
-        data, dont_unroll_columns=dont_unroll_columns
+        data,
+        single_dim_columns=single_dim_columns,
+        not_unrolled_multi_dim_columns=not_unrolled_multi_dim_columns,
     )
     return create_vertical_dataset_from_dict_of_values(
         data_dict,
@@ -567,7 +579,7 @@ def create_vertical_dataset_from_dict_of_values(
 
         raise ValueError(
             f"{error_prefix}Missing required column {column_spec.name!r}.\nThe"
-            f" available unrolled  columns are: {list(data)}.\nThe required"
+            f" available unrolled columns are: {list(data)}.\nThe required"
             f" unrolled columns are: {required_columns}"
         )
 

@@ -1007,6 +1007,37 @@ B,3""")
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
+  def test_multidimensional_catset_object(self):
+    ds = dataset.create_vertical_dataset(
+        {"feature": np.array([[0, 1, 2], [4, 5, 6]], dtype=np.object_)},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                dtype=ds_pb.DType.DTYPE_BYTES,
+                count_nas=0,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=7,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "0": VocabValue(index=1, count=1),
+                        "1": VocabValue(index=2, count=1),
+                        "2": VocabValue(index=3, count=1),
+                        "4": VocabValue(index=4, count=1),
+                        "5": VocabValue(index=5, count=1),
+                        "6": VocabValue(index=6, count=1),
+                    },
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
   def test_multidimensional_ragged_catset_int(self):
     ds = dataset.create_vertical_dataset(
         {
@@ -1402,7 +1433,7 @@ foo, bar, sentence, second
 """,
     )
 
-  def test_pd_list_of_list(self):
+  def test_pd_ragged_list_of_lists(self):
     df = pd.DataFrame({
         "feature": [
             ["single item"],
@@ -1452,6 +1483,42 @@ foo, bar, sentence, second
       )
 
   def test_pd_np_bytes(self):
+    df = pd.DataFrame({
+        "feature": [
+            np.array(["foo", "bar", "sentence", "first"]),
+            np.array(["foo", "bar", "sentence", "second"]),
+        ]
+    })
+    ds = dataset.create_vertical_dataset(
+        df,
+        min_vocab_frequency=1,
+        columns=[("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                dtype=ds_pb.DType.DTYPE_BYTES,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "bar": VocabValue(index=1, count=2),
+                        "foo": VocabValue(index=2, count=2),
+                        "sentence": VocabValue(index=3, count=2),
+                        "first": VocabValue(index=4, count=1),
+                        "second": VocabValue(index=5, count=1),
+                    },
+                    number_of_unique_values=6,
+                ),
+                count_nas=0,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_pd_ragged_np_bytes(self):
     df = pd.DataFrame({
         "feature": [
             np.array(["single item"], np.bytes_),

@@ -411,14 +411,14 @@ Hyper-parameters: ydf.{self._hyperparameters}
     else:
 
       # List of columns that cannot be unrolled.
-      dont_unroll_columns = [self._label]
+      single_dim_columns = [self._label]
       for column in [
           self._weights,
           self._ranking_group,
           self._uplift_treatment,
       ]:
         if column:
-          dont_unroll_columns.append(column)
+          single_dim_columns.append(column)
 
       effective_data_spec_args = None
       if self._data_spec is None:
@@ -428,7 +428,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
           data_spec=self._data_spec,
           inference_args=effective_data_spec_args,
           required_columns=None,  # All columns in the dataspec are required.
-          dont_unroll_columns=dont_unroll_columns,
+          single_dim_columns=single_dim_columns,
           label=self._label,
       )
 

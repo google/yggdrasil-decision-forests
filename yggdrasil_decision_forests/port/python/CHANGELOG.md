@@ -28,6 +28,8 @@
 -   Handle unordered categorical sets in training.
 -   Fix dataspec ignoring definitions of unrolled columns, such as
     multidimensional categorical integers.
+-   Fix error when defining categorical sets for non-ragged multidimensional
+    inputs.
 
 ## 0.6.0 - 2024-07-04
 
