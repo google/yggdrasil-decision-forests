@@ -558,7 +558,7 @@ four entries,4,8,4.4,0
   def test_order_boolean(self, values, expected_counts, count_nas):
     ds = dataset.create_vertical_dataset(
         {"col": np.array(values)},
-        columns=[Column("col", dataspec.Semantic.CATEGORICAL)],
+        columns=[Column("col", Semantic.CATEGORICAL)],
     )
     expected_data_spec = ds_pb.DataSpecification(
         created_num_rows=3,
@@ -584,7 +584,7 @@ four entries,4,8,4.4,0
   def test_order_integers(self):
     ds = dataset.create_vertical_dataset(
         {"col": np.array([0, 1, 4, 3, 1, 2, 3, 4, 12, 11, 10, 9, 8, 7, 6, 5])},
-        columns=[Column("col", dataspec.Semantic.CATEGORICAL)],
+        columns=[Column("col", Semantic.CATEGORICAL)],
         label="col",
     )
     expected_data_spec = ds_pb.DataSpecification(
@@ -882,7 +882,7 @@ B,3""")
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
-  def test_multidimensional_input(self):
+  def test_multidimensional_numerical(self):
     ds = dataset.create_vertical_dataset(
         {"feature": np.array([[0, 1, 2], [4, 5, 6]])}
     )
@@ -940,11 +940,78 @@ B,3""")
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
-  def test_multidimensional_ragged_input(self):
+  def test_multidimensional_categorical_int(self):
+    ds = dataset.create_vertical_dataset(
+        {"feature": np.array([[0, 1, 2], [4, 5, 6]])},
+        columns=[
+            Column("feature", Semantic.CATEGORICAL, min_vocab_frequency=1)
+        ],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature.0_of_3",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DType.DTYPE_INT64,
+                count_nas=0,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "0": VocabValue(index=1, count=1),
+                        "4": VocabValue(index=2, count=1),
+                    },
+                ),
+                is_unstacked=True,
+            ),
+            ds_pb.Column(
+                name="feature.1_of_3",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DType.DTYPE_INT64,
+                count_nas=0,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "1": VocabValue(index=1, count=1),
+                        "5": VocabValue(index=2, count=1),
+                    },
+                ),
+                is_unstacked=True,
+            ),
+            ds_pb.Column(
+                name="feature.2_of_3",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DType.DTYPE_INT64,
+                count_nas=0,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "2": VocabValue(index=1, count=1),
+                        "6": VocabValue(index=2, count=1),
+                    },
+                ),
+                is_unstacked=True,
+            ),
+        ),
+        unstackeds=(
+            ds_pb.Unstacked(
+                original_name="feature",
+                begin_column_idx=0,
+                size=3,
+                type=ds_pb.ColumnType.CATEGORICAL,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_multidimensional_ragged_catset_int(self):
     ds = dataset.create_vertical_dataset(
         {
             "feature": np.array(
-                [np.asarray([0, 1]), np.asarray([0, 1, 2, 3])], dtype=object
+                [np.array([0, 1]), np.array([0, 1, 2, 3])], dtype=np.object_
             )
         },
         min_vocab_frequency=2,
@@ -958,12 +1025,12 @@ B,3""")
                 dtype=ds_pb.DType.DTYPE_BYTES,
                 count_nas=0,
                 categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
                     items={
                         "<OOD>": VocabValue(index=0, count=2),
                         "0": VocabValue(index=1, count=2),
                         "1": VocabValue(index=2, count=2),
                     },
-                    number_of_unique_values=3,
                 ),
             ),
         ),
@@ -1774,7 +1841,7 @@ class MissingColumnsTest(parameterized.TestCase):
       self, column_type: ds_pb.ColumnType
   ):
     df = pd.DataFrame({"f1": [1, 2, 3]})
-    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    column_semantic = Semantic.from_proto_type(column_type)
     with self.assertRaises(ValueError):
       _ = dataset.create_vertical_dataset(
           df, columns=[("f1", column_semantic), ("f2", column_semantic)]
@@ -1784,7 +1851,7 @@ class MissingColumnsTest(parameterized.TestCase):
       self, column_type: ds_pb.ColumnType
   ):
     df = pd.DataFrame({"f1": [1, 2, 3]})
-    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    column_semantic = Semantic.from_proto_type(column_type)
     ds = dataset.create_vertical_dataset(
         df,
         columns=[("f1", column_semantic), ("f2", column_semantic)],
@@ -1804,7 +1871,7 @@ class MissingColumnsTest(parameterized.TestCase):
       self, column_type: ds_pb.ColumnType
   ):
     df = pd.DataFrame({"f1": [1, 2, 3]})
-    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    column_semantic = Semantic.from_proto_type(column_type)
     with self.assertRaises(ValueError):
       _ = dataset.create_vertical_dataset(df, columns=[("f2", column_semantic)])
 
@@ -1812,7 +1879,7 @@ class MissingColumnsTest(parameterized.TestCase):
       self, column_type: ds_pb.ColumnType
   ):
     df = pd.DataFrame({"f1": [1, 2, 3]})
-    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    column_semantic = Semantic.from_proto_type(column_type)
     ds = dataset.create_vertical_dataset(
         df,
         columns=[("f1", column_semantic), ("f2", column_semantic)],
@@ -1876,7 +1943,7 @@ class MissingColumnsTest(parameterized.TestCase):
       self, column_type: ds_pb.ColumnType
   ):
     file_path = self.create_csv()
-    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    column_semantic = Semantic.from_proto_type(column_type)
     with self.assertRaises(ValueError):
       _ = dataset.create_vertical_dataset(
           file_path, columns=[("f1", column_semantic), ("f2", column_semantic)]
@@ -1886,7 +1953,7 @@ class MissingColumnsTest(parameterized.TestCase):
       self, column_type: ds_pb.ColumnType
   ):
     file_path = self.create_csv()
-    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    column_semantic = Semantic.from_proto_type(column_type)
     ds = dataset.create_vertical_dataset(
         file_path,
         columns=[("f1", column_semantic), ("f2", column_semantic)],
@@ -1906,7 +1973,7 @@ class MissingColumnsTest(parameterized.TestCase):
       self, column_type: ds_pb.ColumnType
   ):
     file_path = self.create_csv()
-    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    column_semantic = Semantic.from_proto_type(column_type)
     with self.assertRaises(ValueError):
       _ = dataset.create_vertical_dataset(
           file_path, columns=[("f2", column_semantic)]
@@ -1916,7 +1983,7 @@ class MissingColumnsTest(parameterized.TestCase):
       self, column_type: ds_pb.ColumnType
   ):
     file_path = self.create_csv()
-    column_semantic = dataspec.Semantic.from_proto_type(column_type)
+    column_semantic = Semantic.from_proto_type(column_type)
     ds = dataset.create_vertical_dataset(
         file_path,
         columns=[("f1", column_semantic), ("f2", column_semantic)],

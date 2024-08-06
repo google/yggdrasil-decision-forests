@@ -26,6 +26,8 @@
 -   Fix bug causing distributed training to fail on a sharded dataset containing
     an empty shard.
 -   Handle unordered categorical sets in training.
+-   Fix dataspec ignoring definitions of unrolled columns, such as
+    multidimensional categorical integers.
 
 ## 0.6.0 - 2024-07-04
 
