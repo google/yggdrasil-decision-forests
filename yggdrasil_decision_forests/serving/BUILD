@@ -64,8 +64,8 @@ cc_library_ydf(
         "@com_google_absl//absl/strings:str_format",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@tensorflow_pypi//:libtensorflow_framework",
-            "@tensorflow_pypi//:tf_header_lib",
+            "@release_or_nightly//:tensorflow_libtensorflow_framework",
+            "@release_or_nightly//:tensorflow_tf_header_lib",
         ],
         "//conditions:default": [],
     }),
