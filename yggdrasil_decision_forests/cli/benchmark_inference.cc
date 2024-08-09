@@ -133,12 +133,12 @@ absl::Status Benchmark() {
       /*.runs =*/num_runs_options,
       /*.time =*/absl::nullopt};
 
-  YDF_LOG(INFO) << "Loading model";
+  LOG(INFO) << "Loading model";
   std::unique_ptr<model::AbstractModel> model;
   RETURN_IF_ERROR(model::LoadModel(model_path, &model));
-  YDF_LOG(INFO) << "The model is of type: " << model->name();
+  LOG(INFO) << "The model is of type: " << model->name();
 
-  YDF_LOG(INFO) << "Loading dataset";
+  LOG(INFO) << "Loading dataset";
   dataset::VerticalDataset dataset;
   RETURN_IF_ERROR(
       LoadVerticalDataset(dataset_path, model->data_spec(), &dataset,
@@ -148,10 +148,10 @@ absl::Status Benchmark() {
 
   // Run engines.
   const auto engine_factories = model->ListCompatibleFastEngines();
-  YDF_LOG(INFO) << "Found " << engine_factories.size()
-                << " compatible fast engines.";
+  LOG(INFO) << "Found " << engine_factories.size()
+            << " compatible fast engines.";
   for (const auto& engine_factory : engine_factories) {
-    YDF_LOG(INFO) << "Running " << engine_factory->name();
+    LOG(INFO) << "Running " << engine_factory->name();
     ASSIGN_OR_RETURN(auto engine, engine_factory->CreateEngine(model.get()));
     RETURN_IF_ERROR(utils::BenchmarkFastEngine(options, *engine.get(),
                                                *model.get(), dataset, &results,
@@ -159,7 +159,7 @@ absl::Status Benchmark() {
   }
 
   if (absl::GetFlag(FLAGS_generic)) {
-    YDF_LOG(INFO) << "Running the slow generic engine";
+    LOG(INFO) << "Running the slow generic engine";
     RETURN_IF_ERROR(
         utils::BenchmarkGenericSlowEngine(options, *model, dataset, &results));
   }
@@ -175,8 +175,7 @@ int main(int argc, char** argv) {
   InitLogging(kUsageMessage, &argc, &argv, true);
   const auto status = yggdrasil_decision_forests::Benchmark();
   if (!status.ok()) {
-    YDF_LOG(INFO) << "The benchmark failed with the following error: "
-                  << status;
+    LOG(INFO) << "The benchmark failed with the following error: " << status;
     return 1;
   }
   return 0;

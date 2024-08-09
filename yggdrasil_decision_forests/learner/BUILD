@@ -119,6 +119,7 @@ cc_library_ydf(
         ":abstract_learner_cc_proto",
         ":learner_library",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],

@@ -256,8 +256,8 @@ absl::Status AbstractModel::AppendPredictions(
     proto::Prediction prediction;
     for (dataset::VerticalDataset::row_t test_row_idx = 0;
          test_row_idx < dataset.nrow(); test_row_idx++) {
-      LOG_INFO_EVERY_N_SEC(30, _ << (test_row_idx + 1) << "/" << dataset.nrow()
-                                 << " predictions generated.");
+      LOG_EVERY_N_SEC(INFO, 30) << (test_row_idx + 1) << "/" << dataset.nrow()
+                                << " predictions generated.";
       Predict(dataset, test_row_idx, &prediction);
       if (add_ground_truth) {
         RETURN_IF_ERROR(SetGroundTruth(dataset, test_row_idx, &prediction));
@@ -275,7 +275,7 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
                             proto::Prediction* dst_prediction) {
   switch (task) {
     case proto::UNDEFINED:
-      YDF_LOG(WARNING) << "Undefined task";
+      LOG(WARNING) << "Undefined task";
       break;
     case proto::CLASSIFICATION: {
       auto* classification = dst_prediction->mutable_classification();
@@ -418,8 +418,8 @@ absl::Status AbstractModel::AppendEvaluation(
     proto::Prediction prediction;
     for (dataset::VerticalDataset::row_t test_row_idx = 0;
          test_row_idx < dataset.nrow(); test_row_idx++) {
-      LOG_INFO_EVERY_N_SEC(30, _ << (test_row_idx + 1) << "/" << dataset.nrow()
-                                 << " predictions evaluated.");
+      LOG_EVERY_N_SEC(INFO, 30) << (test_row_idx + 1) << "/" << dataset.nrow()
+                                << " predictions evaluated.";
       Predict(dataset, test_row_idx, &prediction);
       RETURN_IF_ERROR(SetGroundTruth(dataset, test_row_idx, &prediction));
       if (option.has_weights()) {
@@ -513,8 +513,8 @@ absl::Status AbstractModel::AppendEvaluationOverrideType(
   } else {
     for (dataset::VerticalDataset::row_t test_row_idx = 0;
          test_row_idx < dataset.nrow(); test_row_idx++) {
-      LOG_INFO_EVERY_N_SEC(30, _ << (test_row_idx + 1) << "/" << dataset.nrow()
-                                 << " predictions evaluated.");
+      LOG_EVERY_N_SEC(INFO, 30) << (test_row_idx + 1) << "/" << dataset.nrow()
+                                << " predictions evaluated.";
       Predict(dataset, test_row_idx, &original_prediction);
       RETURN_IF_ERROR(ChangePredictionType(
           task(), override_task, original_prediction, &overridden_prediction));
@@ -808,8 +808,8 @@ void AbstractModel::AppendDescriptionAndStatistics(
   const auto self_evaluation_description =
       metric::TextReport(ValidationEvaluation());
   if (self_evaluation_description.ok()) {
-    YDF_LOG(INFO) << "Model self evaluation:\n"
-                  << self_evaluation_description.value();
+    LOG(INFO) << "Model self evaluation:\n"
+              << self_evaluation_description.value();
   } else {
     absl::StrAppend(description, "Cannot compute model self evaluation:",
                     self_evaluation_description.status().message(), "\n");
@@ -1017,7 +1017,7 @@ void AppendVariableImportanceDescription(
 }
 
 metric::proto::EvaluationResults AbstractModel::ValidationEvaluation() const {
-  YDF_LOG(WARNING) << "Validation evaluation not supported for " << name();
+  LOG(WARNING) << "Validation evaluation not supported for " << name();
   return {};
 }
 
@@ -1294,12 +1294,12 @@ AbstractModel::BuildFastEngine(
 
   auto engine_or = engine_factory->CreateEngine(this);
   if (!engine_or.ok()) {
-    YDF_LOG(WARNING) << "The engine \"" << engine_factory->name()
-                     << "\" is compatible but could not be created: "
-                     << engine_or.status().message();
+    LOG(WARNING) << "The engine \"" << engine_factory->name()
+                 << "\" is compatible but could not be created: "
+                 << engine_or.status().message();
   } else {
-    LOG_INFO_EVERY_N_SEC(
-        10, _ << "Engine \"" << engine_factory->name() << "\" built");
+    LOG_EVERY_N_SEC(INFO, 10)
+        << "Engine \"" << engine_factory->name() << "\" built";
   }
   return engine_or;
 }

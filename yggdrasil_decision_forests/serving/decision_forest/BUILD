@@ -154,7 +154,6 @@ cc_library_ydf(
         "@com_google_absl//absl/base:config",
         "@com_google_absl//absl/numeric:bits",
         "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -250,6 +249,7 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/log",
         "@com_google_googletest//:gtest_main",
     ],
 )

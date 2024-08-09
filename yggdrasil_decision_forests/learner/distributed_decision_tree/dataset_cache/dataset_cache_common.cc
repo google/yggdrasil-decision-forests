@@ -199,7 +199,7 @@ absl::StatusOr<std::vector<float>> ExtractDiscretizedBoundariesWithDownsampling(
 
 bool HasAllRequiredFiles(absl::string_view cache_path, const int num_columns,
                          const int num_shards) {
-  YDF_LOG(INFO) << "Checking required files in partial cache.";
+  LOG(INFO) << "Checking required files in partial cache.";
 
   using model::distributed_decision_tree::dataset_cache::proto::
       PartialColumnShardMetadata;
@@ -224,8 +224,8 @@ bool HasAllRequiredFiles(absl::string_view cache_path, const int num_columns,
           const auto status = file::GetBinaryProto(shard_meta_data_path,
                                                    &ignore, file::Defaults());
           if (!status.ok()) {
-            YDF_LOG(INFO) << "Cannot parse " << shard_meta_data_path
-                          << ". Issue: " << status.message();
+            LOG(INFO) << "Cannot parse " << shard_meta_data_path
+                      << ". Issue: " << status.message();
             is_valid = false;
           }
         });

@@ -19,6 +19,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_SPLITTER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_SPLITTER_H_
 
+#include "absl/log/check.h"
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_scanner.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"

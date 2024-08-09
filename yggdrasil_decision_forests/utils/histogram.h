@@ -18,7 +18,7 @@
 // Usage example:
 //   std::vector<int> values = ...;
 //   const auto histogram = Histogram::MakeUniform(values);
-//   YDF_LOG(INFO) << "\n" << histogram.ToString();
+//   LOG(INFO) << "\n" << histogram.ToString();
 //
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_HISTOGRAM_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_HISTOGRAM_H_
@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/accurate_sum.h"

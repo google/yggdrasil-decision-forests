@@ -90,7 +90,7 @@ TEST(Report, HtmlReportClassification) {
 
   const auto path =
       file::JoinPath(test::TmpDirectory(), "report_classification.html");
-  YDF_LOG(INFO) << "path: " << path;
+  LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_report));
 }
 
@@ -136,7 +136,7 @@ TEST(Report, HtmlReportRegression) {
 
   const auto path =
       file::JoinPath(test::TmpDirectory(), "report_regression.html");
-  YDF_LOG(INFO) << "path: " << path;
+  LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_report));
 }
 
@@ -181,7 +181,7 @@ TEST(Report, HtmlReportAnomalyDetection) {
 
   const auto path =
       file::JoinPath(test::TmpDirectory(), "report_anomaly_detection.html");
-  YDF_LOG(INFO) << "path: " << path;
+  LOG(INFO) << "path: " << path;
   ASSERT_OK(file::SetContent(path, html_report));
 }
 }  // namespace

@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
 
   // Scan the columns of the dataset to create a dataspec.
   // Same as :infer_dataspec
-  YDF_LOG(INFO) << "Create dataspec";
+  LOG(INFO) << "Create dataspec";
   const auto dataspec_path =
       file::JoinPath(absl::GetFlag(FLAGS_output_dir), "dataspec.pbtxt");
   ygg::dataset::proto::DataSpecification dataspec;
@@ -89,16 +89,16 @@ int main(int argc, char** argv) {
 
   // Display the dataspec in a human readable form.
   // Same as :show_dataspec
-  YDF_LOG(INFO) << "Nice print of the dataspec";
+  LOG(INFO) << "Nice print of the dataspec";
   const auto dataspec_report =
       ygg::dataset::PrintHumanReadable(dataspec, false);
   QCHECK_OK(
       file::SetContent(absl::StrCat(dataspec_path, ".txt"), dataspec_report));
-  YDF_LOG(INFO) << "Dataspec:\n" << dataspec_report;
+  LOG(INFO) << "Dataspec:\n" << dataspec_report;
 
   // Train the model.
   // Same as :train
-  YDF_LOG(INFO) << "Train model";
+  LOG(INFO) << "Train model";
 
   // Configure the learner.
   ygg::model::proto::TrainingConfig train_config;
@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
   auto model = learner->TrainWithStatus(train_dataset_path, dataspec).value();
 
   // Save the model.
-  YDF_LOG(INFO) << "Export the model";
+  LOG(INFO) << "Export the model";
   const auto model_path =
       file::JoinPath(absl::GetFlag(FLAGS_output_dir), "model");
   QCHECK_OK(ygg::model::SaveModel(model_path, model.get()));
@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
                                         &model_description);
   QCHECK_OK(
       file::SetContent(absl::StrCat(model_path, ".txt"), model_description));
-  YDF_LOG(INFO) << "Model:\n" << model_description;
+  LOG(INFO) << "Model:\n" << model_description;
 
   // Evaluate the model
   // Same as :evaluate
@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
       ygg::metric::AppendTextReportWithStatus(evaluation, &evaluation_report));
   QCHECK_OK(file::SetContent(absl::StrCat(evaluation_path, ".txt"),
                              evaluation_report));
-  YDF_LOG(INFO) << "Evaluation:\n" << evaluation_report;
+  LOG(INFO) << "Evaluation:\n" << evaluation_report;
 
   // Compile the model for fast inference.
   const std::unique_ptr<ygg::serving::FastEngine> serving_engine =
@@ -183,9 +183,9 @@ int main(int argc, char** argv) {
   std::vector<float> batch_of_predictions;
   serving_engine->Predict(*examples, 2, &batch_of_predictions);
 
-  YDF_LOG(INFO) << "Predictions:";
+  LOG(INFO) << "Predictions:";
   for (const float prediction : batch_of_predictions) {
-    YDF_LOG(INFO) << "\t" << prediction;
+    LOG(INFO) << "\t" << prediction;
   }
 
   return 0;

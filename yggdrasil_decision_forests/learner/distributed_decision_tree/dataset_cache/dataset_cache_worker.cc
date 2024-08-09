@@ -23,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -203,9 +204,8 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumn(
 
   if (!file::Rename(temp_column_path, final_column_path, file::Defaults())
            .ok()) {
-    YDF_LOG(WARNING)
-        << "Already existing final file. Multiple workers seems to "
-           "work on the same shard.";
+    LOG(WARNING) << "Already existing final file. Multiple workers seems to "
+                    "work on the same shard.";
   }
 
   return absl::OkStatus();
@@ -214,11 +214,11 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumn(
 absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
     const proto::WorkerRequest::SeparateDatasetColumns& request,
     proto::WorkerResult::SeparateDatasetColumns* result) {
-  YDF_LOG(INFO) << "Separate dataset columns on " << request.dataset_path();
+  LOG(INFO) << "Separate dataset columns on " << request.dataset_path();
   result->set_shard_idx(request.shard_idx());
 
   // TODO: Use a dataset reader directly with multi-threaded reading.
-  YDF_LOG(INFO) << "Reading dataset";
+  LOG(INFO) << "Reading dataset";
   dataset::VerticalDataset dataset;
   dataset::LoadConfig load_dataset_config;
   load_dataset_config.num_threads = kNumThreads;
@@ -257,9 +257,9 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
           if (!worker_status.ok()) {
             return;
           }
-          LOG_INFO_EVERY_N_SEC(30, _ << "Exporting columns "
-                                     << (exported_columns + 1) << "/"
-                                     << request.columns_size());
+          LOG_EVERY_N_SEC(INFO, 30)
+              << "Exporting columns " << (exported_columns + 1) << "/"
+              << request.columns_size();
         }
 
         const auto local_status = SeparateDatasetColumn(
@@ -282,15 +282,15 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
 absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
     const proto::WorkerRequest::SortNumericalColumn& request,
     proto::WorkerResult::SortNumericalColumn* result) {
-  YDF_LOG(INFO) << "Sort numerical column #" << request.column_idx() << " with "
-                << request.num_examples() << " examples";
+  LOG(INFO) << "Sort numerical column #" << request.column_idx() << " with "
+            << request.num_examples() << " examples";
 
   // Read the values.
-  YDF_LOG(INFO) << "Allocate buffer [column #" << request.column_idx() << "]";
+  LOG(INFO) << "Allocate buffer [column #" << request.column_idx() << "]";
   // TODO: Read the shards in parallel.
   std::vector<std::pair<float, model::SignedExampleIdx>> value_and_example_idxs(
       request.num_examples());
-  YDF_LOG(INFO) << "Load data [column #" << request.column_idx() << "]";
+  LOG(INFO) << "Load data [column #" << request.column_idx() << "]";
   const int input_buffer_size = kIOBufferSizeInBytes / sizeof(float);
   ShardedFloatColumnReader reader;
   RETURN_IF_ERROR(reader.Open(
@@ -314,12 +314,12 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
   RETURN_IF_ERROR(reader.Close());
 
   // Sort the values.
-  YDF_LOG(INFO) << "Sort data [column #" << request.column_idx() << "]";
+  LOG(INFO) << "Sort data [column #" << request.column_idx() << "]";
   std::sort(value_and_example_idxs.begin(), value_and_example_idxs.end());
 
   // Export the sorted values.
-  YDF_LOG(INFO) << "Save sorted numerical values [column #"
-                << request.column_idx() << "]";
+  LOG(INFO) << "Save sorted numerical values [column #" << request.column_idx()
+            << "]";
 
   result->set_output_directory(
       file::JoinPath(request.output_base_directory(), utils::GenUniqueId()));
@@ -339,10 +339,9 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
     }
   }
   result->mutable_metadata()->set_num_unique_values(num_unique_values);
-  YDF_LOG(INFO) << "Found " << num_unique_values << "/"
-                << request.num_examples()
-                << " unique values on numerical [column #"
-                << request.column_idx() << "]";
+  LOG(INFO) << "Found " << num_unique_values << "/" << request.num_examples()
+            << " unique values on numerical [column #" << request.column_idx()
+            << "]";
 
   // Select how export the values (pre-sorted or discretized).
   result->mutable_metadata()->set_discretized(
@@ -351,20 +350,20 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
           request.max_unique_values_for_discretized_numerical());
 
   if (result->metadata().discretized()) {
-    YDF_LOG(INFO) << "Exported column column #" << request.column_idx()
-                  << " as pre-discretized";
+    LOG(INFO) << "Exported column column #" << request.column_idx()
+              << " as pre-discretized";
     RETURN_IF_ERROR(ExportSortedDiscretizedNumericalColumn(
         request, value_and_example_idxs, num_unique_values, result));
   } else {
-    YDF_LOG(INFO) << "Exported column column #" << request.column_idx()
-                  << " as pre-sorted";
+    LOG(INFO) << "Exported column column #" << request.column_idx()
+              << " as pre-sorted";
     RETURN_IF_ERROR(
         ExportSortedNumericalColumn(request, value_and_example_idxs, result));
   }
 
-  YDF_LOG(INFO) << "Done exporting column #" << request.column_idx() << " with "
-                << num_unique_values << "/" << request.num_examples()
-                << " unique values.";
+  LOG(INFO) << "Done exporting column #" << request.column_idx() << " with "
+            << num_unique_values << "/" << request.num_examples()
+            << " unique values.";
   return absl::OkStatus();
 }
 
@@ -734,9 +733,8 @@ absl::Status ConvertPartialToFinalRawDataCategoricalString(
 absl::Status CreateDatasetCacheWorker::ConvertPartialToFinalRawData(
     const proto::WorkerRequest::ConvertPartialToFinalRawData& request,
     proto::WorkerResult::ConvertPartialToFinalRawData* result) {
-  YDF_LOG(INFO) << "Convert partial to final for column #"
-                << request.column_idx() << " and shard #"
-                << request.shard_idx();
+  LOG(INFO) << "Convert partial to final for column #" << request.column_idx()
+            << " and shard #" << request.shard_idx();
 
   // Get the various paths.
   const auto tmp_file = file::JoinPath(request.final_cache_directory(),
@@ -763,7 +761,7 @@ absl::Status CreateDatasetCacheWorker::ConvertPartialToFinalRawData(
 
   ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(output_file));
   if (already_exist) {
-    YDF_LOG(INFO) << "The result already exist.";
+    LOG(INFO) << "The result already exist.";
     return absl::OkStatus();
   }
 
@@ -791,9 +789,8 @@ absl::Status CreateDatasetCacheWorker::ConvertPartialToFinalRawData(
   }
 
   if (!file::Rename(tmp_file, output_file, file::Defaults()).ok()) {
-    YDF_LOG(WARNING)
-        << "Already existing final file. Multiple workers seems to "
-           "work on the same shard.";
+    LOG(WARNING) << "Already existing final file. Multiple workers seems to "
+                    "work on the same shard.";
   }
 
   return absl::OkStatus();

@@ -87,6 +87,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:testing_macros",
         "//yggdrasil_decision_forests/utils:uid",
         "@com_google_absl//absl/container:node_hash_set",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",

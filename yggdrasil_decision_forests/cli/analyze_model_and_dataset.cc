@@ -50,7 +50,7 @@ namespace yggdrasil_decision_forests {
 namespace cli {
 
 void AnalyseDatasetAndModel() {
-  YDF_LOG(INFO) << "Warning: The :analyze_model_and_dataset is experimental";
+  LOG(INFO) << "Warning: The :analyze_model_and_dataset is experimental";
 
   // Check required flags.
   QCHECK(!absl::GetFlag(FLAGS_model).empty());
@@ -63,11 +63,11 @@ void AnalyseDatasetAndModel() {
                   .value();
   }
 
-  YDF_LOG(INFO) << "Load model";
+  LOG(INFO) << "Load model";
   std::unique_ptr<model::AbstractModel> model;
   QCHECK_OK(model::LoadModel(absl::GetFlag(FLAGS_model), &model));
 
-  YDF_LOG(INFO) << "Load dataset";
+  LOG(INFO) << "Load dataset";
   dataset::VerticalDataset dataset;
   QCHECK_OK(dataset::LoadVerticalDataset(
       absl::GetFlag(FLAGS_dataset), model->data_spec(), &dataset,

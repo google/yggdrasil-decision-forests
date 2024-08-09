@@ -107,8 +107,7 @@ absl::Status UpdateDataSpecWithCsvExample(
   for (int col_idx = 0; col_idx < data_spec->columns_size(); col_idx++) {
     proto::Column* col = data_spec->mutable_columns(col_idx);
     if (col->is_unstacked()) {
-      YDF_LOG(FATAL)
-          << "Unstacked numerical features not supported for csv files";
+      LOG(FATAL) << "Unstacked numerical features not supported for csv files";
     }
     auto* col_acc = accumulator->mutable_columns(col_idx);
     // Skip NAs
@@ -205,11 +204,11 @@ absl::Status CsvDataSpecCreator::InferColumnsAndTypes(
       }
     }
     while (reader.NextRow(&row).value()) {
-      LOG_INFO_EVERY_N_SEC(30, _ << nrow << " row(s) processed");
+      LOG_EVERY_N_SEC(INFO, 30) << nrow << " row(s) processed";
       // Check if we have seen enough records to determine all the types.
       if (guide.max_num_scanned_rows_to_guess_type() > 0 &&
           nrow >= guide.max_num_scanned_rows_to_guess_type()) {
-        YDF_LOG(INFO)
+        LOG(INFO)
             << "Stop scanning the csv file to infer the type. Some records "
                "were not considered.";
         break;
@@ -296,7 +295,7 @@ absl::Status CsvDataSpecCreator::ComputeColumnStatistics(
         scan_complete = true;
         break;
       }
-      LOG_INFO_EVERY_N_SEC(30, _ << nrow << " row(s) processed");
+      LOG_EVERY_N_SEC(INFO, 30) << nrow << " row(s) processed";
       // Check the number of fields.
       if (row->size() != csv_header.size()) {
         return absl::InvalidArgumentError(absl::StrCat(

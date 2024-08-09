@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/utils/blob_sequence.h"
 
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {

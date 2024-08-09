@@ -70,6 +70,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@com_google_googletest//:gtest_main",

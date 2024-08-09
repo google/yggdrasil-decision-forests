@@ -26,6 +26,7 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -205,9 +206,8 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
   mdl->AddTree(absl::make_unique<decision_tree::DecisionTree>());
   auto* decision_tree = mdl->mutable_decision_trees()->front().get();
 
-  YDF_LOG(INFO) << "Training CART on " << train_dataset.nrow()
-                << " example(s) and " << config_link.features().size()
-                << " feature(s).";
+  LOG(INFO) << "Training CART on " << train_dataset.nrow() << " example(s) and "
+            << config_link.features().size() << " feature(s).";
 
   std::vector<float> weights;
   RETURN_IF_ERROR(dataset::GetWeights(train_dataset, config_link, &weights));
@@ -594,8 +594,8 @@ absl::Status PruneTree(const dataset::VerticalDataset& dataset,
   }
 
   const auto num_nodes_post_pruning = tree->NumNodes();
-  YDF_LOG(INFO) << num_nodes_pre_pruning << " nodes before pruning. "
-                << num_nodes_post_pruning << " nodes after pruning.";
+  LOG(INFO) << num_nodes_pre_pruning << " nodes before pruning. "
+            << num_nodes_post_pruning << " nodes after pruning.";
   return absl::OkStatus();
 }
 

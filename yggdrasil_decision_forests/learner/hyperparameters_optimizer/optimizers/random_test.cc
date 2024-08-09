@@ -89,10 +89,10 @@ TEST(Random, Base) {
       // No more parameters to evaluate.
       break;
     } else if (status == NextCandidateStatus::kWaitForEvaluation) {
-      YDF_LOG(FATAL) << "Should not append. As no evaluation pending.";
+      LOG(FATAL) << "Should not append. As no evaluation pending.";
     }
 
-    YDF_LOG(INFO) << "candidate: " << candidate.ShortDebugString();
+    LOG(INFO) << "candidate: " << candidate.ShortDebugString();
 
     double evaluation = trial_idx % 5;
     if (evaluation < 0.5) {
@@ -110,8 +110,8 @@ TEST(Random, Base) {
 
   EXPECT_NEAR(best_score, 4, 0.0001);
 
-  YDF_LOG(INFO) << "trial_idx: " << trial_idx << " score: " << best_score
-                << " params: " << best_params.DebugString();
+  LOG(INFO) << "trial_idx: " << trial_idx << " score: " << best_score
+            << " params: " << best_params.DebugString();
 }
 
 TEST(Random, UpdateWeights) {

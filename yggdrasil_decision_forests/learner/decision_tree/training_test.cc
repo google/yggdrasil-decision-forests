@@ -172,7 +172,7 @@ TEST_P(TrainTree, Base) {
 
   std::string description;
   tree.AppendModelStructure(dataset.data_spec(), 0, &description);
-  YDF_LOG(INFO) << "tree:\n" << description;
+  LOG(INFO) << "tree:\n" << description;
 
   EXPECT_EQ(description,
             R"(    "f1">=2.5 [s:0.347222 n:6 np:4 miss:0] ; pred:0.833333
@@ -247,7 +247,7 @@ TEST_P(TrainTree, DiscretizedNumerical) {
 
   std::string description;
   tree.AppendModelStructure(dataset.data_spec(), 0, &description);
-  YDF_LOG(INFO) << "tree:\n" << description;
+  LOG(INFO) << "tree:\n" << description;
 
   EXPECT_EQ(
       description,
@@ -450,7 +450,7 @@ TEST(MHLDTOblique, Classification) {
                           label_stats, 50, &best_condition, &random, &cache)
                           .value();
 
-  YDF_LOG(INFO) << "best_condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "best_condition:\n" << best_condition.DebugString();
 
   EXPECT_TRUE(result);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
@@ -500,7 +500,7 @@ TEST(MHLDTOblique, Classification_Again) {
                           label_stats, 50, &best_condition, &random, &cache)
                           .value();
 
-  YDF_LOG(INFO) << "best_condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "best_condition:\n" << best_condition.DebugString();
 
   EXPECT_TRUE(result);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 6);

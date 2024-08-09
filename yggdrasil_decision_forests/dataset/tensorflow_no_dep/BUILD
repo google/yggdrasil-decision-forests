@@ -18,7 +18,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/crc:crc32c",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
@@ -88,7 +87,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
-        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/log",
         "@com_google_googletest//:gtest_main",
     ],
 )

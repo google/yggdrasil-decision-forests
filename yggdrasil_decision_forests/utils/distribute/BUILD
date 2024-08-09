@@ -95,7 +95,10 @@ cc_library_ydf(
     name = "utils",
     srcs = ["utils.cc"],
     hdrs = ["utils.h"],
-    deps = ["//yggdrasil_decision_forests/utils:concurrency"],
+    deps = [
+        "//yggdrasil_decision_forests/utils:concurrency",
+        "@com_google_absl//absl/memory",
+    ],
 )
 
 # Tests

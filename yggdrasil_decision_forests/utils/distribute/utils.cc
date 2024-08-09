@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/utils.h"
 
+#include "absl/memory/memory.h"
+
 namespace yggdrasil_decision_forests {
 namespace distribute {
 

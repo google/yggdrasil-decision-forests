@@ -255,7 +255,7 @@ TEST_F(RandomForestOnAdult, Base) {
 
   std::string description;
   model_->AppendDescriptionAndStatistics(false, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   CHECK_NE(description.find("MEAN_DECREASE_IN_ACCURACY"), -1);
   CHECK_NE(description.find("Out-of-bag evaluation: accuracy:"), -1);
@@ -608,7 +608,7 @@ TEST_F(RandomForestOnAdult, MakingAModelPurePureServingModel) {
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
   const auto pre_pruning_size = model_->ModelSizeInBytes().value();
-  YDF_LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
+  LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
 
   CHECK_OK(model_->MakePureServing());
 
@@ -616,7 +616,7 @@ TEST_F(RandomForestOnAdult, MakingAModelPurePureServingModel) {
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
 
   const auto post_pruning_size = model_->ModelSizeInBytes().value();
-  YDF_LOG(INFO) << "post_pruning_size:" << post_pruning_size;
+  LOG(INFO) << "post_pruning_size:" << post_pruning_size;
   EXPECT_LE(static_cast<float>(post_pruning_size) / pre_pruning_size, 0.80);
 }
 
@@ -883,8 +883,8 @@ TEST(ExtremelyRandomizeTrees, Figure10) {
   std::string ert_description, rf_description;
   ert_model->AppendDescriptionAndStatistics(false, &ert_description);
   rf_model->AppendDescriptionAndStatistics(false, &rf_description);
-  YDF_LOG(INFO) << "ERT model:\n" << ert_description;
-  YDF_LOG(INFO) << "RF model:\n" << rf_description;
+  LOG(INFO) << "ERT model:\n" << ert_description;
+  LOG(INFO) << "RF model:\n" << rf_description;
 
   dataset::VerticalDataset test_and_preds_dataset =
       test_dataset.ShallowNonOwningClone();

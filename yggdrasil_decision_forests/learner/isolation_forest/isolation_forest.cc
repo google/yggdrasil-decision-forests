@@ -28,6 +28,7 @@
 
 #include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/random/distributions.h"
 #include "absl/status/status.h"
@@ -450,9 +451,9 @@ IsolationForestLearner::TrainWithStatusImpl(
   model->set_num_examples_per_trees(
       GetNumExamplesPerTrees(*config.if_config, train_dataset.nrow()));
 
-  YDF_LOG(INFO) << "Training isolation forest on " << train_dataset.nrow()
-                << " example(s) and " << config.config_link.features_size()
-                << " feature(s).";
+  LOG(INFO) << "Training isolation forest on " << train_dataset.nrow()
+            << " example(s) and " << config.config_link.features_size()
+            << " feature(s).";
 
   utils::RandomEngine global_random(config.training_config.random_seed());
 

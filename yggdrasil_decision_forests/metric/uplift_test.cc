@@ -93,7 +93,7 @@ proto::EvaluationResults GenEvaluationBinaryOutcome(
   // Create reports.
   std::string report;
   CHECK_OK(AppendTextReportWithStatus(eval, &report));
-  YDF_LOG(INFO) << "Report :\n" << report;
+  LOG(INFO) << "Report :\n" << report;
 
   return eval;
 }

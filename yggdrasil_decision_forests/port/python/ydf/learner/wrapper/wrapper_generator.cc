@@ -334,8 +334,8 @@ $0
     if (learner_config_it != learner_configs.end()) {
       learner_config = learner_config_it->second;
     } else {
-      YDF_LOG(INFO) << "No learner config for " << learner_key
-                    << ". Using default config.";
+      LOG(INFO) << "No learner config for " << learner_key
+                << ". Using default config.";
     }
 
     const auto class_name = LearnerKeyToClassName(learner_key);

@@ -17,6 +17,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_STATUS_MACROS_DEFAULT_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_STATUS_MACROS_DEFAULT_H_
 
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 // Evaluates an expression returning a absl::Status. Returns with the status
@@ -88,7 +89,7 @@
   auto tmpvar = (rexpr);                                        \
   if (ABSL_PREDICT_FALSE(!tmpvar.ok())) {                       \
     std::string _;                                              \
-    YDF_LOG(WARNING) << message;                                \
+    LOG(WARNING) << message;                                    \
     return tmpvar.status();                                     \
   }                                                             \
   lhs = std::move(tmpvar).value()

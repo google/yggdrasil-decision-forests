@@ -18,7 +18,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_UTILS_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_UTILS_H_
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/serving/serving.pb.h"
@@ -46,7 +45,7 @@ namespace serving {
 //  stats.Update(examples, num_examples, ExampleFormat::FORMAT_EXAMPLE_MAJOR);
 //
 //  // Final display.
-//  YDF_LOG(INFO) << "Statistics:\n", << stats.BuildReport();
+//  LOG(INFO) << "Statistics:\n", << stats.BuildReport();
 //
 // FutureWork(gbm): Create a method exporting results as a CSV file.
 class FeatureStatistics {

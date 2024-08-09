@@ -46,6 +46,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",

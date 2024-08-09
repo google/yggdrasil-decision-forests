@@ -131,10 +131,9 @@ class VerticalDataset {
           "The template class argument does not derive  AbstractColumn.");
       T* const casted_column = dynamic_cast<T* const>(this);
       if (!casted_column) {
-        YDF_LOG(FATAL) << "Column \"" << name() << "\" has type "
-                       << proto::ColumnType_Name(type())
-                       << " and is not compatible with type "
-                       << typeid(T).name();
+        LOG(FATAL) << "Column \"" << name() << "\" has type "
+                   << proto::ColumnType_Name(type())
+                   << " and is not compatible with type " << typeid(T).name();
       }
       return casted_column;
     }
@@ -907,9 +906,9 @@ absl::Status VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
       dynamic_cast<VerticalDataset::TemplateScalarStorage<T>*>(dst);
   STATUS_CHECK(cast_dst != nullptr);
   if (values_.empty() && !indices.empty()) {
-    YDF_LOG(FATAL) << "Trying to extract " << indices.size()
-                   << " examples from the non-allocated column \"" << name()
-                   << "\".";
+    LOG(FATAL) << "Trying to extract " << indices.size()
+               << " examples from the non-allocated column \"" << name()
+               << "\".";
   }
   const size_t indices_size = indices.size();
   const size_t init_dst_nrows = dst->nrows();

@@ -24,7 +24,6 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/tensorflow.h"

@@ -63,8 +63,7 @@ absl::StatusOr<Preprocessing> PreprocessTrainingDataset(
 
   const auto duration = absl::Now() - time_begin;
   if (duration > absl::Seconds(10)) {
-    YDF_LOG(INFO) << "Feature index computed in "
-                  << absl::FormatDuration(duration);
+    LOG(INFO) << "Feature index computed in " << absl::FormatDuration(duration);
   }
   return preprocessing;
 }

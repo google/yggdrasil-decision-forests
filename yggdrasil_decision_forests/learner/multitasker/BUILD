@@ -69,9 +69,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
     ],
 )

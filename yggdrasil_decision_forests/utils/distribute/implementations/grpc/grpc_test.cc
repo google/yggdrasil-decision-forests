@@ -136,10 +136,10 @@ TEST(GRPC, TestMessup) {
   TestMessup(all.manager.get(), [&]() {
     // This method creates a new worker #0, and tell the manager to replace the
     // old worker #0 by the new worker #0. After this change, any call to the
-    // old worker #0 will trigger a YDF_LOG(FATAL).
+    // old worker #0 will trigger a LOG(FATAL).
 
     // Mark worker #0 as forbidden. New requests to this worker will trigger a
-    // YDF_LOG(FATAL).
+    // LOG(FATAL).
     CHECK_OK(all.manager->BlockingRequest("forbidden", 0).status());
 
     auto* grpc_manager = dynamic_cast<GRPCManager*>(all.manager.get());

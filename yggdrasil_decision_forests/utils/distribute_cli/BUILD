@@ -32,6 +32,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
         "//yggdrasil_decision_forests/utils/distribute:distribute_without_implementations",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/time",
     ],
@@ -65,8 +66,6 @@ cc_library_ydf(
     deps = [
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:hash",
-        "//yggdrasil_decision_forests/utils:logging",
-        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],
 )

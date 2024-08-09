@@ -74,7 +74,7 @@ void (*existing_signal_handler_alarm)(int) = nullptr;
 
 void ReceiveSignal(int signal) {
   if (!stop_training) {
-    YDF_LOG(INFO) << "Stopping all active trainings";
+    LOG(INFO) << "Stopping all active trainings";
     stop_training = true;
   } else {
     // Pass the signal to any existing handler.
@@ -95,12 +95,12 @@ void EnableUserInterruption() {
   if (active_learners.fetch_add(1) == 0) {
     existing_signal_handler_int = std::signal(SIGINT, ReceiveSignal);
     if (existing_signal_handler_int == SIG_ERR) {
-      YDF_LOG(WARNING) << "Cannot set SIGINT handler";
+      LOG(WARNING) << "Cannot set SIGINT handler";
     }
 #ifndef _WIN32
     existing_signal_handler_alarm = std::signal(SIGALRM, ReceiveSignal);
     if (existing_signal_handler_alarm == SIG_ERR) {
-      YDF_LOG(WARNING) << "Cannot set SIGALRM handler";
+      LOG(WARNING) << "Cannot set SIGALRM handler";
     }
 #endif
   }
@@ -115,12 +115,12 @@ absl::Status DisableUserInterruption() {
 
   if (existing_signal_handler_int &&
       std::signal(SIGINT, existing_signal_handler_int) == SIG_ERR) {
-    YDF_LOG(WARNING) << "Cannot unset SIGINT handler";
+    LOG(WARNING) << "Cannot unset SIGINT handler";
   }
 #ifndef _WIN32
   if (existing_signal_handler_alarm &&
       std::signal(SIGALRM, existing_signal_handler_alarm) == SIG_ERR) {
-    YDF_LOG(WARNING) << "Cannot unset SIGALRM handler";
+    LOG(WARNING) << "Cannot unset SIGALRM handler";
   }
 #endif
   if (stop_training) {
@@ -142,8 +142,8 @@ class GenericCCLearner {
       const absl::optional<
           std::reference_wrapper<const dataset::VerticalDataset>>
           validation_dataset = std::nullopt) const {
-    YDF_LOG(INFO) << "Data spec:\n"
-                  << dataset::PrintHumanReadable(dataset.data_spec());
+    LOG(INFO) << "Data spec:\n"
+              << dataset::PrintHumanReadable(dataset.data_spec());
     EnableUserInterruption();
     absl::StatusOr<std::unique_ptr<model::AbstractModel>> model;
     {
@@ -160,7 +160,7 @@ class GenericCCLearner {
       const dataset::proto::DataSpecification& data_spec,
       const absl::optional<std::string> validation_dataset_path =
           std::nullopt) const {
-    YDF_LOG(INFO) << "Data spec:\n" << dataset::PrintHumanReadable(data_spec);
+    LOG(INFO) << "Data spec:\n" << dataset::PrintHumanReadable(data_spec);
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,
                      dataset::GetTypedPath(dataset_path));
     std::optional<std::string> typed_valid_path;
@@ -184,7 +184,7 @@ class GenericCCLearner {
       const std::string& dataset_path,
       const dataset::proto::DataSpecificationGuide& data_spec_guide,
       const std::optional<std::string> validation_dataset_path) const {
-    YDF_LOG(INFO) << "Data spec guide:\n" << data_spec_guide.DebugString();
+    LOG(INFO) << "Data spec guide:\n" << data_spec_guide.DebugString();
 
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,
                      dataset::GetTypedPath(dataset_path));

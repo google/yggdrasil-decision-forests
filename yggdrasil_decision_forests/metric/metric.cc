@@ -359,8 +359,8 @@ absl::Status FinalizeRankingMetricsFromSampledPredictions(
 
   // Performs bootstrapping.
   if (option.bootstrapping_samples() > 0) {
-    YDF_LOG(INFO) << "Computing ranking confidence intervals of evaluation "
-                     "metrics with bootstrapping.";
+    LOG(INFO) << "Computing ranking confidence intervals of evaluation "
+                 "metrics with bootstrapping.";
 
     BootstrapMetricEstimate(individual_ndcgs, option.bootstrapping_samples(),
                             eval->mutable_ranking()->mutable_ndcg());
@@ -972,8 +972,8 @@ absl::Status FinalizeEvaluation(const proto::EvaluationOptions& option,
     case model::proto::Task::REGRESSION: {
       // Performs bootstrapping.
       if (option.bootstrapping_samples() > 0) {
-        YDF_LOG(INFO) << "Computing rmse intervals of evaluation metrics with "
-                         "bootstrapping.";
+        LOG(INFO) << "Computing rmse intervals of evaluation metrics with "
+                     "bootstrapping.";
         RETURN_IF_ERROR(
             internal::UpdateRMSEConfidenceIntervalUsingBootstrapping(option,
                                                                      eval));
@@ -1241,8 +1241,8 @@ absl::Status BuildROCCurve(const proto::EvaluationOptions& option,
     return absl::OkStatus();
   }
   if (sorted_predictions.empty()) {
-    YDF_LOG(WARNING) << "No sampled prediction found. Computation of the ROC "
-                        "curve skipped.";
+    LOG(WARNING) << "No sampled prediction found. Computation of the ROC "
+                    "curve skipped.";
     return absl::OkStatus();
   }
   std::sort(sorted_predictions.begin(), sorted_predictions.end(),
@@ -1262,10 +1262,9 @@ absl::Status BuildROCCurve(const proto::EvaluationOptions& option,
 
   // Performs bootstrapping.
   if (option.bootstrapping_samples() > 0) {
-    YDF_LOG(INFO)
-        << "Computing confidence intervals of evaluation metrics with "
-           "bootstrapping for label #"
-        << label_value << ".";
+    LOG(INFO) << "Computing confidence intervals of evaluation metrics with "
+                 "bootstrapping for label #"
+              << label_value << ".";
     RETURN_IF_ERROR(internal::ComputeRocConfidenceIntervalsUsingBootstrapping(
         option, sorted_predictions, roc));
   }
@@ -1555,12 +1554,12 @@ absl::StatusOr<double> GetMetricClassificationOneVsOthers(
     // with the higher index) is considered the positive class.
     positive_class_idx = num_label_classes - 1;
     if (num_label_classes > 3) {
-      YDF_LOG(WARNING) << "The \"positive_class\" was not provided. Using "
-                          "positive_class_idx="
-                       << positive_class_idx << "=\""
-                       << dataset::CategoricalIdxToRepresentation(
-                              evaluation.label_column(), positive_class_idx)
-                       << "\" instead.";
+      LOG(WARNING) << "The \"positive_class\" was not provided. Using "
+                      "positive_class_idx="
+                   << positive_class_idx << "=\""
+                   << dataset::CategoricalIdxToRepresentation(
+                          evaluation.label_column(), positive_class_idx)
+                   << "\" instead.";
     }
   } else {
     ASSIGN_OR_RETURN(positive_class_idx,

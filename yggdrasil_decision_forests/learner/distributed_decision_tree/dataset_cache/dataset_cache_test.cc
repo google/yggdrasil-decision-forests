@@ -171,9 +171,9 @@ TEST_F(End2End, CategoricalInOrder) {
     }
   }
 
-  YDF_LOG(INFO) << "Histogram:";
+  LOG(INFO) << "Histogram:";
   for (auto x : histogram) {
-    YDF_LOG(INFO) << "\t" << x.first << " : " << x.second;
+    LOG(INFO) << "\t" << x.first << " : " << x.second;
   }
 
   CHECK_OK(reader.Close());

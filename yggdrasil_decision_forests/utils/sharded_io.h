@@ -158,7 +158,7 @@ template <typename T>
 absl::Status ShardedWriter<T>::OpenNextShard() {
   num_records_in_cur_shard_ = 0;
   if (cur_path_idx_ + 1 >= paths_.size()) {
-    YDF_LOG(INFO)
+    LOG(INFO)
         << "Not enough shards allocated. Continue to write in the last shard.";
     return absl::OkStatus();
   }

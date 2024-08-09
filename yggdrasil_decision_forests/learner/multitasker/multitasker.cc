@@ -17,6 +17,8 @@
 
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -249,8 +251,8 @@ MultitaskerLearner::TrainWithStatusImpl(
   };
 
   if (!secondary_task_idxs.empty()) {
-    YDF_LOG(INFO) << "Train multitasker secondary tasks with "
-                  << secondary_task_idxs.size() << " model(s)";
+    LOG(INFO) << "Train multitasker secondary tasks with "
+              << secondary_task_idxs.size() << " model(s)";
 
     {
       utils::concurrency::ThreadPool pool("multitasker",
@@ -266,7 +268,7 @@ MultitaskerLearner::TrainWithStatusImpl(
 
     // Use the secondary models to generated the training dataset for the
     // primary tasks.
-    YDF_LOG(INFO) << "Generate signals for primary tasks";
+    LOG(INFO) << "Generate signals for primary tasks";
     for (const auto subtask_idx : secondary_task_idxs) {
       RETURN_IF_ERROR(AddPredictionToDataset(
           train_dataset, *model->models_[subtask_idx], &primary_train_dataset,
@@ -277,13 +279,12 @@ MultitaskerLearner::TrainWithStatusImpl(
             &primary_valid_dataset, nullptr));
       }
     }
-    YDF_LOG(INFO) << "New features: "
-                  << absl::StrJoin(secondary_model_output, " ");
+    LOG(INFO) << "New features: " << absl::StrJoin(secondary_model_output, " ");
   }
 
   if (!primary_task_idxs.empty()) {
-    YDF_LOG(INFO) << "Train multitasker primary tasks with "
-                  << primary_task_idxs.size() << " model(s)";
+    LOG(INFO) << "Train multitasker primary tasks with "
+              << primary_task_idxs.size() << " model(s)";
     utils::concurrency::ThreadPool pool("multitasker",
                                         deployment().num_threads());
     pool.StartWorkers();
@@ -367,8 +368,8 @@ MultitaskerLearner::GetGenericHyperParameterSpecification() const {
   const auto& mt_config =
       training_config().GetExtension(proto::multitasker_config);
   if (mt_config.subtasks_size() == 0) {
-    YDF_LOG(WARNING) << "Sub-learner not set. This is only expected during the "
-                        "automatic documentation generation.";
+    LOG(WARNING) << "Sub-learner not set. This is only expected during the "
+                    "automatic documentation generation.";
     return AbstractLearner::GetGenericHyperParameterSpecification();
   }
 

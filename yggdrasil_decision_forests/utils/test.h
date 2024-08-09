@@ -91,7 +91,7 @@ class ParseProtoHelper {
   T call() {
     T message;
     if (!google::protobuf::TextFormat::ParseFromString(text_proto_, &message)) {
-      YDF_LOG(FATAL) << "Cannot parse proto:\n" << text_proto_;
+      LOG(FATAL) << "Cannot parse proto:\n" << text_proto_;
     }
     return message;
   }

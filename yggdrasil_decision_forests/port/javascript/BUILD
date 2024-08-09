@@ -63,6 +63,8 @@ cc_binary(
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/learner/random_forest",
         "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/serving:example_set",
+        "//yggdrasil_decision_forests/serving:fast_engine",
         "//yggdrasil_decision_forests/utils:logging",
     ],
 )

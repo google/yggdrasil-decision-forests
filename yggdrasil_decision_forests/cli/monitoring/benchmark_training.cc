@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -128,8 +129,8 @@ class Trainer {
 
       dataset::proto::DataSpecification data_spec;
       dataset::CreateDataSpec(dataset_path, false, guide_, &data_spec);
-      YDF_LOG(INFO) << "Dataspec:\n"
-                    << dataset::PrintHumanReadable(data_spec, false);
+      LOG(INFO) << "Dataspec:\n"
+                << dataset::PrintHumanReadable(data_spec, false);
 
       // Load the dataset in memory.
       RETURN_IF_ERROR(
@@ -751,7 +752,7 @@ absl::Status Benchmark_GBT_SyntheticV2(std::vector<Result>* results) {
     const std::string dst_path =
         absl::StrCat(dataset_format, ":",
                      file::JoinPath(dataset_directory, dataset_filename));
-    YDF_LOG(INFO) << "Generating synthetic dataset";
+    LOG(INFO) << "Generating synthetic dataset";
     RETURN_IF_ERROR(
         dataset::GenerateSyntheticDataset(synthetic.second, dst_path));
 
@@ -962,8 +963,7 @@ int main(int argc, char** argv) {
   std::cout << "Start benchmark";
   const auto status = yggdrasil_decision_forests::Benchmark();
   if (!status.ok()) {
-    YDF_LOG(INFO) << "The benchmark failed with the following error: "
-                  << status;
+    LOG(INFO) << "The benchmark failed with the following error: " << status;
     return 1;
   }
   return 0;

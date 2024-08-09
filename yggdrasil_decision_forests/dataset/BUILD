@@ -41,7 +41,6 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
     ],
 )
 
@@ -83,8 +82,6 @@ cc_library_ydf(
         ":formats",
         ":formats_cc_proto",
         "//yggdrasil_decision_forests/utils:status_macros",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
@@ -214,8 +211,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:usage",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
@@ -461,7 +456,6 @@ cc_test(
         ":vertical_dataset",
         ":vertical_dataset_io",
         "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         #"@com_google_googletest//:gtest_main", # When fixed
@@ -486,7 +480,6 @@ cc_test(
         ":vertical_dataset_io",
         #"@com_google_googletest//:gtest_main", # When fixed
         "@com_google_googletest//:gtest_main",
-        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
@@ -506,7 +499,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:test",
-        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",

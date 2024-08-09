@@ -19,7 +19,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/blob_sequence.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"

@@ -34,7 +34,6 @@ pybind_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:span",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/dataset:types",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
@@ -294,6 +293,7 @@ cc_test(
     ],
     tags = ["manual"],
     deps = [
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",

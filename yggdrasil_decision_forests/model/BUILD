@@ -196,6 +196,7 @@ cc_library_ydf(
         ":prediction_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],

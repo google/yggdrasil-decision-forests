@@ -83,16 +83,15 @@ absl::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
     cache->features_ = {options.features().begin(), options.features().end()};
   }
   std::sort(cache->features_.begin(), cache->features_.end());
-  YDF_LOG(INFO) << "Create dataset cache reader on " << cache->features_.size()
-                << " / " << cache->meta_data_.columns_size()
-                << " feature(s) and " << cache->meta_data_.num_examples()
-                << " example(s)";
+  LOG(INFO) << "Create dataset cache reader on " << cache->features_.size()
+            << " / " << cache->meta_data_.columns_size() << " feature(s) and "
+            << cache->meta_data_.num_examples() << " example(s)";
 
   RETURN_IF_ERROR(dataset::CheckNumExamples(cache->meta_data_.num_examples()));
 
   if (cache->meta_data_.has_weight_column_idx()) {
     // Load the weight values.
-    YDF_LOG(INFO) << "Loading weights in memory";
+    LOG(INFO) << "Loading weights in memory";
     cache->weights_.reserve(cache->meta_data_.num_examples());
     RETURN_IF_ERROR(ShardedFloatColumnReader::ReadAndAppend(
         file::JoinPath(path, kFilenameRaw,
@@ -105,7 +104,7 @@ absl::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
   }
 
   if (cache->meta_data_.has_label_column_idx()) {
-    YDF_LOG(INFO) << "Loading labels in memory";
+    LOG(INFO) << "Loading labels in memory";
 
     const auto label_column_idx = cache->meta_data_.label_column_idx();
     const auto& label_column_metadata =
@@ -154,8 +153,8 @@ absl::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
     RETURN_IF_ERROR(cache->InitializeAndLoadInMemoryCache());
   }
 
-  YDF_LOG(INFO) << "Dataset cache meta-data:\n" << cache->MetadataInformation();
-  YDF_LOG(INFO) << "Dataset cache reader created in " << absl::Now() - begin;
+  LOG(INFO) << "Dataset cache meta-data:\n" << cache->MetadataInformation();
+  LOG(INFO) << "Dataset cache reader created in " << absl::Now() - begin;
   return cache;
 }
 
@@ -202,8 +201,8 @@ absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
           }
         }  // Join on "pool".
 
-        YDF_LOG(INFO) << "Non-blocking feature update done in "
-                      << (absl::Now() - begin);
+        LOG(INFO) << "Non-blocking feature update done in "
+                  << (absl::Now() - begin);
         DCHECK(non_blocking_.is_running);
         non_blocking_.is_running = false;
       });
@@ -235,7 +234,7 @@ absl::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
     // Not running.
     return false;
   }
-  YDF_LOG(INFO) << "Non-blocking work done. Making the new features available";
+  LOG(INFO) << "Non-blocking work done. Making the new features available";
 
   // Wait for the loading thread.
   non_blocking_.loading_thread->Join();
@@ -243,8 +242,8 @@ absl::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
 
   // Propagate the loading thread error (if any).
   if (!non_blocking_.status.ok()) {
-    YDF_LOG(INFO) << "Error in non-blocking loading: "
-                  << non_blocking_.status.message();
+    LOG(INFO) << "Error in non-blocking loading: "
+              << non_blocking_.status.message();
     return absl::Status(non_blocking_.status);
   }
 
@@ -266,8 +265,8 @@ absl::Status DatasetCacheReader::LoadingAndUnloadingFeatures(
         "Non-blocking feature loading already in progress.");
   }
 
-  YDF_LOG(INFO) << "Loading " << load_features.size() << " and unloading "
-                << unload_features.size() << " feature(s)";
+  LOG(INFO) << "Loading " << load_features.size() << " and unloading "
+            << unload_features.size() << " feature(s)";
 
   if (options_.load_cache_in_memory()) {
     const auto begin = absl::Now();
@@ -303,7 +302,7 @@ absl::Status DatasetCacheReader::LoadingAndUnloadingFeatures(
       RETURN_IF_ERROR(worker_status);
     }
 
-    YDF_LOG(INFO) << "Update loaded features in " << (absl::Now() - begin);
+    LOG(INFO) << "Update loaded features in " << (absl::Now() - begin);
   }
 
   return ApplyLoadingAndUnloadingFeaturesToMetadata(load_features,
@@ -526,7 +525,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
 }
 
 absl::Status DatasetCacheReader::InitializeAndLoadInMemoryCache() {
-  YDF_LOG(INFO) << "Loading features in memory";
+  LOG(INFO) << "Loading features in memory";
 
   const auto num_columns = meta_data().columns_size();
   in_memory_cache_.inorder_categorical_columns_.resize(num_columns);
@@ -567,8 +566,8 @@ absl::Status DatasetCacheReader::InitializeAndLoadInMemoryCache() {
   RETURN_IF_ERROR(worker_status);
 
   load_in_memory_duration_ = absl::Now() - begin;
-  YDF_LOG(INFO) << "Features loaded in memory in " << load_in_memory_duration_
-                << " for " << (memory_usage / (1024 * 1024)) << " MB";
+  LOG(INFO) << "Features loaded in memory in " << load_in_memory_duration_
+            << " for " << (memory_usage / (1024 * 1024)) << " MB";
   return absl::OkStatus();
 }
 
@@ -1003,9 +1002,8 @@ absl::Status PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
          col_idx++) {
       if (num_examples_per_columns[col_idx] !=
           num_examples_per_columns.front()) {
-        YDF_LOG(FATAL)
-            << "Invalid partial dataset cache: The different columns do "
-               "not have the same number of examples.";
+        LOG(FATAL) << "Invalid partial dataset cache: The different columns do "
+                      "not have the same number of examples.";
       }
     }
   }

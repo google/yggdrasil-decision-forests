@@ -149,7 +149,7 @@ TEST_F(End2End, Base) {
     EXPECT_EQ(reader->DiscretizedNumericalFeatureBoundaries(4).size(), 15);
   }
 
-  YDF_LOG(INFO) << reader->MetadataInformation();
+  LOG(INFO) << reader->MetadataInformation();
 }
 
 }  // namespace

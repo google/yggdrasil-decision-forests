@@ -15,22 +15,26 @@
 
 #include "yggdrasil_decision_forests/utils/logging_default.h"
 
+#include "absl/base/log_severity.h"
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
+#include "absl/log/flags.h"
+#include "absl/log/globals.h"
+#include "absl/log/initialize.h"
+#include "absl/log/log.h"
 
-namespace yggdrasil_decision_forests {
-namespace logging {
-int logging_level = 2;
-bool show_details = true;
-}  // namespace logging
-}  // namespace yggdrasil_decision_forests
-
-ABSL_FLAG(bool, alsologtostderr, true,
-         "If true, stream the logs to std::clog. If false, ignore the logs.");
+ABSL_FLAG(bool, alsologtostderr, false, "Log all messages to stderr");
 
 void InitLogging(const char* usage, int* argc, char*** argv,
                  bool remove_flags) {
   absl::SetProgramUsageMessage(usage);
   absl::ParseCommandLine(*argc, *argv);
+
+  if (absl::GetFlag(FLAGS_alsologtostderr)) {
+    absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+    absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
+  }
+
+  absl::InitializeLog();
 }

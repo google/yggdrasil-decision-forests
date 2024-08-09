@@ -33,6 +33,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/random/random.h"
 #include "absl/status/status.h"
@@ -150,7 +151,7 @@ void TrainAndTestTester::ConfigureForSyntheticDataset() {
       synthetic_dataset_.mutable_regression();
       break;
     default:
-      YDF_LOG(FATAL) << "Non supported task";
+      LOG(FATAL) << "Non supported task";
   }
 }
 
@@ -197,7 +198,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   }
   const auto log_dir = file::JoinPath(test::TmpDirectory(), test_dir_, "logs");
 
-  YDF_LOG(INFO) << "Set log directory: " << log_dir;
+  LOG(INFO) << "Set log directory: " << log_dir;
   learner_->set_log_directory(log_dir);
 
   // Apply custom loss if necessary.
@@ -221,9 +222,8 @@ void TrainAndTestTester::TrainAndEvaluateModel(
     learner_->set_stop_training_trigger(&stop_training);
     interrupter_thread = absl::make_unique<utils::concurrency::Thread>([&]() {
       absl::SleepFor(interrupt_training_after.value());
-      YDF_LOG(INFO)
-          << "Interrupt the training. Waiting for the learner to return "
-             "a model.";
+      LOG(INFO) << "Interrupt the training. Waiting for the learner to return "
+                   "a model.";
       stop_training = true;
     });
   }
@@ -263,7 +263,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
     interrupter_thread.reset();
   }
 
-  YDF_LOG(INFO) << "Training duration: " << training_duration_;
+  LOG(INFO) << "Training duration: " << training_duration_;
 
   // Evaluate the model.
   utils::RandomEngine rnd(1234);  // Not used
@@ -271,14 +271,14 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   // Print the model evaluation.
   const auto evaluation_description = metric::TextReport(evaluation_).value();
-  // YDF_LOG(INFO) << "Evaluation:\n" << evaluation_description;
+  // LOG(INFO) << "Evaluation:\n" << evaluation_description;
 
   // Export the evaluation to a html file.
   std::string html_evaluation_report;
   CHECK_OK(metric::AppendHtmlReport(evaluation_, &html_evaluation_report));
   const auto html_report_path =
       file::JoinPath(test::TmpDirectory(), test_dir_, "evaluation.html");
-  YDF_LOG(INFO) << "Export html report to: " << html_report_path;
+  LOG(INFO) << "Export html report to: " << html_report_path;
   CHECK_OK(file::SetContent(html_report_path, html_evaluation_report));
 
   if (!check_model) {
@@ -290,7 +290,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
       file::JoinPath(test::TmpDirectory(), test_dir_, "model");
   EXPECT_OK(SaveModel(model_path, model_.get(), model_io));
 
-  // YDF_LOG(INFO) << "Description:\n"
+  // LOG(INFO) << "Description:\n"
   //               <<
   //               model_->DescriptionAndStatistics(show_full_model_structure_);
 
@@ -322,12 +322,12 @@ void TrainAndTestTester::TrainAndEvaluateModel(
             // No metrics
             break;
           default:
-            YDF_LOG(FATAL) << "Not implemented";
+            LOG(FATAL) << "Not implemented";
         }
       };
 
   // Evaluate the model saved to disk.
-  YDF_LOG(INFO) << "Evaluate model saved to disk";
+  LOG(INFO) << "Evaluate model saved to disk";
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_OK(LoadModel(model_path, &loaded_model, model_io));
   rnd.seed(1234);
@@ -345,11 +345,11 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   // Ensure that the predictions of the semi-fast engine are similar as the
   // predictions of the generic engine.
-  YDF_LOG(INFO) << "Test generic engine";
+  LOG(INFO) << "Test generic engine";
   TestGenericEngine(*model_, test_dataset_);
 
   // Evaluation with disabled semi-fast engine.
-  YDF_LOG(INFO) << "Evaluate model without fast engine";
+  LOG(INFO) << "Evaluate model without fast engine";
   loaded_model->SetAllowFastEngine(false);
   rnd.seed(1234);
   const auto evaluation_loaded_model_no_fast_engine =
@@ -413,7 +413,7 @@ dataset::proto::DataSpecification TrainAndTestTester::BuildDataspec(
   }
   dataset::proto::DataSpecification data_spec;
   dataset::CreateDataSpec(dataset_path, false, guide_, &data_spec);
-  // YDF_LOG(INFO) << "Dataspec:\n"
+  // LOG(INFO) << "Dataspec:\n"
   //               << dataset::PrintHumanReadable(data_spec, false);
   return data_spec;
 }
@@ -535,7 +535,7 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
   }
 
   if (split_train_ratio_ == 1.0) {
-    YDF_LOG(INFO) << "Using the same dataset for training and evaluation";
+    LOG(INFO) << "Using the same dataset for training and evaluation";
     test_example_idxs = train_example_idxs;
   }
 
@@ -549,26 +549,26 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
     ShuffleDataset(&valid_dataset_);
   }
 
-  YDF_LOG(INFO) << "Number of examples: train:" << train_dataset_.nrow()
-                << " valid:" << valid_dataset_.nrow()
-                << " test:" << test_dataset_.nrow();
+  LOG(INFO) << "Number of examples: train:" << train_dataset_.nrow()
+            << " valid:" << valid_dataset_.nrow()
+            << " test:" << test_dataset_.nrow();
 }
 
 void TestGenericEngine(const model::AbstractModel& model,
                        const dataset::VerticalDataset& dataset) {
   auto engine_or = model.BuildFastEngine();
   if (!engine_or.ok()) {
-    YDF_LOG(INFO) << "Model " << model.name()
-                  << " does not implement any fast generic engine: "
-                  << engine_or.status().message();
+    LOG(INFO) << "Model " << model.name()
+              << " does not implement any fast generic engine: "
+              << engine_or.status().message();
     return;
   }
-  YDF_LOG(INFO) << "Testing fast generic engine.";
+  LOG(INFO) << "Testing fast generic engine.";
   auto engine = std::move(engine_or.value());
   ExpectEqualPredictions(dataset, model, *engine);
-  YDF_LOG(INFO) << "Fast generic and generic engine predictions match";
+  LOG(INFO) << "Fast generic and generic engine predictions match";
 
-  YDF_LOG(INFO) << "Check engine wrapper";
+  LOG(INFO) << "Check engine wrapper";
   const model::EngineWrapperModel wrapper_engine(&model, std::move(engine));
   for (int example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
     model::proto::Prediction generic, vertical_dataset, proto_example;
@@ -663,7 +663,7 @@ void ExpectEqualPredictions(const model::proto::Task task,
       break;
 
     default:
-      YDF_LOG(FATAL) << "Not supported task";
+      LOG(FATAL) << "Not supported task";
   }
 }
 
@@ -706,12 +706,12 @@ void ExpectEqualPredictions(
         } else if (predictions.size() == num_examples * num_classes) {
           compact_format = false;
         } else {
-          YDF_LOG(FATAL)
-              << "predictions for classification are expected to be of "
-                 "size \"num_row\" (compact format) or \"num_rows * "
-                 "num_classes\" (classical format). Got num_classes="
-              << num_classes << " predictions.size()=" << predictions.size()
-              << " num_examples=" << num_examples << ".";
+          LOG(FATAL) << "predictions for classification are expected to be of "
+                        "size \"num_row\" (compact format) or \"num_rows * "
+                        "num_classes\" (classical format). Got num_classes="
+                     << num_classes
+                     << " predictions.size()=" << predictions.size()
+                     << " num_examples=" << num_examples << ".";
         }
 
         if (compact_format) {
@@ -768,7 +768,7 @@ void ExpectEqualPredictions(
         break;
 
       default:
-        YDF_LOG(FATAL) << "Not supported task";
+        LOG(FATAL) << "Not supported task";
     }
     prediction_idx++;
   }
@@ -795,7 +795,7 @@ void TestPredefinedHyperParameters(
            predefined_hyper_parameters.size());
 
   for (const auto& hyper_parameters : predefined_hyper_parameters) {
-    YDF_LOG(INFO) << "Testing hyper-parameters " << hyper_parameters.name();
+    LOG(INFO) << "Testing hyper-parameters " << hyper_parameters.name();
     // Configure a learner
     std::unique_ptr<model::AbstractLearner> learner;
     CHECK_OK(model::GetLearner(train_config, &learner, {}));
@@ -943,7 +943,7 @@ absl::Status ExportUpliftPredictionsToTFUpliftCsvFormat(
         writer.WriteRow({uplift_str, response_str, weight_str, group_str}));
   }
   RETURN_IF_ERROR(output_handle->Close());
-  YDF_LOG(INFO) << "Uplift predictions exported to: " << output_csv_path;
+  LOG(INFO) << "Uplift predictions exported to: " << output_csv_path;
   return absl::OkStatus();
 }
 
@@ -1044,11 +1044,11 @@ void ExpectEqualGoldenModel(const model::AbstractModel& model,
         file::JoinPath(test::TmpDirectory(), "golden", model_name);
     ASSERT_OK(model::SaveModel(observed_model_path, &model));
 
-    YDF_LOG(INFO) << "The model unit test failed.";
-    YDF_LOG(INFO) << "";
-    YDF_LOG(INFO) << "Update the golden file with:\n"
-                  << "cp -R " << observed_model_path << " "
-                  << local_expected_model_path;
+    LOG(INFO) << "The model unit test failed.";
+    LOG(INFO) << "";
+    LOG(INFO) << "Update the golden file with:\n"
+              << "cp -R " << observed_model_path << " "
+              << local_expected_model_path;
     ASSERT_OK(status);
   }
 }

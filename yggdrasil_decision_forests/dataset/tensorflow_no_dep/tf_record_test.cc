@@ -19,7 +19,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/strings/str_cat.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -94,7 +94,7 @@ TEST(TFRecord, Reader) {
     if (!has_value) {
       break;
     }
-    YDF_LOG(INFO) << message.DebugString();
+    LOG(INFO) << message.DebugString();
     if (message_idx == 3) {
       EXPECT_THAT(message, EqualsProto(ThirdExample()));
     }
@@ -116,7 +116,7 @@ TEST(TFRecord, ShardedReader) {
     if (!has_value) {
       break;
     }
-    YDF_LOG(INFO) << message.DebugString();
+    LOG(INFO) << message.DebugString();
     if (message_idx == 3) {
       EXPECT_THAT(message, EqualsProto(ThirdExample()));
     }

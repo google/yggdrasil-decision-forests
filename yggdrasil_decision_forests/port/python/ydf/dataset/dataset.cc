@@ -32,12 +32,12 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/optional.h"
-#include "absl/types/span.h"
 #include "pybind11_protobuf/native_proto_caster.h"  // IWYU pragma : keep
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -404,12 +404,12 @@ absl::StatusOr<dataset::proto::Column> CreateCategoricalColumnSpec(
                          name, max_vocab_count));
   }
   if (max_vocab_count == -1) {
-    YDF_LOG(INFO) << "max_vocab_count = -1 for column " << name
-                  << ", the dictionary will not be pruned by size.";
+    LOG(INFO) << "max_vocab_count = -1 for column " << name
+              << ", the dictionary will not be pruned by size.";
   }
   if (max_vocab_count == 0) {
-    YDF_LOG(WARNING) << "max_vocab_count = 0 for column " << name
-                     << ", the dictionary will only contain OOD values.";
+    LOG(WARNING) << "max_vocab_count = 0 for column " << name
+                 << ", the dictionary will only contain OOD values.";
   }
   if (min_vocab_frequency < 0) {
     return absl::InvalidArgumentError(
@@ -749,7 +749,7 @@ absl::Status CheckDataSpecForPathReading(
           column.type() == dataset::proto::CATEGORICAL_SET) {
         if (column.tokenizer().splitter() !=
             dataset::proto::Tokenizer::NO_SPLITTING) {
-          YDF_LOG(INFO)
+          LOG(INFO)
               << "Column " << column.name()
               << " has type CATEGORICAL_SET and will be tokenized. Set the "
                  "column type to CATEGORICAL or deactivate the tokenizer in "

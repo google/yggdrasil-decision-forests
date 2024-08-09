@@ -74,7 +74,7 @@ bool GenerateShardedFilenames(absl::string_view spec,
 
   int int_count;
   if (count == "*") {
-    YDF_LOG(WARNING) << "Non defined shard count not supported in " << spec;
+    LOG(WARNING) << "Non defined shard count not supported in " << spec;
     return false;
   } else if (absl::SimpleAtoi(count, &int_count)) {
   } else {
@@ -271,7 +271,7 @@ std::string GetBasename(absl::string_view path) {
 #endif
     return filename;
   } catch (const std::exception& e) {
-    YDF_LOG(ERROR) << "Error parsing basename of " << path << ": " << e.what();
+    LOG(ERROR) << "Error parsing basename of " << path << ": " << e.what();
     return "";
   }
 }

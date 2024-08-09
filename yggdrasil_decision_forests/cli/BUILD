@@ -105,10 +105,8 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_reader",
         "//yggdrasil_decision_forests/dataset:example_writer",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
-        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/status:statusor",
     ],
@@ -190,6 +188,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:feature_importance",
         "//yggdrasil_decision_forests/utils:logging",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
     ],
 )
 

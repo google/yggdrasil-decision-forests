@@ -48,6 +48,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:uid",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
+        "@com_google_absl//absl/log",
     ] + select({
         "//conditions:default": ["//yggdrasil_decision_forests/learner:all_learners"],
     }),

@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {

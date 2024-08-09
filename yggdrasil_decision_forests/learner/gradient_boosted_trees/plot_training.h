@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_PLOT_TRAINING_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_PLOT_TRAINING_H_
 
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 

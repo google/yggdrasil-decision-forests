@@ -104,7 +104,7 @@ TEST(LearnerWrappers, LearnerKeyToClassName) {
 
 TEST(LearnerWrappers, Base) {
   ASSERT_OK_AND_ASSIGN(const auto content, GenLearnerWrapper());
-  YDF_LOG(INFO) << "content:\n" << content;
+  LOG(INFO) << "content:\n" << content;
 
   EXPECT_THAT(content, HasSubstr(R"(
 class FakeAlgorithmLearner(generic_learner.GenericLearner):

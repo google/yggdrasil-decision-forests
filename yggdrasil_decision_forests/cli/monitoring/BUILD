@@ -14,6 +14,7 @@ cc_binary_ydf(
     srcs = ["benchmark_training.cc"],
     deps = [
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",

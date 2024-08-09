@@ -64,7 +64,7 @@ TEST_F(CartOnAdult, Base) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   utils::ExpectEqualGoldenModel(*model_, "cart_adult");
 }

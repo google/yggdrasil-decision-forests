@@ -88,13 +88,13 @@ public:
   // Initialize the worker with the welcome blob.
   // Note: "Blob" is an alias for "std::string".
   absl::Status Setup(Blob welcome_blob) override {
-    YDF_LOG(INFO) << "I am worker #" << WorkerIdx();
+    LOG(INFO) << "I am worker #" << WorkerIdx();
     return absl::OkStatus();
   }
 
   // Stop the worker.
   absl::Status Done() override {
-    YDF_LOG(INFO) << "Bye";
+    LOG(INFO) << "Bye";
     return absl::OkStatus();
   }
 

@@ -47,6 +47,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 
 namespace yggdrasil_decision_forests {

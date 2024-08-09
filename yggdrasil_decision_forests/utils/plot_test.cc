@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/utils/plot.h"
 
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -91,7 +92,7 @@ TEST(Plot, Base) {
 
   const auto html_plot = ExportToHtml(plot).value();
   const auto path = file::JoinPath(test::TmpDirectory(), "plot.html");
-  YDF_LOG(INFO) << "path: " << path;
+  LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_plot));
 
   // The plot has been checked by hand.
@@ -207,7 +208,7 @@ TEST(MultiPlot, Base) {
 
   const auto html_plot = ExportToHtml(multiplot).value();
   const auto path = file::JoinPath(test::TmpDirectory(), "multiplot.html");
-  YDF_LOG(INFO) << "path: " << path;
+  LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_plot));
 
   // The plot has been checked by hand.

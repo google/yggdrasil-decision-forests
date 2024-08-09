@@ -21,6 +21,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
@@ -128,7 +129,7 @@ absl::Status LoadModel(absl::string_view directory,
   if (is_tensorflow_saved_model.ok() && is_tensorflow_saved_model.value()) {
     effective_directory =
         file::JoinPath(effective_directory, kTensorFlowDecisionForestsAssets);
-    YDF_LOG(INFO)
+    LOG(INFO)
         << "Detected `" << kTensorFlowSavedModelProtoFileName
         << "` in directory " << directory
         << ". Loading a TensorFlow Decision Forests model from C++ YDF or "

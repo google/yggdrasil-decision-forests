@@ -79,8 +79,8 @@ void Train() {
     config.mutable_metadata()->set_framework("Yggdrasil cli");
   }
 
-  YDF_LOG(INFO) << "Configuration:\n" << config.DebugString();
-  YDF_LOG(INFO) << "Deployment:\n" << deployment.DebugString();
+  LOG(INFO) << "Configuration:\n" << config.DebugString();
+  LOG(INFO) << "Deployment:\n" << deployment.DebugString();
 
   std::unique_ptr<model::AbstractLearner> learner;
   QCHECK_OK(model::GetLearner(config, &learner));
@@ -93,13 +93,13 @@ void Train() {
     valid_dataset = absl::GetFlag(FLAGS_valid_dataset);
   }
 
-  YDF_LOG(INFO) << "Start training model.";
+  LOG(INFO) << "Start training model.";
   auto model = learner
                    ->TrainWithStatus(absl::GetFlag(FLAGS_dataset), data_spec,
                                      valid_dataset)
                    .value();
 
-  YDF_LOG(INFO) << "Save model.";
+  LOG(INFO) << "Save model.";
   QCHECK_OK(model::SaveModel(absl::GetFlag(FLAGS_output), model.get()));
 }
 

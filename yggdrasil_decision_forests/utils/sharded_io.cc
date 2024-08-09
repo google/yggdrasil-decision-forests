@@ -19,13 +19,11 @@
 #include <string>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
-#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -60,8 +58,7 @@ absl::Status ExpandInputShards(const absl::string_view sharded_path,
       level_3.insert(level_3.end(), level_2_item_sharded.begin(),
                      level_2_item_sharded.end());
     } else {
-      YDF_LOG(WARNING) << "Path \"" << level_2_item
-                       << "\" does not match any file";
+      LOG(WARNING) << "Path \"" << level_2_item << "\" does not match any file";
       level_3.push_back(level_2_item);
     }
   }

@@ -375,7 +375,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // Since all the attributes have the same value, there are no valid splits.
   attributes = {1, 1, 1, 1, 1, 1};
@@ -386,7 +386,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
@@ -443,7 +443,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // Since all the attributes have the same value, there are no valid splits.
   attributes = {1, 1, 1, 1, 1, 1};
@@ -454,7 +454,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBaseAdvances) {
@@ -504,9 +504,9 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseAdvances) {
                     min_num_obs, dt_config, label_distribution, -1, &rnd,
                     &best_condition, &cache),
                 SplitSearchResult::kBetterSplitFound);
-      YDF_LOG(INFO) << "num_label_classes:" << num_label_classes
-                    << " num_attribute_classes:" << num_attribute_classes;
-      YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+      LOG(INFO) << "num_label_classes:" << num_label_classes
+                << " num_attribute_classes:" << num_attribute_classes;
+      LOG(INFO) << "Condition:\n" << best_condition.DebugString();
     }
   }
 }
@@ -761,7 +761,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForClassification) {
                 num_label_classes, min_num_obs, dt_config, label_distribution,
                 -1, &best_condition, &cache),
             SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 template <typename TestParam>
@@ -844,7 +844,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartIsNaForRegression) {
               SplitSearchResult::kNoBetterSplitFound);
   }
 
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitHistogramForRegression) {
@@ -1162,7 +1162,7 @@ TYPED_TEST(FindBestSplitTest,
           &best_condition, &cache),
       SplitSearchResult::kBetterSplitFound);
 
-  YDF_LOG(INFO) << "Condition: " << best_condition.condition().DebugString();
+  LOG(INFO) << "Condition: " << best_condition.condition().DebugString();
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 3.0f);
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 5);
@@ -1249,7 +1249,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
         SplitSearchResult::kNoBetterSplitFound);
   }
 
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // Since all the attributes have the same value, there are no valid splits.
   attributes = {1, 1, 1, 1, 1, 1};
@@ -1259,7 +1259,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
                 num_attribute_classes, na_replacement, min_num_obs, dt_config,
                 label_distribution, -1, &best_condition, &cache, &rnd),
             SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
@@ -1304,7 +1304,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
                 num_label_classes, false, min_num_obs, dt_config,
                 label_distribution, -1, &best_condition, &cache),
             SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TYPED_TEST(FindBestSplitTest,
@@ -1365,7 +1365,7 @@ TYPED_TEST(FindBestSplitTest,
           selected_examples, weights, attributes, labels, false, min_num_obs,
           dt_config, label_distribution, -1, &best_condition, &cache),
       SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, LocalImputationForNumericalAttribute) {
@@ -1480,7 +1480,7 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // Since all the attributes have the same value, there are no valid splits.
   attributes = {1, 1, 1, 1, 1, 1};
@@ -1490,7 +1490,7 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // All the attribute value are NA.
   attributes = {-1, -1, -1, -1, -1, -1};
@@ -1500,7 +1500,7 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, LocalImputationForBooleanAttribute) {

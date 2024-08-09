@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -408,9 +409,8 @@ RandomForestLearner::TrainWithStatusImpl(
 
   if (training_config().task() == model::proto::Task::NUMERICAL_UPLIFT &&
       rf_config.compute_oob_performances()) {
-    YDF_LOG(WARNING)
-        << "RF does not support OOB performances with the numerical "
-           "uplift task (yet).";
+    LOG(WARNING) << "RF does not support OOB performances with the numerical "
+                    "uplift task (yet).";
     rf_config.set_compute_oob_performances(false);
   }
 
@@ -425,9 +425,9 @@ RandomForestLearner::TrainWithStatusImpl(
   mdl->set_data_spec(train_dataset.data_spec());
   internal::InitializeModelWithTrainingConfig(config_with_default, config_link,
                                               mdl.get());
-  YDF_LOG(INFO) << "Training random forest on " << train_dataset.nrow()
-                << " example(s) and " << config_link.features().size()
-                << " feature(s).";
+  LOG(INFO) << "Training random forest on " << train_dataset.nrow()
+            << " example(s) and " << config_link.features().size()
+            << " feature(s).";
   RETURN_IF_ERROR(CheckConfiguration(train_dataset.data_spec(),
                                      config_with_default, config_link,
                                      rf_config, deployment()));
@@ -588,7 +588,7 @@ RandomForestLearner::TrainWithStatusImpl(
         if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
           if (!training_stopped_early) {
             training_stopped_early = true;
-            YDF_LOG(INFO) << "Training interrupted per request";
+            LOG(INFO) << "Training interrupted per request";
           }
           return;
         }
@@ -607,8 +607,8 @@ RandomForestLearner::TrainWithStatusImpl(
                   training_config().maximum_training_duration_seconds())) {
             if (!training_stopped_early) {
               training_stopped_early = true;
-              YDF_LOG(INFO) << "Stop training because of the maximum training "
-                               "duration.";
+              LOG(INFO) << "Stop training because of the maximum training "
+                           "duration.";
             }
             return;
           }
@@ -650,7 +650,7 @@ RandomForestLearner::TrainWithStatusImpl(
             static bool already_shown = false;
             if (!already_shown) {
               already_shown = true;
-              YDF_LOG(WARNING)
+              LOG(WARNING)
                   << "Example sampling without replacement "
                      "(sampling_with_replacement=false) with a sampling ratio "
                      "of 1 (bootstrap_size_ratio=1). All the examples "
@@ -707,11 +707,11 @@ RandomForestLearner::TrainWithStatusImpl(
                     training_config().maximum_model_size_in_memory_in_bytes()) {
               if (!training_stopped_early) {
                 training_stopped_early = true;
-                YDF_LOG(INFO) << "Stop training after " << num_trained_trees
-                              << " trees because the model size exceeded "
-                                 "maximum_model_size_in_memory_in_bytes="
-                              << training_config()
-                                     .maximum_model_size_in_memory_in_bytes();
+                LOG(INFO) << "Stop training after " << num_trained_trees
+                          << " trees because the model size exceeded "
+                             "maximum_model_size_in_memory_in_bytes="
+                          << training_config()
+                                 .maximum_model_size_in_memory_in_bytes();
               }
               // Remove the tree that was just trained.
               decision_tree.reset();
@@ -809,7 +809,7 @@ RandomForestLearner::TrainWithStatusImpl(
             absl::StrAppendFormat(
                 &snippet, " (tree index:%d) done %s", tree_idx,
                 internal::EvaluationSnippet(evaluation.evaluation()));
-            YDF_LOG(INFO) << snippet;
+            LOG(INFO) << snippet;
           }
 
           // Variable importance.
@@ -828,10 +828,10 @@ RandomForestLearner::TrainWithStatusImpl(
             }
           }
         } else {
-          LOG_INFO_EVERY_N_SEC(
-              20, _ << "Training of tree " << current_num_trained_trees << "/"
-                    << rf_config.num_trees() << " (tree index:" << tree_idx
-                    << ") done");
+          LOG_EVERY_N_SEC(INFO, 20)
+              << "Training of tree " << current_num_trained_trees << "/"
+              << rf_config.num_trees() << " (tree index:" << tree_idx
+              << ") done";
         }
       });
     }
@@ -881,15 +881,15 @@ RandomForestLearner::TrainWithStatusImpl(
             "growth of the tree (e.g. maximum depth)"));
       }
       trees.erase(trees.begin() + num_trees_to_keep, trees.end());
-      YDF_LOG(INFO) << "Retaining the first " << num_trees_to_keep
-                    << " trees to satisfy the "
-                       "\"total_max_num_nodes\" constraint.";
+      LOG(INFO) << "Retaining the first " << num_trees_to_keep
+                << " trees to satisfy the "
+                   "\"total_max_num_nodes\" constraint.";
     }
   }
 
   if (compute_oob_performances &&
       !mdl->mutable_out_of_bag_evaluations()->empty()) {
-    YDF_LOG(INFO)
+    LOG(INFO)
         << "Final OOB metrics: "
         << internal::EvaluationSnippet(
                mdl->mutable_out_of_bag_evaluations()->back().evaluation());
@@ -1006,13 +1006,13 @@ void UpdateOOBPredictionsWithNewTree(
         AddRegressionLeafToAccumulator(*leaf, &accumulator.regression);
         break;
       case model::proto::Task::RANKING:
-        YDF_LOG(FATAL) << "OOB not implemented for Uplift.";
+        LOG(FATAL) << "OOB not implemented for Uplift.";
         break;
       case model::proto::Task::CATEGORICAL_UPLIFT:
         AddUpliftLeafToAccumulator(*leaf, &accumulator.uplift);
         break;
       default:
-        YDF_LOG(WARNING) << "Not implemented";
+        LOG(WARNING) << "Not implemented";
     }
   }
 }
@@ -1042,7 +1042,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     case model::proto::Task::NUMERICAL_UPLIFT:
       break;
     default:
-      YDF_LOG(WARNING) << "Not implemented";
+      LOG(WARNING) << "Not implemented";
   }
   if (weight_links.has_value()) {
     // Note: The "weights" of "eval_options" won't be used, but "has_weights()"
@@ -1084,7 +1084,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
             prediction_accumulator.uplift.end()};
         break;
       default:
-        YDF_LOG(WARNING) << "Not implemented";
+        LOG(WARNING) << "Not implemented";
     }
     RETURN_IF_ERROR(model::SetGroundTruth(
         train_dataset, example_idx,
@@ -1104,7 +1104,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
       metric::FinalizeEvaluation(eval_options, label_column_spec, &evaluation));
   if (!for_permutation_importance &&
       evaluation.sampled_predictions_size() != 0) {
-    YDF_LOG(WARNING) << "Internal error: Non empty oob evaluation";
+    LOG(WARNING) << "Internal error: Non empty oob evaluation";
     evaluation.clear_sampled_predictions();
   }
   return evaluation;

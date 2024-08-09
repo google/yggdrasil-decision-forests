@@ -24,7 +24,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
@@ -97,7 +96,7 @@ GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path) {
 std::string FormatToRecommendedExtension(proto::DatasetFormat format) {
   switch (format) {
     case proto::INVALID:
-      YDF_LOG(FATAL) << "Invalid format";
+      LOG(FATAL) << "Invalid format";
       break;
     case proto::FORMAT_CSV:
       return "csv";
@@ -113,7 +112,7 @@ std::string FormatToRecommendedExtension(proto::DatasetFormat format) {
 std::string DatasetFormatToPrefix(proto::DatasetFormat format) {
   switch (format) {
     case proto::INVALID:
-      YDF_LOG(FATAL) << "Invalid format";
+      LOG(FATAL) << "Invalid format";
       break;
     case proto::FORMAT_CSV:
       return FORMAT_CSV;

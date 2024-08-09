@@ -68,7 +68,7 @@ class IsolationForestOnGaussians : public utils::TrainAndTestTester {
 
 TEST_F(IsolationForestOnGaussians, DefaultHyperParameters) {
   TrainAndEvaluateModel();
-  YDF_LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
 
   utils::RandomEngine rnd;
   metric::proto::EvaluationOptions options;
@@ -79,7 +79,7 @@ TEST_F(IsolationForestOnGaussians, DefaultHyperParameters) {
                                    model::proto::Task::CLASSIFICATION,
                                    model_->label_col_idx(), -1, &rnd));
 
-  YDF_LOG(INFO) << "Evaluation:\n" << metric::TextReport(evaluation).value();
+  LOG(INFO) << "Evaluation:\n" << metric::TextReport(evaluation).value();
   EXPECT_NEAR(evaluation.classification().rocs(1).auc(), 0.99, 0.005f);
 
   EXPECT_EQ(model_->task(), model::proto::Task::ANOMALY_DETECTION);
@@ -110,7 +110,7 @@ class IsolationForestOnAdult : public utils::TrainAndTestTester {
 
 TEST_F(IsolationForestOnAdult, DefaultHyperParameters) {
   TrainAndEvaluateModel();
-  YDF_LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
 }
 
 class IsolationForestOnMammographicMasses : public utils::TrainAndTestTester {
@@ -132,7 +132,7 @@ class IsolationForestOnMammographicMasses : public utils::TrainAndTestTester {
 
 TEST_F(IsolationForestOnMammographicMasses, DefaultHyperParameters) {
   TrainAndEvaluateModel();
-  YDF_LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
 }
 
 TEST(IsolationForest, BadTask) {

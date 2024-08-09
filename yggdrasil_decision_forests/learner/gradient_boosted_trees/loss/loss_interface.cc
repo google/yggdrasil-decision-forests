@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
@@ -149,7 +150,7 @@ absl::Status RankingGroupsIndices::Initialize(
               });
 
     if (group.second.size() > kMaximumItemsInRankingGroup) {
-      YDF_LOG(WARNING)
+      LOG(WARNING)
           << "The number of items in the group \"" << group.first << "\" is "
           << group.second.size() << " which is greater than "
           << kMaximumItemsInRankingGroup
@@ -169,8 +170,8 @@ absl::Status RankingGroupsIndices::Initialize(
     }
     return a.items.front().example_idx < b.items.front().example_idx;
   });
-  YDF_LOG(INFO) << "Found " << groups_.size() << " groups in " << dataset.nrow()
-                << " examples.";
+  LOG(INFO) << "Found " << groups_.size() << " groups in " << dataset.nrow()
+            << " examples.";
   return absl::OkStatus();
 }
 

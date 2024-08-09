@@ -16,7 +16,9 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CLI_WORKER_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CLI_WORKER_H_
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute_cli/common.h"

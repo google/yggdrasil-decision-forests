@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -63,22 +64,22 @@ class Engine1 : public serving::FastEngine {
  public:
   std::unique_ptr<serving::AbstractExampleSet> AllocateExamples(
       int num_examples) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return {};
   }
 
   void Predict(const serving::AbstractExampleSet& examples, int num_examples,
                std::vector<float>* predictions) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
   }
 
   int NumPredictionDimension() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return 1;
   }
 
   const serving::FeaturesDefinition& features() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return features_;
   }
 
@@ -117,22 +118,22 @@ class Engine2 : public serving::FastEngine {
  public:
   std::unique_ptr<serving::AbstractExampleSet> AllocateExamples(
       int num_examples) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return {};
   }
 
   void Predict(const serving::AbstractExampleSet& examples, int num_examples,
                std::vector<float>* predictions) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
   }
 
   int NumPredictionDimension() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return 1;
   }
 
   const serving::FeaturesDefinition& features() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return features_;
   }
 

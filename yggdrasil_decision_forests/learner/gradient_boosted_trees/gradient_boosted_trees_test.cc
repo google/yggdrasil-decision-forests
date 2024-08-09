@@ -34,6 +34,7 @@
 #include "gtest/gtest.h"
 #include "absl/container/btree_set.h"
 #include "absl/container/fixed_array.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -684,7 +685,7 @@ TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraints) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   QCHECK_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",
@@ -723,7 +724,7 @@ TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraintsPure) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   EXPECT_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",
@@ -761,7 +762,7 @@ TEST_F(GradientBoostedTreesOnAdult, DecreasingMonotonicConstraints) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   QCHECK_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",
@@ -798,7 +799,7 @@ TEST_F(GradientBoostedTreesOnAdult, ObliqueMonotonicConstraints) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   QCHECK_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",
@@ -1007,16 +1008,16 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingExact) {
   // Shard the training dataset.
   const auto sharded_path = ShardDataset(train_ds_, 20, 0.3);
 
-  YDF_LOG(INFO) << "Train sharded model";
+  LOG(INFO) << "Train sharded model";
   gbt_config->mutable_sample_with_shards();
 
   const auto model = learner->TrainWithStatus(sharded_path, data_spec_).value();
 
-  YDF_LOG(INFO) << "Evaluate models";
+  LOG(INFO) << "Evaluate models";
   // Evaluate the models.
   utils::RandomEngine rnd(1234);
   const auto evaluation = model->Evaluate(test_ds_, {}, &rnd);
-  YDF_LOG(INFO) << "Evaluation:" << metric::TextReport(evaluation).value();
+  LOG(INFO) << "Evaluation:" << metric::TextReport(evaluation).value();
 
   // Sharded model is "good".
   const auto nan = std::numeric_limits<double>::quiet_NaN();
@@ -1561,7 +1562,7 @@ TEST_F(GradientBoostedTreesOnAdult, MakingAModelPurePureServingModel) {
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8676, 0.0129, 0.8615);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.0167, 0.2977);
   const auto pre_pruning_size = model_->ModelSizeInBytes().value();
-  YDF_LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
+  LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
 
   CHECK_OK(model_->MakePureServing());
 
@@ -1569,7 +1570,7 @@ TEST_F(GradientBoostedTreesOnAdult, MakingAModelPurePureServingModel) {
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.0167, 0.2977);
 
   const auto post_pruning_size = model_->ModelSizeInBytes().value();
-  YDF_LOG(INFO) << "post_pruning_size:" << post_pruning_size;
+  LOG(INFO) << "post_pruning_size:" << post_pruning_size;
   EXPECT_LE(static_cast<float>(post_pruning_size) / pre_pruning_size, 0.80);
 }
 
@@ -1675,7 +1676,7 @@ TEST_F(GradientBoostedTreesOnAbalone, MonotonicConstraintsPure) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   EXPECT_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",

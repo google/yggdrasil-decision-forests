@@ -77,7 +77,7 @@ void AppendVerticalDatasetToHtml(const VerticalDataset& dataset,
   h::Html content;
   if (options.interactive_column_sorting) {
     if (options.id.empty()) {
-      YDF_LOG(WARNING) << "sortable tables require a id.";
+      LOG(WARNING) << "sortable tables require a id.";
     }
     content.Append(h::Table(a::Class("sortable"), a::Id(options.id), rows));
   } else {

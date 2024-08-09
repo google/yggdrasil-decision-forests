@@ -102,7 +102,7 @@ TEST(DataSpecUtil, PrintHumanReadableWithDType) {
         columns { name: "f2" type: NUMERICAL dtype: DTYPE_INT64 }
       )pb");
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  YDF_LOG(INFO) << readable_representation;
+  LOG(INFO) << readable_representation;
   std::string expected_result =
       R"(Number of records: 0
 Number of columns: 2
@@ -148,7 +148,7 @@ TEST(Dataset, DiscretizeAdult) {
   dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
 
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  YDF_LOG(INFO) << readable_representation;
+  LOG(INFO) << readable_representation;
   std::string expected_result = R"(Number of records: 32561
 Number of columns: 2
 
@@ -184,7 +184,7 @@ TEST(Dataset, AdultAllDiscretized) {
       )pb");
   dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
-  YDF_LOG(INFO) << readable_representation;
+  LOG(INFO) << readable_representation;
   std::string expected_result = R"(Number of records: 32561
 Number of columns: 15
 

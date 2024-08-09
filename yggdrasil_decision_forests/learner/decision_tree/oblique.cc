@@ -28,6 +28,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/optional.h"
 #include "Eigen/Dense"
 #include "Eigen/Eigenvalues"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
