@@ -4584,7 +4584,8 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
     if (error_on_wrong_splitter_statistics) {
       return absl::InternalError(message);
     } else {
-      LOG(WARNING) << message;
+      // Logging this message too often will crash.
+      LOG_FIRST_N(WARNING, 10) << message;
     }
   }
   return absl::OkStatus();
