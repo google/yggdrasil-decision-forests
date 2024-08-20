@@ -129,7 +129,9 @@ absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
   utils::RandomEngine rnd;
   ASSIGN_OR_RETURN(
       const auto evaluation,
-      model_->EvaluateWithEngine(*engine, dataset, effective_options, &rnd));
+      model_->EvaluateWithEngineOverrideType(
+          *engine, dataset, effective_options, effective_options.task(),
+          label_col_idx(), model_->ranking_group_col_idx(), &rnd));
   return evaluation;
 }
 

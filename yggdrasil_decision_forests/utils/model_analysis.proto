@@ -45,6 +45,8 @@ message Options {
   // Measure the importance of each input feature using permutation variable
   // importance:
   // https://christophm.github.io/interpretable-ml-book/feature-importance.html.
+  // Permuted variable importances are not yet supported for anomaly detection
+  // models.
   optional PermutedVariableImportance permuted_variable_importance = 7;
 
   message PermutedVariableImportance {

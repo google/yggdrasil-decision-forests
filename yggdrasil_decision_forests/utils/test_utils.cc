@@ -267,7 +267,16 @@ void TrainAndTestTester::TrainAndEvaluateModel(
 
   // Evaluate the model.
   utils::RandomEngine rnd(1234);  // Not used
-  evaluation_ = model_->Evaluate(test_dataset_, eval_options_, &rnd);
+  if (evaluation_override_type_ != model::proto::Task::UNDEFINED) {
+    evaluation_ =
+        model_
+            ->EvaluateOverrideType(
+                test_dataset_, eval_options_, evaluation_override_type_,
+                model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd)
+            .value();
+  } else {
+    evaluation_ = model_->Evaluate(test_dataset_, eval_options_, &rnd);
+  }
 
   // Print the model evaluation.
   const auto evaluation_description = metric::TextReport(evaluation_).value();
@@ -331,8 +340,18 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   std::unique_ptr<model::AbstractModel> loaded_model;
   EXPECT_OK(LoadModel(model_path, &loaded_model, model_io));
   rnd.seed(1234);
-  const auto evaluation_loaded_model =
-      loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+  metric::proto::EvaluationResults evaluation_loaded_model;
+  if (evaluation_override_type_ != model::proto::Task::UNDEFINED) {
+    evaluation_loaded_model =
+        loaded_model
+            ->EvaluateOverrideType(
+                test_dataset_, eval_options_, evaluation_override_type_,
+                model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd)
+            .value();
+  } else {
+    evaluation_loaded_model =
+        loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+  }
 
   // Test that the exported model evaluation is the same as the original model
   // evaluation.
@@ -352,16 +371,36 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   LOG(INFO) << "Evaluate model without fast engine";
   loaded_model->SetAllowFastEngine(false);
   rnd.seed(1234);
-  const auto evaluation_loaded_model_no_fast_engine =
-      loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+  metric::proto::EvaluationResults evaluation_loaded_model_no_fast_engine;
+  if (evaluation_override_type_ != model::proto::Task::UNDEFINED) {
+    evaluation_loaded_model_no_fast_engine =
+        loaded_model
+            ->EvaluateOverrideType(
+                test_dataset_, eval_options_, evaluation_override_type_,
+                model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd)
+            .value();
+  } else {
+    evaluation_loaded_model_no_fast_engine =
+        loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+  }
   check_evaluation_is_equal(evaluation_loaded_model,
                             evaluation_loaded_model_no_fast_engine);
 
   // Test that the pure version of the model is equal to the non-pure version.
   EXPECT_OK(loaded_model->MakePureServing());
   rnd.seed(1234);
-  const auto evaluation_loaded_and_pure_model =
-      loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+  metric::proto::EvaluationResults evaluation_loaded_and_pure_model;
+  if (evaluation_override_type_ != model::proto::Task::UNDEFINED) {
+    evaluation_loaded_and_pure_model =
+        loaded_model
+            ->EvaluateOverrideType(
+                test_dataset_, eval_options_, evaluation_override_type_,
+                model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd)
+            .value();
+  } else {
+    evaluation_loaded_and_pure_model =
+        loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+  }
   check_evaluation_is_equal(evaluation_, evaluation_loaded_and_pure_model);
 }
 
@@ -424,7 +463,9 @@ void TrainAndTestTester::FixConfiguration(
     int32_t* numerical_weight_attribute_idx,
     float* max_numerical_weight_value) {
   eval_options_.set_bootstrapping_samples(100);
-  eval_options_.set_task(train_config_.task());
+  if (train_config_.task() != model::proto::ANOMALY_DETECTION) {
+    eval_options_.set_task(train_config_.task());
+  }
 
   *numerical_weight_attribute_idx = -1;
   *max_numerical_weight_value = -1;

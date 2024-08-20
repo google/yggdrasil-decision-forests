@@ -20,15 +20,18 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.pb.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
+#include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -60,7 +63,8 @@ class IsolationForestOnGaussians : public utils::TrainAndTestTester {
     train_config_.add_features("f.*");
     train_config_.set_label("label");
     dataset_filename_ = "gaussians_train.csv";
-    eval_options_.set_task(model::proto::Task::ANOMALY_DETECTION);
+    eval_options_.set_task(model::proto::Task::CLASSIFICATION);
+    evaluation_override_type_ = model::proto::CLASSIFICATION;
 
     if_config()->set_subsample_count(100);
   }
@@ -91,6 +95,18 @@ TEST_F(IsolationForestOnGaussians, DefaultHyperParameters) {
   EXPECT_GT(if_model->NumNodes(), if_model->num_trees() * 32);
 }
 
+TEST_F(IsolationForestOnGaussians, Accuracy) {
+  // Warning: This evaluates on the training dataset.
+  dataset_test_filename_ = "gaussians_test.csv";
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_subsample_count(256);
+  if_config->set_num_trees(100);
+  TrainAndEvaluateModel();
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.97, 0.025);
+}
+
 class IsolationForestOnAdult : public utils::TrainAndTestTester {
   proto::IsolationForestTrainingConfig* if_config() {
     return train_config_.MutableExtension(
@@ -102,7 +118,8 @@ class IsolationForestOnAdult : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::ANOMALY_DETECTION);
     train_config_.set_label("income");
     dataset_filename_ = "adult_train.csv";
-    eval_options_.set_task(model::proto::Task::ANOMALY_DETECTION);
+    eval_options_.set_task(model::proto::Task::CLASSIFICATION);
+    evaluation_override_type_ = model::proto::CLASSIFICATION;
 
     if_config()->set_subsample_count(100);
   }
@@ -124,15 +141,26 @@ class IsolationForestOnMammographicMasses : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::ANOMALY_DETECTION);
     train_config_.set_label("Severity");
     dataset_filename_ = "mammographic_masses.csv";
-    eval_options_.set_task(model::proto::Task::ANOMALY_DETECTION);
+    auto* label_guide = guide_.add_column_guides();
+    label_guide->set_column_name_pattern("Severity");
+    label_guide->set_type(dataset::proto::CATEGORICAL);
+    eval_options_.set_task(model::proto::Task::CLASSIFICATION);
+    evaluation_override_type_ = model::proto::CLASSIFICATION;
 
     if_config()->set_subsample_count(100);
   }
 };
 
-TEST_F(IsolationForestOnMammographicMasses, DefaultHyperParameters) {
+TEST_F(IsolationForestOnMammographicMasses, Accuracy) {
+  // Warning: This evaluates on the training dataset.
+  dataset_test_filename_ = "mammographic_masses.csv";
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_subsample_count(256);
+  if_config->set_num_trees(100);
   TrainAndEvaluateModel();
   LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.51, 0.02);
 }
 
 TEST(IsolationForest, BadTask) {

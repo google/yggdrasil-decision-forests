@@ -757,8 +757,9 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
                          options.cep().example_sampling()));
   }
 
+  // TODO: Implement permuted variable importances for anomaly detection.
   if (options.permuted_variable_importance().enabled() &&
-      model.label_col_idx() != -1) {
+      model.task() != model::proto::ANOMALY_DETECTION) {
     RETURN_IF_ERROR(ComputePermutationFeatureImportance(
         dataset, &model, analysis.mutable_variable_importances(),
         {options.num_threads(),

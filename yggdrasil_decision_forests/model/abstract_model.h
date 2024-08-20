@@ -225,16 +225,28 @@ class AbstractModel {
       const metric::proto::EvaluationOptions& option, utils::RandomEngine* rnd,
       std::vector<model::proto::Prediction>* predictions = nullptr) const;
 
-  // Similar to "Evaluate", but allow to override the evaluation objective.
+  // Similar to "EvaluateWithStatus", but allow to override the evaluation
+  // objective.
   absl::StatusOr<metric::proto::EvaluationResults> EvaluateOverrideType(
       const dataset::VerticalDataset& dataset,
-      const metric::proto::EvaluationOptions& option,
-      const proto::Task override_task, const int override_label_col_idx,
-      const int override_group_col_idx, utils::RandomEngine* rnd,
+      const metric::proto::EvaluationOptions& option, proto::Task override_task,
+      int override_label_col_idx, int override_group_col_idx,
+      utils::RandomEngine* rnd,
+      std::vector<model::proto::Prediction>* predictions = nullptr) const;
+
+  // Similar to "EvaluateWithEngine", but allow to override the evaluation
+  // objective.
+  absl::StatusOr<metric::proto::EvaluationResults>
+  EvaluateWithEngineOverrideType(
+      const serving::FastEngine& engine,
+      const dataset::VerticalDataset& dataset,
+      const metric::proto::EvaluationOptions& option, proto::Task override_task,
+      int override_label_col_idx, int override_group_col_idx,
+      utils::RandomEngine* rnd,
       std::vector<model::proto::Prediction>* predictions = nullptr) const;
 
   // Evaluates the model and appends the results to an initialized and
-  // non-finalized EvaluationResults.
+  // non-finalized EvaluationResults proto.
   //
   // If specified, "predictions" will be populated with the predictions.
   absl::Status AppendEvaluation(
@@ -243,15 +255,15 @@ class AbstractModel {
       metric::proto::EvaluationResults* eval,
       std::vector<model::proto::Prediction>* predictions = nullptr) const;
 
-  // Similar as "AppendEvaluation" above. But operate on dataset stored on disk.
-  // This method is preferable when the number of examples is large since they
-  // do not have to be all loaded in memory as the same time.
+  // Similar as "AppendEvaluation" above. But operates on a dataset stored on
+  // disk. This method is preferable when the number of examples is large since
+  // they do not have to be all loaded in memory as the same time.
   absl::Status AppendEvaluation(const absl::string_view typed_path,
                                 const metric::proto::EvaluationOptions& option,
                                 utils::RandomEngine* rnd,
                                 metric::proto::EvaluationResults* eval) const;
 
-  // Similar to "AppendEvaluation", but allow to override the evaluation
+  // Similar to "AppendEvaluation", but allows to override the evaluation
   // objective.
   absl::Status AppendEvaluationOverrideType(
       const dataset::VerticalDataset& dataset,
@@ -464,6 +476,15 @@ class AbstractModel {
       std::vector<model::proto::Prediction>* predictions,
       metric::proto::EvaluationResults* eval) const;
 
+  absl::Status AppendEvaluationWithEngineOverrideType(
+      const dataset::VerticalDataset& dataset,
+      const metric::proto::EvaluationOptions& option, proto::Task override_task,
+      int override_label_col_idx, int override_group_col_idx,
+      const dataset::proto::LinkedWeightDefinition& weight_links,
+      const serving::FastEngine& engine, utils::RandomEngine* rnd,
+      std::vector<model::proto::Prediction>* predictions,
+      metric::proto::EvaluationResults* eval) const;
+
  protected:
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 
@@ -541,9 +562,11 @@ REGISTRATION_CREATE_POOL(AbstractModel);
 // functions do not require for a model to exist. When possible use
 // "model.SetGroundTruth(...)" instead.
 
-// In case of non-ranking task (e.g. regression), "ranking_group_col_idx" should
-// be set to  "kNoRankingGroup".
+// In case of a non-ranking task (e.g. regression), `ranking_group_col_idx`
+// should be set to  `kNoRankingGroup`.
 constexpr int kNoRankingGroup = -1;
+// In case of a non-uplift task (e.g. regression), `uplift_treatment_col_idx`
+// should be set to  `kNoUpliftTreatmentGroup`.
 constexpr int kNoUpliftTreatmentGroup = -1;
 
 // Indices of the columns needed to set the ground truth.
@@ -576,11 +599,6 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
 absl::Status SetGroundTruth(const dataset::proto::Example& example,
                             const GroundTruthColumnIndices& columns,
                             proto::Task task, proto::Prediction* prediction);
-
-// Converts a prediction from one type to another.
-absl::Status ChangePredictionType(proto::Task src_task, proto::Task dst_task,
-                                  const proto::Prediction& src_pred,
-                                  proto::Prediction* dst_pred);
 
 // Create a user readable description of the set of the variable importances of
 // a model as returned by "GetVariableImportance".

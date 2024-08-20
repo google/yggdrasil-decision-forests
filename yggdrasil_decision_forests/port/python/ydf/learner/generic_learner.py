@@ -80,7 +80,7 @@ class GenericLearner:
     if self._label is not None and not isinstance(label, str):
       raise ValueError("The 'label' should be a string")
     if task != Task.ANOMALY_DETECTION and not self._label:
-      raise ValueError("Constructing the learner requires a non-empty label.")
+      raise ValueError("This learner requires a label.")
 
     if self._ranking_group is not None and task != Task.RANKING:
       raise ValueError(
@@ -423,13 +423,28 @@ Hyper-parameters: ydf.{self._hyperparameters}
       effective_data_spec_args = None
       if self._data_spec is None:
         effective_data_spec_args = self._build_data_spec_args()
+
+      required_columns = None  # All columns in the dataspec are required.
+      if self._task == Task.ANOMALY_DETECTION:
+        if self._data_spec is not None:
+          required_columns = [
+              col.name
+              for col in self._data_spec.columns
+              if col.name != self._label
+          ]
+        if effective_data_spec_args is not None:
+          required_columns = [
+              col.name
+              for col in effective_data_spec_args.columns
+              if col is not None and col.name != self._label
+          ]
       return dataset.create_vertical_dataset_with_spec_or_args(
           ds,
           data_spec=self._data_spec,
           inference_args=effective_data_spec_args,
-          required_columns=None,  # All columns in the dataspec are required.
+          required_columns=required_columns,
           single_dim_columns=single_dim_columns,
-          label=self._label,
+          label=self._label if self._task != Task.ANOMALY_DETECTION else None,
       )
 
   def cross_validation(
@@ -533,7 +548,9 @@ Hyper-parameters: ydf.{self._hyperparameters}
       column are specified as features.
     """
 
-    def create_label_column(name: str, task: Task) -> Optional[dataspec.Column]:
+    def create_label_column(
+        name: Optional[str], task: Task
+    ) -> Optional[dataspec.Column]:
       if task in [Task.CLASSIFICATION, Task.CATEGORICAL_UPLIFT]:
         return dataspec.Column(
             name=name,
@@ -544,8 +561,16 @@ Hyper-parameters: ydf.{self._hyperparameters}
       elif task in [Task.REGRESSION, Task.RANKING, Task.NUMERICAL_UPLIFT]:
         return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
       elif task in [Task.ANOMALY_DETECTION]:
-        # No label column
-        return None
+        if name is None:
+          # No label column
+          return None
+        else:
+          return dataspec.Column(
+              name=name,
+              semantic=dataspec.Semantic.CATEGORICAL,
+              max_vocab_count=-1,
+              min_vocab_frequency=1,
+          )
       else:
         raise ValueError(f"Unsupported task {task.name} for label column")
 

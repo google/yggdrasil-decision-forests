@@ -18,6 +18,7 @@
 -   Change the default number of examples to scan when training on files to
     determine the semantic and dictionaries of columns from 10k to 100k.
 -   Various improvements of error messages.
+-   Evaluation for Anomaly Detection models.
 
 ### Fix
 

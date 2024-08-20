@@ -119,6 +119,9 @@ class TrainAndTestTester : public ::testing::Test {
 
   metric::proto::EvaluationResults evaluation_;
 
+  // Type used when evaluating the model.
+  model::proto::Task evaluation_override_type_ = model::proto::Task::UNDEFINED;
+
   std::unique_ptr<model::AbstractLearner> learner_;
 
   // Configure the evaluation.

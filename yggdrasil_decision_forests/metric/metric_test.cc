@@ -30,6 +30,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -38,6 +39,7 @@ namespace yggdrasil_decision_forests {
 namespace metric {
 namespace {
 
+using test::ApproximatelyEqualsProto;
 using test::EqualsProto;
 using test::StatusIs;
 using ::testing::Bool;
@@ -807,20 +809,6 @@ TEST(Metric, GetMetricRegression) {
       GetMetric(results_regression,
                 PARSE_TEST_PROTO(R"pb(regression { mae {} })pb")));
   EXPECT_NEAR(mae, MAE(results_regression), 0.0001);
-}
-
-TEST(Metric, GetMetricAnomalyDetection) {
-  const proto::EvaluationResults results = PARSE_TEST_PROTO(R"pb(
-    task: ANOMALY_DETECTION
-    label_column { type: CATEGORICAL }
-    anomaly_detection {}
-    count_predictions: 10
-  )pb");
-
-  EXPECT_THAT(
-      GetMetric(results, PARSE_TEST_PROTO(R"pb(anomaly_detection {})pb"))
-          .status(),
-      StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(Metric, GetMetricClassification) {
@@ -1766,6 +1754,80 @@ TEST(Metric, HigherIsBetter) {
         )pb");
     EXPECT_FALSE(HigherIsBetter(accessor).value());
   }
+}
+
+TEST(ChangePredictionType, ClassificationToRanking) {
+  {
+    const model::proto::Prediction src_pred = PARSE_TEST_PROTO(
+        R"pb(classification {
+               distribution { counts: 0 counts: 1 counts: 3 sum: 4 }
+             })pb");
+    model::proto::Prediction dst_pred;
+    CHECK_OK(ChangePredictionType(model::proto::Task::CLASSIFICATION,
+                                  model::proto::Task::RANKING, src_pred,
+                                  &dst_pred));
+    EXPECT_THAT(dst_pred,
+                EqualsProto(utils::ParseTextProto<model::proto::Prediction>(
+                                R"(ranking { relevance: 0.75 })")
+                                .value()));
+  }
+
+  {
+    const model::proto::Prediction src_pred =
+        PARSE_TEST_PROTO(R"pb(regression { value: 5 })pb");
+    model::proto::Prediction dst_pred;
+    CHECK_OK(ChangePredictionType(model::proto::Task::REGRESSION,
+                                  model::proto::Task::RANKING, src_pred,
+                                  &dst_pred));
+    EXPECT_THAT(dst_pred,
+                EqualsProto(utils::ParseTextProto<model::proto::Prediction>(
+                                R"(ranking { relevance: 5 })")
+                                .value()));
+  }
+
+  {
+    const model::proto::Prediction src_pred =
+        PARSE_TEST_PROTO(R"pb(ranking { relevance: 5 })pb");
+    model::proto::Prediction dst_pred;
+    CHECK_OK(ChangePredictionType(model::proto::Task::RANKING,
+                                  model::proto::Task::REGRESSION, src_pred,
+                                  &dst_pred));
+    EXPECT_THAT(dst_pred,
+                EqualsProto(utils::ParseTextProto<model::proto::Prediction>(
+                                R"(regression { value: 5 })")
+                                .value()));
+  }
+
+  {
+    const model::proto::Prediction src_pred =
+        PARSE_TEST_PROTO(R"pb(regression { value: 5 })pb");
+    model::proto::Prediction dst_pred;
+    CHECK_OK(ChangePredictionType(model::proto::Task::REGRESSION,
+                                  model::proto::Task::REGRESSION, src_pred,
+                                  &dst_pred));
+    EXPECT_THAT(dst_pred,
+                EqualsProto(utils::ParseTextProto<model::proto::Prediction>(
+                                R"(regression { value: 5 })")
+                                .value()));
+  }
+}
+
+TEST(ChangePredictionType, AnomalyDetectionToClassification) {
+  const model::proto::Prediction src_pred =
+      PARSE_TEST_PROTO(R"pb(anomaly_detection { value: 0.8 })pb");
+  model::proto::Prediction dst_pred;
+  ASSERT_OK(ChangePredictionType(model::proto::Task::ANOMALY_DETECTION,
+                                 model::proto::Task::CLASSIFICATION, src_pred,
+                                 &dst_pred));
+  EXPECT_THAT(dst_pred,
+              ApproximatelyEqualsProto(PARSE_TEST_PROTO_WITH_TYPE(
+                  model::proto::Prediction,
+                  R"pb(
+                    classification {
+                      value: 2
+                      distribution { counts: 0 counts: 0.2 counts: 0.8 sum: 1 }
+                    }
+                  )pb")));
 }
 
 }  // namespace

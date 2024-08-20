@@ -281,6 +281,8 @@ class Column(object):
   monotonic: MonotonicConstraint = None
 
   def __post_init__(self):
+    if self.name is None:
+      raise ValueError("The name of a column cannot be None")
     # Check matching between hyper-parameters and semantic.
     if self.semantic != Semantic.DISCRETIZED_NUMERICAL:
       if self.num_discretized_numerical_bins is not None:

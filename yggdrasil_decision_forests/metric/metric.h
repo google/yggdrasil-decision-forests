@@ -50,6 +50,12 @@ absl::Status AddPrediction(const proto::EvaluationOptions& option,
                            utils::RandomEngine* rnd,
                            proto::EvaluationResults* eval);
 
+// Converts a prediction from one type to another.
+absl::Status ChangePredictionType(model::proto::Task src_task,
+                                  model::proto::Task dst_task,
+                                  const model::proto::Prediction& src_pred,
+                                  model::proto::Prediction* dst_pred);
+
 // Merge two initialized (with the same options) and non-finalized evaluations.
 absl::Status MergeEvaluation(const proto::EvaluationOptions& option,
                              const proto::EvaluationResults& src,

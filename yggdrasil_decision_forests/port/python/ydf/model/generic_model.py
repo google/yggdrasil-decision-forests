@@ -418,6 +418,7 @@ Use `model.describe()` for more details
       *,
       bootstrapping: Union[bool, int] = False,
       weighted: bool = False,
+      evaluation_task: Optional[Task] = None,
   ) -> metric.Evaluation:
     """Evaluates the quality of a model on a dataset.
 
@@ -440,6 +441,9 @@ Use `model.describe()` for more details
 
     ```
     evaluation = model.evaluate(test_ds)
+    # If model is an anomaly detection model:
+    # evaluation = model.evaluate(test_ds,
+                                  evaluation_task=ydf.Task.CLASSIFICATION)
     evaluation
     ```
 
@@ -456,6 +460,10 @@ Use `model.describe()` for more details
       weighted: If true, the evaluation is weighted according to the training
         weights. If false, the evaluation is non-weighted. b/351279797: Change
         default to weights=True.
+      evaluation_task: Set the type of model evaluation to use. If None, this is
+        the same as the model's task. Some models can be evaluated with a
+        different task. Notably, ANOMALY DETECTION models must currently be
+        evaluated as CLASSIFICATION.
 
     Returns:
       Model evaluation.
@@ -476,10 +484,12 @@ Use `model.describe()` for more details
             " than 100 as bootstrapping will not yield useful results. Got"
             f" {bootstrapping!r} instead"
         )
+      if evaluation_task is None:
+        evaluation_task = self.task()
 
       options_proto = metric_pb2.EvaluationOptions(
           bootstrapping_samples=bootstrapping_samples,
-          task=self.task()._to_proto_type(),  # pylint: disable=protected-access
+          task=evaluation_task._to_proto_type(),  # pylint: disable=protected-access
       )
 
       evaluation_proto = self._model.Evaluate(

@@ -79,7 +79,14 @@ class LearnerTest(parameterized.TestCase):
             Column("treat", semantic=dataspec.Semantic.CATEGORICAL),
         ],
     )
-    self.gaussians = test_utils.load_datasets("gaussians")
+    self.gaussians = test_utils.load_datasets(
+        "gaussians",
+        column_args=[
+            Column("label", semantic=dataspec.Semantic.CATEGORICAL),
+            Column("features.0_of_2", semantic=dataspec.Semantic.NUMERICAL),
+            Column("features.1_of_2", semantic=dataspec.Semantic.NUMERICAL),
+        ],
+    )
 
   def _check_adult_model(
       self,
@@ -1163,7 +1170,7 @@ class LoggingTest(parameterized.TestCase):
 class IsolationForestLearnerTest(LearnerTest):
 
   @parameterized.parameters(False, True)
-  def test_gaussians(self, with_labels: bool):
+  def test_gaussians_train_and_analyze(self, with_labels: bool):
     if with_labels:
       learner = specialized_learners.IsolationForestLearner(label="label")
     else:
@@ -1182,18 +1189,49 @@ class IsolationForestLearnerTest(LearnerTest):
     _ = model.analyze_prediction(self.gaussians.test_pd.iloc[:1])
     _ = model.analyze(self.gaussians.test)
 
-    if with_labels:
-      evaluation = model.evaluate(self.gaussians.test)
-      self.assertDictEqual(
-          evaluation.to_dict(),
-          {"num_examples": 280, "num_examples_weighted": 280.0},
+  def test_gaussians_evaluation_default_task(self):
+    learner = specialized_learners.IsolationForestLearner(label="label")
+    model = learner.train(self.gaussians.train)
+    with self.assertRaisesRegex(
+        ValueError,
+        ".*evaluate the model as a classification model.*",
+    ):
+      _ = model.evaluate(self.gaussians.test)
+
+  def test_gaussians_evaluation_no_label(self):
+    learner = specialized_learners.IsolationForestLearner(features=["f1", "f2"])
+    model = learner.train(self.gaussians.train)
+    with self.assertRaisesRegex(
+        ValueError,
+        ".*A model cannot be evaluated without a label..*",
+    ):
+      _ = model.evaluate(
+          self.gaussians.test,
+          evaluation_task=generic_learner.Task.CLASSIFICATION,
       )
-    else:
-      with self.assertRaisesRegex(
-          ValueError,
-          "Cannot evaluate an anomaly detection model without a label",
-      ):
-        _ = model.evaluate(self.gaussians.test)
+
+  def test_gaussians_evaluation_with_label(self):
+    learner = specialized_learners.IsolationForestLearner(label="label")
+    model = learner.train(self.gaussians.train)
+    evaluation = model.evaluate(
+        self.gaussians.test,
+        evaluation_task=generic_learner.Task.CLASSIFICATION,
+    )
+    self.assertSameElements(
+        evaluation.to_dict().keys(),
+        [
+            "num_examples",
+            "num_examples_weighted",
+            "accuracy",
+            "characteristic_0:name",
+            "characteristic_0:pr_auc",
+            "characteristic_0:roc_auc",
+            "confusion_matrix",
+            "loss",
+        ],
+    )
+    self.assertAlmostEqual(evaluation.accuracy, 0.98, delta=0.01)
+    self.assertAlmostEqual(evaluation.loss, 0.52, delta=0.01)
 
   def test_max_depth_gaussians_subsample_ratio(self):
     learner = specialized_learners.IsolationForestLearner(
