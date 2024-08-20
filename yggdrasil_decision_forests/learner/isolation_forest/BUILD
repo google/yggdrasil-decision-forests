@@ -19,6 +19,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner:abstract_learner",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
+        "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:generic_parameters",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",

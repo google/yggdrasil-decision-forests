@@ -194,7 +194,7 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_documentation()->set_description(
         R"(What structure of split to consider for numerical features.
 - `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.
-- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.
+- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.
 - `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029)");
   }
   {

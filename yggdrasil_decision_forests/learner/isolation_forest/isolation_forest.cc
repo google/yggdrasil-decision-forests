@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -40,7 +41,9 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -118,6 +121,104 @@ absl::StatusOr<internal::Configuration> BuildConfig(
 namespace internal {
 
 absl::StatusOr<bool> FindSplit(
+    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
+  switch (config.if_config->decision_tree().split_axis_case()) {
+    case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
+        SPLIT_AXIS_NOT_SET:
+    case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
+        kAxisAlignedSplit:
+      return FindSplitAxisAligned(config, train_dataset, selected_examples,
+                                  node, rnd);
+    case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
+        kSparseObliqueSplit:
+      return FindSplitOblique(config, train_dataset, selected_examples, node,
+                              rnd);
+    default:
+      return absl::InvalidArgumentError(
+          "Only axis-aligned and sparse oblique splits are supported for "
+          "isolation forests.");
+  }
+}
+
+absl::StatusOr<bool> FindSplitOblique(
+    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
+  DCHECK_GT(selected_examples.size(), 0);
+  if (config.config_link.numerical_features().empty()) {
+    return false;
+  }
+  decision_tree::internal::Projection current_projection;
+  const float projection_density = config.if_config->decision_tree()
+                                       .sparse_oblique_split()
+                                       .projection_density_factor() /
+                                   config.config_link.numerical_features_size();
+  int8_t monotonic_direction;
+  decision_tree::internal::ProjectionEvaluator projection_evaluator(
+      train_dataset, config.config_link.numerical_features());
+  std::vector<float> projection_values;
+
+  decision_tree::internal::SampleProjection(
+      config.if_config->decision_tree(), train_dataset.data_spec(),
+      config.config_link, projection_density, &current_projection,
+      &monotonic_direction, rnd);
+
+  // Pre-compute the result of the current_projection.
+  RETURN_IF_ERROR(projection_evaluator.Evaluate(
+      current_projection, selected_examples, &projection_values));
+
+  // Find minimum and maximum value.
+  float min_value;
+  float max_value;
+  UnsignedExampleIdx num_valid_examples = 0;
+  for (const float value : projection_values) {
+    if (std::isnan(value)) {
+      continue;
+    }
+    if (num_valid_examples == 0 || value < min_value) {
+      min_value = value;
+    }
+    if (num_valid_examples == 0 || value > max_value) {
+      max_value = value;
+    }
+    num_valid_examples++;
+  }
+
+  if (num_valid_examples == 0 || max_value == min_value) {
+    // Cannot split.
+    return false;
+  }
+
+  // Randomly select a threshold in (min_value, max_value).
+  const float threshold = std::uniform_real_distribution<float>(
+      std::nextafter(min_value, std::numeric_limits<float>::max()),
+      max_value)(*rnd);
+  DCHECK_GT(threshold, min_value);
+  DCHECK_LE(threshold, max_value);
+
+  // Count the number of positive examples.
+  UnsignedExampleIdx num_pos_examples = 0;
+  for (const auto value : projection_values) {
+    if (value >= threshold) {
+      num_pos_examples++;
+    }
+  }
+
+  DCHECK_GT(num_pos_examples, 0);
+  DCHECK_LT(num_pos_examples, selected_examples.size());
+
+  // Set split.
+  auto* condition = node->mutable_node()->mutable_condition();
+  RETURN_IF_ERROR(decision_tree::internal::SetCondition(
+      current_projection, threshold, train_dataset.data_spec(), condition));
+  condition->set_num_training_examples_without_weight(selected_examples.size());
+  condition->set_num_pos_training_examples_without_weight(num_pos_examples);
+  return true;
+}
+
+absl::StatusOr<bool> FindSplitAxisAligned(
     const Configuration& config, const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
@@ -429,6 +530,32 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_description(
         R"(Maximum depth of the tree. `max_depth=1` means that all trees will be roots. `max_depth=-1` means that tree depth unconstrained by this parameter. `max_depth=-2` means that the maximum depth is log2(number of sampled examples per tree) (default).)");
   }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        decision_tree::kHParamSplitAxis);
+    param.mutable_categorical()->set_default_value(
+        decision_tree::kHParamSplitAxisAxisAligned);
+    param.mutable_categorical()->clear_possible_values();
+    param.mutable_categorical()->add_possible_values(
+        decision_tree::kHParamSplitAxisAxisAligned);
+    param.mutable_categorical()->add_possible_values(
+        decision_tree::kHParamSplitAxisSparseOblique);
+    param.mutable_documentation()->set_description(
+        R"(What structure of split to consider for numerical features.
+- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.
+- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. This includes the splits described in "Extended Isolation Forests" (Sahand Hariri et al., 2018).)");
+  }
+
+  // Remove invalid hyperparameters.
+  hparam_def.mutable_fields()->erase(
+      decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent);
+  hparam_def.mutable_fields()->erase(
+      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections);
+  hparam_def.mutable_fields()->erase(
+      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections);
+  hparam_def.mutable_fields()->erase(
+      decision_tree::kHParamSplitAxisMhldObliqueSampleAttributes);
 
   return hparam_def;
 }

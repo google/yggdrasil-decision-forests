@@ -356,7 +356,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
-      Sparse oblique splits (i.e. random splits one a small number of features)
+      Sparse oblique splits (i.e. random splits on a small number of features)
       from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
       `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
       "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
@@ -422,8 +422,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
-      max_num_scanned_rows_to_infer_semantic: int = 10000,
-      max_num_scanned_rows_to_compute_statistics: int = 10000,
+      max_num_scanned_rows_to_infer_semantic: int = 100_000,
+      max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       adapt_bootstrap_size_ratio_for_maximum_training_duration: bool = False,
       allow_na_conditions: bool = False,
@@ -858,11 +858,6 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       num_numerical_features]. If the value is above the total number of
       numerical features, the value is capped automatically. The value 1 is
       allowed but results in ordinary (non-oblique) splits. Default: None.
-    mhld_oblique_sample_attributes: For MHLD oblique splits i.e.
-      `split_axis=MHLD_OBLIQUE`. If true, applies the attribute sampling
-      controlled by the "num_candidate_attributes" or
-      "num_candidate_attributes_ratio" parameters. If false, all the attributes
-      are tested. Default: None.
     min_examples: Minimum number of examples in a node. Default: 5.
     missing_value_policy: Method used to handle missing attribute values. -
       `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean
@@ -908,16 +903,6 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       the training. This solution is faster but consumes much more memory than
       IN_NODE. - PRESORT: Automatically choose between FORCE_PRESORT and
       IN_NODE. . Default: "AUTO".
-    sparse_oblique_max_num_projections: For sparse oblique splits i.e.
-      `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after
-      the num_projections_exponent). Oblique splits try out
-      max(p^num_projections_exponent, max_num_projections) random projections
-      for choosing a split, where p is the number of numerical features.
-      Increasing "max_num_projections" increases the training time but not the
-      inference time. In late stage model development, if every bit of accuracy
-      if important, increase this value. The paper "Sparse Projection Oblique
-      Random Forests" (Tomita et al, 2020) does not define this hyperparameter.
-      Default: None.
     sparse_oblique_normalization: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before
       applying the sparse oblique projections. - `NONE`: No normalization. -
@@ -925,22 +910,6 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       deviation on the entire train dataset. Also known as Z-Score
       normalization. - `MIN_MAX`: Normalize the feature by the range (i.e.
       max-min) estimated on the entire train dataset. Default: None.
-    sparse_oblique_num_projections_exponent: For sparse oblique splits i.e.
-      `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
-      to test at each node. Increasing this value very likely improves the
-      quality of the model, drastically increases the training time, and doe not
-      impact the inference time. Oblique splits try out
-      max(p^num_projections_exponent, max_num_projections) random projections
-      for choosing a split, where p is the number of numerical features.
-      Therefore, increasing this `num_projections_exponent` and possibly
-      `max_num_projections` may improve model quality, but will also
-      significantly increase training time. Note that the complexity of
-      (classic) Random Forests is roughly proportional to
-      `num_projections_exponent=0.5`, since it considers sqrt(num_features) for
-      a split. The complexity of (classic) GBDT is roughly proportional to
-      `num_projections_exponent=1`, since it considers all features for a split.
-      The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020)
-      recommends values in [1/4, 2]. Default: None.
     sparse_oblique_projection_density_factor: Density of the projections as an
       exponent of the number of features. Independently for each projection,
       each feature has a probability "projection_density_factor / num_features"
@@ -956,11 +925,10 @@ class IsolationForestLearner(generic_learner.GenericLearner):
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
-      Sparse oblique splits (i.e. random splits one a small number of features)
-      from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
-      `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
-      "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
-      et al., 2029 Default: "AXIS_ALIGNED".
+      Sparse oblique splits (i.e. random splits on a small number of features)
+      from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. This
+      includes the splits described in "Extended Isolation Forests" (Sahand
+      Hariri et al., 2018). Default: "AXIS_ALIGNED".
     subsample_count: Number of examples used to grow each tree. Only one of
       "subsample_ratio" and "subsample_count" can be set. By default, sample 256
       examples per tree. Note that this parameter also restricts the tree's
@@ -1028,8 +996,8 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
-      max_num_scanned_rows_to_infer_semantic: int = 10000,
-      max_num_scanned_rows_to_compute_statistics: int = 10000,
+      max_num_scanned_rows_to_infer_semantic: int = 100_000,
+      max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       allow_na_conditions: bool = False,
       categorical_algorithm: str = "CART",
@@ -1047,7 +1015,6 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       maximum_model_size_in_memory_in_bytes: float = -1.0,
       maximum_training_duration_seconds: float = -1.0,
       mhld_oblique_max_num_attributes: Optional[int] = None,
-      mhld_oblique_sample_attributes: Optional[bool] = None,
       min_examples: int = 5,
       missing_value_policy: str = "GLOBAL_IMPUTATION",
       num_candidate_attributes: Optional[int] = 0,
@@ -1056,9 +1023,7 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       pure_serving_model: bool = False,
       random_seed: int = 123456,
       sorting_strategy: str = "AUTO",
-      sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
-      sparse_oblique_num_projections_exponent: Optional[float] = None,
       sparse_oblique_projection_density_factor: Optional[float] = None,
       sparse_oblique_weights: Optional[str] = None,
       split_axis: str = "AXIS_ALIGNED",
@@ -1100,7 +1065,6 @@ class IsolationForestLearner(generic_learner.GenericLearner):
         ),
         "maximum_training_duration_seconds": maximum_training_duration_seconds,
         "mhld_oblique_max_num_attributes": mhld_oblique_max_num_attributes,
-        "mhld_oblique_sample_attributes": mhld_oblique_sample_attributes,
         "min_examples": min_examples,
         "missing_value_policy": missing_value_policy,
         "num_candidate_attributes": num_candidate_attributes,
@@ -1109,13 +1073,7 @@ class IsolationForestLearner(generic_learner.GenericLearner):
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
         "sorting_strategy": sorting_strategy,
-        "sparse_oblique_max_num_projections": (
-            sparse_oblique_max_num_projections
-        ),
         "sparse_oblique_normalization": sparse_oblique_normalization,
-        "sparse_oblique_num_projections_exponent": (
-            sparse_oblique_num_projections_exponent
-        ),
         "sparse_oblique_projection_density_factor": (
             sparse_oblique_projection_density_factor
         ),
@@ -1607,7 +1565,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
-      Sparse oblique splits (i.e. random splits one a small number of features)
+      Sparse oblique splits (i.e. random splits on a small number of features)
       from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
       `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
       "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
@@ -1690,8 +1648,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
-      max_num_scanned_rows_to_infer_semantic: int = 10000,
-      max_num_scanned_rows_to_compute_statistics: int = 10000,
+      max_num_scanned_rows_to_infer_semantic: int = 100_000,
+      max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       adapt_subsample_for_maximum_training_duration: bool = False,
       allow_na_conditions: bool = False,
@@ -2175,8 +2133,8 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
-      max_num_scanned_rows_to_infer_semantic: int = 10000,
-      max_num_scanned_rows_to_compute_statistics: int = 10000,
+      max_num_scanned_rows_to_infer_semantic: int = 100_000,
+      max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       apply_link_function: bool = True,
       force_numerical_discretization: bool = False,
@@ -2310,7 +2268,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
     return abstract_learner_pb2.LearnerCapabilities(
         support_max_training_duration=False,
         resume_training=True,
-        support_validation_dataset=False,
+        support_validation_dataset=True,
         support_partial_cache_dataset_format=True,
         support_max_model_size_in_memory=False,
         support_monotonic_constraints=False,
@@ -2600,7 +2558,7 @@ class CartLearner(generic_learner.GenericLearner):
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
-      Sparse oblique splits (i.e. random splits one a small number of features)
+      Sparse oblique splits (i.e. random splits on a small number of features)
       from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
       `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
       "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
@@ -2665,8 +2623,8 @@ class CartLearner(generic_learner.GenericLearner):
       min_vocab_frequency: int = 5,
       discretize_numerical_columns: bool = False,
       num_discretized_numerical_bins: int = 255,
-      max_num_scanned_rows_to_infer_semantic: int = 10000,
-      max_num_scanned_rows_to_compute_statistics: int = 10000,
+      max_num_scanned_rows_to_infer_semantic: int = 100_000,
+      max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       allow_na_conditions: bool = False,
       categorical_algorithm: str = "CART",

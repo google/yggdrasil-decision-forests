@@ -196,6 +196,15 @@ TEST_F(IsolationForestOnMammographicMasses, MaxDepth) {
   EXPECT_EQ(max_depth, 8);
 }
 
+TEST_F(IsolationForestOnMammographicMasses, Oblique) {
+  deployment_config_.set_num_threads(1);
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  EXPECT_TRUE(if_config->decision_tree().has_sparse_oblique_split());
+  TrainAndEvaluateModel();
+}
+
 TEST(DefaultMaximumDepth, Base) {
   EXPECT_EQ(internal::DefaultMaximumDepth(254), 8);
   EXPECT_EQ(internal::DefaultMaximumDepth(255), 8);
@@ -238,6 +247,8 @@ TEST(FindSplit, Numerical) {
     utils::RandomEngine rnd(seed);
 
     internal::Configuration config;
+    proto::IsolationForestTrainingConfig if_config;
+    config.if_config = &if_config;
     config.config_link.add_features(0);  // Only select "f1".
 
     decision_tree::NodeWithChildren node;

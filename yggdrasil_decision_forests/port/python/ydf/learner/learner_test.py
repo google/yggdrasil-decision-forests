@@ -37,6 +37,8 @@ from ydf.metric import metric
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model.decision_forest_model import decision_forest_model
+from ydf.model.tree import condition as condition_lib
+from ydf.model.tree import node as node_lib
 from ydf.utils import log
 from ydf.utils import test_utils
 
@@ -1282,6 +1284,20 @@ class IsolationForestLearnerTest(LearnerTest):
     learner.hyperparameters["subsample_ratio"] = 0.5
     with self.assertRaises(ValueError):
       learner.validate_hyperparameters()
+
+  def test_max_depth_gaussians_oblique(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"],
+        split_axis="SPARSE_OBLIQUE",
+        num_trees=5,
+    )
+    model = learner.train(self.gaussians.train)
+    first_tree = model.get_tree(0)
+    first_root = first_tree.root
+    self.assertIsInstance(first_root, node_lib.NonLeaf)
+    self.assertIsInstance(
+        first_root.condition, condition_lib.NumericalSparseObliqueCondition
+    )
 
 
 class UtilityTest(LearnerTest):

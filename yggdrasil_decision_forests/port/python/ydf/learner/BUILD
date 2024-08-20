@@ -248,6 +248,8 @@ py_test(
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
         "//ydf/model/decision_forest_model",
+        "//ydf/model/tree:condition",
+        "//ydf/model/tree:node",
         "//ydf/utils:log",
         "//ydf/utils:test_utils",
     ],
