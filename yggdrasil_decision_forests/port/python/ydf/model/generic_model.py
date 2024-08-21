@@ -897,12 +897,6 @@ Use `model.describe()` for more details
       force: Try to export even in currently unsupported environments. WARNING:
         Setting this to true may crash the Python runtime.
     """
-    if platform.system() == "Darwin" and not force:
-      raise ValueError(
-          "Exporting to TensorFlow is currently broken on MacOS and may crash"
-          " the current Python process. To proceed anyway, add parameter"
-          " `force=True`."
-      )
 
     if mode == "keras":
       log.warning(

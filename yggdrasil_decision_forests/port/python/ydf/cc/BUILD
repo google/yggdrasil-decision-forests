@@ -11,6 +11,10 @@ package(
 pybind_extension(
     name = "ydf",
     srcs = ["ydf.cc"],
+    linkopts = select({
+        "@bazel_tools//src/conditions:darwin": ["-Wl,-exported_symbol,_PyInit_ydf"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//ydf/dataset:dataset_cc",
         "//ydf/learner:learner_cc",

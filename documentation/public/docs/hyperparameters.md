@@ -24,11 +24,6 @@ learner: "RANDOM_FOREST"
   num_trees: 1000
 }
 ```
-
-## Table of content
-
-[TOC]
-
 ## GRADIENT_BOOSTED_TREES
 
 A [Gradient Boosted Trees](https://statweb.stanford.edu/~jhf/ftp/trebst.pdf)
@@ -427,14 +422,15 @@ reasonable time.
 
 -   Coefficient applied to each tree prediction. A small value (0.02) tends to
     give more accurate results (assuming enough trees are trained), but results
-    in larger models. Analogous to neural network learning rate.
+    in larger models. Analogous to neural network learning rate. Fixed to 1.0
+    for DART models.
 
 #### [sorting_strategy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
 -   **Type:** Categorical **Default:** PRESORT **Possible values:** IN_NODE,
-    PRESORT
+    PRESORT, FORCE_PRESORT, AUTO
 
--   How are sorted the numerical features in order to find the splits<br>- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>.
+-   How are sorted the numerical features in order to find the splits<br>- AUTO: Selects the most efficient method among IN_NODE, FORCE_PRESORT, and LAYER.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>- FORCE_PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- PRESORT: Automatically choose between FORCE_PRESORT and IN_NODE.<br>.
 
 #### [sparse_oblique_max_num_projections](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -473,7 +469,7 @@ reasonable time.
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
     AXIS_ALIGNED, SPARSE_OBLIQUE, MHLD_OBLIQUE
 
--   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.<br>- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029
+-   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.<br>- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029
 
 #### [subsample](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
@@ -536,8 +532,8 @@ reasonable time.
 
 ## RANDOM_FOREST
 
-A Random Forest (https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf) is
-a collection of deep CART decision trees trained independently and without
+A [Random Forest](https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf)
+is a collection of deep CART decision trees trained independently and without
 pruning. Each tree is trained on a random subset of the original training
 dataset (sampled with replacement).
 
@@ -853,9 +849,9 @@ reasonable time.
 #### [sorting_strategy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
 -   **Type:** Categorical **Default:** PRESORT **Possible values:** IN_NODE,
-    PRESORT
+    PRESORT, FORCE_PRESORT, AUTO
 
--   How are sorted the numerical features in order to find the splits<br>- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>.
+-   How are sorted the numerical features in order to find the splits<br>- AUTO: Selects the most efficient method among IN_NODE, FORCE_PRESORT, and LAYER.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>- FORCE_PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- PRESORT: Automatically choose between FORCE_PRESORT and IN_NODE.<br>.
 
 #### [sparse_oblique_max_num_projections](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -894,7 +890,7 @@ reasonable time.
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
     AXIS_ALIGNED, SPARSE_OBLIQUE, MHLD_OBLIQUE
 
--   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.<br>- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029
+-   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.<br>- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029
 
 #### [uplift_min_examples_in_treatment](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1134,9 +1130,9 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 #### [sorting_strategy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
 -   **Type:** Categorical **Default:** IN_NODE **Possible values:** IN_NODE,
-    PRESORT
+    PRESORT, FORCE_PRESORT, AUTO
 
--   How are sorted the numerical features in order to find the splits<br>- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>.
+-   How are sorted the numerical features in order to find the splits<br>- AUTO: Selects the most efficient method among IN_NODE, FORCE_PRESORT, and LAYER.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>- FORCE_PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- PRESORT: Automatically choose between FORCE_PRESORT and IN_NODE.<br>.
 
 #### [sparse_oblique_max_num_projections](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1175,7 +1171,7 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
     AXIS_ALIGNED, SPARSE_OBLIQUE, MHLD_OBLIQUE
 
--   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.<br>- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029
+-   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.<br>- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029
 
 #### [uplift_min_examples_in_treatment](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1325,7 +1321,8 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 -   Coefficient applied to each tree prediction. A small value (0.02) tends to
     give more accurate results (assuming enough trees are trained), but results
-    in larger models. Analogous to neural network learning rate.
+    in larger models. Analogous to neural network learning rate. Fixed to 1.0
+    for DART models.
 
 #### [use_hessian_gain](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
@@ -1343,8 +1340,8 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 ## ISOLATION_FOREST
 
-An Isolation Forest (https://ieeexplore.ieee.org/abstract/document/4781136) is a
-collection of decision trees trained without labels and independently to
+An [Isolation Forest](https://ieeexplore.ieee.org/abstract/document/4781136) is
+a collection of decision trees trained without labels and independently to
 partition the feature space. The Isolation Forest prediction is an anomaly score
 that indicates whether an example originates from a same distribution to the
 training examples. We refer to Isolation Forest as both the original algorithm
@@ -1455,11 +1452,12 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 #### [max_depth](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
--   **Type:** Integer **Default:** 16 **Possible values:** min:-1
+-   **Type:** Integer **Default:** -2 **Possible values:** min:-2
 
 -   Maximum depth of the tree. `max_depth=1` means that all trees will be roots.
-    `max_depth=-1` means that tree depth is not restricted by this parameter.
-    Values <= -2 will be ignored.
+    `max_depth=-1` means that tree depth unconstrained by this parameter.
+    `max_depth=-2` means that the maximum depth is log2(number of sampled
+    examples per tree) (default).
 
 #### [max_num_nodes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1495,15 +1493,6 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
     [2, num_numerical_features]. If the value is above the total number of
     numerical features, the value is capped automatically. The value 1 is
     allowed but results in ordinary (non-oblique) splits.
-
-#### [mhld_oblique_sample_attributes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** false **Possible values:** true, false
-
--   For MHLD oblique splits i.e. `split_axis=MHLD_OBLIQUE`. If true, applies the
-    attribute sampling controlled by the "num_candidate_attributes" or
-    "num_candidate_attributes_ratio" parameters. If false, all the attributes
-    are tested.
 
 #### [min_examples](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1566,16 +1555,10 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 #### [sorting_strategy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
--   **Type:** Categorical **Default:** PRESORT **Possible values:** IN_NODE,
-    PRESORT
+-   **Type:** Categorical **Default:** AUTO **Possible values:** IN_NODE,
+    PRESORT, FORCE_PRESORT, AUTO
 
--   How are sorted the numerical features in order to find the splits<br>- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>.
-
-#### [sparse_oblique_max_num_projections](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Integer **Default:** 6000 **Possible values:** min:1
-
--   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after the num_projections_exponent).<br>Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Increasing "max_num_projections" increases the training time but not the inference time. In late stage model development, if every bit of accuracy if important, increase this value.<br>The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does not define this hyperparameter.
+-   How are sorted the numerical features in order to find the splits<br>- AUTO: Selects the most efficient method among IN_NODE, FORCE_PRESORT, and LAYER.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>- FORCE_PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- PRESORT: Automatically choose between FORCE_PRESORT and IN_NODE.<br>.
 
 #### [sparse_oblique_normalization](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1583,12 +1566,6 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
     STANDARD_DEVIATION, MIN_MAX
 
 -   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before applying the sparse oblique projections.<br>- `NONE`: No normalization.<br>- `STANDARD_DEVIATION`: Normalize the feature by the estimated standard deviation on the entire train dataset. Also known as Z-Score normalization.<br>- `MIN_MAX`: Normalize the feature by the range (i.e. max-min) estimated on the entire train dataset.
-
-#### [sparse_oblique_num_projections_exponent](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Real **Default:** 2 **Possible values:** min:0
-
--   For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections to test at each node.<br>Increasing this value very likely improves the quality of the model, drastically increases the training time, and doe not impact the inference time.<br>Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Therefore, increasing this `num_projections_exponent` and possibly `max_num_projections` may improve model quality, but will also significantly increase training time.<br>Note that the complexity of (classic) Random Forests is roughly proportional to `num_projections_exponent=0.5`, since it considers sqrt(num_features) for a split. The complexity of (classic) GBDT is roughly proportional to `num_projections_exponent=1`, since it considers all features for a split.<br>The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) recommends values in [1/4, 2].
 
 #### [sparse_oblique_projection_density_factor](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1606,27 +1583,28 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 #### [split_axis](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
 -   **Type:** Categorical **Default:** AXIS_ALIGNED **Possible values:**
-    AXIS_ALIGNED, SPARSE_OBLIQUE, MHLD_OBLIQUE
+    AXIS_ALIGNED, SPARSE_OBLIQUE
 
--   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.<br>- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029
+-   What structure of split to consider for numerical features.<br>- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.<br>- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. This includes the splits described in "Extended Isolation Forests" (Sahand Hariri et al., 2018).
 
 #### [subsample_count](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.proto)
 
--   **Type:** Integer **Default:** 300 **Possible values:** min:0
+-   **Type:** Integer **Default:** 256 **Possible values:** min:0
 
 -   Number of examples used to grow each tree. Only one of "subsample_ratio" and
-    "subsample_count" can be set. If neither is set, "subsample_count" is
-    assumed to be equal to 256. This is the default value recommended in the
-    isolation forest paper.
+    "subsample_count" can be set. By default, sample 256 examples per tree. Note
+    that this parameter also restricts the tree's maximum depth to log2(examples
+    used per tree) unless max_depth is set explicitly.
 
 #### [subsample_ratio](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.proto)
 
--   **Type:** Integer **Default:** 300 **Possible values:** min:0
+-   **Type:** Real **Default:** 1 **Possible values:** min:0
 
 -   Ratio of number of training examples used to grow each tree. Only one of
-    "subsample_ratio" and "subsample_count" can be set. If neither is set,
-    "subsample_count" is assumed to be equal to 256. This is the default value
-    recommended in the isolation forest paper.
+    "subsample_ratio" and "subsample_count" can be set. By default, sample 256
+    examples per tree. Note that this parameter also restricts the tree's
+    maximum depth to log2(examples used per tree) unless max_depth is set
+    explicitly.
 
 #### [uplift_min_examples_in_treatment](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 

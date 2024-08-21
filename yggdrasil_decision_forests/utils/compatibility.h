@@ -24,6 +24,7 @@
 
 #include <stdint.h>
 
+#include <cassert>
 #include <type_traits>
 
 #include "absl/types/optional.h"

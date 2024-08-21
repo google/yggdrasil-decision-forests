@@ -22,13 +22,13 @@ import setuptools
 from setuptools.command.install import install
 from setuptools.dist import Distribution
 
-_VERSION = "0.6.0"
+_VERSION = "0.7.0"
 
 with open("README.md", "r", encoding="utf-8") as fh:
   long_description = fh.read()
 
 REQUIRED_PACKAGES = [
-    "numpy<2.0.0",
+    "numpy",
     "absl_py",
     "protobuf>=3.14",
 ]

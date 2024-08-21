@@ -3,7 +3,7 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
-## Head
+## 1.10.0 - 2024-08-21
 
 ### Features
 
@@ -11,6 +11,7 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 -   The default value of `num_candidate_attributes` in the CART learner is
     changed from 0 (Random Forest style sampling) to -1 (no sampling). This is
     the generally accepted logic of CART.
+-   Added support for GCS for file I/O.
 
 ## 1.9.0 - 2024-03-12
 

@@ -33,7 +33,7 @@ build_and_maybe_test () {
    echo "   Compiler : $CC"
 
     bazel version
-    local ARCHITECTURE=$(uname --m)
+    local ARCHITECTURE=$(uname -m)
 
     local flags="--config=linux_cpp17 --features=-fully_static_link"
     if [ "$ARCHITECTURE" == "x86_64" ]; then

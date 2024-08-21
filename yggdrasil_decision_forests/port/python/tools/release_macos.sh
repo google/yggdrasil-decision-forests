@@ -14,6 +14,7 @@
 # limitations under the License.
 
 
+# Running this script inside a python venv may not work.
 set -vex
 
 declare -a python_versions=("3.8" "3.9" "3.10" "3.11" "3.12")
@@ -27,7 +28,7 @@ do
   source ${TMPDIR}venv/bin/activate
   pip install --upgrade pip
 
-  echo "Building with $(python3 -V 2>&1)"
+  echo "Building with $(python -V 2>&1)"
 
   bazel clean --expunge
   RUN_TESTS=0 CC="clang" ./tools/build_test_linux.sh
