@@ -984,18 +984,11 @@ Use `model.describe()` for more details
         classification, outputs a tensorflow of shape [num examples, 2]
         containing the probability of both the negative and positive classes.
         Has no effect on non-binary classification models.
-      force: Try to export even in currently unsupported environments. WARNING:
-        Setting this to true may crash the Python runtime.
+      force: Try to export even in currently unsupported environments.
 
     Returns:
       A TensorFlow @tf.function.
     """
-    if platform.system() == "Darwin" and not force:
-      raise ValueError(
-          "Exporting to TensorFlow is currently broken on MacOS and may crash"
-          " the current Python process. To proceed anyway, add parameter"
-          " `force=True`."
-      )
 
     return _get_export_tf().ydf_model_to_tf_function(
         ydf_model=self,
