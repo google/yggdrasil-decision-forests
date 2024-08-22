@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/utils/distribute_cli/distribute_cli_worker.h"
 
+#include "absl/log/log.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"

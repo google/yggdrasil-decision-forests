@@ -13,6 +13,8 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/serving/decision_forest:decision_forest_serving",
         "//yggdrasil_decision_forests/utils:protobuf",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )

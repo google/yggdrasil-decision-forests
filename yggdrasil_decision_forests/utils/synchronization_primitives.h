@@ -21,6 +21,9 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_SYNCHRONIZATION_PRIMITIVES_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_SYNCHRONIZATION_PRIMITIVES_H_
 
+#include "absl/base/attributes.h"
+#include "absl/base/thread_annotations.h"
+#include "absl/time/time.h"
 #ifdef YGG_STD_MUTEX
 #include <condition_variable>  // c++11
 #include <mutex>               // c++11

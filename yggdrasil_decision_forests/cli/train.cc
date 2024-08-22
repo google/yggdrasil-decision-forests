@@ -16,6 +16,8 @@
 // Train a ML model and export it to disk.
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/model/model_library.h"

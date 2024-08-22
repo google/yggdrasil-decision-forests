@@ -17,6 +17,8 @@
 
 #include <limits>
 
+#include "absl/log/check.h"
+#include "absl/numeric/bits.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"

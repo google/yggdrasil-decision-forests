@@ -16,6 +16,8 @@
 #include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.h"
 
 #include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"

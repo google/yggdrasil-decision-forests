@@ -16,6 +16,8 @@
 #include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.h"
 
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"

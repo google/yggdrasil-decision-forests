@@ -17,6 +17,7 @@
 
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping/early_stopping_snapshot.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"

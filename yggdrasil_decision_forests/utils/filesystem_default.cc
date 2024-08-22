@@ -14,6 +14,7 @@
  */
 
 #include "yggdrasil_decision_forests/utils/filesystem_default.h"
+#include "absl/memory/memory.h"
 
 #if __cplusplus > 201402L
 #include <filesystem>

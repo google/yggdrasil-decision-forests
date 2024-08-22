@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"

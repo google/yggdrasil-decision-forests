@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/distribute_cli/common.h"
 
+#include "absl/log/check.h"
+#include "absl/numeric/int128.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"

@@ -32,6 +32,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/base/log_severity.h"
 #include "absl/container/btree_set.h"
 #include "absl/container/fixed_array.h"
 #include "absl/log/log.h"

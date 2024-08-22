@@ -19,6 +19,9 @@
 // "cli/benchmark_inference" benchmark inference tool.
 //
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/time/clock.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"

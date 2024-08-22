@@ -41,6 +41,7 @@
 //     empty string (i.e. --new_file_prefix=) to remove the model prefix.
 //
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"

@@ -14,6 +14,7 @@
  */
 
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
+#include "absl/log/log.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {

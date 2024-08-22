@@ -16,6 +16,9 @@
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 
 #include "gmock/gmock.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"

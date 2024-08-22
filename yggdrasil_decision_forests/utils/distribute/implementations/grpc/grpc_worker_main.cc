@@ -16,6 +16,7 @@
 // A worker waiting for jobs sent by the GRPC manager.
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_worker.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 

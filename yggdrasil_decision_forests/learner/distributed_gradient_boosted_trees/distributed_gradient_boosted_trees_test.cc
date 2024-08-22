@@ -20,7 +20,10 @@
 
 #include "gmock/gmock.h"
 #include "absl/debugging/leak_check.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"

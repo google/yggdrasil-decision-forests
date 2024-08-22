@@ -37,6 +37,8 @@
 #include <vector>
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"

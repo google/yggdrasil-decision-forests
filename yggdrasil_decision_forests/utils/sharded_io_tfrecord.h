@@ -18,6 +18,9 @@
 
 #include <string>
 
+#include "absl/log/check.h"
+#include "absl/memory/memory.h"
+#include "absl/status/statusor.h"
 #include "tensorflow/core/lib/io/record_reader.h"
 #include "tensorflow/core/lib/io/record_writer.h"
 #include "tensorflow/core/platform/file_system.h"

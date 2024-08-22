@@ -14,6 +14,9 @@
  */
 
 #include "yggdrasil_decision_forests/utils/distribute/test_utils.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {

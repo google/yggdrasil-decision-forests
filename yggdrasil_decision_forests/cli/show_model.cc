@@ -16,6 +16,7 @@
 // Display the statistics and structure of a model.
 
 #include "absl/flags/flag.h"
+#include "absl/strings/str_join.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/logging.h"

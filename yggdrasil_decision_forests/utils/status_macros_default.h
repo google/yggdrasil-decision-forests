@@ -17,6 +17,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_STATUS_MACROS_DEFAULT_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_STATUS_MACROS_DEFAULT_H_
 
+#include "absl/base/optimization.h"
 #include "absl/log/log.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 

@@ -42,8 +42,10 @@
 #include <string>
 #include <vector>
 
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/histogram.h"
 
 namespace yggdrasil_decision_forests {

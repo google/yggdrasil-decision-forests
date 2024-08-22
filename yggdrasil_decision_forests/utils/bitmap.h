@@ -50,6 +50,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/base/optimization.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 

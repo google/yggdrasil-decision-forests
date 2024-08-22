@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "absl/base/optimization.h"
+#include "absl/log/log.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"

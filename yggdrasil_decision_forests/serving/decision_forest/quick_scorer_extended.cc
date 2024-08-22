@@ -17,7 +17,11 @@
 
 #include <stdlib.h>
 
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/substitute.h"
 
 #ifdef __AVX2__
 #include <immintrin.h>

@@ -38,7 +38,9 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_BLOB_SEQUENCE_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_BLOB_SEQUENCE_H_
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 
 namespace yggdrasil_decision_forests {

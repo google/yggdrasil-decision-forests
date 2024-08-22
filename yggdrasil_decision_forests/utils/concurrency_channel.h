@@ -23,6 +23,7 @@
 #include <queue>
 #include <string>
 
+#include "absl/log/log.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"

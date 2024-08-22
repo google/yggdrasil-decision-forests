@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.h"
 
 #include "gmock/gmock.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 

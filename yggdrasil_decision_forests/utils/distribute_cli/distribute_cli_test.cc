@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/utils/distribute_cli/distribute_cli.h"
 
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 

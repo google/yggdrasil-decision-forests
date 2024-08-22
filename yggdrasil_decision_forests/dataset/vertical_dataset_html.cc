@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_html.h"
 
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/utils/html.h"
 
