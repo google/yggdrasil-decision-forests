@@ -24,7 +24,6 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"

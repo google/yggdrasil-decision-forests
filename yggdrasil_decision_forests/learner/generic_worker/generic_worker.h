@@ -21,6 +21,8 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_LEARNER_generic_worker_GENERIC_WORKER_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_LEARNER_generic_worker_GENERIC_WORKER_H_
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"

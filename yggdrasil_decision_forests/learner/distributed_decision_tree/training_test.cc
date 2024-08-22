@@ -16,6 +16,9 @@
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 
 #include "gmock/gmock.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -55,21 +58,20 @@ void GenericTrainingLoop(LabelAccessor* label_accessor, Tester* tester,
   CHECK_OK(tree_builder->AggregateLabelStatistics(
       *label_accessor, &label_stats_per_node.front(), &thread_pool));
 
-  YDF_LOG(INFO) << "Input features: "
-                << absl::StrJoin(tester->config_link_.features().begin(),
-                                 tester->config_link_.features().end(), ", ");
+  LOG(INFO) << "Input features: "
+            << absl::StrJoin(tester->config_link_.features().begin(),
+                             tester->config_link_.features().end(), ", ");
 
   // Set the root tree value using the global label statistics.
   CHECK_OK(tree_builder->SetRootValue(label_stats_per_node.front()));
 
   for (int iter_idx = 0; iter_idx < tester->dt_config_.max_depth();
        iter_idx++) {
-    YDF_LOG(INFO) << "Iteration # " << iter_idx;
+    LOG(INFO) << "Iteration # " << iter_idx;
 
-    YDF_LOG(INFO) << "Label statistics (" << label_stats_per_node.size()
-                  << "):";
+    LOG(INFO) << "Label statistics (" << label_stats_per_node.size() << "):";
     for (const auto& label_stats : label_stats_per_node) {
-      YDF_LOG(INFO) << label_stats.DebugString();
+      LOG(INFO) << label_stats.DebugString();
     }
 
     // Collect the input features. All the nodes are seeing all the same
@@ -88,8 +90,8 @@ void GenericTrainingLoop(LabelAccessor* label_accessor, Tester* tester,
          *label_accessor, label_stats_per_node, iter_idx > 0,
          tester->dataset_.get(), &splits}));
     const auto num_valid_splits = NumValidSplits(splits);
-    YDF_LOG(INFO) << "Found " << num_valid_splits << " / " << splits.size()
-                  << " split(s)";
+    LOG(INFO) << "Found " << num_valid_splits << " / " << splits.size()
+              << " split(s)";
 
     if (num_valid_splits == 0) {
       break;
@@ -99,51 +101,50 @@ void GenericTrainingLoop(LabelAccessor* label_accessor, Tester* tester,
     SplitPerOpenNode no_splits(splits.size());
     CHECK_OK(MergeBestSplits(no_splits, &splits));
 
-    YDF_LOG(INFO) << "Splits (" << splits.size() << "):";
+    LOG(INFO) << "Splits (" << splits.size() << "):";
     for (const auto& split : splits) {
-      YDF_LOG(INFO) << "\tCondition:\n" << split.condition.DebugString();
-      YDF_LOG(INFO) << "\tNegative label stats:\n"
-                    << split.label_statistics[0].DebugString();
-      YDF_LOG(INFO) << "\tPositive label stats:\n"
-                    << split.label_statistics[1].DebugString();
-      YDF_LOG(INFO);
+      LOG(INFO) << "\tCondition:\n" << split.condition.DebugString();
+      LOG(INFO) << "\tNegative label stats:\n"
+                << split.label_statistics[0].DebugString();
+      LOG(INFO) << "\tPositive label stats:\n"
+                << split.label_statistics[1].DebugString();
+      LOG(INFO);
     }
 
     // Add the found splits to the tree structure.
     const auto node_remapping = tree_builder->ApplySplitToTree(splits).value();
-    YDF_LOG(INFO) << "Remapping:";
+    LOG(INFO) << "Remapping:";
     for (int i = 0; i < node_remapping.size(); i++) {
-      YDF_LOG(INFO) << "\t" << i << " -> " << node_remapping[i].indices[0]
-                    << " + " << node_remapping[i].indices[1];
+      LOG(INFO) << "\t" << i << " -> " << node_remapping[i].indices[0] << " + "
+                << node_remapping[i].indices[1];
     }
 
     std::string description;
     tree_builder->tree().AppendModelStructure(
         tester->data_spec_, tester->config_link_.label(), &description);
-    YDF_LOG(INFO) << "Tree:\n" << description;
+    LOG(INFO) << "Tree:\n" << description;
 
     // Evaluate the split for all the active training examples.
     SplitEvaluationPerOpenNode split_evaluation;
     CHECK_OK(EvaluateSplits(example_to_node, splits, &split_evaluation,
                             tester->dataset_.get(), &thread_pool));
 
-    YDF_LOG(INFO) << "Split evaluation (" << split_evaluation.size() << "):";
+    LOG(INFO) << "Split evaluation (" << split_evaluation.size() << "):";
     for (const auto& evaluation : split_evaluation) {
-      YDF_LOG(INFO) << "\t" << evaluation.size() << " byte(s)";
-      YDF_LOG(INFO) << "\t (first 10 values) "
-                    << utils::bitmap::ToStringBit(
-                           evaluation,
-                           std::min<int>(10, evaluation.size() * 8));
+      LOG(INFO) << "\t" << evaluation.size() << " byte(s)";
+      LOG(INFO) << "\t (first 10 values) "
+                << utils::bitmap::ToStringBit(
+                       evaluation, std::min<int>(10, evaluation.size() * 8));
     }
 
     // Update the example->node map.
     CHECK_OK(UpdateExampleNodeMap(splits, split_evaluation, node_remapping,
                                   &example_to_node, &thread_pool));
 
-    YDF_LOG(INFO) << "Example to node map (first 10 values):";
+    LOG(INFO) << "Example to node map (first 10 values):";
     ExampleIndex example_idx = 0;
     for (const auto& node_idx : example_to_node) {
-      YDF_LOG(INFO) << "\t" << node_idx;
+      LOG(INFO) << "\t" << node_idx;
       if (example_idx > 10) {
         break;
       }
@@ -154,9 +155,9 @@ void GenericTrainingLoop(LabelAccessor* label_accessor, Tester* tester,
     const auto previous_label_stats_per_node_size = label_stats_per_node.size();
     CHECK_OK(
         UpdateLabelStatistics(splits, node_remapping, &label_stats_per_node));
-    YDF_LOG(INFO) << "Update the number of open nodes "
-                  << previous_label_stats_per_node_size << " -> "
-                  << label_stats_per_node.size();
+    LOG(INFO) << "Update the number of open nodes "
+              << previous_label_stats_per_node_size << " -> "
+              << label_stats_per_node.size();
   }
 }
 
@@ -223,8 +224,7 @@ class AdultClassificationDataset : public ::testing::Test {
     dataset_ = dataset_cache::DatasetCacheReader::Create(cache_path_,
                                                          cache_reader_options)
                    .value();
-    YDF_LOG(INFO) << "Cache meta-data:\n"
-                  << dataset_->meta_data().DebugString();
+    LOG(INFO) << "Cache meta-data:\n" << dataset_->meta_data().DebugString();
 
     CHECK_OK(AbstractLearner::LinkTrainingConfig(config_, data_spec_,
                                                  &config_link_));
@@ -537,8 +537,7 @@ class AbaloneRegressionDataset : public ::testing::Test {
     dataset_ = dataset_cache::DatasetCacheReader::Create(cache_path_,
                                                          cache_reader_options)
                    .value();
-    YDF_LOG(INFO) << "Cache meta-data:\n"
-                  << dataset_->meta_data().DebugString();
+    LOG(INFO) << "Cache meta-data:\n" << dataset_->meta_data().DebugString();
 
     CHECK_OK(AbstractLearner::LinkTrainingConfig(config_, data_spec_,
                                                  &config_link_));

@@ -19,26 +19,22 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <cmath>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
-#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -70,7 +66,7 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
   // Returns log(y/(1-y)) with y the weighted ratio of positive labels.
   absl::StatusOr<std::vector<float>> InitialPredictions(
       const dataset::VerticalDataset& dataset, int label_col_idx,
-      const std::vector<float>& weights) const override;
+      const absl::Span<const float> weights) const override;
 
   virtual absl::StatusOr<std::vector<float>> InitialPredictions(
       const decision_tree::proto::LabelStatistics& label_statistics)
@@ -78,45 +74,44 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
 
   template <typename T>
   absl::Status TemplatedUpdateGradients(
-      const std::vector<T>& labels, const std::vector<float>& predictions,
+      const absl::Span<T> labels, const absl::Span<const float> predictions,
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const;
 
   template <typename T>
-  static void TemplatedUpdateGradientsImp(const std::vector<T>& labels,
-                                          const std::vector<float>& predictions,
-                                          size_t begin_example_idx,
-                                          size_t end_example_idx,
-                                          std::vector<float>* gradient_data,
-                                          std::vector<float>* hessian_data);
+  static void TemplatedUpdateGradientsImp(
+      const absl::Span<T> labels, const absl::Span<const float> predictions,
+      size_t begin_example_idx, size_t end_example_idx,
+      std::vector<float>* gradient_data, std::vector<float>* hessian_data);
 
   absl::Status UpdateGradients(
-      const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+      const absl::Span<const int16_t> labels,
+      const absl::Span<const float> predictions,
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   absl::Status UpdateGradients(
-      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+      const absl::Span<const int32_t> labels,
+      const absl::Span<const float> predictions,
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
-
 
   std::vector<std::string> SecondaryMetricNames() const override;
 
   template <typename T>
   absl::StatusOr<LossResults> TemplatedLoss(
-      const std::vector<T>& labels, const std::vector<float>& predictions,
-      const std::vector<float>& weights,
+      const absl::Span<T> labels, const absl::Span<const float> predictions,
+      const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const;
 
   template <bool use_weights, typename T>
   static void TemplatedLossImp(
-      const std::vector<T>& labels, const std::vector<float>& predictions,
-      const std::vector<float>& weights, size_t begin_example_idx,
+      const absl::Span<T> labels, const absl::Span<const float> predictions,
+      const absl::Span<const float> weights, size_t begin_example_idx,
       size_t end_example_idx, double* __restrict sum_loss,
       utils::IntegersConfusionMatrixDouble* confusion_matrix);
 
@@ -124,8 +119,9 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
   //
   // `weights` may be empty, which is interpreted as unit weights.
   absl::StatusOr<LossResults> Loss(
-      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
-      const std::vector<float>& weights,
+      const absl::Span<const int32_t> labels,
+      const absl::Span<const float> predictions,
+      const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
@@ -133,8 +129,9 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
   //
   // `weights` may be empty, which is interpreted as unit weights.
   absl::StatusOr<LossResults> Loss(
-      const std::vector<int16_t>& labels, const std::vector<float>& predictions,
-      const std::vector<float>& weights,
+      const absl::Span<const int16_t> labels,
+      const absl::Span<const float> predictions,
+      const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const override;
 };

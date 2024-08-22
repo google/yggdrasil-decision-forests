@@ -19,7 +19,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/status/status.h"
+#include "absl/log/log.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -44,11 +44,11 @@ std::string DatasetDir() {
 TEST(VerticalDatasetIOTest, Load) {
   for (const auto& dataset_path :
        {absl::StrCat("csv:", file::JoinPath(DatasetDir(), "toy.csv"))}) {
-    YDF_LOG(INFO) << "Create dataspec for " << dataset_path;
+    LOG(INFO) << "Create dataspec for " << dataset_path;
     proto::DataSpecificationGuide guide;
     proto::DataSpecification data_spec;
     CreateDataSpec(dataset_path, false, guide, &data_spec);
-    YDF_LOG(INFO) << "Load " << dataset_path;
+    LOG(INFO) << "Load " << dataset_path;
     VerticalDataset ds;
     EXPECT_OK(LoadVerticalDataset(dataset_path, data_spec, &ds));
     EXPECT_EQ(ds.nrow(), 4);

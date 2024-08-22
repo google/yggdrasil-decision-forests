@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -82,9 +83,8 @@ absl::Status GetInputFeatures(
   }
 
   if (input_features_idxs->empty()) {
-    YDF_LOG(WARNING)
-        << "The model does not have any input features i.e. the model "
-           "is constant and will always return the same prediction.";
+    LOG(WARNING) << "The model does not have any input features i.e. the model "
+                    "is constant and will always return the same prediction.";
   }
 
   return absl::OkStatus();

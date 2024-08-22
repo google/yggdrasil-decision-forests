@@ -17,6 +17,7 @@
 
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/early_stopping/early_stopping_snapshot.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -50,9 +51,9 @@ bool EarlyStopping::ShouldStop(const int current_iter_idx) {
     return false;
   }
   if (last_num_trees_ - best_num_trees_ >= num_trees_look_ahead_) {
-    YDF_LOG(INFO) << "Early stop of the training because the validation "
-                     "loss does not decrease anymore. Best valid-loss: "
-                  << best_loss_;
+    LOG(INFO) << "Early stop of the training because the validation "
+                 "loss does not decrease anymore. Best valid-loss: "
+              << best_loss_;
     return true;
   }
   return false;

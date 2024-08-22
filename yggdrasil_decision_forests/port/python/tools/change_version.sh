@@ -1,3 +1,20 @@
+#!/bin/bash
+# Copyright 2022 Google LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+
 # Update the version of the addon.
 
 confirmation () {
@@ -30,7 +47,7 @@ echo "Update version"
 sed -i -e "s/_VERSION = \"[_rcv\.0-9]\+\"/_VERSION = \"${NEW_VERSION}\"/" ${SRC}/config/setup.py
 sed -i -e "s/version = \"[_rcv\.0-9]\+\"/version = \"${NEW_VERSION}\"/" ${SRC}/ydf/version.py
 # TODO: Fail if the version cannot be updated
-# TODO: Update the version in the build_windows_release.bat script.
+# TODO: Update the version in the release_windows.bat script.
 
 echo
 echo "Check that the following files have been updated correctly:"
@@ -38,4 +55,4 @@ echo ${SRC}/config/setup.py
 echo ${SRC}/ydf/version.py
 echo "Update the changelog:"
 echo ${SRC}/CHANGELOG.md
-echo ${SRC}/tools/build_windows_release.bat
+echo ${SRC}/tools/release_windows.bat

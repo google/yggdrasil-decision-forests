@@ -17,7 +17,11 @@
 
 #include <stdlib.h>
 
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/substitute.h"
 
 #ifdef __AVX2__
 #include <immintrin.h>
@@ -25,7 +29,6 @@
 
 #include "absl/base/config.h"
 #include "absl/numeric/bits.h"
-#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
@@ -906,9 +909,9 @@ absl::Status BaseGenericToSpecializedModel(const AbstractModel& src,
 #elif ABSL_HAVE_BUILTIN(__builtin_cpu_supports) && \
     (defined(__x86_64__) || defined(__i386__))
   if (__builtin_cpu_supports("avx2")) {
-    LOG_INFO_EVERY_N_SEC(
-        30, _ << "The binary was compiled without AVX2 support, but your CPU "
-                 "supports it. Enable it for faster model inference.");
+    LOG_EVERY_N_SEC(INFO, 30)
+        << "The binary was compiled without AVX2 support, but your CPU "
+           "supports it. Enable it for faster model inference.";
   }
 #endif
 

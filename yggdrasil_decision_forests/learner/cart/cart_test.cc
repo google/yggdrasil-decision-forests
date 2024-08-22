@@ -19,6 +19,7 @@
 #include <string>
 
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -31,6 +32,17 @@ namespace model {
 namespace cart {
 namespace {
 
+using Internal = ::yggdrasil_decision_forests::model::decision_tree::proto::
+    DecisionTreeTrainingConfig::Internal;
+
+void SetExpectedSortingStrategy(Internal::SortingStrategy expected,
+                                model::proto::TrainingConfig* train_config) {
+  auto* cart_config = train_config->MutableExtension(cart::proto::cart_config);
+  cart_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_ensure_effective_sorting_strategy(expected);
+}
+
 class CartOnAdult : public utils::TrainAndTestTester {
   void SetUp() override {
     train_config_.set_learner(CartLearner::kRegisteredName);
@@ -38,19 +50,22 @@ class CartOnAdult : public utils::TrainAndTestTester {
     train_config_.set_label("income");
     train_config_.add_features(".*");
     dataset_filename_ = "adult.csv";
+
+    // CART only uses IN_NODE sorting.
+    SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   }
 };
 
 TEST_F(CartOnAdult, Base) {
   TrainAndEvaluateModel();
   // Random Forest has an accuracy of ~0.860.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8560, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.4373, 0.05);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8546, 0.011, 0.8552);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.4392, 0.156, 0.4082);
 
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   utils::ExpectEqualGoldenModel(*model_, "cart_adult");
 }
@@ -65,6 +80,9 @@ class CartOnAdultPreSplit : public utils::TrainAndTestTester {
     train_config_.add_features(".*");
     dataset_filename_ = "adult_train.csv";
     dataset_test_filename_ = "adult_test.csv";
+
+    // CART only use IN_NODE sorting.
+    SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   }
 };
 
@@ -80,6 +98,15 @@ class CartOnAbalone : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::REGRESSION);
     train_config_.set_label("Rings");
     dataset_filename_ = "abalone.csv";
+
+    // CART only use IN_NODE sorting.
+    auto* cart_config =
+        train_config_.MutableExtension(cart::proto::cart_config);
+    cart_config->mutable_decision_tree()
+        ->mutable_internal()
+        ->set_ensure_effective_sorting_strategy(
+            decision_tree::proto::DecisionTreeTrainingConfig::Internal::
+                IN_NODE);
   }
 };
 
@@ -87,10 +114,7 @@ TEST_F(CartOnAbalone, Base) {
   TrainAndEvaluateModel();
   // Random Forest has an rmse of ~2.10.
   // The default RMSE (always retuning the label mean) is ~3.204.
-  // Note: This test show a lot of variance with RMSE ranging from 2.333
-  // to 2.649 from only changes in the random generator output.
-  EXPECT_LT(metric::RMSE(evaluation_), 2.67);
-  EXPECT_GT(metric::RMSE(evaluation_), 2.31);
+  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.3728, 0.1566, 2.3054);
 
   auto* rf_model =
       dynamic_cast<const random_forest::RandomForestModel*>(model_.get());
@@ -106,25 +130,31 @@ class CartOnIris : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::CLASSIFICATION);
     train_config_.set_label("class");
     dataset_filename_ = "iris.csv";
+
+    // CART only uses IN_NODE sorting.
+    SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   }
 };
 
 TEST_F(CartOnIris, Base) {
   TrainAndEvaluateModel();
   // Random Forest has an accuracy of ~0.947.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9333, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 1.0883, 0.04);
 
-  EXPECT_GE(metric::Accuracy(model_->ValidationEvaluation()), 0.80);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.82, 0.23, 0.9333);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 1.0176, 1.3571, 1.0883);
+
+  const auto valid_acc = metric::Accuracy(model_->ValidationEvaluation());
+  YDF_TEST_METRIC(valid_acc, 0.8, 0.3, 0.8333);
 }
 
 TEST_F(CartOnIris, WithManualValidation) {
   pass_validation_dataset_ = true;
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.9730, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.11347, 0.04);
-
-  EXPECT_GE(metric::Accuracy(model_->ValidationEvaluation()), 0.80);
+  // This test should have no variance.
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.973, 0.0001, 0.973);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1135, 0.0001, 0.1135);
+  const auto valid_acc = metric::Accuracy(model_->ValidationEvaluation());
+  YDF_TEST_METRIC(valid_acc, 0.9211, 0.0001, 0.9211);
 }
 
 TEST(Cart, SetHyperParameters) {
@@ -245,18 +275,22 @@ class CartOnSimPTE : public utils::TrainAndTestTester {
 
     dataset_filename_ = "sim_pte_train.csv";
     dataset_test_filename_ = "sim_pte_test.csv";
+
+    // CART only use IN_NODE sorting.
+    SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   }
 };
 
 TEST_F(CartOnSimPTE, Base) {
   TrainAndEvaluateModel();
   // Note: A Qini of ~0.1 is expected with a simple Random Forest model.
-  EXPECT_NEAR(metric::Qini(evaluation_), 0.051, 0.01);
+  YDF_TEST_METRIC(metric::Qini(evaluation_), 0.058, 0.041, 0.0825);
 
   auto* rf_model =
       dynamic_cast<const random_forest::RandomForestModel*>(model_.get());
-  EXPECT_GT(rf_model->num_pruned_nodes().value(), 20);
-  EXPECT_GT(rf_model->NumNodes(), 20);
+
+  YDF_TEST_METRIC(rf_model->num_pruned_nodes().value(), 49.0, 46.5, 58.0);
+  YDF_TEST_METRIC(rf_model->NumNodes(), 37.0, 42.0, 33.0);
 }
 
 TEST_F(CartOnSimPTE, Honest) {
@@ -264,7 +298,7 @@ TEST_F(CartOnSimPTE, Honest) {
   config->mutable_decision_tree()->mutable_honest();
 
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Qini(evaluation_), 0.05047, 0.01);
+  YDF_TEST_METRIC(metric::Qini(evaluation_), 0.044, 0.0521, 0.0276);
 }
 
 }  // namespace

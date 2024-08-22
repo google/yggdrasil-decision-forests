@@ -75,7 +75,7 @@ absl::Status MeanAverageErrorLoss::Status() const {
 
 absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& weights) const {
+    const absl::Span<const float> weights) const {
   // The initial value is the weighted median value.
 
   ASSIGN_OR_RETURN(
@@ -83,7 +83,7 @@ absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(
       dataset
           .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
               label_col_idx));
-  const std::vector<float>& labels = label_col->values();
+  const absl::Span<const float> labels = label_col->values();
   STATUS_CHECK_GT(labels.size(), 0);
 
   float initial_prediction;
@@ -129,7 +129,8 @@ absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(
 }
 
 absl::Status MeanAverageErrorLoss::UpdateGradients(
-    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -168,8 +169,9 @@ std::vector<std::string> MeanAverageErrorLoss::SecondaryMetricNames() const {
 }
 
 absl::StatusOr<LossResults> MeanAverageErrorLoss::Loss(
-    const std::vector<float>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   ASSIGN_OR_RETURN(float mae,

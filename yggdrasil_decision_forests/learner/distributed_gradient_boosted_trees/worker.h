@@ -16,6 +16,9 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_GRADIENT_BOOSTED_TREES_WORKER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_GRADIENT_BOOSTED_TREES_WORKER_H_
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/worker.pb.h"
@@ -304,7 +307,7 @@ class DistributedGradientBoostedTreesWorker
   absl::Duration dataset_feature_duration_;
   int dataset_num_features_loaded_ = 0;
 
-  // Prints details about the computation with YDF_LOG(INFO).
+  // Prints details about the computation with LOG(INFO).
   bool worker_logs_ = true;
 };
 

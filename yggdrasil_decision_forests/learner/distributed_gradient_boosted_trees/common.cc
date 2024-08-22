@@ -16,6 +16,8 @@
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 

@@ -49,6 +49,12 @@ py_library(
     deps = ["//ydf/cc:ydf"],
 )
 
+py_library(
+    name = "func_helpers",
+    srcs = ["func_helpers.py"],
+    deps = [],
+)
+
 pybind_library(
     name = "custom_casters",
     hdrs = ["custom_casters.h"],
@@ -89,11 +95,11 @@ pybind_library(
 # =====
 
 py_test(
-    name = "string_lib_test",
-    srcs = ["string_lib_test.py"],
+    name = "func_helpers_test",
+    srcs = ["func_helpers_test.py"],
     python_version = "PY3",
     deps = [
-        ":string_lib",
+        ":func_helpers",
         # absl/testing:absltest dep,
     ],
 )
@@ -114,6 +120,16 @@ py_test(
     python_version = "PY3",
     deps = [
         ":paths",
+        # absl/testing:absltest dep,
+    ],
+)
+
+py_test(
+    name = "string_lib_test",
+    srcs = ["string_lib_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":string_lib",
         # absl/testing:absltest dep,
     ],
 )

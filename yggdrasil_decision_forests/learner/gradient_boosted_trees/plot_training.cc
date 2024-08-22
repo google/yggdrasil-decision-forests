@@ -19,6 +19,8 @@
 #include "learning/lib/ami/tools/simpleplot/simpleplot.pb.h"
 #include "learning/lib/ami/tools/simpleplot/svg_canvas.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 

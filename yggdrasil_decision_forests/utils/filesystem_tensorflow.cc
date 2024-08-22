@@ -17,10 +17,13 @@
 
 #include <regex>  // NOLINT
 
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
+#include "absl/status/status.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
-#include "absl/strings/str_replace.h"
+#include "absl/strings/string_view.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/path.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -66,7 +69,7 @@ bool GenerateShardedFilenames(absl::string_view spec,
 
   int int_count;
   if (count == "*") {
-    YDF_LOG(WARNING) << "Non defined shard count not supported in " << spec;
+    LOG(WARNING) << "Non defined shard count not supported in " << spec;
     return false;
   } else if (absl::SimpleAtoi(count, &int_count)) {
   } else {

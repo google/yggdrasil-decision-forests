@@ -17,6 +17,8 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -93,7 +95,7 @@ proto::EvaluationResults GenEvaluationBinaryOutcome(
   // Create reports.
   std::string report;
   CHECK_OK(AppendTextReportWithStatus(eval, &report));
-  YDF_LOG(INFO) << "Report :\n" << report;
+  LOG(INFO) << "Report :\n" << report;
 
   return eval;
 }

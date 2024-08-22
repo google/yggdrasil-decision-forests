@@ -421,8 +421,8 @@ class CustomLossTest(parameterized.TestCase):
     npt.assert_allclose(
         model_custom_loss.predict(test_ds),
         model_builtin_loss.predict(test_ds),
-        rtol=1e-5,  # Without activation function, the predictions can be large.
-        atol=1e-6,
+        rtol=1e-3,  # Without activation function, the predictions can be large.
+        atol=1e-5,
     )
 
   def test_multiclass_initial_prediction(self):

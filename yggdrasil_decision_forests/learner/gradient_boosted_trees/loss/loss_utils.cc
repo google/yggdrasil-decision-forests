@@ -15,12 +15,15 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 
+#include <cstdlib>
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
@@ -37,7 +40,7 @@ template <bool weighted>
 absl::Status SetLeafValueWithNewtonRaphsonStep(
     const proto::GradientBoostedTreesTrainingConfig& gbt_config,
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const GradientData& gradients,
+    const absl::Span<const float> weights, const GradientData& gradients,
     decision_tree::NodeWithChildren* node) {
   if constexpr (weighted) {
     DCHECK_LE(selected_examples.size(), weights.size());
@@ -92,6 +95,7 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
 
   auto* reg = node->mutable_node()->mutable_regressor();
 
+  // Save the label statistics used to train the child nodes.
   if (use_hessian_gain) {
     reg->set_sum_gradients(sum_weighted_gradient);
     reg->set_sum_hessians(sum_weighted_hessian);
@@ -123,7 +127,7 @@ SetLeafValueWithNewtonRaphsonStepFunctor(
   return [&gradients, &gbt_config](
              const dataset::VerticalDataset& train_dataset,
              const std::vector<UnsignedExampleIdx>& selected_examples,
-             const std::vector<float>& weights,
+             const absl::Span<const float> weights,
              const model::proto::TrainingConfig& config,
              const model::proto::TrainingConfigLinking& config_link,
              decision_tree::NodeWithChildren* node) -> absl::Status {
@@ -169,7 +173,17 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
     value = utils::clamp(value, -gbt_config_.clamp_leaf_logit(),
                          gbt_config_.clamp_leaf_logit());
   }
-  node->mutable_regressor()->set_top_value(value);
+  auto* reg = node->mutable_regressor();
+  reg->set_top_value(value);
+
+  if (gbt_config_.use_hessian_gain()) {
+    reg->set_sum_gradients(sum_gradients);
+    reg->set_sum_hessians(sum_hessians);
+  } else {
+    *reg->mutable_distribution() =
+        label_statistics.regression_with_hessian().labels();
+  }
+
   return absl::OkStatus();
 }
 

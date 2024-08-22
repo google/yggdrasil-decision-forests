@@ -82,8 +82,11 @@ message GenericHyperParameterSpecification {
 
     optional Documentation documentation = 5;
 
-    // If set, this parameter exist conditionally on other parameter values.
+    // If set, this parameter exists conditionally on other parameter values.
     optional Conditional conditional = 7;
+
+    // If set, this parameter is mutually exclusive with other parameters.
+    optional MutuallyExclusivityCondition mutual_exclusive = 8;
 
     // Categorical hyper parameter i.e. the hyper parameter takes a values
     // from a set of possible values.
@@ -122,6 +125,16 @@ message GenericHyperParameterSpecification {
 
       // When a field is deprecated.
       optional bool deprecated = 8;
+    }
+
+    message MutuallyExclusivityCondition {
+      // List of parameters this parameter is mutually exclusive with. Any
+      // parameter in this list must have this parameter in its
+      // `other_parameters` list.
+      repeated string other_parameters = 1;
+      // True if this parameter is the default parameter of a list of mutually
+      // exclusive parameters.
+      optional bool is_default = 2 [default = false];
     }
   }
 

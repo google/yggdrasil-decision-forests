@@ -16,6 +16,7 @@
 // A worker waiting for jobs sent by the GRPC manager.
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_worker.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -28,9 +29,9 @@ namespace grpc_worker {
 
 void GRPCWorker() {
   const auto port = absl::GetFlag(FLAGS_port);
-  YDF_LOG(INFO) << "Start GRPC worker on port " << port;
+  LOG(INFO) << "Start GRPC worker on port " << port;
   QCHECK_OK(WorkerMain(port, absl::GetFlag(FLAGS_use_loas)));
-  YDF_LOG(INFO) << "Stop GRPC worker";
+  LOG(INFO) << "Stop GRPC worker";
 }
 
 }  // namespace grpc_worker

@@ -17,8 +17,9 @@
 
 #include <limits>
 
+#include "absl/log/check.h"
+#include "absl/numeric/bits.h"
 #include "absl/status/status.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"

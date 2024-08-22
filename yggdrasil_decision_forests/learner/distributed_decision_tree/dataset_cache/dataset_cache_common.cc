@@ -15,16 +15,31 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
 
+#include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
 #include <limits>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/numeric/bits.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -73,16 +88,33 @@ std::string ShardMetadataPath(absl::string_view directory, int shard_idx) {
       absl::StrCat(kFilenameShard, shard_idx, kFilenameMetaDataPostfix));
 }
 
+int DeltaBitIdx(uint64_t num_examples) {
+  return 64 - absl::countl_zero(num_examples);
+}
+
+uint64_t MaskDeltaBitFromDeltaBitIdx(int deltabit) {
+  return uint64_t{1} << deltabit;
+}
+
+uint64_t MaskExampleIdxFromDeltaBitIdx(int deltabit) {
+  return MaskDeltaBitFromDeltaBitIdx(deltabit) - 1;
+}
+
 uint64_t MaskDeltaBit(uint64_t num_examples) {
-  return uint64_t{1} << (64 - absl::countl_zero(num_examples));
+  return MaskDeltaBitFromDeltaBitIdx(DeltaBitIdx(num_examples));
 }
 
 uint64_t MaskExampleIdx(uint64_t num_examples) {
-  return MaskDeltaBit(num_examples) - 1;
+  return MaskExampleIdxFromDeltaBitIdx(DeltaBitIdx(num_examples));
 }
 
 uint64_t MaxValueWithDeltaBit(uint64_t num_examples) {
-  return MaskDeltaBit(num_examples) | num_examples;
+  return MaskDeltaBitFromDeltaBitIdx(DeltaBitIdx(num_examples)) | num_examples;
+}
+
+uint64_t MaxValueWithDeltaBitFromDeltaBitIdx(int deltabit) {
+  return MaskDeltaBitFromDeltaBitIdx(deltabit) |
+         MaskExampleIdxFromDeltaBitIdx(deltabit);
 }
 
 float DiscretizedNumericalToNumerical(
@@ -168,7 +200,7 @@ absl::StatusOr<std::vector<float>> ExtractDiscretizedBoundariesWithDownsampling(
 
 bool HasAllRequiredFiles(absl::string_view cache_path, const int num_columns,
                          const int num_shards) {
-  YDF_LOG(INFO) << "Checking required files in partial cache.";
+  LOG(INFO) << "Checking required files in partial cache.";
 
   using model::distributed_decision_tree::dataset_cache::proto::
       PartialColumnShardMetadata;
@@ -193,8 +225,8 @@ bool HasAllRequiredFiles(absl::string_view cache_path, const int num_columns,
           const auto status = file::GetBinaryProto(shard_meta_data_path,
                                                    &ignore, file::Defaults());
           if (!status.ok()) {
-            YDF_LOG(INFO) << "Cannot parse " << shard_meta_data_path
-                          << ". Issue: " << status.message();
+            LOG(INFO) << "Cannot parse " << shard_meta_data_path
+                      << ". Issue: " << status.message();
             is_valid = false;
           }
         });

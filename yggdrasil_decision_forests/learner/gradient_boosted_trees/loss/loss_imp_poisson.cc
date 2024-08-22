@@ -20,14 +20,13 @@
 #include <string>
 #include <vector>
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -43,7 +42,7 @@ namespace gradient_boosted_trees {
 
 absl::StatusOr<std::vector<float>> PoissonLoss::InitialPredictions(
     const dataset::VerticalDataset &dataset, int label_col_idx,
-    const std::vector<float> &weights) const {
+    const absl::Span<const float> weights) const {
   // The initial value is the logarithm of the weighted mean of the labels.
   double weighted_sum_labels = 0;
   double sum_weights = 0;
@@ -97,7 +96,8 @@ absl::Status PoissonLoss::Status() const {
 }
 
 absl::Status PoissonLoss::UpdateGradients(
-    const std::vector<float> &labels, const std::vector<float> &predictions,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices *ranking_index, GradientDataRef *gradients,
     utils::RandomEngine *random,
     utils::concurrency::ThreadPool *thread_pool) const {
@@ -124,8 +124,8 @@ absl::Status PoissonLoss::UpdateGradients(
   return absl::OkStatus();
 }
 
-void PoissonLoss::UpdateGradientsImp(const std::vector<float> &labels,
-                                     const std::vector<float> &predictions,
+void PoissonLoss::UpdateGradientsImp(const absl::Span<const float> labels,
+                                     const absl::Span<const float> predictions,
                                      size_t begin_example_idx,
                                      size_t end_example_idx,
                                      std::vector<float> *gradient_data,
@@ -145,14 +145,14 @@ void PoissonLoss::UpdateGradientsImp(const std::vector<float> &labels,
   }
 }
 
-
 std::vector<std::string> PoissonLoss::SecondaryMetricNames() const {
   return {"RMSE"};
 }
 
 absl::StatusOr<LossResults> PoissonLoss::Loss(
-    const std::vector<float> &labels, const std::vector<float> &predictions,
-    const std::vector<float> &weights,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices *ranking_index,
     utils::concurrency::ThreadPool *thread_pool) const {
   double sum_loss = 0;
@@ -205,9 +205,9 @@ absl::StatusOr<LossResults> PoissonLoss::Loss(
 }
 
 template <bool use_weights>
-void PoissonLoss::LossImp(const std::vector<float> &labels,
-                          const std::vector<float> &predictions,
-                          const std::vector<float> &weights,
+void PoissonLoss::LossImp(const absl::Span<const float> labels,
+                          const absl::Span<const float> predictions,
+                          const absl::Span<const float> weights,
                           size_t begin_example_idx, size_t end_example_idx,
                           double *__restrict sum_loss,
                           double *__restrict sum_square_error,

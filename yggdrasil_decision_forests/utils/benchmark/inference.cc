@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -57,7 +58,7 @@ void RunOnceGeneric(const model::AbstractModel& model,
         predictions[example_idx] = prediction.ranking().relevance();
         break;
       default:
-        YDF_LOG(INFO) << "Non supported task";
+        LOG(INFO) << "Non supported task";
     }
   }
 }

@@ -24,6 +24,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -1054,7 +1055,7 @@ TEST(Dataset, OverrideMostFrequentItem) {
   proto::DataSpecification data_spec;
   CHECK_OK(CreateDataSpecWithStatus(ToyDatasetTypedPathCsv(), false, guide,
                                     &data_spec));
-  YDF_LOG(INFO) << PrintHumanReadable(data_spec, false);
+  LOG(INFO) << PrintHumanReadable(data_spec, false);
   auto& col = data_spec.columns(GetColumnIdxFromName("Cat_1", data_spec));
   EXPECT_EQ(col.categorical().most_frequent_value(),
             CategoricalStringToValue("B", col));

@@ -1,4 +1,4 @@
-# Improve training speed
+# How to train a model faster?
 
 Some hyper-parameters can have a significant impact on both the model quality
 and the training speed.

@@ -17,7 +17,8 @@
 
 #include <algorithm>
 #include <atomic>
-#include <iterator>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <numeric>
 #include <random>
@@ -26,12 +27,17 @@
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -42,6 +48,8 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -59,6 +67,7 @@
 #include "yggdrasil_decision_forests/utils/feature_importance.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
@@ -225,14 +234,15 @@ RandomForestLearner::GetGenericHyperParameterSpecification() const {
   const auto proto_path = "learner/random_forest/random_forest.proto";
 
   hparam_def.mutable_documentation()->set_description(
-      R"(A Random Forest (https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf) is a collection of deep CART decision trees trained independently and without pruning. Each tree is trained on a random subset of the original training  dataset (sampled with replacement).
+      R"(A [Random Forest](https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf) is a collection of deep CART decision trees trained independently and without pruning. Each tree is trained on a random subset of the original training  dataset (sampled with replacement).
 
 The algorithm is unique in that it is robust to overfitting, even in extreme cases e.g. when there are more features than training examples.
 
 It is probably the most well-known of the Decision Forest training algorithms.)");
 
-  const auto& rf_config =
-      config.GetExtension(random_forest::proto::random_forest_config);
+  auto& rf_config =
+      *config.MutableExtension(random_forest::proto::random_forest_config);
+  RETURN_IF_ERROR(internal::SetDefaultHyperParameters(&rf_config));
 
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamNumTrees);
@@ -387,7 +397,7 @@ RandomForestLearner::TrainWithStatusImpl(
   auto config_with_default = training_config();
   auto& rf_config = *config_with_default.MutableExtension(
       random_forest::proto::random_forest_config);
-  decision_tree::SetDefaultHyperParameters(rf_config.mutable_decision_tree());
+  RETURN_IF_ERROR(internal::SetDefaultHyperParameters(&rf_config));
 
   // If the maximum model size is limited, "keep_non_leaf_label_distribution"
   // defaults to false.
@@ -399,22 +409,25 @@ RandomForestLearner::TrainWithStatusImpl(
 
   if (training_config().task() == model::proto::Task::NUMERICAL_UPLIFT &&
       rf_config.compute_oob_performances()) {
-    YDF_LOG(WARNING)
-        << "RF does not support OOB performances with the numerical "
-           "uplift task (yet).";
+    LOG(WARNING) << "RF does not support OOB performances with the numerical "
+                    "uplift task (yet).";
     rf_config.set_compute_oob_performances(false);
   }
 
-  auto mdl = absl::make_unique<RandomForestModel>();
-  mdl->set_data_spec(train_dataset.data_spec());
   model::proto::TrainingConfigLinking config_link;
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
       config_with_default, train_dataset.data_spec(), &config_link));
+  decision_tree::SetInternalDefaultHyperParameters(
+      config_with_default, config_link, train_dataset.data_spec(),
+      rf_config.mutable_decision_tree());
+
+  auto mdl = absl::make_unique<RandomForestModel>();
+  mdl->set_data_spec(train_dataset.data_spec());
   internal::InitializeModelWithTrainingConfig(config_with_default, config_link,
                                               mdl.get());
-  YDF_LOG(INFO) << "Training random forest on " << train_dataset.nrow()
-                << " example(s) and " << config_link.features().size()
-                << " feature(s).";
+  LOG(INFO) << "Training random forest on " << train_dataset.nrow()
+            << " example(s) and " << config_link.features().size()
+            << " feature(s).";
   RETURN_IF_ERROR(CheckConfiguration(train_dataset.data_spec(),
                                      config_with_default, config_link,
                                      rf_config, deployment()));
@@ -575,7 +588,7 @@ RandomForestLearner::TrainWithStatusImpl(
         if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
           if (!training_stopped_early) {
             training_stopped_early = true;
-            YDF_LOG(INFO) << "Training interrupted per request";
+            LOG(INFO) << "Training interrupted per request";
           }
           return;
         }
@@ -594,8 +607,8 @@ RandomForestLearner::TrainWithStatusImpl(
                   training_config().maximum_training_duration_seconds())) {
             if (!training_stopped_early) {
               training_stopped_early = true;
-              YDF_LOG(INFO) << "Stop training because of the maximum training "
-                               "duration.";
+              LOG(INFO) << "Stop training because of the maximum training "
+                           "duration.";
             }
             return;
           }
@@ -637,7 +650,7 @@ RandomForestLearner::TrainWithStatusImpl(
             static bool already_shown = false;
             if (!already_shown) {
               already_shown = true;
-              YDF_LOG(WARNING)
+              LOG(WARNING)
                   << "Example sampling without replacement "
                      "(sampling_with_replacement=false) with a sampling ratio "
                      "of 1 (bootstrap_size_ratio=1). All the examples "
@@ -694,11 +707,11 @@ RandomForestLearner::TrainWithStatusImpl(
                     training_config().maximum_model_size_in_memory_in_bytes()) {
               if (!training_stopped_early) {
                 training_stopped_early = true;
-                YDF_LOG(INFO) << "Stop training after " << num_trained_trees
-                              << " trees because the model size exceeded "
-                                 "maximum_model_size_in_memory_in_bytes="
-                              << training_config()
-                                     .maximum_model_size_in_memory_in_bytes();
+                LOG(INFO) << "Stop training after " << num_trained_trees
+                          << " trees because the model size exceeded "
+                             "maximum_model_size_in_memory_in_bytes="
+                          << training_config()
+                                 .maximum_model_size_in_memory_in_bytes();
               }
               // Remove the tree that was just trained.
               decision_tree.reset();
@@ -796,7 +809,7 @@ RandomForestLearner::TrainWithStatusImpl(
             absl::StrAppendFormat(
                 &snippet, " (tree index:%d) done %s", tree_idx,
                 internal::EvaluationSnippet(evaluation.evaluation()));
-            YDF_LOG(INFO) << snippet;
+            LOG(INFO) << snippet;
           }
 
           // Variable importance.
@@ -815,10 +828,10 @@ RandomForestLearner::TrainWithStatusImpl(
             }
           }
         } else {
-          LOG_INFO_EVERY_N_SEC(
-              20, _ << "Training of tree " << current_num_trained_trees << "/"
-                    << rf_config.num_trees() << " (tree index:" << tree_idx
-                    << ") done");
+          LOG_EVERY_N_SEC(INFO, 20)
+              << "Training of tree " << current_num_trained_trees << "/"
+              << rf_config.num_trees() << " (tree index:" << tree_idx
+              << ") done";
         }
       });
     }
@@ -868,15 +881,15 @@ RandomForestLearner::TrainWithStatusImpl(
             "growth of the tree (e.g. maximum depth)"));
       }
       trees.erase(trees.begin() + num_trees_to_keep, trees.end());
-      YDF_LOG(INFO) << "Retaining the first " << num_trees_to_keep
-                    << " trees to satisfy the "
-                       "\"total_max_num_nodes\" constraint.";
+      LOG(INFO) << "Retaining the first " << num_trees_to_keep
+                << " trees to satisfy the "
+                   "\"total_max_num_nodes\" constraint.";
     }
   }
 
   if (compute_oob_performances &&
       !mdl->mutable_out_of_bag_evaluations()->empty()) {
-    YDF_LOG(INFO)
+    LOG(INFO)
         << "Final OOB metrics: "
         << internal::EvaluationSnippet(
                mdl->mutable_out_of_bag_evaluations()->back().evaluation());
@@ -993,13 +1006,13 @@ void UpdateOOBPredictionsWithNewTree(
         AddRegressionLeafToAccumulator(*leaf, &accumulator.regression);
         break;
       case model::proto::Task::RANKING:
-        YDF_LOG(FATAL) << "OOB not implemented for Uplift.";
+        LOG(FATAL) << "OOB not implemented for Uplift.";
         break;
       case model::proto::Task::CATEGORICAL_UPLIFT:
         AddUpliftLeafToAccumulator(*leaf, &accumulator.uplift);
         break;
       default:
-        YDF_LOG(WARNING) << "Not implemented";
+        LOG(WARNING) << "Not implemented";
     }
   }
 }
@@ -1029,7 +1042,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     case model::proto::Task::NUMERICAL_UPLIFT:
       break;
     default:
-      YDF_LOG(WARNING) << "Not implemented";
+      LOG(WARNING) << "Not implemented";
   }
   if (weight_links.has_value()) {
     // Note: The "weights" of "eval_options" won't be used, but "has_weights()"
@@ -1071,7 +1084,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
             prediction_accumulator.uplift.end()};
         break;
       default:
-        YDF_LOG(WARNING) << "Not implemented";
+        LOG(WARNING) << "Not implemented";
     }
     RETURN_IF_ERROR(model::SetGroundTruth(
         train_dataset, example_idx,
@@ -1091,7 +1104,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
       metric::FinalizeEvaluation(eval_options, label_column_spec, &evaluation));
   if (!for_permutation_importance &&
       evaluation.sampled_predictions_size() != 0) {
-    YDF_LOG(WARNING) << "Internal error: Non empty oob evaluation";
+    LOG(WARNING) << "Internal error: Non empty oob evaluation";
     evaluation.clear_sampled_predictions();
   }
   return evaluation;
@@ -1272,6 +1285,18 @@ absl::Status ExportOOBPredictions(
         return absl::InvalidArgumentError("Unsupported task");
     }
     RETURN_IF_ERROR(writer->Write(example));
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status SetDefaultHyperParameters(
+    random_forest::proto::RandomForestTrainingConfig* rf_config) {
+  decision_tree::SetDefaultHyperParameters(rf_config->mutable_decision_tree());
+
+  if (rf_config->decision_tree().internal().sorting_strategy() ==
+      decision_tree::proto::DecisionTreeTrainingConfig::Internal::AUTO) {
+    return absl::InvalidArgumentError("sorting_strategy not set");
   }
 
   return absl::OkStatus();

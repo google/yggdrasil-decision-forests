@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "absl/memory/memory.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree_io_interface.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"

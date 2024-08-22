@@ -21,6 +21,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizer_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -89,10 +90,10 @@ TEST(Random, Base) {
       // No more parameters to evaluate.
       break;
     } else if (status == NextCandidateStatus::kWaitForEvaluation) {
-      YDF_LOG(FATAL) << "Should not append. As no evaluation pending.";
+      LOG(FATAL) << "Should not append. As no evaluation pending.";
     }
 
-    YDF_LOG(INFO) << "candidate: " << candidate.ShortDebugString();
+    LOG(INFO) << "candidate: " << candidate.ShortDebugString();
 
     double evaluation = trial_idx % 5;
     if (evaluation < 0.5) {
@@ -110,8 +111,8 @@ TEST(Random, Base) {
 
   EXPECT_NEAR(best_score, 4, 0.0001);
 
-  YDF_LOG(INFO) << "trial_idx: " << trial_idx << " score: " << best_score
-                << " params: " << best_params.DebugString();
+  LOG(INFO) << "trial_idx: " << trial_idx << " score: " << best_score
+            << " params: " << best_params.DebugString();
 }
 
 TEST(Random, UpdateWeights) {

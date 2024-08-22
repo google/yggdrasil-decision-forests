@@ -15,6 +15,9 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
@@ -87,7 +90,7 @@ void feature_statistics_toy_example(const ExampleFormat format) {
       dataset, 0, 3, {"a", "b", "c"}, replacement_values, &batch_1, format));
 
   stats.Update(batch_1, 3, format);
-  YDF_LOG(INFO) << "Report 1:\n" << stats.BuildReport();
+  LOG(INFO) << "Report 1:\n" << stats.BuildReport();
   const proto::FeatureStatistics expected_1 = PARSE_TEST_PROTO(
       R"pb(
         features {
@@ -111,7 +114,7 @@ void feature_statistics_toy_example(const ExampleFormat format) {
   EXPECT_THAT(stats.Export(), EqualsProto(expected_1));
 
   stats.Update(batch_1, 3, format);
-  YDF_LOG(INFO) << "Report 2:\n" << stats.BuildReport();
+  LOG(INFO) << "Report 2:\n" << stats.BuildReport();
   const proto::FeatureStatistics expected_2 = PARSE_TEST_PROTO(
       R"pb(
         features {
@@ -135,7 +138,7 @@ void feature_statistics_toy_example(const ExampleFormat format) {
   EXPECT_THAT(stats.Export(), EqualsProto(expected_2));
 
   FeatureStatistics stats2(&dataset.data_spec(), {0, 1, 2}, replacement_values);
-  YDF_LOG(INFO) << "Report 3:\n" << stats.BuildReport();
+  LOG(INFO) << "Report 3:\n" << stats.BuildReport();
   const proto::FeatureStatistics expected_3 = PARSE_TEST_PROTO(
       R"pb(
         features { numerical {} }
@@ -145,11 +148,11 @@ void feature_statistics_toy_example(const ExampleFormat format) {
   EXPECT_THAT(stats2.Export(), EqualsProto(expected_3));
 
   CHECK_OK(stats2.ImportAndAggregate(stats.Export()));
-  YDF_LOG(INFO) << "Report 4:\n" << stats.BuildReport();
+  LOG(INFO) << "Report 4:\n" << stats.BuildReport();
   EXPECT_THAT(stats.Export(), EqualsProto(stats2.Export()));
 
   CHECK_OK(stats2.ImportAndAggregate(stats.Export()));
-  YDF_LOG(INFO) << "Report 5:\n" << stats.BuildReport();
+  LOG(INFO) << "Report 5:\n" << stats.BuildReport();
   const proto::FeatureStatistics expected_4 = PARSE_TEST_PROTO(
       R"pb(
         features {
@@ -225,8 +228,8 @@ void feature_statistics_adult(const ExampleFormat format) {
 
     stats.Update(flat_examples, end_example_idx - begin_example_idx, format);
   }
-  YDF_LOG(INFO) << "Report:";
-  YDF_LOG(INFO) << stats.BuildReport();
+  LOG(INFO) << "Report:";
+  LOG(INFO) << stats.BuildReport();
 }
 
 TEST(FeatureStatistics, QKMS) {

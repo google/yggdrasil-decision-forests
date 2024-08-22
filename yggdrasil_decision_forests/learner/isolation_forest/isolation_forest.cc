@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -26,8 +27,11 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
+#include "absl/random/distributions.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -37,7 +41,9 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -87,7 +93,8 @@ absl::StatusOr<internal::Configuration> BuildConfig(
   decision_tree::SetDefaultHyperParameters(
       config.if_config->mutable_decision_tree());
 
-  if (!config.if_config->decision_tree().has_max_depth()) {
+  if (!config.if_config->decision_tree().has_max_depth() ||
+      config.if_config->decision_tree().max_depth() == -2) {
     const auto num_examples_per_trees =
         GetNumExamplesPerTrees(*config.if_config, num_training_examples);
     config.if_config->mutable_decision_tree()->set_max_depth(
@@ -114,6 +121,104 @@ absl::StatusOr<internal::Configuration> BuildConfig(
 namespace internal {
 
 absl::StatusOr<bool> FindSplit(
+    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
+  switch (config.if_config->decision_tree().split_axis_case()) {
+    case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
+        SPLIT_AXIS_NOT_SET:
+    case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
+        kAxisAlignedSplit:
+      return FindSplitAxisAligned(config, train_dataset, selected_examples,
+                                  node, rnd);
+    case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
+        kSparseObliqueSplit:
+      return FindSplitOblique(config, train_dataset, selected_examples, node,
+                              rnd);
+    default:
+      return absl::InvalidArgumentError(
+          "Only axis-aligned and sparse oblique splits are supported for "
+          "isolation forests.");
+  }
+}
+
+absl::StatusOr<bool> FindSplitOblique(
+    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
+  DCHECK_GT(selected_examples.size(), 0);
+  if (config.config_link.numerical_features().empty()) {
+    return false;
+  }
+  decision_tree::internal::Projection current_projection;
+  const float projection_density = config.if_config->decision_tree()
+                                       .sparse_oblique_split()
+                                       .projection_density_factor() /
+                                   config.config_link.numerical_features_size();
+  int8_t monotonic_direction;
+  decision_tree::internal::ProjectionEvaluator projection_evaluator(
+      train_dataset, config.config_link.numerical_features());
+  std::vector<float> projection_values;
+
+  decision_tree::internal::SampleProjection(
+      config.if_config->decision_tree(), train_dataset.data_spec(),
+      config.config_link, projection_density, &current_projection,
+      &monotonic_direction, rnd);
+
+  // Pre-compute the result of the current_projection.
+  RETURN_IF_ERROR(projection_evaluator.Evaluate(
+      current_projection, selected_examples, &projection_values));
+
+  // Find minimum and maximum value.
+  float min_value;
+  float max_value;
+  UnsignedExampleIdx num_valid_examples = 0;
+  for (const float value : projection_values) {
+    if (std::isnan(value)) {
+      continue;
+    }
+    if (num_valid_examples == 0 || value < min_value) {
+      min_value = value;
+    }
+    if (num_valid_examples == 0 || value > max_value) {
+      max_value = value;
+    }
+    num_valid_examples++;
+  }
+
+  if (num_valid_examples == 0 || max_value == min_value) {
+    // Cannot split.
+    return false;
+  }
+
+  // Randomly select a threshold in (min_value, max_value).
+  const float threshold = std::uniform_real_distribution<float>(
+      std::nextafter(min_value, std::numeric_limits<float>::max()),
+      max_value)(*rnd);
+  DCHECK_GT(threshold, min_value);
+  DCHECK_LE(threshold, max_value);
+
+  // Count the number of positive examples.
+  UnsignedExampleIdx num_pos_examples = 0;
+  for (const auto value : projection_values) {
+    if (value >= threshold) {
+      num_pos_examples++;
+    }
+  }
+
+  DCHECK_GT(num_pos_examples, 0);
+  DCHECK_LT(num_pos_examples, selected_examples.size());
+
+  // Set split.
+  auto* condition = node->mutable_node()->mutable_condition();
+  RETURN_IF_ERROR(decision_tree::internal::SetCondition(
+      current_projection, threshold, train_dataset.data_spec(), condition));
+  condition->set_num_training_examples_without_weight(selected_examples.size());
+  condition->set_num_pos_training_examples_without_weight(num_pos_examples);
+  return true;
+}
+
+absl::StatusOr<bool> FindSplitAxisAligned(
     const Configuration& config, const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
@@ -284,6 +389,23 @@ int DefaultMaximumDepth(UnsignedExampleIdx num_examples_per_trees) {
 std::vector<UnsignedExampleIdx> SampleExamples(
     const UnsignedExampleIdx num_examples,
     const UnsignedExampleIdx num_examples_to_sample, utils::RandomEngine* rnd) {
+  if (num_examples_to_sample < num_examples / 2) {
+    // If the number of examples is not too large, use Floyd's algorithm for
+    // sampling `num_examples_to_sample` examples from range [0, num_examples).
+    // https://doi.org/10.1145/30401.315746
+
+    absl::btree_set<UnsignedExampleIdx> sampled_examples;
+    for (UnsignedExampleIdx j = num_examples - num_examples_to_sample;
+         j < num_examples; j++) {
+      UnsignedExampleIdx t = absl::Uniform<UnsignedExampleIdx>(*rnd, 0, j + 1);
+      if (!sampled_examples.insert(t).second) {
+        sampled_examples.insert(j);
+      }
+    }
+    std::vector<UnsignedExampleIdx> examples(sampled_examples.begin(),
+                                             sampled_examples.end());
+    return {sampled_examples.begin(), sampled_examples.end()};
+  }
   std::vector<UnsignedExampleIdx> examples(num_examples);
   std::iota(examples.begin(), examples.end(), 0);
   std::shuffle(examples.begin(), examples.end(), *rnd);
@@ -357,7 +479,7 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
   const auto proto_path = "learner/isolation_forest/isolation_forest.proto";
 
   hparam_def.mutable_documentation()->set_description(
-      R"(An Isolation Forest (https://ieeexplore.ieee.org/abstract/document/4781136) is a collection of decision trees trained without labels and independently to partition the feature space. The Isolation Forest prediction is an anomaly score that indicates whether an example originates from a same distribution to the training examples. We refer to Isolation Forest as both the original algorithm by Liu et al. and its extensions.)");
+      R"(An [Isolation Forest](https://ieeexplore.ieee.org/abstract/document/4781136) is a collection of decision trees trained without labels and independently to partition the feature space. The Isolation Forest prediction is an anomaly score that indicates whether an example originates from a same distribution to the training examples. We refer to Isolation Forest as both the original algorithm by Liu et al. and its extensions.)");
 
   const auto& if_config =
       config.GetExtension(isolation_forest::proto::isolation_forest_config);
@@ -375,24 +497,66 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
     auto& param =
         hparam_def.mutable_fields()->operator[](kHParamSubsampleCount);
     param.mutable_integer()->set_minimum(0);
-    param.mutable_integer()->set_default_value(if_config.num_trees());
+    param.mutable_integer()->set_default_value(if_config.subsample_count());
+    param.mutable_mutual_exclusive()->set_is_default(true);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamSubsampleRatio);
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Number of examples used to grow each tree. Only one of "subsample_ratio" and "subsample_count" can be set. If neither is set, "subsample_count" is assumed to be equal to 256. This is the default value recommended in the isolation forest paper.)");
+        R"(Number of examples used to grow each tree. Only one of "subsample_ratio" and "subsample_count" can be set. By default, sample 256 examples per tree. Note that this parameter also restricts the tree's maximum depth to log2(examples used per tree) unless max_depth is set explicitly.)");
   }
 
   {
     auto& param =
         hparam_def.mutable_fields()->operator[](kHParamSubsampleRatio);
-    param.mutable_integer()->set_minimum(0);
-    param.mutable_integer()->set_default_value(if_config.num_trees());
+    param.mutable_real()->set_minimum(0);
+    param.mutable_real()->set_default_value(1.0);
+    param.mutable_mutual_exclusive()->set_is_default(false);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamSubsampleCount);
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Ratio of number of training examples used to grow each tree. Only one of "subsample_ratio" and "subsample_count" can be set. If neither is set, "subsample_count" is assumed to be equal to 256. This is the default value recommended in the isolation forest paper.)");
+        R"(Ratio of number of training examples used to grow each tree. Only one of "subsample_ratio" and "subsample_count" can be set. By default, sample 256 examples per tree. Note that this parameter also restricts the tree's maximum depth to log2(examples used per tree) unless max_depth is set explicitly.)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
       if_config.decision_tree(), &hparam_def));
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](decision_tree::kHParamMaxDepth);
+    param.mutable_integer()->set_minimum(-2);
+    param.mutable_integer()->set_default_value(-2);
+    param.mutable_documentation()->set_description(
+        R"(Maximum depth of the tree. `max_depth=1` means that all trees will be roots. `max_depth=-1` means that tree depth unconstrained by this parameter. `max_depth=-2` means that the maximum depth is log2(number of sampled examples per tree) (default).)");
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        decision_tree::kHParamSplitAxis);
+    param.mutable_categorical()->set_default_value(
+        decision_tree::kHParamSplitAxisAxisAligned);
+    param.mutable_categorical()->clear_possible_values();
+    param.mutable_categorical()->add_possible_values(
+        decision_tree::kHParamSplitAxisAxisAligned);
+    param.mutable_categorical()->add_possible_values(
+        decision_tree::kHParamSplitAxisSparseOblique);
+    param.mutable_documentation()->set_description(
+        R"(What structure of split to consider for numerical features.
+- `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.
+- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. This includes the splits described in "Extended Isolation Forests" (Sahand Hariri et al., 2018).)");
+  }
+
+  // Remove invalid hyperparameters.
+  hparam_def.mutable_fields()->erase(
+      decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent);
+  hparam_def.mutable_fields()->erase(
+      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections);
+  hparam_def.mutable_fields()->erase(
+      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections);
+  hparam_def.mutable_fields()->erase(
+      decision_tree::kHParamSplitAxisMhldObliqueSampleAttributes);
+
   return hparam_def;
 }
 
@@ -414,9 +578,9 @@ IsolationForestLearner::TrainWithStatusImpl(
   model->set_num_examples_per_trees(
       GetNumExamplesPerTrees(*config.if_config, train_dataset.nrow()));
 
-  YDF_LOG(INFO) << "Training isolation forest on " << train_dataset.nrow()
-                << " example(s) and " << config.config_link.features_size()
-                << " feature(s).";
+  LOG(INFO) << "Training isolation forest on " << train_dataset.nrow()
+            << " example(s) and " << config.config_link.features_size()
+            << " feature(s).";
 
   utils::RandomEngine global_random(config.training_config.random_seed());
 
@@ -441,6 +605,9 @@ IsolationForestLearner::TrainWithStatusImpl(
         const auto selected_examples = internal::SampleExamples(
             train_dataset.nrow(), model->num_examples_per_trees(),
             &local_random);
+        DCHECK(
+            std::is_sorted(selected_examples.begin(), selected_examples.end()));
+        DCHECK_EQ(selected_examples.size(), model->num_examples_per_trees());
         auto tree_or =
             GrowTree(config, train_dataset, selected_examples, &local_random);
         if (!tree_or.ok()) {

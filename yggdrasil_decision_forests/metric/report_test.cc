@@ -17,6 +17,8 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -90,7 +92,7 @@ TEST(Report, HtmlReportClassification) {
 
   const auto path =
       file::JoinPath(test::TmpDirectory(), "report_classification.html");
-  YDF_LOG(INFO) << "path: " << path;
+  LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_report));
 }
 
@@ -136,7 +138,7 @@ TEST(Report, HtmlReportRegression) {
 
   const auto path =
       file::JoinPath(test::TmpDirectory(), "report_regression.html");
-  YDF_LOG(INFO) << "path: " << path;
+  LOG(INFO) << "path: " << path;
   CHECK_OK(file::SetContent(path, html_report));
 }
 
@@ -156,7 +158,7 @@ TEST(Report, HtmlReportAnomalyDetection) {
   // Configure the evaluation.
   utils::RandomEngine rnd;
   proto::EvaluationOptions option;
-  option.set_task(model::proto::Task::ANOMALY_DETECTION);
+  option.set_task(model::proto::Task::CLASSIFICATION);
 
   // Initialize.
   proto::EvaluationResults eval;
@@ -168,10 +170,22 @@ TEST(Report, HtmlReportAnomalyDetection) {
 
   // Add some predictions.
   pred.mutable_anomaly_detection()->set_value(0.5);
-  ASSERT_OK(AddPrediction(option, pred, &rnd, &eval));
+  // It is not possible to add an anomaly detection prediction directly.
+  EXPECT_FALSE(AddPrediction(option, pred, &rnd, &eval).ok());
+
+  model::proto::Prediction classification_pred;
+  ASSERT_OK(ChangePredictionType(model::proto::Task::ANOMALY_DETECTION,
+                                 model::proto::Task::CLASSIFICATION, pred,
+                                 &classification_pred));
+  classification_pred.mutable_classification()->set_ground_truth(1);
+  ASSERT_OK(AddPrediction(option, classification_pred, &rnd, &eval));
 
   pred.mutable_anomaly_detection()->set_value(0.1);
-  ASSERT_OK(AddPrediction(option, pred, &rnd, &eval));
+  ASSERT_OK(ChangePredictionType(model::proto::Task::ANOMALY_DETECTION,
+                                 model::proto::Task::CLASSIFICATION, pred,
+                                 &classification_pred));
+  classification_pred.mutable_classification()->set_ground_truth(1);
+  ASSERT_OK(AddPrediction(option, classification_pred, &rnd, &eval));
 
   // Finalize.
   ASSERT_OK(FinalizeEvaluation(option, label_column, &eval));
@@ -181,7 +195,7 @@ TEST(Report, HtmlReportAnomalyDetection) {
 
   const auto path =
       file::JoinPath(test::TmpDirectory(), "report_anomaly_detection.html");
-  YDF_LOG(INFO) << "path: " << path;
+  LOG(INFO) << "path: " << path;
   ASSERT_OK(file::SetContent(path, html_report));
 }
 }  // namespace

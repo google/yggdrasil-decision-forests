@@ -1,4 +1,4 @@
-# Improve model quality
+# How to improve a model?
 
 This document provides advice on how to improve the quality, speed, and size of
 a YDF model. The amount of improvement will vary depending on the dataset. In

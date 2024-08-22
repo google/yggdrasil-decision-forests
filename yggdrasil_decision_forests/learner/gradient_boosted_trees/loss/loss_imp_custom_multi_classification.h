@@ -87,14 +87,15 @@ class CustomMultiClassificationLoss : public AbstractLoss {
 
   absl::StatusOr<std::vector<float>> InitialPredictions(
       const dataset::VerticalDataset& dataset, int label_col_idx,
-      const std::vector<float>& weights) const override;
+      const absl::Span<const float> weights) const override;
 
   absl::StatusOr<std::vector<float>> InitialPredictions(
       const decision_tree::proto::LabelStatistics& label_statistics)
       const override;
 
   absl::Status UpdateGradients(
-      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+      const absl::Span<const int32_t> labels,
+      const absl::Span<const float> predictions,
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
@@ -102,8 +103,9 @@ class CustomMultiClassificationLoss : public AbstractLoss {
   std::vector<std::string> SecondaryMetricNames() const override;
 
   absl::StatusOr<LossResults> Loss(
-      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
-      const std::vector<float>& weights,
+      const absl::Span<const int32_t> labels,
+      const absl::Span<const float> predictions,
+      const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const override;
 

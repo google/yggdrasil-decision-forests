@@ -32,8 +32,10 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/base/log_severity.h"
 #include "absl/container/btree_set.h"
 #include "absl/container/fixed_array.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -85,6 +87,8 @@ using test::EqualsProto;
 using ::testing::ElementsAre;
 using ::testing::SizeIs;
 using ::testing::UnorderedElementsAre;
+using Internal = ::yggdrasil_decision_forests::model::decision_tree::proto::
+    DecisionTreeTrainingConfig::Internal;
 
 std::string DatasetDir() {
   return file::JoinPath(
@@ -323,6 +327,21 @@ CustomMultiClassificationLossFunctions Multinomial3CustomLoss() {
                                                 gradient_and_hessian};
 }
 
+// Utility to set the configured and expected sorting strategy.
+void SetSortingStrategy(Internal::SortingStrategy set,
+                        absl::optional<Internal::SortingStrategy> expected,
+                        model::proto::TrainingConfig* train_config) {
+  auto* gbt_config = train_config->MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_decision_tree()->mutable_internal()->set_sorting_strategy(
+      set);
+  if (expected.has_value()) {
+    gbt_config->mutable_decision_tree()
+        ->mutable_internal()
+        ->set_ensure_effective_sorting_strategy(*expected);
+  }
+}
+
 TEST(GradientBoostedTrees, ExtractValidationDataset) {
   const std::string ds_typed_path =
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult.csv"));
@@ -540,11 +559,34 @@ class GradientBoostedTreesOnAdult : public utils::TrainAndTestTester {
         gradient_boosted_trees::proto::gradient_boosted_trees_config);
     gbt_config->mutable_decision_tree()
         ->set_internal_error_on_wrong_splitter_statistics(true);
+
+    // By default, we expect all the learners to use pre-sortings.
+    SetSortingStrategy(Internal::AUTO, Internal::PRESORTED, &train_config_);
   }
 };
 
-// Train and test a model on the adult dataset.
-TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
+TEST_F(GradientBoostedTreesOnAdult, Base) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+
+  TrainAndEvaluateModel();
+
+  // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
+  // is significantly better (which is expected as, unlike RF,  GBT is
+  // calibrated).
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8644, 0.0099, 0.8664);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2979, 0.0127, 0.2942);
+
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+  EXPECT_TRUE(gbt_model->CheckStructure(
+      decision_tree::CheckStructureOptions::GlobalImputation()));
+
+  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_base");
+}
+
+TEST_F(GradientBoostedTreesOnAdult, SubsamplingDeprecatedParam) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_num_trees(100);
@@ -563,7 +605,31 @@ TEST_F(GradientBoostedTreesOnAdult, BaseDeprecated) {
   EXPECT_TRUE(gbt_model->CheckStructure(
       decision_tree::CheckStructureOptions::GlobalImputation()));
 
-  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_base_deprecated");
+  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_subsampling");
+}
+
+// Train and test a model on the adult dataset.
+TEST_F(GradientBoostedTreesOnAdult, SubsamplingNewParam) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
+  TrainAndEvaluateModel();
+
+  // Note: Accuracy is similar as RF (see :random_forest_test). However, logloss
+  // is significantly better (which is expected as, unlike RF, GBT is
+  // calibrated).
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8647, 0.0099, 0.8658);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2984, 0.0162, 0.294);
+
+  auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
+  EXPECT_TRUE(gbt_model->CheckStructure(
+      decision_tree::CheckStructureOptions::GlobalImputation()));
+
+  utils::ExpectEqualGoldenModel(*model_, "gbt_adult_subsampling");
 }
 
 // Train and test a model on the adult dataset.
@@ -587,28 +653,6 @@ TEST_F(GradientBoostedTreesOnAdult, BaseWithNAConditions) {
       decision_tree::CheckStructureOptions::GlobalImputation()));
 
   utils::ExpectEqualGoldenModel(*model_, "gbt_adult_base_with_na");
-}
-
-// Train and test a model on the adult dataset.
-TEST_F(GradientBoostedTreesOnAdult, Base) {
-  auto* gbt_config = train_config_.MutableExtension(
-      gradient_boosted_trees::proto::gradient_boosted_trees_config);
-  gbt_config->set_num_trees(100);
-  gbt_config->mutable_decision_tree()->set_max_depth(4);
-  gbt_config->set_shrinkage(0.1f);
-  gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(0.9f);
-  TrainAndEvaluateModel();
-
-  // Note: Accuracy is similar as RF (see :random_forest_test). However, logloss
-  // is significantly better (which is expected as, unlike RF, GBT is
-  // calibrated).
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8647, 0.0099, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2984, 0.0162, 0.294);
-
-  auto* gbt_model =
-      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
-  EXPECT_TRUE(gbt_model->CheckStructure(
-      decision_tree::CheckStructureOptions::GlobalImputation()));
 }
 
 TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraints) {
@@ -642,7 +686,7 @@ TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraints) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   QCHECK_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",
@@ -681,7 +725,7 @@ TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraintsPure) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   EXPECT_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",
@@ -719,7 +763,7 @@ TEST_F(GradientBoostedTreesOnAdult, DecreasingMonotonicConstraints) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   QCHECK_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",
@@ -727,6 +771,8 @@ TEST_F(GradientBoostedTreesOnAdult, DecreasingMonotonicConstraints) {
 }
 
 TEST_F(GradientBoostedTreesOnAdult, ObliqueMonotonicConstraints) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
+
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
 
@@ -754,7 +800,7 @@ TEST_F(GradientBoostedTreesOnAdult, ObliqueMonotonicConstraints) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   QCHECK_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",
@@ -963,16 +1009,16 @@ TEST_F(PerShardSamplingOnAdult, PerShardSamplingExact) {
   // Shard the training dataset.
   const auto sharded_path = ShardDataset(train_ds_, 20, 0.3);
 
-  YDF_LOG(INFO) << "Train sharded model";
+  LOG(INFO) << "Train sharded model";
   gbt_config->mutable_sample_with_shards();
 
   const auto model = learner->TrainWithStatus(sharded_path, data_spec_).value();
 
-  YDF_LOG(INFO) << "Evaluate models";
+  LOG(INFO) << "Evaluate models";
   // Evaluate the models.
   utils::RandomEngine rnd(1234);
   const auto evaluation = model->Evaluate(test_ds_, {}, &rnd);
-  YDF_LOG(INFO) << "Evaluation:" << metric::TextReport(evaluation).value();
+  LOG(INFO) << "Evaluation:" << metric::TextReport(evaluation).value();
 
   // Sharded model is "good".
   const auto nan = std::numeric_limits<double>::quiet_NaN();
@@ -1118,8 +1164,8 @@ TEST_F(GradientBoostedTreesOnAdult, GossDeprecated) {
   gbt_config->set_use_goss(true);
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86, 0.012, 0.86);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3106, 0.0168, 0.3074);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86640, 0.0127, 0.86640);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.29422, 0.0138, 0.29422);
 }
 
 // Train and test a model on the adult dataset with Goss sampling.
@@ -1132,8 +1178,8 @@ TEST_F(GradientBoostedTreesOnAdult, Goss) {
   gbt_config->mutable_gradient_one_side_sampling();
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8601, 0.0127, 0.86);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3095, 0.0138, 0.3074);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86640, 0.0127, 0.86640);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.29422, 0.0138, 0.29422);
 }
 
 // Train and test a model on the adult dataset.
@@ -1319,6 +1365,7 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDuration) {
 }
 
 TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeLocalGrowth) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
   dataset_sampling_ = 1.0f;
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1346,6 +1393,7 @@ TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeLocalGrowth) {
 }
 
 TEST_F(GradientBoostedTreesOnAdult, MaximumDurationInTreeGlobalGrowth) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
   dataset_sampling_ = 1.0f;
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1421,7 +1469,7 @@ TEST_F(GradientBoostedTreesOnAdult, Dart) {
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3293, 0.0727, nan);
 }
 
-TEST_F(GradientBoostedTreesOnAdult, Hessian) {
+TEST_F(GradientBoostedTreesOnAdult, HessianAndSubsampling) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_num_trees(100);
@@ -1515,7 +1563,7 @@ TEST_F(GradientBoostedTreesOnAdult, MakingAModelPurePureServingModel) {
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8676, 0.0129, 0.8615);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.0167, 0.2977);
   const auto pre_pruning_size = model_->ModelSizeInBytes().value();
-  YDF_LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
+  LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
 
   CHECK_OK(model_->MakePureServing());
 
@@ -1523,7 +1571,7 @@ TEST_F(GradientBoostedTreesOnAdult, MakingAModelPurePureServingModel) {
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2977, 0.0167, 0.2977);
 
   const auto post_pruning_size = model_->ModelSizeInBytes().value();
-  YDF_LOG(INFO) << "post_pruning_size:" << post_pruning_size;
+  LOG(INFO) << "post_pruning_size:" << post_pruning_size;
   EXPECT_LE(static_cast<float>(post_pruning_size) / pre_pruning_size, 0.80);
 }
 
@@ -1574,6 +1622,7 @@ TEST_F(GradientBoostedTreesOnAbalone, L2Regularization) {
 }
 
 TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
   deployment_config_.set_num_threads(5);
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1628,7 +1677,7 @@ TEST_F(GradientBoostedTreesOnAbalone, MonotonicConstraintsPure) {
   // Show the tree structure.
   std::string description;
   model_->AppendDescriptionAndStatistics(true, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   EXPECT_OK(utils::model_analysis::AnalyseAndCreateHtmlReport(
       *model_, test_dataset_, "", "",

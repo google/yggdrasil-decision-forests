@@ -62,6 +62,8 @@ from ydf.learner.tuner import VizierTuner
 # Utilities
 from ydf.utils.log import verbose
 from ydf.model.model_lib import load_model
+from ydf.model.model_lib import deserialize_model
+
 # A feature is a column used as input of a model. In practice, users generally
 # use them interchangeably.
 from ydf.dataset.dataspec import Column as Feature
@@ -77,6 +79,7 @@ from ydf.dataset.dataset import create_vertical_dataset
 from ydf.model.model_metadata import ModelMetadata
 from ydf.model.model_lib import from_tensorflow_decision_forests
 from ydf.model.generic_model import from_sklearn
+from ydf.model.generic_model import NodeFormat
 
 # Custom Loss
 from ydf.learner.custom_loss import RegressionLoss

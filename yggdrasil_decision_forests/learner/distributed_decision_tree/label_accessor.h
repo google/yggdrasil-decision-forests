@@ -36,8 +36,15 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_LABEL_ACCESSOR_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_LABEL_ACCESSOR_H_
 
+#include <cstddef>
+#include <cstdint>
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -50,20 +57,20 @@ typedef UnsignedExampleIdx ExampleIndex;
 class ClassificationLabelFiller {
  public:
   // How to represent a label value.
-  typedef int16_t Label;
+  typedef int32_t Label;
   // TODO: Add special handling for unit weights.
   typedef decision_tree::LabelCategoricalBucket</*weighted*/ true> LabelBucket;
   typedef decision_tree::LabelCategoricalScoreAccumulator Accumulator;
   typedef LabelBucket::Initializer AccumulatorInitializer;
 
-  ClassificationLabelFiller(const std::vector<Label>& labels,
-                            const std::vector<float>& weights,
+  ClassificationLabelFiller(const absl::Span<const Label> labels,
+                            const absl::Span<const float> weights,
                             const Label num_classes)
       : labels_(labels), weights_(weights), num_classes_(num_classes) {}
 
-  const std::vector<Label>& labels() const { return labels_; }
-  const std::vector<float>& weights() const { return weights_; }
-  const size_t num_examples() const { return labels_.size(); }
+  absl::Span<const Label> labels() const { return labels_; }
+  absl::Span<const float> weights() const { return weights_; }
+  size_t num_examples() const { return labels_.size(); }
 
   void InitializeAndZeroAccumulator(Accumulator* accumulator) const {
     accumulator->label.SetNumClasses(num_classes_);
@@ -74,6 +81,11 @@ class ClassificationLabelFiller {
     bucket->value.Clear();
     bucket->value.SetNumClasses(num_classes_);
     bucket->count = 0;
+  }
+
+  void Prefetch(const ExampleIndex example_idx) const {
+    PREFETCH(&labels_[example_idx]);
+    if (!weights_.empty()) PREFETCH(&weights_[example_idx]);
   }
 
   void Add(const ExampleIndex example_idx, Accumulator* accumulator) const {
@@ -102,8 +114,8 @@ class ClassificationLabelFiller {
   }
 
  private:
-  const std::vector<Label>& labels_;
-  const std::vector<float>& weights_;
+  const absl::Span<const Label> labels_;
+  const absl::Span<const float> weights_;
   const int num_classes_;
 };
 
@@ -117,13 +129,13 @@ class RegressionLabelFiller {
   typedef decision_tree::LabelNumericalScoreAccumulator Accumulator;
   typedef LabelBucket::Initializer AccumulatorInitializer;
 
-  RegressionLabelFiller(const std::vector<Label>& labels,
-                        const std::vector<float>& weights)
+  RegressionLabelFiller(const absl::Span<const Label> labels,
+                        const absl::Span<const float> weights)
       : labels_(labels), weights_(weights) {}
 
-  const std::vector<Label>& labels() const { return labels_; }
-  const std::vector<float>& weights() const { return weights_; }
-  const size_t num_examples() const { return labels_.size(); }
+  absl::Span<const Label> labels() const { return labels_; }
+  absl::Span<const float> weights() const { return weights_; }
+  size_t num_examples() const { return labels_.size(); }
 
   void InitializeAndZeroAccumulator(Accumulator* accumulator) const {
     accumulator->label.Clear();
@@ -132,6 +144,11 @@ class RegressionLabelFiller {
   void InitializeAndZeroBucket(LabelBucket* bucket) const {
     bucket->value.Clear();
     bucket->count = 0;
+  }
+
+  void Prefetch(const ExampleIndex example_idx) const {
+    PREFETCH(&labels_[example_idx]);
+    if (!weights_.empty()) PREFETCH(&weights_[example_idx]);
   }
 
   void Add(const ExampleIndex example_idx, Accumulator* accumulator) const {
@@ -160,8 +177,8 @@ class RegressionLabelFiller {
   }
 
  private:
-  const std::vector<Label>& labels_;
-  const std::vector<float>& weights_;
+  const absl::Span<const Label> labels_;
+  const absl::Span<const float> weights_;
 };
 
 // Regression label filler. Alternative to
@@ -175,15 +192,15 @@ class RegressionWithHessianLabelFiller {
   typedef decision_tree::LabelNumericalWithHessianScoreAccumulator Accumulator;
   typedef LabelBucket::Initializer AccumulatorInitializer;
 
-  RegressionWithHessianLabelFiller(const std::vector<float>& labels,
-                                   const std::vector<float>& hessians,
-                                   const std::vector<float>& weights)
+  RegressionWithHessianLabelFiller(const absl::Span<const float> labels,
+                                   const absl::Span<const float> hessians,
+                                   const absl::Span<const float> weights)
       : labels_(labels), hessians_(hessians), weights_(weights) {}
 
-  const std::vector<float>& labels() const { return labels_; }
-  const std::vector<float>& hessians() const { return hessians_; }
-  const std::vector<float>& weights() const { return weights_; }
-  const size_t num_examples() const { return labels_.size(); }
+  absl::Span<const float> labels() const { return labels_; }
+  absl::Span<const float> hessians() const { return hessians_; }
+  absl::Span<const float> weights() const { return weights_; }
+  size_t num_examples() const { return labels_.size(); }
 
   void InitializeAndZeroAccumulator(Accumulator* accumulator) const {
     accumulator->label.Clear();
@@ -194,6 +211,12 @@ class RegressionWithHessianLabelFiller {
     bucket->value.Clear();
     bucket->sum_hessian = 0;
     bucket->count = 0;
+  }
+
+  void Prefetch(const ExampleIndex example_idx) const {
+    PREFETCH(&labels_[example_idx]);
+    PREFETCH(&hessians_[example_idx]);
+    if (!weights_.empty()) PREFETCH(&weights_[example_idx]);
   }
 
   void Add(const ExampleIndex example_idx, Accumulator* accumulator) const {
@@ -230,9 +253,9 @@ class RegressionWithHessianLabelFiller {
   }
 
  private:
-  const std::vector<float>& labels_;
-  const std::vector<float>& hessians_;
-  const std::vector<float>& weights_;
+  const absl::Span<const float> labels_;
+  const absl::Span<const float> hessians_;
+  const absl::Span<const float> weights_;
 };
 
 // Gives access to label values.
@@ -283,8 +306,8 @@ class AbstractLabelAccessor {
 class ClassificationLabelAccessor : public AbstractLabelAccessor {
  public:
   ClassificationLabelAccessor(
-      const std::vector<ClassificationLabelFiller::Label>& labels,
-      const std::vector<float>& weights, const int num_classes)
+      absl::Span<const ClassificationLabelFiller::Label> labels,
+      absl::Span<const float> weights, const int num_classes)
       : labels_(labels), weights_(weights), num_classes_(num_classes) {}
 
   absl::StatusOr<ClassificationLabelFiller> CreateClassificationLabelFiller()
@@ -299,16 +322,16 @@ class ClassificationLabelAccessor : public AbstractLabelAccessor {
   }
 
  private:
-  const std::vector<ClassificationLabelFiller::Label>& labels_;
-  const std::vector<float>& weights_;
+  const absl::Span<const ClassificationLabelFiller::Label> labels_;
+  const absl::Span<const float> weights_;
   ClassificationLabelFiller::Label num_classes_;
 };
 
 class RegressionLabelAccessor : public AbstractLabelAccessor {
  public:
   RegressionLabelAccessor(
-      const std::vector<RegressionLabelFiller::Label>& labels,
-      const std::vector<float>& weights)
+      const absl::Span<const RegressionLabelFiller::Label> labels,
+      const absl::Span<const float> weights)
       : labels_(labels), weights_(weights) {}
 
   absl::StatusOr<RegressionLabelFiller> CreateRegressionLabelFiller()
@@ -323,15 +346,15 @@ class RegressionLabelAccessor : public AbstractLabelAccessor {
   }
 
  private:
-  const std::vector<RegressionLabelFiller::Label>& labels_;
-  const std::vector<float>& weights_;
+  const absl::Span<const RegressionLabelFiller::Label> labels_;
+  const absl::Span<const float> weights_;
 };
 
 class RegressionWithHessianLabelAccessor : public AbstractLabelAccessor {
  public:
-  RegressionWithHessianLabelAccessor(const std::vector<float>& gradients,
-                                     const std::vector<float>& hessians,
-                                     const std::vector<float>& weights)
+  RegressionWithHessianLabelAccessor(const absl::Span<const float> gradients,
+                                     const absl::Span<const float> hessians,
+                                     const absl::Span<const float> weights)
       : labels_(gradients), hessians_(hessians), weights_(weights) {}
 
   absl::StatusOr<RegressionWithHessianLabelFiller>
@@ -346,9 +369,9 @@ class RegressionWithHessianLabelAccessor : public AbstractLabelAccessor {
   }
 
  private:
-  const std::vector<float>& labels_;
-  const std::vector<float>& hessians_;
-  const std::vector<float>& weights_;
+  const absl::Span<const float> labels_;
+  const absl::Span<const float> hessians_;
+  const absl::Span<const float> weights_;
 };
 
 }  // namespace distributed_decision_tree

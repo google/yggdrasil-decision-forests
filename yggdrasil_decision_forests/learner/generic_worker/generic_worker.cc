@@ -15,6 +15,9 @@
 
 #include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.h"
 
+#include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -38,11 +41,11 @@ constexpr char GenericWorker::kWorkerKey[];
 absl::Status GenericWorker::TrainModel(
     const proto::Request::TrainModel& request,
     proto::Result::TrainModel* result) {
-  YDF_LOG(INFO) << "Training model with:";
-  YDF_LOG(INFO) << "Configuration:\n" << request.train_config().DebugString();
-  YDF_LOG(INFO) << "Deployment:\n" << request.deployment_config().DebugString();
-  YDF_LOG(INFO) << "Dataset: " << request.dataset_path();
-  YDF_LOG(INFO) << "Valid dataset: " << request.valid_dataset_path();
+  LOG(INFO) << "Training model with:";
+  LOG(INFO) << "Configuration:\n" << request.train_config().DebugString();
+  LOG(INFO) << "Deployment:\n" << request.deployment_config().DebugString();
+  LOG(INFO) << "Dataset: " << request.dataset_path();
+  LOG(INFO) << "Valid dataset: " << request.valid_dataset_path();
 
   result->set_model_path(
       file::JoinPath(request.model_base_path(), utils::GenUniqueId()));
@@ -67,7 +70,7 @@ absl::Status GenericWorker::TrainModel(
     valid_dataset = request.valid_dataset_path();
   }
 
-  YDF_LOG(INFO) << "Start training model";
+  LOG(INFO) << "Start training model";
   ASSIGN_OR_RETURN(auto model,
                    learner->TrainWithStatus(request.dataset_path(),
                                             request.dataspec(), valid_dataset));
@@ -76,7 +79,7 @@ absl::Status GenericWorker::TrainModel(
     *result->mutable_validation_evaluation() = model->ValidationEvaluation();
   }
 
-  YDF_LOG(INFO) << "Save model to " << result->model_path();
+  LOG(INFO) << "Save model to " << result->model_path();
   RETURN_IF_ERROR(model::SaveModel(result->model_path(), model.get()));
 
   return absl::OkStatus();
@@ -85,10 +88,10 @@ absl::Status GenericWorker::TrainModel(
 absl::Status GenericWorker::EvaluateModel(
     const proto::Request::EvaluateModel& request,
     proto::Result::EvaluateModel* result) {
-  YDF_LOG(INFO) << "Evaluating model with:";
-  YDF_LOG(INFO) << "Options:\n" << request.options().DebugString();
-  YDF_LOG(INFO) << "Model: " << request.model_path();
-  YDF_LOG(INFO) << "Dataset: " << request.dataset_path();
+  LOG(INFO) << "Evaluating model with:";
+  LOG(INFO) << "Options:\n" << request.options().DebugString();
+  LOG(INFO) << "Model: " << request.model_path();
+  LOG(INFO) << "Dataset: " << request.dataset_path();
 
   std::unique_ptr<model::AbstractModel> model;
   RETURN_IF_ERROR(model::LoadModel(request.model_path(), &model));

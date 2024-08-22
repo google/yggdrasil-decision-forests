@@ -15,17 +15,34 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <numeric>
+#include <string>
+#include <tuple>
+#include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
+#include "absl/time/clock.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
-#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
-#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/math.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -102,14 +119,14 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
     const distribute::proto::Config& distribute_config,
     const bool delete_source_file) {
   const auto begin = absl::Now();
-  YDF_LOG(INFO) << "Create dataset cache " << final_cache_directory
-                << " from partial dataset cache " << partial_cache_directory;
+  LOG(INFO) << "Create dataset cache " << final_cache_directory
+            << " from partial dataset cache " << partial_cache_directory;
 
   // Check if the cache is already there.
   const auto done_path = file::JoinPath(final_cache_directory, kFilenameDone);
   ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(done_path));
   if (already_exist) {
-    YDF_LOG(INFO) << "The dataset cache already exist.";
+    LOG(INFO) << "The dataset cache already exist.";
     return absl::OkStatus();
   }
 
@@ -150,6 +167,7 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
       &partial_meta_data, file::Defaults()));
   metadata.set_num_examples(data_spec.created_num_rows());
   metadata.set_num_shards_in_feature_cache(partial_meta_data.num_shards());
+  metadata.set_delta_bit_idx(DeltaBitIdx(metadata.num_examples()));
 
   // TODO: Index the categorical-string features.
 
@@ -173,10 +191,10 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
   RETURN_IF_ERROR(distribute_manager->Done());
   RETURN_IF_ERROR(file::SetContent(done_path, "done"));
 
-  YDF_LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
-  YDF_LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
+  LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
+  LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
 
-  YDF_LOG(INFO) << "Raw meta-data:\n" << metadata.DebugString();
+  LOG(INFO) << "Raw meta-data:\n" << metadata.DebugString();
 
   return absl::OkStatus();
 }
@@ -188,14 +206,14 @@ absl::Status CreateDatasetCacheFromShardedFiles(
     const proto::CreateDatasetCacheConfig& config,
     const distribute::proto::Config& distribute_config) {
   const auto begin = absl::Now();
-  YDF_LOG(INFO) << "Create dataset cache in " << cache_directory
-                << " for dataset " << typed_path;
+  LOG(INFO) << "Create dataset cache in " << cache_directory << " for dataset "
+            << typed_path;
 
   // Check if the cache is already there.
   const auto done_path = file::JoinPath(cache_directory, kFilenameDone);
   ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(done_path));
   if (already_exist) {
-    YDF_LOG(INFO) << "The dataset cache already exist.";
+    LOG(INFO) << "The dataset cache already exist.";
     return absl::OkStatus();
   }
 
@@ -224,7 +242,7 @@ absl::Status CreateDatasetCacheFromShardedFiles(
   // List the columns in the dataset.
   ASSIGN_OR_RETURN(const auto effective_columns,
                    GetColumnsOrAll(data_spec, columns, config));
-  YDF_LOG(INFO) << "Found " << effective_columns.size() << " column(s)";
+  LOG(INFO) << "Found " << effective_columns.size() << " column(s)";
 
   proto::CacheMetadata metadata;
   RETURN_IF_ERROR(internal::InitializeMetadata(data_spec, effective_columns,
@@ -234,7 +252,7 @@ absl::Status CreateDatasetCacheFromShardedFiles(
   std::vector<std::string> dataset_shards;
   std::string dataset_type;
   RETURN_IF_ERROR(ListShards(typed_path, &dataset_shards, &dataset_type));
-  YDF_LOG(INFO) << "Found " << dataset_shards.size() << " shard(s)";
+  LOG(INFO) << "Found " << dataset_shards.size() << " shard(s)";
 
   // Separate the columns of individual shards.
   RETURN_IF_ERROR(internal::SeparateDatasetColumns(
@@ -254,8 +272,8 @@ absl::Status CreateDatasetCacheFromShardedFiles(
   RETURN_IF_ERROR(distribute_manager->Done());
   RETURN_IF_ERROR(file::SetContent(done_path, "done"));
 
-  YDF_LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
-  YDF_LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
+  LOG(INFO) << "Dataset cache meta-data:\n" << MetaDataReport(metadata);
+  LOG(INFO) << "Dataset cache created in " << absl::Now() - begin;
   return absl::OkStatus();
 }
 
@@ -374,7 +392,7 @@ absl::Status SeparateDatasetColumns(
     const proto::CreateDatasetCacheConfig& config,
     distribute::AbstractManager* distribute_manager,
     proto::CacheMetadata* cache_metadata) {
-  YDF_LOG(INFO) << "Start separating dataset by columns";
+  LOG(INFO) << "Start separating dataset by columns";
 
   cache_metadata->set_num_examples(0);
 
@@ -403,12 +421,11 @@ absl::Status SeparateDatasetColumns(
 
   RETURN_IF_ERROR(distribute_manager->SetParallelExecutionPerWorker(1));
 
-  YDF_LOG(INFO) << "Create " << num_output_shards
-                << " shards in the dataset cache from the "
-                << dataset_shards.size()
-                << " shards of the original dataset i.e. ~"
-                << shards_per_requests << " shards to prepare for each of the "
-                << distribute_manager->NumWorkers() << " workers";
+  LOG(INFO) << "Create " << num_output_shards
+            << " shards in the dataset cache from the " << dataset_shards.size()
+            << " shards of the original dataset i.e. ~" << shards_per_requests
+            << " shards to prepare for each of the "
+            << distribute_manager->NumWorkers() << " workers";
 
   cache_metadata->set_num_shards_in_feature_cache(num_output_shards);
   int pending_requests = 0;
@@ -419,8 +436,8 @@ absl::Status SeparateDatasetColumns(
         ShardMetadataPath(cache_directory, output_shard_idx, num_output_shards);
     ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(metadata_path));
     if (already_exist) {
-      YDF_LOG(INFO) << "The result of job #" << output_shard_idx
-                    << " is already there.";
+      LOG(INFO) << "The result of job #" << output_shard_idx
+                << " is already there.";
 
       proto::ShardMetadata metadata;
       RETURN_IF_ERROR(
@@ -448,8 +465,8 @@ absl::Status SeparateDatasetColumns(
 
   // Receive and rename the results.
   for (int result_idx = 0; result_idx < pending_requests; result_idx++) {
-    LOG_INFO_EVERY_N_SEC(10, _ << "\tSplit dataset by columns "
-                               << (result_idx + 1) << "/" << pending_requests);
+    LOG_EVERY_N_SEC(INFO, 10) << "\tSplit dataset by columns "
+                              << (result_idx + 1) << "/" << pending_requests;
     ASSIGN_OR_RETURN(
         const auto generic_result,
         distribute_manager->NextAsynchronousProtoAnswer<proto::WorkerResult>());
@@ -467,12 +484,14 @@ absl::Status SeparateDatasetColumns(
     cache_metadata->set_num_examples(cache_metadata->num_examples() +
                                      metadata.num_examples());
   }
+  cache_metadata->set_delta_bit_idx(
+      DeltaBitIdx(cache_metadata->num_examples()));
 
   RETURN_IF_ERROR(distribute_manager->SetParallelExecutionPerWorker(
       kNumParallelQueriesPerWorker));
 
-  YDF_LOG(INFO) << "Column separation done. " << cache_metadata->num_examples()
-                << " example(s) found";
+  LOG(INFO) << "Column separation done. " << cache_metadata->num_examples()
+            << " example(s) found";
   return absl::OkStatus();
 }
 
@@ -485,7 +504,7 @@ absl::Status ConvertPartialToFinalRawData(
     const bool delete_source_file,
     distribute::AbstractManager* distribute_manager,
     proto::CacheMetadata* cache_metadata) {
-  YDF_LOG(INFO) << "Convert partial to final raw data";
+  LOG(INFO) << "Convert partial to final raw data";
 
   // Common part of the requests.
   proto::WorkerRequest generic_request;
@@ -537,8 +556,8 @@ absl::Status ConvertPartialToFinalRawData(
 
   // Receive and rename the results.
   for (int result_idx = 0; result_idx < pending_requests; result_idx++) {
-    LOG_INFO_EVERY_N_SEC(10, _ << "\tconverted columns " << (result_idx + 1)
-                               << "/" << pending_requests);
+    LOG_EVERY_N_SEC(INFO, 10) << "\tconverted columns " << (result_idx + 1)
+                              << "/" << pending_requests;
 
     ASSIGN_OR_RETURN(
         const auto generic_result,
@@ -554,7 +573,7 @@ absl::Status SortNumericalColumns(
     const proto::CreateDatasetCacheConfig& config,
     distribute::AbstractManager* distribute_manager,
     proto::CacheMetadata* cache_metadata) {
-  YDF_LOG(INFO) << "Start sorting numerical columns";
+  LOG(INFO) << "Start sorting numerical columns";
 
   // Common part of the requests.
   proto::WorkerRequest generic_request;
@@ -562,6 +581,7 @@ absl::Status SortNumericalColumns(
   request.set_output_base_directory(
       file::JoinPath(cache_directory, kFilenameTmp));
   request.set_num_examples(cache_metadata->num_examples());
+  request.set_delta_bit_idx(cache_metadata->delta_bit_idx());
   request.set_cache_directory(std::string(cache_directory));
 
   // We assume that a cache entry takes 4 bytes.
@@ -597,8 +617,8 @@ absl::Status SortNumericalColumns(
       auto* column_metadata =
           cache_metadata->mutable_columns(column_idx)->mutable_numerical();
       column_metadata->MergeFrom(metadata.metadata());
-      YDF_LOG(INFO) << "The result of job for column #" << column_idx
-                    << " is already there.";
+      LOG(INFO) << "The result of job for column #" << column_idx
+                << " is already there.";
       continue;
     }
 
@@ -616,8 +636,8 @@ absl::Status SortNumericalColumns(
 
   // Receive and rename the results.
   for (int result_idx = 0; result_idx < pending_requests; result_idx++) {
-    LOG_INFO_EVERY_N_SEC(10, _ << "\tsorting numerical columns "
-                               << (result_idx + 1) << "/" << pending_requests);
+    LOG_EVERY_N_SEC(INFO, 10) << "\tsorting numerical columns "
+                              << (result_idx + 1) << "/" << pending_requests;
 
     ASSIGN_OR_RETURN(
         const auto generic_result,
@@ -631,8 +651,8 @@ absl::Status SortNumericalColumns(
     ASSIGN_OR_RETURN(const bool already_exist,
                      file::FileExists(final_directory));
     if (already_exist) {
-      YDF_LOG(WARNING) << "The directory result of job on column #"
-                       << result.column_idx() << " already exist.";
+      LOG(WARNING) << "The directory result of job on column #"
+                   << result.column_idx() << " already exist.";
     } else {
       RETURN_IF_ERROR(file::Rename(result.output_directory(), final_directory,
                                    file::Defaults()));

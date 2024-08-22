@@ -16,6 +16,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_MODEL_TESTING_UTILS_H_
 #define YGGDRASIL_DECISION_FORESTS_MODEL_TESTING_UTILS_H_
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -43,13 +44,13 @@ class FakeModel : public AbstractModel {
 
   void Predict(const dataset::proto::Example& example,
                proto::Prediction* prediction) const override {
-    YDF_LOG(FATAL) << "Unimplemented: Predict Example";
+    LOG(FATAL) << "Unimplemented: Predict Example";
   }
 
   void Predict(const dataset::VerticalDataset& dataset,
                dataset::VerticalDataset::row_t row_idx,
                proto::Prediction* prediction) const override {
-    YDF_LOG(FATAL) << "Unimplemented: Predict Dataset";
+    LOG(FATAL) << "Unimplemented: Predict Dataset";
   }
 };
 

@@ -25,7 +25,7 @@ set -vex
 
 bazel build -c opt //third_party/yggdrasil_decision_forests/cli/monitoring:benchmark_training
 
-bazel-bin/third_party/yggdrasil_decision_forests/cli/monitoring/benchmark_training --output=/tmp/train_benchmark_new.csv
+bazel-bin/third_party/yggdrasil_decision_forests/cli/monitoring/benchmark_training --output=/tmp/train_benchmark_old.csv
 
 # Let's assume you generated a benchmark in /tmp/train_benchmark_old.csv
 bazel run -c opt //third_party/yggdrasil_decision_forests/cli/monitoring:compare_benchmark -- \

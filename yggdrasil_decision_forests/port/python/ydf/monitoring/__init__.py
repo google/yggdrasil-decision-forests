@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2022 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,31 +12,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# Builds all python versions for release on Pypi
-
-PYTHON_VERSIONS=( 3.8 3.9 3.10 3.11 3.12 )
-
-function build_py() {
-  local PYTHON="python"$1
-  echo "Starting build with $PYTHON"
-  $PYTHON -m venv /tmp/venv_$PYTHON
-  source /tmp/venv_$PYTHON/bin/activate
-  bazel clean --expunge
-  export CC="gcc"
-  ./tools/test_pydf.sh
-  ./tools/build_pydf.sh python
-}
-
-function main() {
-  set -e
-  for ver in ${PYTHON_VERSIONS[*]} 
-  do
-    build_py $ver 
-  done
-  set +e
-}
-
-
-
-main

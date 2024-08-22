@@ -19,15 +19,16 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <iterator>
-#include <limits>
 #include <numeric>
 #include <random>
 #include <type_traits>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "Eigen/Dense"
 #include "Eigen/Eigenvalues"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -35,11 +36,12 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -91,94 +93,6 @@ GradientAndHessian ExtractLabels(
     const std::vector<UnsignedExampleIdx>& selected) {
   return {/*.gradient_data =*/Extract(labels.gradient_data, selected),
           /*.hessian_data =*/Extract(labels.hessian_data, selected)};
-}
-
-// Randomly generates a projection. A projection cannot be empty. If the
-// projection contains only one dimension, the weight is guaranteed to be 1.
-// If the projection contains an input feature with monotonic constraint,
-// monotonic_direction is set to 1 (i.e. the projection should be monotonically
-// increasing).
-void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
-                      const dataset::proto::DataSpecification& data_spec,
-                      const model::proto::TrainingConfigLinking& config_link,
-                      const float projection_density,
-                      internal::Projection* projection,
-                      int8_t* monotonic_direction,
-                      utils::RandomEngine* random) {
-  *monotonic_direction = 0;
-  projection->clear();
-  std::uniform_real_distribution<float> unif01;
-  std::uniform_real_distribution<float> unif1m1(-1.f, 1.f);
-
-  const auto gen_weight = [&](const int feature) -> float {
-    float weight = unif1m1(*random);
-    if (dt_config.sparse_oblique_split().binary_weight()) {
-      weight = (weight >= 0) ? 1.f : -1.f;
-    }
-
-    if (config_link.per_columns_size() > 0 &&
-        config_link.per_columns(feature).has_monotonic_constraint()) {
-      const bool direction_increasing =
-          config_link.per_columns(feature).monotonic_constraint().direction() ==
-          model::proto::MonotonicConstraint::INCREASING;
-      if (direction_increasing == (weight < 0)) {
-        weight = -weight;
-      }
-      // As soon as one selected feature is monotonic, the oblique split becomes
-      // monotonic.
-      *monotonic_direction = 1;
-    }
-
-    const auto& spec = data_spec.columns(feature).numerical();
-    switch (dt_config.sparse_oblique_split().normalization()) {
-      case proto::DecisionTreeTrainingConfig::SparseObliqueSplit::NONE:
-        return weight;
-      case proto::DecisionTreeTrainingConfig::SparseObliqueSplit::
-          STANDARD_DEVIATION:
-        return weight / std::max(1e-6, spec.standard_deviation());
-      case proto::DecisionTreeTrainingConfig::SparseObliqueSplit::MIN_MAX:
-        return weight / std::max(1e-6f, spec.max_value() - spec.min_value());
-    }
-  };
-
-  for (const auto feature : config_link.numerical_features()) {
-    if (unif01(*random) < projection_density) {
-      projection->push_back({feature, gen_weight(feature)});
-    }
-  }
-  if (projection->empty()) {
-    std::uniform_int_distribution<int> unif_feature_idx(
-        0, config_link.numerical_features_size() - 1);
-    projection->push_back({/*.attribute_idx =*/config_link.numerical_features(
-                               unif_feature_idx(*random)),
-                           /*.weight =*/1.f});
-  } else if (projection->size() == 1) {
-    projection->front().weight = 1.f;
-  }
-}
-
-// Converts a Projection object + float threshold into a proto condition of the
-// same semantic.
-absl::Status SetCondition(const Projection& projection, const float threshold,
-                          const dataset::proto::DataSpecification& dataspec,
-                          proto::NodeCondition* condition) {
-  if (projection.empty()) {
-    return absl::InternalError("Empty projection");
-  }
-  auto& oblique_condition =
-      *condition->mutable_condition()->mutable_oblique_condition();
-  oblique_condition.set_threshold(threshold);
-  oblique_condition.clear_attributes();
-  oblique_condition.clear_weights();
-  for (const auto& item : projection) {
-    oblique_condition.add_attributes(item.attribute_idx);
-    oblique_condition.add_weights(item.weight);
-    oblique_condition.add_na_replacements(
-        dataspec.columns(item.attribute_idx).numerical().mean());
-  }
-  condition->set_attribute(projection.front().attribute_idx);
-  condition->set_na_value(false);
-  return absl::OkStatus();
 }
 
 }  // namespace
@@ -745,6 +659,87 @@ absl::StatusOr<bool> FindBestConditionOblique(
 }
 
 namespace internal {
+
+void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
+                      const dataset::proto::DataSpecification& data_spec,
+                      const model::proto::TrainingConfigLinking& config_link,
+                      const float projection_density,
+                      internal::Projection* projection,
+                      int8_t* monotonic_direction,
+                      utils::RandomEngine* random) {
+  *monotonic_direction = 0;
+  projection->clear();
+  std::uniform_real_distribution<float> unif01;
+  std::uniform_real_distribution<float> unif1m1(-1.f, 1.f);
+
+  const auto gen_weight = [&](const int feature) -> float {
+    float weight = unif1m1(*random);
+    if (dt_config.sparse_oblique_split().binary_weight()) {
+      weight = (weight >= 0) ? 1.f : -1.f;
+    }
+
+    if (config_link.per_columns_size() > 0 &&
+        config_link.per_columns(feature).has_monotonic_constraint()) {
+      const bool direction_increasing =
+          config_link.per_columns(feature).monotonic_constraint().direction() ==
+          model::proto::MonotonicConstraint::INCREASING;
+      if (direction_increasing == (weight < 0)) {
+        weight = -weight;
+      }
+      // As soon as one selected feature is monotonic, the oblique split becomes
+      // monotonic.
+      *monotonic_direction = 1;
+    }
+
+    const auto& spec = data_spec.columns(feature).numerical();
+    switch (dt_config.sparse_oblique_split().normalization()) {
+      case proto::DecisionTreeTrainingConfig::SparseObliqueSplit::NONE:
+        return weight;
+      case proto::DecisionTreeTrainingConfig::SparseObliqueSplit::
+          STANDARD_DEVIATION:
+        return weight / std::max(1e-6, spec.standard_deviation());
+      case proto::DecisionTreeTrainingConfig::SparseObliqueSplit::MIN_MAX:
+        return weight / std::max(1e-6f, spec.max_value() - spec.min_value());
+    }
+  };
+
+  for (const auto feature : config_link.numerical_features()) {
+    if (unif01(*random) < projection_density) {
+      projection->push_back({feature, gen_weight(feature)});
+    }
+  }
+  if (projection->empty()) {
+    std::uniform_int_distribution<int> unif_feature_idx(
+        0, config_link.numerical_features_size() - 1);
+    projection->push_back({/*.attribute_idx =*/config_link.numerical_features(
+                               unif_feature_idx(*random)),
+                           /*.weight =*/1.f});
+  } else if (projection->size() == 1) {
+    projection->front().weight = 1.f;
+  }
+}
+
+absl::Status SetCondition(const Projection& projection, const float threshold,
+                          const dataset::proto::DataSpecification& dataspec,
+                          proto::NodeCondition* condition) {
+  if (projection.empty()) {
+    return absl::InternalError("Empty projection");
+  }
+  auto& oblique_condition =
+      *condition->mutable_condition()->mutable_oblique_condition();
+  oblique_condition.set_threshold(threshold);
+  oblique_condition.clear_attributes();
+  oblique_condition.clear_weights();
+  for (const auto& item : projection) {
+    oblique_condition.add_attributes(item.attribute_idx);
+    oblique_condition.add_weights(item.weight);
+    oblique_condition.add_na_replacements(
+        dataspec.columns(item.attribute_idx).numerical().mean());
+  }
+  condition->set_attribute(projection.front().attribute_idx);
+  condition->set_na_value(false);
+  return absl::OkStatus();
+}
 
 absl::Status LDACache::ComputeClassification(
     const proto::DecisionTreeTrainingConfig& dt_config,

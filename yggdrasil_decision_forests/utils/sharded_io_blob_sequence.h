@@ -16,10 +16,10 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_TOOL_SHARDED_IO_BLOG_SEQUENCE_H_
 #define YGGDRASIL_DECISION_FORESTS_TOOL_SHARDED_IO_BLOG_SEQUENCE_H_
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/blob_sequence.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"

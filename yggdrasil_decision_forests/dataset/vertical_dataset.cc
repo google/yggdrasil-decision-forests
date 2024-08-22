@@ -17,7 +17,7 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <iterator>
+#include <cstdint>
 #include <memory>
 #include <numeric>
 #include <string>
@@ -25,10 +25,10 @@
 #include <utility>
 #include <vector>
 
+#include "absl/base/optimization.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/cord.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -43,7 +43,7 @@ namespace yggdrasil_decision_forests {
 namespace dataset {
 
 constexpr float VerticalDataset::NumericalColumn::kNaValue;
-constexpr char VerticalDataset::BooleanColumn::kNaValue;
+constexpr int8_t VerticalDataset::BooleanColumn::kNaValue;
 constexpr int VerticalDataset::CategoricalColumn::kNaValue;
 constexpr VerticalDataset::DiscretizedNumericalColumn::Format
     VerticalDataset::DiscretizedNumericalColumn::kNaValue;
@@ -854,7 +854,7 @@ absl::StatusOr<VerticalDataset> VerticalDataset::ConvertToGivenDataspec(
       if (std::find(required_column_idxs.begin(), required_column_idxs.end(),
                     dst_col_idx) != required_column_idxs.end()) {
         return absl::InvalidArgumentError(absl::StrCat(
-            "Source dataspec don't contains the required column \"",
+            "Source dataspec doesn't contains the required column \"",
             dst_col->name(), "\"."));
       } else {
         for (row_t example_idx = 0; example_idx < nrow_; example_idx++) {
@@ -1060,6 +1060,54 @@ void VerticalDataset::ShrinkToFit() {
   for (int col_idx = 0; col_idx < ncol(); col_idx++) {
     mutable_column(col_idx)->ShrinkToFit();
   }
+}
+
+absl::StatusOr<const VerticalDataset::CategoricalColumn*>
+VerticalDataset::categorical_column(int col_idx) const {
+  return ColumnWithCastWithStatus<dataset::VerticalDataset::CategoricalColumn>(
+      col_idx);
+}
+
+absl::StatusOr<VerticalDataset::CategoricalColumn*>
+VerticalDataset::mutable_categorical_column(int col_idx) {
+  return MutableColumnWithCastWithStatus<
+      dataset::VerticalDataset::CategoricalColumn>(col_idx);
+}
+
+absl::StatusOr<const VerticalDataset::NumericalColumn*>
+VerticalDataset::numerical_column(int col_idx) const {
+  return ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+      col_idx);
+}
+
+absl::StatusOr<VerticalDataset::NumericalColumn*>
+VerticalDataset::mutable_numerical_column(int col_idx) {
+  return MutableColumnWithCastWithStatus<
+      dataset::VerticalDataset::NumericalColumn>(col_idx);
+}
+
+absl::StatusOr<const VerticalDataset::BooleanColumn*>
+VerticalDataset::boolean_column(int col_idx) const {
+  return ColumnWithCastWithStatus<dataset::VerticalDataset::BooleanColumn>(
+      col_idx);
+}
+
+absl::StatusOr<VerticalDataset::BooleanColumn*>
+VerticalDataset::mutable_boolean_column(int col_idx) {
+  return MutableColumnWithCastWithStatus<
+      dataset::VerticalDataset::BooleanColumn>(col_idx);
+}
+
+absl::StatusOr<const VerticalDataset::DiscretizedNumericalColumn*>
+VerticalDataset::discretized_numerical_column(int col_idx) const {
+  return ColumnWithCastWithStatus<
+      dataset::VerticalDataset::DiscretizedNumericalColumn>(col_idx);
+}
+
+absl::StatusOr<VerticalDataset::DiscretizedNumericalColumn*>
+VerticalDataset::mutable_discretized_numerical_column(int col_idx) {
+  return MutableColumnWithCastWithStatus<
+      dataset::VerticalDataset::DiscretizedNumericalColumn>(col_idx);
 }
 
 }  // namespace dataset

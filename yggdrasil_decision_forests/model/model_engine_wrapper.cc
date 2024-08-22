@@ -18,7 +18,6 @@
 #include <memory>
 #include <vector>
 
-#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"

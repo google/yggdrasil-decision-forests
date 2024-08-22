@@ -19,8 +19,9 @@
 
 #include <memory>
 
-#include "absl/base/port.h"
+#include "absl/base/internal/endian.h"
 #include "absl/crc/crc32c.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -63,7 +64,7 @@ absl::StatusOr<absl::crc32c_t> TFRecordReader::ReadCRC() {
 
 TFRecordReader::~TFRecordReader() {
   if (stream_) {
-    YDF_LOG(WARNING) << "Destruction of a non closed TFRecordReader";
+    LOG(WARNING) << "Destruction of a non closed TFRecordReader";
     Close().IgnoreError();
   }
 }
@@ -128,7 +129,7 @@ absl::StatusOr<std::unique_ptr<TFRecordWriter>> TFRecordWriter::Create(
 
 TFRecordWriter::~TFRecordWriter() {
   if (stream_) {
-    YDF_LOG(WARNING) << "Destruction of a non closed TFRecordWriter";
+    LOG(WARNING) << "Destruction of a non closed TFRecordWriter";
     Close().IgnoreError();
   }
 }

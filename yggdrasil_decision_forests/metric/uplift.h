@@ -17,7 +17,6 @@
 #define YGGDRASIL_DECISION_FORESTS_METRIC_UPLIFT_H_
 
 #include "absl/status/status.h"
-#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 

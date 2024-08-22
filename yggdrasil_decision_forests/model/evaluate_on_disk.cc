@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -91,8 +92,8 @@ absl::Status AppendEvaluation(const AbstractModel& model,
       utils::concurrency::MutexLock lock(&mutex);
       RETURN_IF_ERROR(metric::MergeEvaluation(option, sub_evaluation, eval));
       num_evaluated_shards++;
-      LOG_INFO_EVERY_N_SEC(30, _ << num_evaluated_shards << "/" << shards.size()
-                                 << " shards evaluated");
+      LOG_EVERY_N_SEC(INFO, 30) << num_evaluated_shards << "/" << shards.size()
+                                << " shards evaluated";
       return absl::OkStatus();
     };
 
@@ -122,7 +123,7 @@ absl::Status AppendEvaluation(const AbstractModel& model,
 
   } else {
     // Evaluate using the (slow) generic inference.
-    YDF_LOG(WARNING)
+    LOG(WARNING)
         << "Evaluation with the slow generic engine without distribution";
     dataset::VerticalDataset dataset;
     RETURN_IF_ERROR(

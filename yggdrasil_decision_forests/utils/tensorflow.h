@@ -16,6 +16,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_TENSORFLOW_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_TENSORFLOW_H_
 
+#include "absl/base/optimization.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "tensorflow/core/platform/status.h"

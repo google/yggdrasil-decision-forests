@@ -15,13 +15,35 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/check.h"
+#include "absl/memory/memory.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
-#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_reader.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/label_accessor.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/splitter.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/distribution.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -216,8 +238,31 @@ absl::Status TreeBuilder::FindBestSplits(
     RETURN_IF_ERROR(
         FindBestSplitsWithFeature(common, feature, /*num_threads=*/1));
   }
-
   return absl::OkStatus();
+}
+
+absl::Status TreeBuilder::FindBestSplits(
+    const FindBestSplitsCommonArgs& common,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  // List all the features tested by at least one node.
+  absl::flat_hash_set<FeatureIndex> all_features;
+  for (const auto& features : common.features_per_open_node) {
+    all_features.insert(features.begin(), features.end());
+  }
+
+  utils::concurrency::BlockingCounter done_find_splits(all_features.size());
+  utils::concurrency::Mutex mutex;
+  absl::Status status;
+
+  // Look for the splits.
+  RETURN_IF_ERROR(FindBestSplitsWithThreadPool(
+      common, {all_features.begin(), all_features.end()}, thread_pool, &mutex,
+      &done_find_splits, &status));
+
+  done_find_splits.Wait();
+  utils::concurrency::MutexLock l(&mutex);
+
+  return status;
 }
 
 absl::Status TreeBuilder::FindBestSplitsWithThreadPool(
@@ -243,7 +288,6 @@ absl::Status TreeBuilder::FindBestSplitsWithThreadPool(
              unique_active_features.size());
 
   // Find the best split per node and per feature.
-  absl::Status worker_status;
   for (const FeatureIndex feature : unique_active_features) {
     thread_pool->Schedule([/*ptr*/ status, /*ptr*/ mutex, /*value*/ feature,
                            /*value*/ common, /*ptr*/ counter, this,
@@ -272,8 +316,9 @@ absl::Status TreeBuilder::FindBestSplitsWithThreadPool(
         utils::concurrency::MutexLock l(mutex);
         status->Update(local_status);
         if (local_status.ok()) {
-          status->Update(
-              MergeBestSplits(*local_common.best_splits, common.best_splits));
+          status->Update(MergeBestSplits(*local_common.best_splits,
+                                         common.best_splits,
+                                         common.attribute_priority_per_node));
         }
         // Note: Making sure the mutex lock is destroyed before the mutex.
       }
@@ -606,14 +651,40 @@ absl::Status TreeBuilder::FindBestSplitsWithFeatureBoolean(
   }
 }
 
-absl::Status MergeBestSplits(const SplitPerOpenNode& src,
-                             SplitPerOpenNode* const dst) {
+absl::Status MergeBestSplits(
+    const SplitPerOpenNode& src, SplitPerOpenNode* const dst,
+    const std::vector<std::vector<int>>* const attribute_priority) {
   if (src.size() != dst->size()) {
     return absl::InternalError("Unexpected number of open nodes");
   }
+  if (attribute_priority && attribute_priority->size() != src.size()) {
+    return absl::InternalError("Unexpected priority size");
+  }
+
   for (int split_idx = 0; split_idx < src.size(); split_idx++) {
-    if (src[split_idx].condition.split_score() >
-        (*dst)[split_idx].condition.split_score()) {
+    const auto& src_cond = src[split_idx].condition;
+    const auto& dst_condition = (*dst)[split_idx].condition;
+
+    // Break ties using the "attribute_priority".
+    bool copy_condition = false;
+    if (src_cond.split_score() > dst_condition.split_score()) {
+      copy_condition = true;
+    } else if (src_cond.split_score() == dst_condition.split_score()) {
+      if (!dst_condition.has_attribute()) {
+        copy_condition = true;
+      } else if (attribute_priority) {
+        const int priority_src =
+            (*attribute_priority)[split_idx][src_cond.attribute()];
+        const int priority_dst =
+            (*attribute_priority)[split_idx][dst_condition.attribute()];
+        copy_condition = priority_src < priority_dst;
+      } else {
+        // The split with the greater attribute is selected
+        copy_condition = src_cond.attribute() < dst_condition.attribute();
+      }
+    }
+
+    if (copy_condition) {
       (*dst)[split_idx] = src[split_idx];
     }
   }
@@ -685,8 +756,13 @@ absl::StatusOr<NodeRemapping> TreeBuilder::ApplySplitToTree(
 
       node.CreateChildren();
       *node.mutable_node()->mutable_condition() = split.condition;
+
+      // Note: For historical reason, the
+      // "num_pos_training_examples_without_weight" field in a node is
+      // equivalent to the "num_training_examples_without_weight" field in a
+      // condition.
       node.mutable_node()->set_num_pos_training_examples_without_weight(
-          split.condition.num_pos_training_examples_without_weight());
+          split.condition.num_training_examples_without_weight());
       remapping[split_idx] = {
           static_cast<NodeIndex>(new_open_nodes.size()),
           static_cast<NodeIndex>(new_open_nodes.size() + 1)};
@@ -723,7 +799,7 @@ absl::Status TreeBuilder::SetRootValue(
 absl::Status EvaluateSplits(const ExampleToNodeMap& example_to_node,
                             const SplitPerOpenNode& splits,
                             SplitEvaluationPerOpenNode* split_evaluation,
-                            dataset_cache::DatasetCacheReader* dataset,
+                            const dataset_cache::DatasetCacheReader* dataset,
                             utils::concurrency::ThreadPool* thread_pool) {
   // Group the split per feature.
   absl::flat_hash_map<FeatureIndex, std::vector<int>> split_per_feature;
@@ -792,7 +868,7 @@ absl::Status EvaluateSplitsPerNumericalFeature(
     const ExampleToNodeMap& example_to_node, const SplitPerOpenNode& splits,
     FeatureIndex feature, const std::vector<int>& active_node_idxs,
     SplitEvaluationPerOpenNode* split_evaluation,
-    dataset_cache::DatasetCacheReader* dataset) {
+    const dataset_cache::DatasetCacheReader* dataset) {
   // Initializer the active nodes.
   std::vector<int> node_idx_to_active_node_idx(splits.size(), -1);
   struct ActiveNode {
@@ -826,7 +902,7 @@ absl::Status EvaluateSplitsPerNumericalFeature(
         return absl::InternalError("Unexpected condition type");
     }
 
-    const auto num_elements = static_cast<uint64_t>(
+    const auto num_elements = static_cast<size_t>(
         splits[node_idx].condition.num_training_examples_without_weight());
     ActiveNode active_node{
         /*writer=*/{num_elements, &(*split_evaluation)[node_idx]},
@@ -838,6 +914,12 @@ absl::Status EvaluateSplitsPerNumericalFeature(
   }
 
   // Scan the dataset and evaluate the split.
+
+  const auto replacement_missing_value = dataset->meta_data()
+                                             .columns(feature)
+                                             .numerical()
+                                             .replacement_missing_value();
+
   ASSIGN_OR_RETURN(auto value_it,
                    dataset->InOrderNumericalFeatureValueIterator(feature));
   ExampleIndex example_idx = 0;
@@ -849,6 +931,10 @@ absl::Status EvaluateSplitsPerNumericalFeature(
     }
 
     for (auto value : values) {
+      if (std::isnan(value)) {
+        value = replacement_missing_value;
+      }
+
       const auto node_idx = example_to_node[example_idx];
       if (node_idx != kClosedNode) {
         const auto active_node_idx = node_idx_to_active_node_idx[node_idx];
@@ -882,7 +968,7 @@ absl::Status EvaluateSplitsPerCategoricalFeature(
     const ExampleToNodeMap& example_to_node, const SplitPerOpenNode& splits,
     FeatureIndex feature, const std::vector<int>& active_node_idxs,
     SplitEvaluationPerOpenNode* split_evaluation,
-    dataset_cache::DatasetCacheReader* dataset) {
+    const dataset_cache::DatasetCacheReader* dataset) {
   // Initializer the active nodes.
   std::vector<int> node_idx_to_active_node_idx(splits.size(), -1);
   struct ActiveNode {
@@ -922,7 +1008,7 @@ absl::Status EvaluateSplitsPerCategoricalFeature(
         return absl::InternalError(
             "Unexpected condition type for categorical feature");
     }
-    const auto num_elements = static_cast<uint64_t>(
+    const auto num_elements = static_cast<size_t>(
         splits[node_idx].condition.num_training_examples_without_weight());
     ActiveNode active_node{
         /*writer=*/{num_elements, &(*split_evaluation)[node_idx]},
@@ -933,6 +1019,10 @@ absl::Status EvaluateSplitsPerCategoricalFeature(
   }
 
   // Scan the dataset and evaluate the split.
+  const auto replacement_missing_value = dataset->meta_data()
+                                             .columns(feature)
+                                             .categorical()
+                                             .replacement_missing_value();
   ASSIGN_OR_RETURN(auto value_it,
                    dataset->InOrderCategoricalFeatureValueIterator(feature));
   ExampleIndex example_idx = 0;
@@ -944,6 +1034,10 @@ absl::Status EvaluateSplitsPerCategoricalFeature(
     }
 
     for (auto value : values) {
+      if (value == dataset::VerticalDataset::CategoricalColumn::kNaValue) {
+        value = replacement_missing_value;
+      }
+
       DCHECK_GE(value, 0);
       DCHECK_LT(value, num_possible_values);
       const auto node_idx = example_to_node[example_idx];
@@ -973,7 +1067,7 @@ absl::Status EvaluateSplitsPerBooleanFeature(
     const ExampleToNodeMap& example_to_node, const SplitPerOpenNode& splits,
     FeatureIndex feature, const std::vector<int>& active_node_idxs,
     SplitEvaluationPerOpenNode* split_evaluation,
-    dataset_cache::DatasetCacheReader* dataset) {
+    const dataset_cache::DatasetCacheReader* dataset) {
   // Initializer the active nodes.
   std::vector<int> node_idx_to_active_node_idx(splits.size(), -1);
   struct ActiveNode {
@@ -981,8 +1075,6 @@ absl::Status EvaluateSplitsPerBooleanFeature(
     // Total number of expected elements.
     size_t num_elements = 0;
   };
-
-  const int num_possible_values = 3;
 
   std::vector<ActiveNode> active_nodes;
   active_nodes.reserve(active_node_idxs.size());
@@ -999,7 +1091,7 @@ absl::Status EvaluateSplitsPerBooleanFeature(
         return absl::InternalError(
             "Unexpected condition type for categorical feature");
     }
-    const auto num_elements = static_cast<uint64_t>(
+    const auto num_elements = static_cast<size_t>(
         splits[node_idx].condition.num_training_examples_without_weight());
     ActiveNode active_node{
         /*writer=*/{num_elements, &(*split_evaluation)[node_idx]},
@@ -1009,6 +1101,10 @@ absl::Status EvaluateSplitsPerBooleanFeature(
   }
 
   // Scan the dataset and evaluate the split.
+  const auto replacement_missing_value = dataset->meta_data()
+                                             .columns(feature)
+                                             .boolean()
+                                             .replacement_missing_value();
   ASSIGN_OR_RETURN(auto value_it,
                    dataset->InOrderBooleanFeatureValueIterator(feature));
   ExampleIndex example_idx = 0;
@@ -1020,15 +1116,20 @@ absl::Status EvaluateSplitsPerBooleanFeature(
     }
 
     for (auto value : values) {
+      if (value == dataset::VerticalDataset::BooleanColumn::kNaValue) {
+        value = replacement_missing_value;
+      }
+
       DCHECK_GE(value, 0);
-      DCHECK_LT(value, num_possible_values);
+      DCHECK_LT(value, 3);
       const auto node_idx = example_to_node[example_idx];
       if (node_idx != kClosedNode) {
         DCHECK_LT(node_idx, splits.size());
         const auto active_node_idx = node_idx_to_active_node_idx[node_idx];
         if (active_node_idx >= 0) {
           auto& active_node = active_nodes[active_node_idx];
-          active_node.writer.Write(value == 1);
+          active_node.writer.Write(
+              value == dataset::VerticalDataset::BooleanColumn::kTrueValue);
         }
       }
       example_idx++;

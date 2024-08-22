@@ -30,6 +30,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -131,10 +132,9 @@ class VerticalDataset {
           "The template class argument does not derive  AbstractColumn.");
       T* const casted_column = dynamic_cast<T* const>(this);
       if (!casted_column) {
-        YDF_LOG(FATAL) << "Column \"" << name() << "\" has type "
-                       << proto::ColumnType_Name(type())
-                       << " and is not compatible with type "
-                       << typeid(T).name();
+        LOG(FATAL) << "Column \"" << name() << "\" has type "
+                   << proto::ColumnType_Name(type())
+                   << " and is not compatible with type " << typeid(T).name();
       }
       return casted_column;
     }
@@ -223,6 +223,9 @@ class VerticalDataset {
     // Add a value.
     template <typename Iter>
     void Add(Iter begin, Iter end) {
+      DCHECK((type() != proto::ColumnType::CATEGORICAL_SET &&
+              type() != proto::ColumnType::NUMERICAL_SET) ||
+             std::is_sorted(begin, end));
       const size_t begin_idx = bank_.size();
       bank_.insert(bank_.end(), begin, end);
       values_.emplace_back(begin_idx, bank_.size());
@@ -231,6 +234,9 @@ class VerticalDataset {
     // Set a value.
     template <typename Iter>
     void SetIter(const row_t row, Iter begin, Iter end) {
+      DCHECK((type() != proto::ColumnType::CATEGORICAL_SET &&
+              type() != proto::ColumnType::NUMERICAL_SET) ||
+             std::is_sorted(begin, end));
       const size_t begin_idx = bank_.size();
       bank_.insert(bank_.end(), begin, end);
       values_[row] = {begin_idx, bank_.size()};
@@ -326,7 +332,7 @@ class VerticalDataset {
     static constexpr float kNaValue = std::numeric_limits<float>::quiet_NaN();
   };
 
-  class BooleanColumn : public TemplateScalarStorage<char> {
+  class BooleanColumn : public TemplateScalarStorage<int8_t> {
    public:
     proto::ColumnType type() const override {
       return proto::ColumnType::BOOLEAN;
@@ -363,11 +369,11 @@ class VerticalDataset {
     bool IsTrue(const row_t row) const { return values()[row] == kTrueValue; }
 
     // Special value used to represent NA.
-    static constexpr char kNaValue = 2;
+    static constexpr int8_t kNaValue = 2;
     // Value representing "true".
-    static constexpr char kTrueValue = 1;
+    static constexpr int8_t kTrueValue = 1;
     // Value representing "false".
-    static constexpr char kFalseValue = 0;
+    static constexpr int8_t kFalseValue = 0;
   };
 
   class DiscretizedNumericalColumn
@@ -689,6 +695,19 @@ class VerticalDataset {
   template <typename T>
   T* MutableColumnWithCastOrNull(int col);
 
+  // Easy cast + access to column data.
+  absl::StatusOr<const CategoricalColumn*> categorical_column(
+      int col_idx) const;
+  absl::StatusOr<CategoricalColumn*> mutable_categorical_column(int col_idx);
+  absl::StatusOr<const NumericalColumn*> numerical_column(int col_idx) const;
+  absl::StatusOr<NumericalColumn*> mutable_numerical_column(int col_idx);
+  absl::StatusOr<const BooleanColumn*> boolean_column(int col_idx) const;
+  absl::StatusOr<BooleanColumn*> mutable_boolean_column(int col_idx);
+  absl::StatusOr<const DiscretizedNumericalColumn*>
+  discretized_numerical_column(int col_idx) const;
+  absl::StatusOr<DiscretizedNumericalColumn*>
+  mutable_discretized_numerical_column(int col_idx);
+
   const proto::DataSpecification& data_spec() const { return data_spec_; }
 
   proto::DataSpecification* mutable_data_spec() { return &data_spec_; }
@@ -888,9 +907,9 @@ absl::Status VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
       dynamic_cast<VerticalDataset::TemplateScalarStorage<T>*>(dst);
   STATUS_CHECK(cast_dst != nullptr);
   if (values_.empty() && !indices.empty()) {
-    YDF_LOG(FATAL) << "Trying to extract " << indices.size()
-                   << " examples from the non-allocated column \"" << name()
-                   << "\".";
+    LOG(FATAL) << "Trying to extract " << indices.size()
+               << " examples from the non-allocated column \"" << name()
+               << "\".";
   }
   const size_t indices_size = indices.size();
   const size_t init_dst_nrows = dst->nrows();

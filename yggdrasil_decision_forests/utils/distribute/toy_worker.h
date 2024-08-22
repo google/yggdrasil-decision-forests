@@ -16,7 +16,15 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_TOY_WORKER_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_TOY_WORKER_H_
 
+#include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 #include "absl/synchronization/barrier.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
@@ -42,21 +50,21 @@ class ToyWorker final : public AbstractWorker {
   virtual ~ToyWorker() { num_existing_toy_workers_--; }
 
   absl::Status Setup(Blob welcome_blob) override {
-    YDF_LOG(INFO) << "Setup worker " << WorkerIdx();
+    LOG(INFO) << "Setup worker " << WorkerIdx();
     CHECK_EQ(welcome_blob, "hello");
     return absl::OkStatus();
   }
 
   absl::Status Done() override {
-    YDF_LOG(INFO) << "Done worker " << WorkerIdx();
+    LOG(INFO) << "Done worker " << WorkerIdx();
     return absl::OkStatus();
   }
 
   absl::StatusOr<Blob> RunRequest(Blob blob) override {
-    YDF_LOG(INFO) << "RunRequest " << blob << " on worker " << WorkerIdx();
+    LOG(INFO) << "RunRequest " << blob << " on worker " << WorkerIdx();
 
     if (forbidden) {
-      YDF_LOG(FATAL) << "A forbidden worker was called!";
+      LOG(FATAL) << "A forbidden worker was called!";
     }
 
     if (absl::StartsWith(blob, "identity")) {
@@ -88,13 +96,13 @@ class ToyWorker final : public AbstractWorker {
     } else if (blob == "wait_barrier") {
       // Wait and block for 5 calls to this request.
       CHECK(barrier_);
-      YDF_LOG(INFO) << "Worker " << WorkerIdx()
-                    << " is waiting for 5 other calls at barrier";
+      LOG(INFO) << "Worker " << WorkerIdx()
+                << " is waiting for 5 other calls at barrier";
       if (barrier_->Block()) {
         delete barrier_;
         barrier_ = nullptr;
       }
-      YDF_LOG(INFO) << "Worker #" << WorkerIdx() << " passed the barrier";
+      LOG(INFO) << "Worker #" << WorkerIdx() << " passed the barrier";
       return "";
     } else if (blob == "get") {
       return value_;
@@ -110,7 +118,7 @@ class ToyWorker final : public AbstractWorker {
     } else if (absl::StartsWith(blob, "max_num_existing_toy_workers")) {
       return absl::StrCat(max_num_existing_toy_workers_.load());
     } else if (blob == "forbidden") {
-      YDF_LOG(INFO) << "Set the worker as forbidden";
+      LOG(INFO) << "Set the worker as forbidden";
       forbidden = true;
       return "";
     }

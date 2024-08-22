@@ -18,8 +18,9 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
-        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/base:endian",
         "@com_google_absl//absl/crc:crc32c",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -88,7 +89,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
-        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/log",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -100,8 +101,6 @@ cc_test(
     deps = [
         ":tf_example",
         ":tf_record_tf_example",
-        "//yggdrasil_decision_forests/dataset:example_reader",
-        "//yggdrasil_decision_forests/dataset:example_reader_interface",
         "//yggdrasil_decision_forests/dataset:example_writer",
         "//yggdrasil_decision_forests/dataset:example_writer_interface",
         "//yggdrasil_decision_forests/utils:filesystem",

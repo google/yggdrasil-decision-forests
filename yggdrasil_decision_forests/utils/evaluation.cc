@@ -13,7 +13,14 @@
  * limitations under the License.
  */
 
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #if defined YGG_TFRECORD_PREDICTIONS
 #include "yggdrasil_decision_forests/utils/sharded_io_tfrecord.h"
 #endif
@@ -249,7 +256,7 @@ absl::Status ExampleToPrediction(
       }
     } break;
     default:
-      YDF_LOG(FATAL) << "Non supported task.";
+      LOG(FATAL) << "Non supported task.";
       break;
   }
 
@@ -315,7 +322,7 @@ absl::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
       }
     } break;
     default:
-      YDF_LOG(FATAL) << "Non supported task.";
+      LOG(FATAL) << "Non supported task.";
       break;
   }
 

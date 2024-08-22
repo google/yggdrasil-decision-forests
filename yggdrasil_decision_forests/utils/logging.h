@@ -18,25 +18,6 @@
 
 #include "yggdrasil_decision_forests/utils/logging_default.h"  // IWYU pragma: export
 
-// Prints something every INTERVAL seconds.
-//
-// Usage example:
-//   LOG_INFO_EVERY_N_SEC(5, _ << "Hello world");
-//
-#define LOG_INFO_EVERY_N_SEC(INTERVAL, MESSAGE)               \
-  {                                                           \
-    static std::atomic<int64_t> next_log_time_atomic{0};      \
-    const auto now_time = absl::GetCurrentTimeNanos();        \
-    const auto next_log_time =                                \
-        next_log_time_atomic.load(std::memory_order_relaxed); \
-    if (now_time > next_log_time) {                           \
-      next_log_time_atomic.store(now_time + INTERVAL * 1e9,   \
-                                 std::memory_order_relaxed);  \
-      std::string _;                                          \
-      YDF_LOG(INFO) << MESSAGE;                               \
-    }                                                         \
-  }
-
 #ifndef NOTREACHED
 #define NOTREACHED() DCHECK(false);
 #endif

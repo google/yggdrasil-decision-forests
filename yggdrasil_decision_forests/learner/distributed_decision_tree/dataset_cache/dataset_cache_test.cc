@@ -18,6 +18,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -171,9 +176,9 @@ TEST_F(End2End, CategoricalInOrder) {
     }
   }
 
-  YDF_LOG(INFO) << "Histogram:";
+  LOG(INFO) << "Histogram:";
   for (auto x : histogram) {
-    YDF_LOG(INFO) << "\t" << x.first << " : " << x.second;
+    LOG(INFO) << "\t" << x.first << " : " << x.second;
   }
 
   CHECK_OK(reader.Close());
@@ -241,7 +246,7 @@ TEST_F(End2End, SortedNumericalColumn) {
   const auto mask_delta_bit = MaskDeltaBit(meta_data_.num_examples());
   const auto mask_example_idx = MaskExampleIdx(meta_data_.num_examples());
 
-  int delta_bit_idx = 0;
+  int num_delta_bit_idx = 0;
   size_t num_examples = 0;
   while (true) {
     CHECK_OK(example_idx_reader.Next());
@@ -254,9 +259,10 @@ TEST_F(End2End, SortedNumericalColumn) {
       EXPECT_EQ(ground_truth_values[example_idx],
                 sorted_ground_truth_values[num_examples]);
       if (value & mask_delta_bit) {
-        delta_bit_idx++;
+        num_delta_bit_idx++;
       }
-      EXPECT_EQ(delta_values[delta_bit_idx], ground_truth_values[example_idx]);
+      EXPECT_EQ(delta_values[num_delta_bit_idx],
+                ground_truth_values[example_idx]);
       num_examples++;
     }
   }
@@ -616,6 +622,7 @@ TEST_F(TestCreateDatasetCacheFromPartialDatasetCache, Base) {
         num_examples: 10
         num_shards_in_feature_cache: 2
         num_shards_in_index_cache: 1
+        delta_bit_idx: 4
         columns {
           available: true
           numerical {

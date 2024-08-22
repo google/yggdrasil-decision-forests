@@ -19,6 +19,9 @@
 #include <iostream>
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/learner/export_doc.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
@@ -43,7 +46,7 @@ std::string url(absl::string_view path, absl::string_view keyword) {
         "yggdrasil_decision_forests/",
         path);
   } else {
-    YDF_LOG(FATAL) << "Unknown --url_type value";
+    LOG(FATAL) << "Unknown --url_type value";
   }
 }
 

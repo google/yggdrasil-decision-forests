@@ -55,7 +55,7 @@ build_and_maybe_test () {
     # Not all tests can be run without TF support
     local testable_components=""
     local buildable_cli_components=""
-    # Do not build the PYDF targets, use tools/test_pydf.sh instead
+    # Do not build the PYDF targets, use tools/build_test_linux.sh instead
     local pydf_targets="-//yggdrasil_decision_forests/port/python/...:all"
     if [ "$3" = 0 ]; then
       # No tensorflow support

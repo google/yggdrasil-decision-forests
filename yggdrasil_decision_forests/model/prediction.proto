@@ -72,7 +72,7 @@ message Prediction {
   }
 
   message AnomalyDetection {
-    // Value between 0 (normal) and 1 (anomaly).
+    // Anomaly score between 0 (normal) and 1 (anomaly).
     optional float value = 1;
   }
 

@@ -87,11 +87,15 @@ std::vector<InputFeature> BuildProtoInputFeatures(
 class Model {
  public:
   Model() {}
+
   Model(std::unique_ptr<ydf::serving::FastEngine>&& engine,
         const ydf::model::AbstractModel* model,
-        const bool created_tfdf_signature)
+        const bool created_tfdf_signature,
+        std::vector<std::string> label_classes)
       : engine_(std::move(engine)) {
     DCHECK(engine_);
+
+    label_classes_ = std::move(label_classes);
 
     if (created_tfdf_signature) {
       proto_input_features_ = BuildProtoInputFeatures(model);
@@ -131,6 +135,9 @@ class Model {
     }
   }
 
+  // Lists the label classes of the model.
+  std::vector<std::string> GetLabelClasses() { return label_classes_; }
+
   // Lists the input features of the model.
   std::vector<InputFeature> GetInputFeatures() {
     std::vector<InputFeature> input_features;
@@ -151,7 +158,7 @@ class Model {
   // example values.
   void NewBatchOfExamples(int num_examples) {
     if (num_examples < 0) {
-      YDF_LOG(WARNING) << "num_examples should be positive";
+      LOG(WARNING) << "num_examples should be positive";
       return;
     }
     if (!examples_ || num_examples != num_examples_) {
@@ -165,8 +172,7 @@ class Model {
   // Sets the value of a numerical feature.
   void SetNumerical(int example_idx, int feature_id, float value) {
     if (example_idx >= num_examples_) {
-      YDF_LOG(WARNING)
-          << "example_idx should be less than the number of examples";
+      LOG(WARNING) << "example_idx should be less than the number of examples";
       return;
     }
 
@@ -177,8 +183,7 @@ class Model {
   // Sets the value of a boolean feature.
   void SetBoolean(int example_idx, int feature_id, bool value) {
     if (example_idx >= num_examples_) {
-      YDF_LOG(WARNING)
-          << "example_idx should be less than the number of examples";
+      LOG(WARNING) << "example_idx should be less than the number of examples";
       return;
     }
     examples_->SetBoolean(example_idx, {feature_id}, value,
@@ -188,8 +193,7 @@ class Model {
   // Sets the value of a categorical feature.
   void SetCategoricalInt(int example_idx, int feature_id, int value) {
     if (example_idx >= num_examples_) {
-      YDF_LOG(WARNING)
-          << "example_idx should be less than the number of examples";
+      LOG(WARNING) << "example_idx should be less than the number of examples";
       return;
     }
 
@@ -201,8 +205,7 @@ class Model {
   void SetCategoricalString(int example_idx, int feature_id,
                             std::string value) {
     if (example_idx >= num_examples_) {
-      YDF_LOG(WARNING)
-          << "example_idx should be less than the number of examples";
+      LOG(WARNING) << "example_idx should be less than the number of examples";
       return;
     }
     examples_->SetCategorical(example_idx, {feature_id}, value,
@@ -213,8 +216,7 @@ class Model {
   void SetCategoricalSetString(int example_idx, int feature_id,
                                std::vector<std::string> value) {
     if (example_idx >= num_examples_) {
-      YDF_LOG(WARNING)
-          << "example_idx should be less than the number of examples";
+      LOG(WARNING) << "example_idx should be less than the number of examples";
       return;
     }
     examples_->SetCategoricalSet(example_idx, {feature_id}, value,
@@ -225,8 +227,7 @@ class Model {
   void SetCategoricalSetInt(int example_idx, int feature_id,
                             std::vector<int> value) {
     if (example_idx >= num_examples_) {
-      YDF_LOG(WARNING)
-          << "example_idx should be less than the number of examples";
+      LOG(WARNING) << "example_idx should be less than the number of examples";
       return;
     }
     examples_->SetCategoricalSet(example_idx, {feature_id}, value,
@@ -236,7 +237,7 @@ class Model {
   // Runs the model on the previously set features.
   std::vector<float> Predict() {
     if (num_examples_ == -1) {
-      YDF_LOG(WARNING) << "predict called before setting any examples";
+      LOG(WARNING) << "predict called before setting any examples";
       return {};
     }
     std::vector<float> predictions;
@@ -250,7 +251,7 @@ class Model {
     output.dense_col_representation = dense_col_representation_;
 
     if (num_examples_ == -1) {
-      YDF_LOG(WARNING) << "predict called before setting any examples";
+      LOG(WARNING) << "predict called before setting any examples";
       return output;
     }
 
@@ -266,7 +267,7 @@ class Model {
     // Export the predictions.
     if (decompact_probability_) {
       if (engine_output_dim != 1) {
-        YDF_LOG(FATAL) << "Wrong NumPredictionDimension";
+        LOG(FATAL) << "Wrong NumPredictionDimension";
       }
       for (int example_idx = 0; example_idx < num_examples_; example_idx++) {
         const float proba =
@@ -309,7 +310,33 @@ class Model {
 
   // Number of examples allocated in "examples_".
   int num_examples_ = -1;
+
+  // Label classes of the model. Only used for classification models. Otherwise,
+  // is empty.
+  std::vector<std::string> label_classes_;
 };
+
+// Extracts the classification labels of a model.
+absl::StatusOr<std::vector<std::string>> ExtractLabelClasses(
+    const ydf::model::AbstractModel& model) {
+  const auto& col_spec = model.data_spec().columns(model.label_col_idx());
+  STATUS_CHECK_EQ(col_spec.type(),
+                  ydf::dataset::proto::ColumnType::CATEGORICAL);
+  std::vector<std::string> label_classes(
+      col_spec.categorical().number_of_unique_values() - 1);
+  if (col_spec.categorical().is_already_integerized()) {
+    for (int i = 1; i < col_spec.categorical().number_of_unique_values(); i++) {
+      label_classes[i - 1] = absl::StrCat(i);
+    }
+  } else {
+    for (const auto& item : col_spec.categorical().items()) {
+      if (item.second.index() > 0) {
+        label_classes[item.second.index() - 1] = item.first;
+      }
+    }
+  }
+  return label_classes;
+}
 
 // Loads a model from a path.
 std::shared_ptr<Model> LoadModel(std::string path,
@@ -323,19 +350,31 @@ std::shared_ptr<Model> LoadModel(std::string path,
   std::unique_ptr<ydf::model::AbstractModel> ydf_model;
   auto status = ydf::model::LoadModel(path, &ydf_model, options);
   if (!status.ok()) {
-    YDF_LOG(WARNING) << status.message();
+    LOG(WARNING) << status.message();
     return {};
   }
 
   // Compile model.
   auto engine_or = ydf_model->BuildFastEngine();
   if (!engine_or.ok()) {
-    YDF_LOG(WARNING) << engine_or.status().message();
+    LOG(WARNING) << engine_or.status().message();
     return {};
   }
 
+  // Extract the label classes, if any.
+  std::vector<std::string> label_classes;
+  if (ydf_model->task() == ydf::model::proto::Task::CLASSIFICATION) {
+    auto label_classes_or = ExtractLabelClasses(*ydf_model);
+    if (!label_classes_or.ok()) {
+      LOG(WARNING) << label_classes_or.status().message();
+      return {};
+    }
+    label_classes = std::move(label_classes_or.value());
+  }
+
   return std::make_shared<Model>(std::move(engine_or).value(), ydf_model.get(),
-                                 created_tfdf_signature);
+                                 created_tfdf_signature,
+                                 std::move(label_classes));
 }
 
 std::vector<std::string> CreateVectorString(size_t reserved) {
@@ -366,6 +405,7 @@ EMSCRIPTEN_BINDINGS(my_module) {
       .function("setCategoricalSetString", &Model::SetCategoricalSetString)
       .function("setCategoricalSetInt", &Model::SetCategoricalSetInt)
       .function("getInputFeatures", &Model::GetInputFeatures)
+      .function("getLabelClasses", &Model::GetLabelClasses)
       .function("getProtoInputFeatures", &Model::GetProtoInputFeatures);
 
   emscripten::value_object<InputFeature>("InputFeature")

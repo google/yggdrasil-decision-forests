@@ -20,7 +20,10 @@
 
 #include "gmock/gmock.h"
 #include "absl/debugging/leak_check.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
@@ -220,7 +223,7 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
       decision_tree { max_depth: 3 }
     }
   )pb");
-  YDF_LOG(INFO) << "Training classical algorithm";
+  LOG(INFO) << "Training classical algorithm";
   TrainAndEvaluateModel();
   // Note: The description includes a details of the tree structure.
   auto* gbt_model =
@@ -257,7 +260,7 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
       }
     }
   )pb");
-  YDF_LOG(INFO) << "Training distributed algorithm";
+  LOG(INFO) << "Training distributed algorithm";
   TrainAndEvaluateModel();
   // Note: The description includes a details of the tree structure.
   auto* distributed_gbt_model =
@@ -456,13 +459,13 @@ TEST(DISABLED_LargeDataset, Base) {
   std::vector<std::string> shard_paths;
   file::GenerateShardedFilenames(ds_path, &shard_paths);
   if (file::FileExists(shard_paths.back()).value()) {
-    YDF_LOG(INFO) << "Dataset already present";
+    LOG(INFO) << "Dataset already present";
   } else {
-    YDF_LOG(INFO) << "Create dataset: " << ds_path;
+    LOG(INFO) << "Create dataset: " << ds_path;
     CHECK_OK(file::RecursivelyCreateDir(ds_dir, file::Defaults()));
 
     const auto create_shard = [&](const int shard_idx) {
-      YDF_LOG(INFO) << "Write shard " << shard_idx << " of " << num_shards;
+      LOG(INFO) << "Write shard " << shard_idx << " of " << num_shards;
       const auto& path = shard_paths[shard_idx];
       auto writer = file::OpenOutputFile(path).value();
       std::minstd_rand0 rnd(shard_idx);
@@ -491,14 +494,14 @@ TEST(DISABLED_LargeDataset, Base) {
     }
   }
 
-  YDF_LOG(INFO) << "Create dataspec";
+  LOG(INFO) << "Create dataspec";
   const auto dataspec =
       dataset::CreateDataSpec(absl::StrCat("csv:", shard_paths.front()))
           .value();
   std::string dataspec_report = dataset::PrintHumanReadable(dataspec);
-  YDF_LOG(INFO) << "Dataspec:\n" << dataspec_report;
+  LOG(INFO) << "Dataspec:\n" << dataspec_report;
 
-  YDF_LOG(INFO) << "Train model";
+  LOG(INFO) << "Train model";
   model::proto::TrainingConfig train_config = PARSE_TEST_PROTO(R"pb(
     learner: "DISTRIBUTED_GRADIENT_BOOSTED_TREES"
     task: REGRESSION
@@ -537,8 +540,8 @@ TEST(DISABLED_LargeDataset, Base) {
   auto model =
       learner->TrainWithStatus(absl::StrCat("csv:", ds_path), dataspec).value();
 
-  YDF_LOG(INFO) << "Model trained";
-  YDF_LOG(INFO) << model->DescriptionAndStatistics(true);
+  LOG(INFO) << "Model trained";
+  LOG(INFO) << model->DescriptionAndStatistics(true);
 }
 
 }  // namespace

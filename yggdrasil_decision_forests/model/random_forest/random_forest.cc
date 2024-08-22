@@ -26,11 +26,14 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/inlined_vector.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -343,7 +346,7 @@ void RandomForestModel::Predict(const dataset::VerticalDataset& dataset,
       PredictUplift(dataset, row_idx, prediction);
       break;
     default:
-      YDF_LOG(FATAL) << "Non supported task.";
+      LOG(FATAL) << "Non supported task.";
       break;
   }
 }
@@ -363,7 +366,7 @@ void RandomForestModel::Predict(const dataset::proto::Example& example,
       PredictUplift(example, prediction);
       break;
     default:
-      YDF_LOG(FATAL) << "Non supported task.";
+      LOG(FATAL) << "Non supported task.";
       break;
   }
 }
@@ -578,9 +581,8 @@ std::vector<std::string> RandomForestModel::AvailableVariableImportances()
       // TODO: Add uplift variable importances.
       break;
     default:
-      YDF_LOG(FATAL) << "RandomForest for task "
-                     << model::proto::Task_Name(task())
-                     << " does not implement VariableImportances.";
+      LOG(FATAL) << "RandomForest for task " << model::proto::Task_Name(task())
+                 << " does not implement VariableImportances.";
   }
   const auto structural = AvailableStructuralVariableImportances();
   variable_importances.insert(variable_importances.end(), structural.begin(),
@@ -637,11 +639,10 @@ RandomForestModel::GetVariableImportance(absl::string_view key) const {
 metric::proto::EvaluationResults RandomForestModel::ValidationEvaluation()
     const {
   if (out_of_bag_evaluations_.empty()) {
-    YDF_LOG(WARNING)
-        << "ValidationEvaluation requires OOB evaluation enabled."
-           "Random Forest models should be trained with "
-           "compute_oob_performances:true. CART models do not support "
-           "OOB evaluation.";
+    LOG(WARNING) << "ValidationEvaluation requires OOB evaluation enabled."
+                    "Random Forest models should be trained with "
+                    "compute_oob_performances:true. CART models do not support "
+                    "OOB evaluation.";
     return {};
   }
   return out_of_bag_evaluations_.back().evaluation();
@@ -770,7 +771,7 @@ std::string EvaluationSnippet(
       return absl::Substitute("qini:$0 auuc:$1", metric::Qini(evaluation),
                               metric::AUUC(evaluation));
     default:
-      YDF_LOG(FATAL) << "Not implemented";
+      LOG(FATAL) << "Not implemented";
   }
 }
 

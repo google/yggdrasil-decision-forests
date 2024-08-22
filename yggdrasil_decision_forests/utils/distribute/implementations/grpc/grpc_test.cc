@@ -15,6 +15,11 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/check.h"
+#include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.pb.h"
@@ -136,10 +141,10 @@ TEST(GRPC, TestMessup) {
   TestMessup(all.manager.get(), [&]() {
     // This method creates a new worker #0, and tell the manager to replace the
     // old worker #0 by the new worker #0. After this change, any call to the
-    // old worker #0 will trigger a YDF_LOG(FATAL).
+    // old worker #0 will trigger a LOG(FATAL).
 
     // Mark worker #0 as forbidden. New requests to this worker will trigger a
-    // YDF_LOG(FATAL).
+    // LOG(FATAL).
     CHECK_OK(all.manager->BlockingRequest("forbidden", 0).status());
 
     auto* grpc_manager = dynamic_cast<GRPCManager*>(all.manager.get());

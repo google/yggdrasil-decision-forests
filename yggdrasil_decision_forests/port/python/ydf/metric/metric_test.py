@@ -50,6 +50,28 @@ class ConfusionTest(absltest.TestCase):
         """),
     )
 
+  def test_with_weights(self):
+    c = metric.ConfusionMatrix(
+        classes=(
+            "a",
+            "b",
+        ),
+        matrix=np.array([[1.123456, 12345.6789], [3.456789, 4.5678901]]),
+    )
+    self.assertEqual(
+        str(c),
+        """\
+label (row) \\ prediction (col)
++---------+---------+---------+
+|         |       a |       b |
++---------+---------+---------+
+|       a | 1.12346 | 12345.7 |
++---------+---------+---------+
+|       b | 3.45679 | 4.56789 |
++---------+---------+---------+
+""",
+    )
+
 
 class SafeDivTest(absltest.TestCase):
 
@@ -151,7 +173,11 @@ class EvaluationTest(absltest.TestCase):
     print(evaluation)
     dict_eval = evaluation.to_dict()
     self.assertLessEqual(
-        {"accuracy": (1 + 4) / (1 + 2 + 3 + 4), "loss": 2.0, "num_examples": 1}.items(),
+        {
+            "accuracy": (1 + 4) / (1 + 2 + 3 + 4),
+            "loss": 2.0,
+            "num_examples": 1,
+        }.items(),
         dict_eval.items(),
     )
 

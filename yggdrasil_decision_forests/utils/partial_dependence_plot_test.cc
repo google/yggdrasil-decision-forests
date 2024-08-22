@@ -23,7 +23,8 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "absl/memory/memory.h"
+#include "absl/log/check.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"

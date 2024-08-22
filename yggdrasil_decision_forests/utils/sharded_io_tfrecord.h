@@ -18,13 +18,15 @@
 
 #include <string>
 
+#include "absl/log/check.h"
+#include "absl/memory/memory.h"
+#include "absl/status/statusor.h"
 #include "tensorflow/core/lib/io/record_reader.h"
 #include "tensorflow/core/lib/io/record_writer.h"
 #include "tensorflow/core/platform/file_system.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/tensorflow.h"

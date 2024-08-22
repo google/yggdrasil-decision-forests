@@ -48,6 +48,10 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:uid",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/types:optional",
     ] + select({
         "//conditions:default": ["//yggdrasil_decision_forests/learner:all_learners"],
     }),
@@ -73,6 +77,8 @@ cc_test(
         "//yggdrasil_decision_forests/utils/distribute",
         "//yggdrasil_decision_forests/utils/distribute:distribute_without_implementations",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_cc_proto",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

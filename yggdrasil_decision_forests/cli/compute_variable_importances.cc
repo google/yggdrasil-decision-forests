@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
@@ -66,11 +67,11 @@ void PermutationVI() {
   QCHECK(!absl::GetFlag(FLAGS_output_model).empty());
   QCHECK(!absl::GetFlag(FLAGS_dataset).empty());
 
-  YDF_LOG(INFO) << "Load model";
+  LOG(INFO) << "Load model";
   std::unique_ptr<model::AbstractModel> model;
   QCHECK_OK(model::LoadModel(absl::GetFlag(FLAGS_input_model), &model));
 
-  YDF_LOG(INFO) << "Load dataset";
+  LOG(INFO) << "Load dataset";
   dataset::LoadConfig read_dataset_options;
   read_dataset_options.num_threads = absl::GetFlag(FLAGS_num_io_threads);
   dataset::VerticalDataset dataset;
@@ -78,7 +79,7 @@ void PermutationVI() {
       absl::GetFlag(FLAGS_dataset), model->data_spec(), &dataset,
       /*ensure_non_missing=*/model->input_features(), read_dataset_options));
 
-  YDF_LOG(INFO) << "Compute the permutation variable importances";
+  LOG(INFO) << "Compute the permutation variable importances";
   utils::ComputeFeatureImportanceOptions options;
   options.num_threads = absl::GetFlag(FLAGS_num_compute_threads);
   options.num_rounds = absl::GetFlag(FLAGS_num_repetitions);
@@ -86,7 +87,7 @@ void PermutationVI() {
       dataset, model.get(), model->mutable_precomputed_variable_importances(),
       options));
 
-  YDF_LOG(INFO) << "Save model";
+  LOG(INFO) << "Save model";
   QCHECK_OK(model::SaveModel(absl::GetFlag(FLAGS_output_model), model.get()));
 }
 

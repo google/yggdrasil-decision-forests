@@ -41,6 +41,7 @@
 //     empty string (i.e. --new_file_prefix=) to remove the model prefix.
 //
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -74,19 +75,19 @@ void EditModel() {
   const auto output = absl::GetFlag(FLAGS_output);
 
   if (input == kStringNoSet) {
-    YDF_LOG(FATAL) << "--input required";
+    LOG(FATAL) << "--input required";
   }
   if (output == kStringNoSet) {
-    YDF_LOG(FATAL) << "--output required";
+    LOG(FATAL) << "--output required";
   }
 
-  YDF_LOG(INFO) << "Loading model";
+  LOG(INFO) << "Loading model";
   std::unique_ptr<model::AbstractModel> model;
   QCHECK_OK(model::LoadModel(input, &model));
   auto* label_column =
       model->mutable_data_spec()->mutable_columns(model->label_col_idx());
 
-  YDF_LOG(INFO) << "Apply action";
+  LOG(INFO) << "Apply action";
 
   // Change the name of the label.
   if (absl::GetFlag(FLAGS_new_label_name) != kStringNoSet) {
@@ -97,9 +98,8 @@ void EditModel() {
   if (absl::GetFlag(FLAGS_new_weights_name) != kStringNoSet) {
     auto weights = model->weights();
     if (!weights.has_value()) {
-      YDF_LOG(FATAL)
-          << "Cannot apply --new_weights_name because the model is not "
-             "weighted.";
+      LOG(FATAL) << "Cannot apply --new_weights_name because the model is not "
+                    "weighted.";
     }
     auto* weight_column = model->mutable_data_spec()->mutable_columns(
         weights.value().attribute_idx());
@@ -116,7 +116,7 @@ void EditModel() {
   if (absl::GetFlag(FLAGS_new_file_prefix) != kStringNoSet) {
     output_options.file_prefix = absl::GetFlag(FLAGS_new_file_prefix);
   }
-  YDF_LOG(INFO) << "Saving model";
+  LOG(INFO) << "Saving model";
   QCHECK_OK(model::SaveModel(output, model.get(), output_options));
 }
 

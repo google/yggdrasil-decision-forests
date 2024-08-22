@@ -27,9 +27,11 @@
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -302,14 +304,14 @@ absl::Status FinalizeComputeSpecColumnCategorical(
   const uint64_t count_pruned_items =
       non_pruned_number_of_unique_values - item_frequency_vector.size();
   if (count_pruned_items > 0) {
-    YDF_LOG(INFO) << count_pruned_items
-                  << " item(s) have been pruned (i.e. they are considered "
-                     "out of dictionary) for the column "
-                  << col->name() << " (" << item_frequency_vector.size()
-                  << " item(s) left) because min_value_count="
-                  << col->categorical().min_value_count()
-                  << " and max_number_of_unique_values="
-                  << col->categorical().max_number_of_unique_values();
+    LOG(INFO) << count_pruned_items
+              << " item(s) have been pruned (i.e. they are considered "
+                 "out of dictionary) for the column "
+              << col->name() << " (" << item_frequency_vector.size()
+              << " item(s) left) because min_value_count="
+              << col->categorical().min_value_count()
+              << " and max_number_of_unique_values="
+              << col->categorical().max_number_of_unique_values();
   }
 
   // Update the dictionary map.
@@ -423,7 +425,7 @@ absl::Status CreateDataSpecWithStatus(
   // Detect the column names and semantics.
   RETURN_IF_ERROR(creator->InferColumnsAndTypes(paths, guide, data_spec));
   FinalizeInferTypes(guide, data_spec);
-  YDF_LOG(INFO) << data_spec->columns_size() << " column(s) found";
+  LOG(INFO) << data_spec->columns_size() << " column(s) found";
 
   // Computes the statistics (e.g. dictionaries, ratio of missing values) for
   // each column.
@@ -435,8 +437,8 @@ absl::Status CreateDataSpecWithStatus(
       creator->ComputeColumnStatistics(paths, guide, data_spec, &accumulator));
   RETURN_IF_ERROR(FinalizeComputeSpec(guide, accumulator, data_spec));
 
-  YDF_LOG(INFO) << "Finalizing [" << data_spec->created_num_rows()
-                << " row(s) found]";
+  LOG(INFO) << "Finalizing [" << data_spec->created_num_rows()
+            << " row(s) found]";
   return absl::OkStatus();
 }
 
@@ -622,8 +624,8 @@ absl::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path) {
                    GetDatasetPathAndTypeOrStatus(typed_path));
   std::vector<std::string> paths;
   RETURN_IF_ERROR(utils::ExpandInputShards(sharded_path, &paths));
-  YDF_LOG(INFO) << "Counting the number of examples on " << paths.size()
-                << " shard(s)";
+  LOG(INFO) << "Counting the number of examples on " << paths.size()
+            << " shard(s)";
   std::atomic<int64_t> number_of_examples{0};
 
   const auto& format_name = proto::DatasetFormat_Name(format);

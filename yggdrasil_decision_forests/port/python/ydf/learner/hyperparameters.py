@@ -15,9 +15,11 @@
 """Utility functions for YDF Hyperparameters."""
 from collections.abc import Mapping
 import dataclasses
-from typing import Dict, Union
+from typing import Dict, Set, Union
 
+from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.model import hyperparameter_pb2
+from ydf.cc import ydf
 from ydf.learner import custom_loss
 
 
@@ -78,6 +80,39 @@ def dict_to_generic_hyperparameter(
     else:
       raise ValueError(f"Invalid value {value} for parameter {key}")
   return generic_hps
+
+
+def validate_hyperparameters(
+    hp_dict: HyperParameters,
+    train_config: abstract_learner_pb2.TrainingConfig,
+    deployment_config: abstract_learner_pb2.DeploymentConfig,
+):
+  """Returns None if the hyperparameters are valid, raises otherwise."""
+  not_none_hps = set(key for key, value in hp_dict.items() if value is not None)
+  return ydf.ValidateHyperparameters(
+      not_none_hps, train_config, deployment_config
+  )
+
+
+def fix_hyperparameters(
+    hp_dict: HyperParameters,
+    explicit_parameters: Set[str],
+    train_config: abstract_learner_pb2.TrainingConfig,
+    deployment_config: abstract_learner_pb2.DeploymentConfig,
+) -> HyperParameters:
+  """Returns exclusion-free hyperparameters."""
+  not_none_hp_names = set(
+      key for key, value in hp_dict.items() if value is not None
+  )
+  explicit_hp_names = explicit_parameters.intersection(not_none_hp_names)
+  invalid_hp_names = ydf.GetInvalidHyperparameters(
+      not_none_hp_names, explicit_hp_names, train_config, deployment_config
+  )
+  return {
+      key: value
+      for key, value in hp_dict.items()
+      if key not in invalid_hp_names
+  }
 
 
 @dataclasses.dataclass

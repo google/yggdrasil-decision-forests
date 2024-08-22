@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2022 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,31 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Smoke test for Benchmarks."""
 
-# Builds all python versions for release on Pypi
+from absl.testing import absltest
 
-PYTHON_VERSIONS=( 3.8 3.9 3.10 3.11 3.12 )
-
-function build_py() {
-  local PYTHON="python"$1
-  echo "Starting build with " $PYTHON
-  $PYTHON -m venv /tmp/venv_$PYTHON
-  source /tmp/venv_$PYTHON/bin/activate
-  bazel clean --expunge
-  export CC="gcc"
-  RUN_TESTS=0 ./tools/test_pydf.sh
-  ./tools/build_pydf.sh python
-}
-
-function main() {
-  set -e
-  for ver in ${PYTHON_VERSIONS[*]} 
-  do
-    build_py $ver 
-  done
-  set +e
-}
+from ydf.monitoring import benchmark_train_speed as benchmark
 
 
+class BenchTest(absltest.TestCase):
 
-main
+  def test_smoke(self):
+    runner = benchmark.Runner()
+    benchmark.bench_train("iris", "default", "cart", "ydf", runner, 1, 1)
+
+
+if __name__ == "__main__":
+  absltest.main()

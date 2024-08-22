@@ -14,6 +14,9 @@
  */
 
 // clang-format off
+#include "absl/memory/memory.h"
+#include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #ifdef YDF_EVAL_TFRECORD
 #include "yggdrasil_decision_forests/utils/sharded_io_tfrecord.h"
 #endif

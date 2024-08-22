@@ -31,9 +31,9 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
-#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/describe.h"
@@ -115,12 +115,23 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
 
 absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
     const dataset::VerticalDataset& dataset,
-    const metric::proto::EvaluationOptions& options) {
+    const metric::proto::EvaluationOptions& options, const bool weighted) {
   py::gil_scoped_release release;
+
+  auto effective_options = options;
+  if (weighted && model_->weights().has_value()) {
+    ASSIGN_OR_RETURN(*effective_options.mutable_weights(),
+                     dataset::GetUnlinkedWeightDefinition(
+                         model_->weights().value(), model_->data_spec()));
+  }
+
   ASSIGN_OR_RETURN(const auto engine, GetEngine());
   utils::RandomEngine rnd;
-  ASSIGN_OR_RETURN(const auto evaluation,
-                   model_->EvaluateWithEngine(*engine, dataset, options, &rnd));
+  ASSIGN_OR_RETURN(
+      const auto evaluation,
+      model_->EvaluateWithEngineOverrideType(
+          *engine, dataset, effective_options, effective_options.task(),
+          label_col_idx(), model_->ranking_group_col_idx(), &rnd));
   return evaluation;
 }
 
@@ -156,6 +167,12 @@ absl::Status GenericCCModel::Save(
     const std::optional<std::string> file_prefix) const {
   py::gil_scoped_release release;
   return model::SaveModel(directory, model_.get(), {file_prefix});
+}
+
+absl::StatusOr<py::bytes> GenericCCModel::Serialize() const {
+  ASSIGN_OR_RETURN(std::string serialized_model,
+                   model::SerializeModel(*model_));
+  return py::bytes(serialized_model);
 }
 
 model::proto::Metadata GenericCCModel::metadata() const {

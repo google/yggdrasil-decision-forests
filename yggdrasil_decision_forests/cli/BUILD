@@ -31,7 +31,9 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils/benchmark:inference",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:optional",
     ],
@@ -79,6 +81,8 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils/distribute/implementations/grpc",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -93,6 +97,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:logging",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -105,12 +110,12 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_reader",
         "//yggdrasil_decision_forests/dataset:example_writer",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
-        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -132,6 +137,8 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:evaluation",
         "//yggdrasil_decision_forests/utils:logging",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -158,6 +165,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:random",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
     ],
 )
 
@@ -173,6 +181,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:logging",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -190,6 +199,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:feature_importance",
         "//yggdrasil_decision_forests/utils:logging",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
     ],
 )
 
@@ -207,6 +217,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:model_analysis",
         "//yggdrasil_decision_forests/utils:protobuf",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
     ],
 )
 
@@ -289,6 +300,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -18,6 +18,7 @@
 #include <string>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -70,6 +71,9 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_integer()->set_minimum(-1);
     param->mutable_integer()->set_default_value(
         config.num_candidate_attributes());
+    param->mutable_mutual_exclusive()->add_other_parameters(
+        kHParamNumCandidateAttributesRatio);
+    param->mutable_mutual_exclusive()->set_is_default(true);
     param->mutable_documentation()->set_description(
         R"(Number of unique valid attributes tested for each node. An attribute is valid if it has at least a valid split. If `num_candidate_attributes=0`, the value is set to the classical default value for Random Forest: `sqrt(number of input attributes)` in case of classification and `number_of_input_attributes / 3` in case of regression. If `num_candidate_attributes=-1`, all the attributes are tested.)");
   }
@@ -80,6 +84,9 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_real()->set_maximum(1.);
     param->mutable_real()->set_default_value(
         config.num_candidate_attributes_ratio());
+    param->mutable_mutual_exclusive()->add_other_parameters(
+        kHParamNumCandidateAttributes);
+    param->mutable_mutual_exclusive()->set_is_default(false);
     param->mutable_documentation()->set_description(
         R"(Ratio of attributes tested at each node. If set, it is equivalent to `num_candidate_attributes = number_of_input_features x num_candidate_attributes_ratio`. The possible values are between ]0, and 1] as well as -1. If not set or equal to -1, the `num_candidate_attributes` is used.)");
   }
@@ -188,7 +195,7 @@ absl::Status GetGenericHyperParameterSpecification(
     param->mutable_documentation()->set_description(
         R"(What structure of split to consider for numerical features.
 - `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.
-- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits one a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.
+- `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.
 - `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029)");
   }
   {
@@ -341,6 +348,14 @@ The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does n
         param->mutable_categorical()->set_default_value(
             kHParamSortingStrategyPresort);
         break;
+      case proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED:
+        param->mutable_categorical()->set_default_value(
+            kHParamSortingStrategyForcePresort);
+        break;
+      case proto::DecisionTreeTrainingConfig::Internal::AUTO:
+        param->mutable_categorical()->set_default_value(
+            kHParamSortingStrategyAuto);
+        break;
       default:
         return absl::InvalidArgumentError("Non implemented sorting strategy");
     }
@@ -348,10 +363,16 @@ The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does n
         kHParamSortingStrategyInNode);
     param->mutable_categorical()->add_possible_values(
         kHParamSortingStrategyPresort);
+    param->mutable_categorical()->add_possible_values(
+        kHParamSortingStrategyForcePresort);
+    param->mutable_categorical()->add_possible_values(
+        kHParamSortingStrategyAuto);
     param->mutable_documentation()->set_description(
         R"(How are sorted the numerical features in order to find the splits
-- PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.
+- AUTO: Selects the most efficient method among IN_NODE, FORCE_PRESORT, and LAYER.
 - IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.
+- FORCE_PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.
+- PRESORT: Automatically choose between FORCE_PRESORT and IN_NODE.
 .)");
   }
 
@@ -440,6 +461,14 @@ absl::Status SetHyperParameters(
     const auto hparam = generic_hyper_params->Get(kHParamMaxDepth);
     if (hparam.has_value()) {
       dt_config->set_max_depth(hparam.value().value().integer());
+      if (dt_config->max_depth() < 2 && dt_config->max_depth() != -1 &&
+          dt_config->max_depth() != -2) {
+        LOG(WARNING)
+            << "Setting max_depth=" << dt_config->max_depth()
+            << " for a training model will not result in any learning (i.e. "
+               "root tree without conditions). To learn stumps (i.e., decision "
+               "trees with a single condition), use max_depth=2.";
+      }
     }
   }
 
@@ -745,6 +774,12 @@ absl::Status SetHyperParameters(
       } else if (value == kHParamSortingStrategyPresort) {
         dt_config->mutable_internal()->set_sorting_strategy(
             proto::DecisionTreeTrainingConfig::Internal::PRESORTED);
+      } else if (value == kHParamSortingStrategyForcePresort) {
+        dt_config->mutable_internal()->set_sorting_strategy(
+            proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
+      } else if (value == kHParamSortingStrategyAuto) {
+        dt_config->mutable_internal()->set_sorting_strategy(
+            proto::DecisionTreeTrainingConfig::Internal::AUTO);
       } else {
         return absl::InvalidArgumentError(
             absl::StrFormat(R"(Unknown value "%s" for parameter "%s")", value,

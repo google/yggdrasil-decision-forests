@@ -20,6 +20,7 @@
 
 #include <cstdint>
 
+#include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
 
 #include "farmhash.h"

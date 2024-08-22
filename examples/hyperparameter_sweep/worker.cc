@@ -17,9 +17,11 @@
 #include <string>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
+#include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -121,12 +123,12 @@ class Worker : public distribute::AbstractWorker {
     ASSIGN_OR_RETURN(auto request, ydf::utils::ParseBinaryProto<proto::Request>(
                                        serialized_request));
 
-    YDF_LOG(INFO) << "Create dataspec";
+    LOG(INFO) << "Create dataspec";
     ydf::dataset::proto::DataSpecification dataspec;
     ydf::dataset::CreateDataSpec(init_message.train_path(), false,
                                  request.guide(), &dataspec);
 
-    YDF_LOG(INFO) << "Train model";
+    LOG(INFO) << "Train model";
     std::unique_ptr<ydf::model::AbstractLearner> learner;
     RETURN_IF_ERROR(GetLearner(request.train_config(), &learner));
 
@@ -147,12 +149,12 @@ class Worker : public distribute::AbstractWorker {
           model.get());
       STATUS_CHECK(gbt_model);
 
-      YDF_LOG(INFO) << "Load test dataset";
+      LOG(INFO) << "Load test dataset";
       ydf::dataset::VerticalDataset test_dataset;
       RETURN_IF_ERROR(ydf::dataset::LoadVerticalDataset(
           init_message.test_path(), model->data_spec(), &test_dataset));
 
-      YDF_LOG(INFO) << "Evaluate model";
+      LOG(INFO) << "Evaluate model";
       ydf::utils::RandomEngine rnd;
       ydf::metric::proto::EvaluationOptions eval_option;
       eval_option.set_bootstrapping_samples(-1);

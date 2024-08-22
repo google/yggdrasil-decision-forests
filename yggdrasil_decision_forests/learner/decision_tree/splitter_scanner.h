@@ -43,7 +43,7 @@
 //     step, evaluate the score of the split.
 //
 // If the preprocessor "YDF_DEBUG_PRINT_SPLIT" is set, detailed logs of the
-// splitting algorithm are printed with YDF_LOG(INFO).
+// splitting algorithm are printed with LOG(INFO).
 //
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_SPLITTER_SCANNER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_SPLITTER_SCANNER_H_
@@ -60,11 +60,11 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
-#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -723,19 +723,18 @@ SplitSearchResult ScanSplits(
   bool no_new_examples_since_last_new_best_split = false;
 
 #ifdef YDF_DEBUG_PRINT_SPLIT
-  YDF_LOG(INFO) << "Start scanning split with ScanSplits with: num_buckets:"
-                << example_bucket_set.items.size()
-                << " best_score:" << best_score
-                << " num_examples:" << num_examples
-                << " weighted_num_examples:" << weighted_num_examples;
+  LOG(INFO) << "Start scanning split with ScanSplits with: num_buckets:"
+            << example_bucket_set.items.size() << " best_score:" << best_score
+            << " num_examples:" << num_examples
+            << " weighted_num_examples:" << weighted_num_examples;
 #endif
 
   for (int bucket_idx = 0; bucket_idx < end_bucket_idx; bucket_idx++) {
     const auto& item = example_bucket_set.items[bucket_idx];
 
 #ifdef YDF_DEBUG_PRINT_SPLIT
-    YDF_LOG(INFO) << "Scan item\n\tfeature: " << item.feature
-                  << "\n\tlabel: " << item.label;
+    LOG(INFO) << "Scan item\n\tfeature: " << item.feature
+              << "\n\tlabel: " << item.label;
 #endif
 
     if constexpr (bucket_interpolation) {
@@ -756,7 +755,7 @@ SplitSearchResult ScanSplits(
     if (!FeatureBucketType::IsValidSplit(
             item.feature, example_bucket_set.items[bucket_idx + 1].feature)) {
 #ifdef YDF_DEBUG_PRINT_SPLIT
-      YDF_LOG(INFO) << "\tinvalid split (feature)";
+      LOG(INFO) << "\tinvalid split (feature)";
 #endif
       continue;
     }
@@ -764,21 +763,21 @@ SplitSearchResult ScanSplits(
     // Enough examples?
     if (num_pos_examples < min_num_obs) {
 #ifdef YDF_DEBUG_PRINT_SPLIT
-      YDF_LOG(INFO) << "\tnot enough examples on positive side";
+      LOG(INFO) << "\tnot enough examples on positive side";
 #endif
       break;
     }
 
     if (num_neg_examples < min_num_obs) {
 #ifdef YDF_DEBUG_PRINT_SPLIT
-      YDF_LOG(INFO) << "\tnot enough examples on negative side";
+      LOG(INFO) << "\tnot enough examples on negative side";
 #endif
       continue;
     }
 
     if (!initializer.IsValidSplit(neg, pos)) {
 #ifdef YDF_DEBUG_PRINT_SPLIT
-      YDF_LOG(INFO) << "\tinvalid split (accumulator)";
+      LOG(INFO) << "\tinvalid split (accumulator)";
 #endif
       continue;
     }
@@ -787,14 +786,14 @@ SplitSearchResult ScanSplits(
     tried_one_split = true;
 
 #ifdef YDF_DEBUG_PRINT_SPLIT
-    YDF_LOG(INFO) << "\tscore: " << score;
+    LOG(INFO) << "\tscore: " << score;
 #endif
 
     if (score > best_score) {
 #ifdef YDF_DEBUG_PRINT_SPLIT
-      YDF_LOG(INFO) << "Score:" << std::setprecision(16) << score
-                    << " Best_score: " << best_score;
-      YDF_LOG(INFO) << "\tnew best split";
+      LOG(INFO) << "Score:" << std::setprecision(16) << score
+                << " Best_score: " << best_score;
+      LOG(INFO) << "\tnew best split";
 #endif
 
       // Memorize the split.
@@ -811,9 +810,9 @@ SplitSearchResult ScanSplits(
   }
 
 #ifdef YDF_DEBUG_PRINT_SPLIT
-  YDF_LOG(INFO) << "Last bucket:\n\tfeature: "
-                << example_bucket_set.items.back().feature
-                << "\n\tlabel: " << example_bucket_set.items.back().label;
+  LOG(INFO) << "Last bucket:\n\tfeature: "
+            << example_bucket_set.items.back().feature
+            << "\n\tlabel: " << example_bucket_set.items.back().label;
 #endif
 
   if (best_bucket_idx != -1) {
@@ -1044,31 +1043,24 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   SignedExampleIdx best_sorted_example_idx = -1;
   SignedExampleIdx best_previous_sorted_example_idx = -1;
 
-  constexpr auto new_value_mask = ((SparseItem::ExampleIdx)1)
-                                  << (sizeof(SparseItem::ExampleIdx) * 8 - 1);
-  constexpr auto example_idx_mask = new_value_mask - 1;
-
   // A new (i.e. different) attribute value was observed in the scan since the
   // last score test.
   bool new_attribute_value = false;
 
   // Index of the nearest previous example with a  value different from the
   // current example (i.e. the "sorted_example_idx" example).
-  SparseItem::ExampleIdx previous_sorted_example_idx = 0;
+  SparseItemMeta::ExampleIdx previous_sorted_example_idx = 0;
 
   // Iterate over the attribute values in increasing order.
   // Note: For some reasons, the iterator for-loop is faster than the
   // for(auto:sorted_attributes) for loop (test on 10 different compiled
   // binaries).
-  for (SparseItem::ExampleIdx sorted_example_idx = 0;
+  for (SparseItemMeta::ExampleIdx sorted_example_idx = 0;
        sorted_example_idx < sorted_attributes.size(); sorted_example_idx++) {
     const auto& sorted_attribute = sorted_attributes[sorted_example_idx];
 
-    auto example_idx =
-        sorted_attribute.example_idx_and_extra & example_idx_mask;
-
-    const bool is_new_value =
-        sorted_attribute.example_idx_and_extra & new_value_mask;
+    auto example_idx = sorted_attribute & SparseItemMeta::kMaskExampleIdx;
+    const bool is_new_value = sorted_attribute & SparseItemMeta::kMaskDeltaBit;
     new_attribute_value |= is_new_value;
 
     // Skip non selected examples.
@@ -1128,12 +1120,11 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   if (found_split) {
     // Finalize the best found split.
     const auto best_previous_feature_value = feature_filler.GetValue(
-        sorted_attributes[best_previous_sorted_example_idx]
-            .example_idx_and_extra &
-        example_idx_mask);
-    const auto best_feature_value = feature_filler.GetValue(
-        sorted_attributes[best_sorted_example_idx].example_idx_and_extra &
-        example_idx_mask);
+        sorted_attributes[best_previous_sorted_example_idx] &
+        SparseItemMeta::kMaskExampleIdx);
+    const auto best_feature_value =
+        feature_filler.GetValue(sorted_attributes[best_sorted_example_idx] &
+                                SparseItemMeta::kMaskExampleIdx);
     // TODO: Experiment with random splits in ]best_previous_feature_value,
     // best_feature_value[.
 

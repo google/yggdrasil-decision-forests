@@ -15,18 +15,26 @@
 
 #include "yggdrasil_decision_forests/learner/cart/cart.h"
 
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <numeric>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -34,6 +42,7 @@
 #include "yggdrasil_decision_forests/learner/cart/cart.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -42,7 +51,6 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
-#include "yggdrasil_decision_forests/utils/adaptive_work.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -69,6 +77,28 @@ void GenTrainAndValidIndices(const float validation_ratio,
     const bool in_training = unif_dist_01(*rnd) > validation_ratio;
     (in_training ? train : valid)->push_back(example_idx);
   }
+}
+
+absl::Status SetDefaultHyperParameters(
+    cart::proto::CartTrainingConfig* cart_config) {
+  // The basic definition of CART does not have any attribute sampling.
+  if (!cart_config->decision_tree().has_num_candidate_attributes() &&
+      !cart_config->decision_tree().has_num_candidate_attributes_ratio()) {
+    cart_config->mutable_decision_tree()->set_num_candidate_attributes(-1);
+  }
+
+  // There is no need for pre-sorting.
+  cart_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_sorting_strategy(
+          decision_tree::proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  // Set the default generic decision tree hyper-parameter which might have not
+  // be set by this CART specific function.
+  decision_tree::SetDefaultHyperParameters(
+      cart_config->mutable_decision_tree());
+
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -116,7 +146,8 @@ CartLearner::GetGenericHyperParameterSpecification() const {
 
   model::proto::TrainingConfig config;
   const auto proto_path = "learner/cart/cart.proto";
-  const auto& cart_config = config.GetExtension(cart::proto::cart_config);
+  auto& cart_config = *config.MutableExtension(cart::proto::cart_config);
+  RETURN_IF_ERROR(SetDefaultHyperParameters(&cart_config));
 
   {
     auto& param =
@@ -152,13 +183,15 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
   // Assemble and check the training configuration.
   auto config = training_config();
   auto& cart_config = *config.MutableExtension(cart::proto::cart_config);
-  decision_tree::SetDefaultHyperParameters(cart_config.mutable_decision_tree());
-  // There is no need for pre-sorting.
-  cart_config.mutable_decision_tree()->mutable_internal()->set_sorting_strategy(
-      decision_tree::proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  RETURN_IF_ERROR(SetDefaultHyperParameters(&cart_config));
+
   model::proto::TrainingConfigLinking config_link;
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
       config, train_dataset.data_spec(), &config_link));
+  decision_tree::SetInternalDefaultHyperParameters(
+      config, config_link, train_dataset.data_spec(),
+      cart_config.mutable_decision_tree());
   RETURN_IF_ERROR(CheckConfiguration(train_dataset.data_spec(), config,
                                      config_link, deployment()));
 
@@ -173,9 +206,8 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
   mdl->AddTree(absl::make_unique<decision_tree::DecisionTree>());
   auto* decision_tree = mdl->mutable_decision_trees()->front().get();
 
-  YDF_LOG(INFO) << "Training CART on " << train_dataset.nrow()
-                << " example(s) and " << config_link.features().size()
-                << " feature(s).";
+  LOG(INFO) << "Training CART on " << train_dataset.nrow() << " example(s) and "
+            << config_link.features().size() << " feature(s).";
 
   std::vector<float> weights;
   RETURN_IF_ERROR(dataset::GetWeights(train_dataset, config_link, &weights));
@@ -562,8 +594,8 @@ absl::Status PruneTree(const dataset::VerticalDataset& dataset,
   }
 
   const auto num_nodes_post_pruning = tree->NumNodes();
-  YDF_LOG(INFO) << num_nodes_pre_pruning << " nodes before pruning. "
-                << num_nodes_post_pruning << " nodes after pruning.";
+  LOG(INFO) << num_nodes_pre_pruning << " nodes before pruning. "
+            << num_nodes_post_pruning << " nodes after pruning.";
   return absl::OkStatus();
 }
 

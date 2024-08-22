@@ -37,11 +37,25 @@ from ydf.metric import metric
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model.decision_forest_model import decision_forest_model
+from ydf.model.tree import condition as condition_lib
+from ydf.model.tree import node as node_lib
 from ydf.utils import log
 from ydf.utils import test_utils
 
 ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
 Column = dataspec.Column
+
+
+def get_tree_depth(
+    current_node: Any,
+    depth: int,
+):
+  if current_node.is_leaf:
+    return depth
+  return max(
+      get_tree_depth(current_node.neg_child, depth + 1),
+      get_tree_depth(current_node.pos_child, depth + 1),
+  )
 
 
 class LearnerTest(parameterized.TestCase):
@@ -67,7 +81,14 @@ class LearnerTest(parameterized.TestCase):
             Column("treat", semantic=dataspec.Semantic.CATEGORICAL),
         ],
     )
-    self.gaussians = test_utils.load_datasets("gaussians")
+    self.gaussians = test_utils.load_datasets(
+        "gaussians",
+        column_args=[
+            Column("label", semantic=dataspec.Semantic.CATEGORICAL),
+            Column("features.0_of_2", semantic=dataspec.Semantic.NUMERICAL),
+            Column("features.1_of_2", semantic=dataspec.Semantic.NUMERICAL),
+        ],
+    )
 
   def _check_adult_model(
       self,
@@ -86,9 +107,10 @@ class LearnerTest(parameterized.TestCase):
       - Make sure predictions of original model and serialized model match.
 
     Args:
-      learner: A learner for on the adult dataset.
-      minimum_accuracy: minimum accuracy.
+      learner: A learner on the adult dataset.
+      minimum_accuracy: Minimum accuracy.
       check_serialization: If true, check the serialization of the model.
+      valid: Optional validation dataset.
 
     Returns:
       The model, its evaluation and the predictions on the test dataset.
@@ -246,6 +268,29 @@ class RandomForestLearnerTest(LearnerTest):
         learner.train(test_utils.toy_dataset()).task(),
         generic_learner.Task.REGRESSION,
     )
+
+  def test_model_type_regression_unordered_set_indices(self):
+    ds = pd.DataFrame({
+        "col_cat_set": [
+            ["A", "A"],
+            ["A", "B"],
+            ["A", "B"],
+            ["C", "B"],
+            ["C", "B"],
+        ],
+        "binary_int_label": [0, 0, 1, 1, 1],
+    })
+    learner = specialized_learners.RandomForestLearner(
+        label="binary_int_label",
+        num_trees=1,
+        task=generic_learner.Task.REGRESSION,
+        min_vocab_frequency=1,
+        num_candidate_attributes_ratio=1.0,
+        bootstrap_training_dataset=False,
+        min_examples=1,
+        categorical_set_split_greedy_sampling=1.0,
+    )
+    _ = learner.train(ds)
 
   def test_model_type_classification_string_label(self):
     learner = specialized_learners.RandomForestLearner(
@@ -623,6 +668,60 @@ class RandomForestLearnerTest(LearnerTest):
     ):
       _ = learner.train(ds)
 
+  def test_weighted_training_and_evaluation(self):
+
+    def gen_ds(seed, n=10000):
+      np.random.seed(seed)
+      f1 = np.random.uniform(size=n)
+      f2 = np.random.uniform(size=n)
+      f3 = np.random.uniform(size=n)
+      weights = np.random.uniform(size=n)
+      return {
+          "f1": f1,
+          "f2": f2,
+          "f3": f3,
+          "label": (
+              # Make the examples with high weights harder to predict.
+              f1 + f2 * 0.5 + f3 * 0.5 + np.random.uniform(size=n) * weights
+              >= 1.5
+          ),
+          "weights": weights,
+      }
+
+    model = specialized_learners.RandomForestLearner(
+        label="label",
+        weights="weights",
+        num_trees=300,
+        winner_take_all=False,
+    ).train(gen_ds(0))
+
+    test_ds = gen_ds(1)
+
+    self_evaluation = model.self_evaluation()
+    non_weighted_evaluation = model.evaluate(test_ds, weighted=False)
+    weighted_evaluation = model.evaluate(test_ds, weighted=True)
+
+    self.assertIsNotNone(self_evaluation)
+    self.assertAlmostEqual(self_evaluation.accuracy, 0.824501, delta=0.005)
+    self.assertAlmostEqual(
+        non_weighted_evaluation.accuracy, 0.8417, delta=0.005
+    )
+    self.assertAlmostEqual(weighted_evaluation.accuracy, 0.8172290, delta=0.005)
+    predictions = model.predict(test_ds)
+
+    manual_non_weighted_evaluation = np.mean(
+        (predictions >= 0.5) == test_ds["label"]
+    )
+    manual_weighted_evaluation = np.sum(
+        ((predictions >= 0.5) == test_ds["label"]) * test_ds["weights"]
+    ) / np.sum(test_ds["weights"])
+    self.assertAlmostEqual(
+        manual_non_weighted_evaluation, non_weighted_evaluation.accuracy
+    )
+    self.assertAlmostEqual(
+        manual_weighted_evaluation, weighted_evaluation.accuracy
+    )
+
   def test_learn_and_predict_when_label_is_not_last_column(self):
     label = "age"
     learner = specialized_learners.RandomForestLearner(
@@ -680,6 +779,63 @@ class RandomForestLearnerTest(LearnerTest):
     with self.assertRaisesRegex(ValueError, "should be a string"):
       _ = specialized_learners.RandomForestLearner(label=np.array([1, 0]))  # pytype: disable=wrong-arg-types
 
+  def test_wrong_shape_multidim_model(self):
+    model = specialized_learners.RandomForestLearner(
+        label="label", num_trees=5
+    ).train({
+        "feature": np.array([[0, 1], [3, 4]]),
+        "label": np.array([0, 1]),
+    })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Column 'feature' is expected to be multi-dimensional with shape 2 but"
+        r" it is single-dimensional. If you use Numpy arrays, the column is"
+        r" expected to be an array of shape \[num_examples, 2\].",
+    ):
+      _ = model.predict({
+          "feature": np.array([0, 1]),
+      })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Unexpected shape for multi-dimensional column 'feature'. Column has"
+        r" shape 1 but is expected to have shape 2.",
+    ):
+      _ = model.predict({
+          "feature": np.array([[0], [1]]),
+      })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Unexpected shape for multi-dimensional column 'feature'. Column has"
+        r" shape 3 but is expected to have shape 2.",
+    ):
+      _ = model.predict({
+          "feature": np.array([[0, 1, 2], [3, 4, 5]]),
+      })
+
+  def test_wrong_shape_singledim_model(self):
+    model = specialized_learners.RandomForestLearner(
+        label="label", num_trees=5
+    ).train({
+        "feature": np.array([0, 1]),
+        "label": np.array([0, 1]),
+    })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Column 'feature' is expected to single-dimensional but it is"
+        r" multi-dimensional with shape 2.",
+    ):
+      _ = model.predict({
+          "feature": np.array([[0, 1]]),
+      })
+    with self.assertRaisesRegex(
+        ValueError,
+        r"Column 'feature' is expected to single-dimensional but it is"
+        r" multi-dimensional with shape 1.",
+    ):
+      _ = model.predict({
+          "feature": np.array([[0], [1]]),
+      })
+
 
 class CARTLearnerTest(LearnerTest):
 
@@ -713,15 +869,13 @@ class CARTLearnerTest(LearnerTest):
     self.assertAlmostEqual(evaluation.rmse, 114.081, places=3)
 
   def test_monotonic_non_compatible_learner(self):
-    learner = specialized_learners.CartLearner(
-        label="label", features=[dataspec.Column("feature", monotonic=+1)]
-    )
-    ds = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
     with self.assertRaisesRegex(
         test_utils.AbslInvalidArgumentError,
         "The learner CART does not support monotonic constraints",
     ):
-      _ = learner.train(ds)
+      _ = specialized_learners.CartLearner(
+          label="label", features=[dataspec.Column("feature", monotonic=+1)]
+      )
 
   def test_tuner_manual(self):
     tuner = tuner_lib.RandomSearchTuner(num_trials=5)
@@ -1018,7 +1172,7 @@ class LoggingTest(parameterized.TestCase):
 class IsolationForestLearnerTest(LearnerTest):
 
   @parameterized.parameters(False, True)
-  def test_gaussians(self, with_labels: bool):
+  def test_gaussians_train_and_analyze(self, with_labels: bool):
     if with_labels:
       learner = specialized_learners.IsolationForestLearner(label="label")
     else:
@@ -1037,18 +1191,113 @@ class IsolationForestLearnerTest(LearnerTest):
     _ = model.analyze_prediction(self.gaussians.test_pd.iloc[:1])
     _ = model.analyze(self.gaussians.test)
 
-    if with_labels:
-      evaluation = model.evaluate(self.gaussians.test)
-      self.assertDictEqual(
-          evaluation.to_dict(),
-          {"num_examples": 280, "num_examples_weighted": 280.0},
+  def test_gaussians_evaluation_default_task(self):
+    learner = specialized_learners.IsolationForestLearner(label="label")
+    model = learner.train(self.gaussians.train)
+    with self.assertRaisesRegex(
+        ValueError,
+        ".*evaluate the model as a classification model.*",
+    ):
+      _ = model.evaluate(self.gaussians.test)
+
+  def test_gaussians_evaluation_no_label(self):
+    learner = specialized_learners.IsolationForestLearner(features=["f1", "f2"])
+    model = learner.train(self.gaussians.train)
+    with self.assertRaisesRegex(
+        ValueError,
+        ".*A model cannot be evaluated without a label..*",
+    ):
+      _ = model.evaluate(
+          self.gaussians.test,
+          evaluation_task=generic_learner.Task.CLASSIFICATION,
       )
-    else:
-      with self.assertRaisesRegex(
-          ValueError,
-          "Cannot evaluate an anomaly detection model without a label",
-      ):
-        _ = model.evaluate(self.gaussians.test)
+
+  def test_gaussians_evaluation_with_label(self):
+    learner = specialized_learners.IsolationForestLearner(label="label")
+    model = learner.train(self.gaussians.train)
+    evaluation = model.evaluate(
+        self.gaussians.test,
+        evaluation_task=generic_learner.Task.CLASSIFICATION,
+    )
+    self.assertSameElements(
+        evaluation.to_dict().keys(),
+        [
+            "num_examples",
+            "num_examples_weighted",
+            "accuracy",
+            "characteristic_0:name",
+            "characteristic_0:pr_auc",
+            "characteristic_0:roc_auc",
+            "confusion_matrix",
+            "loss",
+        ],
+    )
+    self.assertAlmostEqual(evaluation.accuracy, 0.98, delta=0.01)
+    self.assertAlmostEqual(evaluation.loss, 0.52, delta=0.01)
+
+  def test_max_depth_gaussians_subsample_ratio(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"],
+        subsample_ratio=0.9,
+    )
+    self.assertEqual(learner.hyperparameters["subsample_ratio"], 0.9)
+    model = learner.train(self.gaussians.train)
+
+    max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
+    self.assertEqual(max_depth, 8)
+
+  def test_max_depth_gaussians_subsample_count(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"],
+        subsample_count=128,
+    )
+    self.assertEqual(learner.hyperparameters["subsample_count"], 128)
+    model = learner.train(self.gaussians.train)
+
+    max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
+    self.assertEqual(max_depth, 7)
+
+  def test_max_depth_gaussians_max_depth(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"], subsample_ratio=1.0, max_depth=10
+    )
+    model = learner.train(self.gaussians.train)
+
+    max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
+    self.assertEqual(max_depth, 10)
+
+  def test_illegal_agument_combination_constructor(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        ".*Only one of the following hyperparameters can be set:"
+        " (subsample_ratio, subsample_count|subsample_count,"
+        " subsample_ratio).*",
+    ):
+      _ = specialized_learners.IsolationForestLearner(
+          features=["f1", "f2"], subsample_count=128, subsample_ratio=0.5
+      )
+
+  def test_illegal_agument_combination_explicit_call(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"], subsample_count=128
+    )
+    learner.hyperparameters["subsample_ratio"] = 0.5
+    with self.assertRaises(ValueError):
+      learner.validate_hyperparameters()
+
+  def test_max_depth_gaussians_oblique(self):
+    learner = specialized_learners.IsolationForestLearner(
+        features=["f1", "f2"],
+        split_axis="SPARSE_OBLIQUE",
+        num_trees=5,
+    )
+    model = learner.train(self.gaussians.train)
+    first_tree = model.get_tree(0)
+    first_root = first_tree.root
+    self.assertIsInstance(first_root, node_lib.NonLeaf)
+    self.assertIsInstance(
+        first_root.condition, condition_lib.NumericalSparseObliqueCondition
+    )
 
 
 class UtilityTest(LearnerTest):

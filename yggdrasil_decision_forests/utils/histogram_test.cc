@@ -19,6 +19,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
@@ -137,7 +138,7 @@ TEST(Histogram, UniformIntRnd) {
   for (int i = 0; i < 10000; i++) {
     values.push_back(dist(rnd));
   }
-  YDF_LOG(INFO) << Histogram<int>::MakeUniform(values).ToString();
+  LOG(INFO) << Histogram<int>::MakeUniform(values).ToString();
 }
 
 TEST(Histogram, UniformFloatRnd) {
@@ -147,7 +148,7 @@ TEST(Histogram, UniformFloatRnd) {
   for (int i = 0; i < 10000; i++) {
     values.push_back(dist(rnd));
   }
-  YDF_LOG(INFO) << Histogram<float>::MakeUniform(values).ToString();
+  LOG(INFO) << Histogram<float>::MakeUniform(values).ToString();
 }
 
 TEST(Histogram, UniformFloatWithWeightsRnd) {
@@ -159,8 +160,7 @@ TEST(Histogram, UniformFloatWithWeightsRnd) {
     values.push_back(dist(rnd));
     weights.push_back(dist2(rnd));
   }
-  YDF_LOG(INFO)
-      << Histogram<float>::MakeUniform(values, 10, weights).ToString();
+  LOG(INFO) << Histogram<float>::MakeUniform(values, 10, weights).ToString();
 }
 
 TEST(Metric, BucketizedContainer) {

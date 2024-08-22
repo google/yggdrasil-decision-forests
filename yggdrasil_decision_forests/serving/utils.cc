@@ -15,8 +15,12 @@
 
 #include "yggdrasil_decision_forests/serving/utils.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -66,8 +70,8 @@ FeatureStatistics::FeatureStatistics(
         feature.mutable_categorical();
         break;
       default:
-        YDF_LOG(WARNING) << "Type of feature \"" << col_spec.name()
-                         << " is supported.";
+        LOG(WARNING) << "Type of feature \"" << col_spec.name()
+                     << " is supported.";
     }
   }
 }

@@ -18,8 +18,8 @@
 #include <utility>
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
-#include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
@@ -92,7 +92,7 @@ absl::Status Run() {
   const auto train_dataset_path = absl::GetFlag(FLAGS_dataset_train);
   const auto test_dataset_path = absl::GetFlag(FLAGS_dataset_test);
 
-  YDF_LOG(INFO) << "Initialize worker manager";
+  LOG(INFO) << "Initialize worker manager";
   proto::Initialization initialize;
   initialize.set_train_path(train_dataset_path);
   initialize.set_test_path(test_dataset_path);
@@ -192,7 +192,7 @@ absl::Status Run() {
               }
           }
 
-  YDF_LOG(INFO) << "Commands: " << num_commands;
+  LOG(INFO) << "Commands: " << num_commands;
 
   int solved_commands = 0;
 
@@ -202,8 +202,7 @@ absl::Status Run() {
     ASSIGN_OR_RETURN(const auto result,
                      manager->NextAsynchronousProtoAnswer<proto::Result>());
     solved_commands++;
-    YDF_LOG(INFO) << "Receive result " << solved_commands << " / "
-                  << num_commands;
+    LOG(INFO) << "Receive result " << solved_commands << " / " << num_commands;
 
     for (const auto& result_item : result.items()) {
       // Comma in json file.

@@ -15,7 +15,12 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.h"
 
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -29,7 +34,7 @@ constexpr char MultiThreadManager::kKey[];
 absl::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
                                                          int worker_idx) {
   if (verbosity_ >= 2) {
-    YDF_LOG(INFO) << "Emitting blocking request of " << blob.size() << " bytes";
+    LOG(INFO) << "Emitting blocking request of " << blob.size() << " bytes";
   }
 
   if (worker_idx < 0) {
@@ -41,8 +46,8 @@ absl::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
                    _ << "Error emitted by worker #" << worker_idx);
 
   if (verbosity_ >= 2) {
-    YDF_LOG(INFO) << "Completed blocking request with " << answer.size()
-                  << " bytes";
+    LOG(INFO) << "Completed blocking request with " << answer.size()
+              << " bytes";
   }
   return answer;
 }
@@ -50,8 +55,7 @@ absl::StatusOr<Blob> MultiThreadManager::BlockingRequest(Blob blob,
 absl::Status MultiThreadManager::AsynchronousRequest(Blob blob,
                                                      int worker_idx) {
   if (verbosity_ >= 2) {
-    YDF_LOG(INFO) << "Emitting asynchronous request of " << blob.size()
-                  << " bytes";
+    LOG(INFO) << "Emitting asynchronous request of " << blob.size() << " bytes";
   }
   if (worker_idx < 0) {
     pending_queries_.Push(std::move(blob));
@@ -63,19 +67,19 @@ absl::Status MultiThreadManager::AsynchronousRequest(Blob blob,
 
 absl::StatusOr<Blob> MultiThreadManager::NextAsynchronousAnswer() {
   if (verbosity_ >= 2) {
-    YDF_LOG(INFO) << "Wait for next result";
+    LOG(INFO) << "Wait for next result";
   }
   auto answer = pending_answers_.Pop();
   if (!answer.has_value()) {
     return absl::OutOfRangeError("No more results available");
   }
   if (verbosity_ >= 1 && !answer.value().ok()) {
-    YDF_LOG(INFO) << "Return asynchronous result failure: "
-                  << answer.value().status();
+    LOG(INFO) << "Return asynchronous result failure: "
+              << answer.value().status();
   }
   if (verbosity_ >= 2 && answer.value().ok()) {
-    YDF_LOG(INFO) << "Return asynchronous result with "
-                  << answer.value().value().size() << " bytes";
+    LOG(INFO) << "Return asynchronous result with "
+              << answer.value().value().size() << " bytes";
   }
   return std::move(answer.value());
 }
@@ -122,10 +126,10 @@ int MultiThreadManager::NumWorkers() { return workers_.size(); }
 absl::Status MultiThreadManager::Done(
     absl::optional<bool> kill_worker_manager) {
   if (verbosity_ >= 1) {
-    YDF_LOG(INFO) << "Release workers";
+    LOG(INFO) << "Release workers";
   }
   if (done_was_called_) {
-    YDF_LOG(WARNING) << "Calling done twice";
+    LOG(WARNING) << "Calling done twice";
     return absl::OkStatus();
   }
   done_was_called_ = true;
@@ -146,7 +150,7 @@ absl::Status MultiThreadManager::Done(
 
 absl::Status MultiThreadManager::SetParallelExecutionPerWorker(int num) {
   if (verbosity_) {
-    YDF_LOG(INFO) << "Change the number of parallel execution per worker";
+    LOG(INFO) << "Change the number of parallel execution per worker";
   }
 
   // Close the query channels.
@@ -181,8 +185,8 @@ absl::Status MultiThreadManager::Initialize(const proto::Config& config,
   const auto num_workers = imp_config.num_workers();
   verbosity_ = config.verbosity();
   if (verbosity_ >= 1) {
-    YDF_LOG(INFO) << "Initialize manager with " << welcome_blob.size()
-                  << " bytes welcome blob and " << num_workers << " workers";
+    LOG(INFO) << "Initialize manager with " << welcome_blob.size()
+              << " bytes welcome blob and " << num_workers << " workers";
   }
   if (num_workers <= 0) {
     return absl::InvalidArgumentError(

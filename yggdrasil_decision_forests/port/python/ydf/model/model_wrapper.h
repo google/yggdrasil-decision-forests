@@ -95,6 +95,9 @@ class GenericCCModel {
   absl::Status Save(std::string_view directory,
                     std::optional<std::string> file_prefix) const;
 
+  // Serializes a model to a sequence of bytes.
+  absl::StatusOr<py::bytes> Serialize() const;
+
   // TODO: Allow passing the output array as a parameter to reduce heap
   // allocations.
   absl::StatusOr<py::array_t<float>> Predict(
@@ -102,7 +105,7 @@ class GenericCCModel {
 
   absl::StatusOr<metric::proto::EvaluationResults> Evaluate(
       const dataset::VerticalDataset& dataset,
-      const metric::proto::EvaluationOptions& options);
+      const metric::proto::EvaluationOptions& options, bool weighted);
 
   absl::StatusOr<utils::model_analysis::proto::StandaloneAnalysisResult>
   Analyze(const dataset::VerticalDataset& dataset,

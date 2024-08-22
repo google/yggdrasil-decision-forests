@@ -53,6 +53,9 @@ class WarningMessage(enum.Enum):
   CANNOT_SHOW_DETAILS_LOGS = 0
   CAST_NUMERICAL_TO_FLOAT32 = 1
   TO_TF_SAVED_MODEL_KERAS_MODE = 2
+  USE_DISCRETIZED = 3
+  USE_DISTRIBUTED = 4
+  DONT_USE_PICKLE = 5
 
 
 # List of already showed warning message that should not be displayed again.
@@ -119,7 +122,7 @@ def warning(
     msg: str,
     *args: Any,
     message_id: Optional[WarningMessage] = None,
-    is_strict: bool = False
+    is_strict: bool = False,
 ) -> None:
   """Print a warning message.
 
@@ -164,6 +167,39 @@ def strict(value: bool = True) -> None:
 
   global _STRICT
   _STRICT = value
+
+
+def maybe_warning_large_dataset(
+    num_training_examples: int,
+    distributed: bool,
+    discretize_numerical_columns: bool,
+):
+  """Prints a warning if large training is not optimal."""
+
+  num_example_limit_non_distributed = 10_000_000
+  num_example_limit_non_discretized = 2_000_000
+
+  if (
+      not distributed
+      and num_training_examples >= num_example_limit_non_distributed
+  ):
+    warning(
+        "On large datasets, distributed training can significantly speed"
+        " training. See:"
+        " https://ydf.readthedocs.io/en/latest/tutorial/distributed_training",
+        message_id=WarningMessage.USE_DISTRIBUTED,
+    )
+
+  if (
+      not discretize_numerical_columns
+      and num_training_examples >= num_example_limit_non_discretized
+  ):
+    warning(
+        "On large datasets, using discretized numerical features (i.e."
+        " `discretize_numerical_columns=True`) can significantly speed-up"
+        " training without impact on model quality.",
+        message_id=WarningMessage.USE_DISCRETIZED,
+    )
 
 
 def is_direct_output(stream=sys.stdout):

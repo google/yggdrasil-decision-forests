@@ -24,6 +24,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "src/google/protobuf/text_format.h"
@@ -91,7 +92,7 @@ class ParseProtoHelper {
   T call() {
     T message;
     if (!google::protobuf::TextFormat::ParseFromString(text_proto_, &message)) {
-      YDF_LOG(FATAL) << "Cannot parse proto:\n" << text_proto_;
+      LOG(FATAL) << "Cannot parse proto:\n" << text_proto_;
     }
     return message;
   }

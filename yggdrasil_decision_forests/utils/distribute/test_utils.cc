@@ -14,6 +14,9 @@
  */
 
 #include "yggdrasil_decision_forests/utils/distribute/test_utils.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -144,11 +147,11 @@ void TestChangeManager(ManagerCreatorAndWorkers* manager_creator, bool nice) {
   // Do not check for the results.
 
   if (nice) {
-    YDF_LOG(INFO) << "Nicely stop the manager";
+    LOG(INFO) << "Nicely stop the manager";
     EXPECT_OK(m1->Done(false));
   }
 
-  YDF_LOG(INFO) << "Create new manager";
+  LOG(INFO) << "Create new manager";
 
   auto m2 = manager_creator->manager_creator();
 
@@ -156,9 +159,9 @@ void TestChangeManager(ManagerCreatorAndWorkers* manager_creator, bool nice) {
   EXPECT_EQ(m2->BlockingRequest("num_existing_toy_workers").value(), "1");
 
   // Ensure there is never more than one worker initialized at any time.
-  YDF_LOG(INFO) << "max_num_existing_toy_workers:"
-                << m2->BlockingRequest("max_num_existing_toy_workers").value()
-                << " (expecting 1 if the test is run in isolation)";
+  LOG(INFO) << "max_num_existing_toy_workers:"
+            << m2->BlockingRequest("max_num_existing_toy_workers").value()
+            << " (expecting 1 if the test is run in isolation)";
 
   EXPECT_EQ(m2->BlockingRequest("get").value(), "");
   EXPECT_OK(m2->BlockingRequest("set:2").status());
@@ -169,33 +172,33 @@ void TestChangeManager(ManagerCreatorAndWorkers* manager_creator, bool nice) {
 void TestMessup(AbstractManager* manager, std::function<void()> messup) {
   TestBlockingRequest(manager, false);
 
-  YDF_LOG(INFO) << "Messup #1";
+  LOG(INFO) << "Messup #1";
   messup();
 
   TestBlockingRequest(manager, false);
 
-  YDF_LOG(INFO) << "Messup #2";
+  LOG(INFO) << "Messup #2";
   messup();
 
   TestBlockingRequestWithSpecificWorker(manager, false);
 
-  YDF_LOG(INFO) << "Messup #3";
+  LOG(INFO) << "Messup #3";
   messup();
 
   TestAsynchronousRequest(manager, false);
   TestAsynchronousRequestWithSpecificWorker(manager, false);
 
-  YDF_LOG(INFO) << "Messup #4";
+  LOG(INFO) << "Messup #4";
   messup();
 
   TestAsynchronousIntraWorkerCommunication(manager, false);
 
-  YDF_LOG(INFO) << "Messup #5";
+  LOG(INFO) << "Messup #5";
   messup();
 
   TestAsynchronousIntraWorkerCommunication(manager, false);
 
-  YDF_LOG(INFO) << "Done";
+  LOG(INFO) << "Done";
   EXPECT_OK(manager->Done(true));
 }
 

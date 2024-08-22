@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/escaping.h"
@@ -51,7 +52,7 @@ std::string NumericalVecToString(const std::vector<T>& vec) {
 
 absl::StatusOr<std::string> CompileRankingNumericalOnly(
     const std::string& model_path, const std::string& name_space) {
-  YDF_LOG(INFO) << "Converting Model from " << model_path;
+  LOG(INFO) << "Converting Model from " << model_path;
   STATUS_CHECK_NE(name_space, "");
 
   const std::string raw_model_file_contents = R"(
@@ -163,8 +164,8 @@ absl::StatusOr<const serving::decision_forest::
   }
   // TODO: Add an explicit check that all features are numerical.
   RETURN_IF_ERROR(GenericToSpecializedModel(*gbt_model, &flat_model));
-  YDF_LOG(INFO) << "Loaded model. Start compilation to "
-                << "GradientBoostedTreesRankingNumericalOnly model";
+  LOG(INFO) << "Loaded model. Start compilation to "
+            << "GradientBoostedTreesRankingNumericalOnly model";
 
   std::string model_nodes = "{";
 
@@ -223,7 +224,7 @@ absl::StatusOr<const serving::decision_forest::
                        model_oblique_internal_feature_idxs  // $8
       );
 
-  YDF_LOG(INFO) << "Model compilation complete.";
+  LOG(INFO) << "Model compilation complete.";
 
   return model_file_contents;
 }

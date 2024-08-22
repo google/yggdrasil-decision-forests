@@ -35,12 +35,11 @@ Some milestones of YDF's development:
 -   2023: [Presentation](https://doi.org/10.1145/3580305.3599933) at KDD23.
 -   2023: Development of the standalone Python API.
 
-## Python: YDF and TF-DF
+## YDF and TF-DF
 
 ### Should I use the YDF or TensorFlow Decision Forests (TF-DF)?
 
-When possible, use YDF's new Python API. See below for a comparison of the
-features.
+You should prefer YDF over TF-DF in nearly all cases.
 
 YDF's Python API and TF-DF share the same C++ backend and, as a consequence,
 many of their features and the models they produce are the same. However, TF-DF
@@ -57,7 +56,7 @@ cases (see comparison below).
 
 ### What is the status of the Python API?
 
-YDF's Python API have reached parity with TF-DF and is still in active
+YDF's Python API has reached feature parity with TF-DF and is in active
 development for more features.
 
 ### How are YDF and TF-DF different?
@@ -74,18 +73,13 @@ Model evaluation               | `model.evaluate(ds)` evaluates a model and retu
 Model analysis                 | `model.analyze(ds)` produces a rich model analysis html report with variable importances, PDPs and CEPs.                                                                                   | Not available
 Model benchmarking             | `model.benchmark(ds)` measures the model inference speed.                                                                                                                                  | Not available
 Cross-validation               | `learner.cross_validation(ds)` performs a cross-validation and return a rich model evaluation report.                                                                                      | Not available
+Anomaly detection              | Available with Isolation Forests and its extensions.                                                                                                                                       | Not available
 Python model serving           | `model.predict(ds)` makes predictions. Support many dataset formats (file paths, pandas dataframe, dictionary of numpy arrays, TensorFlow Dataset).                                        | `model.predict(ds)` on TensorFlow Datasets. When calling `model.predict(ds)` on a model loaded from disk, you might need to adapt feature dtypes.
 TensorFlow Serving / Vertex AI | `model.to_tensorflow_saved_model(path)` create a valid SavedModel. The SavedModel signature is build automatically.                                                                        | `model.save(path, signature)`. The model signature should be written manually.
-Other model serving            | Model directly available in C++, Python, CLI, go and Javascript. You can also use utilities to generate serving code: For example, call `model.to_cpp()` to generate the C++ serving code. | Call `model.save(path, signature)` to generate a TensorFlow SaveModel, and use the TensorFlow C++ API to run the model in C++. Alternatively, export the model to YDF.
+Other model serving            | Model directly available in C++, Python, CLI, Go and Javascript. You can also use utilities to generate serving code: For example, call `model.to_cpp()` to generate the C++ serving code. | Call `model.save(path, signature)` to generate a TensorFlow SaveModel, and use the TensorFlow C++ API to run the model in C++. Alternatively, export the model to YDF.
 Training speed                 | On a small dataset, training up to 5x faster than TensorFlow Decision Forests. On all dataset sizes, model inference is up to 1000x faster than TensorFlow Decision Forests.               | On a small dataset, most of the time is spent in TensorFlow dataset reading.
 Library loading speed          | The YDF library is ~9MB.                                                                                                                                                                   | The TF-DF library is ~12MB, but it requires TensorFlow which is ~600MB.
 Error messages                 | Short, high level and actionable error messages.                                                                                                                                           | Long and hard to understand error messages often about Tensor shapes.
-
-### Is it PYDF or YDF?
-
-The name of the library is simply `ydf`, and so is the name of the corresponding
-Pip package. Internally, the team sometimes uses the name *PYDF* because it fits
-so well.
 
 ## Common modeling questions
 
@@ -104,6 +98,22 @@ similar to changing the random seed.
 
 ## Misc
 
+### Which architectures are supported by YDF?
+
+YDF supports the following architectures:
+
+-   Manylinux2014 x86_64 (to be updated to a newer version of manylinux in one of 
+    the next releases).
+-   MaxOS Arm64
+
+We also publish Windows binaries, usually with some delay after the release.
+
+The following architectures probably work, but we will not release binaries for them at this time:
+
+-   Manylinux2014 aarch64 (to be updated to a newer version of manylinux in one
+    of the next releases).
+-   MacOS Intel.
+
 ### My model performs worse / better than with library XYZ, why?
 
 While decision forest libraries implement similar algorithms, they generally
@@ -117,6 +127,12 @@ paper our paper titled
 [Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://doi.org/10.1145/3580305.3599933)
 in KDD 2023 for a comparison of model performances trained with different
 libraries.
+
+### Is it PYDF or YDF?
+
+The name of the library is simply `ydf`, and so is the name of the corresponding
+Pip package. Internally, the team sometimes uses the name *PYDF* because it fits
+so well.
 
 ### How should I pronounce PYDF?
 

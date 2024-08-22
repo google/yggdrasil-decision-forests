@@ -20,7 +20,6 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
-#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
@@ -90,6 +89,8 @@ constexpr char kHParamSplitAxisMhldObliqueSampleAttributes[] =
 constexpr char kHParamSortingStrategy[] = "sorting_strategy";
 constexpr char kHParamSortingStrategyInNode[] = "IN_NODE";
 constexpr char kHParamSortingStrategyPresort[] = "PRESORT";
+constexpr char kHParamSortingStrategyForcePresort[] = "FORCE_PRESORT";
+constexpr char kHParamSortingStrategyAuto[] = "AUTO";
 
 constexpr char kHParamKeepNonLeafLabelDistribution[] =
     "keep_non_leaf_label_distribution";

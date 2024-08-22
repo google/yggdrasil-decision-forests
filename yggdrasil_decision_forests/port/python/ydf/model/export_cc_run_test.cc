@@ -17,6 +17,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "ydf/model/export_cc_generated_lib.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -37,9 +38,9 @@ TEST(RunModel, Base) {
 
   const auto predictions = model->Predict();
 
-  YDF_LOG(INFO) << "Predictions:";
+  LOG(INFO) << "Predictions:";
   for (const float p : predictions) {
-    YDF_LOG(INFO) << p;
+    LOG(INFO) << p;
   }
 }
 

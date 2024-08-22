@@ -16,7 +16,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_TOOL_ADAPTIVE_WORK_H_
 #define YGGDRASIL_DECISION_FORESTS_TOOL_ADAPTIVE_WORK_H_
 
-#include "absl/base/thread_annotations.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {

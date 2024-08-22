@@ -16,6 +16,8 @@
 #include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.h"
 
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -90,10 +92,9 @@ TEST(TrainAndEvaluateModel, Base) {
   auto evaluate_result =
       manager->BlockingProtoRequest<proto::Result>(evaluate_request).value();
 
-  YDF_LOG(INFO) << "Evaluation:"
-                << metric::TextReport(
-                       evaluate_result.evaluate_model().evaluation())
-                       .value();
+  LOG(INFO) << "Evaluation:"
+            << metric::TextReport(evaluate_result.evaluate_model().evaluation())
+                   .value();
 
   EXPECT_GE(metric::Accuracy(evaluate_result.evaluate_model().evaluation()),
             0.86);

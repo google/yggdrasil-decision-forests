@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -158,7 +159,7 @@ template <typename T>
 absl::Status ShardedWriter<T>::OpenNextShard() {
   num_records_in_cur_shard_ = 0;
   if (cur_path_idx_ + 1 >= paths_.size()) {
-    YDF_LOG(INFO)
+    LOG(INFO)
         << "Not enough shards allocated. Continue to write in the last shard.";
     return absl::OkStatus();
   }

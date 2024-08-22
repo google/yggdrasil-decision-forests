@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/load_balancer/load_balancer.h"
 
 #include "gmock/gmock.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
@@ -81,52 +82,52 @@ TEST(LoadBalancer, DynamicBalancing) {
   balancer.AddFeatureLoadingDurationMeasurement(1.0);
   balancer.AddFeatureLoadingDurationMeasurement(0.9);
   balancer.AddFeatureLoadingDurationMeasurement(1.1);
-  YDF_LOG(INFO) << balancer.Info();
+  LOG(INFO) << balancer.Info();
   EXPECT_THAT(balancer.WorkersPerFeatures(),
               ElementsAre(1, -1, 0, -1, 1, -1, 0));  // 2 in each workers.
 
   // Worker #0 is faster than worker #1.
-  YDF_LOG(INFO) << "Step 1";
+  LOG(INFO) << "Step 1";
   CHECK_OK(balancer.AddWorkDurationMeasurement({{1, 2}, {5, 2}}).status());
   CHECK_OK(balancer.ApplyPendingOrder());
-  YDF_LOG(INFO) << balancer.Info();
+  LOG(INFO) << balancer.Info();
   EXPECT_THAT(balancer.WorkersPerFeatures(),
               ElementsAre(1, -1, 0, -1, 1, -1, 0));  // 2 in each workers.
 
-  YDF_LOG(INFO) << "Step 2";
+  LOG(INFO) << "Step 2";
   CHECK_OK(balancer.AddWorkDurationMeasurement({{1, 2}, {5, 2}}).status());
   CHECK_OK(balancer.ApplyPendingOrder());
-  YDF_LOG(INFO) << balancer.Info();
+  LOG(INFO) << balancer.Info();
   EXPECT_THAT(balancer.WorkersPerFeatures(),
               ElementsAre(1, -1, 0, -1, 1, -1, 0));  // 2 in each workers.
 
-  YDF_LOG(INFO) << "Step 3";
+  LOG(INFO) << "Step 3";
   CHECK_OK(balancer.AddWorkDurationMeasurement({{1, 2}, {5, 2}}).status());
   CHECK_OK(balancer.ApplyPendingOrder());
-  YDF_LOG(INFO) << balancer.Info();
+  LOG(INFO) << balancer.Info();
   // Transfer of feature expected.
   EXPECT_THAT(balancer.WorkersPerFeatures(),
               ElementsAre(0, -1, 0, -1, 1, -1, 0));  // 3 in worker 0.
 
   // Now, worker #1 is faster than worker #0.
-  YDF_LOG(INFO) << "Step 4";
+  LOG(INFO) << "Step 4";
   CHECK_OK(balancer.AddWorkDurationMeasurement({{8, 3}, {1, 1}}).status());
   CHECK_OK(balancer.ApplyPendingOrder());
-  YDF_LOG(INFO) << balancer.Info();
+  LOG(INFO) << balancer.Info();
   EXPECT_THAT(balancer.WorkersPerFeatures(),
               ElementsAre(0, -1, 0, -1, 1, -1, 0));  // 3 in worker 0.
 
-  YDF_LOG(INFO) << "Step 5";
+  LOG(INFO) << "Step 5";
   CHECK_OK(balancer.AddWorkDurationMeasurement({{8, 3}, {1, 1}}).status());
   CHECK_OK(balancer.ApplyPendingOrder());
-  YDF_LOG(INFO) << balancer.Info();
+  LOG(INFO) << balancer.Info();
   EXPECT_THAT(balancer.WorkersPerFeatures(),
               ElementsAre(1, -1, 0, -1, 1, -1, 0));  // 2 in worker 0.
 
-  YDF_LOG(INFO) << "Step 6";
+  LOG(INFO) << "Step 6";
   CHECK_OK(balancer.AddWorkDurationMeasurement({{4, 2}, {4, 2}}).status());
   CHECK_OK(balancer.ApplyPendingOrder());
-  YDF_LOG(INFO) << balancer.Info();
+  LOG(INFO) << balancer.Info();
   // Two transfers of feature expected.
   EXPECT_THAT(balancer.WorkersPerFeatures(),
               ElementsAre(1, -1, 0, -1, 1, -1, 0));  // 2 in worker 0.

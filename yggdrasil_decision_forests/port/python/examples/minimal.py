@@ -62,10 +62,10 @@ def main(argv):
   predictions = loaded_model.predict(test_df)
   print(predictions)
 
-  if not (sys.version_info < (3, 9)) and (sys.version_info < (3, 12)):
-    # TensorFlow is not supported anymore for py3.8.
-    # TensorFlow Decision Forests is not yet supported for py3.12.
-    loaded_model.to_tensorflow_saved_model("/tmp/tf_saved_model")
+  # if not (sys.version_info < (3, 9)) and (sys.version_info < (3, 12)):
+  #   # TensorFlow is not supported anymore for py3.8.
+  #   # TensorFlow Decision Forests is not yet supported for py3.12.
+  #   loaded_model.to_tensorflow_saved_model("/tmp/tf_saved_model")
 
 
 if __name__ == "__main__":

@@ -15,6 +15,9 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+
 namespace yggdrasil_decision_forests {
 namespace distribute {
 

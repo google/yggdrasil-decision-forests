@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 

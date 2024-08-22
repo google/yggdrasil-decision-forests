@@ -40,14 +40,22 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_OBLIQUE_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_OBLIQUE_H_
 
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
+#include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
@@ -200,7 +208,7 @@ class LDACache {
                        std::vector<double>* out) const;
 
  private:
-  // The SB and SW square matricies for all the features.
+  // The SB and SW square matrices for all the features.
   std::vector<double> sb_;
   std::vector<double> sw_;
 
@@ -224,6 +232,24 @@ void SubtractTransposeMultiplyAdd(
     const std::vector<int>& selected_features,
     const ProjectionEvaluator& projection_evaluator, absl::Span<double> b,
     std::vector<double>& output);
+
+// Randomly generates a projection. A projection cannot be empty. If the
+// projection contains only one dimension, the weight is guaranteed to be 1.
+// If the projection contains an input feature with monotonic constraint,
+// monotonic_direction is set to 1 (i.e. the projection should be monotonically
+// increasing).
+void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
+                      const dataset::proto::DataSpecification& data_spec,
+                      const model::proto::TrainingConfigLinking& config_link,
+                      float projection_density,
+                      internal::Projection* projection,
+                      int8_t* monotonic_direction, utils::RandomEngine* random);
+
+// Converts a Projection object + float threshold into a proto condition of the
+// same semantic. `projection` cannot be empty.
+absl::Status SetCondition(const Projection& projection, float threshold,
+                          const dataset::proto::DataSpecification& dataspec,
+                          proto::NodeCondition* condition);
 
 }  // namespace internal
 }  // namespace decision_tree

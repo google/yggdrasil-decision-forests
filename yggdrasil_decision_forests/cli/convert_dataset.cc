@@ -27,7 +27,9 @@
 //     --output=tfrecord+tfe:/my/dataset.tfrecord-tfe
 //
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "absl/status/statusor.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_reader.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
@@ -105,12 +107,12 @@ void ConvertDataset() {
   int64_t nrow = 0;
   absl::StatusOr<bool> status;
   while ((status = reader->Next(&example)).ok() && status.value()) {
-    LOG_INFO_EVERY_N_SEC(30, _ << nrow << " examples converted.");
+    LOG_EVERY_N_SEC(INFO, 30) << nrow << " examples converted.";
     QCHECK_OK(writer->Write(example));
     nrow++;
   }
 
-  YDF_LOG(INFO) << "Converting done. " << nrow << " example(s) converted.";
+  LOG(INFO) << "Converting done. " << nrow << " example(s) converted.";
 }
 
 }  // namespace cli

@@ -24,6 +24,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -36,7 +37,7 @@ using test::EqualsProto;
 
 TEST(ModelLibrary, CreateAllLearners) {
   for (const auto& learner_name : AllRegisteredLearners()) {
-    YDF_LOG(INFO) << learner_name;
+    LOG(INFO) << learner_name;
     std::unique_ptr<AbstractLearner> learner;
     proto::TrainingConfig train_config;
     train_config.set_label("my_label");

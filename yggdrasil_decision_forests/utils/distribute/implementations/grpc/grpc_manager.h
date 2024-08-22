@@ -21,7 +21,12 @@
 #include "grpcpp/channel.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/server.h"
-#include "absl/container/node_hash_map.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
@@ -38,9 +43,8 @@ class GRPCManager : public AbstractManager {
 
   virtual ~GRPCManager() {
     if (!done_was_called_) {
-      YDF_LOG(WARNING)
-          << "Calling destructor on distribute manager before having "
-             "called \"Done\".";
+      LOG(WARNING) << "Calling destructor on distribute manager before having "
+                      "called \"Done\".";
       CHECK_OK(Done({}));
     }
   }

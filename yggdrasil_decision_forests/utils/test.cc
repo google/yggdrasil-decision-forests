@@ -24,9 +24,9 @@
 #include "gtest/gtest.h"
 
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -62,27 +62,26 @@ void ExpectEqualGolden(
         std::regex_replace(expected_content, token_regex, token.second);
   }
   if (expected_content != content) {
-    YDF_LOG(INFO) << "The given value does not match the golden value: "
-                  << path;
+    LOG(INFO) << "The given value does not match the golden value: " << path;
 
     const int max_print = 1000;
     if (content.size() < max_print) {
-      YDF_LOG(INFO) << "Given value  (" << content.size()
-                    << " characters)\n====================\n"
-                    << content << "\n====================";
+      LOG(INFO) << "Given value  (" << content.size()
+                << " characters)\n====================\n"
+                << content << "\n====================";
     } else {
-      YDF_LOG(INFO)
+      LOG(INFO)
           << "The content is too large (" << content.size()
           << " characters) to be printed.\nFirst part:\n====================\n"
           << content.substr(0, max_print) << "\n====================";
     }
 
     if (expected_content.size() < max_print) {
-      YDF_LOG(INFO) << "Expected value  (" << expected_content.size()
-                    << " characters)\n====================\n"
-                    << expected_content << "\n====================";
+      LOG(INFO) << "Expected value  (" << expected_content.size()
+                << " characters)\n====================\n"
+                << expected_content << "\n====================";
     } else {
-      YDF_LOG(INFO)
+      LOG(INFO)
           << "The expected_content is too large (" << expected_content.size()
           << " characters) to be printed.\nFirst part:\n====================\n"
           << expected_content.substr(0, max_print) << "\n====================";
@@ -95,15 +94,15 @@ void ExpectEqualGolden(
         output_dir, absl::StrCat("actual_", actual_idx, ".html"));
     const std::string expected_output_path = file::JoinPath(
         output_dir, absl::StrCat("expected_", actual_idx++, ".html"));
-    YDF_LOG(INFO) << "Content saved to " << output_path;
-    YDF_LOG(INFO) << "";
-    YDF_LOG(INFO) << "Update the golden file with:\ncp " << output_path << " "
-                  << path;
-    YDF_LOG(INFO) << "";
-    YDF_LOG(INFO) << "Look at the difference between the fields with:\ndiff "
-                  << output_path << " " << path;
-    YDF_LOG(INFO) << "";
-    YDF_LOG(INFO) << "Expected: " << expected_output_path;
+    LOG(INFO) << "Content saved to " << output_path;
+    LOG(INFO) << "";
+    LOG(INFO) << "Update the golden file with:\ncp " << output_path << " "
+              << path;
+    LOG(INFO) << "";
+    LOG(INFO) << "Look at the difference between the fields with:\ndiff "
+              << output_path << " " << path;
+    LOG(INFO) << "";
+    LOG(INFO) << "Expected: " << expected_output_path;
     ASSERT_OK(file::SetContent(expected_output_path, expected_content));
     ASSERT_OK(file::SetContent(output_path, content));
     EXPECT_TRUE(false);
@@ -113,7 +112,7 @@ void ExpectEqualGolden(
 #ifdef _WIN32
 
 bool IsPortAvailable(int port) {
-  YDF_LOG(WARNING) << "Validating port " << port << " without checking it.";
+  LOG(WARNING) << "Validating port " << port << " without checking it.";
   return true;
 }
 
@@ -130,16 +129,16 @@ bool IsPortAvailable(int port) {
   int actual_port;
 
   if (fd < 0) {
-    YDF_LOG(ERROR) << "socket() failed: " << strerror(errno);
+    LOG(ERROR) << "socket() failed: " << strerror(errno);
     return false;
   }
 
   // SO_REUSEADDR lets us start up a server immediately after it exists.
   int one = 1;
   if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0) {
-    YDF_LOG(ERROR) << "setsockopt() failed: " << strerror(errno);
+    LOG(ERROR) << "setsockopt() failed: " << strerror(errno);
     if (close(fd) < 0) {
-      YDF_LOG(ERROR) << "close() failed: " << strerror(errno);
+      LOG(ERROR) << "close() failed: " << strerror(errno);
     };
     return false;
   }
@@ -150,9 +149,9 @@ bool IsPortAvailable(int port) {
   addr.sin_port = htons(static_cast<uint16_t>(port));
   if (bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0)
   {
-    YDF_LOG(WARNING) << "bind(port=" << port << ") failed: " <<
+    LOG(WARNING) << "bind(port=" << port << ") failed: " <<
     strerror(errno); if (close(fd) < 0) {
-      YDF_LOG(ERROR) << "close() failed: " << strerror(errno);
+      LOG(ERROR) << "close() failed: " << strerror(errno);
     };
     return false;
   }
@@ -160,9 +159,9 @@ bool IsPortAvailable(int port) {
   // Get the bound port number.
   if (getsockname(fd, reinterpret_cast<struct sockaddr*>(&addr), &addr_len) <
       0) {
-    YDF_LOG(WARNING) << "getsockname() failed: " << strerror(errno);
+    LOG(WARNING) << "getsockname() failed: " << strerror(errno);
     if (close(fd) < 0) {
-      YDF_LOG(ERROR) << "close() failed: " << strerror(errno);
+      LOG(ERROR) << "close() failed: " << strerror(errno);
     };
     return false;
   }
@@ -172,7 +171,7 @@ bool IsPortAvailable(int port) {
 
   CHECK_EQ(port, actual_port);
   if (close(fd) < 0) {
-    YDF_LOG(ERROR) << "close() failed: " << strerror(errno);
+    LOG(ERROR) << "close() failed: " << strerror(errno);
   }
 
   return true;
@@ -190,7 +189,7 @@ int PickUnusedPortOrDie() {
       return port;
     }
   }
-  YDF_LOG(WARNING) << "Failed to pick an unused port";
+  LOG(WARNING) << "Failed to pick an unused port";
   return 0;
 }
 

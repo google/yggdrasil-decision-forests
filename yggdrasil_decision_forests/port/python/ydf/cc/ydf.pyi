@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple, TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -89,7 +89,6 @@ class VerticalDataset:
       unrolling: Dict[str, List[str]],
   ) -> None: ...
 
-
 # Model bindings
 # ================
 
@@ -119,6 +118,7 @@ class GenericCCModel:
       self,
       dataset: VerticalDataset,
       options: metric_pb2.EvaluationOptions,
+      weighted: bool,
   ) -> metric_pb2.EvaluationResults: ...
   def Analyze(
       self,
@@ -140,6 +140,7 @@ class GenericCCModel:
   def set_metadata(self, metadata: abstract_model_pb2.Metadata) -> None: ...
   def label_col_idx(self) -> int: ...
   def Save(self, directory: str, file_prefix: Optional[str]): ...
+  def Serialize(self) -> bytes: ...
   def Describe(self, full_details: bool, text_format: bool) -> str: ...
   def input_features(self) -> List[int]: ...
   def hyperparameter_optimizer_logs(
@@ -213,6 +214,7 @@ class GradientBoostedTreesCCModel(DecisionForestCCModel):
 ModelCCType = TypeVar('ModelCCType', bound=GenericCCModel)
 
 def LoadModel(directory: str, file_prefix: Optional[str]) -> ModelCCType: ...
+def DeserializeModel(data: bytes) -> ModelCCType: ...
 def ModelAnalysisCreateHtmlReport(
     analysis: model_analysis_pb2.StandaloneAnalysisResult,
     options: model_analysis_pb2.Options,
@@ -221,7 +223,6 @@ def PredictionAnalysisCreateHtmlReport(
     analysis: model_analysis_pb2.PredictionAnalysisResult,
     options: model_analysis_pb2.PredictionAnalysisOptions,
 ) -> str: ...
-
 
 # Learner bindings
 # ================
@@ -325,6 +326,18 @@ def GetLearner(
     custom_loss: Optional[CCRegressionLoss],
 ) -> GenericCCLearner: ...
 
+def GetInvalidHyperparameters(
+    hp_names: Set[str],
+    explicit_hps: Set[str],
+    train_config: abstract_learner_pb2.TrainingConfig,
+    deployment_config: abstract_learner_pb2.DeploymentConfig,
+) -> Set[str]: ...
+def ValidateHyperparameters(
+    hyperparameters: Set[str],
+    train_config: abstract_learner_pb2.TrainingConfig,
+    deployment_config: abstract_learner_pb2.DeploymentConfig,
+) -> None: ...
+
 
 # Metric bindings
 # ================
@@ -332,12 +345,10 @@ def GetLearner(
 def EvaluationToStr(evaluation: metric_pb2.EvaluationResults) -> str: ...
 def EvaluationPlotToHtml(evaluation: metric_pb2.EvaluationResults) -> str: ...
 
-
 # Log bindings
 # ================
 
 def SetLoggingLevel(level: int, print_file: bool) -> None: ...
-
 
 # Worker bindings
 # ================
@@ -345,4 +356,3 @@ def SetLoggingLevel(level: int, print_file: bool) -> None: ...
 def StartWorkerBlocking(port: int) -> None: ...
 def StartWorkerNonBlocking(port: int) -> int: ...
 def StopWorkerNonBlocking(uid: int) -> None: ...
-

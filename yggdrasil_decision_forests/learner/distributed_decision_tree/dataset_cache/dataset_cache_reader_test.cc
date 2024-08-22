@@ -17,6 +17,9 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -149,7 +152,7 @@ TEST_F(End2End, Base) {
     EXPECT_EQ(reader->DiscretizedNumericalFeatureBoundaries(4).size(), 15);
   }
 
-  YDF_LOG(INFO) << reader->MetadataInformation();
+  LOG(INFO) << reader->MetadataInformation();
 }
 
 }  // namespace

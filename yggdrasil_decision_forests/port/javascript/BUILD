@@ -35,6 +35,7 @@ cc_binary(
     defines = [],
     linkopts = [
         "--bind",
+        "--minify=0",
         "-s USE_PTHREADS=0",
         "-s EXPORTED_RUNTIME_METHODS=FS",  # To access YDF output file from JS.
         "-s ALLOW_MEMORY_GROWTH=1",
@@ -62,6 +63,8 @@ cc_binary(
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/learner/random_forest",
         "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/serving:example_set",
+        "//yggdrasil_decision_forests/serving:fast_engine",
         "//yggdrasil_decision_forests/utils:logging",
     ],
 )

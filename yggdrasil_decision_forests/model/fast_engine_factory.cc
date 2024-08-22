@@ -14,6 +14,7 @@
  */
 
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
+#include "absl/log/log.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -23,8 +24,8 @@ std::vector<std::unique_ptr<FastEngineFactory>> ListAllFastEngines() {
   for (const auto& engine_name : FastEngineFactoryRegisterer::GetNames()) {
     auto engine_factory = FastEngineFactoryRegisterer::Create(engine_name);
     if (!engine_factory.ok()) {
-      YDF_LOG(WARNING) << "Error when creating fast engine:" << engine_name
-                       << " : " << engine_factory.status();
+      LOG(WARNING) << "Error when creating fast engine:" << engine_name << " : "
+                   << engine_factory.status();
     }
     factories.emplace_back(std::move(engine_factory).value());
   }

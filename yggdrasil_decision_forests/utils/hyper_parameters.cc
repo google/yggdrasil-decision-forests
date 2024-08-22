@@ -20,10 +20,12 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
 #include "absl/meta/type_traits.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -35,8 +37,8 @@ GenericHyperParameterConsumer::GenericHyperParameterConsumer(
   for (const auto& field : generic_hyper_parameters.fields()) {
     if (generic_hyper_parameters_.find(field.name()) !=
         generic_hyper_parameters_.end()) {
-      YDF_LOG(FATAL) << "The field \"" << field.name()
-                     << "\" is defined several times.";
+      LOG(FATAL) << "The field \"" << field.name()
+                 << "\" is defined several times.";
     }
     generic_hyper_parameters_[field.name()] = field;
   }
@@ -45,8 +47,8 @@ GenericHyperParameterConsumer::GenericHyperParameterConsumer(
 absl::optional<model::proto::GenericHyperParameters::Field>
 GenericHyperParameterConsumer::Get(const absl::string_view key) {
   if (consumed_values_.find(key) != consumed_values_.end()) {
-    YDF_LOG(FATAL) << absl::StrCat("Already consumed hyper-parameter \"", key,
-                                   "\".");
+    LOG(FATAL) << absl::StrCat("Already consumed hyper-parameter \"", key,
+                               "\".");
   }
   consumed_values_.insert(std::string(key));
   const auto value_it = generic_hyper_parameters_.find(key);

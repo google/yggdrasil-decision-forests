@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "absl/container/node_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -304,14 +305,13 @@ absl::Status TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
   uint64_t nrow = 0;
   tensorflow::Example example;
   while (reader->Next(&example).value()) {
-    LOG_INFO_EVERY_N_SEC(30, _ << nrow << " row(s) processed");
+    LOG_EVERY_N_SEC(INFO, 30) << nrow << " row(s) processed";
 
     // Check if we have seen enough records to determine all the types.
     if (guide.max_num_scanned_rows_to_guess_type() > 0 &&
         nrow >= guide.max_num_scanned_rows_to_guess_type()) {
-      YDF_LOG(INFO)
-          << "Stop scanning the dataset to infer the type. Some records "
-             "were not considered.";
+      LOG(INFO) << "Stop scanning the dataset to infer the type. Some records "
+                   "were not considered.";
       break;
     }
 
@@ -411,7 +411,7 @@ absl::Status TFExampleReaderToDataSpecCreator::ComputeColumnStatistics(
         nrow >= guide.max_num_scanned_rows_to_accumulate_statistics()) {
       break;
     }
-    LOG_INFO_EVERY_N_SEC(30, _ << nrow << " row(s) processed");
+    LOG_EVERY_N_SEC(INFO, 30) << nrow << " row(s) processed";
     RETURN_IF_ERROR(
         UpdateDataSpecWithTFExample(example, data_spec, accumulator));
     nrow++;

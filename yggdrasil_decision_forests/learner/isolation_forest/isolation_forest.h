@@ -94,17 +94,36 @@ int DefaultMaximumDepth(UnsignedExampleIdx num_examples_per_trees);
 
 // Finds a split (i.e. condition) for a node.
 //
-// A split is randomly sampled and returned.
-// A valid split always branches one training examples in each branch. If not
+// A valid split always branches on training examples in each branch. If no
 // valid split can be generated, "FindSplit" returns false and not split is set.
 // If a valid split is sampled, the condition of "node" is set and the function
 // returns true.
 //
-// This function currently only implement the original isolation forest
-// algorithm: Only split of the form "X >= threshold" are generated. The
-// threshold is uniformly sampled between the minimum and maximum values
-// observed in the training examples reaching this node
+// TODO: Add support for non-numerical features.
 absl::StatusOr<bool> FindSplit(
+    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
+
+// An oblique split is randomly sampled and returned.
+//
+// This function implements the oblique splits as described in
+// "Sparse Projection Oblique Random Forests" 2020 JMLR paper by Tomita et al
+// (https://www.jmlr.org/papers/volume21/18-664/18-664.pdf), adapted to
+// isolation forests. In particular, this includes splits as performed for
+// extended isolation forests.
+absl::StatusOr<bool> FindSplitOblique(
+    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
+
+// An axis-aligned split is randomly sampled and returned.
+//
+// This function implements the original isolation forest algorithm: Only splits
+// of the form "X >= threshold" are generated. The threshold is uniformly
+// sampled between the minimum and maximum values observed in the training
+// examples reaching this node.
+absl::StatusOr<bool> FindSplitAxisAligned(
     const Configuration& config, const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);

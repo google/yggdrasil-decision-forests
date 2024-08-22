@@ -15,7 +15,18 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
@@ -50,6 +61,7 @@ DistributedGradientBoostedTreesLearner::Capabilities() const {
   model::proto::LearnerCapabilities capabilities;
   capabilities.set_resume_training(true);
   capabilities.set_support_partial_cache_dataset_format(true);
+  capabilities.set_support_validation_dataset(true);
   return capabilities;
 }
 
@@ -289,9 +301,9 @@ absl::Status SetDefaultHyperParameters(
         gradient_boosted_trees::internal::DefaultLoss(
             config.task(), data_spec.columns(config_link.label())));
     spe_config->mutable_gbt()->set_loss(default_loss);
-    YDF_LOG(INFO) << "Default loss set to "
-                  << gradient_boosted_trees::proto::Loss_Name(
-                         spe_config->mutable_gbt()->loss());
+    LOG(INFO) << "Default loss set to "
+              << gradient_boosted_trees::proto::Loss_Name(
+                     spe_config->mutable_gbt()->loss());
   }
 
   return absl::OkStatus();
@@ -402,9 +414,9 @@ TrainWithCache(
     ASSIGN_OR_RETURN(
         validation_dataset_per_worker,
         DivideValidationDataset(typed_valid_path.value(), num_eval_workers));
-    YDF_LOG(INFO) << "Of the " << num_all_workers << " workers, use "
-                  << num_train_workers << " for training and "
-                  << num_eval_workers << " for evaluation";
+    LOG(INFO) << "Of the " << num_all_workers << " workers, use "
+              << num_train_workers << " for training and " << num_eval_workers
+              << " for evaluation";
   } else {
     num_train_workers = num_all_workers;
     num_eval_workers = 0;
@@ -444,7 +456,7 @@ TrainWithCache(
   if (last_checkpoint_idx.ok()) {
     // Restoring the model from the checkpoint.
     iter_idx = last_checkpoint_idx.value();
-    YDF_LOG(INFO) << "Resume training from iteration #" << iter_idx;
+    LOG(INFO) << "Resume training from iteration #" << iter_idx;
     minimum_iter_for_new_checkpoint = iter_idx + 1;
     proto::Checkpoint checkpoint_metadata;
     RETURN_IF_ERROR(RestoreManagerCheckpoint(
@@ -464,12 +476,12 @@ TrainWithCache(
     // loading the dataset cache immediately (instead of waiting the first
     // request).
 
-    YDF_LOG(INFO) << "Asking one worker for the initial label statistics";
+    LOG(INFO) << "Asking one worker for the initial label statistics";
     ASSIGN_OR_RETURN(label_statistics,
                      EmitGetLabelStatistics(distribute_manager.get(),
                                             monitoring, &load_balancer));
-    YDF_LOG(INFO) << "Training dataset label statistics:\n"
-                  << label_statistics.DebugString();
+    LOG(INFO) << "Training dataset label statistics:\n"
+              << label_statistics.DebugString();
 
     ASSIGN_OR_RETURN(const auto initial_predictions,
                      loss->InitialPredictions(label_statistics));
@@ -499,7 +511,7 @@ TrainWithCache(
   Evaluation training_evaluation;
   auto time_last_checkpoint = absl::Now();
 
-  YDF_LOG(INFO) << "Start training";
+  LOG(INFO) << "Start training";
   for (; iter_idx < spe_config.gbt().num_trees(); iter_idx++) {
     // Create a checkpoint.
     if (iter_idx >= minimum_iter_for_new_checkpoint &&
@@ -519,18 +531,17 @@ TrainWithCache(
         input_features, log_directory, model.get(), &training_evaluation,
         distribute_manager.get(), &random, monitoring, &validation_aggregator);
     if (!iter_status.ok()) {
-      YDF_LOG(WARNING) << "Iteration issue: " << iter_status.message();
+      LOG(WARNING) << "Iteration issue: " << iter_status.message();
     }
 
     if (absl::IsDataLoss(iter_status)) {
       // A worker was restarted and is missing data.
-      YDF_LOG(WARNING) << "Re-synchronizing the workers";
+      LOG(WARNING) << "Re-synchronizing the workers";
 
       auto resync_iter_idx_status =
           utils::GetGreatestSnapshot(SnapshotDirectory(work_directory));
       if (!resync_iter_idx_status.ok()) {
-        YDF_LOG(WARNING)
-            << "No existing snapshot. Restart training from start.";
+        LOG(WARNING) << "No existing snapshot. Restart training from start.";
         // TODO: Restart training without rebooting the trainer.
       }
       auto resync_iter_idx = resync_iter_idx_status.value();
@@ -570,10 +581,10 @@ TrainWithCache(
     ASSIGN_OR_RETURN(previous_validation_evaluation,
                      validation_aggregator.GetAggregated(iter_idx - 1));
   }
-  YDF_LOG(INFO) << "Training done. Final model: "
-                << TrainingLog(*model, training_evaluation,
-                               previous_validation_evaluation, spe_config,
-                               metric_names, monitoring, load_balancer);
+  LOG(INFO) << "Training done. Final model: "
+            << TrainingLog(*model, training_evaluation,
+                           previous_validation_evaluation, spe_config,
+                           metric_names, monitoring, load_balancer);
 
   // Finalize the model with the assumption that all the trees are used i.e. not
   // early stopping.
@@ -762,9 +773,9 @@ absl::Status RunIteration(
 
   // Display training logs.
   if (monitoring->ShouldDisplayLogs()) {
-    YDF_LOG(INFO) << TrainingLog(*model, *training_evaluation,
-                                 validation_evaluation, spe_config,
-                                 metric_names, monitoring, *load_balancer);
+    LOG(INFO) << TrainingLog(*model, *training_evaluation,
+                             validation_evaluation, spe_config, metric_names,
+                             monitoring, *load_balancer);
   }
 
   // Record training logs.
@@ -794,7 +805,7 @@ absl::Status RunIteration(
     const auto begin = absl::Now();
     RETURN_IF_ERROR(gradient_boosted_trees::internal::ExportTrainingLogs(
         model->training_logs(), log_directory));
-    YDF_LOG(INFO) << "Training logs exported in " << (absl::Now() - begin);
+    LOG(INFO) << "Training logs exported in " << (absl::Now() - begin);
   }
 
   return absl::OkStatus();
@@ -850,7 +861,7 @@ absl::Status CreateCheckpoint(
     distributed_decision_tree::LoadBalancer* load_balancer,
     PartialEvaluationAggregator* validation_aggregator) {
   monitoring->BeginStage(internal::Monitoring::kCreateCheckpoint);
-  YDF_LOG(INFO) << "Start creating checkpoint for iteration " << iter_idx;
+  LOG(INFO) << "Start creating checkpoint for iteration " << iter_idx;
   const auto begin_create_checkpoint = absl::Now();
 
   proto::Checkpoint checkpoint;
@@ -886,9 +897,8 @@ absl::Status CreateCheckpoint(
   RETURN_IF_ERROR(
       utils::AddSnapshot(SnapshotDirectory(work_directory), iter_idx));
 
-  YDF_LOG(INFO) << "Checkpoint created in "
-                << absl::Now() - begin_create_checkpoint << " for iteration "
-                << iter_idx;
+  LOG(INFO) << "Checkpoint created in " << absl::Now() - begin_create_checkpoint
+            << " for iteration " << iter_idx;
   monitoring->EndStage(internal::Monitoring::kCreateCheckpoint);
   return absl::OkStatus();
 }
@@ -899,7 +909,7 @@ absl::Status RestoreManagerCheckpoint(
     decision_tree::proto::LabelStatistics* label_statistics,
     proto::Checkpoint* checkpoint,
     PartialEvaluationAggregator* validation_aggregator) {
-  YDF_LOG(INFO) << "Restoring model from checkpoint at iteration " << iter_idx;
+  LOG(INFO) << "Restoring model from checkpoint at iteration " << iter_idx;
   const auto checkpoint_dir = file::JoinPath(
       work_directory, kFileNameCheckPoint, absl::StrCat(iter_idx));
   RETURN_IF_ERROR(
@@ -1181,7 +1191,7 @@ EmitFindSplits(
 
   if (num_worker_preloading == 0 && !new_balancing &&
       load_balancer->HasPendingOrder()) {
-    YDF_LOG(INFO) << "Apply load balancer pending order.";
+    LOG(INFO) << "Apply load balancer pending order.";
     RETURN_IF_ERROR(load_balancer->ApplyPendingOrder());
   }
 
@@ -1473,10 +1483,10 @@ absl::Status EmitCreateCheckpoint(
             (generic_result.worker_idx() + 1) % load_balancer->NumWorkers();
         // The worker was restarted and it misses the data required to create
         // the checkpoint. Re-send the request to another worker.
-        YDF_LOG(WARNING) << "Worker #" << generic_result.worker_idx()
-                         << " does not have the right data to create the "
-                            "checkpoint. Trying worker #"
-                         << new_worker_idx << " instead";
+        LOG(WARNING) << "Worker #" << generic_result.worker_idx()
+                     << " does not have the right data to create the "
+                        "checkpoint. Trying worker #"
+                     << new_worker_idx << " instead";
 
         retries++;
         if (retries > max_retries) {
@@ -1562,12 +1572,12 @@ absl::Status EmitStartTraining(
         result.feature_loading_time_seconds());
 
     // Most of the time is used for the workers to load the dataset.
-    LOG_INFO_EVERY_N_SEC(60, _ << "\tLoading dataset in workers "
-                               << (reply_idx + 1) << " / "
-                               << load_balancer->NumWorkers()
-                               << " [duration: " << absl::Now() - begin << "]");
+    LOG_EVERY_N_SEC(INFO, 60)
+        << "\tLoading dataset in workers " << (reply_idx + 1) << " / "
+        << load_balancer->NumWorkers() << " [duration: " << absl::Now() - begin
+        << "]";
   }
-  YDF_LOG(INFO) << "Worker ready to train in " << absl::Now() - begin;
+  LOG(INFO) << "Worker ready to train in " << absl::Now() - begin;
 
   monitoring->EndStage(internal::Monitoring::kStartTraining);
 
@@ -1750,25 +1760,24 @@ bool Monitoring::ShouldDisplayLogs() {
 
 void Monitoring::BeginStage(Monitoring::Stages stage) {
   if (current_stage_ != -1) {
-    YDF_LOG(WARNING) << "Starting stage " << StageName(stage)
-                     << " before the previous stage "
-                     << StageName(
-                            static_cast<Monitoring::Stages>(current_stage_))
-                     << " was marked as completed.";
+    LOG(WARNING) << "Starting stage " << StageName(stage)
+                 << " before the previous stage "
+                 << StageName(static_cast<Monitoring::Stages>(current_stage_))
+                 << " was marked as completed.";
     return;
   }
   current_stage_ = stage;
   begin_current_stage_ = absl::Now();
 
   if (verbose_) {
-    YDF_LOG(INFO) << "Starting stage " << StageName(stage);
+    LOG(INFO) << "Starting stage " << StageName(stage);
   }
 }
 
 void Monitoring::EndStage(Monitoring::Stages stage) {
   DCHECK_GE(current_stage_, 0);
   if (current_stage_ < 0) {
-    YDF_LOG(WARNING) << "Invalid BeginStage > EndStage. stage=" << stage;
+    LOG(WARNING) << "Invalid BeginStage > EndStage. stage=" << stage;
     return;
   }
   const auto duration_current_stage = absl::Now() - begin_current_stage_;
@@ -1799,8 +1808,8 @@ void Monitoring::EndStage(Monitoring::Stages stage) {
   }
 
   if (verbose_) {
-    YDF_LOG(INFO) << "Finishing stage " << StageName(stage) << " in "
-                  << duration_current_stage;
+    LOG(INFO) << "Finishing stage " << StageName(stage) << " in "
+              << duration_current_stage;
   }
   current_stage_ = -1;
 }
@@ -1816,8 +1825,8 @@ void Monitoring::NewIter() {
 void Monitoring::FindSplitWorkerReplyTime(int worker_idx,
                                           absl::Duration delay) {
   if (verbose_) {
-    YDF_LOG(INFO) << "\tWorker #" << worker_idx << " replied to FindSplits in "
-                  << delay;
+    LOG(INFO) << "\tWorker #" << worker_idx << " replied to FindSplits in "
+              << delay;
   }
   last_min_split_reply_times_.push_back({worker_idx, delay});
 }

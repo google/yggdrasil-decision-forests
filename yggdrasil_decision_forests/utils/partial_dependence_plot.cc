@@ -27,10 +27,9 @@
 #include <utility>
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -497,15 +496,14 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs,
     const int num_numerical_bins, const float example_sampling) {
-  YDF_LOG(INFO) << "Initiate PDP accumulator";
+  LOG(INFO) << "Initiate PDP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializePartialDependencePlotSet(
                        model.data_spec(), attribute_idxs, model.task(),
                        model.label_col_idx(), num_numerical_bins, dataset));
-  YDF_LOG(INFO) << "Compute partial dependence plot for "
-                << attribute_idxs.size() << " set of features and "
-                << NumModelCallPerExample(pdp_set)
-                << " model call(s) per example.";
+  LOG(INFO) << "Compute partial dependence plot for " << attribute_idxs.size()
+            << " set of features and " << NumModelCallPerExample(pdp_set)
+            << " model call(s) per example.";
 
   std::default_random_engine random;
   std::uniform_real_distribution<float> dist_unif_unit;
@@ -517,7 +515,7 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
       continue;
     }
     if ((example_idx % 100) == 0) {
-      LOG_INFO_EVERY_N_SEC(30, _ << example_idx + 1 << " examples scanned.");
+      LOG_EVERY_N_SEC(INFO, 30) << example_idx + 1 << " examples scanned.";
     }
     dataset.ExtractExample(example_idx, &example);
 
@@ -532,15 +530,14 @@ ComputeConditionalExpectationPlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs, int num_numerical_bins,
     float example_sampling) {
-  YDF_LOG(INFO) << "Initiate CEP accumulator";
+  LOG(INFO) << "Initiate CEP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializeConditionalExpectationPlotSet(
                        model.data_spec(), attribute_idxs, model.task(),
                        model.label_col_idx(), num_numerical_bins, dataset));
-  YDF_LOG(INFO) << "Compute conditional expectation plot for "
-                << attribute_idxs.size() << " set of features and "
-                << NumModelCallPerExample(pdp_set)
-                << " model call(s) per example.";
+  LOG(INFO) << "Compute conditional expectation plot for "
+            << attribute_idxs.size() << " set of features and "
+            << NumModelCallPerExample(pdp_set) << " model call(s) per example.";
 
   std::default_random_engine random;
   std::uniform_real_distribution<float> dist_unif_01;
@@ -552,7 +549,7 @@ ComputeConditionalExpectationPlotSet(
       continue;
     }
     if ((example_idx % 100) == 0) {
-      LOG_INFO_EVERY_N_SEC(30, _ << example_idx + 1 << " examples scanned.");
+      LOG_EVERY_N_SEC(INFO, 30) << example_idx + 1 << " examples scanned.";
     }
     dataset.ExtractExample(example_idx, &example);
     RETURN_IF_ERROR(
@@ -565,7 +562,7 @@ ComputeConditionalExpectationPlotSet(
 absl::StatusOr<std::vector<std::vector<int>>> GenerateAttributesCombinations(
     const model::AbstractModel& model, const bool flag_1d, const bool flag_2d,
     const bool flag_2d_categorical_numerical) {
-  YDF_LOG(INFO) << "List plotting attribute combinations";
+  LOG(INFO) << "List plotting attribute combinations";
   std::vector<std::vector<int>> attribute_idxs;
   if (flag_1d) {
     RETURN_IF_ERROR(
@@ -586,7 +583,7 @@ absl::StatusOr<std::vector<std::vector<int>>> GenerateAttributesCombinations(
       std::unique(attribute_idxs.begin(), attribute_idxs.end()),
       attribute_idxs.end());
 
-  YDF_LOG(INFO) << "Found " << attribute_idxs.size() << " combination(s)";
+  LOG(INFO) << "Found " << attribute_idxs.size() << " combination(s)";
   return attribute_idxs;
 }
 

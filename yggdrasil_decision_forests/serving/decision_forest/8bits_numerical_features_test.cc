@@ -17,7 +17,10 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/strings/str_join.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -152,12 +155,12 @@ TEST(Num8Bits, ToyExample) {
   GradientBoostedTreesModel model;
   dataset::VerticalDataset dataset;
   BuildToyModelAndToyDataset(&model, &dataset);
-  YDF_LOG(INFO) << "Model:\n" << model.DescriptionAndStatistics(true);
+  LOG(INFO) << "Model:\n" << model.DescriptionAndStatistics(true);
 
   num_8bits::GradientBoostedTreesBinaryClassificationModel engine;
   CHECK_OK(GenericToSpecializedModel(model, &engine));
 
-  YDF_LOG(INFO) << "Engine:\n" << EngineDetails(engine);
+  LOG(INFO) << "Engine:\n" << EngineDetails(engine);
 
   EXPECT_EQ(engine.num_trees, 2);
   EXPECT_EQ(engine.num_features, 2);
@@ -207,7 +210,7 @@ TEST(Num8Bits, CompareToSlowEngine) {
   CHECK(gbt_model);
   GradientBoostedTreesBinaryClassificationModel engine;
   CHECK_OK(GenericToSpecializedModel(*gbt_model, &engine));
-  YDF_LOG(INFO) << "Engine:\n" << EngineDetails(engine);
+  LOG(INFO) << "Engine:\n" << EngineDetails(engine);
 
   // Prediction with new inference engine.
   std::vector<uint8_t> examples(engine.num_features * dataset.nrow());

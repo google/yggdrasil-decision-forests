@@ -21,11 +21,13 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -693,7 +695,7 @@ absl::Status AnalyseAndCreateHtmlReport(const model::AbstractModel& model,
                                         absl::string_view dataset_path,
                                         absl::string_view output_directory,
                                         const proto::Options& options) {
-  YDF_LOG(INFO) << "Load dataset";
+  LOG(INFO) << "Load dataset";
   dataset::VerticalDataset dataset;
   RETURN_IF_ERROR(dataset::LoadVerticalDataset(
       dataset_path, model.data_spec(), &dataset,
@@ -717,12 +719,12 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
   auto engine_or = model.BuildFastEngine();
   std::unique_ptr<model::EngineWrapperModel> engine_wrapper;
   if (engine_or.ok()) {
-    YDF_LOG(INFO) << "Run the model with the fast engine wrapper";
+    LOG(INFO) << "Run the model with the fast engine wrapper";
     engine_wrapper = std::make_unique<model::EngineWrapperModel>(
         &model, std::move(engine_or.value()));
     effective_model = engine_wrapper.get();
   } else {
-    YDF_LOG(INFO)
+    LOG(INFO)
         << "Run the model with the slow engine. No fast engine could be found: "
         << engine_or.status().message();
   }
@@ -757,8 +759,9 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
                          options.cep().example_sampling()));
   }
 
+  // TODO: Implement permuted variable importances for anomaly detection.
   if (options.permuted_variable_importance().enabled() &&
-      model.label_col_idx() != -1) {
+      model.task() != model::proto::ANOMALY_DETECTION) {
     RETURN_IF_ERROR(ComputePermutationFeatureImportance(
         dataset, &model, analysis.mutable_variable_importances(),
         {options.num_threads(),
@@ -795,7 +798,7 @@ absl::Status CreateHtmlReport(const model::AbstractModel& model,
 
   RETURN_IF_ERROR(
       file::SetContent(file::JoinPath(output_directory, kIndex), html_content));
-  YDF_LOG(INFO) << "Report written to " << output_directory;
+  LOG(INFO) << "Report written to " << output_directory;
   return absl::OkStatus();
 }
 

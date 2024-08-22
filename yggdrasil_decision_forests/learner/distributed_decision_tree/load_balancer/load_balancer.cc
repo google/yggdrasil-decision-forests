@@ -17,7 +17,12 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -85,7 +90,7 @@ absl::Status LoadBalancer::Initialize(
       static_cast<int>(std::ceil(static_cast<double>(max_num_features) *
                                  (1.0 + options_.max_unbalance_ratio())));
 
-  YDF_LOG(INFO) << "Create load balancer:\n" << Info();
+  LOG(INFO) << "Create load balancer:\n" << Info();
   return absl::OkStatus();
 }
 
@@ -222,7 +227,7 @@ const LoadBalancer::ChangePerWorker& LoadBalancer::PendingOrderPerWorker(
 
 absl::Status LoadBalancer::ApplyPendingOrder() {
   if (!pending_orders_.empty()) {
-    YDF_LOG(INFO) << "Apply pending orders";
+    LOG(INFO) << "Apply pending orders";
   }
 
   for (const auto& order : pending_orders_) {
@@ -304,7 +309,7 @@ absl::StatusOr<double> LoadBalancer::EstimateFeatureLoadingTime() const {
 }
 
 absl::Status LoadBalancer::CreateRandomBalancingOrders() {
-  YDF_LOG(INFO) << "Random re-balancing of the features";
+  LOG(INFO) << "Random re-balancing of the features";
 
   std::vector<int> active_feature_to_worker;
   active_feature_to_worker.reserve(active_features_.size());
@@ -337,45 +342,45 @@ absl::Status LoadBalancer::CreateRandomBalancingOrders() {
     num_unit_orders++;
   }
   max_num_features_per_workers_ = active_features_.size();
-  YDF_LOG(INFO) << num_unit_orders << " unit orders generated";
+  LOG(INFO) << num_unit_orders << " unit orders generated";
   return absl::OkStatus();
 }
 
 absl::Status LoadBalancer::TryCreateBalancingOrders() {
   ASSIGN_OR_RETURN(const auto feature_loading_time,
                    EstimateFeatureLoadingTime());
-  YDF_LOG(INFO) << "Try to balance workers' load [feature-loading-time:"
-                << feature_loading_time
-                << " max-features-per-workers:" << max_num_features_per_workers_
-                << "]";
+  LOG(INFO) << "Try to balance workers' load [feature-loading-time:"
+            << feature_loading_time
+            << " max-features-per-workers:" << max_num_features_per_workers_
+            << "]";
   int num_unit_orders = 0;
 
   auto time_per_worker = CreateWorkTimeEstimatePerWorker();
 
   const auto print_debug_info = [&time_per_worker]() {
     // Print debug infos.
-    YDF_LOG(INFO) << "Best and worst sorted wall time per workers:";
+    LOG(INFO) << "Best and worst sorted wall time per workers:";
     const int num_display_items = 5;
     for (int idx = 0; idx < num_display_items && idx < time_per_worker.size();
          idx++) {
       const auto& item = time_per_worker[idx];
-      YDF_LOG(INFO) << "\tidx:" << idx
-                    << " time:" << item.time_per_features * item.num_features
-                    << " time-p-f:" << item.time_per_features
-                    << " worker:" << item.worker_idx
-                    << " num_features:" << item.num_features;
+      LOG(INFO) << "\tidx:" << idx
+                << " time:" << item.time_per_features * item.num_features
+                << " time-p-f:" << item.time_per_features
+                << " worker:" << item.worker_idx
+                << " num_features:" << item.num_features;
     }
     if (time_per_worker.size() > num_display_items) {
-      YDF_LOG(INFO) << "\t...";
+      LOG(INFO) << "\t...";
       for (int idx = std::max<int>(time_per_worker.size() - num_display_items,
                                    num_display_items);
            idx < time_per_worker.size(); idx++) {
         const auto& item = time_per_worker[idx];
-        YDF_LOG(INFO) << "\tidx:" << idx
-                      << " time:" << item.time_per_features * item.num_features
-                      << " time-p-f:" << item.time_per_features
-                      << " worker:" << item.worker_idx
-                      << " num_features:" << item.num_features;
+        LOG(INFO) << "\tidx:" << idx
+                  << " time:" << item.time_per_features * item.num_features
+                  << " time-p-f:" << item.time_per_features
+                  << " worker:" << item.worker_idx
+                  << " num_features:" << item.num_features;
       }
     }
   };
@@ -409,8 +414,8 @@ absl::Status LoadBalancer::TryCreateBalancingOrders() {
       median_time = time_per_worker[time_per_worker.size() / 2].time();
     }
     const auto min_src_time = median_time * options_.median_margin_ratio();
-    YDF_LOG(INFO) << "Bad workers: median-worker-time: " << median_time
-                  << " minimum-time-for-bad-worker: " << min_src_time;
+    LOG(INFO) << "Bad workers: median-worker-time: " << median_time
+              << " minimum-time-for-bad-worker: " << min_src_time;
 
     // Get the source and destination workers.
     const auto src_time_idx = GetWorstCandidateWallTime(time_per_worker);
@@ -459,15 +464,15 @@ absl::Status LoadBalancer::TryCreateBalancingOrders() {
     workers_[src_worker].pending_orders.unload_features.push_back(feature);
     workers_[dst_worker].pending_orders.load_features.push_back(feature);
 
-    YDF_LOG(INFO) << "Reassigning feature " << feature << " from worker #"
-                  << src_worker << " to worker #" << dst_worker
-                  << " for an estimated gain of " << gain;
+    LOG(INFO) << "Reassigning feature " << feature << " from worker #"
+              << src_worker << " to worker #" << dst_worker
+              << " for an estimated gain of " << gain;
     num_unit_orders++;
   }
 
   if (num_unit_orders > 0) {
-    YDF_LOG(INFO) << "Create order with " << num_unit_orders
-                  << " feature transfers";
+    LOG(INFO) << "Create order with " << num_unit_orders
+              << " feature transfers";
     num_orders++;
   }
   num_unit_orders_ += num_unit_orders;

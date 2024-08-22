@@ -28,6 +28,8 @@
 #include <random>
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -123,11 +125,11 @@ int main(int argc, char** argv) {
 
   // Specify the features in the dataset.
   const auto dataspec = BuildDataspec(/*num_features=*/num_features);
-  YDF_LOG(INFO) << "Dataspec:\n"
-                << ydf::dataset::PrintHumanReadable(dataspec, false);
+  LOG(INFO) << "Dataspec:\n"
+            << ydf::dataset::PrintHumanReadable(dataspec, false);
 
   // Create a synthetic training dataset
-  YDF_LOG(INFO) << "Generate dataset";
+  LOG(INFO) << "Generate dataset";
   const auto train_ds = CreateSyntheticDataset(
       dataspec, /*num_features=*/num_features, /*num_examples=*/10000);
 
@@ -138,7 +140,7 @@ int main(int argc, char** argv) {
   }
 
   // Train a model
-  YDF_LOG(INFO) << "Train model";
+  LOG(INFO) << "Train model";
   ydf::model::proto::TrainingConfig train_config;
   train_config.set_learner("GRADIENT_BOOSTED_TREES");
   train_config.set_task(ydf::model::proto::Task::CLASSIFICATION);
@@ -154,7 +156,7 @@ int main(int argc, char** argv) {
   auto model = learner->TrainWithStatus(train_ds).value();
 
   if (!work_dir.empty()) {
-    YDF_LOG(INFO) << "Save model";
+    LOG(INFO) << "Save model";
     CHECK_OK(ydf::model::SaveModel(file::JoinPath(work_dir, "model"),
                                    model.get(), {""}));
   }
@@ -209,8 +211,8 @@ int main(int argc, char** argv) {
   CHECK_OK(Predict(engine, examples, serving_ds.nrow(), &engine_predictions));
 
   // Print the first predictions.
-  YDF_LOG(INFO) << "Predictions: " << engine_predictions[0] << " "
-                << engine_predictions[1] << " " << engine_predictions[2];
+  LOG(INFO) << "Predictions: " << engine_predictions[0] << " "
+            << engine_predictions[1] << " " << engine_predictions[2];
 
   return 0;
 }

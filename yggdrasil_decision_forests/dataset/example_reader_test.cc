@@ -19,6 +19,7 @@
 #include <string>
 
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -45,11 +46,11 @@ TEST(ExampleReader, CreateExampleReader) {
        {absl::StrCat("tfrecord+tfe:",
                      file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
         absl::StrCat("csv:", file::JoinPath(DatasetDir(), "toy.csv"))}) {
-    YDF_LOG(INFO) << "Create dataspec for " << dataset_path;
+    LOG(INFO) << "Create dataspec for " << dataset_path;
     proto::DataSpecificationGuide guide;
     proto::DataSpecification data_spec;
     CreateDataSpec(dataset_path, false, guide, &data_spec);
-    YDF_LOG(INFO) << "Scan " << dataset_path;
+    LOG(INFO) << "Scan " << dataset_path;
     auto reader = CreateExampleReader(dataset_path, data_spec).value();
     proto::Example example;
     int num_rows = 0;

@@ -55,20 +55,28 @@ def create_dataset(
       "i1": np.random.randint(100, size=n),
       "i2": np.random.randint(100, size=n),
       "c1": np.random.choice(["x", "y", "z"], size=n, p=[0.6, 0.3, 0.1]),
+      "c2": np.random.choice([b"x", b"y", b"z"], size=n, p=[0.6, 0.3, 0.1]),
+      "c3": np.random.choice([1, 2, 3], size=n, p=[0.6, 0.3, 0.1]),
+      "c4": np.random.randint(2, size=n).astype(np.bool_),
       "b1": np.random.randint(2, size=n).astype(np.bool_),
       "b2": np.random.randint(2, size=n).astype(np.bool_),
       # Cat-set features
       "cs1": [[], ["a", "b", "c"], ["b", "c"], ["a"]] * (n // 4),
+      "cs2": [[], [b"a", b"b", b"c"], [b"b", b"c"], [b"a"]] * (n // 4),
+      "cs3": [[], [1, 2, 3], [2, 3], [1]] * (n // 4),
+      "cs4": [[], [False, True, False], [True, False], [False]] * (n // 4),
       # Multi-dim features
       "multi_f1": np.random.random(size=(n, 5)),
       "multi_f2": np.random.random(size=(n, 5)),
       "multi_i1": np.random.randint(100, size=(n, 5)),
       "multi_c1": np.random.choice(["x", "y", "z"], size=(n, 5)),
+      "multi_c2": np.random.choice([b"x", b"y", b"z"], size=(n, 5)),
       "multi_b1": np.random.randint(2, size=(n, 5)).astype(np.bool_),
       # Labels
-      "label_class_binary": np.random.choice([False, True], size=n),
-      "label_class_multi": np.random.choice(["l1", "l2", "l3"], size=n),
-      "label_regress": np.random.random(size=n),
+      "label_class_binary1": np.random.choice([False, True], size=n),
+      "label_class_multi1": np.random.choice(["l1", "l2", "l3"], size=n),
+      "label_class_multi2": np.random.choice([b"l1", b"l2", b"l3"], size=n),
+      "label_regress1": np.random.random(size=n),
   }
   return {k: data[k] for k in columns}
 
@@ -215,9 +223,9 @@ def check_toy_model(test_self, model):
 
 
 def create_toy_model(test_self):
-  columns = ["f1", "c1", "f2", "label_regress"]
+  columns = ["f1", "c1", "f2", "c2", "label_regress1"]
   model = specialized_learners.GradientBoostedTreesLearner(
-      label="label_regress",
+      label="label_regress1",
       task=generic_learner.Task.REGRESSION,
       num_trees=1,
   ).train(create_dataset(columns))
@@ -381,50 +389,120 @@ class JaxModelTest(parameterized.TestCase):
             ),
         ),
     )
-    self.assertIsNotNone(feature_encoder)
     self.assertDictEqual(
         feature_encoder.categorical, {"f2": {"<OOD>": 0, "A": 1, "B": 2}}
     )
 
   def test_feature_encoder_on_model(self):
-    columns = ["f1", "i1", "c1", "b1", "cs1", "label_class_binary"]
+    columns = [
+        "f1",
+        "i1",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "b1",
+        "cs1",
+        "cs2",
+        "cs3",
+        "cs4",
+        "label_class_binary1",
+    ]
     model = specialized_learners.RandomForestLearner(
-        label="label_class_binary",
+        label="label_class_binary1",
         num_trees=2,
-        features=[("cs1", dataspec_lib.Semantic.CATEGORICAL_SET)],
+        features=[
+            ("c3", dataspec_lib.Semantic.CATEGORICAL),
+            ("c4", dataspec_lib.Semantic.CATEGORICAL),
+            ("cs1", dataspec_lib.Semantic.CATEGORICAL_SET),
+            ("cs2", dataspec_lib.Semantic.CATEGORICAL_SET),
+            ("cs3", dataspec_lib.Semantic.CATEGORICAL_SET),
+            ("cs4", dataspec_lib.Semantic.CATEGORICAL_SET),
+        ],
         include_all_columns=True,
     ).train(create_dataset(columns))
     feature_encoder = to_jax.FeatureEncoder.build(
         model.input_features(), model.data_spec()
     )
-    self.assertIsNotNone(feature_encoder)
     self.assertDictEqual(
         feature_encoder.categorical,
         {
             "c1": {"<OOD>": 0, "x": 1, "y": 2, "z": 3},
+            "c2": {"<OOD>": 0, "x": 1, "y": 2, "z": 3},
+            "c3": {"<OOD>": 0, "1": 1, "2": 2, "3": 3},
+            "c4": {"<OOD>": 0, "false": 1, "true": 2},
             "cs1": {"<OOD>": 0, "a": 1, "b": 2, "c": 3},
+            "cs2": {"<OOD>": 0, "a": 1, "b": 2, "c": 3},
+            "cs3": {"<OOD>": 0, "1": 1, "2": 2, "3": 3},
+            "cs4": {"<OOD>": 0, "False": 1, "True": 2},
         },
     )
 
-    encoded_features = feature_encoder.encode(
-        {"f1": [1, 2, 3], "c1": ["x", "y", "other"]}
+    feature_values_py = {
+        "f1": [1, 2, 3],
+        "c1": ["x", "y", "other"],
+        "c2": [b"x", b"y", b"other"],
+        "c3": [1, 2, 4],
+        "c4": [False, True],
+    }
+    encoded_features_py = feature_encoder.encode(feature_values_py)
+    np.testing.assert_array_equal(
+        encoded_features_py["f1"], jnp.asarray([1, 2, 3])
     )
     np.testing.assert_array_equal(
-        encoded_features["f1"], jnp.asarray([1, 2, 3])
+        encoded_features_py["c1"], jnp.asarray([1, 2, 0])
     )
     np.testing.assert_array_equal(
-        encoded_features["c1"], jnp.asarray([1, 2, 0])
+        encoded_features_py["c2"], jnp.asarray([1, 2, 0])
+    )
+    np.testing.assert_array_equal(
+        encoded_features_py["c3"], jnp.asarray([1, 2, 0])
+    )
+    np.testing.assert_array_equal(
+        encoded_features_py["c4"], jnp.asarray([1, 2])
     )
 
-  def test_feature_encoder_is_none(self):
-    columns = ["f1", "i1", "label_class_binary"]
+    feature_values_np = {k: np.asarray(v) for k, v in feature_values_py.items()}
+    encoded_features_np = feature_encoder.encode(feature_values_np)
+    for k in encoded_features_np:
+      np.testing.assert_array_equal(
+          encoded_features_np[k], encoded_features_py[k]
+      )
+
+  def test_feature_encoder_categorical_is_empty(self):
+    columns = ["f1", "i1", "label_class_binary1"]
     model = specialized_learners.RandomForestLearner(
-        label="label_class_binary", num_trees=2
+        label="label_class_binary1", num_trees=2
     ).train(create_dataset(columns))
     feature_encoder = to_jax.FeatureEncoder.build(
         model.input_features(), model.data_spec()
     )
-    self.assertIsNone(feature_encoder)
+    self.assertEmpty(feature_encoder.categorical)
+
+  def test_feature_encoder_unexpected_type(self):
+    columns = ["c1", "label_class_binary1"]
+    model = specialized_learners.RandomForestLearner(
+        label="label_class_binary1", num_trees=2
+    ).train(create_dataset(columns))
+    feature_encoder = to_jax.FeatureEncoder.build(
+        model.input_features(), model.data_spec()
+    )
+    encoded_features = feature_encoder.encode({"f1": [1.0, 2.0, 3.0]})
+    np.testing.assert_array_equal(
+        encoded_features["f1"], jnp.asarray([1.0, 2.0, 3.0])
+    )
+    with self.assertRaisesRegex(
+        ValueError, "Unexpected categorical value type"
+    ):
+      feature_encoder.encode({"c1": [1.0, 2.0, 3.0]})
+    with self.assertRaisesRegex(
+        ValueError, "Unexpected categorical value type"
+    ):
+      feature_encoder.encode({"c1": ["x", "y", None]})
+    with self.assertRaisesRegex(
+        ValueError, "Unexpected categorical value type"
+    ):
+      feature_encoder.encode({"c1": [["x", "y"], ["z", "w"]]})
 
 
 class InternalFeatureSpecTest(parameterized.TestCase):
@@ -448,8 +526,14 @@ class InternalFeatureSpecTest(parameterized.TestCase):
             generic_model.InputFeature(
                 "c2", dataspec_lib.Semantic.CATEGORICAL, 5
             ),
-            generic_model.InputFeature("b1", dataspec_lib.Semantic.BOOLEAN, 6),
-            generic_model.InputFeature("b2", dataspec_lib.Semantic.BOOLEAN, 7),
+            generic_model.InputFeature(
+                "c3", dataspec_lib.Semantic.CATEGORICAL, 6
+            ),
+            generic_model.InputFeature(
+                "c4", dataspec_lib.Semantic.CATEGORICAL, 7
+            ),
+            generic_model.InputFeature("b1", dataspec_lib.Semantic.BOOLEAN, 8),
+            generic_model.InputFeature("b2", dataspec_lib.Semantic.BOOLEAN, 9),
         ],
         ds_pb.DataSpecification(
             created_num_rows=3,
@@ -478,6 +562,14 @@ class InternalFeatureSpecTest(parameterized.TestCase):
                 ),
                 ds_pb.Column(
                     name="c2",
+                    type=ds_pb.ColumnType.CATEGORICAL,
+                ),
+                ds_pb.Column(
+                    name="c3",
+                    type=ds_pb.ColumnType.CATEGORICAL,
+                ),
+                ds_pb.Column(
+                    name="c4",
                     type=ds_pb.ColumnType.CATEGORICAL,
                 ),
                 ds_pb.Column(
@@ -513,6 +605,8 @@ class InternalFeatureSpecTest(parameterized.TestCase):
         [
             InternalFeatureItem(name="c1", dim=1),
             InternalFeatureItem(name="c2", dim=1),
+            InternalFeatureItem(name="c3", dim=1),
+            InternalFeatureItem(name="c4", dim=1),
         ],
     )
     self.assertEqual(
@@ -523,11 +617,13 @@ class InternalFeatureSpecTest(parameterized.TestCase):
         ],
     )
     self.assertEqual(self.basic_mapping.inv_numerical, {0: 2, 1: 3, 2: 0, 3: 1})
-    self.assertEqual(self.basic_mapping.inv_categorical, {4: 0, 5: 1})
-    self.assertEqual(self.basic_mapping.inv_boolean, {6: 0, 7: 1})
+    self.assertEqual(
+        self.basic_mapping.inv_categorical, {4: 0, 5: 1, 6: 2, 7: 3}
+    )
+    self.assertEqual(self.basic_mapping.inv_boolean, {8: 0, 9: 1})
     self.assertEqual(
         self.basic_mapping.feature_names,
-        {"multidim_n3", "n1", "n2", "c1", "c2", "b1", "b2"},
+        {"multidim_n3", "n1", "n2", "c1", "c2", "c3", "c4", "b1", "b2"},
     )
 
   def test_non_supported_type(self):
@@ -556,9 +652,11 @@ class InternalFeatureSpecTest(parameterized.TestCase):
       self.basic_mapping.convert_features({
           "n1": jnp.array([1, 2]),
           "n2": jnp.array([3, 4]),
-          "multidim_n3": jnp.array([[9, 10], [11, 12]]),
+          "multidim_n3": jnp.array([[13, 14], [15, 16]]),
           "c1": jnp.array([5, 6]),
           "c2": jnp.array([7, 8]),
+          "c3": jnp.array([9, 10]),
+          "c4": jnp.array([11, 12]),
           "b1": jnp.array([True, False]),
           "b2": jnp.array([False, True]),
           "other": jnp.array([1, 2]),
@@ -571,9 +669,11 @@ class InternalFeatureSpecTest(parameterized.TestCase):
           "n2": jnp.array([3, 4]),
           # multidim_n3 is a 3-dimensional feature, but 1-dimentional values are
           # fed (taking into account the batch size).
-          "multidim_n3": jnp.array([9, 10]),
+          "multidim_n3": jnp.array([13, 14]),
           "c1": jnp.array([5, 6]),
           "c2": jnp.array([7, 8]),
+          "c3": jnp.array([9, 10]),
+          "c4": jnp.array([11, 12]),
           "b1": jnp.array([True, False]),
           "b2": jnp.array([False, True]),
       })
@@ -585,9 +685,11 @@ class InternalFeatureSpecTest(parameterized.TestCase):
           "n2": jnp.array([[9, 10], [11, 12]]),
           # multidim_n3 is a 3-dimensional feature, but 2-dimentional values are
           # fed (taking into account the batch size).
-          "multidim_n3": jnp.array([[9, 10], [11, 12]]),
+          "multidim_n3": jnp.array([[13, 14], [15, 16]]),
           "c1": jnp.array([5, 6]),
           "c2": jnp.array([7, 8]),
+          "c3": jnp.array([9, 10]),
+          "c4": jnp.array([11, 12]),
           "b1": jnp.array([True, False]),
           "b2": jnp.array([False, True]),
       })
@@ -596,18 +698,20 @@ class InternalFeatureSpecTest(parameterized.TestCase):
     internal_values = self.basic_mapping.convert_features({
         "n1": jnp.array([1, 2]),
         "n2": jnp.array([3, 4]),
-        "multidim_n3": jnp.array([[9, 10], [11, 12]]),
+        "multidim_n3": jnp.array([[13, 14], [15, 16]]),
         "c1": jnp.array([5, 6]),
         "c2": jnp.array([7, 8]),
+        "c3": jnp.array([9, 10]),
+        "c4": jnp.array([11, 12]),
         "b1": jnp.array([True, False]),
         "b2": jnp.array([False, True]),
     })
     np.testing.assert_array_equal(
         internal_values.numerical,
-        jnp.array([[9.0, 10.0, 1.0, 3.0], [11.0, 12.0, 2.0, 4.0]]),
+        jnp.array([[13.0, 14.0, 1.0, 3.0], [15.0, 16.0, 2.0, 4.0]]),
     )
     np.testing.assert_array_equal(
-        internal_values.categorical, jnp.array([[5, 7], [6, 8]])
+        internal_values.categorical, jnp.array([[5, 7, 9, 11], [6, 8, 10, 12]])
     )
     np.testing.assert_array_equal(
         internal_values.boolean, jnp.array([[True, False], [False, True]])
@@ -683,18 +787,21 @@ class InternalForestTest(parameterized.TestCase):
     )
     self.assertEqual(
         internal_forest.feature_spec.categorical,
-        [InternalFeatureItem(name="c1", dim=1)],
+        [
+            InternalFeatureItem(name="c1", dim=1),
+            InternalFeatureItem(name="c2", dim=1),
+        ],
     )
     self.assertEqual(internal_forest.feature_spec.boolean, [])
     self.assertEqual(internal_forest.feature_spec.inv_numerical, {1: 0, 3: 1})
-    self.assertEqual(internal_forest.feature_spec.inv_categorical, {2: 0})
+    self.assertEqual(internal_forest.feature_spec.inv_categorical, {2: 0, 4: 1})
     self.assertEqual(internal_forest.feature_spec.inv_boolean, {})
     self.assertEqual(
-        internal_forest.feature_spec.feature_names, {"f1", "f2", "c1"}
+        internal_forest.feature_spec.feature_names, {"f1", "f2", "c1", "c2"}
     )
 
     self.assertEqual(internal_forest.num_trees(), 2)
-    self.assertIsNotNone(internal_forest.feature_encoder)
+    self.assertNotEmpty(internal_forest.feature_encoder.categorical)
 
     self.assertEqual(
         internal_forest.leaf_outputs,
@@ -754,9 +861,9 @@ class InternalForestTest(parameterized.TestCase):
     self.assertEqual(internal_forest.max_depth, 3)
 
   def test_internal_forest_on_model(self):
-    columns = ["f1", "i1", "c1", "label_regress"]
+    columns = ["f1", "i1", "c1", "label_regress1"]
     model = specialized_learners.RandomForestLearner(
-        label="label_regress",
+        label="label_regress1",
         task=generic_learner.Task.REGRESSION,
         num_trees=10,
         max_depth=5,
@@ -764,7 +871,7 @@ class InternalForestTest(parameterized.TestCase):
 
     internal_forest = to_jax.InternalForest(model)
     self.assertEqual(internal_forest.num_trees(), 10)
-    self.assertIsNotNone(internal_forest.feature_encoder)
+    self.assertNotEmpty(internal_forest.feature_encoder.categorical)
 
 
 class ToJaxTest(parameterized.TestCase):
@@ -787,31 +894,50 @@ class ToJaxTest(parameterized.TestCase):
       (
           "gbt_regression_num",
           ["f1", "f2"],
-          "label_regress",
+          "label_regress1",
           generic_learner.Task.REGRESSION,
           False,
           specialized_learners.GradientBoostedTreesLearner,
       ),
       (
           "gbt_regression_num_cat",
-          ["f1", "f2", "c1"],
-          "label_regress",
+          ["f1", "f2", "c1", "c2"],
+          "label_regress1",
           generic_learner.Task.REGRESSION,
           True,
           specialized_learners.GradientBoostedTreesLearner,
       ),
       (
           "gbt_class_binary_num_cat",
-          ["f1", "f2", "c1", "label_class_binary"],
-          "label_class_binary",
+          ["f1", "f2", "c1", "c2", "label_class_binary1"],
+          "label_class_binary1",
           generic_learner.Task.CLASSIFICATION,
           True,
           specialized_learners.GradientBoostedTreesLearner,
       ),
       (
-          "gbt_class_multi_num_cat",
-          ["f1", "f2", "c1", "label_class_multi"],
-          "label_class_multi",
+          "gbt_class_binary_num_cat_tfl",
+          ["f1", "f2", "c1", "c2", "label_class_binary1"],
+          "label_class_binary1",
+          generic_learner.Task.CLASSIFICATION,
+          True,
+          specialized_learners.GradientBoostedTreesLearner,
+          None,
+          True,
+          True,
+      ),
+      (
+          "gbt_class_multi_num_cat1",
+          ["f1", "f2", "c1", "c2", "label_class_multi1"],
+          "label_class_multi1",
+          generic_learner.Task.CLASSIFICATION,
+          True,
+          specialized_learners.GradientBoostedTreesLearner,
+      ),
+      (
+          "gbt_class_multi_num_cat2",
+          ["f1", "f2", "c1", "c2", "label_class_multi2"],
+          "label_class_multi2",
           generic_learner.Task.CLASSIFICATION,
           True,
           specialized_learners.GradientBoostedTreesLearner,
@@ -819,7 +945,7 @@ class ToJaxTest(parameterized.TestCase):
       (
           "gbt_regression_num_multidim",
           ["f1", "multi_f1"],
-          "label_regress",
+          "label_regress1",
           generic_learner.Task.REGRESSION,
           False,
           specialized_learners.GradientBoostedTreesLearner,
@@ -827,7 +953,7 @@ class ToJaxTest(parameterized.TestCase):
       (
           "gbt_regression_num_oblique",
           ["f1", "f2", "f3", "f4"],
-          "label_regress",
+          "label_regress1",
           generic_learner.Task.REGRESSION,
           False,
           specialized_learners.GradientBoostedTreesLearner,
@@ -847,6 +973,7 @@ class ToJaxTest(parameterized.TestCase):
       learner,
       learner_kwargs=None,
       test_tf_conversion: bool = True,
+      test_tf_lite: bool = False,
   ):
 
     if learner_kwargs is None:
@@ -869,22 +996,21 @@ class ToJaxTest(parameterized.TestCase):
     )
 
     # Golden predictions
-    test_ds = create_dataset(columns, 1, seed=2)
+    test_ds = create_dataset(columns, 10, seed=2)
     ydf_predictions = model.predict(test_ds)
 
-    # Convert model to tf function
-    jax_model = to_jax.to_jax_function(model)
-    assert (jax_model.encoder is not None) == has_encoding
+    # Convert model to a jax function
+    with jax.numpy_dtype_promotion("strict"):
+      kwargs = {}
+      if test_tf_lite:
+        kwargs["compatibility"] = "TFL"
+      jax_model = to_jax.to_jax_function(model, **kwargs)
+      assert bool(jax_model.encoder.categorical) == has_encoding
 
-    # Generate Jax predictions
-    del test_ds[label]
-    if jax_model.encoder is not None:
+      # Generate Jax predictions
+      del test_ds[label]
       input_values = jax_model.encoder(test_ds)
-    else:
-      input_values = {
-          k: jnp.asarray(v) for k, v in test_ds.items() if k != label
-      }
-    jax_predictions = jax_model.predict(input_values)
+      jax_predictions = jax_model.predict(input_values)
 
     # Test predictions
     np.testing.assert_allclose(
@@ -927,6 +1053,43 @@ class ToJaxTest(parameterized.TestCase):
         rtol=1e-5,
         atol=1e-5,
     )
+
+    if test_tf_lite:
+      # Test TFLite conversion
+
+      # Generate the input specs.
+      # Note: TFL uses the spec names to generate the argument names.
+      # Note: "from_tensor" does not implement the automatic JAX->TF conversion.
+      tf_input_specs = {
+          k: tf.TensorSpec.from_tensor(tf.constant(v), name=k)
+          for k, v in input_values.items()
+      }
+
+      concrete_predict = tf_model.my_call.get_concrete_function(tf_input_specs)
+      converter = tf.lite.TFLiteConverter.from_concrete_functions(
+          [concrete_predict], tf_model
+      )
+      # TODO: Remove when TFL support all the YDF->JAX required ops.
+      converter.target_spec.supported_ops = [
+          tf.lite.OpsSet.TFLITE_BUILTINS,  # enable TensorFlow Lite ops.
+          tf.lite.OpsSet.SELECT_TF_OPS,  # enable TensorFlow ops.
+      ]
+      tflite_model = converter.convert()
+      interpreter = tf.lite.Interpreter(model_content=tflite_model)
+      interpreter.allocate_tensors()
+      tfl_predict = interpreter.get_signature_runner("serving_default")
+
+      logging.info("input_values:\n%s", input_values)
+      logging.info("tfl_predict:\n%s", tfl_predict)
+      logging.info("concrete_predict:\n%s", concrete_predict)
+
+      tfl_predictions = tfl_predict(**input_values)["output_0"]
+      np.testing.assert_allclose(
+          ydf_predictions,
+          tfl_predictions,
+          rtol=1e-5,
+          atol=1e-5,
+      )
 
   def test_dataset_ellipse(self):
     with tempfile.TemporaryDirectory() as tempdir:
@@ -1185,6 +1348,40 @@ class ToJaxTest(parameterized.TestCase):
     ├─(pos)─ value=7
     └─(neg)─ value=6
 """,
+    )
+
+
+class BitmapTest(parameterized.TestCase):
+
+  @parameterized.parameters(
+      ([], []),
+      ([1], [0b0001]),
+      ([0], [0b0000]),
+      ([0, 1], [0b0010]),
+      ([1, 0, 0, 1] * 8, [0b_1001_1001_1001_1001_1001_1001_1001_1001]),
+      (
+          [1, 0, 0, 1] * 8 + [1],
+          [0b_1001_1001_1001_1001_1001_1001_1001_1001, 0b0001],
+      ),
+  )
+  def test_compress_bitmap(self, src, expected):
+    np.testing.assert_equal(to_jax.compress_bitmap(src), expected)
+
+  @parameterized.parameters(
+      ([1], 0, True),
+      ([1, 0, 0, 1], 0, True),
+      ([1, 0, 0, 1], 1, False),
+      ([1, 0, 0, 1], 2, False),
+      ([1, 0, 0, 1], 3, True),
+      ([0] * 31 + [1], 31, True),
+      ([0] * 31 + [0], 31, False),
+      ([0] * 32 + [1], 32, True),
+      ([0] * 32 + [0], 32, False),
+  )
+  def test_get_bit(self, bitmap, query, expected):
+    np.testing.assert_equal(
+        to_jax.get_bit(jnp.array(to_jax.compress_bitmap(bitmap)), query),
+        jnp.bool_(expected),
     )
 
 

@@ -34,10 +34,10 @@ pybind_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:span",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/dataset:types",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:weight",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_cc_proto",
@@ -81,6 +81,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
+        "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
         "@ydf_cc//yggdrasil_decision_forests/utils/benchmark:inference",
     ],
 )
@@ -130,12 +131,13 @@ py_library(
     srcs = ["export_jax.py"],
     deps = [
         ":generic_model",
+        # numpy dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/learner:custom_loss_py",
         "//ydf/model/decision_forest_model",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/tree:all",
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
@@ -213,20 +215,11 @@ py_library(
 )
 
 py_library(
-    name = "benchmark",
-    srcs = ["benchmark.py"],
+    name = "export_docker",
+    srcs = ["export_docker.py"],
     deps = [
-        ":export_jax",  # buildcleaner: keep
-        ":export_tf",  # buildcleaner: keep
         ":generic_model",
-        # jax dep,
-        # numpy dep,
-        # tensorflow:tensorflow_no_contrib dep,
-        # tensorflow_decision_forests dep,
-        # ydf dep,
-        "//ydf/dataset",
-        "//ydf/learner:specialized_learners",
-        "//ydf/utils:string_lib",
+        "//ydf/dataset:dataspec",
     ],
 )
 
@@ -300,6 +293,7 @@ cc_test(
     ],
     tags = ["manual"],
     deps = [
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -347,6 +341,7 @@ py_test(
 
 py_test(
     name = "jax_model_test",
+    timeout = "long",
     srcs = ["jax_model_test.py"],
     data = [
         "//test_data",
@@ -389,13 +384,19 @@ py_test(
 )
 
 py_test(
-    name = "benchmark_test",
-    srcs = ["benchmark_test.py"],
+    name = "export_docker_test",
+    srcs = ["export_docker_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     python_version = "PY3",
     deps = [
-        ":benchmark",
+        ":export_docker",
+        ":model_lib",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
-        # numpy dep,
+        # fastapi dep,  # buildcleaner: keep
+        # pydantic dep,  # buildcleaner: keep
+        # requests dep,  # buildcleaner: keep
+        "//ydf:api",
+        "//ydf/utils:test_utils",
     ],
 )

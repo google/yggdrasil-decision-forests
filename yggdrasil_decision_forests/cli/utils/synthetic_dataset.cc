@@ -46,6 +46,7 @@
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -82,12 +83,12 @@ void SyntheticDataset() {
     QCHECK_OK(file::GetTextProto(absl::GetFlag(FLAGS_options), &options,
                                  file::Defaults()));
   }
-  YDF_LOG(INFO) << "Options:\n" << options.DebugString();
+  LOG(INFO) << "Options:\n" << options.DebugString();
   QCHECK_OK(GenerateSyntheticDatasetTrainValidTest(
       options, absl::GetFlag(FLAGS_train), absl::GetFlag(FLAGS_valid),
       absl::GetFlag(FLAGS_test), absl::GetFlag(FLAGS_ratio_valid),
       absl::GetFlag(FLAGS_ratio_test)));
-  YDF_LOG(INFO) << "Generation done";
+  LOG(INFO) << "Generation done";
 }
 
 }  // namespace dataset

@@ -17,6 +17,7 @@
 import dataclasses
 import enum
 import os
+import platform
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, TypeVar, Union
 
 from absl import logging
@@ -158,6 +159,19 @@ class GenericModel:
   def name(self) -> str:
     """Returns the name of the model type."""
     return self._model.name()
+
+  def __getstate__(self):
+    log.warning(
+        "Model pickling is discouraged. To save a model on disk, use"
+        " `model.save(path)` and `... = ydf.load_model(path)` instead. To"
+        " serialize a model to bytes, use `data = model.serialize()` and"
+        " `... = ydf.deserialize_model(data)` instead.",
+        message_id=log.WarningMessage.DONT_USE_PICKLE,
+    )
+    return self._model.Serialize()
+
+  def __setstate__(self, state):
+    self._model = ydf.DeserializeModel(state)
 
   def task(self) -> Task:
     """Task solved by the model."""
@@ -328,6 +342,43 @@ Use `model.describe()` for more details
     with log.cc_log_context():
       self._model.Save(path, advanced_options.file_prefix)
 
+  def serialize(self) -> bytes:
+    """Serializes a model to a sequence of bytes (i.e. `bytes`).
+
+    A serialized model is equivalent to model saved with `model.save`. It can
+    possibly contain meta-data related to model training and interpretation. To
+    minimize the size of a serialized model, removes this meta-data by passing
+    the argument `pure_serving_model=True` to the `train` method.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Create a model
+    dataset = pd.DataFrame({"feature": [0, 1], "label": [0, 1]})
+    learner = ydf.RandomForestLearner(label="label")
+    model = learner.train(dataset)
+
+    # Serialize model
+    # Note: serialized_model is a bytes.
+    serialized_model = model.serialize()
+
+    # Deserialize model
+    deserialized_model = ydf.deserialize_model(serialized_model)
+
+    # Make predictions
+    model.predict(dataset)
+    deserialized_model.predict(dataset)
+    ```
+
+    Returns:
+      The serialized model.
+    """
+    with log.cc_log_context():
+      return self._model.Serialize()
+
   def predict(self, data: dataset.InputDataset) -> np.ndarray:
     """Returns the predictions of the model on the given dataset.
 
@@ -364,7 +415,10 @@ Use `model.describe()` for more details
   def evaluate(
       self,
       data: dataset.InputDataset,
+      *,
       bootstrapping: Union[bool, int] = False,
+      weighted: bool = False,
+      evaluation_task: Optional[Task] = None,
   ) -> metric.Evaluation:
     """Evaluates the quality of a model on a dataset.
 
@@ -387,6 +441,9 @@ Use `model.describe()` for more details
 
     ```
     evaluation = model.evaluate(test_ds)
+    # If model is an anomaly detection model:
+    # evaluation = model.evaluate(test_ds,
+                                  evaluation_task=ydf.Task.CLASSIFICATION)
     evaluation
     ```
 
@@ -400,6 +457,13 @@ Use `model.describe()` for more details
         to an integer, it specifies the number of bootstrapping samples to use.
         In this case, if the number is less than 100, an error is raised as
         bootstrapping will not yield useful results.
+      weighted: If true, the evaluation is weighted according to the training
+        weights. If false, the evaluation is non-weighted. b/351279797: Change
+        default to weights=True.
+      evaluation_task: Set the type of model evaluation to use. If None, this is
+        the same as the model's task. Some models can be evaluated with a
+        different task. Notably, ANOMALY DETECTION models must currently be
+        evaluated as CLASSIFICATION.
 
     Returns:
       Model evaluation.
@@ -420,13 +484,17 @@ Use `model.describe()` for more details
             " than 100 as bootstrapping will not yield useful results. Got"
             f" {bootstrapping!r} instead"
         )
+      if evaluation_task is None:
+        evaluation_task = self.task()
 
       options_proto = metric_pb2.EvaluationOptions(
           bootstrapping_samples=bootstrapping_samples,
-          task=self.task()._to_proto_type(),  # pylint: disable=protected-access
+          task=evaluation_task._to_proto_type(),  # pylint: disable=protected-access
       )
 
-      evaluation_proto = self._model.Evaluate(ds._dataset, options_proto)  # pylint: disable=protected-access
+      evaluation_proto = self._model.Evaluate(
+          ds._dataset, options_proto, weighted=weighted
+      )  # pylint: disable=protected-access
     return metric.Evaluation(evaluation_proto)
 
   def analyze_prediction(
@@ -616,6 +684,9 @@ Use `model.describe()` for more details
       pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
       post_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
       temp_dir: Optional[str] = None,
+      tensor_specs: Optional[Dict[str, Any]] = None,
+      feature_specs: Optional[Dict[str, Any]] = None,
+      force: bool = False,
   ) -> None:
     """Exports the model as a TensorFlow Saved model.
 
@@ -673,25 +744,97 @@ Use `model.describe()` for more details
     )
     ```
 
-    The SavedModel format allows for custom preprocessing and postprocessing
-    computation in addition to the model inference. Such computation can be
-    specified with the `pre_processing` and `post_processing` arguments:
+    Some TensorFlow Serving or Servomatic pipelines rely on feed examples as
+    serialized TensorFlow Example proto (instead of raw tensor values) and/or
+    wrap the model raw output (e.g. probability predictions) into a special
+    structure (called the Serving API). You can create models compatible with
+    those two convensions with `feed_example_proto=True` and `servo_api=True`
+    respectively:
 
     ```python
-    def pre_processing(features):
-      features = features.copy()
-      features["f1"] = features["f1"] * 2
-      return features
-
     model.to_tensorflow_saved_model(
         path="/tmp/my_model",
         mode="tf",
-        pre_processing=pre_processing,
+        feed_example_proto=True,
+        servo_api=True
     )
     ```
 
-    For more complex combinations, such as composing multiple models, use the
-    method `to_tensorflow_function` instead of `to_tensorflow_saved_model`.
+    If your model requires some data preprocessing or post-processing, you can
+    express them as a @tf.function or a tf module and pass them to the
+    `pre_processing` and `post_processing` arguments respectively.
+
+    Warning: When exporting a SavedModel, YDF infers the model signature using
+    the dtype of the features observed during training. If the signature of the
+    pre_processing function is different than the signature of the model (e.g.,
+    the processing creates a new feature), you need to specify the tensor specs
+    (`tensor_specs`; if `feed_example_proto=False`) or feature spec
+    (`feature_specs`; if `feed_example_proto=True`) argument:
+
+    ```python
+    # Define a pre-processing function
+    @tf.function
+    def pre_processing(raw_features):
+      features = {**raw_features}
+      # Create a new feature.
+      features["sin_f1"] = tf.sin(features["f1"])
+      # Remove a feature
+      del features["f1"]
+      return features
+
+    # Create Numpy dataset
+    raw_dataset = {
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    }
+
+    # Apply the preprocessing on the training dataset.
+    processed_dataset = (
+        tf.data.Dataset.from_tensor_slices(raw_dataset)
+        .batch(128)  # The batch size has no impact on the model.
+        .map(preprocessing)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+
+    # Train a model on the pre-processed dataset.
+    ydf_model = specialized_learners.RandomForestLearner(
+        label="l",
+        task=generic_learner.Task.CLASSIFICATION,
+    ).train(processed_dataset)
+
+    # Export the model to a raw SavedModel model with the pre-processing
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model",
+        mode="tf",
+        feed_example_proto=False,
+        pre_processing=pre_processing,
+        tensor_specs{
+            "f1": tf.TensorSpec(shape=[None], name="f1", dtype=tf.float64),
+            "f2": tf.TensorSpec(shape=[None], name="f2", dtype=tf.float64),
+        }
+    )
+
+    # Export the model to a SavedModel consuming serialized tf examples with the
+    # pre-processing
+    model.to_tensorflow_saved_model(
+        path="/tmp/my_model",
+        mode="tf",
+        feed_example_proto=True,
+        pre_processing=pre_processing,
+        feature_specs={
+            "f1": tf.io.FixedLenFeature(
+                shape=[], dtype=tf.float32, default_value=math.nan
+            ),
+            "f2": tf.io.FixedLenFeature(
+                shape=[], dtype=tf.float32, default_value=math.nan
+            ),
+        }
+    )
+    ```
+
+    For more flexibility, use the method `to_tensorflow_function` instead of
+    `to_tensorflow_saved_model`.
 
     Args:
       path: Path to store the Tensorflow Decision Forests model.
@@ -712,8 +855,10 @@ Use `model.describe()` for more details
       feature_dtypes: Mapping from feature name to TensorFlow dtype. Use this
         mapping to feature dtype. For instance, numerical features are encoded
         with tf.float32 by default. If you plan on feeding tf.float64 or
-        tf.int32, use `feature_dtype` to specify it. Only compatible with
-        mode="tf".
+        tf.int32, use `feature_dtype` to specify it. `feature_dtypes` is ignored
+        if `tensor_specs` is set. If set, disables the automatic signature
+        extraction on `pre_processing` (if `pre_processing` is also set). Only
+        compatible with mode="tf".
       servo_api: If true, adds a SavedModel signature to make the model
         compatible with the `Classify` or `Regress` servo APIs. Only compatible
         with mode="tf". If false, outputs the raw model predictions.
@@ -723,12 +868,34 @@ Use `model.describe()` for more details
         provided as a binary serialized TensorFlow Example proto. This is the
         format expected by VertexAI and most TensorFlow Serving pipelines.
       pre_processing: Optional TensorFlow function or module to apply on the
-        input features before applying the model. Only compatible with
-        mode="tf".
+        input features before applying the model. If the `pre_processing`
+        function has been traced (i.e., the function has been called once with
+        actual data and contains a concrete instance in its cache), this
+        signature is extracted and used as signature of the SavedModel. Only
+        compatible with mode="tf".
       post_processing: Optional TensorFlow function or module to apply on the
         model predictions. Only compatible with mode="tf".
       temp_dir: Temporary directory used during the conversion. If None
         (default), uses `tempfile.mkdtemp` default temporary directory.
+      tensor_specs: Optional dictionary of `tf.TensorSpec` that define the input
+        features of the model to export. If not provided, the TensorSpecs are
+        automatically generated based on the model features seen during
+        training. This means that "tensor_specs" is only necessary when using a
+        "pre_processing" argument that expects different features than what the
+        model was trained with. This argument is ignored when exporting model
+        with `feed_example_proto=True` as in this case, the TensorSpecs are
+        defined by the `tf.io.parse_example` parsing feature specs. Only
+        compatible with mode="tf".
+      feature_specs: Optional dictionary of `tf.io.parse_example` parsing
+        feature specs e.g. `tf.io.FixedLenFeature` or `tf.io.RaggedFeature`. If
+        not provided, the praising feature specs are automatically generated
+        based on the model features seen during training. This means that
+        "feature_specs" is only necessary when using a "pre_processing" argument
+        that expects different features than what the model was trained with.
+        This argument is ignored when exporting model with
+        `feed_example_proto=False`. Only compatible with mode="tf".
+      force: Try to export even in currently unsupported environments. WARNING:
+        Setting this to true may crash the Python runtime.
     """
 
     if mode == "keras":
@@ -751,6 +918,8 @@ Use `model.describe()` for more details
         pre_processing=pre_processing,
         post_processing=post_processing,
         temp_dir=temp_dir,
+        tensor_specs=tensor_specs,
+        feature_specs=feature_specs,
     )
 
   def to_tensorflow_function(  # pytype: disable=name-error
@@ -758,6 +927,7 @@ Use `model.describe()` for more details
       temp_dir: Optional[str] = None,
       can_be_saved: bool = True,
       squeeze_binary_classification: bool = True,
+      force: bool = False,
   ) -> "tensorflow.Module":
     """Converts the YDF model into a @tf.function callable TensorFlow Module.
 
@@ -814,6 +984,7 @@ Use `model.describe()` for more details
         classification, outputs a tensorflow of shape [num examples, 2]
         containing the probability of both the negative and positive classes.
         Has no effect on non-binary classification models.
+      force: Try to export even in currently unsupported environments.
 
     Returns:
       A TensorFlow @tf.function.
@@ -831,6 +1002,7 @@ Use `model.describe()` for more details
       jit: bool = True,
       apply_activation: bool = True,
       leaves_as_params: bool = False,
+      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",
   ) -> "export_jax.JaxModel":
     """Converts the YDF model into a JAX function.
 
@@ -867,6 +1039,8 @@ Use `model.describe()` for more details
       leaves_as_params: If true, exports the leaf values as learnable
         parameters. In this case, `params` is set in the returned value, and it
         should be passed to `predict(feature_values, params)`.
+      compatibility: Constraint on the YDF->JAX conversion to runtime
+        compatibility. Can be "XLA" (default), and "TFL" (for TensorFlow Lite).
 
     Returns:
       A dataclass containing the JAX prediction function (`predict`) and
@@ -879,6 +1053,7 @@ Use `model.describe()` for more details
         jit=jit,
         apply_activation=apply_activation,
         leaves_as_params=leaves_as_params,
+        compatibility=compatibility,
     )
 
   def update_with_jax_params(self, params: Dict[str, Any]):
@@ -922,6 +1097,52 @@ Use `model.describe()` for more details
       params: Learnable parameter of the model generated with `to_jax_function`.
     """
     _get_export_jax().update_with_jax_params(model=self, params=params)
+
+  def to_docker(
+      self,
+      path: str,
+      exist_ok: bool = False,
+  ) -> None:
+    """Exports the model to a Docker endpoint deployable on Cloud.
+
+    This function creates a directory containing a Dockerfile, the model and
+    support files.
+
+    Usage example:
+
+    ```python
+    import ydf
+
+    # Train a model.
+    model = ydf.RandomForestLearner(label="l").train({
+        "f1": np.random.random(size=100),
+        "f2": np.random.random(size=100),
+        "l": np.random.randint(2, size=100),
+    })
+
+    # Export the model to a Docker endpoint.
+    model.to_docker(path="/tmp/my_model")
+
+    # Print instructions on how to use the model
+    !cat /tmp/my_model/readme.md
+
+    # Test the end-point locally
+    docker build --platform linux/amd64 -t ydf_predict_image /tmp/my_model
+    docker run --rm -p 8080:8080 -d ydf_predict_image
+
+    # Deploy the model on Google Cloud
+    gcloud run deploy ydf-predict --source /tmp/my_model
+
+    # Check the automatically created utility scripts "test_locally.sh" and
+    # "deploy_in_google_cloud.sh" for more examples.
+    ```
+
+    Args:
+      path: Directory where to create the Docker endpoint
+      exist_ok: If false (default), fails if the directory already exist. If
+        true, override the directory content if any.
+    """
+    _get_export_docker().to_docker(model=self, path=path, exist_ok=exist_ok)
 
   def hyperparameter_optimizer_logs(
       self,
@@ -1193,6 +1414,15 @@ def _get_export_sklearn():
         "it installed and try again. If using pip, run `pip install"
         " scikit-learn`."
     ) from exc
+
+
+def _get_export_docker():
+  try:
+    from ydf.model import export_docker  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+
+    return export_docker
+  except ImportError as exc:
+    raise ValueError("Cannot import the export_docker utility") from exc
 
 
 ModelType = TypeVar("ModelType", bound=GenericModel)

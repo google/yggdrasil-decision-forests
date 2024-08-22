@@ -15,6 +15,9 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -210,7 +213,7 @@ TEST(QuickScorer, Compilation) {
   CHECK_OK(GenericToSpecializedModel(model, &quick_scorer_model));
 
   const auto model_description = DescribeQuickScorer(quick_scorer_model);
-  YDF_LOG(INFO) << "Model:\n" << model_description;
+  LOG(INFO) << "Model:\n" << model_description;
 
   EXPECT_EQ(quick_scorer_model.features().input_features().size(), 3);
 
@@ -254,7 +257,7 @@ TEST(QuickScorer, ExampleSet) {
   CHECK_OK(GenericToSpecializedModel(model, &quick_scorer_model));
 
   const auto model_description = DescribeQuickScorer(quick_scorer_model);
-  YDF_LOG(INFO) << "Model:\n" << model_description;
+  LOG(INFO) << "Model:\n" << model_description;
 
   GradientBoostedTreesRegressionQuickScorerExtended::ExampleSet examples(
       5, quick_scorer_model);
@@ -327,7 +330,7 @@ TEST(QuickScorer, ExceedStackBuffer) {
   CHECK_OK(GenericToSpecializedModel(model, &quick_scorer_model));
 
   const auto model_description = DescribeQuickScorer(quick_scorer_model);
-  YDF_LOG(INFO) << "Model:\n" << model_description;
+  LOG(INFO) << "Model:\n" << model_description;
 
   GradientBoostedTreesRegressionQuickScorerExtended::ExampleSet examples(
       5, quick_scorer_model);

@@ -14,6 +14,7 @@
 
 """Dataspec utilities."""
 
+import copy
 import dataclasses
 import enum
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
@@ -280,6 +281,8 @@ class Column(object):
   monotonic: MonotonicConstraint = None
 
   def __post_init__(self):
+    if self.name is None:
+      raise ValueError("The name of a column cannot be None")
     # Check matching between hyper-parameters and semantic.
     if self.semantic != Semantic.DISCRETIZED_NUMERICAL:
       if self.num_discretized_numerical_bins is not None:
@@ -539,8 +542,8 @@ def get_all_columns(
     specified_columns = [Column(col) for col in available_columns]
     used_unroll_feature_info.update(unroll_feature_info)
   else:
-    specified_columns = []
     # Add the specified columns in order, but ignore those that do not exist.
+    specified_columns = []
     for col in inference_args.columns:
       if col.name in available_columns_as_set:
         if col.name in unroll_feature_info:
@@ -549,19 +552,19 @@ def get_all_columns(
           )
         specified_columns.append(col)
       elif col.name in unroll_feature_info:
-        if col.name in unroll_feature_info:
-          used_unroll_feature_info[col.name] = unroll_feature_info[col.name]
-        specified_columns.extend(
-            [Column(col) for col in unroll_feature_info[col.name]]
+        specified_columns.extend([
+            dataclasses.replace(col, name=unroll_name)
+            for unroll_name in unroll_feature_info[col.name]
+        ])
+        used_unroll_feature_info[col.name] = unroll_feature_info[col.name]
+      elif required_columns is None or col.name in required_columns_as_set:
+        raise ValueError(
+            f"Column {col.name!r} is required but was not found in the data."
+            f" Available columns: {available_columns}"
         )
-      else:
-        if required_columns is None or col.name in required_columns_as_set:
-          raise ValueError(
-              f"Column {col.name!r} is required but was not found in the data."
-              f" Available columns: {available_columns}"
-          )
 
   specified_columns_names = set(col.name for col in specified_columns)
+
   if inference_args.include_all_columns and inference_args.columns is not None:
     # The user specified the type of some of the columns, but asked for all the
     # columns to be used.
@@ -580,6 +583,7 @@ def get_all_columns(
       # Note: Required columns that are not already included, are not unrolled.
       specified_columns.append(Column(col_name))
       specified_columns_names.add(col_name)
+
   return specified_columns, used_unroll_feature_info
 
 

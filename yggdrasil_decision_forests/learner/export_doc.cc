@@ -15,7 +15,14 @@
 
 #include "yggdrasil_decision_forests/learner/export_doc.h"
 
+#include "absl/log/log.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
@@ -66,9 +73,9 @@ absl::StatusOr<std::string> ExportSeveralLearnersToMarkdown(
     const std::vector<std::string>& ordering) {
   std::string content;
 
-  YDF_LOG(INFO) << "Export learners:";
+  LOG(INFO) << "Export learners:";
   for (const auto& x : learners) {
-    YDF_LOG(INFO) << "\t" << x;
+    LOG(INFO) << "\t" << x;
   }
 
   // Index of "v" in "ordering". Returns "ordering.size()" is "v" is not in

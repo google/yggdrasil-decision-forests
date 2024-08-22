@@ -24,7 +24,9 @@
 #endif
 // clang-format on
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace file {

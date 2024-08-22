@@ -21,8 +21,10 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -45,7 +47,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace {
 
-using test::ApproximatelyEqualsProto;
 using test::EqualsProto;
 using test::StatusIs;
 
@@ -63,22 +64,22 @@ class Engine1 : public serving::FastEngine {
  public:
   std::unique_ptr<serving::AbstractExampleSet> AllocateExamples(
       int num_examples) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return {};
   }
 
   void Predict(const serving::AbstractExampleSet& examples, int num_examples,
                std::vector<float>* predictions) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
   }
 
   int NumPredictionDimension() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return 1;
   }
 
   const serving::FeaturesDefinition& features() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return features_;
   }
 
@@ -117,22 +118,22 @@ class Engine2 : public serving::FastEngine {
  public:
   std::unique_ptr<serving::AbstractExampleSet> AllocateExamples(
       int num_examples) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return {};
   }
 
   void Predict(const serving::AbstractExampleSet& examples, int num_examples,
                std::vector<float>* predictions) const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
   }
 
   int NumPredictionDimension() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return 1;
   }
 
   const serving::FeaturesDefinition& features() const override {
-    YDF_LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
     return features_;
   }
 
@@ -287,72 +288,6 @@ TEST(AbstractModel, BuildFastEngine) {
   EXPECT_OK(engine_or_status.status());
   const serving::FastEngine* engine = engine_or_status.value().get();
   EXPECT_TRUE(dynamic_cast<const Engine2*>(engine) != nullptr);
-}
-
-TEST(ChangePredictionType, ClassificationToRanking) {
-  {
-    const proto::Prediction src_pred = PARSE_TEST_PROTO(
-        R"pb(classification {
-               distribution { counts: 0 counts: 1 counts: 3 sum: 4 }
-             })pb");
-    proto::Prediction dst_pred;
-    CHECK_OK(ChangePredictionType(proto::Task::CLASSIFICATION,
-                                  proto::Task::RANKING, src_pred, &dst_pred));
-    EXPECT_THAT(dst_pred, EqualsProto(utils::ParseTextProto<proto::Prediction>(
-                                          R"(ranking { relevance: 0.75 })")
-                                          .value()));
-  }
-
-  {
-    const proto::Prediction src_pred =
-        PARSE_TEST_PROTO(R"pb(regression { value: 5 })pb");
-    proto::Prediction dst_pred;
-    CHECK_OK(ChangePredictionType(proto::Task::REGRESSION, proto::Task::RANKING,
-                                  src_pred, &dst_pred));
-    EXPECT_THAT(dst_pred, EqualsProto(utils::ParseTextProto<proto::Prediction>(
-                                          R"(ranking { relevance: 5 })")
-                                          .value()));
-  }
-
-  {
-    const proto::Prediction src_pred =
-        PARSE_TEST_PROTO(R"pb(ranking { relevance: 5 })pb");
-    proto::Prediction dst_pred;
-    CHECK_OK(ChangePredictionType(proto::Task::RANKING, proto::Task::REGRESSION,
-                                  src_pred, &dst_pred));
-    EXPECT_THAT(dst_pred, EqualsProto(utils::ParseTextProto<proto::Prediction>(
-                                          R"(regression { value: 5 })")
-                                          .value()));
-  }
-
-  {
-    const proto::Prediction src_pred =
-        PARSE_TEST_PROTO(R"pb(regression { value: 5 })pb");
-    proto::Prediction dst_pred;
-    CHECK_OK(ChangePredictionType(
-        proto::Task::REGRESSION, proto::Task::REGRESSION, src_pred, &dst_pred));
-    EXPECT_THAT(dst_pred, EqualsProto(utils::ParseTextProto<proto::Prediction>(
-                                          R"(regression { value: 5 })")
-                                          .value()));
-  }
-}
-
-TEST(ChangePredictionType, AnomalyDetectionToClassification) {
-  const proto::Prediction src_pred =
-      PARSE_TEST_PROTO(R"pb(anomaly_detection { value: 0.8 })pb");
-  proto::Prediction dst_pred;
-  ASSERT_OK(ChangePredictionType(proto::Task::ANOMALY_DETECTION,
-                                 proto::Task::CLASSIFICATION, src_pred,
-                                 &dst_pred));
-  EXPECT_THAT(dst_pred,
-              ApproximatelyEqualsProto(PARSE_TEST_PROTO_WITH_TYPE(
-                  proto::Prediction,
-                  R"pb(
-                    classification {
-                      value: 2
-                      distribution { counts: 0 counts: 0.2 counts: 0.8 sum: 1 }
-                    }
-                  )pb")));
 }
 
 TEST(FloatToProtoPrediction, Base) {

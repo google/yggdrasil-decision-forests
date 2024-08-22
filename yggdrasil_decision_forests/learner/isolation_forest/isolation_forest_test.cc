@@ -20,18 +20,22 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.pb.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
+#include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -59,7 +63,8 @@ class IsolationForestOnGaussians : public utils::TrainAndTestTester {
     train_config_.add_features("f.*");
     train_config_.set_label("label");
     dataset_filename_ = "gaussians_train.csv";
-    eval_options_.set_task(model::proto::Task::ANOMALY_DETECTION);
+    eval_options_.set_task(model::proto::Task::CLASSIFICATION);
+    evaluation_override_type_ = model::proto::CLASSIFICATION;
 
     if_config()->set_subsample_count(100);
   }
@@ -67,7 +72,7 @@ class IsolationForestOnGaussians : public utils::TrainAndTestTester {
 
 TEST_F(IsolationForestOnGaussians, DefaultHyperParameters) {
   TrainAndEvaluateModel();
-  YDF_LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
 
   utils::RandomEngine rnd;
   metric::proto::EvaluationOptions options;
@@ -78,7 +83,7 @@ TEST_F(IsolationForestOnGaussians, DefaultHyperParameters) {
                                    model::proto::Task::CLASSIFICATION,
                                    model_->label_col_idx(), -1, &rnd));
 
-  YDF_LOG(INFO) << "Evaluation:\n" << metric::TextReport(evaluation).value();
+  LOG(INFO) << "Evaluation:\n" << metric::TextReport(evaluation).value();
   EXPECT_NEAR(evaluation.classification().rocs(1).auc(), 0.99, 0.005f);
 
   EXPECT_EQ(model_->task(), model::proto::Task::ANOMALY_DETECTION);
@@ -88,6 +93,18 @@ TEST_F(IsolationForestOnGaussians, DefaultHyperParameters) {
   auto if_model = dynamic_cast<const IsolationForestModel*>(model_.get());
   EXPECT_EQ(if_model->num_trees(), 300);
   EXPECT_GT(if_model->NumNodes(), if_model->num_trees() * 32);
+}
+
+TEST_F(IsolationForestOnGaussians, Accuracy) {
+  // Warning: This evaluates on the training dataset.
+  dataset_test_filename_ = "gaussians_test.csv";
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_subsample_count(256);
+  if_config->set_num_trees(100);
+  TrainAndEvaluateModel();
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.97, 0.025);
 }
 
 class IsolationForestOnAdult : public utils::TrainAndTestTester {
@@ -101,7 +118,8 @@ class IsolationForestOnAdult : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::ANOMALY_DETECTION);
     train_config_.set_label("income");
     dataset_filename_ = "adult_train.csv";
-    eval_options_.set_task(model::proto::Task::ANOMALY_DETECTION);
+    eval_options_.set_task(model::proto::Task::CLASSIFICATION);
+    evaluation_override_type_ = model::proto::CLASSIFICATION;
 
     if_config()->set_subsample_count(100);
   }
@@ -109,7 +127,7 @@ class IsolationForestOnAdult : public utils::TrainAndTestTester {
 
 TEST_F(IsolationForestOnAdult, DefaultHyperParameters) {
   TrainAndEvaluateModel();
-  YDF_LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
 }
 
 class IsolationForestOnMammographicMasses : public utils::TrainAndTestTester {
@@ -123,15 +141,26 @@ class IsolationForestOnMammographicMasses : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::ANOMALY_DETECTION);
     train_config_.set_label("Severity");
     dataset_filename_ = "mammographic_masses.csv";
-    eval_options_.set_task(model::proto::Task::ANOMALY_DETECTION);
+    auto* label_guide = guide_.add_column_guides();
+    label_guide->set_column_name_pattern("Severity");
+    label_guide->set_type(dataset::proto::CATEGORICAL);
+    eval_options_.set_task(model::proto::Task::CLASSIFICATION);
+    evaluation_override_type_ = model::proto::CLASSIFICATION;
 
     if_config()->set_subsample_count(100);
   }
 };
 
-TEST_F(IsolationForestOnMammographicMasses, DefaultHyperParameters) {
+TEST_F(IsolationForestOnMammographicMasses, Accuracy) {
+  // Warning: This evaluates on the training dataset.
+  dataset_test_filename_ = "mammographic_masses.csv";
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_subsample_count(256);
+  if_config->set_num_trees(100);
   TrainAndEvaluateModel();
-  YDF_LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.51, 0.02);
 }
 
 TEST(IsolationForest, BadTask) {
@@ -151,6 +180,29 @@ TEST(IsolationForest, BadTask) {
 
   EXPECT_THAT(learner->TrainWithStatus(dataset_path, dataspec).status(),
               StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(IsolationForestOnMammographicMasses, MaxDepth) {
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_subsample_count(256);
+  TrainAndEvaluateModel();
+  auto* df_model = dynamic_cast<model::DecisionForestInterface*>(model_.get());
+  ASSERT_NE(df_model, nullptr);
+  int max_depth = -1;
+  for (const auto& tree : df_model->decision_trees()) {
+    max_depth = std::max(max_depth, tree->MaximumDepth());
+  }
+  EXPECT_EQ(max_depth, 8);
+}
+
+TEST_F(IsolationForestOnMammographicMasses, Oblique) {
+  deployment_config_.set_num_threads(1);
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  EXPECT_TRUE(if_config->decision_tree().has_sparse_oblique_split());
+  TrainAndEvaluateModel();
 }
 
 TEST(DefaultMaximumDepth, Base) {
@@ -195,6 +247,8 @@ TEST(FindSplit, Numerical) {
     utils::RandomEngine rnd(seed);
 
     internal::Configuration config;
+    proto::IsolationForestTrainingConfig if_config;
+    config.if_config = &if_config;
     config.config_link.add_features(0);  // Only select "f1".
 
     decision_tree::NodeWithChildren node;
@@ -238,6 +292,39 @@ TEST(GetGenericHyperParameterSpecification, Base) {
            IsolationForestLearner::kHParamSubsampleCount,
        }) {
     EXPECT_TRUE(hp_specs.fields().contains(field));
+  }
+}
+
+TEST(GetGenericHyperParameterSpecification,
+     GenericHyperParameterMutualExclusive) {
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(IsolationForestLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::ANOMALY_DETECTION);
+  ASSERT_OK_AND_ASSIGN(auto learner, model::GetLearner(train_config));
+
+  ASSERT_OK_AND_ASSIGN(const auto hparam_def,
+                       learner->GetGenericHyperParameterSpecification());
+
+  for (const auto& field : hparam_def.fields()) {
+    if (field.second.has_mutual_exclusive()) {
+      bool is_default = field.second.mutual_exclusive().is_default();
+      const auto& other_parameters =
+          field.second.mutual_exclusive().other_parameters();
+      for (const auto& other_parameter : other_parameters) {
+        auto other_param_it =
+            std::find_if(hparam_def.fields().begin(), hparam_def.fields().end(),
+                         [other_parameter](const auto& field) {
+                           return other_parameter == field.first;
+                         });
+        EXPECT_FALSE(other_param_it == hparam_def.fields().end());
+        EXPECT_THAT(
+            other_param_it->second.mutual_exclusive().other_parameters(),
+            testing::Contains(field.first));
+        if (is_default) {
+          EXPECT_FALSE(other_param_it->second.mutual_exclusive().is_default());
+        }
+      }
+    }
   }
 }
 

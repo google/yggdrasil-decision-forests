@@ -25,6 +25,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/numbers.h"
@@ -122,10 +123,9 @@ void CheckCompatibleEngine(
   }
 
   if (expected_engines != compatible_engines) {
-    YDF_LOG(INFO) << "expected_engines:"
-                  << absl::StrJoin(expected_engines, " ");
-    YDF_LOG(INFO) << "compatible_engines:"
-                  << absl::StrJoin(compatible_engines, " ");
+    LOG(INFO) << "expected_engines:" << absl::StrJoin(expected_engines, " ");
+    LOG(INFO) << "compatible_engines:"
+              << absl::StrJoin(compatible_engines, " ");
     ADD_FAILURE();
   }
 }
@@ -671,7 +671,7 @@ TEST(DecisionForest, NonGlobalImputationQuickScorer) {
 
   GradientBoostedTreesRegressionQuickScorerExtended engine;
   CHECK_OK(GenericToSpecializedModel(*model.get(), &engine));
-  YDF_LOG(INFO) << "Engine:\n" << DescribeQuickScorer(engine);
+  LOG(INFO) << "Engine:\n" << DescribeQuickScorer(engine);
 
   const auto examples = BuildNonGlobalImputationExamples(engine);
   std::vector<float> predictions;

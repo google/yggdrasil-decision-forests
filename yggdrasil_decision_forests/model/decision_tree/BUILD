@@ -43,6 +43,7 @@ cc_library_ydf(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
@@ -96,6 +97,7 @@ cc_library_ydf(
         ":decision_tree_io_interface",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:sharded_io_blob_sequence",
+        "@com_google_absl//absl/memory",
     ],
     alwayslink = 1,
 )

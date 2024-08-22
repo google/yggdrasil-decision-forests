@@ -36,15 +36,24 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_TRAINING_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_TRAINING_H_
 
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_reader.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/label_accessor.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/splitter.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -83,10 +92,8 @@ absl::Status SetLeafValue(
 
 // Signature of a function that sets the value (i.e. the prediction) of a leaf
 // from the gradient label statistics.
-typedef std::function<absl::Status(
-    const decision_tree::proto::LabelStatistics& label_stats,
-    decision_tree::proto::Node* leaf)>
-    SetLeafValueFromLabelStatsFunctor;
+using SetLeafValueFromLabelStatsFunctor =
+    decision_tree::SetLeafValueFromLabelStatsFunctor;
 
 // A decision tree being build.
 //
@@ -147,6 +154,9 @@ class TreeBuilder {
 
   // Finds the best splits for the open nodes.
   absl::Status FindBestSplits(const FindBestSplitsCommonArgs& common) const;
+  absl::Status FindBestSplits(
+      const FindBestSplitsCommonArgs& common,
+      utils::concurrency::ThreadPool* thread_pool) const;
 
   // Finds the best splits for the open nodes. Unlike "FindBestSplits",
   // "FindBestSplitsWithThreadPool" schedules the split finding in the thread
@@ -283,14 +293,22 @@ ExampleToNodeMap CreateExampleToNodeMap(ExampleIndex num_examples);
 
 // Merges two sets of splits element per element. "dst" will contain the split
 // (from "src" or "dst") with the highest scores.
-absl::Status MergeBestSplits(const SplitPerOpenNode& src,
-                             SplitPerOpenNode* dst);
+//
+// "attribute_priority"  determines which condition is selected if multiple
+// conditions have the same score. If "attribute_priority=={}", the condition
+// with the smallest attribute index is selected. If "attribute_priority" is not
+// empty, "attribute_priority[node_idx][attribute_idx]" specifies the priority
+// of attribute **attribute_idx** for node **node_idx** (with smaller priority
+// values being selected over higher priority values).
+absl::Status MergeBestSplits(
+    const SplitPerOpenNode& src, SplitPerOpenNode* dst,
+    const std::vector<std::vector<int>>* const attribute_priority = nullptr);
 
 // Evaluates a collection of splits.
 absl::Status EvaluateSplits(const ExampleToNodeMap& example_to_node,
                             const SplitPerOpenNode& splits,
                             SplitEvaluationPerOpenNode* split_evaluation,
-                            dataset_cache::DatasetCacheReader* dataset,
+                            const dataset_cache::DatasetCacheReader* dataset,
                             utils::concurrency::ThreadPool* thread_pool);
 
 // Evaluates a collection of splits on a specific numerical feature.
@@ -298,21 +316,21 @@ absl::Status EvaluateSplitsPerNumericalFeature(
     const ExampleToNodeMap& example_to_node, const SplitPerOpenNode& splits,
     FeatureIndex feature, const std::vector<int>& active_node_idxs,
     SplitEvaluationPerOpenNode* split_evaluation,
-    dataset_cache::DatasetCacheReader* dataset);
+    const dataset_cache::DatasetCacheReader* dataset);
 
 // Evaluates a collection of splits on a specific categorical feature.
 absl::Status EvaluateSplitsPerCategoricalFeature(
     const ExampleToNodeMap& example_to_node, const SplitPerOpenNode& splits,
     FeatureIndex feature, const std::vector<int>& active_node_idxs,
     SplitEvaluationPerOpenNode* split_evaluation,
-    dataset_cache::DatasetCacheReader* dataset);
+    const dataset_cache::DatasetCacheReader* dataset);
 
 // Evaluates a collection of splits on a specific boolean feature.
 absl::Status EvaluateSplitsPerBooleanFeature(
     const ExampleToNodeMap& example_to_node, const SplitPerOpenNode& splits,
     FeatureIndex feature, const std::vector<int>& active_node_idxs,
     SplitEvaluationPerOpenNode* split_evaluation,
-    dataset_cache::DatasetCacheReader* dataset);
+    const dataset_cache::DatasetCacheReader* dataset);
 
 // Update the node index of each example according to the split.
 absl::Status UpdateExampleNodeMap(

@@ -26,6 +26,8 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -275,7 +277,7 @@ int NumberOfFolds(const proto::FoldGenerator& generator,
     case proto::FoldGenerator::GeneratorCase::kPrecomputedCrossValidation:
       return folds.size();
     default:
-      YDF_LOG(FATAL) << "Unknown fold generator.";
+      LOG(FATAL) << "Unknown fold generator.";
   }
   return -1;
 }
@@ -307,7 +309,7 @@ absl::Status GenerateFolds(const proto::FoldGenerator& generator,
       return GenerateFoldsPrecomputedCrossValidation(generator, *dataset,
                                                      folds);
     default:
-      YDF_LOG(FATAL) << "Not supported fold generator.";
+      LOG(FATAL) << "Not supported fold generator.";
   }
 }
 
@@ -326,7 +328,7 @@ absl::Status GenerateFoldsConstDataset(const proto::FoldGenerator& generator,
     case proto::FoldGenerator::GeneratorCase::kPrecomputedCrossValidation:
       return GenerateFoldsPrecomputedCrossValidation(generator, dataset, folds);
     default:
-      YDF_LOG(FATAL) << "Not supported fold generator.";
+      LOG(FATAL) << "Not supported fold generator.";
   }
 }
 

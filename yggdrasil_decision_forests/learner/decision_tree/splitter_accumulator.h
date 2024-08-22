@@ -35,19 +35,19 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
-#include <iterator>
 #include <limits>
+#include <ostream>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
-#include "absl/status/statusor.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator_uplift.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/splitter_structure.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
@@ -499,7 +499,7 @@ struct FeatureBooleanBucket {
   class Filler {
    public:
     explicit Filler(const bool na_replacement,
-                    const std::vector<char>& attributes)
+                    const std::vector<int8_t>& attributes)
         : na_replacement_(na_replacement), attributes_(attributes) {}
 
     size_t NumBuckets() const { return 2; }
@@ -528,7 +528,7 @@ struct FeatureBooleanBucket {
 
    private:
     const bool na_replacement_;
-    const std::vector<char>& attributes_;
+    const std::vector<int8_t>& attributes_;
   };
 
   friend std::ostream& operator<<(std::ostream& os,

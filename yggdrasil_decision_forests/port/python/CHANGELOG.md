@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.7.0 - 2024-08-21
+
+### Feature
+
+-   Expose `validate_hyperparameters()` on the learner.
+-   Clarify which parameters in the learner are optional.
+-   Add support in JAX FeatureEncoder for non-string categorical feature values.
+-   Improve performance of Isolation Forests.
+-   Models can be serialized/deserialized to/from bytes with `model.serialize()`
+    and `ydf.deserialize_model`.
+-   Models can be pickled safely.
+-   Native support for Xarray as a dataset format for all operations (e.g.,
+    training, evaluation, predictions).
+-   The output of `model.to_jax_function` can be converted to a TensorFlow Lite
+    model.
+-   Change the default number of examples to scan when training on files to
+    determine the semantic and dictionaries of columns from 10k to 100k.
+-   Various improvements of error messages.
+-   Evaluation for Anomaly Detection models.
+-   Oblique splits for Anomaly Detection models.
+
+### Fix
+
+-   Fix parsing of multidimensional ragged inputs.
+-   Fix isolation forest hyperparameter defaults.
+-   Fix bug causing distributed training to fail on a sharded dataset containing
+    an empty shard.
+-   Handle unordered categorical sets in training.
+-   Fix dataspec ignoring definitions of unrolled columns, such as
+    multidimensional categorical integers.
+-   Fix error when defining categorical sets for non-ragged multidimensional
+    inputs.
+-   MacOS: Fix compatibility with other protobuf-using libraries such as
+    Tensorflow.
+
+#### Release music
+
+Rondo Alla ingharese quasi un capriccio "Die Wut über den verlorenen Groschen",
+Op. 129. Ludwig van Beethoven
+
+## 0.6.0 - 2024-07-04
+
+### Feature
+
+-   `model.to_jax_function` now always outputs a FeatureEncoder to help feeding
+    data to the JAX model.
+-   The default value of `num_candidate_attributes` in the CART learner is
+    changed from 0 (Random Forest style sampling) to -1 (no sampling). This is
+    the generally accepted logic of CART.
+-   `model.to_tensorflow_saved_model` support preprocessing functions which have
+    a different signature than the YDF model.
+-   Improve error messages when feeding wrong size Numpy arrays.
+-   Add option for weighted evaluation in `model.evaluate`.
+
+### Fix
+
+-   Fix display of confusion matrix with floating point weights.
+
+### Known issues
+
+-   MacOS build is broken.
+
 ## 0.5.0 - 2024-06-17
 
 ### Feature

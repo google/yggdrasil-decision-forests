@@ -176,7 +176,7 @@ def test_almost_equal(a, b) -> Optional[str]:
       return f"numpy array type mismatch: {a} != {b}"
 
     if a.dtype.type in [np.bytes_, np.str_]:
-      if not np.equal(a, b).all():
+      if not np.array_equal(a, b):
         return f"numpy array mismatch: {a} != {b}"
     else:
       if not np.allclose(a, b):

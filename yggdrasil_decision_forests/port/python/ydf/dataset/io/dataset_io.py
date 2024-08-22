@@ -15,13 +15,15 @@
 """Common functionality for all dataset I/O connectors."""
 
 import math
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple
+import re
+from typing import Iterator, Optional, Sequence, Tuple
 
 import numpy as np
 
 from ydf.dataset.io import dataset_io_types
 from ydf.dataset.io import pandas_io
 from ydf.dataset.io import tensorflow_io
+from ydf.dataset.io import xarray_io
 
 
 def unrolled_feature_names(name: str, num_dims: int) -> Sequence[str]:
@@ -42,6 +44,16 @@ def unrolled_feature_names(name: str, num_dims: int) -> Sequence[str]:
       f"{name}.{dim_idx:0{num_leading_zeroes}}{postfix}"
       for dim_idx in range(num_dims)
   ]
+
+
+def parse_unrolled_feature_name(name: str) -> Optional[Tuple[str, int, int]]:
+  """Splits the components of an unrolled feature name."""
+  match = re.fullmatch(
+      r"(?P<base>.*)\.(?P<idx>[0-9]+)_of_(?P<num>[0-9]+)", name
+  )
+  if match is None:
+    return None
+  return match["base"], int(match["idx"]), int(match["num"])
 
 
 def _unroll_column(
@@ -91,7 +103,8 @@ def _unroll_column(
 
 def _unroll_dict(
     src: dataset_io_types.DictInputValues,
-    dont_unroll_columns: Optional[Sequence[str]] = None,
+    single_dim_columns: Sequence[str],
+    not_unrolled_multi_dim_columns: Sequence[str],
 ) -> Tuple[
     dataset_io_types.DictInputValues, dataset_io_types.UnrolledFeaturesInfo
 ]:
@@ -99,29 +112,33 @@ def _unroll_dict(
 
   Args:
     src: Dictionary of single and multi-dim values.
-    dont_unroll_columns: List of columns that cannot be unrolled. If one such
-      column needs to be unrolled, raise an error.
+    single_dim_columns: List of columns that should be single-dimensional. If
+      one such column is multi-dimensional, raise an error.
+    not_unrolled_multi_dim_columns: List of columns that should be
+      multi-dimensional and not unrolled.
 
   Returns:
     Dictionary containing only single-dimensional values.
   """
 
   # Index the columns for fast query.
-  dont_unroll_columns_set = (
-      set(dont_unroll_columns) if dont_unroll_columns else set()
-  )
+  single_dim_columns_set = set(single_dim_columns)
+  not_unrolled_multi_dim_columns_set = set(not_unrolled_multi_dim_columns)
 
   unrolled_features_info = {}
 
-  # Note: We only create a one dictionary independently of the number of
+  # Note: We only create a single dictionary independently of the number of
   # features.
   dst = {}
   for name, value in src.items():
+    if name in not_unrolled_multi_dim_columns_set:
+      dst[name] = value
+      continue
 
     any_is_unrolling = False
     sub_dst = {}
     for sub_name, sub_value, is_unrolling in _unroll_column(
-        name, value, allow_unroll=name not in dont_unroll_columns_set
+        name, value, allow_unroll=name not in single_dim_columns_set
     ):
       sub_dst[sub_name] = sub_value
       any_is_unrolling |= is_unrolling
@@ -136,7 +153,8 @@ def _unroll_dict(
 
 def cast_input_dataset_to_dict(
     data: dataset_io_types.IODataset,
-    dont_unroll_columns: Optional[Sequence[str]] = None,
+    single_dim_columns: Optional[Sequence[str]] = None,
+    not_unrolled_multi_dim_columns: Optional[Sequence[str]] = None,
 ) -> Tuple[
     dataset_io_types.DictInputValues, dataset_io_types.UnrolledFeaturesInfo
 ]:
@@ -146,18 +164,25 @@ def cast_input_dataset_to_dict(
 
   Args:
     data: Input data.
-    dont_unroll_columns: Column in "dont_unroll_columns" will not be unrolled.
+    single_dim_columns: Optional list of columns that should be
+      single-dimensional. If one such column is multi-dimensional, raise an
+      error.
+    not_unrolled_multi_dim_columns: Optional list of columns that should be
+      multi-dimensional and not unrolled.
 
   Returns:
     The normalized features, and information about unrolled features.
   """
 
   unroll_dict_kwargs = {
-      "dont_unroll_columns": dont_unroll_columns,
+      "single_dim_columns": single_dim_columns or [],
+      "not_unrolled_multi_dim_columns": not_unrolled_multi_dim_columns or [],
   }
 
   if pandas_io.is_pandas_dataframe(data):
     return _unroll_dict(pandas_io.to_dict(data), **unroll_dict_kwargs)
+  elif xarray_io.is_xarray_dataset(data):
+    return _unroll_dict(xarray_io.to_dict(data), **unroll_dict_kwargs)
   elif tensorflow_io.is_tensorflow_dataset(data):
     return _unroll_dict(tensorflow_io.to_dict(data), **unroll_dict_kwargs)
 
@@ -167,12 +192,13 @@ def cast_input_dataset_to_dict(
 
   # TODO: Maybe this error should be raised at a layer above this one?
 
-  raise ValueError(
-      "Non supported dataset type: "
-      f"{type(data)}\n\n{dataset_io_types.SUPPORTED_INPUT_DATA_DESCRIPTION}"
-      + (
-          dataset_io_types.HOW_TO_FEED_NUMPY
-          if isinstance(data, np.ndarray)
-          else ""
-      )
-  )
+  if isinstance(data, np.ndarray):
+    raise ValueError(
+        "Unsupported dataset type:"
+        f" {type(data)}\n{dataset_io_types.HOW_TO_FEED_NUMPY}\n\n{dataset_io_types.SUPPORTED_INPUT_DATA_DESCRIPTION}"
+    )
+  else:
+    raise ValueError(
+        "Unsupported dataset type: "
+        f"{type(data)}\n{dataset_io_types.SUPPORTED_INPUT_DATA_DESCRIPTION}"
+    )

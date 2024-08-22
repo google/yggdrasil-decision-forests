@@ -23,6 +23,8 @@
 #include <queue>
 #include <string>
 
+#include "absl/log/log.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
@@ -58,7 +60,7 @@ class Channel {
   // Push an item in the channel.
   void Push(Input item) {
     if (close_channel_) {
-      YDF_LOG(ERROR) << "Ignoring value added to closed channel.";
+      LOG(ERROR) << "Ignoring value added to closed channel.";
       return;
     }
     MutexLock results_lock(&mutex_);

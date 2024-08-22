@@ -48,7 +48,7 @@ absl::Status CustomBinaryClassificationLoss::Status() const {
 absl::StatusOr<std::vector<float>>
 CustomBinaryClassificationLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& weights) const {
+    const absl::Span<const float> weights) const {
   ASSIGN_OR_RETURN(
       const auto* labels,
       dataset.ColumnWithCastWithStatus<
@@ -74,7 +74,8 @@ CustomBinaryClassificationLoss::InitialPredictions(
 }
 
 absl::Status CustomBinaryClassificationLoss::UpdateGradients(
-    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+    const absl::Span<const int32_t> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -95,8 +96,9 @@ std::vector<std::string> CustomBinaryClassificationLoss::SecondaryMetricNames()
 }
 
 absl::StatusOr<LossResults> CustomBinaryClassificationLoss::Loss(
-    const std::vector<int32_t>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<const int32_t> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   DCHECK_EQ(weights.size(), labels.size());

@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {

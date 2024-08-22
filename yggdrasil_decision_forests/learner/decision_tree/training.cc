@@ -21,8 +21,6 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
-#include <iterator>
-#include <limits>
 #include <memory>
 #include <numeric>
 #include <queue>
@@ -32,13 +30,15 @@
 #include <utility>
 #include <vector>
 
+#include "absl/base/optimization.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/time/time.h"
+#include "absl/time/clock.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -46,10 +46,11 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator_uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_scanner.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -105,105 +106,6 @@ NumTrialsForRandomCategoricalSplit(const proto::Categorical::Random& config) {
             32 + std::pow(active_dictionary_size, num_trial_exponent);
         return std::min(num_trials, max_num_trials);
       };
-}
-
-// Set the label value for a classification label on a vertical dataset.
-template <bool weighted>
-absl::Status SetClassificationLabelDistribution(
-    const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
-  if constexpr (weighted) {
-    DCHECK_LE(selected_examples.size(), weights.size());
-  } else {
-    DCHECK(weights.empty());
-  }
-  ASSIGN_OR_RETURN(
-      const auto* const labels,
-      dataset.ColumnWithCastWithStatus<
-          dataset::VerticalDataset::CategoricalColumn>(config_link.label()));
-  utils::IntegerDistributionDouble label_distribution;
-  const int32_t num_classes = dataset.data_spec()
-                                  .columns(config_link.label())
-                                  .categorical()
-                                  .number_of_unique_values();
-  label_distribution.SetNumClasses(num_classes);
-  for (const UnsignedExampleIdx example_idx : selected_examples) {
-    if constexpr (weighted) {
-      label_distribution.Add(labels->values()[example_idx],
-                             weights[example_idx]);
-    } else {
-      label_distribution.Add(labels->values()[example_idx]);
-    }
-  }
-  label_distribution.Save(node->mutable_classifier()->mutable_distribution());
-  node->mutable_classifier()->set_top_value(label_distribution.TopClass());
-  return absl::OkStatus();
-}
-
-absl::Status SetCategoricalUpliftLabelDistribution(
-    const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
-  DCHECK(!weights.empty());
-  // TODO: Update.
-  ASSIGN_OR_RETURN(
-      const auto* const outcomes,
-      dataset.ColumnWithCastWithStatus<
-          dataset::VerticalDataset::CategoricalColumn>(config_link.label()));
-
-  ASSIGN_OR_RETURN(const auto* const treatments,
-                   dataset.ColumnWithCastWithStatus<
-                       dataset::VerticalDataset::CategoricalColumn>(
-                       config_link.uplift_treatment()));
-
-  const auto& outcome_spec = dataset.data_spec().columns(config_link.label());
-  const auto& treatment_spec =
-      dataset.data_spec().columns(config_link.uplift_treatment());
-
-  UpliftLabelDistribution label_dist;
-  label_dist.InitializeAndClearCategoricalOutcome(
-      outcome_spec.categorical().number_of_unique_values(),
-      treatment_spec.categorical().number_of_unique_values());
-
-  for (const UnsignedExampleIdx example_idx : selected_examples) {
-    label_dist.AddCategoricalOutcome(outcomes->values()[example_idx],
-                                     treatments->values()[example_idx],
-                                     weights[example_idx]);
-  }
-  internal::UpliftLabelDistToLeaf(label_dist, node->mutable_uplift());
-  return absl::OkStatus();
-}
-
-absl::Status SetRegressiveUpliftLabelDistribution(
-    const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
-  const auto* const outcomes =
-      dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-          config_link.label());
-
-  const auto* const treatments =
-      dataset.ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-          config_link.uplift_treatment());
-
-  const auto& treatment_spec =
-      dataset.data_spec().columns(config_link.uplift_treatment());
-
-  UpliftLabelDistribution label_dist;
-  label_dist.InitializeAndClearNumericalOutcome(
-      treatment_spec.categorical().number_of_unique_values());
-
-  for (const UnsignedExampleIdx example_idx : selected_examples) {
-    label_dist.AddNumericalOutcome(outcomes->values()[example_idx],
-                                   treatments->values()[example_idx],
-                                   weights[example_idx]);
-  }
-  internal::UpliftLabelDistToLeaf(label_dist, node->mutable_uplift());
-  return absl::OkStatus();
 }
 
 // Compute the ratio of true label for all attribute values.
@@ -326,7 +228,7 @@ void LocalImputationForCategoricalAttribute(
 // attribute. Returns the most frequent attribute value.
 void LocalImputationForBooleanAttribute(
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     bool* na_replacement) {
   DCHECK(!weights.empty());
   utils::IntegerDistributionDouble attribute_distribution;
@@ -471,75 +373,38 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
   return std::make_pair(best_attr_value, best_candidate_variance_reduction);
 }
 
-// Predicts if the sorting-in-node numerical splitter is slower or faster than
-// the numerical splitter using a pre-sorted index. Returns true if learning a
-// split on "num_selected_examples" while the entire training dataset contains
-// "num_total_examples" is more efficient with a pre-sorted splitter. If false,
-// a splitter with in-node sorting is more efficient.
+// Select which sorting strategy to use effectively.
 //
-// This function is an heuristic that impact the training speed but not the
-// model.
-//
-// This function is used when PRESORTING is enabled (see
-// "SetDefaultHyperParameters").
-bool IsPresortingOnNumericalSplitMoreEfficient(
-    const int64_t num_selected_examples, const int64_t num_total_examples) {
-  const float ratio =
-      static_cast<float>(num_selected_examples) / num_total_examples;
-  return num_selected_examples >= 25 && ratio >= 0.125;
+// If the strategy is AUTO or PRESORTED, the fastest / selected strategy depends
+// on the data.
+proto::DecisionTreeTrainingConfig::Internal::SortingStrategy EffectiveStrategy(
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const int64_t num_selected_examples,
+    const InternalTrainConfig& internal_config) {
+  auto strategy = dt_config.internal().sorting_strategy();
+  switch (strategy) {
+    // User specified strategy.
+    case proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED:
+    case proto::DecisionTreeTrainingConfig::Internal::IN_NODE:
+      return strategy;
+
+    case proto::DecisionTreeTrainingConfig::Internal::AUTO:
+      CHECK(false);  // The AUTO strategy should have been resolved before.
+      [[fallthrough]];
+    case proto::DecisionTreeTrainingConfig::Internal::PRESORTED: {
+      DCHECK(internal_config.preprocessing);
+      const auto num_total_examples =
+          internal_config.preprocessing->num_examples();
+      const float ratio =
+          static_cast<float>(num_selected_examples) / num_total_examples;
+      return (num_selected_examples >= 25 && ratio >= 0.125)
+                 ? proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED
+                 : proto::DecisionTreeTrainingConfig::Internal::IN_NODE;
+    }
+  };
 }
 
 }  // namespace
-
-absl::Status SetLabelDistribution(
-    const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    NodeWithChildren* node) {
-  switch (config.task()) {
-    case model::proto::Task::CLASSIFICATION:
-      if (weights.empty()) {
-        RETURN_IF_ERROR(SetClassificationLabelDistribution</*weighted=*/false>(
-            train_dataset, selected_examples, weights, config_link,
-            node->mutable_node()));
-      } else {
-        RETURN_IF_ERROR(SetClassificationLabelDistribution</*weighted=*/true>(
-            train_dataset, selected_examples, weights, config_link,
-            node->mutable_node()));
-      }
-      break;
-    case model::proto::Task::REGRESSION:
-      if (weights.empty()) {
-        RETURN_IF_ERROR(SetRegressionLabelDistribution</*weighted=*/false>(
-            train_dataset, selected_examples, weights, config_link,
-            node->mutable_node()));
-        break;
-      } else {
-        RETURN_IF_ERROR(SetRegressionLabelDistribution</*weighted=*/true>(
-            train_dataset, selected_examples, weights, config_link,
-            node->mutable_node()));
-        break;
-      }
-
-    case model::proto::Task::CATEGORICAL_UPLIFT:
-      RETURN_IF_ERROR(SetCategoricalUpliftLabelDistribution(
-          train_dataset, selected_examples, weights, config_link,
-          node->mutable_node()));
-      break;
-
-    case model::proto::Task::NUMERICAL_UPLIFT:
-      RETURN_IF_ERROR(SetRegressiveUpliftLabelDistribution(
-          train_dataset, selected_examples, weights, config_link,
-          node->mutable_node()));
-      break;
-
-    default:
-      NOTREACHED();
-  }
-  return absl::OkStatus();
-}
 
 // Specialization in the case of classification.
 SplitSearchResult FindBestCondition(
@@ -668,11 +533,10 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
-                            train_dataset.column(attribute_idx)->type())
-                     << " attribute "
-                     << train_dataset.column(attribute_idx)->name()
-                     << " is not supported.";
+      LOG(FATAL) << dataset::proto::ColumnType_Name(
+                        train_dataset.column(attribute_idx)->type())
+                 << " attribute " << train_dataset.column(attribute_idx)->name()
+                 << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
@@ -745,7 +609,7 @@ SplitSearchResult FindBestCondition(
               cache);
         }
       } else {
-        YDF_LOG(FATAL) << "Only split exact implemented for hessian gains.";
+        LOG(FATAL) << "Only split exact implemented for hessian gains.";
       }
     } break;
 
@@ -855,11 +719,10 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
-                            train_dataset.column(attribute_idx)->type())
-                     << " attribute "
-                     << train_dataset.column(attribute_idx)->name()
-                     << " is not supported.";
+      LOG(FATAL) << dataset::proto::ColumnType_Name(
+                        train_dataset.column(attribute_idx)->type())
+                 << " attribute " << train_dataset.column(attribute_idx)->name()
+                 << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
@@ -1075,11 +938,10 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
-                            train_dataset.column(attribute_idx)->type())
-                     << " attribute "
-                     << train_dataset.column(attribute_idx)->name()
-                     << " is not supported.";
+      LOG(FATAL) << dataset::proto::ColumnType_Name(
+                        train_dataset.column(attribute_idx)->type())
+                 << " attribute " << train_dataset.column(attribute_idx)->name()
+                 << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
@@ -1163,16 +1025,15 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
-                            train_dataset.column(attribute_idx)->type())
-                     << " attribute "
-                     << train_dataset.column(attribute_idx)->name()
-                     << " is not supported.";
+      LOG(FATAL) << dataset::proto::ColumnType_Name(
+                        train_dataset.column(attribute_idx)->type())
+                 << " attribute " << train_dataset.column(attribute_idx)->name()
+                 << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
   if (dt_config.allow_na_conditions()) {
-    YDF_LOG(FATAL) << "allow_na_conditions not supported";
+    LOG(FATAL) << "allow_na_conditions not supported";
   }
 
   return result;
@@ -1233,16 +1094,15 @@ SplitSearchResult FindBestCondition(
     } break;
 
     default:
-      YDF_LOG(FATAL) << dataset::proto::ColumnType_Name(
-                            train_dataset.column(attribute_idx)->type())
-                     << " attribute "
-                     << train_dataset.column(attribute_idx)->name()
-                     << " is not supported.";
+      LOG(FATAL) << dataset::proto::ColumnType_Name(
+                        train_dataset.column(attribute_idx)->type())
+                 << " attribute " << train_dataset.column(attribute_idx)->name()
+                 << " is not supported.";
   }
 
   // Condition of the type "Attr is NA".
   if (dt_config.allow_na_conditions()) {
-    YDF_LOG(FATAL) << "allow_na_conditions not supported";
+    LOG(FATAL) << "allow_na_conditions not supported";
   }
 
   return result;
@@ -1948,8 +1808,7 @@ absl::StatusOr<bool> FindBestCondition(
               ->values(),
           treatment_spec.categorical().number_of_unique_values());
 
-      internal::UpliftLeafToLabelDist(parent.uplift(),
-                                      &label_stat.label_distribution);
+      UpliftLeafToLabelDist(parent.uplift(), &label_stat.label_distribution);
 
       return FindBestConditionManager(
           train_dataset, selected_examples, weights, config, config_link,
@@ -1973,8 +1832,7 @@ absl::StatusOr<bool> FindBestCondition(
               ->values(),
           treatment_spec.categorical().number_of_unique_values());
 
-      internal::UpliftLeafToLabelDist(parent.uplift(),
-                                      &label_stat.label_distribution);
+      UpliftLeafToLabelDist(parent.uplift(), &label_stat.label_distribution);
 
       return FindBestConditionManager(
           train_dataset, selected_examples, weights, config, config_link,
@@ -2129,7 +1987,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
   FeatureNumericalBucket::Filler feature_filler(selected_examples.size(),
                                                 na_replacement, attributes);
 
-  const auto sorting_strategy = dt_config.internal().sorting_strategy();
+  const auto sorting_strategy =
+      EffectiveStrategy(dt_config, selected_examples.size(), internal_config);
 
   // "Why ==3" ?
   // Categorical attributes always have one class reserved for
@@ -2145,71 +2004,52 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
           initializer(label_distribution);
 
       if (sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-          sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
-        if (!internal_config.preprocessing) {
-          YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                            "strategy";
-        }
-        if (sorting_strategy ==
-                proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
-            IsPresortingOnNumericalSplitMoreEfficient(
-                selected_examples.size(),
-                internal_config.preprocessing->num_examples())) {
-          const auto& sorted_attributes =
-              internal_config.preprocessing
-                  ->presorted_numerical_features()[attribute_idx];
-          return ScanSplitsPresortedSparse<
-              FeatureNumericalLabelUnweightedBinaryCategoricalOneValue,
-              LabelBinaryCategoricalScoreAccumulator>(
-              internal_config.preprocessing->num_examples(), selected_examples,
-              sorted_attributes.items, feature_filler, label_filler,
-              initializer, min_num_obs, attribute_idx,
-              internal_config.duplicated_selected_examples, condition,
-              &cache->cache_v2);
-        }
+          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+        const auto& sorted_attributes =
+            internal_config.preprocessing
+                ->presorted_numerical_features()[attribute_idx];
+        return ScanSplitsPresortedSparse<
+            FeatureNumericalLabelUnweightedBinaryCategoricalOneValue,
+            LabelBinaryCategoricalScoreAccumulator>(
+            internal_config.preprocessing->num_examples(), selected_examples,
+            sorted_attributes.items, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx,
+            internal_config.duplicated_selected_examples, condition,
+            &cache->cache_v2);
+      } else if (sorting_strategy ==
+                 proto::DecisionTreeTrainingConfig::Internal::IN_NODE) {
+        return FindBestSplit_LabelUnweightedBinaryClassificationFeatureNumerical(
+            selected_examples, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      } else {
+        LOG(FATAL) << "Non supported strategy.";
       }
-
-      return FindBestSplit_LabelUnweightedBinaryClassificationFeatureNumerical(
-          selected_examples, feature_filler, label_filler, initializer,
-          min_num_obs, attribute_idx, condition, &cache->cache_v2);
     } else {
       LabelBinaryCategoricalOneValueBucket</*weighted=*/true>::Filler
           label_filler(labels, weights);
       LabelBinaryCategoricalOneValueBucket</*weighted=*/true>::Initializer
           initializer(label_distribution);
-
       if (sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-          sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
-        if (!internal_config.preprocessing) {
-          YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                            "strategy";
-        }
-        if (sorting_strategy ==
-                proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
-            IsPresortingOnNumericalSplitMoreEfficient(
-                selected_examples.size(),
-                internal_config.preprocessing->num_examples())) {
-          const auto& sorted_attributes =
-              internal_config.preprocessing
-                  ->presorted_numerical_features()[attribute_idx];
-          return ScanSplitsPresortedSparse<
-              FeatureNumericalLabelBinaryCategoricalOneValue,
-              LabelBinaryCategoricalScoreAccumulator>(
-              internal_config.preprocessing->num_examples(), selected_examples,
-              sorted_attributes.items, feature_filler, label_filler,
-              initializer, min_num_obs, attribute_idx,
-              internal_config.duplicated_selected_examples, condition,
-              &cache->cache_v2);
-        }
+          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+        const auto& sorted_attributes =
+            internal_config.preprocessing
+                ->presorted_numerical_features()[attribute_idx];
+        return ScanSplitsPresortedSparse<
+            FeatureNumericalLabelBinaryCategoricalOneValue,
+            LabelBinaryCategoricalScoreAccumulator>(
+            internal_config.preprocessing->num_examples(), selected_examples,
+            sorted_attributes.items, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx,
+            internal_config.duplicated_selected_examples, condition,
+            &cache->cache_v2);
+      } else if (sorting_strategy ==
+                 proto::DecisionTreeTrainingConfig::Internal::IN_NODE) {
+        return FindBestSplit_LabelBinaryClassificationFeatureNumerical(
+            selected_examples, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      } else {
+        LOG(FATAL) << "Non supported strategy.";
       }
-
-      return FindBestSplit_LabelBinaryClassificationFeatureNumerical(
-          selected_examples, feature_filler, label_filler, initializer,
-          min_num_obs, attribute_idx, condition, &cache->cache_v2);
     }
   } else {
     // Multi-class classification.
@@ -2220,35 +2060,26 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
           initializer(label_distribution);
 
       if (sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-          sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
-        if (!internal_config.preprocessing) {
-          YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                            "strategy";
-        }
-        if (sorting_strategy ==
-                proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
-            IsPresortingOnNumericalSplitMoreEfficient(
-                selected_examples.size(),
-                internal_config.preprocessing->num_examples())) {
-          const auto& sorted_attributes =
-              internal_config.preprocessing
-                  ->presorted_numerical_features()[attribute_idx];
-          return ScanSplitsPresortedSparse<
-              FeatureNumericalLabelUnweightedCategoricalOneValue,
-              LabelCategoricalScoreAccumulator>(
-              internal_config.preprocessing->num_examples(), selected_examples,
-              sorted_attributes.items, feature_filler, label_filler,
-              initializer, min_num_obs, attribute_idx,
-              internal_config.duplicated_selected_examples, condition,
-              &cache->cache_v2);
-        }
+          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+        const auto& sorted_attributes =
+            internal_config.preprocessing
+                ->presorted_numerical_features()[attribute_idx];
+        return ScanSplitsPresortedSparse<
+            FeatureNumericalLabelUnweightedCategoricalOneValue,
+            LabelCategoricalScoreAccumulator>(
+            internal_config.preprocessing->num_examples(), selected_examples,
+            sorted_attributes.items, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx,
+            internal_config.duplicated_selected_examples, condition,
+            &cache->cache_v2);
+      } else if (sorting_strategy ==
+                 proto::DecisionTreeTrainingConfig::Internal::IN_NODE) {
+        return FindBestSplit_LabelUnweightedClassificationFeatureNumerical(
+            selected_examples, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      } else {
+        LOG(FATAL) << "Non supported strategy.";
       }
-
-      return FindBestSplit_LabelUnweightedClassificationFeatureNumerical(
-          selected_examples, feature_filler, label_filler, initializer,
-          min_num_obs, attribute_idx, condition, &cache->cache_v2);
     } else {
       LabelCategoricalOneValueBucket</*weighted=*/true>::Filler label_filler(
           labels, weights);
@@ -2256,35 +2087,26 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
           initializer(label_distribution);
 
       if (sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-          sorting_strategy ==
-              proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
-        if (!internal_config.preprocessing) {
-          YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                            "strategy";
-        }
-        if (sorting_strategy ==
-                proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
-            IsPresortingOnNumericalSplitMoreEfficient(
-                selected_examples.size(),
-                internal_config.preprocessing->num_examples())) {
-          const auto& sorted_attributes =
-              internal_config.preprocessing
-                  ->presorted_numerical_features()[attribute_idx];
-          return ScanSplitsPresortedSparse<
-              FeatureNumericalLabelCategoricalOneValue,
-              LabelCategoricalScoreAccumulator>(
-              internal_config.preprocessing->num_examples(), selected_examples,
-              sorted_attributes.items, feature_filler, label_filler,
-              initializer, min_num_obs, attribute_idx,
-              internal_config.duplicated_selected_examples, condition,
-              &cache->cache_v2);
-        }
+          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+        const auto& sorted_attributes =
+            internal_config.preprocessing
+                ->presorted_numerical_features()[attribute_idx];
+        return ScanSplitsPresortedSparse<
+            FeatureNumericalLabelCategoricalOneValue,
+            LabelCategoricalScoreAccumulator>(
+            internal_config.preprocessing->num_examples(), selected_examples,
+            sorted_attributes.items, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx,
+            internal_config.duplicated_selected_examples, condition,
+            &cache->cache_v2);
+      } else if (sorting_strategy ==
+                 proto::DecisionTreeTrainingConfig::Internal::IN_NODE) {
+        return FindBestSplit_LabelClassificationFeatureNumerical(
+            selected_examples, feature_filler, label_filler, initializer,
+            min_num_obs, attribute_idx, condition, &cache->cache_v2);
+      } else {
+        LOG(FATAL) << "Non supported strategy.";
       }
-
-      return FindBestSplit_LabelClassificationFeatureNumerical(
-          selected_examples, feature_filler, label_filler, initializer,
-          min_num_obs, attribute_idx, condition, &cache->cache_v2);
     }
   }
 }
@@ -2509,6 +2331,9 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
                                          &na_replacement);
   }
 
+  const auto sorting_strategy =
+      EffectiveStrategy(dt_config, selected_examples.size(), internal_config);
+
   FeatureNumericalBucket::Filler feature_filler(selected_examples.size(),
                                                 na_replacement, attributes);
 
@@ -2522,37 +2347,27 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
                   dt_config.internal().hessian_split_score_subtract_parent(),
                   monotonic_direction, constraints);
 
-  if (dt_config.internal().sorting_strategy() ==
-          proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-      dt_config.internal().sorting_strategy() ==
-          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
-    if (!internal_config.preprocessing) {
-      YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                        "strategy";
-    }
-    if (dt_config.internal().sorting_strategy() ==
-            proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
-        IsPresortingOnNumericalSplitMoreEfficient(
-            selected_examples.size(),
-            internal_config.preprocessing->num_examples())) {
-      const auto& sorted_attributes =
-          internal_config.preprocessing
-              ->presorted_numerical_features()[attribute_idx];
-
-      return ScanSplitsPresortedSparse<
-          FeatureNumericalLabelHessianNumericalOneValue<weighted>,
-          LabelHessianNumericalScoreAccumulator>(
-          internal_config.preprocessing->num_examples(), selected_examples,
-          sorted_attributes.items, feature_filler, label_filler, initializer,
-          min_num_obs, attribute_idx,
-          internal_config.duplicated_selected_examples, condition,
-          &cache->cache_v2);
-    }
+  if (sorting_strategy ==
+      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+    const auto& sorted_attributes =
+        internal_config.preprocessing
+            ->presorted_numerical_features()[attribute_idx];
+    return ScanSplitsPresortedSparse<
+        FeatureNumericalLabelHessianNumericalOneValue<weighted>,
+        LabelHessianNumericalScoreAccumulator>(
+        internal_config.preprocessing->num_examples(), selected_examples,
+        sorted_attributes.items, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx,
+        internal_config.duplicated_selected_examples, condition,
+        &cache->cache_v2);
+  } else if (sorting_strategy ==
+             proto::DecisionTreeTrainingConfig::Internal::IN_NODE) {
+    return FindBestSplit_LabelHessianRegressionFeatureNumerical<weighted>(
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
+  } else {
+    LOG(FATAL) << "Non supported strategy.";
   }
-
-  return FindBestSplit_LabelHessianRegressionFeatureNumerical<weighted>(
-      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
-      attribute_idx, condition, &cache->cache_v2);
 }
 
 template SplitSearchResult
@@ -2637,6 +2452,9 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
                                          &na_replacement);
   }
 
+  const auto sorting_strategy =
+      EffectiveStrategy(dt_config, selected_examples.size(), internal_config);
+
   FeatureNumericalBucket::Filler feature_filler(selected_examples.size(),
                                                 na_replacement, attributes);
 
@@ -2645,38 +2463,28 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
 
   typename LabelNumericalOneValueBucket<weighted>::Initializer initializer(
       label_distribution);
-  const auto sorting_strategy = dt_config.internal().sorting_strategy();
+
   if (sorting_strategy ==
-          proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-      sorting_strategy ==
-          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
-    if (!internal_config.preprocessing) {
-      YDF_LOG(FATAL) << "Preprocessing missing for PRESORTED sorting "
-                        "strategy";
-    }
-
-    if (sorting_strategy ==
-            proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED ||
-        IsPresortingOnNumericalSplitMoreEfficient(
-            -selected_examples.size(),
-            internal_config.preprocessing->num_examples())) {
-      const auto& sorted_attributes =
-          internal_config.preprocessing
-              ->presorted_numerical_features()[attribute_idx];
-      return ScanSplitsPresortedSparse<
-          FeatureNumericalLabelNumericalOneValue<weighted>,
-          LabelNumericalScoreAccumulator>(
-          internal_config.preprocessing->num_examples(), selected_examples,
-          sorted_attributes.items, feature_filler, label_filler, initializer,
-          min_num_obs, attribute_idx,
-          internal_config.duplicated_selected_examples, condition,
-          &cache->cache_v2);
-    }
+      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+    const auto& sorted_attributes =
+        internal_config.preprocessing
+            ->presorted_numerical_features()[attribute_idx];
+    return ScanSplitsPresortedSparse<
+        FeatureNumericalLabelNumericalOneValue<weighted>,
+        LabelNumericalScoreAccumulator>(
+        internal_config.preprocessing->num_examples(), selected_examples,
+        sorted_attributes.items, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx,
+        internal_config.duplicated_selected_examples, condition,
+        &cache->cache_v2);
+  } else if (sorting_strategy ==
+             proto::DecisionTreeTrainingConfig::Internal::IN_NODE) {
+    return FindBestSplit_LabelRegressionFeatureNumerical<weighted>(
+        selected_examples, feature_filler, label_filler, initializer,
+        min_num_obs, attribute_idx, condition, &cache->cache_v2);
+  } else {
+    LOG(FATAL) << "Non supported strategy.";
   }
-
-  return FindBestSplit_LabelRegressionFeatureNumerical<weighted>(
-      selected_examples, feature_filler, label_filler, initializer, min_num_obs,
-      attribute_idx, condition, &cache->cache_v2);
 }
 
 template SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart<true>(
@@ -2827,7 +2635,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
 
 SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<int32_t>& labels, const int32_t num_label_classes,
     bool na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -2897,7 +2705,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
 template <bool weighted>
 SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<float>& labels, bool na_replacement,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -2928,7 +2736,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
 
 template SplitSearchResult FindSplitLabelRegressionFeatureBoolean<true>(
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<float>& labels, bool na_replacement,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -2937,7 +2745,7 @@ template SplitSearchResult FindSplitLabelRegressionFeatureBoolean<true>(
     SplitterPerThreadCache* cache);
 template SplitSearchResult FindSplitLabelRegressionFeatureBoolean<false>(
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<float>& labels, bool na_replacement,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -2948,7 +2756,7 @@ template SplitSearchResult FindSplitLabelRegressionFeatureBoolean<false>(
 template <bool weighted>
 SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
-    const std::vector<float>& weights, const std::vector<char>& attributes,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
     bool na_replacement, const UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -3043,7 +2851,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      YDF_LOG(FATAL) << "Non supported";
+      LOG(FATAL) << "Non supported";
   }
 }
 
@@ -3097,7 +2905,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      YDF_LOG(FATAL) << "Non supported";
+      LOG(FATAL) << "Non supported";
   }
 }
 
@@ -3831,7 +3639,7 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      YDF_LOG(FATAL) << "Non supported";
+      LOG(FATAL) << "Non supported";
   }
 }
 
@@ -3885,7 +3693,7 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
           condition, &cache->cache_v2, random);
 
     default:
-      YDF_LOG(FATAL) << "Non supported";
+      LOG(FATAL) << "Non supported";
   }
 }
 
@@ -3898,9 +3706,9 @@ int NumAttributesToTest(const proto::DecisionTreeTrainingConfig& dt_config,
       dt_config.num_candidate_attributes_ratio() >= 0) {
     if (dt_config.has_num_candidate_attributes() &&
         dt_config.num_candidate_attributes() > 0) {
-      YDF_LOG(WARNING) << "Both \"num_candidate_attributes\" and "
-                          "\"num_candidate_attributes_ratio\" are specified. "
-                          "Ignoring \"num_candidate_attributes\".";
+      LOG(WARNING) << "Both \"num_candidate_attributes\" and "
+                      "\"num_candidate_attributes_ratio\" are specified. "
+                      "Ignoring \"num_candidate_attributes\".";
     }
     num_attributes_to_test = static_cast<int>(
         std::ceil(dt_config.num_candidate_attributes_ratio() * num_attributes));
@@ -4007,7 +3815,15 @@ void GenerateRandomImputationOnColumn(
   CHECK_OK(src->ExtractAndAppend(source_indices, dst));
 }
 
+void SetInternalDefaultHyperParameters(
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& link_config,
+    const dataset::proto::DataSpecification& data_spec,
+    proto::DecisionTreeTrainingConfig* dt_config) {
+}
+
 void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
+  // Emulation of histogram splits.
   if (!config->numerical_split().has_num_candidates()) {
     switch (config->numerical_split().type()) {
       case proto::NumericalSplit::HISTOGRAM_RANDOM:
@@ -4021,24 +3837,44 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
     }
   }
 
+  // By default, use axis aligned splits.
   if (config->split_axis_case() ==
       proto::DecisionTreeTrainingConfig::SPLIT_AXIS_NOT_SET) {
     config->mutable_axis_aligned_split();
   }
 
-  // Disable pre-sorting if not supported by the splitters.
-  if (config->internal().sorting_strategy() ==
-          proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-      config->internal().sorting_strategy() ==
-          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
+  // By default, use the cart categorical algorithm for categorical features.
+  if (config->categorical().algorithm_case() ==
+      proto::Categorical::ALGORITHM_NOT_SET) {
+    config->mutable_categorical()->mutable_cart();
+  }
+
+  // By default, use the local growing strategy i.e. divide and conquer.
+  if (config->growing_strategy_case() ==
+      proto::DecisionTreeTrainingConfig::GROWING_STRATEGY_NOT_SET) {
+    config->mutable_growing_strategy_local();
+  }
+
+  // Change the pre-sorting strategy if not supported by the splitter.
+  using Internal = proto::DecisionTreeTrainingConfig::Internal;
+  auto sorting_strategy = config->internal().sorting_strategy();
+
+  // If possible, use presorting by default.
+  if (sorting_strategy == Internal::AUTO) {
+    sorting_strategy = Internal::PRESORTED;
+  }
+
+  if (sorting_strategy == Internal::PRESORTED ||
+      sorting_strategy == Internal::FORCE_PRESORTED) {
     if (config->has_sparse_oblique_split() ||
         config->has_mhld_oblique_split() ||
         config->missing_value_policy() !=
             proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION) {
-      config->mutable_internal()->set_sorting_strategy(
-          proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+      sorting_strategy = Internal::IN_NODE;
     }
   }
+
+  config->mutable_internal()->set_sorting_strategy(sorting_strategy);
 }
 
 template <class T, class S, class C>
@@ -4217,6 +4053,22 @@ absl::Status DecisionTreeTrain(
     const model::proto::DeploymentConfig& deployment,
     const std::vector<float>& weights, utils::RandomEngine* random,
     DecisionTree* dt, const InternalTrainConfig& internal_config) {
+  // Note: This function is the entry point of all decision tree learning.
+
+  // Check the sorting strategy.
+  if (dt_config.internal().has_ensure_effective_sorting_strategy() &&
+      (dt_config.internal().ensure_effective_sorting_strategy() !=
+       dt_config.internal().sorting_strategy())) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Non expected effective sorting strategy:",
+        proto::DecisionTreeTrainingConfig::Internal::SortingStrategy_Name(
+            dt_config.internal().ensure_effective_sorting_strategy()),
+        "(expected) != ",
+        proto::DecisionTreeTrainingConfig::Internal::SortingStrategy_Name(
+            dt_config.internal().sorting_strategy()),
+        "(actual)"));
+  }
+
   // Decide if execution should happen in single-thread or concurrent mode.
 
   const std::vector<UnsignedExampleIdx>* effective_selected_examples;
@@ -4312,7 +4164,6 @@ absl::Status DecisionTreeCoreTrain(
   dt->CreateRoot();
   PerThreadCache cache;
   switch (dt_config.growing_strategy_case()) {
-    case proto::DecisionTreeTrainingConfig::GROWING_STRATEGY_NOT_SET:
     case proto::DecisionTreeTrainingConfig::kGrowingStrategyLocal: {
       const auto constraints = NodeConstraints::CreateNodeConstraints();
       return NodeTrain(train_dataset, selected_examples, optional_leaf_examples,
@@ -4326,6 +4177,8 @@ absl::Status DecisionTreeCoreTrain(
           config_link, dt_config, deployment, splitter_concurrency_setup,
           weights, internal_config, dt->mutable_root(), random);
       break;
+    default:
+      return absl::InvalidArgumentError("Grow strategy not set");
   }
 }
 
@@ -4494,104 +4347,6 @@ absl::Status NodeTrain(
   return absl::OkStatus();
 }
 
-absl::StatusOr<Preprocessing> PreprocessTrainingDataset(
-    const dataset::VerticalDataset& train_dataset,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const proto::DecisionTreeTrainingConfig& dt_config, const int num_threads) {
-  const auto time_begin = absl::Now();
-  Preprocessing preprocessing;
-  preprocessing.set_num_examples(train_dataset.nrow());
-
-  if (dt_config.internal().sorting_strategy() ==
-          proto::DecisionTreeTrainingConfig::Internal::PRESORTED ||
-      dt_config.internal().sorting_strategy() ==
-          proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED) {
-    RETURN_IF_ERROR(PresortNumericalFeatures(train_dataset, config_link,
-                                             num_threads, &preprocessing));
-  }
-
-  const auto duration = absl::Now() - time_begin;
-  if (duration > absl::Seconds(10)) {
-    YDF_LOG(INFO) << "Feature index computed in "
-                  << absl::FormatDuration(duration);
-  }
-  return preprocessing;
-}
-
-absl::Status PresortNumericalFeatures(
-    const dataset::VerticalDataset& train_dataset,
-    const model::proto::TrainingConfigLinking& config_link,
-    const int num_threads, Preprocessing* preprocessing) {
-  // Check number of examples.
-  RETURN_IF_ERROR(dataset::CheckNumExamples(train_dataset.nrow()));
-
-  preprocessing->mutable_presorted_numerical_features()->resize(
-      train_dataset.data_spec().columns_size());
-
-  utils::concurrency::ThreadPool pool(
-      "presort_numerical_features",
-      std::min(num_threads, config_link.features().size()));
-  pool.StartWorkers();
-
-  // For all the input features in the model.
-  for (const auto feature_idx : config_link.features()) {
-    // Skip non numerical features.
-    if (train_dataset.data_spec().columns(feature_idx).type() !=
-        dataset::proto::NUMERICAL) {
-      continue;
-    }
-
-    pool.Schedule([feature_idx, &train_dataset, preprocessing]() {
-      const UnsignedExampleIdx num_examples = train_dataset.nrow();
-      const auto& values =
-          train_dataset
-              .ColumnWithCastWithStatus<
-                  dataset::VerticalDataset::NumericalColumn>(feature_idx)
-              .value()
-              ->values();
-      CHECK_EQ(num_examples, values.size());
-
-      // Global imputation replacement.
-      const float na_replacement_value =
-          train_dataset.data_spec().columns(feature_idx).numerical().mean();
-
-      std::vector<std::pair<float, SparseItem::ExampleIdx>> items(
-          values.size());
-      for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
-           example_idx++) {
-        auto value = values[example_idx];
-        if (std::isnan(value)) {
-          value = na_replacement_value;
-        }
-        items[example_idx] = {value, example_idx};
-      }
-
-      // Sort by feature value and example index.
-      std::sort(items.begin(), items.end());
-
-      auto& sorted_values =
-          (*preprocessing->mutable_presorted_numerical_features())[feature_idx];
-      sorted_values.items.resize(values.size());
-
-      for (UnsignedExampleIdx sorted_example_idx = 0;
-           sorted_example_idx < num_examples; sorted_example_idx++) {
-        SparseItem::ExampleIdx example_idx = items[sorted_example_idx].second;
-        const bool change_value =
-            sorted_example_idx > 0 && (items[sorted_example_idx].first !=
-                                       items[sorted_example_idx - 1].first);
-        if (change_value) {
-          example_idx |= ((SparseItem::ExampleIdx)1)
-                         << (sizeof(SparseItem::ExampleIdx) * 8 - 1);
-        }
-        sorted_values.items[sorted_example_idx].example_idx_and_extra =
-            example_idx;
-      }
-    });
-  }
-  return absl::OkStatus();
-}
-
 absl::Status ApplyConstraintOnNode(const NodeConstraints& constraint,
                                    NodeWithChildren* node) {
   if (!constraint.min_max_output.has_value()) {
@@ -4745,7 +4500,7 @@ std::vector<float> GenHistogramBins(const proto::NumericalSplit::Type type,
       }
     } break;
     default:
-      YDF_LOG(FATAL) << "Numerical histogram not implemented";
+      LOG(FATAL) << "Numerical histogram not implemented";
   }
   std::sort(candidate_splits.begin(), candidate_splits.end());
   return candidate_splits;
@@ -4829,20 +4584,11 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
     if (error_on_wrong_splitter_statistics) {
       return absl::InternalError(message);
     } else {
-      YDF_LOG(WARNING) << message;
+      // Logging this message too often will crash.
+      LOG_FIRST_N(WARNING, 10) << message;
     }
   }
   return absl::OkStatus();
-}
-
-void UpliftLeafToLabelDist(const decision_tree::proto::NodeUpliftOutput& leaf,
-                           UpliftLabelDistribution* dist) {
-  dist->ImportSetFromLeafProto(leaf);
-}
-
-void UpliftLabelDistToLeaf(const UpliftLabelDistribution& dist,
-                           decision_tree::proto::NodeUpliftOutput* leaf) {
-  dist.ExportToLeafProto(leaf);
 }
 
 }  // namespace internal

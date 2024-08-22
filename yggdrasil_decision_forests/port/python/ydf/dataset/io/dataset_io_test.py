@@ -13,10 +13,11 @@
 # limitations under the License.
 
 from absl.testing import absltest
+from absl.testing import parameterized
 from ydf.dataset.io import dataset_io
 
 
-class DatasetIoTest(absltest.TestCase):
+class DatasetIoTest(parameterized.TestCase):
 
   def test_unrolled_feature_names(self):
     self.assertEqual(
@@ -33,6 +34,26 @@ class DatasetIoTest(absltest.TestCase):
   def test_unrolled_feature_names_with_zero_dim(self):
     with self.assertRaisesRegex(ValueError, "should be strictly positive"):
       dataset_io.unrolled_feature_names("a", 0)
+
+  @parameterized.parameters(
+      ("a.3_of_5", ("a", 3, 5)),
+      ("a.00_of_100", ("a", 0, 100)),
+      (".3_of_5", ("", 3, 5)),
+      (" .3_of_5", (" ", 3, 5)),
+      ("123.123.3_of_5", ("123.123", 3, 5)),
+  )
+  def test_parse_unrolled_feature_name(self, name, expected):
+    self.assertEqual(dataset_io.parse_unrolled_feature_name(name), expected)
+
+  @parameterized.parameters(
+      ("",),
+      (" ",),
+      ("a",),
+      ("1234",),
+      ("1_or_5",),
+  )
+  def test_parse_unrolled_feature_name_is_none(self, name):
+    self.assertIsNone(dataset_io.parse_unrolled_feature_name(name))
 
 
 if __name__ == "__main__":

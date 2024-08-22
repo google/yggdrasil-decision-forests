@@ -15,32 +15,25 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_ndcg.h"
 
+#include <algorithm>
 #include <cmath>
-#include <cstdint>
-#include <limits>
 #include <string>
-#include <type_traits>
+#include <utility>
 #include <vector>
 
-#include "absl/container/inlined_vector.h"
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/substitute.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/training.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/metric/ranking_ndcg.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
-#include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
@@ -57,7 +50,7 @@ absl::Status NDCGLoss::Status() const {
 
 absl::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& weights) const {
+    const absl::Span<const float> weights) const {
   return std::vector<float>{0.f};
 }
 
@@ -67,7 +60,8 @@ absl::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
 }
 
 absl::Status NDCGLoss::UpdateGradients(
-    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -198,14 +192,14 @@ absl::Status NDCGLoss::UpdateGradients(
   return absl::OkStatus();
 }
 
-
 std::vector<std::string> NDCGLoss::SecondaryMetricNames() const {
   return {"NDCG@5"};
 }
 
 absl::StatusOr<LossResults> NDCGLoss::Loss(
-    const std::vector<float>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   if (ranking_index == nullptr) {

@@ -17,6 +17,7 @@
 import concurrent.futures
 import logging
 import os
+import pickle
 import tempfile
 import textwrap
 import time
@@ -615,6 +616,52 @@ Use `model.describe()` for more details
         p3,
         rtol=1e-5,
         atol=1e-5,
+    )
+
+  def test_model_serialize(self):
+    ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+        )
+    )
+    serialized_model = self.adult_binary_class_gbdt.serialize()
+    self.assertIsInstance(serialized_model, bytes)
+    deserialized_model = model_lib.deserialize_model(serialized_model)
+
+    self.assertIsInstance(
+        deserialized_model,
+        gradient_boosted_trees_model.GradientBoostedTreesModel,
+    )
+    _ = deserialized_model.validation_loss()
+    _ = deserialized_model.num_trees()
+
+    original_predictions = self.adult_binary_class_gbdt.predict(ds)
+    deserialized_predictions = deserialized_model.predict(ds)
+    npt.assert_almost_equal(
+        original_predictions, deserialized_predictions, decimal=5
+    )
+
+  def test_model_pickling(self):
+    ds = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+        )
+    )
+    pickled_model = pickle.dumps(self.adult_binary_class_gbdt)
+    self.assertIsInstance(pickled_model, bytes)
+    unpickled_model = pickle.loads(pickled_model)
+
+    self.assertIsInstance(
+        unpickled_model,
+        gradient_boosted_trees_model.GradientBoostedTreesModel,
+    )
+    _ = unpickled_model.validation_loss()
+    _ = unpickled_model.num_trees()
+
+    original_predictions = self.adult_binary_class_gbdt.predict(ds)
+    unpickled_predictions = unpickled_model.predict(ds)
+    npt.assert_almost_equal(
+        original_predictions, unpickled_predictions, decimal=5
     )
 
 

@@ -21,7 +21,10 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -62,11 +65,11 @@ TEST(ModelAnalysis, Classification) {
   const std::string model_path =
       file::JoinPath(ModelDir(), "adult_binary_class_gbdt");
 
-  YDF_LOG(INFO) << "Load model";
+  LOG(INFO) << "Load model";
   std::unique_ptr<model::AbstractModel> model;
   CHECK_OK(model::LoadModel(model_path, &model));
 
-  YDF_LOG(INFO) << "Load dataset";
+  LOG(INFO) << "Load dataset";
   dataset::VerticalDataset dataset;
   CHECK_OK(dataset::LoadVerticalDataset(
       dataset_path, model->data_spec(), &dataset,
@@ -237,11 +240,11 @@ TEST(PredictionAnalysis, Classification) {
   const std::string model_path =
       file::JoinPath(ModelDir(), "adult_binary_class_gbdt");
 
-  YDF_LOG(INFO) << "Load model";
+  LOG(INFO) << "Load model";
   std::unique_ptr<model::AbstractModel> model;
   ASSERT_OK(model::LoadModel(model_path, &model));
 
-  YDF_LOG(INFO) << "Load dataset";
+  LOG(INFO) << "Load dataset";
   dataset::VerticalDataset dataset;
   ASSERT_OK(dataset::LoadVerticalDataset(
       dataset_path, model->data_spec(), &dataset,

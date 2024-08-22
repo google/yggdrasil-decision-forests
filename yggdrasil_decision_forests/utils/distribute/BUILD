@@ -62,6 +62,8 @@ cc_library_ydf(
         ":core",
         ":distribute_cc_proto",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -76,6 +78,8 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -88,6 +92,9 @@ cc_library_ydf(
         ":core",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -95,7 +102,10 @@ cc_library_ydf(
     name = "utils",
     srcs = ["utils.cc"],
     hdrs = ["utils.h"],
-    deps = ["//yggdrasil_decision_forests/utils:concurrency"],
+    deps = [
+        "//yggdrasil_decision_forests/utils:concurrency",
+        "@com_google_absl//absl/memory",
+    ],
 )
 
 # Tests
@@ -109,7 +119,11 @@ cc_library_ydf(
         ":core",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
     ],
     alwayslink = 1,
 )
@@ -125,6 +139,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_cc_proto",
+        "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
     ],
 )

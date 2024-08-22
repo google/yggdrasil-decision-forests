@@ -135,6 +135,36 @@ class DistributedGradientBoostedTreesLearnerTest(absltest.TestCase):
     workers.stop()
     self.assertAlmostEqual(model.evaluate(str(test_ds)).accuracy, 0.850, 1)
 
+  def test_adult_with_validation(self):
+    # Prepare datasets
+    tmp_dir = pathlib.Path(self.create_tempdir().full_path)
+    dataset_directory = test_utils.ydf_test_data_pathlib() / "dataset"
+    splitted_train_ds = split_dataset(
+        dataset_directory / "adult_train.csv", tmp_dir, 10
+    )
+    splitted_train_ds = [str(x) for x in splitted_train_ds]
+    logging.info("Dataset paths: %s", splitted_train_ds)
+
+    ds_for_training = splitted_train_ds[:6]
+    ds_for_validation = splitted_train_ds[6:]
+
+    test_ds = dataset_directory / "adult_test.csv"
+
+    # Start workers
+    workers = create_in_process_workers(4)
+
+    # Train model
+    model = specialized_learners.DistributedGradientBoostedTreesLearner(
+        label="income",
+        working_dir=os.path.join(tmp_dir, "work_dir"),
+        resume_training=True,
+        num_trees=10,
+        workers=workers.ips,
+    ).train(",".join(ds_for_training), valid=",".join(ds_for_validation))
+
+    workers.stop()
+    self.assertAlmostEqual(model.evaluate(str(test_ds)).accuracy, 0.850, 1)
+
 
 class HyperParameterTunerTest(absltest.TestCase):
 

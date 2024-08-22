@@ -26,3 +26,6 @@ bazel build -c opt --config=wasm \
 mkdir -p dist
 cp -f bazel-bin/yggdrasil_decision_forests/port/javascript/ydf.zip dist/ydf.zip
 cp -f bazel-bin/yggdrasil_decision_forests/port/javascript/ydf.zip dist/javascript_wasm.zip
+
+# Extract library to NPM location
+unzip dist/ydf.zip -d yggdrasil_decision_forests/port/javascript/npm/dist

@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Simple Benchmark for PYDF and TF-DF.
+r"""Simple Benchmark for PYDF and TF-DF.
 
 Usage example:
-sudo apt install linux-cpupower
-sudo cpupower frequency-set --governor performance
-bazel run -c opt <fastest possible flags> \
-//external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/utils/benchmark:benchmark
+
+  sudo apt install linux-cpupower
+  sudo cpupower frequency-set --governor performance
+
+  bazel run -c opt --copt=-mfma --copt=-mavx2 --copt=-mavx \
+    //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/monitoring:benchmark_train_speed_main
 """
 
 import itertools
@@ -26,7 +28,7 @@ import itertools
 from absl import app
 from absl import flags
 
-from ydf.utils.benchmark import benchmark
+from ydf.monitoring import benchmark_train_speed as benchmark
 
 AVAILABLE_APPLICATIONS = ["tfdf", "ydf"]
 AVAILABLE_DATASETS = [

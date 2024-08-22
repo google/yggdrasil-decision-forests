@@ -30,6 +30,8 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
@@ -125,14 +127,14 @@ class RankingGroupsIndices {
   absl::Status Initialize(const dataset::VerticalDataset& dataset,
                           int label_col_idx, int group_col_idx);
 
-  double NDCG(const std::vector<float>& predictions,
-              const std::vector<float>& weights, int truncation) const;
+  double NDCG(absl::Span<const float> predictions,
+              const absl::Span<const float> weights, int truncation) const;
 
   const std::vector<Group>& groups() const { return groups_; }
 
  private:
   static void ExtractPredAndLabelRelevance(
-      const std::vector<Item>& group, const std::vector<float>& predictions,
+      const std::vector<Item>& group, absl::Span<const float> predictions,
       std::vector<metric::RankingLabelAndPrediction>* pred_and_label_relevance);
 
   // "groups[i]" is the list of relevance+example_idx of examples with group
@@ -177,7 +179,7 @@ class AbstractLoss {
   // the "bias".
   virtual absl::StatusOr<std::vector<float>> InitialPredictions(
       const dataset::VerticalDataset& dataset, int label_col_idx,
-      const std::vector<float>& weights) const = 0;
+      const absl::Span<const float> weights) const = 0;
 
   // Initial predictions from a pre-aggregated label statistics.
   virtual absl::StatusOr<std::vector<float>> InitialPredictions(
@@ -200,7 +202,7 @@ class AbstractLoss {
 
   // Updates the gradient with label stored in a vector<float>.
   virtual absl::Status UpdateGradients(
-      const std::vector<float>& labels, const std::vector<float>& predictions,
+      absl::Span<const float> labels, absl::Span<const float> predictions,
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const {
@@ -209,7 +211,7 @@ class AbstractLoss {
 
   // Updates the gradient with label stored in a vector<int32_t>.
   virtual absl::Status UpdateGradients(
-      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
+      absl::Span<const int32_t> labels, absl::Span<const float> predictions,
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const {
@@ -218,7 +220,7 @@ class AbstractLoss {
 
   // Updates the gradient with label stored in a vector<int16_t>.
   virtual absl::Status UpdateGradients(
-      const std::vector<int16_t>& labels, const std::vector<float>& predictions,
+      absl::Span<const int16_t> labels, absl::Span<const float> predictions,
       const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const {
@@ -231,7 +233,7 @@ class AbstractLoss {
   // (Numerical) and int32 (Categorical)).
   absl::Status UpdateGradients(
       const dataset::VerticalDataset& dataset, int label_col_idx,
-      const std::vector<float>& predictions,
+      absl::Span<const float> predictions,
       const RankingGroupsIndices* ranking_index,
       std::vector<GradientData>* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool = nullptr) const;
@@ -254,29 +256,30 @@ class AbstractLoss {
   // accordingly.
   absl::StatusOr<LossResults> Loss(
       const dataset::VerticalDataset& dataset, int label_col_idx,
-      const std::vector<float>& predictions, const std::vector<float>& weights,
+      absl::Span<const float> predictions,
+      const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool = nullptr) const;
 
   virtual absl::StatusOr<LossResults> Loss(
-      const std::vector<int16_t>& labels, const std::vector<float>& predictions,
-      const std::vector<float>& weights,
+      absl::Span<const int16_t> labels, absl::Span<const float> predictions,
+      const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("Loss not implemented");
   }
 
   virtual absl::StatusOr<LossResults> Loss(
-      const std::vector<int32_t>& labels, const std::vector<float>& predictions,
-      const std::vector<float>& weights,
+      absl::Span<const int32_t> labels, absl::Span<const float> predictions,
+      const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("Loss lot implemented");
   }
 
   virtual absl::StatusOr<LossResults> Loss(
-      const std::vector<float>& labels, const std::vector<float>& predictions,
-      const std::vector<float>& weights,
+      absl::Span<const float> labels, absl::Span<const float> predictions,
+      const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("Loss not implemented");

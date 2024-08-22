@@ -64,8 +64,10 @@ pybind_library(
         "//ydf/model:model_cc",
         "//ydf/model:model_wrapper",
         "//ydf/utils:status_casters",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec",
@@ -139,6 +141,8 @@ py_library(
     srcs = ["hyperparameters.py"],
     deps = [
         ":custom_loss_py",
+        "//ydf/cc:ydf",
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
     ],
 )
@@ -165,9 +169,10 @@ py_library(
         ":tuner",
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
-        "//ydf/model:generic_model",
         "//ydf/model/gradient_boosted_trees_model",
+        "//ydf/model/isolation_forest_model",
         "//ydf/model/random_forest_model",
+        "//ydf/utils:func_helpers",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
     ],
@@ -202,6 +207,7 @@ pybind_library(
         ":canonical_workers",
         "//ydf/utils:status_casters",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -243,6 +249,8 @@ py_test(
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
         "//ydf/model/decision_forest_model",
+        "//ydf/model/tree:condition",
+        "//ydf/model/tree:node",
         "//ydf/utils:log",
         "//ydf/utils:test_utils",
     ],
@@ -303,6 +311,32 @@ py_test(
         # absl/testing:parameterized dep,
         # pandas dep,
         # tensorflow:tensorflow_no_contrib dep,
+    ],
+)
+
+py_test(
+    name = "hyperparameters_test",
+    srcs = ["hyperparameters_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":hyperparameters",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+    ],
+)
+
+py_test(
+    name = "learner_with_xarray_test",
+    srcs = ["learner_with_xarray_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    python_version = "PY3",
+    deps = [
+        ":specialized_learners",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # xarray dep,
+        "//ydf/utils:test_utils",
     ],
 )
 

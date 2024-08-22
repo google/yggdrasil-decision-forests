@@ -19,9 +19,13 @@
 #include <type_traits>
 #include <vector>
 
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_reader.h"
@@ -72,18 +76,19 @@ absl::Status LoadVerticalDatasetSingleThread(
     RETURN_IF_ERROR(
         dataset->AppendExampleWithStatus(example, config.load_columns));
     if ((dataset->nrow() % 100) == 0) {
-      LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples scanned.");
+      LOG_EVERY_N_SEC(INFO, 30) << dataset->nrow() << " examples scanned.";
     }
   }
 
   dataset->ShrinkToFit();
 
-  LOG_INFO_EVERY_N_SEC(
-      30, _ << dataset->nrow() << " examples read. Memory: "
-            << dataset->MemorySummary() << ". " << skipped_examples << " ("
-            << 100 * skipped_examples /
-                   std::max<size_t>(1, dataset->nrow() + skipped_examples)
-            << "%) examples have been skipped.");
+  LOG_EVERY_N_SEC(INFO, 30)
+      << dataset->nrow()
+      << " examples read. Memory: " << dataset->MemorySummary() << ". "
+      << skipped_examples << " ("
+      << 100 * skipped_examples /
+             std::max<size_t>(1, dataset->nrow() + skipped_examples)
+      << "%) examples have been skipped.";
 
   return status.status();
 }
@@ -104,11 +109,11 @@ absl::StatusOr<std::unique_ptr<BlockOfExamples>> LoadShard(
   ASSIGN_OR_RETURN(auto reader,
                    CreateExampleReader(absl::StrCat(prefix, ":", shard),
                                        data_spec, required_columns));
-  auto* example = google::protobuf::Arena::CreateMessage<proto::Example>(&block->arena);
+  auto* example = google::protobuf::Arena::Create<proto::Example>(&block->arena);
   absl::StatusOr<bool> status;
   while ((status = reader->Next(example)).ok() && status.value()) {
     block->examples.push_back(example);
-    example = google::protobuf::Arena::CreateMessage<proto::Example>(&block->arena);
+    example = google::protobuf::Arena::Create<proto::Example>(&block->arena);
   }
   return block;
 }
@@ -198,10 +203,10 @@ absl::Status LoadVerticalDataset(
         const auto approx_memory_usage_mb =
             4 * num_features * reserved_examples / 1000000;
         if (approx_memory_usage_mb > 100) {
-          LOG_INFO_EVERY_N_SEC(30, _ << "Reserving " << reserved_examples
-                                     << " examples and " << num_features
-                                     << " features for ~"
-                                     << approx_memory_usage_mb << "MB");
+          LOG_EVERY_N_SEC(INFO, 30)
+              << "Reserving " << reserved_examples << " examples and "
+              << num_features << " features for ~" << approx_memory_usage_mb
+              << "MB";
         }
         dataset->Reserve(reserved_examples, config.load_columns);
       }
@@ -215,7 +220,7 @@ absl::Status LoadVerticalDataset(
       RETURN_IF_ERROR(
           dataset->AppendExampleWithStatus(*example, config.load_columns));
     }
-    LOG_INFO_EVERY_N_SEC(30, _ << dataset->nrow() << " examples scanned.");
+    LOG_EVERY_N_SEC(INFO, 30) << dataset->nrow() << " examples scanned.";
     loaded_shards++;
   }
 
@@ -226,14 +231,14 @@ absl::Status LoadVerticalDataset(
   dataset->ShrinkToFit();
 
   processor.JoinAllAndStopThreads();
-  LOG_INFO_EVERY_N_SEC(
-      30, _ << dataset->nrow() << " examples and " << loaded_shards
-            << " shards read in total with " << config.num_threads
-            << " threads. Memory: " << dataset->MemorySummary() << ". "
-            << skipped_examples << " ("
-            << 100 * skipped_examples /
-                   std::max<size_t>(1, dataset->nrow() + skipped_examples)
-            << "%) examples have been skipped.");
+  LOG_EVERY_N_SEC(INFO, 30)
+      << dataset->nrow() << " examples and " << loaded_shards
+      << " shards read in total with " << config.num_threads
+      << " threads. Memory: " << dataset->MemorySummary() << ". "
+      << skipped_examples << " ("
+      << 100 * skipped_examples /
+             std::max<size_t>(1, dataset->nrow() + skipped_examples)
+      << "%) examples have been skipped.";
   return absl::OkStatus();
 }
 

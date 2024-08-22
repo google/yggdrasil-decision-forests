@@ -25,6 +25,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -61,6 +62,18 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace random_forest {
 namespace {
+
+using Internal = ::yggdrasil_decision_forests::model::decision_tree::proto::
+    DecisionTreeTrainingConfig::Internal;
+
+void SetExpectedSortingStrategy(Internal::SortingStrategy expected,
+                                model::proto::TrainingConfig* train_config) {
+  auto* rf_config = train_config->MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_ensure_effective_sorting_strategy(expected);
+}
 
 // Build a forest with two decision trees as follow:
 // [a>1]
@@ -188,6 +201,8 @@ class RandomForestOnAdult : public utils::TrainAndTestTester {
         random_forest::proto::random_forest_config);
     rf_config->mutable_decision_tree()
         ->set_internal_error_on_wrong_splitter_statistics(true);
+
+    SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
   }
 };
 
@@ -241,7 +256,7 @@ TEST_F(RandomForestOnAdult, Base) {
 
   std::string description;
   model_->AppendDescriptionAndStatistics(false, &description);
-  YDF_LOG(INFO) << description;
+  LOG(INFO) << description;
 
   CHECK_NE(description.find("MEAN_DECREASE_IN_ACCURACY"), -1);
   CHECK_NE(description.find("Out-of-bag evaluation: accuracy:"), -1);
@@ -501,6 +516,8 @@ TEST_F(RandomForestOnAdult, MaximumDurationInTree) {
   rf_config->set_winner_take_all_inference(false);
   train_config_.set_maximum_training_duration_seconds(10);
 
+  SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
+
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
   // also preparing the dataset and evaluating the final model.
@@ -570,6 +587,7 @@ TEST_F(RandomForestOnAdult, SparseOblique) {
       random_forest::proto::random_forest_config);
   rf_config->set_winner_take_all_inference(false);
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8571, 0.01);
 }
@@ -580,6 +598,7 @@ TEST_F(RandomForestOnAdult, MHLDTOblique) {
   deployment_config_.set_num_threads(0);
   rf_config->set_winner_take_all_inference(false);
   rf_config->mutable_decision_tree()->mutable_mhld_oblique_split();
+  SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8568, 0.01);
 }
@@ -590,7 +609,7 @@ TEST_F(RandomForestOnAdult, MakingAModelPurePureServingModel) {
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.860, 0.01);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
   const auto pre_pruning_size = model_->ModelSizeInBytes().value();
-  YDF_LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
+  LOG(INFO) << "pre_pruning_size:" << pre_pruning_size;
 
   CHECK_OK(model_->MakePureServing());
 
@@ -598,7 +617,7 @@ TEST_F(RandomForestOnAdult, MakingAModelPurePureServingModel) {
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
 
   const auto post_pruning_size = model_->ModelSizeInBytes().value();
-  YDF_LOG(INFO) << "post_pruning_size:" << post_pruning_size;
+  LOG(INFO) << "post_pruning_size:" << post_pruning_size;
   EXPECT_LE(static_cast<float>(post_pruning_size) / pre_pruning_size, 0.80);
 }
 
@@ -614,6 +633,8 @@ class RandomForestOnAbalone : public utils::TrainAndTestTester {
         random_forest::proto::random_forest_config);
     rf_config->mutable_decision_tree()
         ->set_internal_error_on_wrong_splitter_statistics(true);
+
+    SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
   }
 };
 
@@ -652,6 +673,7 @@ TEST_F(RandomForestOnAbalone, SparseOblique) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::RMSE(evaluation_), 2.054, 0.01);
 }
@@ -862,8 +884,8 @@ TEST(ExtremelyRandomizeTrees, Figure10) {
   std::string ert_description, rf_description;
   ert_model->AppendDescriptionAndStatistics(false, &ert_description);
   rf_model->AppendDescriptionAndStatistics(false, &rf_description);
-  YDF_LOG(INFO) << "ERT model:\n" << ert_description;
-  YDF_LOG(INFO) << "RF model:\n" << rf_description;
+  LOG(INFO) << "ERT model:\n" << ert_description;
+  LOG(INFO) << "RF model:\n" << rf_description;
 
   dataset::VerticalDataset test_and_preds_dataset =
       test_dataset.ShallowNonOwningClone();
@@ -999,6 +1021,8 @@ class RandomForestOnIris : public utils::TrainAndTestTester {
         random_forest::proto::random_forest_config);
     rf_config->mutable_decision_tree()
         ->set_internal_error_on_wrong_splitter_statistics(true);
+
+    SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
   }
 };
 
@@ -1016,6 +1040,8 @@ class RandomForestOnDNA : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::CLASSIFICATION);
     train_config_.set_label("LABEL");
     dataset_filename_ = "dna.csv";
+
+    SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
   }
 };
 
@@ -1039,6 +1065,8 @@ class RandomForestOnSyntheticClassification : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::CLASSIFICATION);
     synthetic_dataset_.set_num_examples(10000);
     ConfigureForSyntheticDataset();
+
+    SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
   }
 };
 
@@ -1061,6 +1089,7 @@ TEST_F(RandomForestOnSyntheticClassification, SparseOblique) {
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   rf_config->mutable_decision_tree()
       ->set_internal_error_on_wrong_splitter_statistics(true);
+  SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.764, 0.03);
 }
@@ -1073,6 +1102,7 @@ TEST_F(RandomForestOnSyntheticClassification, MHLDTOblique) {
   rf_config->mutable_decision_tree()->mutable_mhld_oblique_split();
   rf_config->mutable_decision_tree()
       ->set_internal_error_on_wrong_splitter_statistics(true);
+  SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.764, 0.04);
 }
@@ -1102,6 +1132,8 @@ class RandomForestOnSimPTE : public utils::TrainAndTestTester {
 
     dataset_filename_ = "sim_pte_train.csv";
     dataset_test_filename_ = "sim_pte_test.csv";
+
+    SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
   }
 };
 
@@ -1191,6 +1223,8 @@ class RandomForestOnRegressiveSimPTE : public utils::TrainAndTestTester {
 
     dataset_filename_ = "sim_pte_train.csv";
     dataset_test_filename_ = "sim_pte_test.csv";
+
+    SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
   }
 };
 
@@ -1246,6 +1280,8 @@ class AutotunedRandomForestOnAdult : public utils::TrainAndTestTester {
 
     deployment_config_.set_cache_path(
         file::JoinPath(test::TmpDirectory(), "working_directory"));
+
+    SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
   }
 };
 

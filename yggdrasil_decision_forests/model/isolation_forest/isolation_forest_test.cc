@@ -29,6 +29,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "absl/log/log.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/decision_tree/builder.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -271,7 +272,7 @@ TEST(IsolationForest, PredictGolden) {
                                           "gaussians_test.csv")),
       model->data_spec(), &dataset));
 
-  YDF_LOG(INFO) << "Model:\n" << model->DescriptionAndStatistics(true);
+  LOG(INFO) << "Model:\n" << model->DescriptionAndStatistics(true);
 
   // Those predictions have been checked with sklearn implementation.
   model::proto::Prediction prediction;

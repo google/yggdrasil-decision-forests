@@ -22,6 +22,7 @@
 #include <utility>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -38,11 +39,11 @@ namespace {
 
 // Starts a worker and block until the worker is shutdown.
 absl::Status StartWorkerBlocking(const int port) {
-  YDF_LOG(INFO) << "Start YDF worker on port " << port;
+  LOG(INFO) << "Start YDF worker on port " << port;
   py::gil_scoped_release release;
   const auto status =
       distribute::grpc_worker::WorkerMain(port, /*use_loas=*/false);
-  YDF_LOG(INFO) << "Stopping worker";
+  LOG(INFO) << "Stopping worker";
   return status;
 }
 
@@ -65,7 +66,7 @@ NonBlockingWorkers& GetNonBlockingWorkers() {
 
 // Starts a worker and returns immediately a key to later stop the worker.
 absl::StatusOr<uint64_t> StartWorkerNonBlocking(const int port) {
-  YDF_LOG(INFO) << "Start YDF worker on port " << port;
+  LOG(INFO) << "Start YDF worker on port " << port;
 
   ASSIGN_OR_RETURN(auto server, distribute::grpc_worker::StartGRPCWorker(
                                     /*port=*/port,
@@ -85,7 +86,7 @@ absl::StatusOr<uint64_t> StartWorkerNonBlocking(const int port) {
 }
 
 absl::Status StopWorkerNonBlocking(const uint64_t uid) {
-  YDF_LOG(INFO) << "Stop YDF worker";
+  LOG(INFO) << "Stop YDF worker";
 
   NonBlockingWorker worker;
   {
@@ -102,10 +103,10 @@ absl::Status StopWorkerNonBlocking(const uint64_t uid) {
   }
 
   worker.server->stop_server.Notify();
-  YDF_LOG(INFO) << "\tWaiting for worker to finish its work";
+  LOG(INFO) << "\tWaiting for worker to finish its work";
   worker.thread->Join();
   worker.thread.reset();
-  YDF_LOG(INFO) << "\tWorker have been stopped";
+  LOG(INFO) << "\tWorker have been stopped";
   return absl::OkStatus();
 }
 

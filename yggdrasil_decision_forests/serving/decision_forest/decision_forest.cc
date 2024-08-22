@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -758,10 +759,10 @@ absl::Status CreateFlatModelNodes(
                                                  set_node, spec_idx_to_feature,
                                                  dst_model, &dst_model->nodes));
   }
-  YDF_LOG(INFO) << "Model loaded with " << dst_model->root_offsets.size()
-                << " root(s), " << dst_model->nodes.size() << " node(s), and "
-                << dst_model->features().input_features().size()
-                << " input feature(s).";
+  LOG(INFO) << "Model loaded with " << dst_model->root_offsets.size()
+            << " root(s), " << dst_model->nodes.size() << " node(s), and "
+            << dst_model->features().input_features().size()
+            << " input feature(s).";
 
   return absl::OkStatus();
 }

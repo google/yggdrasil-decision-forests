@@ -45,6 +45,8 @@
 //   --alsologtostderr
 //
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -90,7 +92,7 @@ int main(int argc, char** argv) {
   // The dataspec is the list of available columns and their meta-data.
   //
   // This is similar to the "infer_dataspec" CLI command.
-  YDF_LOG(INFO) << "Create dataspec";
+  LOG(INFO) << "Create dataspec";
   const auto dataspec_path = file::JoinPath(output_dir, "dataspec.pbtxt");
   const auto dataspec = ydf::dataset::CreateDataSpec(train_path).value();
   // Save the dataspec.
@@ -99,15 +101,15 @@ int main(int argc, char** argv) {
   // Print dataspec.
   //
   // This is similar to the "show_dataspec" CLI command.
-  YDF_LOG(INFO) << "Print dataspec";
+  LOG(INFO) << "Print dataspec";
   std::string dataspec_report = ydf::dataset::PrintHumanReadable(dataspec);
-  YDF_LOG(INFO) << "Dataspec:\n" << dataspec_report;
+  LOG(INFO) << "Dataspec:\n" << dataspec_report;
   // Save dataspec print in a .txt file.
   QCHECK_OK(
       file::SetContent(absl::StrCat(dataspec_path, ".txt"), dataspec_report));
 
   // Train model.
-  YDF_LOG(INFO) << "Train model";
+  LOG(INFO) << "Train model";
 
   // Configure the learner.
   ydf::model::proto::TrainingConfig train_config;
@@ -122,7 +124,7 @@ int main(int argc, char** argv) {
   auto model = learner->TrainWithStatus(train_path, dataspec).value();
 
   // Save the model.
-  YDF_LOG(INFO) << "Export the model";
+  LOG(INFO) << "Export the model";
   const auto model_path = file::JoinPath(output_dir, "model");
   QCHECK_OK(ydf::model::SaveModel(model_path, *model));
 
@@ -130,7 +132,7 @@ int main(int argc, char** argv) {
   //
   // This is similar to the "show_model" CLI command.
   std::string model_description = model->DescriptionAndStatistics();
-  YDF_LOG(INFO) << "Model:\n" << model_description;
+  LOG(INFO) << "Model:\n" << model_description;
   // Save details in a .txt file.
   QCHECK_OK(
       file::SetContent(absl::StrCat(model_path, ".txt"), model_description));
@@ -154,7 +156,7 @@ int main(int argc, char** argv) {
   std::string evaluation_report = ydf::metric::TextReport(evaluation).value();
   QCHECK_OK(file::SetContent(absl::StrCat(evaluation_path, ".txt"),
                              evaluation_report));
-  YDF_LOG(INFO) << "Evaluation:\n" << evaluation_report;
+  LOG(INFO) << "Evaluation:\n" << evaluation_report;
 
   // Compile the model into an engine for fast inference.
   const auto engine = model->BuildFastEngine().value();
@@ -194,12 +196,12 @@ int main(int argc, char** argv) {
   engine->Predict(*examples, 2, &batch_of_predictions);
 
   // Print predictions.
-  YDF_LOG(INFO) << "Predictions:";
+  LOG(INFO) << "Predictions:";
   for (const float prediction : batch_of_predictions) {
-    YDF_LOG(INFO) << "\t" << prediction;
+    LOG(INFO) << "\t" << prediction;
   }
 
-  YDF_LOG(INFO) << "The results are available in " << output_dir;
+  LOG(INFO) << "The results are available in " << output_dir;
 
   return 0;
 }

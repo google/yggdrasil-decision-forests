@@ -17,7 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iterator>
+#include <cstdint>
 #include <limits>
 #include <numeric>
 #include <random>
@@ -29,8 +29,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/container/flat_hash_set.h"
-#include "absl/status/status.h"
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -41,7 +43,10 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
@@ -50,6 +55,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -135,6 +141,7 @@ TEST(DecisionTree, FakeTrain) {
 
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.set_internal_error_on_wrong_splitter_statistics(true);
+  dt_config.mutable_growing_strategy_local();
 
   utils::RandomEngine random;
   DecisionTree dt;
@@ -369,7 +376,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // Since all the attributes have the same value, there are no valid splits.
   attributes = {1, 1, 1, 1, 1, 1};
@@ -380,7 +387,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
@@ -437,7 +444,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // Since all the attributes have the same value, there are no valid splits.
   attributes = {1, 1, 1, 1, 1, 1};
@@ -448,7 +455,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBaseAdvances) {
@@ -498,9 +505,9 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseAdvances) {
                     min_num_obs, dt_config, label_distribution, -1, &rnd,
                     &best_condition, &cache),
                 SplitSearchResult::kBetterSplitFound);
-      YDF_LOG(INFO) << "num_label_classes:" << num_label_classes
-                    << " num_attribute_classes:" << num_attribute_classes;
-      YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+      LOG(INFO) << "num_label_classes:" << num_label_classes
+                << " num_attribute_classes:" << num_attribute_classes;
+      LOG(INFO) << "Condition:\n" << best_condition.DebugString();
     }
   }
 }
@@ -755,7 +762,7 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForClassification) {
                 num_label_classes, min_num_obs, dt_config, label_distribution,
                 -1, &best_condition, &cache),
             SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 template <typename TestParam>
@@ -838,7 +845,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartIsNaForRegression) {
               SplitSearchResult::kNoBetterSplitFound);
   }
 
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitHistogramForRegression) {
@@ -1017,6 +1024,10 @@ TYPED_TEST(FindBestSplitWithDuplicatesTest,
   const float na_replacement = 2;
   const UnsignedExampleIdx min_num_obs = 1;
 
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
+
   // Computes the preprocessing.
   Preprocessing preprocessing;
   {
@@ -1041,13 +1052,11 @@ TYPED_TEST(FindBestSplitWithDuplicatesTest,
     }
     model::proto::TrainingConfigLinking config_link;
     config_link.add_features(0);
-    CHECK_OK(PresortNumericalFeatures(dataset, config_link, 6, &preprocessing));
+    CHECK_OK(PresortNumericalFeatures(dataset, config_link, dt_config, 6,
+                                      &preprocessing));
     preprocessing.set_num_examples(dataset.nrow());
   }
 
-  proto::DecisionTreeTrainingConfig dt_config;
-  dt_config.mutable_internal()->set_sorting_strategy(
-      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
   utils::NormalDistributionDouble label_distribution;
   for (const auto example_idx : selected_examples) {
     if constexpr (TestFixture::kWeighted) {
@@ -1105,6 +1114,10 @@ TYPED_TEST(FindBestSplitTest,
   const float na_replacement = 2;
   const UnsignedExampleIdx min_num_obs = 1;
 
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
+
   // Computes the preprocessing.
   Preprocessing preprocessing;
   {
@@ -1125,13 +1138,11 @@ TYPED_TEST(FindBestSplitTest,
     }
     model::proto::TrainingConfigLinking config_link;
     config_link.add_features(0);
-    CHECK_OK(PresortNumericalFeatures(dataset, config_link, 6, &preprocessing));
+    CHECK_OK(PresortNumericalFeatures(dataset, config_link, dt_config, 6,
+                                      &preprocessing));
     preprocessing.set_num_examples(dataset.nrow());
   }
 
-  proto::DecisionTreeTrainingConfig dt_config;
-  dt_config.mutable_internal()->set_sorting_strategy(
-      proto::DecisionTreeTrainingConfig::Internal::FORCE_PRESORTED);
   utils::NormalDistributionDouble label_distribution;
   for (const auto example_idx : selected_examples) {
     if constexpr (TestFixture::kWeighted) {
@@ -1152,7 +1163,7 @@ TYPED_TEST(FindBestSplitTest,
           &best_condition, &cache),
       SplitSearchResult::kBetterSplitFound);
 
-  YDF_LOG(INFO) << "Condition: " << best_condition.condition().DebugString();
+  LOG(INFO) << "Condition: " << best_condition.condition().DebugString();
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 3.0f);
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 5);
@@ -1239,7 +1250,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
         SplitSearchResult::kNoBetterSplitFound);
   }
 
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // Since all the attributes have the same value, there are no valid splits.
   attributes = {1, 1, 1, 1, 1, 1};
@@ -1249,13 +1260,13 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
                 num_attribute_classes, na_replacement, min_num_obs, dt_config,
                 label_distribution, -1, &best_condition, &cache, &rnd),
             SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
   // Small basic dataset.
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
-  std::vector<char> attributes = {0, 1, 0, 1, 0, 0};
+  std::vector<int8_t> attributes = {0, 1, 0, 1, 0, 0};
   const std::vector<float> weights = {1, 1, 1, 1, 1, 1};
   const std::vector<int32_t> labels = {1, 0, 0, 0, 0, 1};
   const int32_t num_label_classes = 2;
@@ -1294,14 +1305,14 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
                 num_label_classes, false, min_num_obs, dt_config,
                 label_distribution, -1, &best_condition, &cache),
             SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TYPED_TEST(FindBestSplitTest,
            FindBestCategoricalSplitCartBooleanForRegression) {
   // Small basic dataset.
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
-  std::vector<char> attributes = {0, 1, 0, 1, 0, 0};
+  std::vector<int8_t> attributes = {0, 1, 0, 1, 0, 0};
   std::vector<float> weights;
   if constexpr (TestFixture::kWeighted) {
     weights = {1., 2., 3., 4., 5., 6.};
@@ -1355,7 +1366,7 @@ TYPED_TEST(FindBestSplitTest,
           selected_examples, weights, attributes, labels, false, min_num_obs,
           dt_config, label_distribution, -1, &best_condition, &cache),
       SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, LocalImputationForNumericalAttribute) {
@@ -1470,7 +1481,7 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kNoBetterSplitFound);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // Since all the attributes have the same value, there are no valid splits.
   attributes = {1, 1, 1, 1, 1, 1};
@@ -1480,7 +1491,7 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
   // All the attribute value are NA.
   attributes = {-1, -1, -1, -1, -1, -1};
@@ -1490,14 +1501,14 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
           num_label_classes, na_replacement, min_num_obs, dt_config,
           label_distribution, -1, &rnd, &best_condition, &cache),
       SplitSearchResult::kInvalidAttribute);
-  YDF_LOG(INFO) << "Condition:\n" << best_condition.DebugString();
+  LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
 
 TEST(DecisionTree, LocalImputationForBooleanAttribute) {
   const std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3, 4, 5};
   const std::vector<float> weights = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
-  const char na = dataset::VerticalDataset::BooleanColumn::kNaValue;
-  std::vector<char> attributes = {0, 1, 0, 0, na, na};
+  const int8_t na = dataset::VerticalDataset::BooleanColumn::kNaValue;
+  std::vector<int8_t> attributes = {0, 1, 0, 0, na, na};
   const std::vector<int32_t> labels = {1, 1, 0, 0, 1, 0};
   const int32_t num_label_classes = 2;
 
@@ -2294,6 +2305,34 @@ TEST(DecisionTree, GenericHyperParameterCategorical) {
   EXPECT_OK(
       SetHyperParameters(&consumed_hparams, &dt_config, &generic_hyper_params));
   EXPECT_TRUE(dt_config.categorical().has_random());
+}
+
+TEST(DecisionTree, GenericHyperParameterMutualExclusive) {
+  // Ensure the parameter is defined.
+  model::proto::GenericHyperParameterSpecification hparam_def;
+  EXPECT_OK(GetGenericHyperParameterSpecification({}, &hparam_def));
+
+  for (const auto& field : hparam_def.fields()) {
+    if (field.second.has_mutual_exclusive()) {
+      bool is_default = field.second.mutual_exclusive().is_default();
+      const auto& other_parameters =
+          field.second.mutual_exclusive().other_parameters();
+      for (const auto& other_parameter : other_parameters) {
+        auto other_param_it =
+            std::find_if(hparam_def.fields().begin(), hparam_def.fields().end(),
+                         [other_parameter](const auto& field) {
+                           return other_parameter == field.first;
+                         });
+        EXPECT_FALSE(other_param_it == hparam_def.fields().end());
+        EXPECT_THAT(
+            other_param_it->second.mutual_exclusive().other_parameters(),
+            testing::Contains(field.first));
+        if (is_default) {
+          EXPECT_FALSE(other_param_it->second.mutual_exclusive().is_default());
+        }
+      }
+    }
+  }
 }
 
 TEST(DecisionTree, MidThreshold) {

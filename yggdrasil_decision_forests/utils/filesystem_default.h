@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -113,7 +114,7 @@ class FileInputByteStream
   absl::Status Close();
 
  private:
-  std::FILE* file_;
+  std::ifstream file_stream_;
 };
 
 class FileOutputByteStream
@@ -124,7 +125,7 @@ class FileOutputByteStream
   absl::Status Close();
 
  private:
-  std::FILE* file_;
+  std::ofstream file_stream_;
 };
 
 // Exports a proto to disk in binary format.

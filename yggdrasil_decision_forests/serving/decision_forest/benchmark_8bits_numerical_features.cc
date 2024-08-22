@@ -19,6 +19,9 @@
 // "cli/benchmark_inference" benchmark inference tool.
 //
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/time/clock.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -46,16 +49,16 @@ namespace decision_forest {
 namespace num_8bits {
 
 absl::Status Benchmark() {
-  YDF_LOG(INFO) << "Load model";
+  LOG(INFO) << "Load model";
   std::unique_ptr<model::AbstractModel> model;
   RETURN_IF_ERROR(model::LoadModel(absl::GetFlag(FLAGS_model), &model));
 
-  YDF_LOG(INFO) << "Load dataset";
+  LOG(INFO) << "Load dataset";
   dataset::VerticalDataset dataset;
   RETURN_IF_ERROR(LoadVerticalDataset(absl::GetFlag(FLAGS_dataset),
                                       model->data_spec(), &dataset));
 
-  YDF_LOG(INFO) << "Compile model";
+  LOG(INFO) << "Compile model";
   // Compile model
   auto* gbt_model =
       dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
@@ -75,7 +78,7 @@ absl::Status Benchmark() {
 
   RETURN_IF_ERROR(GenericToSpecializedModel(*gbt_model, &engine));
 
-  YDF_LOG(INFO) << "Details:\n" << EngineDetails(engine);
+  LOG(INFO) << "Details:\n" << EngineDetails(engine);
 
   // Copy data to the format expected by the engine
   std::vector<uint8_t> examples(engine.num_features * dataset.nrow());
@@ -97,7 +100,7 @@ absl::Status Benchmark() {
   }
   std::vector<float> engine_predictions;
 
-  YDF_LOG(INFO) << "Run benchmark";
+  LOG(INFO) << "Run benchmark";
 
   auto run_once = [&]() {
     Predict(engine, examples, dataset.nrow(), &engine_predictions)
@@ -120,7 +123,7 @@ absl::Status Benchmark() {
 
   const auto time_per_example =
       (end_time - start_time) / (num_runs * dataset.nrow());
-  YDF_LOG(INFO) << "Average inference time per example: " << time_per_example;
+  LOG(INFO) << "Average inference time per example: " << time_per_example;
 
   return absl::OkStatus();
 }
@@ -135,8 +138,7 @@ int main(int argc, char** argv) {
   const auto status = yggdrasil_decision_forests::serving::decision_forest::
       num_8bits::Benchmark();
   if (!status.ok()) {
-    YDF_LOG(INFO) << "The benchmark failed with the following error: "
-                  << status;
+    LOG(INFO) << "The benchmark failed with the following error: " << status;
     return 1;
   }
   return 0;

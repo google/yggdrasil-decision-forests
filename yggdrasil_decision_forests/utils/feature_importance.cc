@@ -23,9 +23,11 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -188,9 +190,9 @@ absl::Status ComputePermutationFeatureImportance(
     utils::concurrency::ThreadPool pool("variable_importance",
                                         options.num_threads);
     pool.StartWorkers();
-    YDF_LOG(INFO) << "Running " << model->data_spec().columns_size()
-                  << " features on " << options.num_threads << " threads with "
-                  << options.num_rounds << " rounds";
+    LOG(INFO) << "Running " << model->data_spec().columns_size()
+              << " features on " << options.num_threads << " threads with "
+              << options.num_rounds << " rounds";
     for (int feature_idx = 0; feature_idx < model->data_spec().columns_size();
          feature_idx++) {
       for (int round_idx = 0; round_idx < options.num_rounds; round_idx++) {

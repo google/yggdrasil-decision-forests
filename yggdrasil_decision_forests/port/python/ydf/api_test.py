@@ -16,6 +16,7 @@
 
 import math
 import os
+import pickle
 import sys
 
 from absl import logging
@@ -67,6 +68,24 @@ class ApiTest(absltest.TestCase):
     tempdir = self.create_tempdir().full_path
     model.save(tempdir, ydf.ModelIOOptions(file_prefix="model_prefix_"))
     logging.info(os.listdir(tempdir))
+
+  def test_serialize_and_deserialize_model(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
+    )
+    model = ydf.load_model(model_path)
+    serialized_model = model.serialize()
+    deserialized_model = ydf.deserialize_model(serialized_model)
+    logging.info(deserialized_model)
+
+  def test_pickle_and_unpickle_model(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
+    )
+    model = ydf.load_model(model_path)
+    pickled_model = pickle.dumps(model)
+    unpickled_model = pickle.loads(pickled_model)
+    logging.info(unpickled_model)
 
   def test_train_random_forest(self):
     pd_ds = pd.DataFrame({

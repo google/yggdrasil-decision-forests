@@ -45,7 +45,7 @@ absl::Status CustomRegressionLoss::Status() const {
 
 absl::StatusOr<std::vector<float>> CustomRegressionLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
-    const std::vector<float>& weights) const {
+    const absl::Span<const float> weights) const {
   ASSIGN_OR_RETURN(
       const auto* labels,
       dataset
@@ -69,7 +69,8 @@ absl::StatusOr<std::vector<float>> CustomRegressionLoss::InitialPredictions(
 }
 
 absl::Status CustomRegressionLoss::UpdateGradients(
-    const std::vector<float>& labels, const std::vector<float>& predictions,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
     const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
@@ -92,8 +93,9 @@ std::vector<std::string> CustomRegressionLoss::SecondaryMetricNames() const {
 }
 
 absl::StatusOr<LossResults> CustomRegressionLoss::Loss(
-    const std::vector<float>& labels, const std::vector<float>& predictions,
-    const std::vector<float>& weights,
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
+    const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
   DCHECK_EQ(weights.size(), labels.size());

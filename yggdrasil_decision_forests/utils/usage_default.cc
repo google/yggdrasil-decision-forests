@@ -16,6 +16,7 @@
 #include <cstdint>
 
 #include "absl/strings/string_view.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {

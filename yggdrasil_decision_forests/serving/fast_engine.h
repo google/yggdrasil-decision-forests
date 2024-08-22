@@ -31,6 +31,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_FAST_ENGINE_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_FAST_ENGINE_H_
 
+#include "absl/status/status.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 
 namespace yggdrasil_decision_forests {

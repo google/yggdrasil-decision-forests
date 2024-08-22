@@ -14,16 +14,24 @@
 # limitations under the License.
 
 
-#
-# Start a notebook instance
-#
-# Usage example:
-#  # Compile PYDF
-#  third_party/yggdrasil_decision_forests/tools/run_e2e_pydf_test.sh
-#  # Start a notebook (this file)
-#  ./tools/start_notebook.sh
-#  # Open your browser to http://localhost:8888/
+# Running this script inside a python venv may not work.
+set -vex
 
-pip install notebook -U
-python tools/assembly_pip_files.py
-( cd tmp_package && jupyter-lab --no-browser --allow-root --port 8889 )
+declare -a python_versions=("3.8" "3.9" "3.10" "3.11" "3.12")
+
+for pyver in "${python_versions[@]}"
+do
+  pyenv install -s $pyver
+  export PYENV_VERSION=$pyver
+  rm -rf ${TMPDIR}venv
+  python -m venv ${TMPDIR}venv
+  source ${TMPDIR}venv/bin/activate
+  pip install --upgrade pip
+
+  echo "Building with $(python -V 2>&1)"
+
+  bazel clean --expunge
+  RUN_TESTS=0 CC="clang" ./tools/build_test_linux.sh
+  ./tools/package_linux.sh
+  deactivate
+done

@@ -20,6 +20,7 @@
 #include <queue>
 #include <string>
 
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 

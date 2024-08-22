@@ -17,12 +17,13 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/log.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
 namespace {
 
-TEST(Logging, LogInfo) { YDF_LOG(INFO) << "Hello world"; }
+TEST(Logging, LogInfo) { LOG(INFO) << "Hello world"; }
 
 }  // namespace
 }  // namespace utils

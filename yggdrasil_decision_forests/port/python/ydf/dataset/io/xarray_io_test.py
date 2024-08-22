@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2022 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,18 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test dataspec utilities for XArray."""
+
+from absl.testing import absltest
+import xarray as xr
+
+from ydf.dataset.io import xarray_io
 
 
-set -vex
+class XArrayIOTest(absltest.TestCase):
 
-DOCKER=ubuntu:20.04
+  def test_is_pandas(self):
+    self.assertTrue(xarray_io.is_xarray_dataset(xr.Dataset()))
+    self.assertFalse(xarray_io.is_xarray_dataset({}))
 
-# Current directory
-DIRNAME=${PWD##*/}
 
-# Download docker
-docker pull ${DOCKER}
-
-# Start docker
-docker run -it -v ${PWD}/..:/working_dir -w /working_dir/${DIRNAME} ${DOCKER} /bin/bash
-
+if __name__ == "__main__":
+  absltest.main()

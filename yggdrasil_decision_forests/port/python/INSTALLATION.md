@@ -12,7 +12,7 @@ pip install ydf --upgrade
 
 ### Pre-work
 
-Use `tools/update_version.sh` to update the version number (if needed) and
+Use `tools/change_version.sh` to update the version number (if needed) and
 remember to update `CHANGELOG.md`.
 
 ### Linux x86_64
@@ -21,8 +21,8 @@ remember to update `CHANGELOG.md`.
 
 For building manylinux2014-compatible packages, you can use an appropriate
 Docker image. The pre-configured build script at
-`tools/build_linux_release_in_docker.sh` starts a container and builds the
-wheels end-to-end. You can find the wheels in the `dist/`subdirectory.
+`tools/release_linux_in_docker.sh` starts a container and builds the wheels
+end-to-end. You can find the wheels in the `dist/`subdirectory.
 
 #### Manual build
 
@@ -44,7 +44,7 @@ Note that we may not be able to help with issues during manual builds.
     ```shell
     # Create a virtual environment where Python dependencies will be installed.
     python -m venv myvenv
-    RUN_TESTS=1 ./tools/test_pydf.sh
+    RUN_TESTS=1 ./tools/build_test_linux.sh
     deactivate
     ```
 
@@ -54,14 +54,14 @@ Note that we may not be able to help with issues during manual builds.
 
     ```shell
     PYTHON_BIN=python
-    ./tools/build_pydf.sh $PYTHON_BIN
+    ./tools/package_linux.sh $PYTHON_BIN
     ```
 
     If you want to build with [Pyenv](https://github.com/pyenv/pyenv) for all
     supported Python versions, run
 
     ```shell
-    ./tools/build_pydf.sh ALL_VERSIONS
+    ./tools/package_linux.sh ALL_VERSIONS
     ```
 
 ### Linux ARM64
@@ -91,7 +91,7 @@ For details and configuration options, please consult the corresponding scripts.
 Simply run
 
 ```shell
-./tools/build_macos_release.sh
+./tools/release_macos.sh
 ```
 
 This will build a MacOS wheel for every supported Python version on the current
@@ -108,7 +108,7 @@ We have not tested AArch64 compilation for YDF yet.
 
 ### Windows
 
-See `tools\build_windows_release.bat` for details.
+See `tools\release_windows.bat` for details.
 
 **Requirements**
 
@@ -123,24 +123,24 @@ See `tools\build_windows_release.bat` for details.
 Simply run
 
 ```shell
-tools\build_windows_release.bat
+tools\release_windows.bat
 ```
 
 This will build a Windows wheel for every supported Python version on the
 current architecture. See the contents of this script for details about the
 build.
 
-**Optionally**, edit `tools\build_windows_release.bat` to
+**Optionally**, edit `tools\release_windows.bat` to
 
 -   Only compile YDF for a specific version of Windows.
 -   Configure the paths to MSys2, Python, and VS.
 
 **Issues**
 
--   `tools\build_windows_release.bat` compiles and tests YDF with various
-    compatible libraries such as TensorFlow and Jax. Compiling YDF does not need
-    those library. Notably, you can disable those libraries in
-    `dev_requirements.txt` if they fail to install on your environment.
+-   `tools\release_windows.bat` compiles and tests YDF with various compatible
+    libraries such as TensorFlow and Jax. Compiling YDF does not need those
+    library. Notably, you can disable those libraries in `dev_requirements.txt`
+    if they fail to install on your environment.
 -   If the compilation fails with the error `error C2475:
     'upbc::kRepeatedFieldArrayGetterPostfix': redefinition; 'constinit'
     specifier mismatch`, you are seeing an issue caused by an old version of

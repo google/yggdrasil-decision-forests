@@ -32,8 +32,11 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
         "//yggdrasil_decision_forests/utils/distribute:distribute_without_implementations",
         "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -50,6 +53,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils/distribute:core",
         "//yggdrasil_decision_forests/utils/distribute:distribute_cc_proto",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -65,8 +69,8 @@ cc_library_ydf(
     deps = [
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:hash",
-        "//yggdrasil_decision_forests/utils:logging",
-        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/numeric:int128",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -77,11 +81,10 @@ cc_test(
     deps = [
         ":distribute_cli",
         ":distribute_cli_worker",
-        "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils/distribute",
-        "//yggdrasil_decision_forests/utils/distribute:distribute_without_implementations",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_cc_proto",
+        "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
     ],
 )

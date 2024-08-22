@@ -28,13 +28,15 @@ You can run the benchmark locally with:
   sudo cpupower frequency-set --governor performance
 
   bazel run -c opt --copt=-mfma --copt=-mavx2 --copt=-mavx \
-      //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/model:benchmark_test\
+      //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/monitoring:benchmark_inference_speed_test\
           --test_filter=ToJaxTest.test_benchmark
 
 You can run the benchmark in a notebook / colab with:
 
-  from ydf.model import benchmark
+  from ydf.monitoring import benchmark_inference_speed as benchmark
   _ = benchmark.run_preconfigured(show_logs=True, models=["reg gbt; num feat"])
+
+Note that some inference engines can use GPU and TPU (if available).
 
 """
 
@@ -143,11 +145,6 @@ class Benchmark:
   wall-time (µs/ex): {self.str_wall_time_seconds_us}
   cpu-time (µs/ex):  {self.str_wall_time_seconds_us}
 """
-
-
-def np_dict_to_jax_dict(df: Dict[str, np.ndarray]) -> Dict[str, jax.Array]:
-  """Converts a dictionary of numpy array into a dictionary of jax arrays."""
-  return {k: jax.numpy.asarray(v) for k, v in df.items()}
 
 
 def build_synthetic_dataset(
@@ -318,10 +315,7 @@ def run_jax_engine(
     with jax.default_device(device):
 
       jax_model = model.to_jax_function()
-      if jax_model.encoder is not None:
-        input_values = jax_model.encoder(dataset_without_labels)
-      else:
-        input_values = np_dict_to_jax_dict(dataset_without_labels)
+      input_values = jax_model.encoder(dataset_without_labels)
 
       for _ in range(run_config.num_warmup_rounds):
         for batch in gen_batch(input_values, batch_size):

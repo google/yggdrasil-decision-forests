@@ -24,10 +24,9 @@
 
 #include <stdint.h>
 
+#include <cassert>
 #include <type_traits>
 
-#include "absl/base/attributes.h"
-#include "absl/status/statusor.h"
 #include "absl/types/optional.h"
 namespace yggdrasil_decision_forests {
 namespace utils {
