@@ -1,5 +1,12 @@
 # Changelog
 
+## Head
+
+### Feature
+
+-   Warn if training on a VerticalDataset and fail if attempting to modify the
+    columns in a VerticalDataset during training.
+
 ## 0.7.0 - 2024-08-21
 
 ### Feature

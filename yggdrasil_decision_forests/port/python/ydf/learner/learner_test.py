@@ -95,6 +95,7 @@ class LearnerTest(parameterized.TestCase):
       learner: generic_learner.GenericLearner,
       minimum_accuracy: float,
       check_serialization: bool = True,
+      use_pandas: bool = False,
       valid: Optional[Any] = None,
   ) -> Tuple[generic_model.GenericModel, metric.Evaluation, np.ndarray]:
     """Runs a battery of test on a model compatible with the adult dataset.
@@ -110,19 +111,27 @@ class LearnerTest(parameterized.TestCase):
       learner: A learner on the adult dataset.
       minimum_accuracy: Minimum accuracy.
       check_serialization: If true, check the serialization of the model.
+      use_pandas: If true, load the dataset from Pandas
       valid: Optional validation dataset.
 
     Returns:
       The model, its evaluation and the predictions on the test dataset.
     """
+    if use_pandas:
+      train_ds = self.adult.train_pd
+      test_ds = self.adult.test_pd
+    else:
+      train_ds = self.adult.train
+      test_ds = self.adult.test
+
     # Train the model.
-    model = learner.train(self.adult.train, valid=valid)
+    model = learner.train(train_ds, valid=valid)
 
     # Evaluate the trained model.
-    evaluation = model.evaluate(self.adult.test)
+    evaluation = model.evaluate(test_ds)
     self.assertGreaterEqual(evaluation.accuracy, minimum_accuracy)
 
-    predictions = model.predict(self.adult.test)
+    predictions = model.predict(test_ds)
 
     if check_serialization:
       ydf_model_path = os.path.join(
@@ -130,7 +139,7 @@ class LearnerTest(parameterized.TestCase):
       )
       model.save(ydf_model_path)
       loaded_model = model_lib.load_model(ydf_model_path)
-      npt.assert_equal(predictions, loaded_model.predict(self.adult.test))
+      npt.assert_equal(predictions, loaded_model.predict(test_ds))
 
     return model, evaluation, predictions
 
@@ -1041,9 +1050,11 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         ),
     )
 
-    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.863)
+    model, _, _ = self._check_adult_model(
+        learner, minimum_accuracy=0.863, use_pandas=True
+    )
 
-    _ = model.analyze(self.adult.test)
+    _ = model.analyze(self.adult.test_pd)
 
   def test_with_validation_pd(self):
     evaluation = (
@@ -1177,10 +1188,10 @@ class IsolationForestLearnerTest(LearnerTest):
       learner = specialized_learners.IsolationForestLearner(label="label")
     else:
       learner = specialized_learners.IsolationForestLearner(
-          features=["f1", "f2"]
+          features=["features.0_of_2", "features.1_of_2"]
       )
-    model = learner.train(self.gaussians.train)
-    predictions = model.predict(self.gaussians.test)
+    model = learner.train(self.gaussians.train_pd)
+    predictions = model.predict(self.gaussians.test_pd)
 
     auc = metrics.roc_auc_score(self.gaussians.test_pd["label"], predictions)
     logging.info("auc:%s", auc)
@@ -1189,7 +1200,7 @@ class IsolationForestLearnerTest(LearnerTest):
     _ = model.describe("text")
     _ = model.describe("html")
     _ = model.analyze_prediction(self.gaussians.test_pd.iloc[:1])
-    _ = model.analyze(self.gaussians.test)
+    _ = model.analyze(self.gaussians.test_pd)
 
   def test_gaussians_evaluation_default_task(self):
     learner = specialized_learners.IsolationForestLearner(label="label")
@@ -1201,8 +1212,10 @@ class IsolationForestLearnerTest(LearnerTest):
       _ = model.evaluate(self.gaussians.test)
 
   def test_gaussians_evaluation_no_label(self):
-    learner = specialized_learners.IsolationForestLearner(features=["f1", "f2"])
-    model = learner.train(self.gaussians.train)
+    learner = specialized_learners.IsolationForestLearner(
+        features=["features.0_of_2", "features.1_of_2"]
+    )
+    model = learner.train(self.gaussians.train_pd)
     with self.assertRaisesRegex(
         ValueError,
         ".*A model cannot be evaluated without a label..*",
@@ -1237,31 +1250,33 @@ class IsolationForestLearnerTest(LearnerTest):
 
   def test_max_depth_gaussians_subsample_ratio(self):
     learner = specialized_learners.IsolationForestLearner(
-        features=["f1", "f2"],
+        features=["features.0_of_2", "features.1_of_2"],
         subsample_ratio=0.9,
     )
     self.assertEqual(learner.hyperparameters["subsample_ratio"], 0.9)
-    model = learner.train(self.gaussians.train)
+    model = learner.train(self.gaussians.train_pd)
 
     max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
     self.assertEqual(max_depth, 8)
 
   def test_max_depth_gaussians_subsample_count(self):
     learner = specialized_learners.IsolationForestLearner(
-        features=["f1", "f2"],
+        features=["features.0_of_2", "features.1_of_2"],
         subsample_count=128,
     )
     self.assertEqual(learner.hyperparameters["subsample_count"], 128)
-    model = learner.train(self.gaussians.train)
+    model = learner.train(self.gaussians.train_pd)
 
     max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
     self.assertEqual(max_depth, 7)
 
   def test_max_depth_gaussians_max_depth(self):
     learner = specialized_learners.IsolationForestLearner(
-        features=["f1", "f2"], subsample_ratio=1.0, max_depth=10
+        features=["features.0_of_2", "features.1_of_2"],
+        subsample_ratio=1.0,
+        max_depth=10,
     )
-    model = learner.train(self.gaussians.train)
+    model = learner.train(self.gaussians.train_pd)
 
     max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
     self.assertEqual(max_depth, 10)
@@ -1285,13 +1300,13 @@ class IsolationForestLearnerTest(LearnerTest):
     with self.assertRaises(ValueError):
       learner.validate_hyperparameters()
 
-  def test_max_depth_gaussians_oblique(self):
+  def test_gaussians_oblique(self):
     learner = specialized_learners.IsolationForestLearner(
-        features=["f1", "f2"],
+        features=["features.0_of_2", "features.1_of_2"],
         split_axis="SPARSE_OBLIQUE",
         num_trees=5,
     )
-    model = learner.train(self.gaussians.train)
+    model = learner.train(self.gaussians.train_pd)
     first_tree = model.get_tree(0)
     first_root = first_tree.root
     self.assertIsInstance(first_root, node_lib.NonLeaf)

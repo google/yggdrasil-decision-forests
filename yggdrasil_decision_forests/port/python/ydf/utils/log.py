@@ -56,6 +56,7 @@ class WarningMessage(enum.Enum):
   USE_DISCRETIZED = 3
   USE_DISTRIBUTED = 4
   DONT_USE_PICKLE = 5
+  TRAINING_VERTICAL_DATASET = 6
 
 
 # List of already showed warning message that should not be displayed again.

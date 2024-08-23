@@ -406,8 +406,30 @@ Hyper-parameters: ydf.{self._hyperparameters}
       self, ds: dataset.InputDataset
   ) -> dataset.VerticalDataset:
     if isinstance(ds, dataset.VerticalDataset):
+      if self._data_spec is not None:
+        raise ValueError(
+            "When training on a VerticalDataset, no data spec can be explicitly"
+            " provided. Specify the data spec when creating the VerticalDataset"
+            " or directly train on the data source."
+        )
+      if self._data_spec_args.columns is not None:
+        raise ValueError(
+            "When training on a VerticalDataset, the columns or its types"
+            " cannot be changed during training. Specify the columns when"
+            " creating the VerticalDataset or directly train on the data"
+            " source."
+        )
+      log.warning(
+          "When training on a VerticalDataset, options to modify the dataset"
+          " are ignored. Specify these options directly when constructing the"
+          " VerticalDataset. Ignored options are `columns, include_all_columns,"
+          " max_vocab_count, min_vocab_frequency, discretize_numerical_columns,"
+          " num_discretized_numerical_bins,"
+          " max_num_scanned_rows_to_infer_semantic,"
+          " max_num_scanned_rows_to_compute_statistics`. ",
+          message_id=log.WarningMessage.TRAINING_VERTICAL_DATASET,
+      )
       return ds
-      # TODO: Check that the user has not specified a data spec guide.
     else:
 
       # List of columns that cannot be unrolled.
