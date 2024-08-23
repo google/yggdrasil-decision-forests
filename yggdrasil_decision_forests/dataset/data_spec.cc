@@ -317,7 +317,7 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
         float num_value;
         if (!absl::SimpleAtof(value, &num_value)) {
           return absl::InvalidArgumentError(
-              absl::StrCat("Cannot parse: ", value));
+              absl::StrCat("Cannot parse value ", value, " as a float"));
         }
 
         dst_value->set_numerical(num_value);
@@ -329,7 +329,7 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
         float num_value;
         if (!absl::SimpleAtof(value, &num_value)) {
           return absl::InvalidArgumentError(
-              absl::StrCat("Cannot parse: ", value));
+              absl::StrCat("Cannot parse value ", value, " as a float"));
         }
         dst_value->set_discretized_numerical(
             NumericalToDiscretizedNumerical(col_spec, num_value));

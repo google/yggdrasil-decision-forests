@@ -214,12 +214,13 @@ AbstractModel::EvaluateOverrideType(
     std::vector<model::proto::Prediction>* predictions) const {
   RETURN_IF_ERROR(CheckCompatibleEvaluationTask(override_task, option.task()));
   metric::proto::EvaluationResults eval;
-  RETURN_IF_ERROR(
-      metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
+  const auto& label_col_spec =
+      dataset.data_spec().columns(override_label_col_idx);
+  RETURN_IF_ERROR(metric::InitializeEvaluation(option, label_col_spec, &eval));
   RETURN_IF_ERROR(AppendEvaluationOverrideType(
       dataset, option, override_task, override_label_col_idx,
       override_group_col_idx, rnd, &eval, predictions));
-  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, label_col_spec, &eval));
   return eval;
 }
 
@@ -234,13 +235,14 @@ AbstractModel::EvaluateWithEngineOverrideType(
   if (label_col_idx_ == -1) {
     STATUS_FATAL("A model cannot be evaluated without a label.");
   }
+  const auto& label_col_spec =
+      dataset.data_spec().columns(override_label_col_idx);
   metric::proto::EvaluationResults eval;
-  RETURN_IF_ERROR(
-      metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(metric::InitializeEvaluation(option, label_col_spec, &eval));
   dataset::proto::LinkedWeightDefinition weight_links;
   if (option.has_weights()) {
     RETURN_IF_ERROR(dataset::GetLinkedWeightDefinition(
-        option.weights(), data_spec_, &weight_links));
+        option.weights(), dataset.data_spec(), &weight_links));
   }
   if (dataset.nrow() == 0) {
     STATUS_FATAL("The dataset is empty. Cannot evaluate model.");
@@ -248,7 +250,7 @@ AbstractModel::EvaluateWithEngineOverrideType(
   RETURN_IF_ERROR(AppendEvaluationWithEngineOverrideType(
       dataset, option, override_task, override_label_col_idx,
       override_group_col_idx, weight_links, engine, rnd, predictions, &eval));
-  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, label_col_spec, &eval));
   return eval;
 }
 

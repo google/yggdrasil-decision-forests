@@ -416,8 +416,11 @@ Use `model.describe()` for more details
       self,
       data: dataset.InputDataset,
       *,
+      weighted: Optional[bool] = None,
+      task: Optional[Task] = None,
+      label: Optional[str] = None,
+      group: Optional[str] = None,
       bootstrapping: Union[bool, int] = False,
-      weighted: bool = False,
       evaluation_task: Optional[Task] = None,
   ) -> metric.Evaluation:
     """Evaluates the quality of a model on a dataset.
@@ -447,9 +450,35 @@ Use `model.describe()` for more details
     evaluation
     ```
 
+    It is possible to evaluate the model differently than it was trained. For
+    example, you can change the label, task and group.
+
+    ```python
+    ...
+    # Train a regression model
+    model = ydf.RandomForestLearner(label="label",
+    task=ydf.Task.REGRESSION).train(train_ds)
+
+    # Evaluate the model as a regressive model
+    regressive_evaluation = model.evaluates(test_ds)
+
+    # Evaluate the model as a ranking model model
+    regressive_evaluation = model.evaluates(test_ds,
+      task=ydf.Task.RANKING, group="group_column")
+    ```
+
     Args:
       data: Dataset. Can be a dictionary of list or numpy array of values,
         Pandas DataFrame, or a VerticalDataset.
+      weighted: If true, the evaluation is weighted according to the training
+        weights. If false, the evaluation is non-weighted. b/351279797: Change
+        default to weights=True.
+      task: Override the task of the model during the evaluation. If None
+        (default), the model is evaluated according to its training task.
+      label: Override the label used to evaluate the model. If None (default),
+        use the model's label.
+      group: Override the group used to evaluate the model. If None (default),
+        use the model's group. Only used for ranking models.
       bootstrapping: Controls whether bootstrapping is used to evaluate the
         confidence intervals and statistical tests (i.e., all the metrics ending
         with "[B]"). If set to false, bootstrapping is disabled. If set to true,
@@ -457,43 +486,84 @@ Use `model.describe()` for more details
         to an integer, it specifies the number of bootstrapping samples to use.
         In this case, if the number is less than 100, an error is raised as
         bootstrapping will not yield useful results.
-      weighted: If true, the evaluation is weighted according to the training
-        weights. If false, the evaluation is non-weighted. b/351279797: Change
-        default to weights=True.
-      evaluation_task: Set the type of model evaluation to use. If None, this is
-        the same as the model's task. Some models can be evaluated with a
-        different task. Notably, ANOMALY DETECTION models must currently be
-        evaluated as CLASSIFICATION.
+      evaluation_task: Deprecated. Use `task` instead.
 
     Returns:
       Model evaluation.
     """
 
-    with log.cc_log_context():
-      ds = dataset.create_vertical_dataset(
-          data, data_spec=self._model.data_spec()
+    # Warning about deprecation of "evaluation_task"
+    if evaluation_task is not None:
+      log.warning(
+          "The `evaluation_task` argument is deprecated. Use `task` instead.",
+          message_id=log.WarningMessage.DEPRECATED_EVALUATION_TASK,
+      )
+      if task is not None:
+        raise ValueError("Cannot specify both `task` and `evaluation_task`")
+      task = evaluation_task
+
+    # Warning about change default value of "weighted")
+    if weighted is None and self._model.weighted_training():
+      # TODO: Change default to true and remove warning.
+      log.warning(
+          "Non-weighted evaluation of a model trained with weighted training."
+          " Are you sure you don't want to do a weighted evaluation? Set"
+          " `model.evaluate(weighted=True, ...)` or"
+          " `model.evaluate(weighted=False, ...)` accordingly.",
+          message_id=log.WarningMessage.WEIGHTED_NOT_SET_IN_EVAL,
+      )
+      weighted = False
+
+    # Warning about unnecessary arguments
+    if task is not None and task == self.task():
+      log.warning(
+          "No need to set the `task` argument in `model.evaluate` if the model"
+          " is evaluated the same way it was trained.",
+          message_id=log.WarningMessage.UNNECESSARY_TASK_ARGUMENT,
+      )
+    if label is not None and label == self.label():
+      log.warning(
+          "No need to set the `task` argument in `model.evaluate` if the model"
+          " is evaluated the same way it was trained.",
+          message_id=log.WarningMessage.UNNECESSARY_LABEL_ARGUMENT,
       )
 
-      if isinstance(bootstrapping, bool):
-        bootstrapping_samples = 2000 if bootstrapping else -1
-      elif isinstance(bootstrapping, int) and bootstrapping >= 100:
-        bootstrapping_samples = bootstrapping
-      else:
-        raise ValueError(
-            "bootstrapping argument should be boolean or an integer greater"
-            " than 100 as bootstrapping will not yield useful results. Got"
-            f" {bootstrapping!r} instead"
-        )
-      if evaluation_task is None:
-        evaluation_task = self.task()
+    if isinstance(bootstrapping, bool):
+      bootstrapping_samples = 2000 if bootstrapping else -1
+    elif isinstance(bootstrapping, int) and bootstrapping >= 100:
+      bootstrapping_samples = bootstrapping
+    else:
+      raise ValueError(
+          "bootstrapping argument should be boolean or an integer greater"
+          " than 100 as bootstrapping will not yield useful results. Got"
+          f" {bootstrapping!r} instead"
+      )
+    if task is None:
+      task = self.task()
+
+    with log.cc_log_context():
+
+      effective_dataspec, label_col_idx, group_col_idx = (
+          self._build_evaluation_dataspec(
+              override_task=task._to_proto_type(),
+              override_label=label,
+              override_group=group,
+          )
+      )
+
+      ds = dataset.create_vertical_dataset(data, data_spec=effective_dataspec)
 
       options_proto = metric_pb2.EvaluationOptions(
           bootstrapping_samples=bootstrapping_samples,
-          task=evaluation_task._to_proto_type(),  # pylint: disable=protected-access
+          task=task._to_proto_type(),  # pylint: disable=protected-access
       )
 
       evaluation_proto = self._model.Evaluate(
-          ds._dataset, options_proto, weighted=weighted
+          ds._dataset,
+          options_proto,
+          weighted=weighted,
+          label_col_idx=label_col_idx,
+          group_col_idx=group_col_idx,
       )  # pylint: disable=protected-access
     return metric.Evaluation(evaluation_proto)
 
@@ -1314,6 +1384,112 @@ Use `model.describe()` for more details
         the fastest engine.
     """
     self._model.ForceEngine(engine_name)
+
+  def _build_evaluation_dataspec(
+      self,
+      override_task: abstract_model_pb2.Task,
+      override_label: Optional[str],
+      override_group: Optional[str],
+  ) -> Tuple[data_spec_pb2.DataSpecification, int, int]:
+
+    # Default dataspec of the model
+    effective_dataspec = self._model.data_spec()
+
+    def find_existing_or_add_column(
+        semantic: Optional[data_spec_pb2.ColumnType],
+        name: Optional[str],
+        default_col_idx: int,
+        usage: str,
+    ) -> int:
+      """Create a new or retreive an existing column."""
+      if name is None:
+        if semantic is None:
+          return -1
+        else:
+          existing_col_def = effective_dataspec.columns[default_col_idx]
+          if existing_col_def.type == semantic:
+            return default_col_idx  # Use the model's default
+          else:
+            col_idx = default_col_idx
+      else:
+        if semantic is None:
+          raise ValueError(
+              f"A {abstract_model_pb2.Task.Name(override_task)} evaluation does"
+              f" not expected a {usage} column."
+          )
+        col_idx = column_names.get(name, None)
+        if col_idx is not None:
+          # A column with the same name already exists
+          existing_col_def = effective_dataspec.columns[col_idx]
+          if existing_col_def.type != semantic:
+            log.warning(
+                f"Add dual semantic to {usage} column {name!r}. Original"
+                " semantic:"
+                f"{data_spec_pb2.ColumnType.Name(existing_col_def.type)} New"
+                f" semantic:{data_spec_pb2.ColumnType.Name(semantic)}"
+            )
+          else:
+            return col_idx
+
+      # Create a new column
+      if col_idx is None:
+        col_idx = len(effective_dataspec.columns)
+        new_col = effective_dataspec.columns.add(name=name, type=semantic)
+      else:
+        new_col = effective_dataspec.columns[col_idx]
+        new_col.type = semantic
+
+      # Populate column content
+      if (
+          override_task == abstract_model_pb2.Task.CLASSIFICATION
+          and self._model.task() == abstract_model_pb2.Task.CLASSIFICATION
+      ):
+        # Copy the dictionnary of the categorical label
+        new_col.categorical.CopyFrom(
+            effective_dataspec.columns[default_col_idx].categorical
+        )
+      elif semantic == data_spec_pb2.ColumnType.CATEGORICAL:
+        # Create a binary looking category
+        new_col.categorical.most_frequent_value = 1
+        new_col.categorical.number_of_unique_values = 3
+        new_col.categorical.is_already_integerized = False
+        new_col.categorical.items[dataspec.YDF_OOD].index = 0
+        new_col.categorical.items["0"].index = 1
+        new_col.categorical.items["1"].index = 2
+
+      return col_idx
+
+    # Compute the expected semantic of the evaluation columns
+    label_col_semantic = (
+        data_spec_pb2.ColumnType.CATEGORICAL
+        if override_task
+        in [
+            abstract_model_pb2.Task.CLASSIFICATION,
+            abstract_model_pb2.Task.CATEGORICAL_UPLIFT,
+        ]
+        else data_spec_pb2.ColumnType.NUMERICAL
+    )
+    group_col_semantic = (
+        data_spec_pb2.ColumnType.HASH
+        if override_task == abstract_model_pb2.Task.RANKING
+        else None
+    )
+
+    # Index the column names
+    column_names = {
+        col.name: idx for idx, col in enumerate(effective_dataspec.columns)
+    }
+
+    effective_label_col_idx = find_existing_or_add_column(
+        label_col_semantic, override_label, self._model.label_col_idx(), "label"
+    )
+    effective_group_col_idx = find_existing_or_add_column(
+        group_col_semantic,
+        override_group,
+        self._model.group_col_idx(),
+        "group",
+    )
+    return effective_dataspec, effective_label_col_idx, effective_group_col_idx
 
 
 def from_sklearn(

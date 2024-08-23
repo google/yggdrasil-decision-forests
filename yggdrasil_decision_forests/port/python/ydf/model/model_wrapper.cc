@@ -115,7 +115,8 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
 
 absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
     const dataset::VerticalDataset& dataset,
-    const metric::proto::EvaluationOptions& options, const bool weighted) {
+    const metric::proto::EvaluationOptions& options, const bool weighted,
+    const int label_col_idx, const int group_col_idx) {
   py::gil_scoped_release release;
 
   auto effective_options = options;
@@ -127,12 +128,19 @@ absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
 
   ASSIGN_OR_RETURN(const auto engine, GetEngine());
   utils::RandomEngine rnd;
-  ASSIGN_OR_RETURN(
-      const auto evaluation,
-      model_->EvaluateWithEngineOverrideType(
-          *engine, dataset, effective_options, effective_options.task(),
-          label_col_idx(), model_->ranking_group_col_idx(), &rnd));
-  return evaluation;
+
+  if (label_col_idx == model_->label_col_idx() &&
+      group_col_idx == model_->ranking_group_col_idx() &&
+      effective_options.task() == model_->task()) {
+    // Model default evaluation
+    return model_->EvaluateWithEngine(*engine, dataset, effective_options,
+                                      &rnd);
+  } else {
+    // Model evaluation with overrides
+    return model_->EvaluateWithEngineOverrideType(
+        *engine, dataset, effective_options, effective_options.task(),
+        label_col_idx, group_col_idx, &rnd);
+  }
 }
 
 absl::StatusOr<utils::model_analysis::proto::StandaloneAnalysisResult>

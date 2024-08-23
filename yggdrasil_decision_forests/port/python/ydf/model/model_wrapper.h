@@ -81,6 +81,8 @@ class GenericCCModel {
 
   int label_col_idx() const { return model_->label_col_idx(); }
 
+  int group_col_idx() const { return model_->ranking_group_col_idx(); }
+
   // Benchmark the inference speed of the model.
   absl::StatusOr<BenchmarkInferenceCCResult> Benchmark(
       const dataset::VerticalDataset& dataset, double benchmark_duration,
@@ -105,7 +107,8 @@ class GenericCCModel {
 
   absl::StatusOr<metric::proto::EvaluationResults> Evaluate(
       const dataset::VerticalDataset& dataset,
-      const metric::proto::EvaluationOptions& options, bool weighted);
+      const metric::proto::EvaluationOptions& options, bool weighted,
+      int label_col_idx, int group_col_idx);
 
   absl::StatusOr<utils::model_analysis::proto::StandaloneAnalysisResult>
   Analyze(const dataset::VerticalDataset& dataset,
@@ -152,6 +155,9 @@ class GenericCCModel {
   std::vector<std::string> ListCompatibleEngines() const {
     return model_->ListCompatibleFastEngineNames();
   }
+
+  // TODO: Remove when solved.
+  bool weighted_training() const { return model_->weights().has_value(); }
 
  protected:
   std::unique_ptr<model::AbstractModel> model_;

@@ -6,6 +6,7 @@
 
 -   Warn if training on a VerticalDataset and fail if attempting to modify the
     columns in a VerticalDataset during training.
+-   User can override the model's task, label or group during evaluation.
 
 ## 0.7.0 - 2024-08-21
 

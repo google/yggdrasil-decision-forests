@@ -35,6 +35,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/ranking_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
@@ -831,15 +832,21 @@ absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
     } break;
     case model::proto::Task::REGRESSION:
       if (label_column.type() != dataset::proto::ColumnType::NUMERICAL) {
-        return absl::InvalidArgumentError(
-            "Regression requires a numerical label.");
+        return absl::InvalidArgumentError(absl::Substitute(
+            "Regression requires a numerical label, got $0 of type $1 "
+            "instead.",
+            label_column.name(),
+            dataset::proto::ColumnType_Name(label_column.type())));
       }
       eval->mutable_regression();
       break;
     case model::proto::Task::RANKING:
       if (label_column.type() != dataset::proto::ColumnType::NUMERICAL) {
-        return absl::InvalidArgumentError(
-            "Ranking requires a numerical label.");
+        return absl::InvalidArgumentError(absl::Substitute(
+            "Ranking requires a numerical label, got $0 of type $1 "
+            "instead.",
+            label_column.name(),
+            dataset::proto::ColumnType_Name(label_column.type())));
       }
       eval->mutable_ranking();
       break;
@@ -957,34 +964,70 @@ absl::Status ChangePredictionType(model::proto::Task src_task,
                                   model::proto::Prediction* dst_pred) {
   if (src_task == dst_task) {
     *dst_pred = src_pred;
-  } else if (src_task == model::proto::Task::CLASSIFICATION &&
-             dst_task == model::proto::Task::RANKING) {
-    if (src_pred.classification().distribution().counts_size() != 3) {
-      STATUS_FATAL(
-          "Conversion CLASSIFICATION -> RANKING only possible for "
-          "binary classification.");
+  }
+  // Source is CLASSIFICATION
+  else if (src_task == model::proto::Task::CLASSIFICATION) {
+    if (dst_task == model::proto::Task::RANKING) {
+      if (src_pred.classification().distribution().counts_size() != 3) {
+        STATUS_FATAL(
+            "Conversion CLASSIFICATION -> RANKING only possible for "
+            "binary classification.");
+      }
+      dst_pred->mutable_ranking()->set_relevance(
+          src_pred.classification().distribution().counts(2) /
+          src_pred.classification().distribution().sum());
+    } else if (dst_task == model::proto::Task::REGRESSION) {
+      if (src_pred.classification().distribution().counts_size() != 3) {
+        STATUS_FATAL(
+            "Conversion CLASSIFICATION -> REGRESSION only possible for "
+            "binary classification.");
+      }
+      dst_pred->mutable_regression()->set_value(
+          src_pred.classification().distribution().counts(2) /
+          src_pred.classification().distribution().sum());
     }
-    dst_pred->mutable_ranking()->set_relevance(
-        src_pred.classification().distribution().counts(2) /
-        src_pred.classification().distribution().sum());
-  } else if (src_task == model::proto::Task::REGRESSION &&
-             dst_task == model::proto::Task::RANKING) {
-    dst_pred->mutable_ranking()->set_relevance(src_pred.regression().value());
-  } else if (src_task == model::proto::Task::RANKING &&
-             dst_task == model::proto::Task::REGRESSION) {
-    dst_pred->mutable_regression()->set_value(src_pred.ranking().relevance());
-  } else if (src_task == model::proto::Task::ANOMALY_DETECTION &&
-             dst_task == model::proto::Task::CLASSIFICATION) {
-    const float value = src_pred.anomaly_detection().value();
-    auto* dst_clas = dst_pred->mutable_classification();
-    // Assume the positive class is the abnormal one.
-    dst_clas->set_value(value >= 0.5f ? 2 : 1);
-    dst_clas->mutable_distribution()->clear_counts();
-    dst_clas->mutable_distribution()->set_sum(1.f);
-    dst_clas->mutable_distribution()->add_counts(0.f);
-    dst_clas->mutable_distribution()->add_counts(1.f - value);
-    dst_clas->mutable_distribution()->add_counts(value);
-  } else {
+  }
+  // Source is REGRESSION
+  else if (src_task == model::proto::Task::REGRESSION) {
+    float value = src_pred.regression().value();
+    if (dst_task == model::proto::Task::RANKING) {
+      dst_pred->mutable_ranking()->set_relevance(value);
+    } else if (dst_task == model::proto::Task::CLASSIFICATION) {
+      value = utils::clamp(value, 0.f, 1.f);
+      auto* dst_clas = dst_pred->mutable_classification();
+      dst_clas->set_value(value >= 0.5f ? 2 : 1);
+      dst_clas->mutable_distribution()->clear_counts();
+      dst_clas->mutable_distribution()->set_sum(1.f);
+      dst_clas->mutable_distribution()->add_counts(0.f);
+      dst_clas->mutable_distribution()->add_counts(1.f - value);
+      dst_clas->mutable_distribution()->add_counts(value);
+    }
+  }
+  // Source is RANKING
+  else if (src_task == model::proto::Task::RANKING &&
+           dst_task == model::proto::Task::REGRESSION) {
+    const float value = src_pred.ranking().relevance();
+    dst_pred->mutable_regression()->set_value(value);
+  }
+  // Source is ANOMALY_DETECTION
+  else if (src_task == model::proto::Task::ANOMALY_DETECTION) {
+    float value = src_pred.anomaly_detection().value();
+    if (dst_task == model::proto::Task::CLASSIFICATION) {
+      value = utils::clamp(value, 0.f, 1.f);
+      auto* dst_clas = dst_pred->mutable_classification();
+      // Assume the positive class is the abnormal one.
+      dst_clas->set_value(value >= 0.5f ? 2 : 1);
+      dst_clas->mutable_distribution()->clear_counts();
+      dst_clas->mutable_distribution()->set_sum(1.f);
+      dst_clas->mutable_distribution()->add_counts(0.f);
+      dst_clas->mutable_distribution()->add_counts(1.f - value);
+      dst_clas->mutable_distribution()->add_counts(value);
+    } else if (dst_task == model::proto::Task::RANKING) {
+      dst_pred->mutable_ranking()->set_relevance(value);
+    }
+  }
+  // Non supported
+  else {
     STATUS_FATALS("Non supported override of task from ",
                   model::proto::Task_Name(src_task), " to ",
                   model::proto::Task_Name(dst_task));

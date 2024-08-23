@@ -123,7 +123,8 @@ void init_model(py::module_& m) {
            py::arg("dataset"))
       // WARNING: This method releases the Global Interpreter Lock.
       .def("Evaluate", WithStatusOr(&GenericCCModel::Evaluate),
-           py::arg("dataset"), py::arg("options"), py::arg("weighted"))
+           py::arg("dataset"), py::arg("options"), py::arg("weighted"),
+           py::arg("label_col_idx"), py::arg("group_col_idx"))
       // WARNING: This method releases the Global Interpreter Lock.
       .def("Analyze", WithStatusOr(&GenericCCModel::Analyze),
            py::arg("dataset"), py::arg("options"))
@@ -141,6 +142,7 @@ void init_model(py::module_& m) {
       .def("set_data_spec", &GenericCCModel::set_data_spec,
            py::arg("data_spec"))
       .def("label_col_idx", &GenericCCModel::label_col_idx)
+      .def("group_col_idx", &GenericCCModel::group_col_idx)
       .def("metadata", &GenericCCModel::metadata)
       .def("set_metadata", &GenericCCModel::set_metadata, py::arg("metadata"))
       .def("Describe", WithStatusOr(&GenericCCModel::Describe),
@@ -154,7 +156,9 @@ void init_model(py::module_& m) {
            py::arg("warmup_duration"), py::arg("batch_size"))
       .def("VariableImportances", &GenericCCModel::VariableImportances)
       .def("ForceEngine", &GenericCCModel::ForceEngine, py::arg("engine_name"))
-      .def("ListCompatibleEngines", &GenericCCModel::ListCompatibleEngines);
+      .def("ListCompatibleEngines", &GenericCCModel::ListCompatibleEngines)
+      // TODO: Remove when solved.
+      .def("weighted_training", &GenericCCModel::weighted_training);
 
   py::class_<BenchmarkInferenceCCResult>(m, "BenchmarkInferenceCCResult")
       .def_readwrite("duration_per_example",
