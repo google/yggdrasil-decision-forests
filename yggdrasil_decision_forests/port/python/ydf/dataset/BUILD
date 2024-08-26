@@ -30,6 +30,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_inference",
         "@ydf_cc//yggdrasil_decision_forests/dataset:formats",
         "@ydf_cc//yggdrasil_decision_forests/dataset:formats_cc_proto",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:types",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",

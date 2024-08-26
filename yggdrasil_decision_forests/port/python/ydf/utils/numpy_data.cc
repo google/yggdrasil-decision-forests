@@ -25,6 +25,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace py = ::pybind11;
 
@@ -35,11 +36,11 @@ namespace {
 // Removes '\0' at the end of a string_view. Returns a string_view without the
 // zeroes.
 std::string_view remove_tailing_zeros(std::string_view src) {
-  int i = static_cast<int>(src.size()) - 1;
-  while (i >= 0 && src[i] == 0) {
+  size_t i = src.size();
+  while (i > 0 && src[i - 1] == 0) {
     i--;
   }
-  return src.substr(0, i + 1);
+  return src.substr(0, i);
 }
 
 }  // namespace
@@ -55,20 +56,21 @@ absl::StatusOr<NPByteArray> NPByteArray::Create(const py::array& data) {
   }
   py::buffer_info info = data.request();
   return NPByteArray{
-      /*_data=*/(char*)info.ptr,
-      /*_stride=*/(size_t)info.strides[0],
-      /*_itemsize=*/(size_t)info.itemsize,
-      /*_size=*/(size_t)info.shape[0],
+      ._data = (char*)info.ptr,
+      ._stride = (size_t)info.strides[0],
+      ._itemsize = (size_t)info.itemsize,
+      ._size = (size_t)info.shape[0],
   };
 }
 
 std::string_view NPByteArray::operator[](size_t i) const {
+  DCHECK_LT(i, _size);
   return remove_tailing_zeros({_data + i * _stride, _itemsize});
 }
 
 // Extracts the content of the numpy array into a string vector.
-std::vector<std::string> NPByteArray::ToVector() const {
-  std::vector<std::string> dst(_size);
+std::vector<std::string_view> NPByteArray::ToVectorNotOwned() const {
+  std::vector<std::string_view> dst(_size);
   for (size_t i = 0; i < _size; i++) {
     dst[i] = (*this)[i];
   }

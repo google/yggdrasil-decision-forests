@@ -43,8 +43,7 @@ class VerticalDataset:
   def PopulateColumnCategoricalSetNPBytes(
       self,
       name: str,
-      data_bank: npt.NDArray[np.bytes_],
-      data_boundaries: npt.NDArray[np.int64],
+      data: npt.NDArray[np.object_],
       ydf_dtype: Optional[data_spec_pb2.DType],
       max_vocab_count: int = -1,
       min_vocab_frequency: int = -1,
@@ -331,7 +330,6 @@ def GetLearner(
     deployment_config: abstract_learner_pb2.DeploymentConfig,
     custom_loss: Optional[CCRegressionLoss],
 ) -> GenericCCLearner: ...
-
 def GetInvalidHyperparameters(
     hp_names: Set[str],
     explicit_hps: Set[str],
@@ -343,7 +341,6 @@ def ValidateHyperparameters(
     train_config: abstract_learner_pb2.TrainingConfig,
     deployment_config: abstract_learner_pb2.DeploymentConfig,
 ) -> None: ...
-
 
 # Metric bindings
 # ================

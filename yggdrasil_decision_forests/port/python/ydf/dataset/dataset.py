@@ -15,7 +15,7 @@
 """Dataset implementations of PYDF."""
 
 import copy
-from typing import Any, Dict, List, Optional, Sequence, Set, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 
@@ -112,7 +112,6 @@ class VerticalDataset:
       return
 
     elif column.semantic == dataspec.Semantic.CATEGORICAL:
-
       force_dictionary = None
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, dtype=np.bytes_)
@@ -164,8 +163,8 @@ class VerticalDataset:
           self._dataset.PopulateColumnCategoricalNPBytes(
               column.name,
               column_data,
-              column_idx=column_idx,
               ydf_dtype=ydf_dtype,
+              column_idx=column_idx,
           )
         return
 
@@ -175,37 +174,30 @@ class VerticalDataset:
           and column_data.dtype.type != np.object_
       ):
         raise ValueError("Categorical Set columns must be a list of lists.")
-      if (
-          len(column_data) > 0
-          and not isinstance(column_data[0], (list, np.ndarray))
-          and column_data[0]
-      ):
-        raise ValueError("Categorical Set columns must be a list of lists.")
-      # TODO: b/313414785 - Consider speeding this up by moving logic to C++.
-      # np.unique also sorts the unique elements, which is expected by YDF.
-      column_data = [np.unique(row).astype(np.bytes_) for row in column_data]
-      boundaries = np.cumsum(
-          [0] + [len(row) for row in column_data[:-1]], dtype=np.int64
-      )
-      bank = np.concatenate(column_data)
-      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(bank.dtype)
+      column_data = np.empty(len(original_column_data), dtype=np.object_)
+      for i, row in enumerate(original_column_data):
+        if isinstance(row, np.ndarray):
+          column_data[i] = row.astype(np.bytes_)
+        elif isinstance(row, list):
+          column_data[i] = np.array(row, dtype=np.bytes_)
+        elif not row:
+          column_data[i] = np.array([b""], dtype=np.bytes_)
+        else:
+          raise ValueError(
+              f"Cannot import column {column.name!r} with"
+              f" semantic={column.semantic} as it contains non-list values."
+              f" Got {original_column_data!r}."
+          )
+      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
 
       if inference_args is not None:
         guide = dataspec.categorical_column_guide(column, inference_args)
         self._dataset.PopulateColumnCategoricalSetNPBytes(
-            column.name,
-            bank,
-            boundaries,
-            ydf_dtype,
-            **guide,
+            column.name, column_data, **guide, ydf_dtype=ydf_dtype
         )
       else:
         self._dataset.PopulateColumnCategoricalSetNPBytes(
-            column.name,
-            bank,
-            boundaries,
-            ydf_dtype,
-            column_idx=column_idx,
+            column.name, column_data, ydf_dtype=ydf_dtype, column_idx=column_idx
         )
       return
 
@@ -458,11 +450,11 @@ def create_vertical_dataset_from_path(
     path = paths.normalize_list_of_paths(path)
   dataset = VerticalDataset()
   if data_spec is not None:
-    dataset._dataset.CreateFromPathWithDataSpec(
+    dataset._dataset.CreateFromPathWithDataSpec(  # pylint: disable=protected-access
         path, data_spec, required_columns
     )
   if inference_args is not None:
-    dataset._dataset.CreateFromPathWithDataSpecGuide(
+    dataset._dataset.CreateFromPathWithDataSpecGuide(  # pylint: disable=protected-access
         path, inference_args.to_proto_guide(), required_columns
     )
   return dataset
@@ -717,7 +709,7 @@ def infer_semantic(name: str, data: Any) -> dataspec.Semantic:
   """Infers the semantic of a column from its data."""
 
   # If a column has no data, we assume it only contains missing values.
-  if len(data) == 0:
+  if len(data) == 0:  # pylint: disable=g-explicit-length-test
     raise ValueError(
         f"Cannot infer automatically the semantic of column {name!r} since no"
         " data for this column was provided. Make sure this column exists in"
@@ -743,9 +735,9 @@ def infer_semantic(name: str, data: Any) -> dataspec.Semantic:
       # For performance reasons, only check the type on the first and last item
       # of the column if it is tokenized.
       if (
-          len(data) > 0
-          and (isinstance(data[0], list) or isinstance(data[0], np.ndarray))
-          and (isinstance(data[-1], list) or isinstance(data[-1], np.ndarray))
+          len(data) > 0  # pylint: disable=g-explicit-length-test
+          and isinstance(data[0], (list, np.ndarray))
+          and isinstance(data[-1], (list, np.ndarray))
       ):
         return dataspec.Semantic.CATEGORICAL_SET
       return dataspec.Semantic.CATEGORICAL

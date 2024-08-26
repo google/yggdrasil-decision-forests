@@ -1474,7 +1474,9 @@ foo, bar, sentence, second
   def test_pd_invalid_type_text(self):
     df = pd.DataFrame({"feature": ["a", "b c", "d e f g h"]})
     with self.assertRaisesRegex(
-        ValueError, "Categorical Set columns must be a list of lists."
+        ValueError,
+        "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL_SET"
+        " as it contains non-list values.",
     ):
       _ = dataset.create_vertical_dataset(
           df,
