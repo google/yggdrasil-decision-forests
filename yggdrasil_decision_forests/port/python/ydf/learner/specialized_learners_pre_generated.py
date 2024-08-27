@@ -769,121 +769,11 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
       `num_discretized_numerical_bins` will be ignored.
-    allow_na_conditions: If true, the tree training evaluates conditions of the
-      type `X is NA` i.e. `X is missing`. Default: False.
-    categorical_algorithm: How to learn splits on categorical attributes. -
-      `CART`: CART algorithm. Find categorical splits of the form "value \\in
-      mask". The solution is exact for binary classification, regression and
-      ranking. It is approximated for multi-class classification. This is a good
-      first algorithm to use. In case of overfitting (very small dataset, large
-      dictionary), the "random" algorithm is a good alternative. - `ONE_HOT`:
-      One-hot encoding. Find the optimal categorical split of the form
-      "attribute == param". This method is similar (but more efficient) than
-      converting converting each possible categorical value into a boolean
-      feature. This method is available for comparison purpose and generally
-      performs worse than other alternatives. - `RANDOM`: Best splits among a
-      set of random candidate. Find the a categorical split of the form "value
-      \\in mask" using a random search. This solution can be seen as an
-      approximation of the CART algorithm. This method is a strong alternative
-      to CART. This algorithm is inspired from section "5.1 Categorical
-      Variables" of "Random Forest", 2001.
-        Default: "CART".
-    categorical_set_split_greedy_sampling: For categorical set splits e.g.
-      texts. Probability for a categorical value to be a candidate for the
-      positive set. The sampling is applied once per node (i.e. not at every
-      step of the greedy optimization). Default: 0.1.
-    categorical_set_split_max_num_items: For categorical set splits e.g. texts.
-      Maximum number of items (prior to the sampling). If more items are
-      available, the least frequent items are ignored. Changing this value is
-      similar to change the "max_vocab_count" before loading the dataset, with
-      the following exception: With `max_vocab_count`, all the remaining items
-      are grouped in a special Out-of-vocabulary item. With `max_num_items`,
-      this is not the case. Default: -1.
-    categorical_set_split_min_item_frequency: For categorical set splits e.g.
-      texts. Minimum number of occurrences of an item to be considered.
-      Default: 1.
-    growing_strategy: How to grow the tree. - `LOCAL`: Each node is split
-      independently of the other nodes. In other words, as long as a node
-      satisfy the splits "constraints (e.g. maximum depth, minimum number of
-      observations), the node will be split. This is the "classical" way to grow
-      decision trees. - `BEST_FIRST_GLOBAL`: The node with the best loss
-      reduction among all the nodes of the tree is selected for splitting. This
-      method is also called "best first" or "leaf-wise growth". See "Best-first
-      decision tree learning", Shi and "Additive logistic regression : A
-      statistical view of boosting", Friedman for more details. Default:
-      "LOCAL".
-    honest: In honest trees, different training examples are used to infer the
-      structure and the leaf values. This regularization technique trades
-      examples for bias estimates. It might increase or reduce the quality of
-      the model. See "Generalized Random Forests", Athey et al. In this paper,
-      Honest trees are trained with the Random Forest algorithm with a sampling
-      without replacement. Default: False.
-    honest_fixed_separation: For honest trees only i.e. honest=true. If true, a
-      new random separation is generated for each tree. If false, the same
-      separation is used for all the trees (e.g., in Gradient Boosted Trees
-      containing multiple trees). Default: False.
-    honest_ratio_leaf_examples: For honest trees only i.e. honest=true. Ratio of
-      examples used to set the leaf values. Default: 0.5.
-    in_split_min_examples_check: Whether to check the `min_examples` constraint
-      in the split search (i.e. splits leading to one child having less than
-      `min_examples` examples are considered invalid) or before the split search
-      (i.e. a node can be derived only if it contains more than `min_examples`
-      examples). If false, there can be nodes with less than `min_examples`
-      training examples. Default: True.
-    keep_non_leaf_label_distribution: Whether to keep the node value (i.e. the
-      distribution of the labels of the training examples) of non-leaf nodes.
-      This information is not used during serving, however it can be used for
-      model interpretation as well as hyper parameter tuning. This can take lots
-      of space, sometimes accounting for half of the model size. Default: True.
     max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
       will be roots. `max_depth=-1` means that tree depth unconstrained by this
       parameter. `max_depth=-2` means that the maximum depth is log2(number of
       sampled examples per tree) (default). Default: -2.
-    max_num_nodes: Maximum number of nodes in the tree. Set to -1 to disable
-      this limit. Only available for `growing_strategy=BEST_FIRST_GLOBAL`.
-      Default: None.
-    maximum_model_size_in_memory_in_bytes: Limit the size of the model when
-      stored in ram. Different algorithms can enforce this limit differently.
-      Note that when models are compiled into an inference, the size of the
-      inference engine is generally much smaller than the original model.
-      Default: -1.0.
-    maximum_training_duration_seconds: Maximum training duration of the model
-      expressed in seconds. Each learning algorithm is free to use this
-      parameter at it sees fit. Enabling maximum training duration makes the
-      model training non-deterministic. Default: -1.0.
-    mhld_oblique_max_num_attributes: For MHLD oblique splits i.e.
-      `split_axis=MHLD_OBLIQUE`. Maximum number of attributes in the projection.
-      Increasing this value increases the training time. Decreasing this value
-      acts as a regularization. The value should be in [2,
-      num_numerical_features]. If the value is above the total number of
-      numerical features, the value is capped automatically. The value 1 is
-      allowed but results in ordinary (non-oblique) splits. Default: None.
     min_examples: Minimum number of examples in a node. Default: 5.
-    missing_value_policy: Method used to handle missing attribute values. -
-      `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean
-      (in case of numerical attribute) or the most-frequent-item (in case of
-      categorical attribute) computed on the entire dataset (i.e. the
-      information contained in the data spec). - `LOCAL_IMPUTATION`: Missing
-      attribute values are imputed with the mean (numerical attribute) or
-      most-frequent-item (in the case of categorical attribute) evaluated on the
-      training examples in the current node. - `RANDOM_LOCAL_IMPUTATION`:
-      Missing attribute values are imputed from randomly sampled values from the
-      training examples in the current node. This method was proposed by Clinic
-      et al. in "Random Survival Forests"
-      (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
-        Default: "GLOBAL_IMPUTATION".
-    num_candidate_attributes: Number of unique valid attributes tested for each
-      node. An attribute is valid if it has at least a valid split. If
-      `num_candidate_attributes=0`, the value is set to the classical default
-      value for Random Forest: `sqrt(number of input attributes)` in case of
-      classification and `number_of_input_attributes / 3` in case of regression.
-      If `num_candidate_attributes=-1`, all the attributes are tested. Default:
-      0.
-    num_candidate_attributes_ratio: Ratio of attributes tested at each node. If
-      set, it is equivalent to `num_candidate_attributes =
-      number_of_input_features x num_candidate_attributes_ratio`. The possible
-      values are between ]0, and 1] as well as -1. If not set or equal to -1,
-      the `num_candidate_attributes` is used. Default: None.
     num_trees: Number of individual decision trees. Increasing the number of
       trees can increase the quality of the model at the expense of size,
       training speed, and inference latency. Default: 300.
@@ -895,14 +785,6 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       Default: False.
     random_seed: Random seed for the training of the model. Learners are
       expected to be deterministic by the random seed. Default: 123456.
-    sorting_strategy: How are sorted the numerical features in order to find the
-      splits - AUTO: Selects the most efficient method among IN_NODE,
-      FORCE_PRESORT, and LAYER. - IN_NODE: The features are sorted just before
-      being used in the node. This solution is slow but consumes little amount
-      of memory. - FORCE_PRESORT: The features are pre-sorted at the start of
-      the training. This solution is faster but consumes much more memory than
-      IN_NODE. - PRESORT: Automatically choose between FORCE_PRESORT and
-      IN_NODE. . Default: "AUTO".
     sparse_oblique_normalization: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before
       applying the sparse oblique projections. - `NONE`: No normalization. -
@@ -939,16 +821,6 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       default, sample 256 examples per tree. Note that this parameter also
       restricts the tree's maximum depth to log2(examples used per tree) unless
       max_depth is set explicitly. Default: None.
-    uplift_min_examples_in_treatment: For uplift models only. Minimum number of
-      examples per treatment in a node. Default: 5.
-    uplift_split_score: For uplift models only. Splitter score i.e. score
-      optimized by the splitters. The scores are introduced in "Decision trees
-      for uplift modeling with single and multiple treatments", Rzepakowski et
-      al. Notation: `p` probability / average value of the positive outcome, `q`
-      probability / average value in the control group. - `KULLBACK_LEIBLER` or
-      `KL`: - p log (p/q) - `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2 -
-      `CHI_SQUARED` or `CS`: (p-q)^2/q
-        Default: "KULLBACK_LEIBLER".
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
@@ -999,38 +871,17 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
-      allow_na_conditions: bool = False,
-      categorical_algorithm: str = "CART",
-      categorical_set_split_greedy_sampling: float = 0.1,
-      categorical_set_split_max_num_items: int = -1,
-      categorical_set_split_min_item_frequency: int = 1,
-      growing_strategy: str = "LOCAL",
-      honest: bool = False,
-      honest_fixed_separation: bool = False,
-      honest_ratio_leaf_examples: float = 0.5,
-      in_split_min_examples_check: bool = True,
-      keep_non_leaf_label_distribution: bool = True,
       max_depth: int = -2,
-      max_num_nodes: Optional[int] = None,
-      maximum_model_size_in_memory_in_bytes: float = -1.0,
-      maximum_training_duration_seconds: float = -1.0,
-      mhld_oblique_max_num_attributes: Optional[int] = None,
       min_examples: int = 5,
-      missing_value_policy: str = "GLOBAL_IMPUTATION",
-      num_candidate_attributes: Optional[int] = 0,
-      num_candidate_attributes_ratio: Optional[float] = None,
       num_trees: int = 300,
       pure_serving_model: bool = False,
       random_seed: int = 123456,
-      sorting_strategy: str = "AUTO",
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_projection_density_factor: Optional[float] = None,
       sparse_oblique_weights: Optional[str] = None,
       split_axis: str = "AXIS_ALIGNED",
       subsample_count: Optional[int] = 256,
       subsample_ratio: Optional[float] = None,
-      uplift_min_examples_in_treatment: int = 5,
-      uplift_split_score: str = "KULLBACK_LEIBLER",
       num_threads: Optional[int] = None,
       working_dir: Optional[str] = None,
       resume_training: bool = False,
@@ -1041,38 +892,11 @@ class IsolationForestLearner(generic_learner.GenericLearner):
   ):
 
     hyper_parameters = {
-        "allow_na_conditions": allow_na_conditions,
-        "categorical_algorithm": categorical_algorithm,
-        "categorical_set_split_greedy_sampling": (
-            categorical_set_split_greedy_sampling
-        ),
-        "categorical_set_split_max_num_items": (
-            categorical_set_split_max_num_items
-        ),
-        "categorical_set_split_min_item_frequency": (
-            categorical_set_split_min_item_frequency
-        ),
-        "growing_strategy": growing_strategy,
-        "honest": honest,
-        "honest_fixed_separation": honest_fixed_separation,
-        "honest_ratio_leaf_examples": honest_ratio_leaf_examples,
-        "in_split_min_examples_check": in_split_min_examples_check,
-        "keep_non_leaf_label_distribution": keep_non_leaf_label_distribution,
         "max_depth": max_depth,
-        "max_num_nodes": max_num_nodes,
-        "maximum_model_size_in_memory_in_bytes": (
-            maximum_model_size_in_memory_in_bytes
-        ),
-        "maximum_training_duration_seconds": maximum_training_duration_seconds,
-        "mhld_oblique_max_num_attributes": mhld_oblique_max_num_attributes,
         "min_examples": min_examples,
-        "missing_value_policy": missing_value_policy,
-        "num_candidate_attributes": num_candidate_attributes,
-        "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
         "num_trees": num_trees,
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
-        "sorting_strategy": sorting_strategy,
         "sparse_oblique_normalization": sparse_oblique_normalization,
         "sparse_oblique_projection_density_factor": (
             sparse_oblique_projection_density_factor
@@ -1081,8 +905,6 @@ class IsolationForestLearner(generic_learner.GenericLearner):
         "split_axis": split_axis,
         "subsample_count": subsample_count,
         "subsample_ratio": subsample_ratio,
-        "uplift_min_examples_in_treatment": uplift_min_examples_in_treatment,
-        "uplift_split_score": uplift_split_score,
     }
     if explicit_args is None:
       raise ValueError("`explicit_args` must not be set by the user")

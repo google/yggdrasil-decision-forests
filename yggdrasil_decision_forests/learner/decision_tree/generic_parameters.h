@@ -20,6 +20,7 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
@@ -113,18 +114,28 @@ constexpr char kHParamHonestRatioLeafExamples[] = "honest_ratio_leaf_examples";
 constexpr char kHParamHonestFixedSeparation[] = "honest_fixed_separation";
 
 // Fill decision tree specific generic hyper parameter specifications.
-// This function is designed to be called by the learners using decision trees
+// This function is designed to be called by the learners using decision tree
 // learning.
+//
+// If only a subset of hyperparameters should be populated, both the set of
+// valid hyperparameters and the set of invalid hyperparameters must be passed
+// to this function. If any hyperparameter is neither valid nor invalid, this
+// function returns an error. Note that if any hyperparameters are defined in
+// hparam_def before being passed to this function, these hyperparameters must
+// also be either valid or invalid.
 absl::Status GetGenericHyperParameterSpecification(
     const proto::DecisionTreeTrainingConfig& config,
-    model::proto::GenericHyperParameterSpecification* hparam_def);
+    model::proto::GenericHyperParameterSpecification* hparam_def,
+    absl::optional<absl::flat_hash_set<std::string>> valid_hyperparameters =
+        absl::nullopt,
+    absl::optional<absl::flat_hash_set<std::string>> invalid_hyperparameters =
+        absl::nullopt);
 
-// Set the fields of a decision tree train proto from set of generic hyper
-// parameters.
-// "consumed_hparams" contains the list of already "consumed" hyper-parameters.
-// An error is raised if "SetHyperParameters" tries to consume an
-// hyper-parameter initially "consumed_hparams". All the consumed
-// hyper-parameter keys are added to "consumed_hparams".
+// Set the fields of a decision tree training proto from the set of generic
+// hyperparameters. "consumed_hparams" contains the list of already "consumed"
+// hyper-parameters. An error is raised if `SetHyperParameters()` tries to
+// consume an hyper-parameter initially `consumed_hparams`. All the consumed
+// hyper-parameter keys are added to `consumed_hparams`.
 absl::Status SetHyperParameters(
     absl::flat_hash_set<std::string>* consumed_hparams,
     proto::DecisionTreeTrainingConfig* dt_config,

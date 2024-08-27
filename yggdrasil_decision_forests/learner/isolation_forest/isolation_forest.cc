@@ -473,6 +473,43 @@ absl::Status IsolationForestLearner::SetHyperParametersImpl(
 
 absl::StatusOr<model::proto::GenericHyperParameterSpecification>
 IsolationForestLearner::GetGenericHyperParameterSpecification() const {
+  absl::flat_hash_set<std::string> valid_decision_tree_hyperparameters = {
+      kHParamRandomSeed,
+      kHParamPureServingModel,
+      decision_tree::kHParamMaxDepth,
+      decision_tree::kHParamMinExamples,
+      decision_tree::kHParamSplitAxis,
+      decision_tree::kHParamSplitAxisSparseObliqueProjectionDensityFactor,
+      decision_tree::kHParamSplitAxisSparseObliqueNormalization,
+      decision_tree::kHParamSplitAxisSparseObliqueWeights};
+  // Remove not yet implemented hyperparameters
+  // TODO: b/345425508 - Implement more hyperparameters for isolation forests.
+  absl::flat_hash_set<std::string> invalid_decision_tree_hyperparameters = {
+      kHParamMaximumModelSizeInMemoryInBytes,
+      kHParamMaximumTrainingDurationSeconds,
+      decision_tree::kHParamGrowingStrategy,
+      decision_tree::kHParamMaxNumNodes,
+      decision_tree::kHParamNumCandidateAttributes,
+      decision_tree::kHParamNumCandidateAttributesRatio,
+      decision_tree::kHParamInSplitMinExampleCheck,
+      decision_tree::kHParamAllowNaConditions,
+      decision_tree::kHParamMissingValuePolicy,
+      decision_tree::kHParamCategoricalSetSplitGreedySampling,
+      decision_tree::kHParamCategoricalSetSplitMaxNumItems,
+      decision_tree::kHParamCategoricalSetSplitMinItemFrequency,
+      decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent,
+      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections,
+      decision_tree::kHParamSplitAxisMhldObliqueMaxNumAttributes,
+      decision_tree::kHParamSplitAxisMhldObliqueSampleAttributes,
+      decision_tree::kHParamCategoricalAlgorithm,
+      decision_tree::kHParamSortingStrategy,
+      decision_tree::kHParamKeepNonLeafLabelDistribution,
+      decision_tree::kHParamUpliftSplitScore,
+      decision_tree::kHParamUpliftMinExamplesInTreatment,
+      decision_tree::kHParamHonest,
+      decision_tree::kHParamHonestRatioLeafExamples,
+      decision_tree::kHParamHonestFixedSeparation};
+
   ASSIGN_OR_RETURN(auto hparam_def,
                    AbstractLearner::GetGenericHyperParameterSpecification());
   model::proto::TrainingConfig config;
@@ -483,6 +520,11 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
 
   const auto& if_config =
       config.GetExtension(isolation_forest::proto::isolation_forest_config);
+
+  RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
+      if_config.decision_tree(), &hparam_def,
+      valid_decision_tree_hyperparameters,
+      invalid_decision_tree_hyperparameters));
 
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamNumTrees);
@@ -519,9 +561,6 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
         R"(Ratio of number of training examples used to grow each tree. Only one of "subsample_ratio" and "subsample_count" can be set. By default, sample 256 examples per tree. Note that this parameter also restricts the tree's maximum depth to log2(examples used per tree) unless max_depth is set explicitly.)");
   }
 
-  RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
-      if_config.decision_tree(), &hparam_def));
-
   {
     auto& param =
         hparam_def.mutable_fields()->operator[](decision_tree::kHParamMaxDepth);
@@ -546,16 +585,6 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
 - `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.
 - `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. This includes the splits described in "Extended Isolation Forests" (Sahand Hariri et al., 2018).)");
   }
-
-  // Remove invalid hyperparameters.
-  hparam_def.mutable_fields()->erase(
-      decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent);
-  hparam_def.mutable_fields()->erase(
-      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections);
-  hparam_def.mutable_fields()->erase(
-      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections);
-  hparam_def.mutable_fields()->erase(
-      decision_tree::kHParamSplitAxisMhldObliqueSampleAttributes);
 
   return hparam_def;
 }
