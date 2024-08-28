@@ -97,17 +97,28 @@ class FakeLearner1 : public model::AbstractLearner {
     field->mutable_value()->set_real(3);
     return {hptemplate, hptemplate2};
   };
+
+  model::proto::LearnerCapabilities Capabilities() const override {
+    model::proto::LearnerCapabilities capabilities;
+    capabilities.set_require_label(false);
+    capabilities.set_resume_training(true);
+    return capabilities;
+  }
 };
 
 TEST(LearnerWrappers, LearnerKeyToClassName) {
-  EXPECT_EQ(LearnerKeyToClassName("RANDOM_FOREST"), "RandomForestLearner");
+  EXPECT_EQ(internal::LearnerKeyToClassName("RANDOM_FOREST"),
+            "RandomForestLearner");
 }
 
 TEST(LearnerWrappers, Base) {
-  ASSERT_OK_AND_ASSIGN(const auto content, GenLearnerWrapper());
+  auto learner_config = internal::LearnerConfigs()["FAKE_ALGORITHM"];
+  ASSERT_OK_AND_ASSIGN(
+      const auto content,
+      internal::GenSingleLearnerWrapper("FAKE_ALGORITHM", learner_config));
   LOG(INFO) << "content:\n" << content;
 
-  EXPECT_THAT(content, HasSubstr(R"(
+  EXPECT_EQ(content, R"(
 class FakeAlgorithmLearner(generic_learner.GenericLearner):
   r"""Fake Algorithm learning algorithm.
 
@@ -123,7 +134,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
 
   model = ydf.FakeAlgorithmLearner().train(dataset)
 
-  print(model.summary())
+  print(model.describe())
   ```
 
   Hyperparameters are configured to give reasonable results for typical
@@ -133,6 +144,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
   details).
 
   Attributes:
+
     label: Label of the dataset. The label column
       should not be identified as a feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
@@ -195,13 +207,6 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
     b: Documentation for b Default: 4.0.
     c: Documentation for c Default: None.
 
-    num_threads: Number of threads used to train the model. Different learning
-      algorithms use multi-threading differently and with different degree of
-      efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
-      default value logic might change in the future.
     resume_training: If true, the model training resumes from the checkpoint
       stored in the `working_dir` directory. If `working_dir` does not
       contain any model checkpoint, the training starts from the beginning.
@@ -209,28 +214,33 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       was interrupted by the user (e.g. ctrl+c or "stop" button in a notebook)
       or rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
       increasing the number of trees.
+    resume_training_snapshot_interval_seconds: Indicative number of seconds in 
+      between snapshots when `resume_training=True`. Might be ignored by
+      some learners.
     working_dir: Path to a directory available for the learning algorithm to
       store intermediate computation results. Depending on the learning
       algorithm and parameters, the working_dir might be optional, required, or
       ignored. For instance, distributed training algorithm always need a
       "working_dir", and the gradient boosted tree and hyper-parameter tuners
       will export artefacts to the "working_dir" if provided.
-    resume_training_snapshot_interval_seconds: Indicative number of seconds in 
-      between snapshots when `resume_training=True`. Might be ignored by
-      some learners.
+    num_threads: Number of threads used to train the model. Different learning
+      algorithms use multi-threading differently and with different degree of
+      efficiency. If `None`, `num_threads` will be automatically set to the
+      number of processors (up to a maximum of 32; or set to 6 if the number of
+      processors is not available). Making `num_threads` significantly larger
+      than the number of processors can slow-down the training speed. The
+      default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
-    workers: If set, enable distributed training. "workers" is the list of IP
-      addresses of the workers. A worker is a process running
-      `ydf.start_worker(port)`.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
 
   @func_helpers.list_explicit_arguments
   def __init__(self,
-      label: str,
+
+      label: Optional[str] = None,
       task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
       *,
       weights: Optional[str] = None,
@@ -248,12 +258,11 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       a: float = 1.0,
       b: Optional[float] = 4.0,
       c: Optional[float] = None,
-      num_threads: Optional[int] = None,
-      working_dir: Optional[str] = None,
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
+      working_dir: Optional[str] = None,
+      num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
-      workers: Optional[Sequence[str]] = None,
       explicit_args: Optional[Set[str]] = None,
       ):
 
@@ -279,10 +288,10 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
 
     deployment_config = self._build_deployment_config(
         num_threads=num_threads,
+        working_dir=working_dir,
         resume_training=resume_training,
         resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
-        working_dir=working_dir,
-        workers=workers,
+
     )
 
     super().__init__(learner_name="FAKE_ALGORITHM",
@@ -348,11 +357,13 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
       support_max_training_duration=False,
-      resume_training=False,
+      resume_training=True,
       support_validation_dataset=False,
       support_partial_cache_dataset_format=False,
       support_max_model_size_in_memory=False,
       support_monotonic_constraints=False,
+      require_label=False,
+      support_custom_loss=False,
     )
 
   @classmethod
@@ -377,19 +388,20 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       Dictionary of the available templates
     """
     return {"fake_template_1v4": hyperparameters.HyperparameterTemplate(name="fake_template_1", version=4, description="This is a fake template.", parameters={"a" :2.0}), "fake_template_2v1": hyperparameters.HyperparameterTemplate(name="fake_template_2", version=1, description="This is another fake template.", parameters={"a" :3.0}), }
-)"));
+)");
 }
 
 TEST(LearnerWrappers, FormatDocumentation) {
-  const auto formatted = FormatDocumentation(R"(AAA AAA AAA AAA AAA.
+  const auto formatted =
+      internal::FormatDocumentation(R"(AAA AAA AAA AAA AAA.
 AAA AAA AAA AAA.
 - AAA AAA AAA AAA.
 - AAA AAA AAA AAA.
 AAA AAA AAA AAA.
   AAA AAA AAA AAA.)",
-                                             /*leading_spaces_first_line=*/4,
-                                             /*leading_spaces_next_lines=*/6,
-                                             /*max_char_per_lines=*/20);
+                                    /*leading_spaces_first_line=*/4,
+                                    /*leading_spaces_next_lines=*/6,
+                                    /*max_char_per_lines=*/20);
   EXPECT_EQ(formatted, R"(    AAA AAA AAA AAA
       AAA.
       AAA AAA AAA
@@ -406,10 +418,10 @@ AAA AAA AAA AAA.
 }
 
 TEST(LearnerWrappers, NumLeadingSpaces) {
-  EXPECT_EQ(NumLeadingSpaces(""), 0);
-  EXPECT_EQ(NumLeadingSpaces(" "), 1);
-  EXPECT_EQ(NumLeadingSpaces("  "), 2);
-  EXPECT_EQ(NumLeadingSpaces("  HELLO "), 2);
+  EXPECT_EQ(internal::NumLeadingSpaces(""), 0);
+  EXPECT_EQ(internal::NumLeadingSpaces(" "), 1);
+  EXPECT_EQ(internal::NumLeadingSpaces("  "), 2);
+  EXPECT_EQ(internal::NumLeadingSpaces("  HELLO "), 2);
 }
 
 }  // namespace

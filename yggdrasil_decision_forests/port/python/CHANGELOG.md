@@ -5,16 +5,16 @@
 ### Breaking
 
 -   Disallow positional parameters for the learners, except for label and task.
+-   Remove the unsupported / invalid hyperparameters from the Isolation Forest
+    learner.
+-   Remove parameters for distributed training and resuming training from
+    learners that do not support these capabilities.
 
 ### Feature
 
 -   Warn if training on a VerticalDataset and fail if attempting to modify the
     columns in a VerticalDataset during training.
 -   User can override the model's task, label or group during evaluation.
-
-### Fix
-
--   Remove the unsupported / invalid hyperparameters from isolation forests.
 
 ## 0.7.0 - 2024-08-21
 

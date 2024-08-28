@@ -22,6 +22,6 @@
 int main(int argc, char* argv[]) {
   // Enable the logging. Optional.
   InitLogging(argv[0], &argc, &argv, true);
-  std::cout << yggdrasil_decision_forests::GenLearnerWrapper().value();
+  std::cout << yggdrasil_decision_forests::GenAllLearnersWrapper().value();
   return 0;
 }

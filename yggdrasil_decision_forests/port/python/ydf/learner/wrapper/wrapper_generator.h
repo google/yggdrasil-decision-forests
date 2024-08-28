@@ -18,14 +18,43 @@
 
 #include <string>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 
 namespace yggdrasil_decision_forests {
 
-// Creates the python code source that contains wrapping classes for all linked
-// learners.
-absl::StatusOr<std::string> GenLearnerWrapper();
+namespace internal {
+
+// Configuration data for each individual learner.
+struct LearnerConfig {
+  // Name of the python class of the model.
+  std::string model_class_name = "generic_model.GenericModel";
+
+  // Default value of the "task" learner constructor argument.
+  std::string default_task = "CLASSIFICATION";
+
+  // Default value of the "task" learner constructor argument.
+  bool support_distributed_training = false;
+};
+
+// Create the configurations for all learners.
+absl::flat_hash_map<std::string, LearnerConfig> LearnerConfigs();
+
+// Creates the header of the file header
+std::string GenHeader();
+
+// Creates and appends the capability-based parameters of the learner.
+absl::Status AppendCapabilityParameters(
+    const LearnerConfig& learner_config,
+    const model::proto::LearnerCapabilities& capabilities,
+    std::string* fields_documentation, std::string* fields_constructor,
+    std::string* deployment_config_constructor);
+
+// Creates the Python code source of the class wrapping a single learner.
+absl::StatusOr<std::string> GenSingleLearnerWrapper(
+    absl::string_view learner_key, LearnerConfig learner_config);
 
 // Returns Python class name from the learner key.
 std::string LearnerKeyToClassName(absl::string_view key);
@@ -45,7 +74,11 @@ std::string FormatDocumentation(absl::string_view raw,
 
 // Gets the number of leading spaces of a string.
 int NumLeadingSpaces(absl::string_view text);
+}  // namespace internal
 
+// Creates the Python code source that contains wrapping classes for all linked
+// learners.
+absl::StatusOr<std::string> GenAllLearnersWrapper();
 }  // namespace yggdrasil_decision_forests
 
 #endif  // YGGDRASIL_DECISION_FORESTS_PORT_PYTHON_YDF_LEARNER_WRAPPER_WRAPPER_H_

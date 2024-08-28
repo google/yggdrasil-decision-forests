@@ -673,10 +673,10 @@ Hyper-parameters: ydf.{self._hyperparameters}
   def _build_deployment_config(
       self,
       num_threads: Optional[int],
-      resume_training: bool,
-      resume_training_snapshot_interval_seconds: int,
-      working_dir: Optional[str],
-      workers: Optional[Sequence[str]],
+      resume_training: Optional[bool] = None,
+      resume_training_snapshot_interval_seconds: Optional[int] = None,
+      working_dir: Optional[str] = None,
+      workers: Optional[Sequence[str]] = None,
   ):
     """Merges constructor arguments into a deployment configuration."""
 

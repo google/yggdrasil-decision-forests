@@ -72,7 +72,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
 
   model = ydf.RandomForestLearner().train(dataset)
 
-  print(model.summary())
+  print(model.describe())
   ```
 
   Hyperparameters are configured to give reasonable results for typical
@@ -377,6 +377,12 @@ class RandomForestLearner(generic_learner.GenericLearner):
       votes for one class. If false, each tree vote for a distribution of
       classes. winner_take_all_inference=false is often preferable. Default:
       True.
+    working_dir: Path to a directory available for the learning algorithm to
+      store intermediate computation results. Depending on the learning
+      algorithm and parameters, the working_dir might be optional, required, or
+      ignored. For instance, distributed training algorithm always need a
+      "working_dir", and the gradient boosted tree and hyper-parameter tuners
+      will export artefacts to the "working_dir" if provided.
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
@@ -384,28 +390,9 @@ class RandomForestLearner(generic_learner.GenericLearner):
       processors is not available). Making `num_threads` significantly larger
       than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
-    resume_training: If true, the model training resumes from the checkpoint
-      stored in the `working_dir` directory. If `working_dir` does not contain
-      any model checkpoint, the training starts from the beginning. Resuming
-      training is useful in the following situations: (1) The training was
-      interrupted by the user (e.g. ctrl+c or "stop" button in a notebook) or
-      rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
-      increasing the number of trees.
-    working_dir: Path to a directory available for the learning algorithm to
-      store intermediate computation results. Depending on the learning
-      algorithm and parameters, the working_dir might be optional, required, or
-      ignored. For instance, distributed training algorithm always need a
-      "working_dir", and the gradient boosted tree and hyper-parameter tuners
-      will export artefacts to the "working_dir" if provided.
-    resume_training_snapshot_interval_seconds: Indicative number of seconds in
-      between snapshots when `resume_training=True`. Might be ignored by some
-      learners.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
-    workers: If set, enable distributed training. "workers" is the list of IP
-      addresses of the workers. A worker is a process running
-      `ydf.start_worker(port)`.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -469,12 +456,9 @@ class RandomForestLearner(generic_learner.GenericLearner):
       uplift_min_examples_in_treatment: int = 5,
       uplift_split_score: str = "KULLBACK_LEIBLER",
       winner_take_all: bool = True,
-      num_threads: Optional[int] = None,
       working_dir: Optional[str] = None,
-      resume_training: bool = False,
-      resume_training_snapshot_interval_seconds: int = 1800,
+      num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
-      workers: Optional[Sequence[str]] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -555,10 +539,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
 
     deployment_config = self._build_deployment_config(
         num_threads=num_threads,
-        resume_training=resume_training,
-        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
-        workers=workers,
     )
 
     super().__init__(
@@ -630,6 +611,8 @@ class RandomForestLearner(generic_learner.GenericLearner):
         support_partial_cache_dataset_format=False,
         support_max_model_size_in_memory=True,
         support_monotonic_constraints=False,
+        require_label=True,
+        support_custom_loss=False,
     )
 
   @classmethod
@@ -704,7 +687,7 @@ class IsolationForestLearner(generic_learner.GenericLearner):
 
   model = ydf.IsolationForestLearner().train(dataset)
 
-  print(model.summary())
+  print(model.describe())
   ```
 
   Hyperparameters are configured to give reasonable results for typical
@@ -824,6 +807,12 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       default, sample 256 examples per tree. Note that this parameter also
       restricts the tree's maximum depth to log2(examples used per tree) unless
       max_depth is set explicitly. Default: None.
+    working_dir: Path to a directory available for the learning algorithm to
+      store intermediate computation results. Depending on the learning
+      algorithm and parameters, the working_dir might be optional, required, or
+      ignored. For instance, distributed training algorithm always need a
+      "working_dir", and the gradient boosted tree and hyper-parameter tuners
+      will export artefacts to the "working_dir" if provided.
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
@@ -831,28 +820,9 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       processors is not available). Making `num_threads` significantly larger
       than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
-    resume_training: If true, the model training resumes from the checkpoint
-      stored in the `working_dir` directory. If `working_dir` does not contain
-      any model checkpoint, the training starts from the beginning. Resuming
-      training is useful in the following situations: (1) The training was
-      interrupted by the user (e.g. ctrl+c or "stop" button in a notebook) or
-      rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
-      increasing the number of trees.
-    working_dir: Path to a directory available for the learning algorithm to
-      store intermediate computation results. Depending on the learning
-      algorithm and parameters, the working_dir might be optional, required, or
-      ignored. For instance, distributed training algorithm always need a
-      "working_dir", and the gradient boosted tree and hyper-parameter tuners
-      will export artefacts to the "working_dir" if provided.
-    resume_training_snapshot_interval_seconds: Indicative number of seconds in
-      between snapshots when `resume_training=True`. Might be ignored by some
-      learners.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
-    workers: If set, enable distributed training. "workers" is the list of IP
-      addresses of the workers. A worker is a process running
-      `ydf.start_worker(port)`.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -886,12 +856,9 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       split_axis: str = "AXIS_ALIGNED",
       subsample_count: Optional[int] = 256,
       subsample_ratio: Optional[float] = None,
-      num_threads: Optional[int] = None,
       working_dir: Optional[str] = None,
-      resume_training: bool = False,
-      resume_training_snapshot_interval_seconds: int = 1800,
+      num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
-      workers: Optional[Sequence[str]] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -926,10 +893,7 @@ class IsolationForestLearner(generic_learner.GenericLearner):
 
     deployment_config = self._build_deployment_config(
         num_threads=num_threads,
-        resume_training=resume_training,
-        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
-        workers=workers,
     )
 
     super().__init__(
@@ -1001,6 +965,8 @@ class IsolationForestLearner(generic_learner.GenericLearner):
         support_partial_cache_dataset_format=False,
         support_max_model_size_in_memory=False,
         support_monotonic_constraints=False,
+        require_label=False,
+        support_custom_loss=False,
     )
 
   @classmethod
@@ -1038,7 +1004,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
 
   model = ydf.GradientBoostedTreesLearner().train(dataset)
 
-  print(model.summary())
+  print(model.describe())
   ```
 
   Hyperparameters are configured to give reasonable results for typical
@@ -1427,13 +1393,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       validation dataset is only used for monitoring and does not influence the
       model directly. If the "validation_ratio" is set to 0, early stopping is
       disabled (i.e., it implies setting early_stopping=NONE). Default: 0.1.
-    num_threads: Number of threads used to train the model. Different learning
-      algorithms use multi-threading differently and with different degree of
-      efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
-      default value logic might change in the future.
+    workers: If set, enable distributed training. "workers" is the list of IP
+      addresses of the workers. A worker is a process running
+      `ydf.start_worker(port)`.
     resume_training: If true, the model training resumes from the checkpoint
       stored in the `working_dir` directory. If `working_dir` does not contain
       any model checkpoint, the training starts from the beginning. Resuming
@@ -1441,21 +1403,25 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       interrupted by the user (e.g. ctrl+c or "stop" button in a notebook) or
       rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
       increasing the number of trees.
+    resume_training_snapshot_interval_seconds: Indicative number of seconds in
+      between snapshots when `resume_training=True`. Might be ignored by some
+      learners.
     working_dir: Path to a directory available for the learning algorithm to
       store intermediate computation results. Depending on the learning
       algorithm and parameters, the working_dir might be optional, required, or
       ignored. For instance, distributed training algorithm always need a
       "working_dir", and the gradient boosted tree and hyper-parameter tuners
       will export artefacts to the "working_dir" if provided.
-    resume_training_snapshot_interval_seconds: Indicative number of seconds in
-      between snapshots when `resume_training=True`. Might be ignored by some
-      learners.
+    num_threads: Number of threads used to train the model. Different learning
+      algorithms use multi-threading differently and with different degree of
+      efficiency. If `None`, `num_threads` will be automatically set to the
+      number of processors (up to a maximum of 32; or set to 6 if the number of
+      processors is not available). Making `num_threads` significantly larger
+      than the number of processors can slow-down the training speed. The
+      default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
-    workers: If set, enable distributed training. "workers" is the list of IP
-      addresses of the workers. A worker is a process running
-      `ydf.start_worker(port)`.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -1535,12 +1501,12 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       use_hessian_gain: bool = False,
       validation_interval_in_trees: int = 1,
       validation_ratio: float = 0.1,
-      num_threads: Optional[int] = None,
-      working_dir: Optional[str] = None,
+      workers: Optional[Sequence[str]] = None,
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
+      working_dir: Optional[str] = None,
+      num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
-      workers: Optional[Sequence[str]] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -1639,10 +1605,10 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
 
     deployment_config = self._build_deployment_config(
         num_threads=num_threads,
-        resume_training=resume_training,
-        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
         workers=workers,
+        resume_training=resume_training,
+        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
     )
 
     super().__init__(
@@ -1714,6 +1680,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         support_partial_cache_dataset_format=False,
         support_max_model_size_in_memory=False,
         support_monotonic_constraints=True,
+        require_label=True,
+        support_custom_loss=True,
     )
 
   @classmethod
@@ -1784,7 +1752,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
 
   model = ydf.DistributedGradientBoostedTreesLearner().train(dataset)
 
-  print(model.summary())
+  print(model.describe())
   ```
 
   Hyperparameters are configured to give reasonable results for typical
@@ -1913,13 +1881,9 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       term i.e. optimizes the splits to minimize the variance of "gradient /
       hessian. Available for all losses except regression. Default: False.
     worker_logs: If true, workers will print training logs. Default: True.
-    num_threads: Number of threads used to train the model. Different learning
-      algorithms use multi-threading differently and with different degree of
-      efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
-      default value logic might change in the future.
+    workers: If set, enable distributed training. "workers" is the list of IP
+      addresses of the workers. A worker is a process running
+      `ydf.start_worker(port)`.
     resume_training: If true, the model training resumes from the checkpoint
       stored in the `working_dir` directory. If `working_dir` does not contain
       any model checkpoint, the training starts from the beginning. Resuming
@@ -1927,21 +1891,25 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       interrupted by the user (e.g. ctrl+c or "stop" button in a notebook) or
       rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
       increasing the number of trees.
+    resume_training_snapshot_interval_seconds: Indicative number of seconds in
+      between snapshots when `resume_training=True`. Might be ignored by some
+      learners.
     working_dir: Path to a directory available for the learning algorithm to
       store intermediate computation results. Depending on the learning
       algorithm and parameters, the working_dir might be optional, required, or
       ignored. For instance, distributed training algorithm always need a
       "working_dir", and the gradient boosted tree and hyper-parameter tuners
       will export artefacts to the "working_dir" if provided.
-    resume_training_snapshot_interval_seconds: Indicative number of seconds in
-      between snapshots when `resume_training=True`. Might be ignored by some
-      learners.
+    num_threads: Number of threads used to train the model. Different learning
+      algorithms use multi-threading differently and with different degree of
+      efficiency. If `None`, `num_threads` will be automatically set to the
+      number of processors (up to a maximum of 32; or set to 6 if the number of
+      processors is not available). Making `num_threads` significantly larger
+      than the number of processors can slow-down the training speed. The
+      default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
-    workers: If set, enable distributed training. "workers" is the list of IP
-      addresses of the workers. A worker is a process running
-      `ydf.start_worker(port)`.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -1979,12 +1947,12 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       shrinkage: float = 0.1,
       use_hessian_gain: bool = False,
       worker_logs: bool = True,
-      num_threads: Optional[int] = None,
-      working_dir: Optional[str] = None,
+      workers: Optional[Sequence[str]] = None,
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
+      working_dir: Optional[str] = None,
+      num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
-      workers: Optional[Sequence[str]] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -2025,10 +1993,10 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
 
     deployment_config = self._build_deployment_config(
         num_threads=num_threads,
-        resume_training=resume_training,
-        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
         workers=workers,
+        resume_training=resume_training,
+        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
     )
 
     super().__init__(
@@ -2100,6 +2068,8 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
         support_partial_cache_dataset_format=True,
         support_max_model_size_in_memory=False,
         support_monotonic_constraints=False,
+        require_label=True,
+        support_custom_loss=False,
     )
 
   @classmethod
@@ -2135,7 +2105,7 @@ class CartLearner(generic_learner.GenericLearner):
 
   model = ydf.CartLearner().train(dataset)
 
-  print(model.summary())
+  print(model.describe())
   ```
 
   Hyperparameters are configured to give reasonable results for typical
@@ -2404,6 +2374,12 @@ class CartLearner(generic_learner.GenericLearner):
     validation_ratio: Ratio of the training dataset used to create the
       validation dataset for pruning the tree. If set to 0, the entire dataset
       is used for training, and the tree is not pruned. Default: 0.1.
+    working_dir: Path to a directory available for the learning algorithm to
+      store intermediate computation results. Depending on the learning
+      algorithm and parameters, the working_dir might be optional, required, or
+      ignored. For instance, distributed training algorithm always need a
+      "working_dir", and the gradient boosted tree and hyper-parameter tuners
+      will export artefacts to the "working_dir" if provided.
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
@@ -2411,28 +2387,9 @@ class CartLearner(generic_learner.GenericLearner):
       processors is not available). Making `num_threads` significantly larger
       than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
-    resume_training: If true, the model training resumes from the checkpoint
-      stored in the `working_dir` directory. If `working_dir` does not contain
-      any model checkpoint, the training starts from the beginning. Resuming
-      training is useful in the following situations: (1) The training was
-      interrupted by the user (e.g. ctrl+c or "stop" button in a notebook) or
-      rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
-      increasing the number of trees.
-    working_dir: Path to a directory available for the learning algorithm to
-      store intermediate computation results. Depending on the learning
-      algorithm and parameters, the working_dir might be optional, required, or
-      ignored. For instance, distributed training algorithm always need a
-      "working_dir", and the gradient boosted tree and hyper-parameter tuners
-      will export artefacts to the "working_dir" if provided.
-    resume_training_snapshot_interval_seconds: Indicative number of seconds in
-      between snapshots when `resume_training=True`. Might be ignored by some
-      learners.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
-    workers: If set, enable distributed training. "workers" is the list of IP
-      addresses of the workers. A worker is a process running
-      `ydf.start_worker(port)`.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -2488,12 +2445,9 @@ class CartLearner(generic_learner.GenericLearner):
       uplift_min_examples_in_treatment: int = 5,
       uplift_split_score: str = "KULLBACK_LEIBLER",
       validation_ratio: float = 0.1,
-      num_threads: Optional[int] = None,
       working_dir: Optional[str] = None,
-      resume_training: bool = False,
-      resume_training_snapshot_interval_seconds: int = 1800,
+      num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
-      workers: Optional[Sequence[str]] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -2562,10 +2516,7 @@ class CartLearner(generic_learner.GenericLearner):
 
     deployment_config = self._build_deployment_config(
         num_threads=num_threads,
-        resume_training=resume_training,
-        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
         working_dir=working_dir,
-        workers=workers,
     )
 
     super().__init__(
@@ -2637,6 +2588,8 @@ class CartLearner(generic_learner.GenericLearner):
         support_partial_cache_dataset_format=False,
         support_max_model_size_in_memory=False,
         support_monotonic_constraints=False,
+        require_label=True,
+        support_custom_loss=False,
     )
 
   @classmethod

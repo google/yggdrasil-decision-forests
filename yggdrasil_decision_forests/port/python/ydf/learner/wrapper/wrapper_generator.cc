@@ -46,18 +46,7 @@
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
-
-// Configuration data for each individual learner.
-struct LearnerConfig {
-  // Name of the python class of the model.
-  std::string model_class_name = "generic_model.GenericModel";
-
-  // Default value of the "task" learner constructor argument.
-  std::string default_task = "CLASSIFICATION";
-
-  // If true, the learner requires a "label" constructor argument.
-  bool require_label = true;
-};
+namespace internal {
 
 absl::flat_hash_map<std::string, LearnerConfig> LearnerConfigs() {
   absl::flat_hash_map<std::string, LearnerConfig> configs;
@@ -73,17 +62,18 @@ absl::flat_hash_map<std::string, LearnerConfig> LearnerConfigs() {
   configs["GRADIENT_BOOSTED_TREES"] = {
       .model_class_name =
           "gradient_boosted_trees_model.GradientBoostedTreesModel",
+      .support_distributed_training = true,
   };
 
   configs["DISTRIBUTED_GRADIENT_BOOSTED_TREES"] = {
       .model_class_name =
           "gradient_boosted_trees_model.GradientBoostedTreesModel",
+      .support_distributed_training = true,
   };
 
   configs["ISOLATION_FOREST"] = {
       .model_class_name = "isolation_forest_model.IsolationForestModel",
       .default_task = "ANOMALY_DETECTION",
-      .require_label = false,
   };
 
   return configs;
@@ -138,20 +128,6 @@ std::string PythonFloat(const float value) {
     }
   }
   return str_value;
-}
-
-void FixGBTDefinition(std::string* fields_documentation,
-                      std::string* fields_constructor) {
-  absl::StrReplaceAll(
-      {{"loss: Optional[str]",
-        "loss: Optional[Union[str, custom_loss.AbstractCustomLoss]]"}},
-      fields_constructor);
-  absl::StrReplaceAll({{"Mean average error a.k.a. MAE.",
-                        "Mean average error a.k.a. MAE. For custom losses, "
-                        "pass the loss object here. Note that when using "
-                        "custom losses, the link function is deactivated (aka "
-                        "apply_link_function is always False)."}},
-                      fields_documentation);
 }
 
 // Generates the Python object for the pre-defined hyper-parameters and the name
@@ -281,7 +257,7 @@ std::string FormatDocumentation(const absl::string_view raw,
   return formatted;
 }
 
-absl::StatusOr<std::string> GenLearnerWrapper() {
+std::string GenHeader() {
   const auto prefix = "";
   const auto pydf_prefix = "ydf.";
 
@@ -301,8 +277,7 @@ from $1utils import func_helpers
 )",
                                          prefix, pydf_prefix);
 
-  std::string wrapper =
-      absl::Substitute(R"(r"""Wrappers around the YDF learners.
+  std::string header = absl::Substitute(R"(r"""Wrappers around the YDF learners.
 
 This file is generated automatically by running the following commands:
   bazel build //ydf/learner:specialized_learners\
@@ -326,211 +301,82 @@ from typing import Dict, Optional, Sequence, Set, Union
 $0
 
 )",
-                       imports);
+                                        imports);
+  return header;
+}
 
-  const auto learner_configs = LearnerConfigs();
+absl::Status AppendCapabilityParameters(
+    const LearnerConfig& learner_config,
+    const model::proto::LearnerCapabilities& capabilities,
+    std::string* fields_documentation, std::string* fields_constructor,
+    std::string* deployment_config_constructor) {
+  if (learner_config.support_distributed_training) {
+    absl::StrAppend(fields_documentation, R"(
+    workers: If set, enable distributed training. "workers" is the list of IP
+      addresses of the workers. A worker is a process running
+      `ydf.start_worker(port)`.)");
+    absl::StrAppend(fields_constructor,
+                    "\n      workers: Optional[Sequence[str]] = None,");
+    absl::StrAppend(deployment_config_constructor,
+                    "        workers=workers,\n");
+  }
+  if (capabilities.resume_training()) {
+    absl::StrAppend(fields_documentation, R"(
+    resume_training: If true, the model training resumes from the checkpoint
+      stored in the `working_dir` directory. If `working_dir` does not
+      contain any model checkpoint, the training starts from the beginning.
+      Resuming training is useful in the following situations: (1) The training
+      was interrupted by the user (e.g. ctrl+c or "stop" button in a notebook)
+      or rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
+      increasing the number of trees.
+    resume_training_snapshot_interval_seconds: Indicative number of seconds in 
+      between snapshots when `resume_training=True`. Might be ignored by
+      some learners.)");
+    absl::StrAppend(fields_constructor, R"(
+      resume_training: bool = False,
+      resume_training_snapshot_interval_seconds: int = 1800,)");
+    absl::StrAppend(deployment_config_constructor,
+                    "        resume_training=resume_training,\n        "
+                    "resume_training_snapshot_interval_seconds=resume_training_"
+                    "snapshot_interval_seconds,\n");
+  }
+  if (!capabilities.require_label()) {
+    absl::StrReplaceAll({{"label: str", "label: Optional[str] = None"}},
+                        fields_constructor);
+  }
+  if (capabilities.support_custom_loss()) {
+    absl::StrReplaceAll(
+        {{"loss: Optional[str]",
+          "loss: Optional[Union[str, custom_loss.AbstractCustomLoss]]"}},
+        fields_constructor);
+    absl::StrReplaceAll(
+        {{"Mean average error a.k.a. MAE.",
+          "Mean average error a.k.a. MAE. For custom losses, "
+          "pass the loss object here. Note that when using "
+          "custom losses, the link function is deactivated (aka "
+          "apply_link_function is always False)."}},
+        fields_documentation);
+  }
+  return absl::OkStatus();
+}
 
-  for (const auto& learner_key : model::AllRegisteredLearners()) {
-    // Get the learner configuration.
-    LearnerConfig learner_config;
-    const auto learner_config_it = learner_configs.find(learner_key);
-    if (learner_config_it != learner_configs.end()) {
-      learner_config = learner_config_it->second;
-    } else {
-      LOG(INFO) << "No learner config for " << learner_key
-                << ". Using default config.";
-    }
+absl::StatusOr<std::string> GenSingleLearnerWrapper(
+    absl::string_view learner_key, LearnerConfig learner_config) {
+  std::string wrapper;
+  const auto class_name = LearnerKeyToClassName(learner_key);
 
-    const auto class_name = LearnerKeyToClassName(learner_key);
+  // Get a learner instance.
+  std::unique_ptr<model::AbstractLearner> learner;
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(learner_key);
+  train_config.set_label("my_label");
+  RETURN_IF_ERROR(GetLearner(train_config, &learner));
+  ASSIGN_OR_RETURN(const auto specifications,
+                   learner->GetGenericHyperParameterSpecification());
+  const auto capabilities = learner->Capabilities();
 
-    // Get a learner instance.
-    std::unique_ptr<model::AbstractLearner> learner;
-    model::proto::TrainingConfig train_config;
-    train_config.set_learner(learner_key);
-    train_config.set_label("my_label");
-    RETURN_IF_ERROR(GetLearner(train_config, &learner));
-    ASSIGN_OR_RETURN(const auto specifications,
-                     learner->GetGenericHyperParameterSpecification());
-
-    // Python documentation.
-    std::string fields_documentation;
-    // Constructor arguments.
-    std::string fields_constructor;
-    // Use of constructor arguments the parameter dictionary.
-    std::string fields_dict;
-
-    // Sort the fields alphabetically.
-    std::vector<std::string> field_names;
-    field_names.reserve(specifications.fields_size());
-    for (const auto& field : specifications.fields()) {
-      field_names.push_back(field.first);
-    }
-    std::sort(field_names.begin(), field_names.end());
-
-    for (const auto& field_name : field_names) {
-      const auto& field_def = specifications.fields().find(field_name)->second;
-
-      if (field_def.documentation().deprecated()) {
-        // Deprecated fields are not exported.
-        continue;
-      }
-
-      // Constructor argument.
-      if (!fields_constructor.empty()) {
-        absl::StrAppend(&fields_constructor, ",\n");
-      }
-      // Type of the attribute.
-      std::string attr_py_type;
-      // Default value of the attribute.
-      std::string attr_py_default_value;
-
-      if (utils::HyperParameterIsBoolean(field_def)) {
-        // Boolean values are stored as categorical.
-        attr_py_type = "bool";
-        attr_py_default_value =
-            (field_def.categorical().default_value() == "true") ? "True"
-                                                                : "False";
-      } else {
-        switch (field_def.Type_case()) {
-          case model::proto::GenericHyperParameterSpecification::Value::
-              kCategorical: {
-            attr_py_type = "str";
-            absl::SubstituteAndAppend(&attr_py_default_value, "\"$0\"",
-                                      field_def.categorical().default_value());
-          } break;
-          case model::proto::GenericHyperParameterSpecification::Value::
-              kInteger:
-            attr_py_type = "int";
-            absl::StrAppend(&attr_py_default_value,
-                            field_def.integer().default_value());
-            break;
-          case model::proto::GenericHyperParameterSpecification::Value::kReal:
-            attr_py_type = "float";
-            absl::StrAppend(&attr_py_default_value,
-                            PythonFloat(field_def.real().default_value()));
-            break;
-          case model::proto::GenericHyperParameterSpecification::Value::
-              kCategoricalList:
-            attr_py_type = "List[str]";
-            attr_py_default_value = "None";
-            break;
-          case model::proto::GenericHyperParameterSpecification::Value::
-              TYPE_NOT_SET:
-            return absl::InvalidArgumentError(
-                absl::Substitute("Missing type for field $0", field_name));
-        }
-      }
-
-      bool is_optional_field = false;
-
-      // If the parameter is conditional on a parent parameter values, and the
-      // default value of the parent parameter does not satisfy the condition,
-      // the default value is set to None.
-      if (field_def.has_conditional()) {
-        is_optional_field = true;
-
-        const auto& conditional = field_def.conditional();
-        const auto& parent_field =
-            specifications.fields().find(conditional.control_field());
-        if (parent_field == specifications.fields().end()) {
-          return absl::InvalidArgumentError(
-              absl::Substitute("Unknown conditional field $0 for field $1",
-                               conditional.control_field(), field_name));
-        }
-        ASSIGN_OR_RETURN(
-            const auto condition,
-            utils::SatisfyDefaultCondition(parent_field->second, conditional));
-        if (!condition) {
-          attr_py_default_value = "None";
-        }
-      }
-
-      if (field_def.has_mutual_exclusive()) {
-        is_optional_field = true;
-
-        if (!field_def.mutual_exclusive().is_default()) {
-          attr_py_default_value = "None";
-        }
-      }
-
-      // Constructor argument.
-      if (is_optional_field) {
-        absl::SubstituteAndAppend(&fields_constructor,
-                                  "      $0: Optional[$1] = $2", field_name,
-                                  attr_py_type, attr_py_default_value);
-
-      } else {
-        absl::SubstituteAndAppend(&fields_constructor, "      $0: $1 = $2",
-                                  field_name, attr_py_type,
-                                  attr_py_default_value);
-      }
-
-      // Assignation to parameter dictionary.
-      absl::SubstituteAndAppend(
-          &fields_dict, "                      \"$0\" : $0,\n", field_name);
-
-      // Documentation
-      if (field_def.documentation().description().empty()) {
-        // Refer to the proto.
-        absl::SubstituteAndAppend(&fields_documentation, "    $0: See $1\n",
-                                  field_name,
-                                  field_def.documentation().proto_path());
-      } else {
-        // Actual documentation.
-        absl::StrAppend(
-            &fields_documentation,
-            FormatDocumentation(
-                absl::StrCat(field_name, ": ",
-                             field_def.documentation().description(),
-                             " Default: ", attr_py_default_value, "."),
-                /*leading_spaces_first_line=*/4,
-                /*leading_spaces_next_lines=*/6));
-      }
-    }
-
-    // Pre-configured hyper-parameters.
-    std::string hp_template_dict;
-    std::string first_template_name;
-    ASSIGN_OR_RETURN(std::tie(hp_template_dict, first_template_name),
-                     BuildHyperparameterTemplates(learner.get()));
-
-    const auto free_text_documentation =
-        FormatDocumentation(specifications.documentation().description(),
-                            /*leading_spaces_first_line=*/2 - 2,
-                            /*leading_spaces_next_lines=*/2);
-
-    const auto nice_learner_name = LearnerKeyToNiceLearnerName(learner_key);
-
-    if (learner_key == "GRADIENT_BOOSTED_TREES") {
-      FixGBTDefinition(&fields_documentation, &fields_constructor);
-    }
-    // TODO: Add support for hyperparameter templates.
-    absl::SubstituteAndAppend(
-        &wrapper, R"(
-class $0(generic_learner.GenericLearner):
-  r"""$6 learning algorithm.
-
-  $5
-  Usage example:
-
-  ```python
-  import ydf
-  import pandas as pd
-
-  dataset = pd.read_csv("project/dataset.csv")
-
-  model = ydf.$0().train(dataset)
-
-  print(model.summary())
-  ```
-
-  Hyperparameters are configured to give reasonable results for typical
-  datasets. Hyperparameters can also be modified manually (see descriptions)
-  below or by applying the hyperparameter templates available with
-  `$0.hyperparameter_templates()` (see this function's documentation for
-  details).
-
-  Attributes:
+  // Python documentation.
+  std::string fields_documentation = R"(
     label: Label of the dataset. The label column
       should not be identified as a feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
@@ -589,44 +435,12 @@ class $0(generic_learner.GenericLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and 
       `num_discretized_numerical_bins` will be ignored.
-$2
-    num_threads: Number of threads used to train the model. Different learning
-      algorithms use multi-threading differently and with different degree of
-      efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
-      default value logic might change in the future.
-    resume_training: If true, the model training resumes from the checkpoint
-      stored in the `working_dir` directory. If `working_dir` does not
-      contain any model checkpoint, the training starts from the beginning.
-      Resuming training is useful in the following situations: (1) The training
-      was interrupted by the user (e.g. ctrl+c or "stop" button in a notebook)
-      or rescheduled, or (2) the hyper-parameter of the learner was changed e.g.
-      increasing the number of trees.
-    working_dir: Path to a directory available for the learning algorithm to
-      store intermediate computation results. Depending on the learning
-      algorithm and parameters, the working_dir might be optional, required, or
-      ignored. For instance, distributed training algorithm always need a
-      "working_dir", and the gradient boosted tree and hyper-parameter tuners
-      will export artefacts to the "working_dir" if provided.
-    resume_training_snapshot_interval_seconds: Indicative number of seconds in 
-      between snapshots when `resume_training=True`. Might be ignored by
-      some learners.
-    tuner: If set, automatically select the best hyperparameters using the
-      provided tuner. When using distributed training, the tuning is
-      distributed.
-    workers: If set, enable distributed training. "workers" is the list of IP
-      addresses of the workers. A worker is a process running
-      `ydf.start_worker(port)`.
-    explicit_args: Helper argument for internal use. Throws if supplied
-      explicitly by the user.
-  """
-
-  @func_helpers.list_explicit_arguments
-  def __init__(self,
-      label: $9,
-      task: generic_learner.Task = generic_learner.Task.$8,
+)";
+  // Constructor arguments.
+  std::string fields_constructor =
+      absl::Substitute(R"(
+      label: str,
+      task: generic_learner.Task = generic_learner.Task.$0,
       *,
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
@@ -640,13 +454,216 @@ $2
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
-$3,
-      num_threads: Optional[int] = None,
+)",
+                       learner_config.default_task);
+  // Use of constructor arguments the parameter dictionary.
+  std::string fields_dict;
+
+  // Sort the fields alphabetically.
+  std::vector<std::string> field_names;
+  field_names.reserve(specifications.fields_size());
+  for (const auto& field : specifications.fields()) {
+    field_names.push_back(field.first);
+  }
+  std::sort(field_names.begin(), field_names.end());
+  bool first_round = true;
+
+  for (const auto& field_name : field_names) {
+    const auto& field_def = specifications.fields().find(field_name)->second;
+
+    if (field_def.documentation().deprecated()) {
+      // Deprecated fields are not exported.
+      continue;
+    }
+
+    // Constructor argument.
+    if (!first_round) {
+      absl::StrAppend(&fields_constructor, ",\n");
+    } else {
+      first_round = false;
+    }
+    // Type of the attribute.
+    std::string attr_py_type;
+    // Default value of the attribute.
+    std::string attr_py_default_value;
+
+    if (utils::HyperParameterIsBoolean(field_def)) {
+      // Boolean values are stored as categorical.
+      attr_py_type = "bool";
+      attr_py_default_value =
+          (field_def.categorical().default_value() == "true") ? "True"
+                                                              : "False";
+    } else {
+      switch (field_def.Type_case()) {
+        case model::proto::GenericHyperParameterSpecification::Value::
+            kCategorical: {
+          attr_py_type = "str";
+          absl::SubstituteAndAppend(&attr_py_default_value, "\"$0\"",
+                                    field_def.categorical().default_value());
+        } break;
+        case model::proto::GenericHyperParameterSpecification::Value::kInteger:
+          attr_py_type = "int";
+          absl::StrAppend(&attr_py_default_value,
+                          field_def.integer().default_value());
+          break;
+        case model::proto::GenericHyperParameterSpecification::Value::kReal:
+          attr_py_type = "float";
+          absl::StrAppend(&attr_py_default_value,
+                          PythonFloat(field_def.real().default_value()));
+          break;
+        case model::proto::GenericHyperParameterSpecification::Value::
+            kCategoricalList:
+          attr_py_type = "List[str]";
+          attr_py_default_value = "None";
+          break;
+        case model::proto::GenericHyperParameterSpecification::Value::
+            TYPE_NOT_SET:
+          return absl::InvalidArgumentError(
+              absl::Substitute("Missing type for field $0", field_name));
+      }
+    }
+
+    bool is_optional_field = false;
+
+    // If the parameter is conditional on a parent parameter values, and the
+    // default value of the parent parameter does not satisfy the condition,
+    // the default value is set to None.
+    if (field_def.has_conditional()) {
+      is_optional_field = true;
+
+      const auto& conditional = field_def.conditional();
+      const auto& parent_field =
+          specifications.fields().find(conditional.control_field());
+      if (parent_field == specifications.fields().end()) {
+        return absl::InvalidArgumentError(
+            absl::Substitute("Unknown conditional field $0 for field $1",
+                             conditional.control_field(), field_name));
+      }
+      ASSIGN_OR_RETURN(
+          const auto condition,
+          utils::SatisfyDefaultCondition(parent_field->second, conditional));
+      if (!condition) {
+        attr_py_default_value = "None";
+      }
+    }
+
+    if (field_def.has_mutual_exclusive()) {
+      is_optional_field = true;
+
+      if (!field_def.mutual_exclusive().is_default()) {
+        attr_py_default_value = "None";
+      }
+    }
+
+    // Constructor argument.
+    if (is_optional_field) {
+      absl::SubstituteAndAppend(&fields_constructor,
+                                "      $0: Optional[$1] = $2", field_name,
+                                attr_py_type, attr_py_default_value);
+
+    } else {
+      absl::SubstituteAndAppend(&fields_constructor, "      $0: $1 = $2",
+                                field_name, attr_py_type,
+                                attr_py_default_value);
+    }
+
+    // Assignation to parameter dictionary.
+    absl::SubstituteAndAppend(
+        &fields_dict, "                      \"$0\" : $0,\n", field_name);
+
+    // Documentation
+    if (field_def.documentation().description().empty()) {
+      // Refer to the proto.
+      absl::SubstituteAndAppend(&fields_documentation, "    $0: See $1\n",
+                                field_name,
+                                field_def.documentation().proto_path());
+    } else {
+      // Actual documentation.
+      absl::StrAppend(
+          &fields_documentation,
+          FormatDocumentation(
+              absl::StrCat(field_name, ": ",
+                           field_def.documentation().description(),
+                           " Default: ", attr_py_default_value, "."),
+              /*leading_spaces_first_line=*/4,
+              /*leading_spaces_next_lines=*/6));
+    }
+  }
+  absl::StrAppend(&fields_constructor, ",");
+
+  std::string deployment_config_constructor =
+      R"(        num_threads=num_threads,
+        working_dir=working_dir,
+)";
+  RETURN_IF_ERROR(AppendCapabilityParameters(
+      learner_config, capabilities, &fields_documentation, &fields_constructor,
+      &deployment_config_constructor));
+
+  // Pre-configured hyper-parameters.
+  std::string hp_template_dict;
+  std::string first_template_name;
+  ASSIGN_OR_RETURN(std::tie(hp_template_dict, first_template_name),
+                   BuildHyperparameterTemplates(learner.get()));
+
+  const auto free_text_documentation =
+      FormatDocumentation(specifications.documentation().description(),
+                          /*leading_spaces_first_line=*/2 - 2,
+                          /*leading_spaces_next_lines=*/2);
+
+  const auto nice_learner_name = LearnerKeyToNiceLearnerName(learner_key);
+
+  absl::SubstituteAndAppend(&wrapper, R"(
+class $0(generic_learner.GenericLearner):
+  r"""$6 learning algorithm.
+
+  $5
+  Usage example:
+
+  ```python
+  import ydf
+  import pandas as pd
+
+  dataset = pd.read_csv("project/dataset.csv")
+
+  model = ydf.$0().train(dataset)
+
+  print(model.describe())
+  ```
+
+  Hyperparameters are configured to give reasonable results for typical
+  datasets. Hyperparameters can also be modified manually (see descriptions)
+  below or by applying the hyperparameter templates available with
+  `$0.hyperparameter_templates()` (see this function's documentation for
+  details).
+
+  Attributes:
+$2
+    working_dir: Path to a directory available for the learning algorithm to
+      store intermediate computation results. Depending on the learning
+      algorithm and parameters, the working_dir might be optional, required, or
+      ignored. For instance, distributed training algorithm always need a
+      "working_dir", and the gradient boosted tree and hyper-parameter tuners
+      will export artefacts to the "working_dir" if provided.
+    num_threads: Number of threads used to train the model. Different learning
+      algorithms use multi-threading differently and with different degree of
+      efficiency. If `None`, `num_threads` will be automatically set to the
+      number of processors (up to a maximum of 32; or set to 6 if the number of
+      processors is not available). Making `num_threads` significantly larger
+      than the number of processors can slow-down the training speed. The
+      default value logic might change in the future.
+    tuner: If set, automatically select the best hyperparameters using the
+      provided tuner. When using distributed training, the tuning is
+      distributed.
+    explicit_args: Helper argument for internal use. Throws if supplied
+      explicitly by the user.
+  """
+
+  @func_helpers.list_explicit_arguments
+  def __init__(self,
+$3
       working_dir: Optional[str] = None,
-      resume_training: bool = False,
-      resume_training_snapshot_interval_seconds: int = 1800,
+      num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
-      workers: Optional[Sequence[str]] = None,
       explicit_args: Optional[Set[str]] = None,
       ):
 
@@ -668,11 +685,7 @@ $4
     )
 
     deployment_config = self._build_deployment_config(
-        num_threads=num_threads,
-        resume_training=resume_training,
-        resume_training_snapshot_interval_seconds=resume_training_snapshot_interval_seconds,
-        working_dir=working_dir,
-        workers=workers,
+$8
     )
 
     super().__init__(learner_name="$1",
@@ -734,22 +747,20 @@ $4
     """
     return super().train(ds=ds, valid=valid, verbose=verbose)
 )",
-        /*$0*/ class_name, /*$1*/ learner_key,
-        /*$2*/ fields_documentation,
-        /*$3*/ fields_constructor, /*$4*/ fields_dict,
-        /*$5*/ free_text_documentation,
-        /*$6*/ nice_learner_name,
-        /*$7*/ learner_config.model_class_name,
-        /*$8*/ learner_config.default_task,
-        /*$9*/ learner_config.require_label ? "str" : "Optional[str] = None");
+                            /*$0*/ class_name, /*$1*/ learner_key,
+                            /*$2*/ fields_documentation,
+                            /*$3*/ fields_constructor, /*$4*/ fields_dict,
+                            /*$5*/ free_text_documentation,
+                            /*$6*/ nice_learner_name,
+                            /*$7*/ learner_config.model_class_name,
+                            /*$8*/ deployment_config_constructor);
 
-    const auto bool_rep = [](const bool value) -> std::string {
-      return value ? "True" : "False";
-    };
+  const auto bool_rep = [](const bool value) -> std::string {
+    return value ? "True" : "False";
+  };
 
-    const auto capabilities = learner->Capabilities();
-    absl::SubstituteAndAppend(
-        &wrapper, R"(
+  absl::SubstituteAndAppend(
+      &wrapper, R"(
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
@@ -759,17 +770,21 @@ $4
       support_partial_cache_dataset_format=$3,
       support_max_model_size_in_memory=$4,
       support_monotonic_constraints=$5,
+      require_label=$6,
+      support_custom_loss=$7,
     )
 )",
-        /*$0*/ bool_rep(capabilities.support_max_training_duration()),
-        /*$1*/ bool_rep(capabilities.resume_training()),
-        /*$2*/ bool_rep(capabilities.support_validation_dataset()),
-        /*$3*/ bool_rep(capabilities.support_partial_cache_dataset_format()),
-        /*$4*/ bool_rep(capabilities.support_max_model_size_in_memory()),
-        /*$5*/ bool_rep(capabilities.support_monotonic_constraints()));
+      /*$0*/ bool_rep(capabilities.support_max_training_duration()),
+      /*$1*/ bool_rep(capabilities.resume_training()),
+      /*$2*/ bool_rep(capabilities.support_validation_dataset()),
+      /*$3*/ bool_rep(capabilities.support_partial_cache_dataset_format()),
+      /*$4*/ bool_rep(capabilities.support_max_model_size_in_memory()),
+      /*$5*/ bool_rep(capabilities.support_monotonic_constraints()),
+      /*$6*/ bool_rep(capabilities.require_label()),
+      /*$7*/ bool_rep(capabilities.support_custom_loss()));
 
-    if (hp_template_dict == "{}") {
-      absl::StrAppend(&wrapper, R"(
+  if (hp_template_dict == "{}") {
+    absl::StrAppend(&wrapper, R"(
   @classmethod
   def hyperparameter_templates(cls) -> Dict[str, hyperparameters.HyperparameterTemplate]:
     r"""Hyperparameter templates for this Learner.
@@ -782,8 +797,8 @@ $4
     """
     return {}
 )");
-    } else {
-      absl::SubstituteAndAppend(&wrapper, R"(
+  } else {
+    absl::SubstituteAndAppend(&wrapper, R"(
   @classmethod
   def hyperparameter_templates(cls) -> Dict[str, hyperparameters.HyperparameterTemplate]:
     r"""Hyperparameter templates for this Learner.
@@ -807,11 +822,34 @@ $4
     """
     return $0
 )",
-                                /*$0*/ hp_template_dict, /*$1*/ class_name,
-                                /*$2*/ first_template_name);
-    }
+                              /*$0*/ hp_template_dict, /*$1*/ class_name,
+                              /*$2*/ first_template_name);
   }
 
+  return wrapper;
+}
+
+}  // namespace internal
+
+absl::StatusOr<std::string> GenAllLearnersWrapper() {
+  std::string wrapper = internal::GenHeader();
+  const auto learner_configs = internal::LearnerConfigs();
+
+  for (const auto& learner_key : model::AllRegisteredLearners()) {
+    // Get the learner configuration.
+    internal::LearnerConfig learner_config;
+    const auto learner_config_it = learner_configs.find(learner_key);
+    if (learner_config_it != learner_configs.end()) {
+      learner_config = learner_config_it->second;
+    } else {
+      LOG(INFO) << "No learner config for " << learner_key
+                << ". Using default config.";
+    }
+    ASSIGN_OR_RETURN(
+        std::string learner_wrapper,
+        internal::GenSingleLearnerWrapper(learner_key, learner_config));
+    absl::StrAppend(&wrapper, learner_wrapper);
+  }
   return wrapper;
 }
 
