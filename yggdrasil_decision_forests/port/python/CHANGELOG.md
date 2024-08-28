@@ -2,6 +2,10 @@
 
 ## HEAD
 
+### Breaking
+
+-   Disallow positional parameters for the learners, except for label and task.
+
 ### Feature
 
 -   Warn if training on a VerticalDataset and fail if attempting to modify the

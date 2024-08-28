@@ -232,6 +232,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
   def __init__(self,
       label: str,
       task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
+      *,
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,

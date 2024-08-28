@@ -320,6 +320,8 @@ included for reference only. The actual wrappers are re-generated during
 compilation.
 """
 
+# pytype: skip-file
+# TODO: b/362480899 - Re-enable typing after pytype issue is fixed.
 from typing import Dict, Optional, Sequence, Set, Union
 $0
 
@@ -625,6 +627,7 @@ $2
   def __init__(self,
       label: $9,
       task: generic_learner.Task = generic_learner.Task.$8,
+      *,
       weights: Optional[str] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
