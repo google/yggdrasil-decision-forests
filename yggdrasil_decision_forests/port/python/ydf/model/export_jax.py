@@ -405,7 +405,7 @@ class InternalFeatureSpec:
       if len(feature_value.shape) == 1:
         feature_value = jnp.expand_dims(feature_value, axis=1)
       elif len(feature_value.shape) != 2:
-        raise ValueError("Featire value must be 1- or 2-dimensional")
+        raise ValueError("Feature value must be 1- or 2-dimensional")
       if feature_value.shape[1] != feature.dim:
         raise ValueError(
             f"Expecting dimension {feature.dim} for feature {feature.name!r}."
