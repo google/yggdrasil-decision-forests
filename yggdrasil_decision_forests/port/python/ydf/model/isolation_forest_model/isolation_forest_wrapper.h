@@ -48,6 +48,10 @@ class IsolationForestCCModel : public DecisionForestCCModel {
     DCHECK_EQ(model_.get(), if_model_);
   }
 
+  int num_examples_per_tree() const {
+    return if_model_->num_examples_per_trees();
+  }
+
  private:
   // This is a non-owning pointer to the model held by `model_`.
   YDFModel* if_model_;

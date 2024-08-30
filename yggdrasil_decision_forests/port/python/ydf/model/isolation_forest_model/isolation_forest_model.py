@@ -22,3 +22,7 @@ class IsolationForestModel(decision_forest_model.DecisionForestModel):
   """An Isolation Forest model for prediction and inspection."""
 
   _model: ydf.IsolationForestCCModel
+
+  def num_examples_per_tree(self) -> int:
+    """Returns the number of examples used to grow each tree."""
+    return self._model.num_examples_per_tree()

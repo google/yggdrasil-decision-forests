@@ -43,6 +43,9 @@ class IsolationForestModelTest(absltest.TestCase):
         build_path("dataset", "gaussians_test.csv")
     )
 
+  def test_num_examples_per_tree(self):
+    self.assertEqual(self.model_gaussians.num_examples_per_tree(), 100)
+
   def test_predict(self):
     predictions = self.model_gaussians.predict(self.dataset_gaussians_test)
     np.testing.assert_allclose(

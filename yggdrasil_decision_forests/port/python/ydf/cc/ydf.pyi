@@ -118,8 +118,8 @@ class GenericCCModel:
       dataset: VerticalDataset,
       options: metric_pb2.EvaluationOptions,
       weighted: bool,
-      label_col_idx:int,
-      group_col_idx:int,
+      label_col_idx: int,
+      group_col_idx: int,
   ) -> metric_pb2.EvaluationResults: ...
   def Analyze(
       self,
@@ -163,7 +163,6 @@ class GenericCCModel:
   # TODO: Remove when solved.
   def weighted_training(self) -> bool: ...
 
-
 class DecisionForestCCModel(GenericCCModel):
   def num_trees(self) -> int: ...
   def PredictLeaves(
@@ -205,6 +204,7 @@ class RandomForestCCModel(DecisionForestCCModel):
 class IsolationForestCCModel(DecisionForestCCModel):
   @property
   def kRegisteredName(self): ...
+  def num_examples_per_tree(self) -> int: ...
 
 class GradientBoostedTreesCCModel(DecisionForestCCModel):
   @property

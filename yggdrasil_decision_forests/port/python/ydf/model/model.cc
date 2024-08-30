@@ -225,6 +225,8 @@ void init_model(py::module_& m) {
              return absl::Substitute(
                  "<model_cc.IsolationForestCCModel of type $0.", a.name());
            })
+      .def("num_examples_per_tree",
+           &IsolationForestCCModel::num_examples_per_tree)
       .def_property_readonly_static("kRegisteredName",
                                     [](py::object /* self */) {
                                       return model::isolation_forest::
