@@ -74,8 +74,12 @@ py_test(
     name = "xarray_io_test",
     srcs = ["xarray_io_test.py"],
     deps = [
+        ":dataset_io_types",
         ":xarray_io",
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # pandas dep,
         # xarray dep,
     ],
 )

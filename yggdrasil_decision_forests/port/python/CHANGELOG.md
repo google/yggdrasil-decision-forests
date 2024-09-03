@@ -51,6 +51,7 @@
     inputs.
 -   MacOS: Fix compatibility with other protobuf-using libraries such as
     Tensorflow.
+-   Fix parsing of NAs in Xarray datasets.
 
 #### Release music
 
