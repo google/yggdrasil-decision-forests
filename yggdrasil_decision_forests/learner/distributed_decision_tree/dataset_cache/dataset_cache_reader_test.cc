@@ -37,6 +37,8 @@ namespace distributed_decision_tree {
 namespace dataset_cache {
 namespace {
 
+using test::StatusIs;
+
 class End2End : public ::testing::Test {
  public:
   void SetUp() override {
@@ -137,6 +139,10 @@ TEST_F(End2End, Base) {
 
   // Discretized, in order, numerical
   {
+    EXPECT_THAT(reader->InOrderNumericalFeatureValueIterator(4).status(),
+                StatusIs(absl::StatusCode::kInvalidArgument,
+                         "Column 4 is not available"));
+
     int count = 0;
     auto col_reader =
         reader->InOrderDiscretizedNumericalFeatureValueIterator(4).value();

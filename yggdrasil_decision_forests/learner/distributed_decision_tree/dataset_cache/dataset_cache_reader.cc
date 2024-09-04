@@ -344,28 +344,31 @@ absl::Status DatasetCacheReader::UnloadInMemoryCacheColumn(
   const auto& column = meta_data().columns(column_idx);
   switch (column.type_case()) {
     case proto::CacheMetadata_Column::kCategorical:
-      DCHECK(in_memory_cache_.inorder_categorical_columns_[column_idx] !=
-             nullptr);
+      STATUS_CHECK(in_memory_cache_.inorder_categorical_columns_[column_idx] !=
+                   nullptr);
       in_memory_cache_.inorder_categorical_columns_[column_idx].reset();
       break;
 
     case proto::CacheMetadata_Column::kNumerical:
-      DCHECK(in_memory_cache_.inorder_numerical_columns_[column_idx] !=
-             nullptr);
       if (column.numerical().discretized()) {
-        DCHECK(in_memory_cache_
-                   .inorder_discretized_numerical_columns_[column_idx] !=
-               nullptr);
-        DCHECK(!in_memory_cache_
-                    .boundaries_of_discretized_numerical_columns_[column_idx]
-                    .empty());
+        STATUS_CHECK(in_memory_cache_
+                         .inorder_discretized_numerical_columns_[column_idx] !=
+                     nullptr);
+        STATUS_CHECK(
+            !in_memory_cache_
+                 .boundaries_of_discretized_numerical_columns_[column_idx]
+                 .empty());
       } else {
-        DCHECK(in_memory_cache_
-                   .presorted_numerical_example_idx_columns_[column_idx] !=
-               nullptr);
-        DCHECK(in_memory_cache_
-                   .presorted_numerical_unique_values_columns_[column_idx] !=
-               nullptr);
+        STATUS_CHECK(in_memory_cache_.inorder_numerical_columns_[column_idx] !=
+                     nullptr);
+        STATUS_CHECK(
+            in_memory_cache_
+                .presorted_numerical_example_idx_columns_[column_idx] !=
+            nullptr);
+        STATUS_CHECK(
+            in_memory_cache_
+                .presorted_numerical_unique_values_columns_[column_idx] !=
+            nullptr);
       }
 
       in_memory_cache_.inorder_numerical_columns_[column_idx].reset();
@@ -380,7 +383,8 @@ absl::Status DatasetCacheReader::UnloadInMemoryCacheColumn(
       break;
 
     case proto::CacheMetadata_Column::kBoolean:
-      DCHECK(in_memory_cache_.inorder_boolean_columns_[column_idx] != nullptr);
+      STATUS_CHECK(in_memory_cache_.inorder_boolean_columns_[column_idx] !=
+                   nullptr);
       in_memory_cache_.inorder_boolean_columns_[column_idx].reset();
       break;
 
@@ -397,7 +401,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
   switch (column.type_case()) {
     case proto::CacheMetadata_Column::kCategorical: {
       auto& dst = in_memory_cache_.inorder_categorical_columns_[column_idx];
-      DCHECK(dst == nullptr);
+      STATUS_CHECK(dst == nullptr);
       dst = absl::make_unique<
           InMemoryIntegerColumnReaderFactory<CategoricalType>>();
       const auto max_value =
@@ -429,24 +433,11 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
           in_memory_cache_
               .boundaries_of_discretized_numerical_columns_[column_idx];
 
-      DCHECK(dst_in_order == nullptr);
-      DCHECK(dst_presorted_example_idxs == nullptr);
-      DCHECK(dst_presorted_unique_values == nullptr);
-      DCHECK(dst_discretized_values == nullptr);
-      DCHECK(dst_discretized_boundaries.empty());
-
-      // Raw numerical value.
-      // TODO: Do not load the raw value if they are discretized.
-      dst_in_order = absl::make_unique<InMemoryFloatColumnReaderFactory>();
-      RETURN_IF_ERROR(dst_in_order->Load(
-          file::JoinPath(path_, kFilenameRaw,
-                         absl::StrCat(kFilenameColumn, column_idx),
-                         kFilenameShardNoUnderscore),
-          /*max_num_values=*/options_.reading_buffer(),
-          /*begin_shard_idx=*/0,
-          /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache(),
-          /*reserve=*/meta_data_.num_examples()));
-      *memory_usage += dst_in_order->MemoryUsage();
+      STATUS_CHECK(dst_in_order == nullptr);
+      STATUS_CHECK(dst_presorted_example_idxs == nullptr);
+      STATUS_CHECK(dst_presorted_unique_values == nullptr);
+      STATUS_CHECK(dst_discretized_values == nullptr);
+      STATUS_CHECK(dst_discretized_boundaries.empty());
 
       if (column.numerical().discretized()) {
         dst_discretized_values =
@@ -473,6 +464,18 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
             /*end_shard_idx=*/1, &dst_discretized_boundaries));
         *memory_usage += dst_discretized_boundaries.size() * sizeof(float);
       } else {
+        // Raw numerical value.
+        dst_in_order = absl::make_unique<InMemoryFloatColumnReaderFactory>();
+        RETURN_IF_ERROR(dst_in_order->Load(
+            file::JoinPath(path_, kFilenameRaw,
+                           absl::StrCat(kFilenameColumn, column_idx),
+                           kFilenameShardNoUnderscore),
+            /*max_num_values=*/options_.reading_buffer(),
+            /*begin_shard_idx=*/0,
+            /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache(),
+            /*reserve=*/meta_data_.num_examples()));
+        *memory_usage += dst_in_order->MemoryUsage();
+
         dst_presorted_example_idxs = absl::make_unique<
             InMemoryIntegerColumnReaderFactory<ExampleIdxType>>();
         RETURN_IF_ERROR(dst_presorted_example_idxs->Load(
@@ -503,7 +506,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
 
     case proto::CacheMetadata_Column::kBoolean: {
       auto& dst = in_memory_cache_.inorder_boolean_columns_[column_idx];
-      DCHECK(dst == nullptr);
+      STATUS_CHECK(dst == nullptr);
 
       dst =
           absl::make_unique<InMemoryIntegerColumnReaderFactory<BooleanType>>();

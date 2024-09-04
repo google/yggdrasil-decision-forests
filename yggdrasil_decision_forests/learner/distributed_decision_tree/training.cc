@@ -33,8 +33,10 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_reader.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/label_accessor.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/splitter.h"
@@ -296,6 +298,7 @@ absl::Status TreeBuilder::FindBestSplitsWithThreadPool(
       {
         utils::concurrency::MutexLock l(mutex);
         if (!status->ok()) {
+          counter->DecrementCount();
           return;
         }
       }
@@ -823,9 +826,15 @@ absl::Status EvaluateSplits(const ExampleToNodeMap& example_to_node,
     const auto& col_metadata = dataset->meta_data().columns(feature_idx);
     switch (col_metadata.type_case()) {
       case dataset_cache::proto::CacheMetadata_Column::kNumerical:
-        RETURN_IF_ERROR(EvaluateSplitsPerNumericalFeature(
-            example_to_node, splits, feature_idx, active_node_idxs,
-            split_evaluation, dataset));
+        if (col_metadata.numerical().discretized()) {
+          RETURN_IF_ERROR(EvaluateSplitsPerDiscretizedNumericalFeature(
+              example_to_node, splits, feature_idx, active_node_idxs,
+              split_evaluation, dataset));
+        } else {
+          RETURN_IF_ERROR(EvaluateSplitsPerNumericalFeature(
+              example_to_node, splits, feature_idx, active_node_idxs,
+              split_evaluation, dataset));
+        }
         break;
 
       case dataset_cache::proto::CacheMetadata_Column::kCategorical:
@@ -878,7 +887,7 @@ absl::Status EvaluateSplitsPerNumericalFeature(
     size_t num_elements = 0;
 
 #ifndef NDEBUG
-    // Only use to check the validity of the code.
+    // Only used to check the validity of the code.
     // Number of elements written so far.
     size_t num_written_elements = 0;
 #endif
@@ -933,6 +942,123 @@ absl::Status EvaluateSplitsPerNumericalFeature(
     for (auto value : values) {
       if (std::isnan(value)) {
         value = replacement_missing_value;
+      }
+
+      const auto node_idx = example_to_node[example_idx];
+      if (node_idx != kClosedNode) {
+        const auto active_node_idx = node_idx_to_active_node_idx[node_idx];
+        if (active_node_idx >= 0) {
+          auto& active_node = active_nodes[active_node_idx];
+
+#ifndef NDEBUG
+          DCHECK_LT(active_node.num_written_elements, active_node.num_elements);
+          active_node.num_written_elements++;
+#endif
+          active_node.writer.Write(value >= active_node.threshold);
+        }
+      }
+      example_idx++;
+    }
+  }
+  RETURN_IF_ERROR(value_it->Close());
+
+  // Finalize the writers.
+  for (auto& active_node : active_nodes) {
+#ifndef NDEBUG
+    DCHECK_EQ(active_node.num_written_elements, active_node.num_elements);
+#endif
+    active_node.writer.Finish();
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status EvaluateSplitsPerDiscretizedNumericalFeature(
+    const ExampleToNodeMap& example_to_node, const SplitPerOpenNode& splits,
+    FeatureIndex feature, const std::vector<int>& active_node_idxs,
+    SplitEvaluationPerOpenNode* split_evaluation,
+    const dataset_cache::DatasetCacheReader* dataset) {
+  // Initialize the active nodes.
+  std::vector<int> node_idx_to_active_node_idx(splits.size(), -1);
+  struct ActiveNode {
+    utils::bitmap::BitWriter writer;
+    float threshold;
+    // Total number of expected elements.
+    size_t num_elements = 0;
+
+#ifndef NDEBUG
+    // Only use to check the validity of the code.
+    // Number of elements written so far.
+    size_t num_written_elements = 0;
+#endif
+  };
+
+  const auto& boundaries =
+      dataset->DiscretizedNumericalFeatureBoundaries(feature);
+
+  std::vector<ActiveNode> active_nodes;
+  active_nodes.reserve(active_node_idxs.size());
+  for (const auto node_idx : active_node_idxs) {
+    node_idx_to_active_node_idx[node_idx] = active_nodes.size();
+
+    const auto& condition = splits[node_idx].condition.condition();
+    float threshold;
+    switch (condition.type_case()) {
+      case decision_tree::proto::Condition::kHigherCondition:
+        threshold = splits[node_idx]
+                        .condition.condition()
+                        .higher_condition()
+                        .threshold();
+        DCHECK(!std::isnan(threshold));
+        break;
+      case decision_tree::proto::Condition::kDiscretizedHigherCondition: {
+        const auto threshold_idx = splits[node_idx]
+                                       .condition.condition()
+                                       .discretized_higher_condition()
+                                       .threshold();
+        threshold = boundaries[threshold_idx - 1];
+        DCHECK(!std::isnan(threshold));
+      } break;
+      default:
+        return absl::InternalError("Unexpected condition type");
+    }
+
+    const auto num_elements = static_cast<size_t>(
+        splits[node_idx].condition.num_training_examples_without_weight());
+    ActiveNode active_node{
+        /*writer=*/{num_elements, &(*split_evaluation)[node_idx]},
+        /*threshold=*/threshold,
+        /*num_elements=*/num_elements,
+    };
+    active_node.writer.AllocateAndZeroBitMap();
+    active_nodes.push_back(std::move(active_node));
+  }
+
+  // Scan the dataset and evaluate the split.
+
+  const auto replacement_missing_value = dataset->meta_data()
+                                             .columns(feature)
+                                             .numerical()
+                                             .replacement_missing_value();
+
+  ASSIGN_OR_RETURN(
+      auto value_it,
+      dataset->InOrderDiscretizedNumericalFeatureValueIterator(feature));
+  ExampleIndex example_idx = 0;
+  while (true) {
+    RETURN_IF_ERROR(value_it->Next());
+    const auto discretized_values = value_it->Values();
+    if (discretized_values.empty()) {
+      break;
+    }
+
+    for (auto discretized_value : discretized_values) {
+      float value;
+      if (discretized_value == dataset::kDiscretizedNumericalMissingValue) {
+        value = replacement_missing_value;
+      } else {
+        value = dataset_cache::DiscretizedNumericalToNumerical(
+            boundaries, discretized_value);
       }
 
       const auto node_idx = example_to_node[example_idx];

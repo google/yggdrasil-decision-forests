@@ -646,10 +646,11 @@ TEST_F(TestCreateDatasetCacheFromPartialDatasetCache, Base) {
   EXPECT_THAT(reader->meta_data(), EqualsProto(expected_meta_data));
 
   {
-    auto iter = reader->InOrderNumericalFeatureValueIterator(0).value();
+    auto iter =
+        reader->InOrderDiscretizedNumericalFeatureValueIterator(0).value();
     CHECK_OK(iter->Next());
-    EXPECT_THAT(iter->Values(),
-                ElementsAre(1, 5, 2, 4, 3, 1, 2, 3, 2.625, 2.625));
+    // Discretized version of: 1, 5, 2, 4, 3, 1, 2, 3, 2.625, 2.625
+    EXPECT_THAT(iter->Values(), ElementsAre(0, 5, 1, 4, 3, 0, 1, 3, 2, 2));
     CHECK_OK(iter->Next());
     EXPECT_TRUE(iter->Values().empty());
     CHECK_OK(iter->Close());

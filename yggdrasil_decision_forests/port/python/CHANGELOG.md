@@ -38,6 +38,8 @@
 -   Various improvements of error messages.
 -   Evaluation for Anomaly Detection models.
 -   Oblique splits for Anomaly Detection models.
+-   Reduce significatively the RAM usage of distributed training with
+    discretized numerical values.
 
 ### Fix
 
