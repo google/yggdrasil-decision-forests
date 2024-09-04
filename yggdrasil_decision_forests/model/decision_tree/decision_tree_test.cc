@@ -30,6 +30,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/decision_tree/builder.h"
@@ -144,10 +145,26 @@ class EvalConditions : public ::testing::Test {
                              const bool expected_result) {
     const proto::NodeCondition condition =
         PARSE_TEST_PROTO(text_proto_condition);
+
+    // Evaluate on single example on dataset
     EXPECT_EQ(EvalCondition(condition, dataset_, dataset_row), expected_result);
+
+    // Evaluate on single proto example
     dataset::proto::Example example;
     dataset_.ExtractExample(dataset_row, &example);
     EXPECT_EQ(EvalCondition(condition, example), expected_result);
+
+    // Evaluate on full dataset
+    std::vector<UnsignedExampleIdx> positive_examples;
+    std::vector<UnsignedExampleIdx> negative_examples;
+    EXPECT_OK(EvalConditionOnDataset(
+        dataset_,
+        std::vector<UnsignedExampleIdx>{
+            static_cast<UnsignedExampleIdx>(dataset_row)},
+        condition,
+        /*dataset_is_dense=*/false, &positive_examples, &negative_examples));
+    EXPECT_EQ(positive_examples.size() == 1, expected_result);
+    EXPECT_EQ(negative_examples.size() == 1, !expected_result);
 
     std::string description;
     AppendConditionDescription(dataset_.data_spec(), condition, &description);

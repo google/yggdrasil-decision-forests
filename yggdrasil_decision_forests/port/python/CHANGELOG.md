@@ -16,6 +16,7 @@
     columns in a VerticalDataset during training.
 -   User can override the model's task, label or group during evaluation.
 -   Add `num_examples_per_tree()` method to Isolation Forest models.
+-   Speed-up training of GBT models by ~10%
 
 ## 0.7.0 - 2024-08-21
 

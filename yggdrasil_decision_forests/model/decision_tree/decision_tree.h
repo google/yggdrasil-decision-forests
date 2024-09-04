@@ -79,6 +79,13 @@ bool EvalConditionFromColumn(
 bool EvalCondition(const proto::NodeCondition& condition,
                    const dataset::proto::Example& example);
 
+absl::Status EvalConditionOnDataset(
+    const dataset::VerticalDataset& dataset,
+    const std::vector<UnsignedExampleIdx>& examples,
+    const proto::NodeCondition& condition, const bool dataset_is_dense,
+    std::vector<UnsignedExampleIdx>* positive_examples,
+    std::vector<UnsignedExampleIdx>* negative_examples);
+
 // Argument to the "CheckStructure" method that tests various aspects of the
 // model structure. By default, "CheckStructureOptions" checks if the model
 // was trained with global imputation.

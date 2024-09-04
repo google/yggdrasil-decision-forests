@@ -3,6 +3,12 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
+## HEAD
+
+### Features
+
+-   Speed-up training of GBT models by ~10%
+
 ## 1.10.0 - 2024-08-21
 
 ### Features
