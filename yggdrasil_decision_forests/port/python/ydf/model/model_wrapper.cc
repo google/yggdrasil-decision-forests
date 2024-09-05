@@ -24,14 +24,14 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -62,6 +62,15 @@ GenericCCModel::GetEngine() {
 }
 
 absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
+    const dataset::VerticalDataset& dataset, bool use_slow_engine) {
+  if (use_slow_engine) {
+    return PredictWithSlowEngine(dataset);
+  } else {
+    return PredictWithFastEngine(dataset);
+  }
+}
+
+absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithFastEngine(
     const dataset::VerticalDataset& dataset) {
   py::array_t<float, py::array::c_style | py::array::forcecast> predictions;
   static_assert(predictions.itemsize() == sizeof(float),
@@ -113,10 +122,52 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
   return predictions;
 }
 
+absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithSlowEngine(
+    const dataset::VerticalDataset& dataset) {
+  py::array_t<float, py::array::c_style | py::array::forcecast> predictions;
+  static_assert(predictions.itemsize() == sizeof(float),
+                "A C++ float should have the same size as a numpy float");
+  const int64_t total_num_examples = dataset.nrow();
+  int64_t num_prediction_dimensions;
+  if (model_->task() == model::proto::Task::CLASSIFICATION) {
+    num_prediction_dimensions =
+        model_->LabelColumnSpec().categorical().number_of_unique_values() - 1;
+    if (num_prediction_dimensions == 2) {
+      num_prediction_dimensions = 1;
+    }
+  } else if (model_->task() == model::proto::Task::CATEGORICAL_UPLIFT ||
+             model_->task() == model::proto::Task::NUMERICAL_UPLIFT) {
+    num_prediction_dimensions = model_->data_spec()
+                                    .columns(model_->uplift_treatment_col_idx())
+                                    .categorical()
+                                    .number_of_unique_values() -
+                                2;
+  } else {
+    num_prediction_dimensions = 1;
+  }
+  predictions.resize({total_num_examples * num_prediction_dimensions});
+
+  model::proto::Prediction prediction;
+  for (dataset::VerticalDataset::row_t example_idx = 0;
+       example_idx < dataset.nrow(); example_idx++) {
+    model_->Predict(dataset, example_idx, &prediction);
+    auto float_prediction = absl::MakeSpan(
+        predictions.mutable_data(example_idx * num_prediction_dimensions),
+        num_prediction_dimensions);
+    model::ProtoToFloatPrediction(prediction, model_->task(), float_prediction);
+  }
+  if (num_prediction_dimensions > 1) {
+    predictions =
+        predictions.reshape({total_num_examples, num_prediction_dimensions});
+  }
+  return predictions;
+}
+
 absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& options, const bool weighted,
-    const int label_col_idx, const int group_col_idx) {
+    const int label_col_idx, const int group_col_idx,
+    const bool use_slow_engine) {
   py::gil_scoped_release release;
 
   auto effective_options = options;
@@ -125,21 +176,37 @@ absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
                      dataset::GetUnlinkedWeightDefinition(
                          model_->weights().value(), model_->data_spec()));
   }
+  if (use_slow_engine) {
+    effective_options.set_force_slow_engine(true);
+    utils::RandomEngine rnd;
 
-  ASSIGN_OR_RETURN(const auto engine, GetEngine());
-  utils::RandomEngine rnd;
-
-  if (label_col_idx == model_->label_col_idx() &&
-      group_col_idx == model_->ranking_group_col_idx() &&
-      effective_options.task() == model_->task()) {
-    // Model default evaluation
-    return model_->EvaluateWithEngine(*engine, dataset, effective_options,
-                                      &rnd);
+    if (label_col_idx == model_->label_col_idx() &&
+        group_col_idx == model_->ranking_group_col_idx() &&
+        effective_options.task() == model_->task()) {
+      // Model default evaluation
+      return model_->Evaluate(dataset, effective_options, &rnd);
+    } else {
+      // Model evaluation with overrides
+      return model_->EvaluateOverrideType(dataset, effective_options,
+                                          effective_options.task(),
+                                          label_col_idx, group_col_idx, &rnd);
+    }
   } else {
-    // Model evaluation with overrides
-    return model_->EvaluateWithEngineOverrideType(
-        *engine, dataset, effective_options, effective_options.task(),
-        label_col_idx, group_col_idx, &rnd);
+    ASSIGN_OR_RETURN(const auto engine, GetEngine());
+    utils::RandomEngine rnd;
+
+    if (label_col_idx == model_->label_col_idx() &&
+        group_col_idx == model_->ranking_group_col_idx() &&
+        effective_options.task() == model_->task()) {
+      // Model default evaluation
+      return model_->EvaluateWithEngine(*engine, dataset, effective_options,
+                                        &rnd);
+    } else {
+      // Model evaluation with overrides
+      return model_->EvaluateWithEngineOverrideType(
+          *engine, dataset, effective_options, effective_options.task(),
+          label_col_idx, group_col_idx, &rnd);
+    }
   }
 }
 

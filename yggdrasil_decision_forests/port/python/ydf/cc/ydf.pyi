@@ -112,6 +112,7 @@ class GenericCCModel:
   def Predict(
       self,
       dataset: VerticalDataset,
+      use_slow_engine: bool,
   ) -> npt.NDArray[np.float32]: ...
   def Evaluate(
       self,
@@ -120,6 +121,7 @@ class GenericCCModel:
       weighted: bool,
       label_col_idx: int,
       group_col_idx: int,
+      use_slow_engine: bool,
   ) -> metric_pb2.EvaluationResults: ...
   def Analyze(
       self,

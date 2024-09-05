@@ -103,12 +103,22 @@ class GenericCCModel {
   // TODO: Allow passing the output array as a parameter to reduce heap
   // allocations.
   absl::StatusOr<py::array_t<float>> Predict(
+      const dataset::VerticalDataset& dataset, bool use_slow_engine);
+
+  // Predict using one of the fast engines. This function is used in the vast
+  // majority of cases.
+  absl::StatusOr<py::array_t<float>> PredictWithFastEngine(
+      const dataset::VerticalDataset& dataset);
+
+  // Predict using the slow engine. This function should only be used for
+  // debugging or edge cases.
+  absl::StatusOr<py::array_t<float>> PredictWithSlowEngine(
       const dataset::VerticalDataset& dataset);
 
   absl::StatusOr<metric::proto::EvaluationResults> Evaluate(
       const dataset::VerticalDataset& dataset,
       const metric::proto::EvaluationOptions& options, bool weighted,
-      int label_col_idx, int group_col_idx);
+      int label_col_idx, int group_col_idx, bool use_slow_engine);
 
   absl::StatusOr<utils::model_analysis::proto::StandaloneAnalysisResult>
   Analyze(const dataset::VerticalDataset& dataset,

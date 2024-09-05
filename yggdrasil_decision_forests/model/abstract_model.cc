@@ -36,6 +36,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -387,6 +388,57 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
   }
 }
 
+void ProtoToFloatPrediction(const proto::Prediction& src_prediction,
+                            proto::Task task,
+                            absl::Span<float> dst_prediction) {
+  size_t num_prediction_dimensions = dst_prediction.size();
+  switch (task) {
+    case proto::UNDEFINED:
+      LOG(WARNING) << "Undefined task";
+      break;
+    case proto::CLASSIFICATION: {
+      const auto& classification = src_prediction.classification();
+      if (num_prediction_dimensions == 1) {
+        // Binary classification, only need the probability of class 2
+        float proba_class2 = classification.distribution().counts(2) /
+                             classification.distribution().sum();
+        dst_prediction[0] = proba_class2;
+      } else {
+        // Multi-class classification, copy all probabilities
+        for (int dim_idx = 0; dim_idx < num_prediction_dimensions; dim_idx++) {
+          dst_prediction[dim_idx] =
+              classification.distribution().counts(dim_idx + 1) /
+              classification.distribution().sum();
+        }
+      }
+    } break;
+
+    case proto::REGRESSION:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction[0] = src_prediction.regression().value();
+      break;
+
+    case proto::RANKING:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction[0] = src_prediction.ranking().relevance();
+      break;
+
+    case proto::CATEGORICAL_UPLIFT:
+    case proto::NUMERICAL_UPLIFT:
+      DCHECK_EQ(num_prediction_dimensions,
+                src_prediction.uplift().treatment_effect().size());
+      std::copy(src_prediction.uplift().treatment_effect().begin(),
+                src_prediction.uplift().treatment_effect().end(),
+                dst_prediction.begin());
+      break;
+
+    case proto::ANOMALY_DETECTION:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction[0] = src_prediction.anomaly_detection().value();
+      break;
+  }
+}
+
 absl::Status AbstractModel::AppendEvaluationWithEngine(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option,
@@ -456,7 +508,10 @@ absl::Status AbstractModel::AppendEvaluation(
         "The dataset is empty. Cannot evaluate model.");
   }
 
-  auto engine_or_status = BuildFastEngine();
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> engine_or_status;
+  if (!option.force_slow_engine()) {
+    engine_or_status = BuildFastEngine();
+  }
   if (engine_or_status.ok()) {
     RETURN_IF_ERROR(AppendEvaluationWithEngine(dataset, option, weight_links,
                                                *engine_or_status.value(), rnd,

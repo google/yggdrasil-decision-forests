@@ -379,7 +379,9 @@ Use `model.describe()` for more details
     with log.cc_log_context():
       return self._model.Serialize()
 
-  def predict(self, data: dataset.InputDataset) -> np.ndarray:
+  def predict(
+      self, data: dataset.InputDataset, *, use_slow_engine=False
+  ) -> np.ndarray:
     """Returns the predictions of the model on the given dataset.
 
     Usage example:
@@ -400,6 +402,12 @@ Use `model.describe()` for more details
       data: Dataset. Can be a dictionary of list or numpy array of values,
         Pandas DataFrame, or a VerticalDataset. If the dataset contains the
         label column, that column is ignored.
+      use_slow_engine: If true, uses the slow engine for making predictions. The
+        slow engine of YDF is an order of magnitude slower than the other
+        prediction engines. There exist very rare edge cases where predictions
+        with the regular engines fail, e.g., models with a very large number of
+        categorical conditions. It is only in these cases, that users should use
+        the slow engine and report the issue to the YDF developers.
     """
     with log.cc_log_context():
       # The data spec contains the label / weights /  ranking group / uplift
@@ -409,7 +417,7 @@ Use `model.describe()` for more details
           data_spec=self._model.data_spec(),
           required_columns=self.input_feature_names(),
       )
-      result = self._model.Predict(ds._dataset)  # pylint: disable=protected-access
+      result = self._model.Predict(ds._dataset, use_slow_engine)  # pylint: disable=protected-access
     return result
 
   def evaluate(
@@ -422,6 +430,7 @@ Use `model.describe()` for more details
       group: Optional[str] = None,
       bootstrapping: Union[bool, int] = False,
       evaluation_task: Optional[Task] = None,
+      use_slow_engine: bool = False,
   ) -> metric.Evaluation:
     """Evaluates the quality of a model on a dataset.
 
@@ -487,6 +496,12 @@ Use `model.describe()` for more details
         In this case, if the number is less than 100, an error is raised as
         bootstrapping will not yield useful results.
       evaluation_task: Deprecated. Use `task` instead.
+      use_slow_engine: If true, uses the slow engine for making predictions. The
+        slow engine of YDF is an order of magnitude slower than the other
+        prediction engines. There exist very rare edge cases where predictions
+        with the regular engines fail, e.g., models with a very large number of
+        categorical conditions. It is only in these cases, that users should use
+        the slow engine and report the issue to the YDF developers.
 
     Returns:
       Model evaluation.
@@ -564,6 +579,7 @@ Use `model.describe()` for more details
           weighted=weighted,
           label_col_idx=label_col_idx,
           group_col_idx=group_col_idx,
+          use_slow_engine=use_slow_engine,
       )  # pylint: disable=protected-access
     return metric.Evaluation(evaluation_proto)
 

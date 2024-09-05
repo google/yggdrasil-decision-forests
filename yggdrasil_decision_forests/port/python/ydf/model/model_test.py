@@ -57,6 +57,10 @@ class GenericModelTest(parameterized.TestCase):
     cls.adult_binary_class_gbdt = model_lib.load_model(
         os.path.join(model_dir, "adult_binary_class_gbdt")
     )
+    # This model is a GBDT multi-class classification model .
+    cls.iris_multi_class_gbdt = model_lib.load_model(
+        os.path.join(model_dir, "iris_multi_class_gbdt")
+    )
     # This model is a GBDT regression model without training logs.
     cls.abalone_regression_gbdt = model_lib.load_model(
         os.path.join(model_dir, "abalone_regression_gbdt")
@@ -64,6 +68,10 @@ class GenericModelTest(parameterized.TestCase):
     # This model is a GBDT ranking model.
     cls.synthetic_ranking_gbdt = model_lib.load_model(
         os.path.join(model_dir, "synthetic_ranking_gbdt")
+    )
+    # This model is a RF uplift model.
+    cls.sim_pte_categorical_uplift_rf = model_lib.load_model(
+        os.path.join(model_dir, "sim_pte_categorical_uplift_rf")
     )
 
     ds_dir = os.path.join(test_utils.ydf_test_data_path(), "dataset")
@@ -947,6 +955,57 @@ Use `model.describe()` for more details
       model.evaluate(
           ds, label="class_label", task=generic_model.Task.CLASSIFICATION
       )
+
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "binary_classification",
+          "model_name": "adult_binary_class_gbdt",
+          "test_ds": "adult_test.csv",
+      },
+      {
+          "testcase_name": "multiclass_classification",
+          "model_name": "iris_multi_class_gbdt",
+          "test_ds": "iris.csv",
+      },
+      {
+          "testcase_name": "regression",
+          "model_name": "abalone_regression_gbdt",
+          "test_ds": "abalone.csv",
+      },
+      {
+          "testcase_name": "ranking",
+          "model_name": "synthetic_ranking_gbdt",
+          "test_ds": "synthetic_ranking_test.csv",
+      },
+      {
+          "testcase_name": "uplift",
+          "model_name": "sim_pte_categorical_uplift_rf",
+          "test_ds": "sim_pte_test.csv",
+      },
+  )
+  def test_slow_engine_prediction(self, model_name, test_ds):
+    model = getattr(self, model_name)
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", test_ds
+    )
+    fast_predictions = model.predict(dataset_path)
+    slow_predictions = model.predict(dataset_path, use_slow_engine=True)
+    np.testing.assert_allclose(
+        fast_predictions, slow_predictions, atol=1e-6, rtol=1e-6
+    )
+
+  def test_evaluate_slow_engine(self):
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+
+    test_df = pd.read_csv(dataset_path)
+    evaluation_slow = self.adult_binary_class_gbdt.evaluate(
+        test_df, use_slow_engine=True
+    )
+    evaluation_fast = self.adult_binary_class_gbdt.evaluate(test_df)
+
+    self.assertEqual(evaluation_fast, evaluation_slow)
 
 
 if __name__ == "__main__":
