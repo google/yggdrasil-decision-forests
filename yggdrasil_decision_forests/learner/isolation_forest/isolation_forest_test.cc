@@ -63,48 +63,60 @@ class IsolationForestOnGaussians : public utils::TrainAndTestTester {
     train_config_.add_features("f.*");
     train_config_.set_label("label");
     dataset_filename_ = "gaussians_train.csv";
+    dataset_test_filename_ = "gaussians_test.csv";
     eval_options_.set_task(model::proto::Task::CLASSIFICATION);
     evaluation_override_type_ = model::proto::CLASSIFICATION;
-
-    if_config()->set_subsample_count(100);
   }
 };
 
 TEST_F(IsolationForestOnGaussians, DefaultHyperParameters) {
   TrainAndEvaluateModel();
   LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  // Confirmed with Scikit-learn.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.980, 0.01);
+  EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.995, 0.004);
+}
 
-  utils::RandomEngine rnd;
-  metric::proto::EvaluationOptions options;
-  options.set_task(model::proto::Task::CLASSIFICATION);
-  ASSERT_OK_AND_ASSIGN(
-      const auto evaluation,
-      model_->EvaluateOverrideType(test_dataset_, options,
-                                   model::proto::Task::CLASSIFICATION,
-                                   model_->label_col_idx(), -1, &rnd));
-
-  LOG(INFO) << "Evaluation:\n" << metric::TextReport(evaluation).value();
-  EXPECT_NEAR(evaluation.classification().rocs(1).auc(), 0.99, 0.005f);
+TEST_F(IsolationForestOnGaussians, ModelStructure) {
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_num_trees(5);
+  TrainAndEvaluateModel();
 
   EXPECT_EQ(model_->task(), model::proto::Task::ANOMALY_DETECTION);
   EXPECT_EQ(model_->label_col_idx(), 2);
   EXPECT_THAT(model_->input_features(), ElementsAre(0, 1));
 
   auto if_model = dynamic_cast<const IsolationForestModel*>(model_.get());
-  EXPECT_EQ(if_model->num_trees(), 300);
+  EXPECT_EQ(if_model->num_trees(), 5);
   EXPECT_GT(if_model->NumNodes(), if_model->num_trees() * 32);
 }
 
-TEST_F(IsolationForestOnGaussians, Accuracy) {
-  // Warning: This evaluates on the training dataset.
-  dataset_test_filename_ = "gaussians_test.csv";
+TEST_F(IsolationForestOnGaussians, MaxDepth) {
   auto* if_config = train_config_.MutableExtension(
       isolation_forest::proto::isolation_forest_config);
-  if_config->set_subsample_count(256);
-  if_config->set_num_trees(100);
+  if_config->set_num_trees(5);
+  if_config->set_subsample_count(128);
+  TrainAndEvaluateModel();
+  auto* df_model = dynamic_cast<model::DecisionForestInterface*>(model_.get());
+  ASSERT_NE(df_model, nullptr);
+  int max_depth = -1;
+  for (const auto& tree : df_model->decision_trees()) {
+    max_depth = std::max(max_depth, tree->MaximumDepth());
+  }
+  EXPECT_EQ(max_depth, 7);
+}
+
+TEST_F(IsolationForestOnGaussians, SmallModel) {
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_num_trees(32);
+  if_config->set_subsample_count(32);
   TrainAndEvaluateModel();
   LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.97, 0.025);
+  // Confirmed with Scikit-learn.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.805, 0.1);
+  EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.975, 0.02);
 }
 
 class IsolationForestOnAdult : public utils::TrainAndTestTester {
@@ -118,16 +130,40 @@ class IsolationForestOnAdult : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::ANOMALY_DETECTION);
     train_config_.set_label("income");
     dataset_filename_ = "adult_train.csv";
+    dataset_test_filename_ = "adult_test.csv";
     eval_options_.set_task(model::proto::Task::CLASSIFICATION);
     evaluation_override_type_ = model::proto::CLASSIFICATION;
-
-    if_config()->set_subsample_count(100);
   }
 };
 
 TEST_F(IsolationForestOnAdult, DefaultHyperParameters) {
   TrainAndEvaluateModel();
   LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  // Confirmed with Scikit-learn.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.759, 0.02);
+  EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.615, 0.03);
+}
+
+TEST_F(IsolationForestOnAdult, SmallModel) {
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_num_trees(32);
+  if_config->set_subsample_count(32);
+  TrainAndEvaluateModel();
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  // Confirmed with Scikit-learn.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.715, 0.06);
+  EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.624, 0.06);
+}
+
+TEST_F(IsolationForestOnAdult, Oblique) {
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  TrainAndEvaluateModel();
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.77, 0.01);
+  EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.615, 0.03);
 }
 
 class IsolationForestOnMammographicMasses : public utils::TrainAndTestTester {
@@ -141,26 +177,42 @@ class IsolationForestOnMammographicMasses : public utils::TrainAndTestTester {
     train_config_.set_task(model::proto::Task::ANOMALY_DETECTION);
     train_config_.set_label("Severity");
     dataset_filename_ = "mammographic_masses.csv";
+    // Warning: For this dataset, evaluate on the training data in the test.
+    dataset_test_filename_ = "mammographic_masses.csv";
     auto* label_guide = guide_.add_column_guides();
     label_guide->set_column_name_pattern("Severity");
     label_guide->set_type(dataset::proto::CATEGORICAL);
     eval_options_.set_task(model::proto::Task::CLASSIFICATION);
     evaluation_override_type_ = model::proto::CLASSIFICATION;
-
-    if_config()->set_subsample_count(100);
   }
 };
 
-TEST_F(IsolationForestOnMammographicMasses, Accuracy) {
-  // Warning: This evaluates on the training dataset.
-  dataset_test_filename_ = "mammographic_masses.csv";
-  auto* if_config = train_config_.MutableExtension(
-      isolation_forest::proto::isolation_forest_config);
-  if_config->set_subsample_count(256);
-  if_config->set_num_trees(100);
+TEST_F(IsolationForestOnMammographicMasses, DefaultHyperParameters) {
   TrainAndEvaluateModel();
   LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.51, 0.02);
+  // Confirmed with Scikit-learn.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.507, 0.027);
+  EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.479, 0.058);
+}
+
+TEST_F(IsolationForestOnMammographicMasses, Oblique) {
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  TrainAndEvaluateModel();
+
+  auto* df_model = dynamic_cast<model::DecisionForestInterface*>(model_.get());
+  ASSERT_NE(df_model, nullptr);
+  ASSERT_EQ(df_model->decision_trees().size(), if_config->num_trees());
+  const auto& first_tree = df_model->decision_trees()[0];
+  EXPECT_TRUE(first_tree->root()
+                  .node()
+                  .condition()
+                  .condition()
+                  .has_oblique_condition());
+
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.507);
+  EXPECT_GE(evaluation_.classification().rocs(1).auc(), 0.45);
 }
 
 TEST(IsolationForest, BadTask) {
@@ -180,29 +232,6 @@ TEST(IsolationForest, BadTask) {
 
   EXPECT_THAT(learner->TrainWithStatus(dataset_path, dataspec).status(),
               StatusIs(absl::StatusCode::kInvalidArgument));
-}
-
-TEST_F(IsolationForestOnMammographicMasses, MaxDepth) {
-  auto* if_config = train_config_.MutableExtension(
-      isolation_forest::proto::isolation_forest_config);
-  if_config->set_subsample_count(256);
-  TrainAndEvaluateModel();
-  auto* df_model = dynamic_cast<model::DecisionForestInterface*>(model_.get());
-  ASSERT_NE(df_model, nullptr);
-  int max_depth = -1;
-  for (const auto& tree : df_model->decision_trees()) {
-    max_depth = std::max(max_depth, tree->MaximumDepth());
-  }
-  EXPECT_EQ(max_depth, 8);
-}
-
-TEST_F(IsolationForestOnMammographicMasses, Oblique) {
-  deployment_config_.set_num_threads(1);
-  auto* if_config = train_config_.MutableExtension(
-      isolation_forest::proto::isolation_forest_config);
-  if_config->mutable_decision_tree()->mutable_sparse_oblique_split();
-  EXPECT_TRUE(if_config->decision_tree().has_sparse_oblique_split());
-  TrainAndEvaluateModel();
 }
 
 TEST(DefaultMaximumDepth, Base) {
