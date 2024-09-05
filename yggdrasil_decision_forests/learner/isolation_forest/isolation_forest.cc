@@ -648,6 +648,7 @@ IsolationForestLearner::TrainWithStatusImpl(
       });
     }
   }
+  RETURN_IF_ERROR(global_status);
   decision_tree::SetLeafIndices(model->mutable_decision_trees());
   return std::move(model);
 }
