@@ -62,6 +62,7 @@ class WarningMessage(enum.Enum):
   DEPRECATED_EVALUATION_TASK = 8
   UNNECESSARY_TASK_ARGUMENT = 9
   UNNECESSARY_LABEL_ARGUMENT = 10
+  TFE_READING_IN_PYTHON_IS_SLOW = 11
 
 
 # List of already showed warning message that should not be displayed again.

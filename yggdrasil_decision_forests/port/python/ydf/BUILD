@@ -14,6 +14,8 @@ py_library(
     deps = [
         ":version",
         ":ydf_protos",
+        "//ydf/api:internal",
+        "//ydf/api:util",
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
         "//ydf/learner:custom_loss_py",

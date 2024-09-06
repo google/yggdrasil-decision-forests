@@ -78,6 +78,7 @@ nav:
     - Numpy Arrays: tutorial/numpy.ipynb
     - XArray: tutorial/xarray.ipynb
     - TensorFlow Dataset: tutorial/tf_dataset.ipynb
+    - Supported dataset formats: dataset_formats.md
     # TODO: Add Dictionary, CSV, TFRecord
   - Modeling:
     - Tuning: tutorial/tuning.ipynb

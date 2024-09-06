@@ -1,6 +1,9 @@
 # pytype binary, test, library
 
-package(licenses = ["notice"])
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],
+)
 
 # Binaries
 # ========
@@ -16,8 +19,30 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "benchmark_io_speed_main",
+    srcs = ["benchmark_io_speed_main.py"],
+    deps = [
+        ":benchmark_io_speed",
+        # absl:app dep,
+        # absl/flags dep,
+        "//ydf/utils:log",
+    ],
+)
+
 # Libraries
 # =========
+
+py_library(
+    name = "benchmark_io_speed",
+    srcs = ["benchmark_io_speed.py"],
+    deps = [
+        # numpy dep,
+        "//ydf/dataset",
+        "//ydf/util:tf_example",
+        "//ydf/utils:log",
+    ],
+)
 
 py_library(
     name = "benchmark_train_speed",

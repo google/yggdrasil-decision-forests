@@ -91,4 +91,13 @@ from ydf.learner.custom_loss import Activation
 # Tree
 from ydf.model import tree
 
+# Utils
+
+from ydf.api import util
+
+# Internals
+
+from ydf.api import internal
+
+
 # pylint: enable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported

@@ -251,6 +251,30 @@ class ApiTest(absltest.TestCase):
     ydf_model = ydf.from_sklearn(skl_model)
     _ = ydf_model.predict({"features": X})
 
+  def test_read_tf_record(self):
+    ds_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_train.recordio.gz"
+    )
+
+    def process(example):
+      for key in ["workclass", "occupation", "native_country"]:
+        if key not in example.features.feature:
+          example.features.feature[key].bytes_list.value.append(b"")
+      return example
+
+    ds = ydf.util.read_tf_record(ds_path, process=process)
+    logging.info("%s", ds)
+
+  def test_io_benchmark(self):
+    tempdir = self.create_tempdir().full_path
+    ydf.internal.benchmark_io_speed(
+        work_dir=tempdir,
+        num_examples=100,
+        num_features=5,
+        num_shards=2,
+        create_workdir=False,
+    )
+
 
 if __name__ == "__main__":
   absltest.main()
