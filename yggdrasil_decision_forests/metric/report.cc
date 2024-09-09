@@ -210,20 +210,20 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
 
   ASSIGN_OR_RETURN(auto* res_plot, placer.NewPlot());
   res_plot->title = "Residual Histogram";
-  res_plot->x_axis.label = "False positive rate";
-  res_plot->y_axis.label = "True positive rate (Recall)";
+  res_plot->x_axis.label = "Residual";
+  res_plot->y_axis.label = "Density";
   res_plot->show_legend = false;
 
   ASSIGN_OR_RETURN(auto* gt_plot, placer.NewPlot());
   gt_plot->title = "Ground Truth Histogram";
-  gt_plot->x_axis.label = "Recall";
-  gt_plot->y_axis.label = "Precision";
+  gt_plot->x_axis.label = "Ground truth";
+  gt_plot->y_axis.label = "Density";
   gt_plot->show_legend = false;
 
   ASSIGN_OR_RETURN(auto* pred_plot, placer.NewPlot());
   pred_plot->title = "Prediction Histogram";
-  pred_plot->x_axis.label = "Threshold";
-  pred_plot->y_axis.label = "Volume";
+  pred_plot->x_axis.label = "Prediction";
+  pred_plot->y_axis.label = "Density";
   pred_plot->show_legend = false;
 
   ASSIGN_OR_RETURN(auto* gt_pred_plot, placer.NewPlot());
