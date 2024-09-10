@@ -331,7 +331,7 @@ def _dict_row_to_tf_example(
         # Multi-dim values in numpy array
         if np.issubdtype(values.dtype, np.integer):
           dst_feature.int64_list.value.extend(values)
-        elif np.issubdtype(values.dtype, np.float_):
+        elif np.issubdtype(values.dtype, np.floating):
           dst_feature.float_list.value.extend(values)
         elif np.issubdtype(values.dtype, np.bytes_):
           dst_feature.bytes_list.value.extend(values)
