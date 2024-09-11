@@ -17,6 +17,8 @@ syntax = "proto2";
 
 package yggdrasil_decision_forests.dataset.proto;
 
+// See dataset/formats.h for the definition of the formats.
+
 // Supported dataset formats.
 enum DatasetFormat {
   INVALID = 0;
@@ -24,5 +26,6 @@ enum DatasetFormat {
   reserved 2, 3, 4, 6;
   FORMAT_TFE_TFRECORD = 5;
   FORMAT_TFE_TFRECORDV2 = 8;
+  FORMAT_TFE_TFRECORD_COMPRESSED_V2 = 9;
   FORMAT_PARTIAL_DATASET_CACHE = 7;
 }

@@ -156,6 +156,28 @@ class RandomForestLearnerTest(LearnerTest):
     logging.info("Evaluation: %s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, 0.864)
 
+  def test_adult_classification_on_tfrecord_dataset(self):
+    learner = specialized_learners.RandomForestLearner(label="income")
+    model = learner.train(
+        "tfrecord:"
+        + os.path.join(
+            test_utils.ydf_test_data_path(),
+            "dataset",
+            "adult_train.recordio.gz",
+        )
+    )
+    logging.info("Trained model: %s", model)
+
+    # Evaluate the trained model.
+    evaluation = model.evaluate(
+        "tfrecord:"
+        + os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.recordio.gz"
+        )
+    )
+    logging.info("Evaluation: %s", evaluation)
+    self.assertGreaterEqual(evaluation.accuracy, 0.864)
+
   def test_two_center_regression(self):
     learner = specialized_learners.RandomForestLearner(
         label="target", task=generic_learner.Task.REGRESSION

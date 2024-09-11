@@ -34,6 +34,8 @@ using TFRecordV2TFExampleReader = ShardedTFRecordReader<tensorflow::Example>;
 REGISTER_AbstractTFExampleReader(TFRecordV2TFExampleReader,
                                  "FORMAT_TFE_TFRECORDV2");
 
+// Non-compressed TFRecord.
+
 class TFRecordV2TFEToExampleReaderInterface
     : public TFExampleReaderToExampleReader {
  public:
@@ -58,6 +60,34 @@ class TFRecordV2TFExampleReaderToDataSpecCreator
 
 REGISTER_AbstractDataSpecCreator(TFRecordV2TFExampleReaderToDataSpecCreator,
                                  "FORMAT_TFE_TFRECORDV2");
+
+// Compressed TFRecord.
+
+class TFRecordCompressedV2TFEToExampleReaderInterface
+    : public TFExampleReaderToExampleReader {
+ public:
+  TFRecordCompressedV2TFEToExampleReaderInterface(
+      const proto::DataSpecification& data_spec,
+      absl::optional<std::vector<int>> ensure_non_missing)
+      : TFExampleReaderToExampleReader(data_spec, ensure_non_missing) {}
+
+  std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
+    return absl::make_unique<TFRecordV2TFExampleReader>(true);
+  }
+};
+REGISTER_ExampleReaderInterface(TFRecordCompressedV2TFEToExampleReaderInterface,
+                                "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
+
+class TFRecordCompressedV2TFExampleReaderToDataSpecCreator
+    : public TFExampleReaderToDataSpecCreator {
+  std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
+    return absl::make_unique<TFRecordV2TFExampleReader>(true);
+  }
+};
+
+REGISTER_AbstractDataSpecCreator(
+    TFRecordCompressedV2TFExampleReaderToDataSpecCreator,
+    "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
 
 // Write tf.Examples in TFRecords.
 class TFRecordV2TFExampleWriter

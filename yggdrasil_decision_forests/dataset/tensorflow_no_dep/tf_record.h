@@ -16,7 +16,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_NO_DEP_TF_RECORD_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_NO_DEP_TF_RECORD_H_
 
-#include <stdint.h>
 
 #include <memory>
 #include <string>
@@ -26,6 +25,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
@@ -39,7 +39,7 @@ class TFRecordReader {
  public:
   // Opens a TFRecord for reading.
   static absl::StatusOr<std::unique_ptr<TFRecordReader>> Create(
-      absl::string_view path);
+      absl::string_view path, bool compressed = false);
 
   ~TFRecordReader();
 
@@ -53,7 +53,7 @@ class TFRecordReader {
   // Closes the stream.
   absl::Status Close();
 
-  TFRecordReader(std::unique_ptr<file::FileInputByteStream>&& stream)
+  TFRecordReader(std::unique_ptr<utils::InputByteStream>&& stream)
       : stream_(std::move(stream)) {}
 
   // Value of the last read record. Includes skipped messages.
@@ -63,7 +63,7 @@ class TFRecordReader {
   // Reads a CRC.
   absl::StatusOr<absl::crc32c_t> ReadCRC();
 
-  std::unique_ptr<file::FileInputByteStream> stream_;
+  std::unique_ptr<utils::InputByteStream> stream_;
   std::string buffer_;
 };
 
@@ -71,12 +71,13 @@ class TFRecordReader {
 template <typename T>
 class ShardedTFRecordReader : public utils::ShardedReader<T> {
  public:
-  ShardedTFRecordReader() = default;
+  ShardedTFRecordReader(bool compressed = false) : compressed_(compressed) {};
   absl::Status OpenShard(absl::string_view path) override;
   absl::StatusOr<bool> NextInShard(T* example) override;
 
  private:
   std::unique_ptr<TFRecordReader> reader_;
+  bool compressed_;
   DISALLOW_COPY_AND_ASSIGN(ShardedTFRecordReader);
 };
 
@@ -127,7 +128,7 @@ absl::Status ShardedTFRecordReader<T>::OpenShard(const absl::string_view path) {
     RETURN_IF_ERROR(reader_->Close());
     reader_.reset();
   }
-  ASSIGN_OR_RETURN(reader_, TFRecordReader::Create(path));
+  ASSIGN_OR_RETURN(reader_, TFRecordReader::Create(path, compressed_));
   return absl::OkStatus();
 }
 

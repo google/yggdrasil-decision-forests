@@ -18,6 +18,7 @@
 #include <stdint.h>
 
 #include <memory>
+#include <utility>
 
 #include "absl/base/internal/endian.h"
 #include "absl/crc/crc32c.h"
@@ -26,15 +27,19 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
+#include "yggdrasil_decision_forests/utils/zlib.h"
 
 namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep {
 namespace {
 constexpr char kInvalidDataMessage[] =
-    "The file is not a non-compressed TFRecord or it is corrupted. If "
-    "you have a compressed TFRecord, decompress it first.";
+    "The data is not a valid non-compressed TF Record. The data is either "
+    "corrupted or (more likely) a gzip compressed TFRecord. In this later "
+    "case, fix the type prefix in the filepath. For example, replace "
+    "'tfrecordv2+tfe:' with 'tfrecord:' (recommended) or  ('tfrecord+tfe').";
 
 static const uint32_t kMaskDelta = 0xa282ead8ul;
 
@@ -70,8 +75,13 @@ TFRecordReader::~TFRecordReader() {
 }
 
 absl::StatusOr<std::unique_ptr<TFRecordReader>> TFRecordReader::Create(
-    const absl::string_view path) {
-  ASSIGN_OR_RETURN(auto stream, file::OpenInputFile(path));
+    const absl::string_view path, bool compressed) {
+  ASSIGN_OR_RETURN(std::unique_ptr<utils::InputByteStream> stream,
+                   file::OpenInputFile(path));
+  if (compressed) {
+    ASSIGN_OR_RETURN(stream,
+                     utils::GZipInputByteStream::Create(std::move(stream)));
+  }
   return absl::make_unique<TFRecordReader>(std::move(stream));
 }
 

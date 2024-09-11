@@ -40,12 +40,19 @@ std::string DatasetDir() {
                         "yggdrasil_decision_forests/"
                         "test_data/dataset");
 }
-
 TEST(ExampleReader, CreateExampleReader) {
-  for (const auto& dataset_path :
-       {absl::StrCat("tfrecord+tfe:",
-                     file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
-        absl::StrCat("csv:", file::JoinPath(DatasetDir(), "toy.csv"))}) {
+  for (const auto& dataset_path : {
+           absl::StrCat("tfrecord+tfe:",
+                        file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
+           absl::StrCat("tfrecord:",
+                        file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
+           absl::StrCat("tfrecordv2+gz+tfe:",
+                        file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
+           absl::StrCat(
+               "tfrecordv2+tfe:",
+               file::JoinPath(DatasetDir(), "toy.nocompress-tfe-tfrecord@2")),
+           absl::StrCat("csv:", file::JoinPath(DatasetDir(), "toy.csv")),
+       }) {
     LOG(INFO) << "Create dataspec for " << dataset_path;
     proto::DataSpecificationGuide guide;
     proto::DataSpecification data_spec;
