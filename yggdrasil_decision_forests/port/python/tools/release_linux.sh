@@ -18,18 +18,24 @@
 
 set -vex
 
-PYTHON_VERSIONS=( 3.8 3.9 3.10 3.11 3.12 )
+if [[ "$INTERACTIVE" = 1 ]]; then
+  PYTHON_VERSIONS=( 3.11 )
+else
+  PYTHON_VERSIONS=( 3.8 3.9 3.10 3.11 3.12 )
+fi
 
 function build_py() {
   VERSION=$1
   echo "Build YDF for python $VERSION"
 
-  # Note: set RUN_TESTS=1 to run the tests.
-  CMD="python$VERSION -m venv /tmp/venv && source /tmp/venv/bin/activate && RUN_TESTS=0 ./tools/build_test_linux.sh && ./tools/package_linux.sh"
-
-  # You can also start an interactive shell with:
-  # CMD="python$VERSION -m venv /tmp/venv && source /tmp/venv/bin/activate && /bin/bash"
-  # In the interactive shell, you can run commands such as "RUN_TESTS=1 ./tools/build_test_linux.sh"
+  if [[ "$INTERACTIVE" = 1 ]]; then
+    # Start an interactive shell with:
+    CMD="python$VERSION -m venv /tmp/venv && source /tmp/venv/bin/activate && /bin/bash"
+    echo "In the interactive shell, you can run commands such as: RUN_TESTS=1 ./tools/build_test_linux.sh"
+  else
+    # Note: set RUN_TESTS=1 to run the tests.
+    CMD="python$VERSION -m venv /tmp/venv && source /tmp/venv/bin/activate && RUN_TESTS=0 ./tools/build_test_linux.sh && ./tools/package_linux.sh"
+  fi
 
   docker run \
     -v pydf_venv_cache_$VERSION:/tmp/venv \
