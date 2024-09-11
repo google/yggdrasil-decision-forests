@@ -434,7 +434,12 @@ absl::Status DistributedGradientBoostedTreesWorker::GetLabelStatistics(
           answer->mutable_label_statistics(), thread_pool_.get()));
     } break;
     default:
-      return absl::InvalidArgumentError("Not supported task");
+      return absl::InvalidArgumentError(
+          absl::StrCat("The distributed gradient boosted trees learner does "
+                       "not support this task:",
+                       model::proto::Task_Name(welcome_.train_config().task()),
+                       ". Use the non-distributed "
+                       "version of the learner."));
   }
 
   return absl::OkStatus();
@@ -1267,7 +1272,12 @@ absl::StatusOr<LossResults> DistributedGradientBoostedTreesWorker::Loss(
       break;
     }
     default:
-      return absl::InvalidArgumentError("Not supported task");
+      return absl::InvalidArgumentError(
+          absl::StrCat("The distributed gradient boosted trees learner does "
+                       "not support this task:",
+                       model::proto::Task_Name(welcome_.train_config().task()),
+                       ". Use the non-distributed "
+                       "version of the learner."));
   }
 }
 
