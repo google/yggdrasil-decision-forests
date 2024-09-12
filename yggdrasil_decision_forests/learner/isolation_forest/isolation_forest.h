@@ -105,26 +105,32 @@ absl::StatusOr<bool> FindSplit(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 
-// An oblique split is randomly sampled and returned.
+// Sample an oblique split on the features in `nontrivial_features`.
 //
 // This function implements the oblique splits as described in
 // "Sparse Projection Oblique Random Forests" 2020 JMLR paper by Tomita et al
 // (https://www.jmlr.org/papers/volume21/18-664/18-664.pdf), adapted to
 // isolation forests. In particular, this includes splits as performed for
 // extended isolation forests.
-absl::StatusOr<bool> FindSplitOblique(
-    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+//
+// There is a small probability that the sampled split is not valid. The
+// function will retry to sample a valid split many times before failing,
+// reducing the probability to a negligible size.
+absl::Status SetRandomSplitNumericalSparseOblique(
+    const std::vector<int>& nontrivial_features, const Configuration& config,
+    const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 
-// An axis-aligned split is randomly sampled and returned.
+// Create an axis-aligned split on `feature_idx`.
 //
 // This function implements the original isolation forest algorithm: Only splits
 // of the form "X >= threshold" are generated. The threshold is uniformly
 // sampled between the minimum and maximum values observed in the training
 // examples reaching this node.
-absl::StatusOr<bool> FindSplitAxisAligned(
-    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+absl::Status SetRandomSplitNumericalAxisAligned(
+    int feature_idx, const Configuration& config,
+    const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 

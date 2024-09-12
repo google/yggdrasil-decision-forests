@@ -1267,7 +1267,7 @@ class IsolationForestLearnerTest(LearnerTest):
             "loss",
         ],
     )
-    self.assertAlmostEqual(evaluation.accuracy, 0.98, delta=0.01)
+    self.assertAlmostEqual(evaluation.accuracy, 0.975, delta=0.015)
     self.assertAlmostEqual(evaluation.loss, 0.52, delta=0.01)
 
   def test_max_depth_gaussians_subsample_ratio(self):

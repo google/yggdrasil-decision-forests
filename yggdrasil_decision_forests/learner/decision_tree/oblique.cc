@@ -176,9 +176,9 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
        projection_idx++) {
     // Generate a current_projection.
     int8_t monotonic_direction;
-    SampleProjection(dt_config, train_dataset.data_spec(), config_link,
-                     projection_density, &current_projection,
-                     &monotonic_direction, random);
+    SampleProjection(config_link.numerical_features(), dt_config,
+                     train_dataset.data_spec(), config_link, projection_density,
+                     &current_projection, &monotonic_direction, random);
 
     // Pre-compute the result of the current_projection.
     RETURN_IF_ERROR(projection_evaluator.Evaluate(
@@ -660,7 +660,8 @@ absl::StatusOr<bool> FindBestConditionOblique(
 
 namespace internal {
 
-void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
+void SampleProjection(const absl::Span<const int>& features,
+                      const proto::DecisionTreeTrainingConfig& dt_config,
                       const dataset::proto::DataSpecification& data_spec,
                       const model::proto::TrainingConfigLinking& config_link,
                       const float projection_density,
@@ -669,6 +670,7 @@ void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
                       utils::RandomEngine* random) {
   *monotonic_direction = 0;
   projection->clear();
+  projection->reserve(projection_density * features.size());
   std::uniform_real_distribution<float> unif01;
   std::uniform_real_distribution<float> unif1m1(-1.f, 1.f);
 
@@ -703,17 +705,16 @@ void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
     }
   };
 
-  for (const auto feature : config_link.numerical_features()) {
+  for (const auto feature : features) {
     if (unif01(*random) < projection_density) {
       projection->push_back({feature, gen_weight(feature)});
     }
   }
   if (projection->empty()) {
-    std::uniform_int_distribution<int> unif_feature_idx(
-        0, config_link.numerical_features_size() - 1);
-    projection->push_back({/*.attribute_idx =*/config_link.numerical_features(
-                               unif_feature_idx(*random)),
-                           /*.weight =*/1.f});
+    std::uniform_int_distribution<int> unif_feature_idx(0, features.size() - 1);
+    projection->push_back(
+        {/*.attribute_idx =*/features[unif_feature_idx(*random)],
+         /*.weight =*/1.f});
   } else if (projection->size() == 1) {
     projection->front().weight = 1.f;
   }
