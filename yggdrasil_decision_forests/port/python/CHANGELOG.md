@@ -21,6 +21,9 @@
 -   Speed-up training of GBT models by ~10%
 -   Add `ydf.util.read_tf_record` and `ydf.util.write_tf_record` to facilitate
     TF Record datasets usage.
+-   Rename LAMBDA_MART_NDCG5 to LAMBDA_MART_NDCG. The old name is deprecated
+    but can still be used.
+-   Allow configuring the truncation of NDCG losses.
 -   Enable multi-threading when using `model.predict` and `model.evaluate`.
 -   Default number of threads of `model.analyze` is equal to the number of
     cores.

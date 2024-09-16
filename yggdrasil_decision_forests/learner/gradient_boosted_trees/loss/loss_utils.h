@@ -47,8 +47,6 @@ namespace gradient_boosted_trees {
 // this maximum only triggers a stern warning.
 constexpr int64_t kMaximumItemsInRankingGroup = 2048;
 
-constexpr int kNDCG5Truncation = 5;
-
 // Index of the secondary metrics according to the type of loss.
 constexpr int kBinomialLossSecondaryMetricClassificationIdx = 0;
 

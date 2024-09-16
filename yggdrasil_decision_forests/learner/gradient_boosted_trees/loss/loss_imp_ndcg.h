@@ -49,7 +49,8 @@ class NDCGLoss : public AbstractLoss {
 
   NDCGLoss(const proto::GradientBoostedTreesTrainingConfig& gbt_config,
            model::proto::Task task, const dataset::proto::Column& label_column)
-      : AbstractLoss(gbt_config, task, label_column) {}
+      : AbstractLoss(gbt_config, task, label_column),
+        ndcg_truncation_(gbt_config.ndcg_loss_options().ndcg_truncation()) {}
 
   absl::Status Status() const override;
 
@@ -82,6 +83,9 @@ class NDCGLoss : public AbstractLoss {
       const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const override;
+
+ private:
+  const int ndcg_truncation_;
 };
 
 // LAMBDA_MART_NDCG5 also creates this loss.

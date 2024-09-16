@@ -586,7 +586,7 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
         validation_evaluation.mutable_regression()->set_sum_square_error(
             metric_value);
         validation_evaluation.set_count_predictions(1.f);
-      } else if (metric_name == "NDCG@5") {
+      } else if (absl::StartsWith(metric_name, "NDCG@")) {
         validation_evaluation.mutable_ranking()->mutable_ndcg()->set_value(
             metric_value);
         validation_evaluation.mutable_ranking()->set_ndcg_truncation(5);

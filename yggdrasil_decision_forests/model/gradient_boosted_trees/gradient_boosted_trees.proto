@@ -70,7 +70,7 @@ enum Loss {
   POISSON = 7;
   // Mean average error (MAE).
   MEAN_AVERAGE_ERROR = 8;
-  // LambdaMART with NDCG@5.
+  // LambdaMART with NDCG loss. Truncation defaults to 5, configurable.
   LAMBDA_MART_NDCG = 9;
 }
 

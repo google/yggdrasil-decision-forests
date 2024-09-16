@@ -134,6 +134,7 @@ absl::StatusOr<LossResults> MeanSquaredErrorLoss::Loss(
     const absl::Span<const float> weights,
     const RankingGroupsIndices* ranking_index,
     utils::concurrency::ThreadPool* thread_pool) const {
+  constexpr int kNDCG5Truncation = 5;
   float loss_value;
   // The RMSE is also the loss.
   ASSIGN_OR_RETURN(loss_value, metric::RMSE(labels, predictions, weights));

@@ -25,7 +25,7 @@ option java_outer_classname = "GradientBoostedTreesLearner";
 
 // Training configuration for the Gradient Boosted Trees algorithm.
 message GradientBoostedTreesTrainingConfig {
-  // Next ID: 38
+  // Next ID: 39
 
   // Basic parameters.
 
@@ -180,6 +180,7 @@ message GradientBoostedTreesTrainingConfig {
     LambdaMartNdcg lambda_mart_ndcg = 12;
     XeNdcg xe_ndcg = 26;
     BinaryFocalLossOptions binary_focal_loss_options = 36;
+    NDCGLossOptions ndcg_loss_options = 38;
   }
 
   message LambdaMartNdcg {
@@ -199,6 +200,17 @@ message GradientBoostedTreesTrainingConfig {
       ONE = 2;
     }
     optional Gamma gamma = 1 [default = UNIFORM];
+
+    // Number of candidates considered when computing the NDCG loss.
+    //
+    // NDCG losses are usually truncated at a particular rank level (generally
+    // between 4 and 10), i.e. only the highly ranked documents are considered
+    // when computing the rank. A smaller values results in a model with
+    // increased emphasis on the first results of the ranking.
+    //
+    // Note that the NDCG truncation of the classic NDCG loss must be configured
+    // separately.
+    optional int32 ndcg_truncation = 2 [default = 5];
   }
 
   message BinaryFocalLossOptions {
@@ -215,6 +227,19 @@ message GradientBoostedTreesTrainingConfig {
     // Corresponds to the 'alpha' parameter in
     // https://arxiv.org/pdf/1708.02002.pdf
     optional float positive_sample_coefficient = 2 [default = 0.5];
+  }
+
+  message NDCGLossOptions {
+    // Number of candidates considered when computing the NDCG loss.
+    //
+    // NDCG losses are usually truncated at a particular rank level (generally
+    // between 4 and 10), i.e. only the highly ranked documents are considered
+    // when computing the rank. A smaller values results in a model with
+    // increased emphasis on the first results of the ranking.
+    //
+    // Note that the NDCG truncation of the cross-entropy NDCG loss must be
+    // configured separately.
+    optional int32 ndcg_truncation = 1 [default = 5];
   }
 
   // L2 regularization on the tree predictions i.e. on the value of the leaf.

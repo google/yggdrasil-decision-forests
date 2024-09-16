@@ -1119,6 +1119,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       variable importance of the model at the end of the training using the
       validation dataset. Enabling this feature can increase the training time
       significantly. Default: False.
+    cross_entropy_ndcg_truncation: Truncation of the cross-entropy NDCG loss.
+      Only used with cross-entropy NDCG loss i.e. `loss="XE_NDCG_MART"`
+      Default: 5.
     dart_dropout: Dropout rate applied when using the DART i.e. when
       forest_extraction=DART. Default: None.
     early_stopping: Early stopping detects the overfitting of the model and
@@ -1211,14 +1214,15 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       likelihood loss. Mainly used for counting problems. Only valid for
       regression. - `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood
       i.e. cross-entropy. Only valid for binary or multi-class classification. -
-      `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5. - `XE_NDCG_MART`:  Cross
+      `LAMBDA_MART_NDCG`: LambdaMART with NDCG@5. - `XE_NDCG_MART`:  Cross
       Entropy Loss NDCG. See arxiv.org/abs/1911.09798. - `BINARY_FOCAL_LOSS`:
       Focal loss. Only valid for binary classification. See
       https://arxiv.org/pdf/1708.02002.pdf. - `POISSON`: Poisson log likelihood.
         Only valid for regression. - `MEAN_AVERAGE_ERROR`: Mean average error
         a.k.a. MAE. For custom losses, pass the loss object here. Note that when
         using custom losses, the link function is deactivated (aka
-        apply_link_function is always False).
+        apply_link_function is always False). - `LAMBDA_MART_NDCG5`: DEPRECATED,
+        use LAMBDA_MART_NDCG. LambdaMART with NDCG@5.
         Default: "DEFAULT".
     max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
       will be roots. `max_depth=-1` means that tree depth is not restricted by
@@ -1261,6 +1265,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       et al. in "Random Survival Forests"
       (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
         Default: "GLOBAL_IMPUTATION".
+    ndcg_truncation: Truncation of the NDCG loss. Only used with NDCG loss i.e.
+      `loss="LAMBDA_MART_NDCG"` Default: 5.
     num_candidate_attributes: Number of unique valid attributes tested for each
       node. An attribute is valid if it has at least a valid split. If
       `num_candidate_attributes=0`, the value is set to the classical default
@@ -1452,6 +1458,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       categorical_set_split_max_num_items: int = -1,
       categorical_set_split_min_item_frequency: int = 1,
       compute_permutation_variable_importance: bool = False,
+      cross_entropy_ndcg_truncation: int = 5,
       dart_dropout: Optional[float] = None,
       early_stopping: str = "LOSS_INCREASE",
       early_stopping_initial_iteration: int = 10,
@@ -1480,6 +1487,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       mhld_oblique_sample_attributes: Optional[bool] = None,
       min_examples: int = 5,
       missing_value_policy: str = "GLOBAL_IMPUTATION",
+      ndcg_truncation: int = 5,
       num_candidate_attributes: Optional[int] = -1,
       num_candidate_attributes_ratio: Optional[float] = None,
       num_trees: int = 300,
@@ -1529,6 +1537,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         "compute_permutation_variable_importance": (
             compute_permutation_variable_importance
         ),
+        "cross_entropy_ndcg_truncation": cross_entropy_ndcg_truncation,
         "dart_dropout": dart_dropout,
         "early_stopping": early_stopping,
         "early_stopping_initial_iteration": early_stopping_initial_iteration,
@@ -1561,6 +1570,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         "mhld_oblique_sample_attributes": mhld_oblique_sample_attributes,
         "min_examples": min_examples,
         "missing_value_policy": missing_value_policy,
+        "ndcg_truncation": ndcg_truncation,
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
         "num_trees": num_trees,

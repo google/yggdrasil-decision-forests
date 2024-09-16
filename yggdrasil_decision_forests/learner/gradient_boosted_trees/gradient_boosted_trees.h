@@ -132,6 +132,8 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamLoss[] = "loss";
   static constexpr char kHParamFocalLossGamma[] = "focal_loss_gamma";
   static constexpr char kHParamFocalLossAlpha[] = "focal_loss_alpha";
+  static constexpr char kHParamNDCGTruncation[] = "ndcg_truncation";
+  static constexpr char kHParamXENDCGTruncation[] = "cross_entropy_ndcg_truncation";
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,

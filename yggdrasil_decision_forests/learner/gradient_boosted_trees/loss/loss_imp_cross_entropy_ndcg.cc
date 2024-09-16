@@ -25,6 +25,7 @@
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -45,6 +46,12 @@ absl::Status CrossEntropyNDCGLoss::Status() const {
   if (task_ != model::proto::Task::RANKING) {
     return absl::InvalidArgumentError(
         "Cross Entropy NDCG loss is only compatible with a ranking task.");
+  }
+  if (ndcg_truncation_ < 1) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("The NDCG truncation must be set to a positive integer, "
+                     "currently found: ",
+                     ndcg_truncation_));
   }
   return absl::OkStatus();
 }
@@ -183,7 +190,7 @@ absl::StatusOr<LossResults> CrossEntropyNDCGLoss::Loss(
     return absl::InternalError("Missing ranking index");
   }
   float loss_value =
-      -ranking_index->NDCG(predictions, weights, kNDCG5Truncation);
+      -ranking_index->NDCG(predictions, weights, ndcg_truncation_);
   return LossResults{/*.loss =*/loss_value, /*.secondary_metrics =*/{}};
 }
 

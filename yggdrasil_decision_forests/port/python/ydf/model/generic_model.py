@@ -60,8 +60,9 @@ class Task(enum.Enum):
   Attributes:
     CLASSIFICATION: Predict a categorical label i.e., an item of an enumeration.
     REGRESSION: Predict a numerical label i.e., a quantity.
-    RANKING: Rank items by label values. The label is expected to be between 0
-      and 4 with NDCG semantic (0: completely unrelated, 4: perfect match).
+    RANKING: Rank items by label values. When using default NDCG settings, the
+      label is expected to be between 0 and 4 with NDCG semantic (0: completely
+      unrelated, 4: perfect match).
     CATEGORICAL_UPLIFT: Predicts the incremental impact of a treatment on a
       categorical outcome.
     NUMERICAL_UPLIFT: Predicts the incremental impact of a treatment on a
