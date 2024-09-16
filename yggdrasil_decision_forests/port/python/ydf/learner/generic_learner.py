@@ -309,7 +309,9 @@ Hyper-parameters: ydf.{self._hyperparameters}
       train_args = {"dataset": train_ds}
 
       if valid is not None:
-        valid_ds = self._get_vertical_dataset(valid)._dataset  # pylint: disable=protected-access
+        valid_ds = dataset.create_vertical_dataset(
+            valid, data_spec=train_ds.data_spec()
+        )._dataset  # pylint: disable=protected-access
         train_args["validation_dataset"] = valid_ds
         log.info(
             "Train model on %d training examples and %d validation examples",

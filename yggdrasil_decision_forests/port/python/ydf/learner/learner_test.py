@@ -1090,6 +1090,13 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     logging.info("evaluation:\n%s", evaluation)
     self.assertAlmostEqual(evaluation.accuracy, 0.87, 1)
 
+  def test_with_validation_missing_columns_fails(self):
+    with self.assertRaisesRegex(ValueError, "Missing required column 'age'"):
+      invalid_adult_test_pd = self.adult.test_pd.drop(["age"], axis=1)
+      specialized_learners.GradientBoostedTreesLearner(
+          label="income", num_trees=50
+      ).train(self.adult.train_pd, valid=invalid_adult_test_pd)
+
   def test_with_validation_path(self):
     evaluation = (
         specialized_learners.GradientBoostedTreesLearner(
