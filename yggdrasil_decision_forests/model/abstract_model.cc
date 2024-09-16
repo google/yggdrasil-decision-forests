@@ -52,6 +52,7 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -448,46 +449,69 @@ absl::Status AbstractModel::AppendEvaluationWithEngine(
     metric::proto::EvaluationResults* eval) const {
   const auto& engine_features = engine.features();
   const int num_prediction_dimensions = engine.NumPredictionDimension();
+  const size_t num_examples = dataset.nrow();
 
-  // Evaluate using the semi-fast generic engine.
-  const int64_t total_num_examples = dataset.nrow();
-  const int64_t batch_size =
-      std::min(static_cast<int64_t>(100), total_num_examples);
+  std::vector<float> raw_predictions(num_prediction_dimensions * num_examples);
 
-  DCHECK_GT(total_num_examples, 0);
-  auto batch_of_examples = engine.AllocateExamples(batch_size);
-  const int64_t num_batches =
-      (total_num_examples + batch_size - 1) / batch_size;
+  size_t initial_prediction_size = 0;
+  if (predictions) {
+    initial_prediction_size = predictions->size();
+    predictions->resize(initial_prediction_size + num_examples);
+  }
 
-  std::vector<float> batch_of_predictions;
-  proto::Prediction prediction;
-  for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
-    const int64_t begin_example_idx = batch_idx * batch_size;
-    const int64_t end_example_idx =
-        std::min(begin_example_idx + batch_size, total_num_examples);
-    const int effective_batch_size = end_example_idx - begin_example_idx;
+  struct Cache {
+    std::unique_ptr<serving::AbstractExampleSet> batch_of_examples;
+    std::vector<float> batch_of_predictions;
+  };
+
+  const auto create_cache = [&](size_t thread_idx, size_t num_threads,
+                                size_t block_size) -> Cache {
+    Cache cache;
+    cache.batch_of_examples = engine.AllocateExamples(block_size);
+    cache.batch_of_predictions.resize(block_size);
+    return cache;
+  };
+
+  const auto run = [&, num_prediction_dimensions](
+                       size_t block_idx, size_t begin_item_idx,
+                       size_t end_item_idx, Cache* cache) -> absl::Status {
+    // Compute predictions
+    const size_t effective_batch_size = end_item_idx - begin_item_idx;
     RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
-        dataset, begin_example_idx, end_example_idx, engine_features,
-        batch_of_examples.get()));
-    engine.Predict(*batch_of_examples, effective_batch_size,
-                   &batch_of_predictions);
-    for (int sub_example_idx = 0; sub_example_idx < effective_batch_size;
-         sub_example_idx++) {
-      FloatToProtoPrediction(batch_of_predictions, sub_example_idx, task(),
-                             num_prediction_dimensions, &prediction);
-      RETURN_IF_ERROR(SetGroundTruth(
-          dataset, begin_example_idx + sub_example_idx, &prediction));
-      if (option.has_weights()) {
-        ASSIGN_OR_RETURN(
-            const float weight,
-            dataset::GetWeightWithStatus(
-                dataset, begin_example_idx + sub_example_idx, weight_links));
-        prediction.set_weight(weight);
-      }
-      RETURN_IF_ERROR(metric::AddPrediction(option, prediction, rnd, eval));
-      if (predictions) {
-        predictions->push_back(prediction);
-      }
+        dataset, begin_item_idx, end_item_idx, engine_features,
+        cache->batch_of_examples.get()));
+    engine.Predict(*cache->batch_of_examples, effective_batch_size,
+                   &cache->batch_of_predictions);
+    std::copy(
+        cache->batch_of_predictions.begin(),
+        cache->batch_of_predictions.begin() +
+            effective_batch_size * num_prediction_dimensions,
+        raw_predictions.begin() + begin_item_idx * num_prediction_dimensions);
+    return absl::OkStatus();
+  };
+
+  RETURN_IF_ERROR(utils::concurrency::ConcurrentForLoopWithWorker<Cache>(
+      /*num_items=*/dataset.nrow(),
+      /*max_num_threads=*/option.num_threads(),
+      /*min_block_size=*/100,    // At least 100 examples in a batch
+      /*max_block_size=*/10000,  // No more than 10k examples in a batch
+      create_cache, run));
+
+  // Evaluate predictions
+  proto::Prediction proto_prediction;
+  for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
+    FloatToProtoPrediction(raw_predictions, example_idx, task(),
+                           num_prediction_dimensions, &proto_prediction);
+    RETURN_IF_ERROR(SetGroundTruth(dataset, example_idx, &proto_prediction));
+    if (option.has_weights()) {
+      ASSIGN_OR_RETURN(
+          const float weight,
+          dataset::GetWeightWithStatus(dataset, example_idx, weight_links));
+      proto_prediction.set_weight(weight);
+    }
+    RETURN_IF_ERROR(metric::AddPrediction(option, proto_prediction, rnd, eval));
+    if (predictions) {
+      (*predictions)[initial_prediction_size + example_idx] = proto_prediction;
     }
   }
   return absl::OkStatus();

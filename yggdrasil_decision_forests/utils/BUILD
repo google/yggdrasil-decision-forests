@@ -340,8 +340,11 @@ cc_library_ydf(
     visibility = ["//visibility:private"],
     deps = [
         ":logging",
+        ":status_macros",
         ":synchronization_primitives",
         "@com_google_absl//absl/log",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:optional",
     ],
 )
@@ -1086,9 +1089,12 @@ cc_test(
     srcs = ["concurrency_test.cc"],
     deps = [
         ":concurrency",
+        ":test",
         # "@com_google_googletest//:gtest_main",  # When fixed
         "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:optional",
+        "//yggdrasil_decision_forests/utils:status_macros",
     ],
 )
 

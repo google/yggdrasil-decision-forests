@@ -36,6 +36,7 @@ from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
 from ydf.model import generic_model
 from ydf.model import model_lib
+from ydf.utils import concurrency
 from ydf.utils import log
 from yggdrasil_decision_forests.utils import fold_generator_pb2
 from yggdrasil_decision_forests.utils.distribute.implementations.grpc import grpc_pb2
@@ -681,7 +682,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
     """Merges constructor arguments into a deployment configuration."""
 
     if num_threads is None:
-      num_threads = self._determine_optimal_num_threads()
+      num_threads = concurrency.determine_optimal_num_threads(training=True)
     config = abstract_learner_pb2.DeploymentConfig(
         num_threads=num_threads,
         try_resume_training=resume_training,
@@ -697,25 +698,6 @@ Hyper-parameters: ydf.{self._hyperparameters}
       grpc_config.grpc_addresses.addresses[:] = workers
 
     return config
-
-  def _determine_optimal_num_threads(self):
-    """Sets  number of threads to min(num_cpus, 32) or 6 if num_cpus unclear."""
-    num_threads = os.cpu_count()
-    if num_threads is None:
-      logging.warning("Cannot determine the number of CPUs. Set num_threads=6")
-      num_threads = 6
-    else:
-      if num_threads > 32:
-        logging.warning(
-            "The `num_threads` constructor argument is not set and the "
-            "number of CPU is os.cpu_count()=%d > 32. Setting num_threads "
-            "to 32. Set num_threads manually to use more than 32 cpus.",
-            num_threads,
-        )
-        num_threads = 32
-      else:
-        logging.info("Use %d thread(s) for training", num_threads)
-    return num_threads
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:

@@ -120,12 +120,13 @@ void init_model(py::module_& m) {
            })
       // WARNING: This method releases the Global Interpreter Lock.
       .def("Predict", WithStatusOr(&GenericCCModel::Predict),
-           py::arg("dataset"), py::arg("use_slow_engine"))
+           py::arg("dataset"), py::arg("use_slow_engine"),
+           py::arg("num_threads"))
       // WARNING: This method releases the Global Interpreter Lock.
       .def("Evaluate", WithStatusOr(&GenericCCModel::Evaluate),
            py::arg("dataset"), py::arg("options"), py::arg("weighted"),
            py::arg("label_col_idx"), py::arg("group_col_idx"),
-           py::arg("use_slow_engine"))
+           py::arg("use_slow_engine"), py::arg("num_threads"))
       // WARNING: This method releases the Global Interpreter Lock.
       .def("Analyze", WithStatusOr(&GenericCCModel::Analyze),
            py::arg("dataset"), py::arg("options"))

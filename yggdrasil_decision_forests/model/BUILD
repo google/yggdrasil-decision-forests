@@ -49,6 +49,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/metric:report",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:fast_engine",
+        "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:distribution",
         "//yggdrasil_decision_forests/utils:distribution_cc_proto",
         "//yggdrasil_decision_forests/utils:logging",

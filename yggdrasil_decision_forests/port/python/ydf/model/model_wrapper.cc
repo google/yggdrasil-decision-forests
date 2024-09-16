@@ -41,6 +41,7 @@
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/benchmark/inference.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -62,16 +63,17 @@ GenericCCModel::GetEngine() {
 }
 
 absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
-    const dataset::VerticalDataset& dataset, bool use_slow_engine) {
+    const dataset::VerticalDataset& dataset, bool use_slow_engine,
+    const int num_threads) {
   if (use_slow_engine) {
-    return PredictWithSlowEngine(dataset);
+    return PredictWithSlowEngine(dataset, num_threads);
   } else {
-    return PredictWithFastEngine(dataset);
+    return PredictWithFastEngine(dataset, num_threads);
   }
 }
 
 absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithFastEngine(
-    const dataset::VerticalDataset& dataset) {
+    const dataset::VerticalDataset& dataset, const int num_threads) {
   py::array_t<float, py::array::c_style | py::array::forcecast> predictions;
   static_assert(predictions.itemsize() == sizeof(float),
                 "A C++ float should have the same size as a numpy float");
@@ -83,36 +85,51 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithFastEngine(
 
   const auto& engine_features = engine->features();
   const int64_t total_num_examples = dataset.nrow();
-  constexpr int64_t kMaxBatchSize = 100;
-  const int64_t batch_size = std::min(kMaxBatchSize, total_num_examples);
-  auto batch_of_examples = engine->AllocateExamples(batch_size);
   predictions.resize({total_num_examples * num_prediction_dimensions});
 
   auto unchecked_predictions = predictions.mutable_unchecked();
 
   {
     py::gil_scoped_release release;
-    const int64_t num_batches =
-        (total_num_examples + batch_size - 1) / batch_size;
-    std::vector<float> batch_of_predictions;
-    for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
-      const int64_t begin_example_idx = batch_idx * batch_size;
-      const int64_t end_example_idx =
-          std::min(begin_example_idx + batch_size, total_num_examples);
-      const int effective_batch_size = end_example_idx - begin_example_idx;
+
+    struct Cache {
+      std::unique_ptr<serving::AbstractExampleSet> batch_of_examples;
+      std::vector<float> batch_of_predictions;
+    };
+
+    const auto create_cache = [&](size_t thread_idx, size_t num_threads,
+                                  size_t block_size) -> Cache {
+      Cache cache;
+      cache.batch_of_examples = engine->AllocateExamples(block_size);
+      cache.batch_of_predictions.resize(block_size);
+      return cache;
+    };
+
+    const auto run = [&, num_prediction_dimensions](
+                         size_t block_idx, size_t begin_item_idx,
+                         size_t end_item_idx, Cache* cache) -> absl::Status {
+      const size_t effective_batch_size = end_item_idx - begin_item_idx;
       RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
-          dataset, begin_example_idx, end_example_idx, engine_features,
-          batch_of_examples.get()));
-      engine->Predict(*batch_of_examples, effective_batch_size,
-                      &batch_of_predictions);
+          dataset, begin_item_idx, end_item_idx, engine_features,
+          cache->batch_of_examples.get()));
+      engine->Predict(*cache->batch_of_examples, effective_batch_size,
+                      &cache->batch_of_predictions);
 
       // Copy this batch to the numpy array.
-      const int64_t np_array_begin =
-          begin_example_idx * num_prediction_dimensions;
+      const int64_t np_array_begin = begin_item_idx * num_prediction_dimensions;
       std::memcpy(unchecked_predictions.mutable_data(np_array_begin),
-                  batch_of_predictions.data(),
-                  batch_of_predictions.size() * sizeof(float));
-    }
+                  cache->batch_of_predictions.data(),
+                  cache->batch_of_predictions.size() * sizeof(float));
+
+      return absl::OkStatus();
+    };
+
+    RETURN_IF_ERROR(utils::concurrency::ConcurrentForLoopWithWorker<Cache>(
+        /*num_items=*/total_num_examples,
+        /*max_num_threads=*/num_threads,
+        /*min_block_size=*/100,    // At least 100 examples in a batch
+        /*max_block_size=*/10000,  // No more than 10k examples in a batch
+        create_cache, run));
   }
 
   if (num_prediction_dimensions > 1) {
@@ -123,7 +140,7 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithFastEngine(
 }
 
 absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithSlowEngine(
-    const dataset::VerticalDataset& dataset) {
+    const dataset::VerticalDataset& dataset, const int num_threads) {
   py::array_t<float, py::array::c_style | py::array::forcecast> predictions;
   static_assert(predictions.itemsize() == sizeof(float),
                 "A C++ float should have the same size as a numpy float");
@@ -147,15 +164,36 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithSlowEngine(
   }
   predictions.resize({total_num_examples * num_prediction_dimensions});
 
-  model::proto::Prediction prediction;
-  for (dataset::VerticalDataset::row_t example_idx = 0;
-       example_idx < dataset.nrow(); example_idx++) {
-    model_->Predict(dataset, example_idx, &prediction);
-    auto float_prediction = absl::MakeSpan(
-        predictions.mutable_data(example_idx * num_prediction_dimensions),
-        num_prediction_dimensions);
-    model::ProtoToFloatPrediction(prediction, model_->task(), float_prediction);
-  }
+  struct Cache {
+    model::proto::Prediction prediction;
+  };
+
+  const auto create_cache = [&](size_t thread_idx, size_t num_threads,
+                                size_t block_size) -> Cache { return {}; };
+
+  const auto run = [&, num_prediction_dimensions](
+                       size_t block_idx, size_t begin_item_idx,
+                       size_t end_item_idx, Cache* cache) -> absl::Status {
+    for (size_t example_idx = begin_item_idx; example_idx < end_item_idx;
+         example_idx++) {
+      model_->Predict(dataset, example_idx, &cache->prediction);
+      auto float_prediction = absl::MakeSpan(
+          predictions.mutable_data(example_idx * num_prediction_dimensions),
+          num_prediction_dimensions);
+      model::ProtoToFloatPrediction(cache->prediction, model_->task(),
+                                    float_prediction);
+    }
+
+    return absl::OkStatus();
+  };
+
+  RETURN_IF_ERROR(utils::concurrency::ConcurrentForLoopWithWorker<Cache>(
+      /*num_items=*/total_num_examples,
+      /*max_num_threads=*/num_threads,
+      /*min_block_size=*/100,    // At least 100 examples in a batch
+      /*max_block_size=*/10000,  // No more than 10k examples in a batch
+      create_cache, run));
+
   if (num_prediction_dimensions > 1) {
     predictions =
         predictions.reshape({total_num_examples, num_prediction_dimensions});
@@ -167,9 +205,8 @@ absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& options, const bool weighted,
     const int label_col_idx, const int group_col_idx,
-    const bool use_slow_engine) {
+    const bool use_slow_engine, const int num_threads) {
   py::gil_scoped_release release;
-
   auto effective_options = options;
   if (weighted && model_->weights().has_value()) {
     ASSIGN_OR_RETURN(*effective_options.mutable_weights(),

@@ -113,6 +113,7 @@ class GenericCCModel:
       self,
       dataset: VerticalDataset,
       use_slow_engine: bool,
+      num_threads: int,
   ) -> npt.NDArray[np.float32]: ...
   def Evaluate(
       self,
@@ -122,6 +123,7 @@ class GenericCCModel:
       label_col_idx: int,
       group_col_idx: int,
       use_slow_engine: bool,
+      num_threads: int,
   ) -> metric_pb2.EvaluationResults: ...
   def Analyze(
       self,
