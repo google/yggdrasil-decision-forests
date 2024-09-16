@@ -84,8 +84,8 @@ class NDCGLoss : public AbstractLoss {
       utils::concurrency::ThreadPool* thread_pool) const override;
 };
 
-REGISTER_AbstractGradientBoostedTreeLoss(NDCGLoss, "LAMBDA_MART_NDCG5");
-
+// LAMBDA_MART_NDCG5 also creates this loss.
+REGISTER_AbstractGradientBoostedTreeLoss(NDCGLoss, "LAMBDA_MART_NDCG");
 
 }  // namespace gradient_boosted_trees
 }  // namespace model

@@ -31,6 +31,7 @@
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
@@ -400,6 +401,7 @@ void GradientBoostedTreesModel::Predict(
         LOG(FATAL) << "Non supported task";
       }
     } break;
+    case proto::Loss::LAMBDA_MART_NDCG:
     case proto::Loss::LAMBDA_MART_NDCG5:
     case proto::Loss::XE_NDCG_MART: {
       double accumulator = initial_predictions_[0];
@@ -493,6 +495,7 @@ void GradientBoostedTreesModel::Predict(
                      });
       prediction->mutable_regression()->set_value(accumulator);
     } break;
+    case proto::Loss::LAMBDA_MART_NDCG:
     case proto::Loss::LAMBDA_MART_NDCG5:
     case proto::Loss::XE_NDCG_MART: {
       double accumulator = initial_predictions_[0];

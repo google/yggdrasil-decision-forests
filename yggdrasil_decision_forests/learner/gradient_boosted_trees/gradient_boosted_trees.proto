@@ -225,7 +225,7 @@ message GradientBoostedTreesTrainingConfig {
   // of models trained with and without l2 regularization can be compared.
   //
   // Used for the following losses: BINOMIAL_LOG_LIKELIHOOD, SQUARED_ERROR,
-  // MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG5, or if use_hessian_gain is
+  // MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG, or if use_hessian_gain is
   // true.
   //
   // Note: In the case of RMSE loss for regression, the L2 regularization play
@@ -237,7 +237,7 @@ message GradientBoostedTreesTrainingConfig {
 
   // L1 regularization on the tree predictions i.e. on the value of the leaf.
   //
-  // Used for the following losses: LAMBDA_MART_NDCG5, or if use_hessian_gain is
+  // Used for the following losses: LAMBDA_MART_NDCG, or if use_hessian_gain is
   // true.
   optional float l1_regularization = 19 [default = 0.0];
 
@@ -256,7 +256,7 @@ message GradientBoostedTreesTrainingConfig {
   // beneficial.
   //
   // Currently only used for the losses:
-  //   - LAMBDA_MART_NDCG5
+  //   - LAMBDA_MART_NDCG
   optional float lambda_loss = 14 [default = 1.0];
 
   // How is the forest of tree built.  Defaults to "mart".
@@ -298,7 +298,7 @@ message GradientBoostedTreesTrainingConfig {
   // the splits to minimize the variance of "gradient / hessian".
   //
   // Hessian gain is available for the losses: BINOMIAL_LOG_LIKELIHOOD,
-  // SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG5.
+  // SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG.
   optional bool use_hessian_gain = 20 [default = false];
 
   // Minimum value of the sum of the hessians in the leafs. Splits that would

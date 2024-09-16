@@ -58,8 +58,9 @@ enum Loss {
   SQUARED_ERROR = 2;
   // Multinomial log likelihood i.e. cross-entropy.
   MULTINOMIAL_LOG_LIKELIHOOD = 3;
+  // DEPRECATED: Use LAMBDA_MART_NDCG.
   // LambdaMART with NDCG5
-  LAMBDA_MART_NDCG5 = 4;
+  LAMBDA_MART_NDCG5 = 4 [deprecated = true];
   // XE_NDCG_MART [arxiv.org/abs/1911.09798]
   XE_NDCG_MART = 5;
   // EXPERIMENTAl. Focal loss. Only valid for binary classification.
@@ -69,6 +70,8 @@ enum Loss {
   POISSON = 7;
   // Mean average error (MAE).
   MEAN_AVERAGE_ERROR = 8;
+  // LambdaMART with NDCG@5.
+  LAMBDA_MART_NDCG = 9;
 }
 
 // Log of the training. This proto is generated during the training of the

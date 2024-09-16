@@ -338,6 +338,7 @@ absl::Status GenericToSpecializedModel(
     GradientBoostedTreesBinaryRegressiveModel* dst) {
   if (src.loss() != Loss::BINOMIAL_LOG_LIKELIHOOD &&
       src.loss() != Loss::SQUARED_ERROR &&
+      src.loss() != Loss::LAMBDA_MART_NDCG &&
       src.loss() != Loss::LAMBDA_MART_NDCG5 &&
       src.loss() != Loss::XE_NDCG_MART) {
     return absl::InvalidArgumentError(

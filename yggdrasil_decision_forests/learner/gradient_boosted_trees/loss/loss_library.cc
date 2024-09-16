@@ -77,6 +77,9 @@ absl::StatusOr<std::unique_ptr<AbstractLoss>> CreateLoss(
   }
 
   auto loss_key = proto::Loss_Name(loss);
+  if (loss == proto::LAMBDA_MART_NDCG5) {
+    loss_key = "LAMBDA_MART_NDCG";
+  }
   ASSIGN_OR_RETURN(auto loss_imp, AbstractLossRegisterer::Create(
                                       loss_key, config, task, label_column));
   RETURN_IF_ERROR(loss_imp->Status());

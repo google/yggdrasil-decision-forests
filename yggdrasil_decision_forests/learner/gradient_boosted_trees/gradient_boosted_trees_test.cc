@@ -2035,6 +2035,16 @@ TEST(GradientBoostedTrees, PredefinedHyperParametersRanking) {
                                                      absl::nullopt);
 }
 
+TEST(GradientBoostedTrees, RankingDeprecatedLoss) {
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+  auto* gbt_config =
+      train_config.MutableExtension(proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::LAMBDA_MART_NDCG5);
+  utils::TestPredefinedHyperParametersRankingDataset(train_config, 2,
+                                                     absl::nullopt);
+}
+
 TEST_F(GradientBoostedTreesOnAdult, InterruptAndResumeTraining) {
   // Train a model for a few seconds, interrupt its training, and resume it.
 

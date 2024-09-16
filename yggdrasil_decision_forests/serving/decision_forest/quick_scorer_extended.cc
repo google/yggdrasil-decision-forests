@@ -968,6 +968,7 @@ absl::Status GenericToSpecializedModel(
     const model::gradient_boosted_trees::GradientBoostedTreesModel& src,
     GradientBoostedTreesRankingQuickScorerExtended* dst) {
   if (src.loss() != Loss::LAMBDA_MART_NDCG5 &&
+      src.loss() != Loss::LAMBDA_MART_NDCG &&
       src.loss() != Loss::XE_NDCG_MART) {
     return absl::InvalidArgumentError(
         "The GBDT is not trained for ranking with ranking loss.");
