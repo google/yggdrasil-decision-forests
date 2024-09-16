@@ -1007,6 +1007,29 @@ Use `model.describe()` for more details
 
     self.assertEqual(evaluation_fast, evaluation_slow)
 
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "ndcg@5",
+          "truncation": 5,
+          "expected_ndcg": 0.7204528553,
+      },
+      {
+          "testcase_name": "ndcg@2",
+          "truncation": 2,
+          "expected_ndcg": 0.6304857312,
+      },
+      {
+          "testcase_name": "ndcg@10",
+          "truncation": 10,
+          "expected_ndcg": 0.8384147895,
+      },
+  )
+  def test_evaluate_ranking_ndcg_truncation(self, truncation, expected_ndcg):
+    evaluation = self.synthetic_ranking_gbdt.evaluate(
+        self.synthetic_ranking_gbdt_test_ds, ndcg_truncation=truncation
+    )
+    self.assertAlmostEqual(evaluation.ndcg, expected_ndcg)
+
 
 if __name__ == "__main__":
   absltest.main()

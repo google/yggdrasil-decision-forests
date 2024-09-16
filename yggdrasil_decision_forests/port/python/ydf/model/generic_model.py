@@ -453,6 +453,7 @@ Use `model.describe()` for more details
       label: Optional[str] = None,
       group: Optional[str] = None,
       bootstrapping: Union[bool, int] = False,
+      ndcg_truncation: int = 5,
       evaluation_task: Optional[Task] = None,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
@@ -520,6 +521,8 @@ Use `model.describe()` for more details
         to an integer, it specifies the number of bootstrapping samples to use.
         In this case, if the number is less than 100, an error is raised as
         bootstrapping will not yield useful results.
+      ndcg_truncation: Controls at which ranking position the NDCG loss should
+        be truncated. Default to 5. Ignored for non-ranking models.
       evaluation_task: Deprecated. Use `task` instead.
       use_slow_engine: If true, uses the slow engine for making predictions. The
         slow engine of YDF is an order of magnitude slower than the other
@@ -600,6 +603,9 @@ Use `model.describe()` for more details
       options_proto = metric_pb2.EvaluationOptions(
           bootstrapping_samples=bootstrapping_samples,
           task=task._to_proto_type(),  # pylint: disable=protected-access
+          ranking=metric_pb2.EvaluationOptions.Ranking(
+              ndcg_truncation=ndcg_truncation
+          ) if task == Task.RANKING else None,
           num_threads=num_threads,
       )
 
