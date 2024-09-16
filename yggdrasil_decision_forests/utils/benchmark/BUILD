@@ -18,6 +18,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:fast_engine",
+        "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/log",

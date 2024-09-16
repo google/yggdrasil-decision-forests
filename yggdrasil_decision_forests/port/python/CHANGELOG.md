@@ -24,6 +24,7 @@
 -   Enable multi-threading when using `model.predict` and `model.evaluate`.
 -   Default number of threads of `model.analyze` is equal to the number of
     cores.
+-   Add multi-threaded results in `model.benchmark`.
 
 ### Fix
 

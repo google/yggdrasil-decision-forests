@@ -104,9 +104,11 @@ class BenchmarkInferenceCCResult:
   """
 
   duration_per_example: float
+  duration_per_example_multithread: float
   benchmark_duration: float
   num_runs: int
   batch_size: int
+  num_threads: int
 
 class GenericCCModel:
   def Predict(
@@ -158,6 +160,7 @@ class GenericCCModel:
       benchmark_duration: float,
       warmup_duration: float,
       batch_size: int,
+      num_threads: int,
   ) -> BenchmarkInferenceCCResult: ...
   def VariableImportances(
       self,

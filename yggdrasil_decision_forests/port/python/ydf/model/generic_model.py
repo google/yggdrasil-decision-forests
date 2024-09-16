@@ -242,6 +242,7 @@ Use `model.describe()` for more details
       benchmark_duration: float = 3,
       warmup_duration: float = 1,
       batch_size: int = 100,
+      num_threads: Optional[int] = None,
   ) -> ydf.BenchmarkInferenceCCResult:
     """Benchmark the inference speed of the model on the given dataset.
 
@@ -262,10 +263,16 @@ Use `model.describe()` for more details
        batch_size: Size of batches when feeding examples to the inference
          engines. The impact of this parameter on the results depends on the
          architecture running the benchmark (notably, cache sizes).
+       num_threads: Number of threads used for the multi-threaded benchmark. If
+         not specified, the number of threads is set to the number of cpu cores.
 
     Returns:
       Benchmark results.
     """
+
+    if num_threads is None:
+      num_threads = concurrency.determine_optimal_num_threads(training=False)
+
     if benchmark_duration <= 0:
       raise ValueError(
           "The duration of the benchmark must be positive, got"
@@ -288,7 +295,11 @@ Use `model.describe()` for more details
           required_columns=self.input_feature_names(),
       )
       result = self._model.Benchmark(
-          vds._dataset, benchmark_duration, warmup_duration, batch_size  # pylint: disable=protected-access
+          vds._dataset,
+          benchmark_duration,
+          warmup_duration,
+          batch_size,
+          num_threads,  # pylint: disable=protected-access
       )
     return result
 

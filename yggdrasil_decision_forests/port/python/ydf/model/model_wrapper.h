@@ -19,6 +19,7 @@
 #include <pybind11/numpy.h>
 
 #include <atomic>
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -48,17 +49,20 @@ namespace yggdrasil_decision_forests::port::python {
 // This class is a pybind-compatible alternative to
 // utils::BenchmarkInferenceResult which does not use absl::Duration objects.
 struct BenchmarkInferenceCCResult {
+  // Single thread
   double duration_per_example;
   double benchmark_duration;
   int num_runs;
-  int batch_size;
 
-  BenchmarkInferenceCCResult(const utils::BenchmarkInferenceResult& result)
-      : duration_per_example(
-            absl::ToDoubleSeconds(result.duration_per_example)),
-        benchmark_duration(absl::ToDoubleSeconds(result.benchmark_duration)),
-        num_runs(result.num_runs),
-        batch_size(result.batch_size) {}
+  // Multi-thread
+  double duration_per_example_multithread;
+  double benchmark_duration_multithread;
+  int num_runs_multithread;
+  int num_threads;
+
+  // Common
+  int batch_size;
+  size_t num_examples;
 
   std::string ToString() const;
 };
@@ -86,7 +90,7 @@ class GenericCCModel {
   // Benchmark the inference speed of the model.
   absl::StatusOr<BenchmarkInferenceCCResult> Benchmark(
       const dataset::VerticalDataset& dataset, double benchmark_duration,
-      double warmup_duration, int batch_size);
+      double warmup_duration, int batch_size, int num_threads);
 
   // Gets an engine of the model. If the engine does not exist, create it.
   // This method is not thread safe.

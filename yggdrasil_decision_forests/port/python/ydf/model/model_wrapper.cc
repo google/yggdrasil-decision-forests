@@ -31,6 +31,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
@@ -305,7 +306,7 @@ absl::StatusOr<std::string> GenericCCModel::Describe(
 // TODO: Pass utils::BenchmarkInferenceRunOptions directly.
 absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
     const dataset::VerticalDataset& dataset, const double benchmark_duration,
-    const double warmup_duration, const int batch_size) {
+    const double warmup_duration, const int batch_size, const int num_threads) {
   py::gil_scoped_release release;
   std::vector<utils::BenchmarkInferenceResult> results;
   const utils::BenchmarkInterfaceTimingOptions timing_options = {
@@ -320,18 +321,47 @@ absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
   ASSIGN_OR_RETURN(const auto engine, GetEngine());
   RETURN_IF_ERROR(
       utils::BenchmarkFastEngine(options, *engine, *model_, dataset, &results));
+
+  RETURN_IF_ERROR(utils::BenchmarkFastEngineMultiThreaded(
+      options, *engine, *model_, dataset, num_threads, &results));
+
   if (results.empty()) {
     return absl::InternalError("No benchmark results.");
   }
-  return BenchmarkInferenceCCResult(results[0]);
+
+  const auto& single_thread_result = results[0];
+  const auto& multi_thread_result = results[1];
+
+  return BenchmarkInferenceCCResult{
+      .duration_per_example =
+          absl::ToDoubleSeconds(single_thread_result.duration_per_example),
+      .benchmark_duration =
+          absl::ToDoubleSeconds(single_thread_result.duration_per_example),
+      .num_runs = single_thread_result.num_runs,
+      .duration_per_example_multithread =
+          absl::ToDoubleSeconds(multi_thread_result.duration_per_example),
+      .benchmark_duration_multithread =
+          absl::ToDoubleSeconds(multi_thread_result.duration_per_example),
+      .num_runs_multithread = multi_thread_result.num_runs,
+      .num_threads = num_threads,
+      .batch_size = single_thread_result.batch_size,
+      .num_examples = static_cast<size_t>(dataset.nrow()),
+  };
 }
 
 std::string BenchmarkInferenceCCResult::ToString() const {
   return absl::StrFormat(
-      "Inference time per example and per cpu core: %.3f us "
-      "(microseconds)\nEstimated over %d runs over %.3f seconds.\n* Measured "
-      "with the C++ serving API. Check model.to_cpp() for details.",
-      duration_per_example * 1000000, num_runs, benchmark_duration);
+      R"BLOCK(Single-thread inference time per example: %.3f us (microseconds)
+Details: %d predictions in %.3f seconds
+
+Multi-thread inference time per example: %.3f us (microseconds)
+Details: %d predictions in %.3f seconds using %d threads
+
+* Measured with the C++ serving API. See model.to_cpp().)BLOCK",
+      duration_per_example * 1000000, num_examples * num_runs,
+      benchmark_duration, duration_per_example_multithread * 1000000,
+      num_examples * num_runs_multithread, benchmark_duration_multithread,
+      num_threads);
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

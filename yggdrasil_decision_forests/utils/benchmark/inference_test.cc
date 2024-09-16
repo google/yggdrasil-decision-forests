@@ -66,6 +66,32 @@ TEST(BenchmarkInference, FastEngine) {
   EXPECT_GT(absl::ToDoubleSeconds(results[0].duration_per_example), 0);
 }
 
+TEST(BenchmarkInference, FastEngineMultiThread) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_rf"), &model));
+
+  dataset::VerticalDataset dataset;
+  EXPECT_OK(dataset::LoadVerticalDataset(
+      absl::StrCat("csv:",
+                   file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
+      model->data_spec(), &dataset));
+  const BenchmarkInterfaceNumRunsOptions num_runs_options = {
+      /*.num_runs =*/5,
+      /*.warmup_runs =*/1,
+  };
+  const BenchmarkInferenceRunOptions options{/*.batch_size =*/2,
+                                             /*.runs =*/num_runs_options,
+                                             /*.time =*/std::nullopt};
+  std::vector<BenchmarkInferenceResult> results;
+
+  ASSERT_OK_AND_ASSIGN(auto engine, model->BuildFastEngine());
+  ASSERT_OK(BenchmarkFastEngineMultiThreaded(
+      options, *engine.get(), *model, dataset, /*num_threads=*/10, &results));
+  ASSERT_THAT(results, testing::SizeIs(1));
+  EXPECT_GT(absl::ToDoubleSeconds(results[0].duration_per_example), 0);
+}
+
 TEST(BenchmarkInference, GenericEngine) {
   const BenchmarkInterfaceNumRunsOptions num_runs_options = {
       /*.num_runs =*/5,

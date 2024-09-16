@@ -76,6 +76,14 @@ absl::Status BenchmarkFastEngine(const BenchmarkInferenceRunOptions& options,
                                  std::vector<BenchmarkInferenceResult>* results,
                                  absl::string_view engine_name = "");
 
+absl::Status BenchmarkFastEngineMultiThreaded(const BenchmarkInferenceRunOptions& options,
+                                 const serving::FastEngine& engine,
+                                 const model::AbstractModel& model,
+                                 const dataset::VerticalDataset& dataset,
+                                 const int num_threads, 
+                                 std::vector<BenchmarkInferenceResult>* results,
+                                 absl::string_view engine_name = "");
+
 }  // namespace yggdrasil_decision_forests::utils
 
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_BENCHMARK_INFERENCE_H_
