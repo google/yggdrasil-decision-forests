@@ -153,7 +153,7 @@ for training (and therefore disable early-stopping). In this case, the
 `num_trees` parameter should be tuned.
 
 ```python
-learner = ydf.GradientBoostedTreesLearner(validation_set_ratio=0., ...)
+learner = ydf.GradientBoostedTreesLearner(validation_ratio=0.0, ...)
 ```
 
 **Warning:** Disabling early stopping may cause the model to overfit. To avoid
