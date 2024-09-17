@@ -111,7 +111,7 @@ class FileInputByteStream
   absl::Status Open(absl::string_view path);
   absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
   absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) override;
-  absl::Status Close();
+  absl::Status Close() override;
 
  private:
   std::ifstream file_stream_;
@@ -122,7 +122,7 @@ class FileOutputByteStream
  public:
   absl::Status Open(absl::string_view path);
   absl::Status Write(absl::string_view chunk) override;
-  absl::Status Close();
+  absl::Status Close() override;
 
  private:
   std::ofstream file_stream_;

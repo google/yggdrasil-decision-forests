@@ -18,11 +18,13 @@
 
 #include <cstddef>
 #include <memory>
-#include <string>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
+
+#define ZLIB_CONST
 #include <zlib.h>
 
 namespace yggdrasil_decision_forests::utils {
@@ -31,7 +33,7 @@ class GZipInputByteStream : public utils::InputByteStream {
  public:
   static absl::StatusOr<std::unique_ptr<GZipInputByteStream>> Create(
       std::unique_ptr<utils::InputByteStream>&& stream,
-      size_t buffer_size = 3 /*1024 * 1024*/);
+      size_t buffer_size = 1024 * 1024);
 
   GZipInputByteStream(std::unique_ptr<utils::InputByteStream>&& stream,
                       size_t buffer_size);
@@ -39,7 +41,7 @@ class GZipInputByteStream : public utils::InputByteStream {
 
   absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
   absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) override;
-  absl::Status Close();
+  absl::Status Close() override;
 
  private:
   absl::Status CloseDeflateStream();
@@ -59,7 +61,37 @@ class GZipInputByteStream : public utils::InputByteStream {
   // zlib decompression state machine.
   z_stream deflate_stream_;
   // Was "deflate_stream_" allocated?
-  bool deflate_stream_is_allocated_ = true;
+  bool deflate_stream_is_allocated_ = false;
+};
+
+class GZipOutputByteStream : public utils::OutputByteStream {
+ public:
+  static absl::StatusOr<std::unique_ptr<GZipOutputByteStream>> Create(
+      std::unique_ptr<utils::OutputByteStream>&& stream,
+      int compression_level = Z_DEFAULT_COMPRESSION,
+      size_t buffer_size = 1024 * 1024);
+
+  GZipOutputByteStream(std::unique_ptr<utils::OutputByteStream>&& stream,
+                       size_t buffer_size);
+  ~GZipOutputByteStream() override;
+
+  absl::Status Write(absl::string_view chunk) override;
+  absl::Status Close() override;
+
+ private:
+  absl::Status CloseInflateStream();
+  absl::Status WriteImpl(absl::string_view chunk, bool flush);
+
+  // Size of the compressed and uncompressed buffers.
+  size_t buffer_size_;
+  // Underlying stream of compressed data.
+  std::unique_ptr<utils::OutputByteStream> stream_;
+  // Buffer of compressed data.
+  std::vector<Bytef> output_buffer_;
+  // zlib decompression state machine.
+  z_stream deflate_stream_;
+  // Was "deflate_stream_" allocated?
+  bool deflate_stream_is_allocated_ = false;
 };
 
 }  // namespace yggdrasil_decision_forests::utils

@@ -15,13 +15,17 @@
 
 #include "yggdrasil_decision_forests/utils/zlib.h"
 
+#include <stddef.h>
+
 #include <memory>
+#include <random>
 #include <string>
 #include <utility>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -29,6 +33,7 @@
 namespace yggdrasil_decision_forests::utils {
 namespace {
 
+using ::testing::TestWithParam;
 using yggdrasil_decision_forests::test::DataRootDirectory;
 
 std::string HelloPath() {
@@ -69,6 +74,68 @@ TEST(GZip, ReadUnit) {
   EXPECT_EQ(n, 0);
 
   EXPECT_OK(stream->Close());
+}
+
+struct GZipTestCase {
+  size_t content_size;
+  size_t buffer_size;
+  int compression;
+  bool random = true;
+};
+
+using GZipTestCaseTest = TestWithParam<GZipTestCase>;
+
+INSTANTIATE_TEST_SUITE_P(
+    GZipTestCaseTestSuiteInstantiation, GZipTestCaseTest,
+    testing::ValuesIn<GZipTestCase>({{1024 * 2, 1024, 8},
+                                     {10, 1024, 8},
+                                     {10, 256, 8},
+                                     {0, 1024 * 1024, 8},
+                                     {10, 1024 * 1024, 8},
+                                     {10 * 1024 * 1024, 1024 * 1024, 8},
+                                     {10 * 1024 * 1024, 1024 * 1024, 8, false},
+                                     {10 * 1024 * 1024, 1024 * 1024, 1},
+                                     {10 * 1024 * 1024, 1024 * 1024, -1}}));
+
+TEST_P(GZipTestCaseTest, WriteAndRead) {
+  const GZipTestCase& test_case = GetParam();
+  std::uniform_int_distribution<int> dist(0, 10);
+  std::mt19937_64 rng(1);
+
+  auto tmp_dir = test::TmpDirectory();
+  auto file_path = file::JoinPath(tmp_dir, "my_file.txt.gz");
+  std::string content;
+  content.reserve(test_case.content_size);
+  if (test_case.random) {
+    for (int i = 0; i < test_case.content_size; i++) {
+      absl::StrAppend(&content, dist(rng));
+    }
+  } else {
+    for (int i = 0; i < test_case.content_size / 2; i++) {
+      absl::StrAppend(&content, "AB");
+    }
+  }
+
+  {
+    auto file_stream = file::OpenOutputFile(file_path).value();
+    auto stream = GZipOutputByteStream::Create(std::move(file_stream),
+                                               test_case.compression,
+                                               test_case.buffer_size)
+                      .value();
+    EXPECT_OK(stream->Write(content));
+    EXPECT_OK(stream->Write(content));
+    EXPECT_OK(stream->Close());
+  }
+
+  {
+    auto file_stream = file::OpenInputFile(file_path).value();
+    auto stream = GZipInputByteStream::Create(std::move(file_stream),
+                                              test_case.buffer_size)
+                      .value();
+    auto read_content = stream->ReadAll().value();
+    EXPECT_OK(stream->Close());
+    EXPECT_EQ(content + content, read_content);
+  }
 }
 
 }  // namespace
