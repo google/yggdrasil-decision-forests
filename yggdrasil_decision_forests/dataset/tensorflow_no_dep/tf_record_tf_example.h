@@ -30,11 +30,11 @@
 
 namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep {
 
+// Non-compressed TFRecord.
+
 using TFRecordV2TFExampleReader = ShardedTFRecordReader<tensorflow::Example>;
 REGISTER_AbstractTFExampleReader(TFRecordV2TFExampleReader,
                                  "FORMAT_TFE_TFRECORDV2");
-
-// Non-compressed TFRecord.
 
 class TFRecordV2TFEToExampleReaderInterface
     : public TFExampleReaderToExampleReader {
@@ -63,6 +63,11 @@ REGISTER_AbstractDataSpecCreator(TFRecordV2TFExampleReaderToDataSpecCreator,
 
 // Compressed TFRecord.
 
+using TFRecordCompressedV2TFExampleReader =
+    ShardedCompressedTFRecordReader<tensorflow::Example>;
+REGISTER_AbstractTFExampleReader(TFRecordCompressedV2TFExampleReader,
+                                 "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
+
 class TFRecordCompressedV2TFEToExampleReaderInterface
     : public TFExampleReaderToExampleReader {
  public:
@@ -89,7 +94,7 @@ REGISTER_AbstractDataSpecCreator(
     TFRecordCompressedV2TFExampleReaderToDataSpecCreator,
     "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
 
-// Write tf.Examples in TFRecords.
+// Write non-compressed  tf.Examples in TFRecords.
 class TFRecordV2TFExampleWriter
     : public ShardedTFRecordWriter<tensorflow::Example> {};
 
@@ -109,6 +114,28 @@ class TFRecordV2TFEToExampleWriterInterface
 };
 REGISTER_ExampleWriterInterface(TFRecordV2TFEToExampleWriterInterface,
                                 "FORMAT_TFE_TFRECORDV2");
+
+// Write compressed TFRecord.
+
+class TFRecordCompressedV2TFExampleWriter
+    : public ShardedCompressedTFRecordWriter<tensorflow::Example> {};
+
+REGISTER_AbstractTFExampleWriter(TFRecordCompressedV2TFExampleWriter,
+                                 "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
+
+class TFRecordCompressedV2TFEToExampleWriterInterface
+    : public TFExampleWriterToExampleWriter {
+ public:
+  TFRecordCompressedV2TFEToExampleWriterInterface(
+      const proto::DataSpecification& data_spec)
+      : TFExampleWriterToExampleWriter(data_spec) {}
+
+  std::unique_ptr<AbstractTFExampleWriter> CreateWriter() override {
+    return absl::make_unique<TFRecordCompressedV2TFExampleWriter>();
+  }
+};
+REGISTER_ExampleWriterInterface(TFRecordCompressedV2TFEToExampleWriterInterface,
+                                "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
 
 }  // namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep
 

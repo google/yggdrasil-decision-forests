@@ -16,7 +16,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_NO_DEP_TF_RECORD_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_NO_DEP_TF_RECORD_H_
 
-
 #include <memory>
 #include <string>
 #include <utility>
@@ -81,13 +80,19 @@ class ShardedTFRecordReader : public utils::ShardedReader<T> {
   DISALLOW_COPY_AND_ASSIGN(ShardedTFRecordReader);
 };
 
+template <typename T>
+class ShardedCompressedTFRecordReader : public ShardedTFRecordReader<T> {
+ public:
+  ShardedCompressedTFRecordReader() : ShardedTFRecordReader<T>(true) {};
+};
+
 // Writes a TFRecord container.
 // Currently, only supports non-compressed TFRecords.
 class TFRecordWriter {
  public:
   // Opens a TFRecord for reading.
   static absl::StatusOr<std::unique_ptr<TFRecordWriter>> Create(
-      absl::string_view path);
+      absl::string_view path, bool compressed = false);
 
   ~TFRecordWriter();
 
@@ -97,11 +102,11 @@ class TFRecordWriter {
   // Closes the stream.
   absl::Status Close();
 
-  TFRecordWriter(std::unique_ptr<file::FileOutputByteStream>&& stream)
+  TFRecordWriter(std::unique_ptr<utils::OutputByteStream>&& stream)
       : stream_(std::move(stream)) {}
 
  private:
-  std::unique_ptr<file::FileOutputByteStream> stream_;
+  std::unique_ptr<utils::OutputByteStream> stream_;
   std::string buffer_;
 };
 
@@ -109,14 +114,22 @@ class TFRecordWriter {
 template <typename T>
 class ShardedTFRecordWriter : public utils::ShardedWriter<T> {
  public:
-  ShardedTFRecordWriter() = default;
+  ShardedTFRecordWriter(bool compressed = false) : compressed_(compressed) {};
   absl::Status OpenShard(absl::string_view path) final;
   absl::Status WriteInShard(const T& value) final;
   absl::Status CloseWithStatus() final;
 
  private:
   std::unique_ptr<TFRecordWriter> writer_;
+  bool compressed_;
   DISALLOW_COPY_AND_ASSIGN(ShardedTFRecordWriter);
+};
+
+template <typename T>
+class ShardedCompressedTFRecordWriter : public ShardedTFRecordWriter<T> {
+ public:
+  ShardedCompressedTFRecordWriter() : ShardedTFRecordWriter<T>(true) {};
+  DISALLOW_COPY_AND_ASSIGN(ShardedCompressedTFRecordWriter);
 };
 
 // Template implementations
@@ -148,7 +161,7 @@ absl::Status ShardedTFRecordWriter<T>::OpenShard(absl::string_view path) {
     RETURN_IF_ERROR(writer_->Close());
     writer_.reset();
   }
-  ASSIGN_OR_RETURN(writer_, TFRecordWriter::Create(path));
+  ASSIGN_OR_RETURN(writer_, TFRecordWriter::Create(path, compressed_));
   return absl::OkStatus();
 }
 

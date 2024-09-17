@@ -132,8 +132,13 @@ absl::Status TFRecordReader::Close() {
 }
 
 absl::StatusOr<std::unique_ptr<TFRecordWriter>> TFRecordWriter::Create(
-    absl::string_view path) {
-  ASSIGN_OR_RETURN(auto stream, file::OpenOutputFile(path));
+    absl::string_view path, bool compressed) {
+  ASSIGN_OR_RETURN(std::unique_ptr<utils::OutputByteStream> stream,
+                   file::OpenOutputFile(path));
+  if (compressed) {
+    ASSIGN_OR_RETURN(stream,
+                     utils::GZipOutputByteStream::Create(std::move(stream)));
+  }
   return absl::make_unique<TFRecordWriter>(std::move(stream));
 }
 
