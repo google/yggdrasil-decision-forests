@@ -29,6 +29,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -78,13 +79,15 @@ absl::Status UpdateConditionalExpectationPlotSet(
 absl::StatusOr<PartialDependencePlotSet> ComputePartialDependencePlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs, int num_numerical_bins,
-    float example_sampling);
+    float example_sampling,
+    absl::optional<float> maximum_duration_seconds = {});
 
 absl::StatusOr<ConditionalExpectationPlotSet>
 ComputeConditionalExpectationPlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs, int num_numerical_bins,
-    float example_sampling);
+    float example_sampling,
+    absl::optional<float> maximum_duration_seconds = {});
 
 // Appends all the "num_dims"-dimensional combinations of input features.
 absl::Status AppendAttributesCombinations(

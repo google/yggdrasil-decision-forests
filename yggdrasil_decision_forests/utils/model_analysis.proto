@@ -103,6 +103,9 @@ message Options {
   // Prefix used to generate unique html element ids. If not set, use a random
   // prefix.
   optional string html_id_prefix = 18;
+
+  // Maximum duration of the analysis in seconds.
+  optional float maximum_duration_seconds = 19;
 }
 
 // Results of a model analysis.

@@ -16,7 +16,7 @@
 
 import os
 import signal
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from absl import logging
 from absl.testing import absltest
@@ -866,6 +866,19 @@ class RandomForestLearnerTest(LearnerTest):
       _ = model.predict({
           "feature": np.array([[0], [1]]),
       })
+
+  def test_analyze_ensure_maximum_duration(self):
+    # Create an analysis that would take a lot of time if not limited in time.
+    def create_dataset(n: int) -> Dict[str, np.ndarray]:
+      return {
+          "feature": np.random.uniform(size=(n, 100)),
+          "label": np.random.uniform(size=(n,)),
+      }
+
+    model = specialized_learners.RandomForestLearner(
+        label="label", task=generic_learner.Task.REGRESSION
+    ).train(create_dataset(1_000))
+    _ = model.analyze(create_dataset(100_000))
 
 
 class CARTLearnerTest(LearnerTest):

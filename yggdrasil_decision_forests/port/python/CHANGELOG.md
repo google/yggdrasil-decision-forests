@@ -9,6 +9,8 @@
     learner.
 -   Remove parameters for distributed training and resuming training from
     learners that do not support these capabilities.
+-   By default, `model.analyze` for a maximum of 20 seconds (i.e.
+    `maximum_duration=20` by default).
 
 ### Feature
 
@@ -28,6 +30,7 @@
 -   Default number of threads of `model.analyze` is equal to the number of
     cores.
 -   Add multi-threaded results in `model.benchmark`.
+-   Add argument to control the maximum duration of `model.analyze`.
 
 ### Fix
 

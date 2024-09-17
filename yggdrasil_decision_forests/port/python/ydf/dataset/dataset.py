@@ -142,14 +142,19 @@ class VerticalDataset:
       ):
         column_data = column_data.astype(np.bytes_)
       elif np.issubdtype(column_data.dtype, np.floating):
-        raise ValueError(
+        message = (
             f"Cannot import column {column.name!r} with"
             f" semantic={column.semantic} as it contains floating point values."
-            f" Got {original_column_data!r}.\nNote: If the column is a label,"
-            " make sure the correct task is selected. For example, you cannot"
-            " train a classification model (task=ydf.Task.CLASSIFICATION) with"
-            " floating point labels."
         )
+        if is_label:
+          message += (
+              "\nNote: This is a label column. Try one of the following"
+              " solutions: (1) To train a classification model, cast the label"
+              " values as integers. (2) To train a regression or a ranking"
+              " model, configure the learner with `task=ydf.Task.REGRESSION`)."
+          )
+        message += f"\nGot {original_column_data!r}."
+        raise ValueError(message)
 
       if column_data.dtype.type == np.bytes_:
         if inference_args is not None:

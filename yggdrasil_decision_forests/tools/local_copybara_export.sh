@@ -58,6 +58,10 @@ run_test() {
   set -e
 
   if [[ "$INTERACTIVE" = 1 ]]; then
+    echo "With TensorFlow build:"
+    echo "INSTALL_DEPENDENCIES=1 TF_SUPPORT="ON" COMPILERS="clang-12" CPP_VERSIONS="17" RUN_TESTS=1 ./tools/test_bazel.sh"
+    echo "Without Tensorflow build:"
+    echo "INSTALL_DEPENDENCIES=1 TF_SUPPORT="OFF" COMPILERS="clang-12" GO_PORT="0" PY_PORT="0" CPP_VERSIONS="14" ./tools/test_bazel.sh"
     CMD='$SHELL'
   else
     CMD='INSTALL_DEPENDENCIES=1 TF_SUPPORT="ON" COMPILERS="clang-12" CPP_VERSIONS="17" RUN_TESTS=1 ./tools/test_bazel.sh;$SHELL'

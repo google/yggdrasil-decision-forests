@@ -675,6 +675,7 @@ Use `model.describe()` for more details
       conditional_expectation_plot: bool = True,
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
+      maximum_duration: Optional[float] = 20,
   ) -> analysis.Analysis:
     """Analyzes a model on a test dataset.
 
@@ -724,6 +725,8 @@ Use `model.describe()` for more details
         If permutation_variable_importance_rounds=0, disables the computation of
         permutation variable importances.
       num_threads: Number of threads to use to compute the analysis.
+      maximum_duration: Maximum duration of the analysis in seconds. Note that
+        the analysis can last a little longer than this value.
 
     Returns:
       Model analysis.
@@ -739,6 +742,7 @@ Use `model.describe()` for more details
 
       options_proto = model_analysis_pb2.Options(
           num_threads=num_threads,
+          maximum_duration_seconds=maximum_duration,
           pdp=model_analysis_pb2.Options.PlotConfig(
               enabled=partial_depepence_plot,
               example_sampling=sampling,
