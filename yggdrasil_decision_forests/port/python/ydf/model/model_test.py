@@ -232,7 +232,10 @@ class GenericModelTest(parameterized.TestCase):
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
     test_df = pd.read_csv(dataset_path)
-    analysis = self.adult_binary_class_gbdt.analyze(test_df, num_bins=4)
+    # Large maximum duration reduces test flakiness.
+    analysis = self.adult_binary_class_gbdt.analyze(
+        test_df, num_bins=4, maximum_duration=60
+    )
 
     # Checked against report.
     self.assertSetEqual(
