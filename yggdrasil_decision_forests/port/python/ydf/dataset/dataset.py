@@ -18,6 +18,7 @@ import copy
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 import numpy as np
+import numpy.typing as npt
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.cc import ydf
@@ -49,6 +50,45 @@ class VerticalDataset:
       A dataspec proto.
     """
     return self._dataset.data_spec()
+
+  def _normalize_categorical_string_values(
+      self,
+      column: dataspec.Column,
+      values: npt.ArrayLike,
+      original_column_data: Any,
+  ) -> npt.NDArray[np.bytes_]:
+    """Normalizes a sequence of categorical string values into an array of bytes."""
+
+    def normalize_categorical_string_value(value: Any) -> bytes:
+      """Normalizes a categorical string value into a bytes literal."""
+      if isinstance(value, str):
+        return value.encode("utf-8")
+      if isinstance(value, (bytes, np.bytes_)):
+        return value
+      if isinstance(value, (bool, np.bool_)):
+        return b"true" if value else b"false"
+      if isinstance(value, (int, np.integer)):
+        return str(value).encode("utf-8")
+      if isinstance(value, (float, np.floating)):
+        raise ValueError(
+            f"Cannot import column {column.name!r} with"
+            f" semantic={column.semantic} as it contains floating point"
+            " values.\nNote: If the column is a label, make sure the correct"
+            " task is selected. For example, you cannot train a classification"
+            " model (task=ydf.Task.CLASSIFICATION) with floating point labels."
+        )
+      raise ValueError(
+          f"Cannot import column {column.name!r} with"
+          f" semantic={column.semantic} and"
+          f" type={_type(original_column_data)}.\nNote: If the column is a"
+          " label, the semantic was selected based on the task. For example,"
+          " task=ydf.Task.CLASSIFICATION requires a CATEGORICAL compatible"
+          " label column, and task=ydf.Task.REGRESSION requires a NUMERICAL"
+          " compatible label column."
+      )
+
+    normalized_values = [normalize_categorical_string_value(v) for v in values]
+    return np.array(normalized_values, dtype=np.bytes_)
 
   def _add_column(
       self,
@@ -114,7 +154,9 @@ class VerticalDataset:
     elif column.semantic == dataspec.Semantic.CATEGORICAL:
       force_dictionary = None
       if not isinstance(column_data, np.ndarray):
-        column_data = np.array(column_data, dtype=np.bytes_)
+        column_data = self._normalize_categorical_string_values(
+            column, column_data, original_column_data
+        )
       ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
 
       if column_data.dtype.type in [np.bool_]:
@@ -128,18 +170,12 @@ class VerticalDataset:
           and (dictionary_size := dense_integer_dictionary_size(column_data))
       ):
         column_data = column_data.astype(np.bytes_)
-        force_dictionary = [dataspec.YDF_OOD_BYTES] + [
-            str(i).encode("utf-8") for i in range(dictionary_size)
-        ]
-      elif (
-          column_data.dtype.type
-          in [
-              np.object_,
-              np.bytes_,
-              np.str_,
-          ]
-          or column_data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE
-      ):
+        force_dictionary = [dataspec.YDF_OOD_BYTES, *range(dictionary_size)]
+      elif column_data.dtype.type in [np.object_, np.str_]:
+        column_data = self._normalize_categorical_string_values(
+            column, column_data, original_column_data
+        )
+      elif column_data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE:
         column_data = column_data.astype(np.bytes_)
       elif np.issubdtype(column_data.dtype, np.floating):
         message = (
@@ -180,11 +216,39 @@ class VerticalDataset:
       ):
         raise ValueError("Categorical Set columns must be a list of lists.")
       column_data = np.empty(len(original_column_data), dtype=np.object_)
+      column_data_are_bytes = True
+      force_dictionary = None
       for i, row in enumerate(original_column_data):
-        if isinstance(row, np.ndarray):
-          column_data[i] = row.astype(np.bytes_)
-        elif isinstance(row, list):
-          column_data[i] = np.array(row, dtype=np.bytes_)
+        if isinstance(row, list):
+          column_data[i] = self._normalize_categorical_string_values(
+              column, row, original_column_data
+          )
+        elif isinstance(row, np.ndarray):
+          if row.dtype.type in [np.bool_]:
+            bool_row = row
+            column_data[i] = np.full_like(bool_row, b"false", "|S5")
+            column_data[i][bool_row] = b"true"
+            force_dictionary = [dataspec.YDF_OOD_BYTES, b"false", b"true"]
+          elif row.dtype.type in [np.object_, np.str_]:
+            column_data[i] = self._normalize_categorical_string_values(
+                column, row, original_column_data
+            )
+          elif row.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE:
+            column_data[i] = row.astype(np.bytes_)
+          elif np.issubdtype(row.dtype, np.floating):
+            raise ValueError(
+                f"Cannot import column {column.name!r} with"
+                f" semantic={column.semantic} as it contains floating point"
+                " values.\nNote: If the column is a label, make sure the"
+                " correct task is selected. For example, you cannot train a"
+                " classification model (task=ydf.Task.CLASSIFICATION) with"
+                " floating point labels."
+            )
+          elif row.dtype.type == np.bytes_:
+            column_data[i] = row
+          else:
+            column_data_are_bytes = False
+            break
         elif not row:
           column_data[i] = np.array([b""], dtype=np.bytes_)
         else:
@@ -195,16 +259,22 @@ class VerticalDataset:
           )
       ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
 
-      if inference_args is not None:
-        guide = dataspec.categorical_column_guide(column, inference_args)
-        self._dataset.PopulateColumnCategoricalSetNPBytes(
-            column.name, column_data, **guide, ydf_dtype=ydf_dtype
-        )
-      else:
-        self._dataset.PopulateColumnCategoricalSetNPBytes(
-            column.name, column_data, ydf_dtype=ydf_dtype, column_idx=column_idx
-        )
-      return
+      if column_data_are_bytes:
+        if inference_args is not None:
+          guide = dataspec.categorical_column_guide(column, inference_args)
+          if force_dictionary:
+            guide["dictionary"] = np.array(force_dictionary, dtype=np.bytes_)
+          self._dataset.PopulateColumnCategoricalSetNPBytes(
+              column.name, column_data, **guide, ydf_dtype=ydf_dtype
+          )
+        else:
+          self._dataset.PopulateColumnCategoricalSetNPBytes(
+              column.name,
+              column_data,
+              ydf_dtype=ydf_dtype,
+              column_idx=column_idx,
+          )
+        return
 
     elif column.semantic == dataspec.Semantic.HASH:
       if not isinstance(column_data, np.ndarray):

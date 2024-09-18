@@ -434,7 +434,7 @@ class JaxModelTest(parameterized.TestCase):
             "cs1": {"<OOD>": 0, "a": 1, "b": 2, "c": 3},
             "cs2": {"<OOD>": 0, "a": 1, "b": 2, "c": 3},
             "cs3": {"<OOD>": 0, "1": 1, "2": 2, "3": 3},
-            "cs4": {"<OOD>": 0, "False": 1, "True": 2},
+            "cs4": {"<OOD>": 0, "false": 1, "true": 2},
         },
     )
 

@@ -585,6 +585,64 @@ class RandomForestLearnerTest(LearnerTest):
         learner.hyperparameters.items(),
     )
 
+  def test_unicode_dataset(self):
+    data = {
+        "\u0080feature": np.array(
+            [["\u0080a", "\u0080b"], ["\u0080c", "\u0080d"]]
+        ),
+        "label": np.array([0, 1]),
+    }
+    learner = specialized_learners.RandomForestLearner(
+        label="label", min_vocab_frequency=1
+    )
+    model = learner.train(data)
+
+    expected_columns = [
+        ds_pb.Column(
+            name="\u0080feature.0_of_2",
+            type=ds_pb.ColumnType.CATEGORICAL,
+            dtype=ds_pb.DType.DTYPE_BYTES,
+            count_nas=0,
+            categorical=ds_pb.CategoricalSpec(
+                items={
+                    "<OOD>": ds_pb.CategoricalSpec.VocabValue(index=0, count=0),
+                    "\u0080a": ds_pb.CategoricalSpec.VocabValue(
+                        index=1, count=1
+                    ),
+                    "\u0080c": ds_pb.CategoricalSpec.VocabValue(
+                        index=2, count=1
+                    ),
+                },
+                number_of_unique_values=3,
+            ),
+            is_unstacked=True,
+        ),
+        ds_pb.Column(
+            name="\u0080feature.1_of_2",
+            type=ds_pb.ColumnType.CATEGORICAL,
+            dtype=ds_pb.DType.DTYPE_BYTES,
+            count_nas=0,
+            categorical=ds_pb.CategoricalSpec(
+                items={
+                    "<OOD>": ds_pb.CategoricalSpec.VocabValue(index=0, count=0),
+                    "\u0080b": ds_pb.CategoricalSpec.VocabValue(
+                        index=1, count=1
+                    ),
+                    "\u0080d": ds_pb.CategoricalSpec.VocabValue(
+                        index=2, count=1
+                    ),
+                },
+                number_of_unique_values=3,
+            ),
+            is_unstacked=True,
+        ),
+    ]
+    # Skip the first column that contains the label.
+    self.assertEqual(model.data_spec().columns[1:], expected_columns)
+
+    predictions = model.predict(data)
+    self.assertEqual(predictions.shape, (2,))
+
   def test_multidimensional_training_dataset(self):
     data = {
         "feature": np.array([[0, 1, 2, 3], [4, 5, 6, 7]]),

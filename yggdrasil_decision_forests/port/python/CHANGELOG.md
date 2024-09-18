@@ -11,6 +11,8 @@
     learners that do not support these capabilities.
 -   By default, `model.analyze` for a maximum of 20 seconds (i.e.
     `maximum_duration=20` by default).
+-   Convert boolean values in categorical sets to lowercase, matching the
+    treatment of categorical features.
 
 ### Feature
 
@@ -31,6 +33,8 @@
     cores.
 -   Add multi-threaded results in `model.benchmark`.
 -   Add argument to control the maximum duration of `model.analyze`.
+-   Add support for Unicode strings, normalize categorical set values in the
+    same way as categorical values, and validate their types.
 
 ### Fix
 

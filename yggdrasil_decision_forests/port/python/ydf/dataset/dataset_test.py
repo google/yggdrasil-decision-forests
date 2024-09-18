@@ -882,6 +882,191 @@ B,3""")
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
+  def test_numerical_float(self):
+    ds = dataset.create_vertical_dataset(
+        {"feature": np.array([1.0, 2.0, 3.0], np.float32)}
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.NUMERICAL,
+                dtype=ds_pb.DType.DTYPE_FLOAT32,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2,
+                    standard_deviation=0.8164965809277263,  # ~math.sqrt(2 / 3)
+                    min_value=1,
+                    max_value=3,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_categorical_invalid_type_float(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL as"
+        " it contains floating point values.",
+    ):
+      _ = dataset.create_vertical_dataset(
+          {"feature": np.array([1.0, 2.0, 3.0])},
+          min_vocab_frequency=1,
+          columns=[Column("feature", Semantic.CATEGORICAL)],
+      )
+
+  def test_categorical_invalid_type_none(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL",
+    ):
+      _ = dataset.create_vertical_dataset(
+          {"feature": np.array(["x", "y", None])},
+          min_vocab_frequency=1,
+          columns=[Column("feature", Semantic.CATEGORICAL)],
+      )
+
+  def test_catset_invalid_type_float(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL_SET"
+        " as it contains floating point values.",
+    ):
+      _ = dataset.create_vertical_dataset(
+          {"feature": np.array([[1.0, 2.0, 3.0]], np.object_)},
+          min_vocab_frequency=1,
+          columns=[Column("feature", Semantic.CATEGORICAL_SET)],
+      )
+
+  def test_catset_invalid_type_none(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL_SET",
+    ):
+      _ = dataset.create_vertical_dataset(
+          {"feature": np.array([["x", "y", None]], np.object_)},
+          min_vocab_frequency=1,
+          columns=[Column("feature", Semantic.CATEGORICAL_SET)],
+      )
+
+  def test_catset_string(self):
+    ds = dataset.create_vertical_dataset(
+        {"feature": np.array([["x", "y"], ["z", "w"]], np.object_)},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                dtype=ds_pb.DType.DTYPE_BYTES,
+                count_nas=0,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=5,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "w": VocabValue(index=1, count=1),
+                        "x": VocabValue(index=2, count=1),
+                        "y": VocabValue(index=3, count=1),
+                        "z": VocabValue(index=4, count=1),
+                    },
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_catset_bytes(self):
+    ds = dataset.create_vertical_dataset(
+        {"feature": np.array([[b"x", b"y"], [b"z", b"w"]], np.object_)},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                dtype=ds_pb.DType.DTYPE_BYTES,
+                count_nas=0,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=5,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "w": VocabValue(index=1, count=1),
+                        "x": VocabValue(index=2, count=1),
+                        "y": VocabValue(index=3, count=1),
+                        "z": VocabValue(index=4, count=1),
+                    },
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_catset_bool(self):
+    ds = dataset.create_vertical_dataset(
+        {"feature": np.array([[True, False], [False, True]], np.object_)},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                dtype=ds_pb.DType.DTYPE_BYTES,
+                count_nas=0,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "false": VocabValue(index=1, count=2),
+                        "true": VocabValue(index=2, count=2),
+                    },
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_catset_int(self):
+    ds = dataset.create_vertical_dataset(
+        {"feature": np.array([[0, 1, 2], [4, 5, 6]], np.object_)},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                dtype=ds_pb.DType.DTYPE_BYTES,
+                count_nas=0,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=7,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "0": VocabValue(index=1, count=1),
+                        "1": VocabValue(index=2, count=1),
+                        "2": VocabValue(index=3, count=1),
+                        "4": VocabValue(index=4, count=1),
+                        "5": VocabValue(index=5, count=1),
+                        "6": VocabValue(index=6, count=1),
+                    },
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
   def test_multidimensional_numerical(self):
     ds = dataset.create_vertical_dataset(
         {"feature": np.array([[0, 1, 2], [4, 5, 6]])}
@@ -1627,6 +1812,59 @@ foo, bar, sentence, second
                         "two": VocabValue(index=5, count=1),
                     },
                     number_of_unique_values=6,
+                ),
+                count_nas=0,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_pd_with_unicode_feature_name(self):
+    df = pd.DataFrame({"\u0080": [1, 2, 3]})
+    ds = dataset.create_vertical_dataset(
+        df,
+        min_vocab_frequency=1,
+        columns=[("\u0080", Semantic.NUMERICAL)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="\u0080",
+                type=ds_pb.ColumnType.NUMERICAL,
+                dtype=ds_pb.DType.DTYPE_INT64,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2,
+                    standard_deviation=0.8164965809277263,  # ~math.sqrt(2 / 3)
+                    min_value=1,
+                    max_value=3,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_pd_with_unicode_values(self):
+    df = pd.DataFrame({"feature": [["\u0080"]]})
+    ds = dataset.create_vertical_dataset(
+        df,
+        min_vocab_frequency=1,
+        columns=[("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=1,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                dtype=ds_pb.DType.DTYPE_BYTES,
+                categorical=ds_pb.CategoricalSpec(
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "\u0080": VocabValue(index=1, count=1),
+                    },
+                    number_of_unique_values=2,
                 ),
                 count_nas=0,
             ),
