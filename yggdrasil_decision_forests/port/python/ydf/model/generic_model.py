@@ -416,9 +416,10 @@ Use `model.describe()` for more details
     ```
 
     Args:
-      data: Dataset. Can be a dictionary of list or numpy array of values,
-        Pandas DataFrame, or a VerticalDataset. If the dataset contains the
-        label column, that column is ignored.
+      data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
+        (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
+        PyGrain DataLoader and Dataset, dictionary of string to NumPy array or
+        lists. If the dataset contains the label column, that column is ignored.
       use_slow_engine: If true, uses the slow engine for making predictions. The
         slow engine of YDF is an order of magnitude slower than the other
         prediction engines. There exist very rare edge cases where predictions
@@ -503,8 +504,10 @@ Use `model.describe()` for more details
     ```
 
     Args:
-      data: Dataset. Can be a dictionary of list or numpy array of values,
-        Pandas DataFrame, or a VerticalDataset.
+      data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
+        (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
+        PyGrain DataLoader and Dataset, dictionary of string to NumPy array or
+        lists.
       weighted: If true, the evaluation is weighted according to the training
         weights. If false, the evaluation is non-weighted. b/351279797: Change
         default to weights=True.
@@ -650,8 +653,10 @@ Use `model.describe()` for more details
     ```
 
     Args:
-      single_example: Example to explain. Can be a dictionary of lists or numpy
-        arrays of values, Pandas DataFrame, or a VerticalDataset.
+      single_example: Example to explain. Supported formats: VerticalDataset,
+        (typed) path, list of (typed) paths, Pandas DataFrame, Xarray Dataset,
+        TensorFlow Dataset, PyGrain DataLoader and Dataset, dictionary of string
+        to NumPy array or lists.
 
     Returns:
       Prediction explanation.
@@ -707,8 +712,10 @@ Use `model.describe()` for more details
     ```
 
     Args:
-      data: Dataset. Can be a dictionary of list or numpy array of values,
-        Pandas DataFrame, or a VerticalDataset.
+      data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
+        (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
+        PyGrain DataLoader and Dataset, dictionary of string to NumPy array or
+        lists.
       sampling: Ratio of examples to use for the analysis. The analysis can be
         expensive to compute. On large datasets, use a small sampling value e.g.
         0.01.

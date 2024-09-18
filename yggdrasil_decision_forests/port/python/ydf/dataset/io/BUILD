@@ -25,6 +25,7 @@ py_library(
     deps = [
         ":dataset_io_types",
         ":pandas_io",
+        ":pygrain_io",
         ":tensorflow_io",
         ":xarray_io",
         # numpy dep,
@@ -57,6 +58,16 @@ py_library(
     deps = [":dataset_io_types"],
 )
 
+py_library(
+    name = "pygrain_io",
+    srcs = ["pygrain_io.py"],
+    deps = [
+        ":dataset_io_types",
+        # absl/logging dep,
+        # numpy dep,
+    ],
+)
+
 # Tests
 # =====
 
@@ -81,6 +92,20 @@ py_test(
         # numpy dep,
         # pandas dep,
         # xarray dep,
+    ],
+)
+
+py_test(
+    name = "pygrain_io_test",
+    srcs = ["pygrain_io_test.py"],
+    deps = [
+        ":dataset_io_types",
+        ":pygrain_io",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # grain:python dep,
+        # jax dep,  # buildcleaner: keep
+        # numpy dep,
     ],
 )
 

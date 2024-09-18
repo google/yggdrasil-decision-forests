@@ -35,6 +35,8 @@
 -   Add argument to control the maximum duration of `model.analyze`.
 -   Add support for Unicode strings, normalize categorical set values in the
     same way as categorical values, and validate their types.
+-   Native support for PyGrain DataLoader and Dataset for all operations (e.g.,
+    training, evaluation, predictions).
 
 ### Fix
 
