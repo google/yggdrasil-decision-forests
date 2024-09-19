@@ -34,6 +34,7 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -104,11 +105,11 @@ absl::Status CrossEntropyNDCGLoss::UpdateGradients(
     params.resize(group_size);
 
     switch (gbt_config_.xe_ndcg().gamma()) {
-      case proto::GradientBoostedTreesTrainingConfig::XeNdcg::ONE:
+      case proto::LossConfiguration::XeNdcg::ONE:
         std::fill(params.begin(), params.end(), 1.f);
         break;
-      case proto::GradientBoostedTreesTrainingConfig::XeNdcg::AUTO:
-      case proto::GradientBoostedTreesTrainingConfig::XeNdcg::UNIFORM:
+      case proto::LossConfiguration::XeNdcg::AUTO:
+      case proto::LossConfiguration::XeNdcg::UNIFORM:
         for (int item_idx = 0; item_idx < group_size; item_idx++) {
           params[item_idx] = distribution(*random);
         }

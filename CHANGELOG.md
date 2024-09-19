@@ -12,6 +12,12 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
     but can still be used.
 -   Allow configuring the truncation of NDCG losses.
 
+### Misc
+
+-   Loss options are now defined 
+    model/gradient_boosted_trees/gradient_boosted_trees.proto (previously
+    learner/gradient_boosted_trees/gradient_boosted_trees.proto)
+
 ## 1.10.0 - 2024-08-21
 
 ### Features
