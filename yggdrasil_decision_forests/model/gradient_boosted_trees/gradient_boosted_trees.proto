@@ -45,6 +45,8 @@ message Header {
   // If true, call to predict methods return logits (e.g. instead of probability
   // in the case of classification).
   optional bool output_logits = 9 [default = false];
+  // Configuration options for losses.
+  optional LossConfiguration loss_configuration = 10;
 }
 
 enum Loss {
@@ -184,5 +186,10 @@ message LossConfiguration {
     // Corresponds to the 'alpha' parameter in
     // https://arxiv.org/pdf/1708.02002.pdf
     optional float positive_sample_coefficient = 2 [default = 0.5];
+  }
+  oneof loss_options {
+    LambdaMartNdcg lambda_mart_ndcg = 1;
+    XeNdcg xe_ndcg = 2;
+    BinaryFocalLossOptions binary_focal_loss_options = 3;
   }
 }

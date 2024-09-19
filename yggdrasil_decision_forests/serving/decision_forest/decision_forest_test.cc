@@ -537,8 +537,10 @@ TEST(SpecializedGradientBoostedTreesTest, MoreThan65kNodesPerTrees) {
 
   model.set_task(model::proto::Task::CLASSIFICATION);
   model.set_label_col_idx(1);
+  model::gradient_boosted_trees::proto::LossConfiguration loss_config;
   model.set_loss(
-      model::gradient_boosted_trees::proto::Loss::BINOMIAL_LOG_LIKELIHOOD);
+      model::gradient_boosted_trees::proto::Loss::BINOMIAL_LOG_LIKELIHOOD,
+      loss_config);
   model.set_initial_predictions({0});
   model.mutable_input_features()->push_back(0);
 
@@ -567,7 +569,9 @@ std::unique_ptr<GradientBoostedTreesModel> BuildNonGlobalImputationGBT() {
   model->set_task(model::proto::Task::REGRESSION);
   model->set_label_col_idx(0);
   model->set_data_spec(dataspec);
-  model->set_loss(model::gradient_boosted_trees::proto::Loss::SQUARED_ERROR);
+  model::gradient_boosted_trees::proto::LossConfiguration loss_config;
+  model->set_loss(model::gradient_boosted_trees::proto::Loss::SQUARED_ERROR,
+                  loss_config);
   model->mutable_initial_predictions()->push_back(0);
   model->mutable_input_features()->push_back(1);
   model->mutable_input_features()->push_back(2);
@@ -700,7 +704,9 @@ std::unique_ptr<GradientBoostedTreesModel> BuildNAConditionGBT() {
   model->set_task(model::proto::Task::REGRESSION);
   model->set_label_col_idx(0);
   model->set_data_spec(dataspec);
-  model->set_loss(model::gradient_boosted_trees::proto::Loss::SQUARED_ERROR);
+  model::gradient_boosted_trees::proto::LossConfiguration loss_config;
+  model->set_loss(model::gradient_boosted_trees::proto::Loss::SQUARED_ERROR,
+                  loss_config);
   model->mutable_initial_predictions()->push_back(0);
   model->mutable_input_features()->push_back(1);
 

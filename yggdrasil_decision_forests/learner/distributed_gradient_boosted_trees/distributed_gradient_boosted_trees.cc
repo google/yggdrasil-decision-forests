@@ -822,7 +822,9 @@ InitializeModel(
   auto model =
       absl::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
   model->set_data_spec(data_spec);
-  model->set_loss(spe_config.gbt().loss());
+  model->set_loss(spe_config.gbt().loss(),
+                  gradient_boosted_trees::GradientBoostedTreesLearner::
+                      BuildLossConfiguration(spe_config.gbt()));
   InitializeModelWithAbstractTrainingConfig(config, config_link, model.get());
 
   const auto secondary_metric_names = loss.SecondaryMetricNames();

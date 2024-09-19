@@ -1018,7 +1018,9 @@ absl::Status DistributedGradientBoostedTreesWorker::EndIterEvaluationWorker(
   partial_model->set_data_spec(welcome_.dataspec());
   const auto& spe_config = welcome_.train_config().GetExtension(
       proto::distributed_gradient_boosted_trees_config);
-  partial_model->set_loss(spe_config.gbt().loss());
+  partial_model->set_loss(spe_config.gbt().loss(),
+                          gradient_boosted_trees::GradientBoostedTreesLearner::
+                              BuildLossConfiguration(spe_config.gbt()));
 
   // The model is used to accumulate pre-activation predictions.
   partial_model->set_output_logits(true);

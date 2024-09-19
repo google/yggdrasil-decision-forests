@@ -133,7 +133,8 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamFocalLossGamma[] = "focal_loss_gamma";
   static constexpr char kHParamFocalLossAlpha[] = "focal_loss_alpha";
   static constexpr char kHParamNDCGTruncation[] = "ndcg_truncation";
-  static constexpr char kHParamXENDCGTruncation[] = "cross_entropy_ndcg_truncation";
+  static constexpr char kHParamXENDCGTruncation[] =
+      "cross_entropy_ndcg_truncation";
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
@@ -152,6 +153,9 @@ class GradientBoostedTreesLearner : public AbstractLearner {
       const model::proto::TrainingConfigLinking& config_link,
       const proto::GradientBoostedTreesTrainingConfig& gbt_config,
       const model::proto::DeploymentConfig& deployment);
+
+  static proto::LossConfiguration BuildLossConfiguration(
+      const proto::GradientBoostedTreesTrainingConfig& gbt_config);
 
   absl::Status SetHyperParametersImpl(
       utils::GenericHyperParameterConsumer* generic_hyper_params) override;

@@ -107,7 +107,8 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
   model->set_task(task);
   model->set_label_col_idx(0);
   model->set_data_spec(dataspec);
-  model->set_loss(Loss::SQUARED_ERROR);
+  model::gradient_boosted_trees::proto::LossConfiguration loss_config;
+  model->set_loss(Loss::SQUARED_ERROR, loss_config);
   model->mutable_initial_predictions()->push_back(duplicate_factor);
 
   for (int duplication_idx = 0; duplication_idx < duplicate_factor;

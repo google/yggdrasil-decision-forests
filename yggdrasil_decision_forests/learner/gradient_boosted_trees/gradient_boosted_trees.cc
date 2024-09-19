@@ -524,6 +524,27 @@ absl::Status GradientBoostedTreesLearner::CheckConfiguration(
   return absl::OkStatus();
 }
 
+proto::LossConfiguration GradientBoostedTreesLearner::BuildLossConfiguration(
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config) {
+  proto::LossConfiguration loss_config;
+  switch (gbt_config.loss_options_case()) {
+    case proto::GradientBoostedTreesTrainingConfig::kBinaryFocalLossOptions:
+      loss_config.mutable_binary_focal_loss_options()->CopyFrom(
+          gbt_config.binary_focal_loss_options());
+      break;
+    case proto::GradientBoostedTreesTrainingConfig::kLambdaMartNdcg:
+      loss_config.mutable_lambda_mart_ndcg()->CopyFrom(
+          gbt_config.lambda_mart_ndcg());
+      break;
+    case proto::GradientBoostedTreesTrainingConfig::kXeNdcg:
+      loss_config.mutable_xe_ndcg()->CopyFrom(gbt_config.xe_ndcg());
+      break;
+    case proto::GradientBoostedTreesTrainingConfig::LOSS_OPTIONS_NOT_SET:
+      break;
+  }
+  return loss_config;
+}
+
 absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
     const dataset::proto::DataSpecification& data_spec,
     internal::AllTrainingConfiguration* all_config) const {
@@ -604,7 +625,8 @@ GradientBoostedTreesLearner::InitializeModel(
   mdl->set_data_spec(data_spec);
   internal::InitializeModelWithTrainingConfig(
       config.train_config, config.train_config_link, mdl.get());
-  mdl->set_loss(config.gbt_config->loss());
+  mdl->set_loss(config.gbt_config->loss(),
+                BuildLossConfiguration(*config.gbt_config));
   const auto secondary_metric_names = config.loss->SecondaryMetricNames();
   *mdl->training_logs_.mutable_secondary_metric_names() = {
       secondary_metric_names.begin(), secondary_metric_names.end()};
