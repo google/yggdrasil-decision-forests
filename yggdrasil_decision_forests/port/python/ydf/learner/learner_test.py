@@ -1063,6 +1063,41 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     self.assertGreaterEqual(evaluation.ndcg, 0.70)
     self.assertLessEqual(evaluation.ndcg, 0.74)
 
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "ndcg@2",
+          "truncation": 2,
+          "expected_ndcg": 0.723,
+          "delta": 0.025,
+      },
+      {
+          "testcase_name": "ndcg@5",
+          "truncation": 5,
+          "expected_ndcg": 0.716,
+          "delta": 0.024,
+      },
+      {
+          "testcase_name": "ndcg@10",
+          "truncation": 10,
+          "expected_ndcg": 0.716,
+          "delta": 0.03,
+      },
+  )
+  def test_ranking_ndcg_truncation(self, truncation, expected_ndcg, delta):
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="LABEL",
+        ranking_group="GROUP",
+        task=generic_learner.Task.RANKING,
+        ndcg_truncation=truncation,
+    )
+
+    model = learner.train(self.synthetic_ranking.train_path)
+
+    evaluation = model.evaluate(
+        self.synthetic_ranking.test_pd, ndcg_truncation=5
+    )
+    self.assertAlmostEqual(evaluation.ndcg, expected_ndcg, delta=delta)
+
   def test_adult_sparse_oblique(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
         label="income",

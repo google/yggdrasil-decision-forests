@@ -233,7 +233,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
   // Perfectly wrong predictions.
   std::vector<float> predictions = {2., 2., 1., 1.};
   proto::GradientBoostedTreesTrainingConfig gbt_config;
-  gbt_config.mutable_ndcg_loss_options()->set_ndcg_truncation(1);
+  gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(1);
   const NDCGLoss loss_imp(gbt_config, model::proto::Task::RANKING,
                           dataset.data_spec().columns(0));
   RankingGroupsIndices index;
@@ -319,7 +319,7 @@ TEST(NDCGLossTest, SecondaryMetricName) {
 TEST(NDCGLossTest, SecondaryMetricNameTrucation10) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   proto::GradientBoostedTreesTrainingConfig gbt_config;
-  gbt_config.mutable_ndcg_loss_options()->set_ndcg_truncation(10);
+  gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(10);
   const auto loss_imp = NDCGLoss(gbt_config, model::proto::Task::RANKING,
                                  dataset.data_spec().columns(0));
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("NDCG@10"));
@@ -328,7 +328,7 @@ TEST(NDCGLossTest, SecondaryMetricNameTrucation10) {
 TEST(NDCGLossTest, InvalidTruncation) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   proto::GradientBoostedTreesTrainingConfig gbt_config;
-  gbt_config.mutable_ndcg_loss_options()->set_ndcg_truncation(0);
+  gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(0);
   const auto loss_imp = NDCGLoss(gbt_config, model::proto::Task::RANKING,
                                  dataset.data_spec().columns(0));
   EXPECT_EQ(loss_imp.Status().code(), absl::StatusCode::kInvalidArgument);

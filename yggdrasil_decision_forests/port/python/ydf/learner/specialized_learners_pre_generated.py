@@ -1119,9 +1119,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       variable importance of the model at the end of the training using the
       validation dataset. Enabling this feature can increase the training time
       significantly. Default: False.
-    cross_entropy_ndcg_truncation: Truncation of the cross-entropy NDCG loss.
-      Only used with cross-entropy NDCG loss i.e. `loss="XE_NDCG_MART"`
-      Default: 5.
+    cross_entropy_ndcg_truncation: Truncation of the cross-entropy NDCG loss
+      (default 5). Only used with cross-entropy NDCG loss i.e.
+      `loss="XE_NDCG_MART"` Default: None.
     dart_dropout: Dropout rate applied when using the DART i.e. when
       forest_extraction=DART. Default: None.
     early_stopping: Early stopping detects the overfitting of the model and
@@ -1140,14 +1140,14 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       Default: 10.
     early_stopping_num_trees_look_ahead: Rolling number of trees used to detect
       validation loss increase and trigger early stopping. Default: 30.
-    focal_loss_alpha: EXPERIMENTAL. Weighting parameter for focal loss, positive
-      samples weighted by alpha, negative samples by (1-alpha). The default 0.5
-      value means no active class-level weighting. Only used with focal loss
-      i.e. `loss="BINARY_FOCAL_LOSS"` Default: 0.5.
-    focal_loss_gamma: EXPERIMENTAL. Exponent of the misprediction exponent term
-      in focal loss, corresponds to gamma parameter in
+    focal_loss_alpha: EXPERIMENTAL, default 0.5. Weighting parameter for focal
+      loss, positive samples weighted by alpha, negative samples by (1-alpha).
+      The default 0.5 value means no active class-level weighting. Only used
+      with focal loss i.e. `loss="BINARY_FOCAL_LOSS"` Default: None.
+    focal_loss_gamma: EXPERIMENTAL, default 2.0. Exponent of the misprediction
+      exponent term in focal loss, corresponds to gamma parameter in
       https://arxiv.org/pdf/1708.02002.pdf. Only used with focal loss i.e.
-        `loss="BINARY_FOCAL_LOSS"` Default: 2.0.
+        `loss="BINARY_FOCAL_LOSS"` Default: None.
     forest_extraction: How to construct the forest: - MART: For Multiple
       Additive Regression Trees. The "classical" way to build a GBDT i.e. each
       tree tries to "correct" the mistakes of the previous trees. - DART: For
@@ -1265,8 +1265,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       et al. in "Random Survival Forests"
       (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
         Default: "GLOBAL_IMPUTATION".
-    ndcg_truncation: Truncation of the NDCG loss. Only used with NDCG loss i.e.
-      `loss="LAMBDA_MART_NDCG"` Default: 5.
+    ndcg_truncation: Truncation of the NDCG loss (default 5). Only used with
+      NDCG loss i.e. `loss="LAMBDA_MART_NDCG". ` Default: None.
     num_candidate_attributes: Number of unique valid attributes tested for each
       node. An attribute is valid if it has at least a valid split. If
       `num_candidate_attributes=0`, the value is set to the classical default
@@ -1458,13 +1458,13 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       categorical_set_split_max_num_items: int = -1,
       categorical_set_split_min_item_frequency: int = 1,
       compute_permutation_variable_importance: bool = False,
-      cross_entropy_ndcg_truncation: int = 5,
+      cross_entropy_ndcg_truncation: Optional[int] = None,
       dart_dropout: Optional[float] = None,
       early_stopping: str = "LOSS_INCREASE",
       early_stopping_initial_iteration: int = 10,
       early_stopping_num_trees_look_ahead: int = 30,
-      focal_loss_alpha: float = 0.5,
-      focal_loss_gamma: float = 2.0,
+      focal_loss_alpha: Optional[float] = None,
+      focal_loss_gamma: Optional[float] = None,
       forest_extraction: str = "MART",
       goss_alpha: float = 0.2,
       goss_beta: float = 0.1,
@@ -1487,7 +1487,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       mhld_oblique_sample_attributes: Optional[bool] = None,
       min_examples: int = 5,
       missing_value_policy: str = "GLOBAL_IMPUTATION",
-      ndcg_truncation: int = 5,
+      ndcg_truncation: Optional[int] = None,
       num_candidate_attributes: Optional[int] = -1,
       num_candidate_attributes_ratio: Optional[float] = None,
       num_trees: int = 300,

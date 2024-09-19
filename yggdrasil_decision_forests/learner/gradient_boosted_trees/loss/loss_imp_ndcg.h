@@ -50,7 +50,7 @@ class NDCGLoss : public AbstractLoss {
   NDCGLoss(const proto::GradientBoostedTreesTrainingConfig& gbt_config,
            model::proto::Task task, const dataset::proto::Column& label_column)
       : AbstractLoss(gbt_config, task, label_column),
-        ndcg_truncation_(gbt_config.ndcg_loss_options().ndcg_truncation()) {}
+        ndcg_truncation_(gbt_config.lambda_mart_ndcg().ndcg_truncation()) {}
 
   absl::Status Status() const override;
 
