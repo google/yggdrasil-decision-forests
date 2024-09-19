@@ -145,9 +145,36 @@ absl::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
       case proto::CacheMetadata_Column::kBoolean:
         return absl::InvalidArgumentError("Boolean label not supported.");
 
+      case proto::CacheMetadata_Column::kHash:
+        return absl::InvalidArgumentError("Hash label not supported.");
+
       case proto::CacheMetadata_Column::TYPE_NOT_SET:
         return absl::InvalidArgumentError("Label type not set");
     }
+  }
+
+  if (cache->meta_data_.has_group_column_idx()) {
+    LOG(INFO) << "Loading hash group in memory";
+    const auto group_column_idx = cache->meta_data_.group_column_idx();
+    const auto& group_column_metadata =
+        cache->meta_data_.columns(group_column_idx);
+    if (group_column_metadata.type_case() !=
+        proto::CacheMetadata_Column::kHash) {
+      return absl::InvalidArgumentError("Group column must be of type HASH.");
+    }
+
+    std::vector<RankingGroupType> data;
+    data.reserve(cache->meta_data_.num_examples());
+    RETURN_IF_ERROR(ShardedIntegerColumnReader<RankingGroupType>::ReadAndAppend(
+        file::JoinPath(path, kFilenameRaw,
+                       absl::StrCat(kFilenameColumn, group_column_idx),
+                       kFilenameShardNoUnderscore),
+        /*max_value=*/
+        kMaxValueHashType,
+        /*begin_shard_idx=*/0,
+        /*end_shard_idx=*/
+        cache->meta_data_.num_shards_in_feature_cache(), &data));
+    cache->ranking_groups_.own(std::move(data));
   }
 
   if (options.load_cache_in_memory()) {
@@ -157,6 +184,14 @@ absl::StatusOr<std::unique_ptr<DatasetCacheReader>> DatasetCacheReader::Create(
   LOG(INFO) << "Dataset cache meta-data:\n" << cache->MetadataInformation();
   LOG(INFO) << "Dataset cache reader created in " << absl::Now() - begin;
   return cache;
+}
+
+absl::Status DatasetCacheReader::release_ranking_groups() {
+  if (ranking_groups_.empty()) {
+    return absl::InvalidArgumentError("Ranking groups are not available");
+  }
+  ranking_groups_.release();
+  return absl::OkStatus();
 }
 
 absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
@@ -388,6 +423,12 @@ absl::Status DatasetCacheReader::UnloadInMemoryCacheColumn(
       in_memory_cache_.inorder_boolean_columns_[column_idx].reset();
       break;
 
+    case proto::CacheMetadata_Column::kHash:
+      STATUS_CHECK(in_memory_cache_.inorder_hash_columns_[column_idx] !=
+                   nullptr);
+      in_memory_cache_.inorder_hash_columns_[column_idx].reset();
+      break;
+
     case proto::CacheMetadata_Column::TYPE_NOT_SET:
       break;
   }
@@ -522,6 +563,23 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
       *memory_usage += dst->MemoryUsage();
     } break;
 
+    case proto::CacheMetadata_Column::kHash: {
+      auto& dst = in_memory_cache_.inorder_hash_columns_[column_idx];
+      STATUS_CHECK(dst == nullptr);
+
+      dst = absl::make_unique<InMemoryIntegerColumnReaderFactory<HashType>>();
+      RETURN_IF_ERROR(
+          dst->Load(file::JoinPath(path_, kFilenameRaw,
+                                   absl::StrCat(kFilenameColumn, column_idx),
+                                   kFilenameShardNoUnderscore),
+                    /*max_value=*/kMaxValueHashType,
+                    /*max_num_values=*/options_.reading_buffer(),
+                    /*begin_shard_idx=*/0,
+                    /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache(),
+                    /*reserve=*/meta_data_.num_examples()));
+      *memory_usage += dst->MemoryUsage();
+    } break;
+
     case proto::CacheMetadata_Column::TYPE_NOT_SET:
       break;
   }
@@ -541,6 +599,7 @@ absl::Status DatasetCacheReader::InitializeAndLoadInMemoryCache() {
   in_memory_cache_.inorder_discretized_numerical_columns_.resize(num_columns);
   in_memory_cache_.boundaries_of_discretized_numerical_columns_.resize(
       num_columns);
+  in_memory_cache_.inorder_hash_columns_.resize(num_columns);
 
   const auto begin = absl::Now();
   std::atomic<size_t> memory_usage{0};
@@ -592,6 +651,14 @@ DatasetCacheReader::categorical_labels() const {
 absl::Span<const RegressionLabelType> DatasetCacheReader::regression_labels()
     const {
   return regression_labels_.values();
+}
+
+absl::Span<const RankingLabelType> DatasetCacheReader::ranking_labels() const {
+  return regression_labels_.values();
+}
+
+absl::Span<const RankingGroupType> DatasetCacheReader::ranking_groups() const {
+  return ranking_groups_.values();
 }
 
 const std::vector<float>& DatasetCacheReader::weights() const {
@@ -716,6 +783,34 @@ DatasetCacheReader::InOrderCategoricalFeatureValueIterator(
       /*max_num_values=*/options_.reading_buffer(),
       /*begin_shard_idx=*/0,
       /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache()));
+  return reader;
+}
+
+absl::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<HashType>>>
+DatasetCacheReader::InOrderHashFeatureValueIterator(int column_idx) const {
+  if (!meta_data().columns(column_idx).has_hash()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Column ", column_idx, " is not hash"));
+  }
+
+  if (options_.load_cache_in_memory()) {
+    if (in_memory_cache_.inorder_hash_columns_[column_idx] == nullptr) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Column ", column_idx, " is not available"));
+    }
+
+    return in_memory_cache_.inorder_hash_columns_[column_idx]->CreateIterator();
+  }
+
+  auto reader = absl::make_unique<ShardedIntegerColumnReader<HashType>>();
+  RETURN_IF_ERROR(
+      reader->Open(file::JoinPath(path_, kFilenameRaw,
+                                  absl::StrCat(kFilenameColumn, column_idx),
+                                  kFilenameShardNoUnderscore),
+                   /*max_value=*/kMaxValueHashType,
+                   /*max_num_values=*/options_.reading_buffer(),
+                   /*begin_shard_idx=*/0,
+                   /*end_shard_idx=*/meta_data_.num_shards_in_feature_cache()));
   return reader;
 }
 
@@ -1020,5 +1115,4 @@ absl::StatusOr<int64_t> PartialDatasetCacheDataSpecCreator::CountExamples(
 }
 
 }  // namespace dataset
-
 }  // namespace yggdrasil_decision_forests

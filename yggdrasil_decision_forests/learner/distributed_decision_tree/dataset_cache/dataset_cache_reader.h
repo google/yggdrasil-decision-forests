@@ -79,8 +79,12 @@ class DatasetCacheReader {
   // Classification labels. Empty if there is not classification labels.
   absl::Span<const ClassificationLabelType> categorical_labels() const;
 
-  // Regression labels. Empty if there is not regression labels.
+  // Regression or ranking labels. Empty otherwise.
   absl::Span<const RegressionLabelType> regression_labels() const;
+
+  // Ranking labels and groups. Empty if there is no ranking label.
+  absl::Span<const RankingLabelType> ranking_labels() const;
+  absl::Span<const RankingGroupType> ranking_groups() const;
 
   // Trainings weights. Empty if the training examples are not weighted.
   const std::vector<float>& weights() const;
@@ -102,6 +106,11 @@ class DatasetCacheReader {
   // index.
   absl::StatusOr<std::unique_ptr<AbstractFloatColumnIterator>>
   InOrderNumericalFeatureValueIterator(int column_idx) const;
+
+  // Iterator over the "column_idx"-th hash column ordered by example
+  // index.
+  absl::StatusOr<std::unique_ptr<AbstractIntegerColumnIterator<HashType>>>
+  InOrderHashFeatureValueIterator(int column_idx) const;
 
   // Iterator over the "column_idx"-th categorical column ordered by example
   // index.
@@ -202,6 +211,10 @@ class DatasetCacheReader {
     return load_in_memory_duration_;
   }
 
+  // Releases the ranking group memory. Fails if the ranking group is not
+  // available.
+  absl::Status release_ranking_groups();
+
  private:
   DatasetCacheReader(absl::string_view path,
                      const proto::DatasetCacheReaderOptions& options)
@@ -237,9 +250,13 @@ class DatasetCacheReader {
   // classification label.
   utils::VectorOwnOrBorrow<ClassificationLabelType> classification_labels_;
 
-  // Regression label values. Empty if the dataset does not have a
+  // Regression or ranking label values. Empty if the dataset does not have a
   // regression label.
   utils::VectorOwnOrBorrow<RegressionLabelType> regression_labels_;
+
+  // Ranking label values. Empty if the dataset does not have a
+  // ranking label.
+  utils::VectorOwnOrBorrow<RankingGroupType> ranking_groups_;
 
   // List of the features available for reading. Sorted in increasing order.
   std::vector<int> features_;
@@ -289,6 +306,10 @@ class DatasetCacheReader {
     std::vector<
         std::unique_ptr<InMemoryIntegerColumnReaderFactory<BooleanType>>>
         inorder_boolean_columns_;
+
+    // Hash
+    std::vector<std::unique_ptr<InMemoryIntegerColumnReaderFactory<HashType>>>
+        inorder_hash_columns_;
   } in_memory_cache_;
 };
 

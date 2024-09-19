@@ -288,6 +288,7 @@ py_test(
     python_version = "PY3",
     shard_count = 10,
     deps = [
+        ":generic_learner",
         ":specialized_learners",
         ":tuner",
         ":worker",

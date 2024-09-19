@@ -71,6 +71,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_interface",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
+        "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:fast_engine",
         "//yggdrasil_decision_forests/utils:bitmap",
         "//yggdrasil_decision_forests/utils:compatibility",

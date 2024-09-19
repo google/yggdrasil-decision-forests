@@ -544,6 +544,51 @@ TEST(DISABLED_LargeDataset, Base) {
   LOG(INFO) << model->DescriptionAndStatistics(true);
 }
 
+class DatasetSyntheticRanking : public utils::TrainAndTestTester {
+  void SetUp() override {
+    auto* hash_column = guide_.add_column_guides();
+    hash_column->set_column_name_pattern("^GROUP$");
+    hash_column->set_type(dataset::proto::ColumnType::HASH);
+
+    train_config_ = PARSE_TEST_PROTO(R"pb(
+      learner: "DISTRIBUTED_GRADIENT_BOOSTED_TREES"
+      task: RANKING
+      label: "LABEL"
+      ranking_group: "GROUP"
+      [yggdrasil_decision_forests.model.distributed_gradient_boosted_trees.proto
+           .distributed_gradient_boosted_trees_config] { worker_logs: false }
+    )pb");
+
+    deployment_config_ = PARSE_TEST_PROTO(R"pb(
+      distribute {
+        implementation_key: "MULTI_THREAD"
+        [yggdrasil_decision_forests.distribute.proto.multi_thread] {
+          num_workers: 5
+        }
+      }
+    )pb");
+
+    dataset_filename_ = "synthetic_ranking_train.csv";
+    dataset_test_filename_ = "synthetic_ranking_test.csv";
+    pass_validation_dataset_ = true;
+    preferred_format_type = "csv";
+    pass_training_dataset_as_path_ = true;
+    num_shards_ = 20;
+
+    deployment_config_.set_cache_path(
+        file::JoinPath(test::TmpDirectory(), "working_directory"));
+  }
+};
+
+// Train and test a model on the adult dataset.
+TEST_F(DatasetSyntheticRanking, Base) {
+  TrainAndEvaluateModel();
+  // Note: Those are the same values as the non-distributed training unit test:
+  // See GradientBoostedTreesOnSyntheticRanking.Base in
+  // learner/gradient_boosted_trees/gradient_boosted_trees_test.cc.
+  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.701838, 0.025846, 0.70330);
+}
+
 }  // namespace
 }  // namespace distributed_gradient_boosted_trees
 }  // namespace model

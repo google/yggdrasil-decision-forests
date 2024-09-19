@@ -52,17 +52,20 @@ int NumBytes(uint64_t max_value);
 // Path to a file in a sharded set of files. Output
 // "{base}_{shard_idx}-of-{num_shards}".
 std::string ShardFilename(absl::string_view base, int shard_idx,
-                          const int num_shards);
+                          int num_shards);
 
 // Writes a sequence of integers.
 class IntegerColumnWriter {
  public:
   // Opens a file. All the written values should be in [-max_value-1,
-  // max_value].
+  // max_value] with max_value <= std::numeric_limits<uint64_t>::max().
+  //
+  // Note: if max_value > std::numeric_limits<int64_t>::max(), only positive
+  // values should be written.
   //
   // The behavior is undefined for values outside of this range (DCHECK in debug
   // mode).
-  absl::Status Open(absl::string_view path, int64_t max_value);
+  absl::Status Open(absl::string_view path, uint64_t max_value);
 
   // Writes a sequence of values.
   template <typename Value>
@@ -77,7 +80,7 @@ class IntegerColumnWriter {
   absl::Status WriteValuesWithCast(absl::Span<const Value> values);
 
   // Written values should be in [-max_value-1, max_value].
-  int64_t max_value_;
+  uint64_t max_value_;
 
   // Current open file.
   file::FileOutputByteStream file_;
@@ -134,7 +137,7 @@ class IntegerColumnReader : public AbstractIntegerColumnIterator<Value> {
   //     "max_value" used in the CategoricalColumnWriter.
   //   max_num_values: Maximum number of values returned in a single "Next"
   //     call.
-  absl::Status Open(absl::string_view path, int64_t max_value,
+  absl::Status Open(absl::string_view path, uint64_t max_value,
                     int max_num_values);
 
   absl::Span<const Value> Values() override;
@@ -179,7 +182,7 @@ class ShardedIntegerColumnReader : public AbstractIntegerColumnIterator<Value> {
   ~ShardedIntegerColumnReader() {}
 
   // Opens the file.
-  absl::Status Open(absl::string_view base_path, int64_t max_value,
+  absl::Status Open(absl::string_view base_path, uint64_t max_value,
                     int max_num_values, int begin_shard_idx, int end_shard_idx);
 
   absl::Span<const Value> Values() override;
@@ -190,7 +193,7 @@ class ShardedIntegerColumnReader : public AbstractIntegerColumnIterator<Value> {
 
   // Reads and appends the content of a sharded file.
   static absl::Status ReadAndAppend(absl::string_view base_path,
-                                    int64_t max_value, int begin_shard_idx,
+                                    uint64_t max_value, int begin_shard_idx,
                                     int end_shard_idx,
                                     std::vector<Value>* output);
 
@@ -204,7 +207,7 @@ class ShardedIntegerColumnReader : public AbstractIntegerColumnIterator<Value> {
  private:
   IntegerColumnReader<Value> sub_reader_;
   std::string base_path_;
-  int64_t max_value_ = 0;
+  uint64_t max_value_ = 0;
   int max_num_values_ = 0;
   int end_shard_idx_ = 0;
   int current_shard_idx_ = 0;
@@ -256,15 +259,13 @@ class InMemoryIntegerColumnReaderFactory {
   // Number of bytes taken by one value stored in the user format.
   constexpr static auto kUserNumBytes = sizeof(Value);
 
-  absl::Status Load(absl::string_view base_path, int64_t max_value,
+  absl::Status Load(absl::string_view base_path, uint64_t max_value,
                     int max_num_values, int begin_shard_idx, int end_shard_idx,
                     size_t reserve = 0);
 
   // Reference to data in "values". "values" should not be destroyed before
   // "InMemoryFloatColumnReaderFactory".
   absl::Status Borrow(absl::Span<const Value> values);
-
-  // void Reserve(size_t num_values, int64_t max_value);
 
   // Creates an iterator over the values. The factory owns the data and
   // should not be destroyed during the life of the iterator. Multiple iterators

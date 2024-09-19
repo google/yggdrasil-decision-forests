@@ -2355,6 +2355,33 @@ TEST_F(GradientBoostedTreesOnAdult, Nondeterminism) {
               ::testing::ContainsRegex("Non matching initial predictions"));
 }
 
+class GradientBoostedTreesOnSyntheticRanking
+    : public utils::TrainAndTestTester {
+  void SetUp() override {
+    auto* hash_column = guide_.add_column_guides();
+    hash_column->set_column_name_pattern("^GROUP$");
+    hash_column->set_type(dataset::proto::ColumnType::HASH);
+
+    train_config_.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+    train_config_.set_task(model::proto::Task::RANKING);
+    train_config_.set_label("LABEL");
+    train_config_.set_ranking_group("GROUP");
+
+    dataset_filename_ = "synthetic_ranking_train.csv";
+    dataset_test_filename_ = "synthetic_ranking_test.csv";
+
+    auto* gbt_config = train_config_.MutableExtension(
+        gradient_boosted_trees::proto::gradient_boosted_trees_config);
+    gbt_config->mutable_decision_tree()
+        ->set_internal_error_on_wrong_splitter_statistics(true);
+  }
+};
+
+TEST_F(GradientBoostedTreesOnSyntheticRanking, Base) {
+  TrainAndEvaluateModel();
+  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.7151, 0.025, 0.7151);
+}
+
 }  // namespace
 }  // namespace gradient_boosted_trees
 }  // namespace model

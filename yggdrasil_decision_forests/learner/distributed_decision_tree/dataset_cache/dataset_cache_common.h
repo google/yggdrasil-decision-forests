@@ -17,6 +17,7 @@
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_DATASET_CACHE_COMMON_H_
 
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -33,13 +34,17 @@ namespace dataset_cache {
 // How to represent a label.
 typedef int32_t ClassificationLabelType;
 typedef float RegressionLabelType;
+typedef RegressionLabelType RankingLabelType;
+typedef uint64_t RankingGroupType;
 
 // How to index an example.
 typedef SignedExampleIdx ExampleIdxType;
-// How to represent a categorical value.
 typedef int32_t CategoricalType;
 typedef int32_t DiscretizedIndexedNumericalType;
 typedef int8_t BooleanType;
+typedef int64_t HashType;
+
+constexpr int64_t kMaxValueHashType = std::numeric_limits<HashType>::max();
 
 // File and directory names.
 constexpr char kFilenameColumn[] = "column_";

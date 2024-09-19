@@ -849,6 +849,9 @@ absl::Status EvaluateSplits(const ExampleToNodeMap& example_to_node,
             split_evaluation, dataset));
         break;
 
+      case dataset_cache::proto::CacheMetadata_Column::kHash:
+        return absl::InternalError("Hash column not supported");
+
       case dataset_cache::proto::CacheMetadata_Column::TYPE_NOT_SET:
         return absl::InternalError("Non set split");
     }

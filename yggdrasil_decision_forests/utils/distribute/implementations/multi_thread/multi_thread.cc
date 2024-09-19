@@ -150,7 +150,8 @@ absl::Status MultiThreadManager::Done(
 
 absl::Status MultiThreadManager::SetParallelExecutionPerWorker(int num) {
   if (verbosity_) {
-    LOG(INFO) << "Change the number of parallel execution per worker";
+    LOG(INFO) << "Change the number of parallel execution per worker to "
+              << num;
   }
 
   // Close the query channels.

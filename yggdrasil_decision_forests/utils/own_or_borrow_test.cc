@@ -29,6 +29,7 @@ TEST(OwnOrBorrow, Vector) {
   std::vector<int> data2{5, 6};
 
   VectorOwnOrBorrow<int> a;
+  EXPECT_TRUE(a.empty());
   EXPECT_TRUE(a.owner());
   EXPECT_THAT(a.values(), ElementsAre());
 
@@ -47,6 +48,18 @@ TEST(OwnOrBorrow, Vector) {
   EXPECT_TRUE(a.owner());
   EXPECT_THAT(a.values(), ElementsAre(1, 5, 3, 4));
   EXPECT_THAT(a.values(), ElementsAre(1, 5, 3, 4));
+
+  a.release();
+  EXPECT_TRUE(a.owner());
+  EXPECT_TRUE(a.empty());
+
+  a.borrow(data2);
+  EXPECT_FALSE(a.owner());
+  EXPECT_THAT(a.values(), ElementsAre(5, 6));
+
+  a.release();
+  EXPECT_TRUE(a.owner());
+  EXPECT_TRUE(a.empty());
 }
 
 }  // namespace

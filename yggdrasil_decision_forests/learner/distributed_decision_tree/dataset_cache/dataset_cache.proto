@@ -27,6 +27,10 @@ message CreateDatasetCacheConfig {
   // Optional index of the label column in the dataspec.
   optional int32 label_column_idx = 2;
 
+  // Optional index to the group column in the dataspec. Only used for ranking
+  // training.
+  optional int32 group_column_idx = 7;
+
   // Optional index of the weight column in the dataspec. Not set if the
   // training is non-weighted.
   optional int32 weight_column_idx = 3;
@@ -252,6 +256,9 @@ message CacheMetadata {
   // Index of the label column in the dataspec.
   optional int32 label_column_idx = 5;
 
+  // Index of the group column in the dataspec.
+  optional int32 group_column_idx = 8;
+
   // Index of the weight column in the dataspec. Not set if the training is
   // non-weighted.
   optional int32 weight_column_idx = 6;
@@ -265,6 +272,7 @@ message CacheMetadata {
       NumericalColumn numerical = 2;
       CategoricalColumn categorical = 3;
       BooleanColumn boolean = 4;
+      HashColumn hash = 5;
     }
   }
 
@@ -285,6 +293,8 @@ message CacheMetadata {
   message BooleanColumn {
     optional bool replacement_missing_value = 2;
   }
+
+  message HashColumn {}
 }
 
 message DatasetCacheReaderOptions {

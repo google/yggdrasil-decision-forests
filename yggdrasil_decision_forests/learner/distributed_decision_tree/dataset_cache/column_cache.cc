@@ -103,7 +103,7 @@ int NumBytes(uint64_t max_value) {
 }
 
 absl::Status IntegerColumnWriter::Open(absl::string_view path,
-                                       int64_t max_value) {
+                                       uint64_t max_value) {
   num_bytes_ = NumBytes(max_value);
   max_value_ = max_value;
   path_ = std::string(path);
@@ -159,6 +159,8 @@ template absl::Status IntegerColumnWriter::WriteValues(
     absl::Span<const int32_t> values);
 template absl::Status IntegerColumnWriter::WriteValues(
     absl::Span<const int64_t> values);
+template absl::Status IntegerColumnWriter::WriteValues(
+    absl::Span<const uint64_t> values);
 
 template <typename Value, typename DstValue>
 absl::Status IntegerColumnWriter::WriteValuesWithCast(
@@ -166,7 +168,7 @@ absl::Status IntegerColumnWriter::WriteValuesWithCast(
 #ifndef NDEBUG
   for (const auto value : values) {
     DCHECK_LE(value, max_value_);
-    if (max_value_ > 0) {
+    if (value < 0 && max_value_ > 0) {
       DCHECK_GT(value, -max_value_);
     }
   }
@@ -185,7 +187,7 @@ absl::Status IntegerColumnWriter::Close() {
 
 template <typename Value>
 absl::Status IntegerColumnReader<Value>::Open(absl::string_view path,
-                                              int64_t max_value,
+                                              uint64_t max_value,
                                               int max_num_values) {
   file_num_bytes_ = NumBytes(max_value);
   if (file_num_bytes_ > sizeof(Value)) {
@@ -246,10 +248,11 @@ template class IntegerColumnReader<int8_t>;
 template class IntegerColumnReader<int16_t>;
 template class IntegerColumnReader<int32_t>;
 template class IntegerColumnReader<int64_t>;
+template class IntegerColumnReader<uint64_t>;
 
 template <typename Value>
 absl::Status ShardedIntegerColumnReader<Value>::ReadAndAppend(
-    absl::string_view base_path, int64_t max_value, int begin_shard_idx,
+    absl::string_view base_path, uint64_t max_value, int begin_shard_idx,
     int end_shard_idx, std::vector<Value>* output) {
   ShardedIntegerColumnReader<Value> reader;
   RETURN_IF_ERROR(
@@ -272,7 +275,7 @@ absl::Status ShardedIntegerColumnReader<Value>::ReadAndAppend(
 
 template <typename Value>
 absl::Status ShardedIntegerColumnReader<Value>::Open(
-    absl::string_view base_path, int64_t max_value, int max_num_values,
+    absl::string_view base_path, uint64_t max_value, int max_num_values,
     int begin_shard_idx, int end_shard_idx) {
   base_path_ = std::string(base_path);
   max_value_ = max_value;
@@ -317,10 +320,11 @@ template class ShardedIntegerColumnReader<int8_t>;
 template class ShardedIntegerColumnReader<int16_t>;
 template class ShardedIntegerColumnReader<int32_t>;
 template class ShardedIntegerColumnReader<int64_t>;
+template class ShardedIntegerColumnReader<uint64_t>;
 
 template <typename Value>
 absl::Status InMemoryIntegerColumnReaderFactory<Value>::Load(
-    absl::string_view base_path, int64_t max_value, int max_num_values,
+    absl::string_view base_path, uint64_t max_value, int max_num_values,
     int begin_shard_idx, int end_shard_idx, size_t reserve) {
   ShardedIntegerColumnReader<Value> file_reader;
   constexpr int buffer_size = kIOBufferSizeInBytes / sizeof(Value);
