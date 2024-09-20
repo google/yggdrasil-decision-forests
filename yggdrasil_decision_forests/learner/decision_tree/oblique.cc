@@ -706,6 +706,7 @@ void SampleProjection(const absl::Span<const int>& features,
   };
 
   for (const auto feature : features) {
+    DCHECK_EQ(data_spec.columns(feature).type(), dataset::proto::NUMERICAL);
     if (unif01(*random) < projection_density) {
       projection->push_back({feature, gen_weight(feature)});
     }

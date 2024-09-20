@@ -99,7 +99,7 @@ int DefaultMaximumDepth(UnsignedExampleIdx num_examples_per_trees);
 // If a valid split is sampled, the condition of "node" is set and the function
 // returns true.
 //
-// TODO: Add support for non-numerical features.
+// TODO: Add support for more feature types.
 absl::StatusOr<bool> FindSplit(
     const Configuration& config, const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -122,13 +122,20 @@ absl::Status SetRandomSplitNumericalSparseOblique(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 
-// Create an axis-aligned split on `feature_idx`.
+// Create an axis-aligned split on nontrivial numerical feature `feature_idx`.
 //
 // This function implements the original isolation forest algorithm: Only splits
 // of the form "X >= threshold" are generated. The threshold is uniformly
 // sampled between the minimum and maximum values observed in the training
 // examples reaching this node.
 absl::Status SetRandomSplitNumericalAxisAligned(
+    int feature_idx, const Configuration& config,
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
+
+// Create a split on nontrivial boolean feature `feature_idx`.
+absl::Status FindSplitBoolean(
     int feature_idx, const Configuration& config,
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
