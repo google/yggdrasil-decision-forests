@@ -44,7 +44,7 @@ constexpr char kInvalidDataMessage[] =
 static const uint32_t kMaskDelta = 0xa282ead8ul;
 
 // Mask applied by TF Record over the CRCs.
-// See tensorflow/tsl/lib/hash/crc32c.h
+// See tensorflow/compiler/xla/tsl/lib/hash/crc32c.h
 // Note: TF Record does NOT compute CRC over a string containing a CRC.
 inline uint32_t Mask(const uint32_t crc) {
   return ((crc >> 15) | (crc << 17)) + kMaskDelta;
