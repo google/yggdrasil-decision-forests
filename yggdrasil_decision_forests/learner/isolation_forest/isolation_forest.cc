@@ -47,6 +47,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -176,11 +177,15 @@ absl::StatusOr<int> FindNontrivialFeatures(
                 train_dataset, feature_idx, na_replacement, selected_examples));
         break;
       }
-      case dataset::proto::CATEGORICAL:
-        LOG_FIRST_N(INFO, 1) << "Ignoring columns of unsupported type "
-                             << dataset::proto::ColumnType_Name(feature.type())
-                             << " e.g. " << feature.name();
-        continue;
+      case dataset::proto::CATEGORICAL: {
+        const int64_t na_replacement =
+            feature.categorical().most_frequent_value();
+        ASSIGN_OR_RETURN(
+            can_split,
+            CanSplit<dataset::VerticalDataset::CategoricalColumn>(
+                train_dataset, feature_idx, na_replacement, selected_examples));
+        break;
+      }
       case dataset::proto::CATEGORICAL_SET:
         LOG_FIRST_N(INFO, 1) << "Ignoring columns of unsupported type "
                              << dataset::proto::ColumnType_Name(feature.type())
@@ -283,6 +288,15 @@ absl::StatusOr<bool> FindSplit(
       RETURN_IF_ERROR(FindSplitBoolean(selected_feature_idx, config,
                                        train_dataset, selected_examples, node,
                                        rnd));
+      break;
+    }
+    case dataset::proto::CATEGORICAL: {
+      const auto& nontrivial_categorical_features =
+          nontrivial_features.find(selected_feature_type);
+      DCHECK(nontrivial_categorical_features != nontrivial_features.end());
+      RETURN_IF_ERROR(FindSplitCategorical(selected_feature_idx, config,
+                                           train_dataset, selected_examples,
+                                           node, rnd));
       break;
     }
     default:
@@ -478,6 +492,95 @@ absl::Status FindSplitBoolean(
   condition->set_attribute(feature_idx);
   condition->mutable_condition()->mutable_true_value_condition();
   condition->set_na_value(na_replacement);
+  condition->set_num_training_examples_without_weight(selected_examples.size());
+  condition->set_num_pos_training_examples_without_weight(num_pos_examples);
+  return absl::OkStatus();
+}
+
+absl::Status FindSplitCategorical(
+    const int feature_idx, const Configuration& config,
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
+  const auto& col_spec = train_dataset.data_spec().columns(feature_idx);
+  const auto na_replacement = col_spec.categorical().most_frequent_value();
+  DCHECK_EQ(col_spec.type(), dataset::proto::CATEGORICAL);
+  DCHECK_GT(selected_examples.size(), 0);
+
+  ASSIGN_OR_RETURN(
+      const auto* value_container,
+      train_dataset.ColumnWithCastWithStatus<
+          dataset::VerticalDataset::CategoricalColumn>(feature_idx));
+  const auto& values = value_container->values();
+  const int num_unique_feature_values =
+      col_spec.categorical().number_of_unique_values();
+
+  // if num_unique_feature_values is very large (likely because of a user
+  // feeding pre-integerized values), the following might be memory-hungry.
+  std::vector<UnsignedExampleIdx> active_feature_values_count(
+      num_unique_feature_values, 0);
+  int num_active_feature_values = 0;
+  for (const auto example_idx : selected_examples) {
+    auto value = values[example_idx];
+    if (value == dataset::VerticalDataset::CategoricalColumn::kNaValue) {
+      value = na_replacement;
+    }
+    if (active_feature_values_count[value] == 0) {
+      num_active_feature_values++;
+    }
+    active_feature_values_count[value]++;
+  }
+  DCHECK_GT(num_active_feature_values, 0);
+  int ensure_chosen_idx = absl::Uniform(*rnd, 0, num_active_feature_values);
+  int ensure_not_chosen_idx =
+      (ensure_chosen_idx +
+       absl::Uniform(*rnd, 1, num_active_feature_values - 1)) %
+      num_active_feature_values;
+  std::vector<int> chosen_values = {};
+  chosen_values.reserve(num_unique_feature_values);
+
+  int selected_values_idx = 0;
+  int num_pos_examples = 0;
+  bool na_is_chosen = false;
+  // Flip a fair coin for every value in the selected examples.
+  for (int item = 0; item < num_unique_feature_values; item++) {
+    if (active_feature_values_count[item] > 0) {
+      bool choose;
+      if (selected_values_idx == ensure_not_chosen_idx) {
+        choose = false;
+      } else if (selected_values_idx == ensure_chosen_idx) {
+        choose = true;
+      } else {
+        choose = absl::Bernoulli(*rnd, 0.5);
+      }
+      if (choose) {
+        chosen_values.push_back(item);
+        num_pos_examples += active_feature_values_count[item];
+        if (item == na_replacement) {
+          na_is_chosen = true;
+        }
+      }
+      selected_values_idx++;
+    } else {
+      // Randomly pick from the non-observed values for a more balanced split.
+      if (absl::Bernoulli(*rnd, 0.5)) {
+        chosen_values.push_back(item);
+        if (item == na_replacement) {
+          na_is_chosen = true;
+        }
+      }
+    }
+  }
+  DCHECK(!chosen_values.empty());
+  DCHECK_GT(num_pos_examples, 0);
+  DCHECK_LT(num_pos_examples, selected_examples.size());
+
+  // Set split.
+  auto* condition = node->mutable_node()->mutable_condition();
+  condition->set_attribute(feature_idx);
+  decision_tree::SetPositiveAttributeSetOfCategoricalContainsCondition(
+      chosen_values, num_unique_feature_values, condition);
+  condition->set_na_value(na_is_chosen);
   condition->set_num_training_examples_without_weight(selected_examples.size());
   condition->set_num_pos_training_examples_without_weight(num_pos_examples);
   return absl::OkStatus();

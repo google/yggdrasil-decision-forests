@@ -141,6 +141,13 @@ absl::Status FindSplitBoolean(
     const std::vector<UnsignedExampleIdx>& selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 
+// Create a split on nontrivial categorical feature `feature_idx`.
+absl::Status FindSplitCategorical(
+    int feature_idx, const Configuration& config,
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
+
 }  // namespace internal
 
 }  // namespace yggdrasil_decision_forests::model::isolation_forest

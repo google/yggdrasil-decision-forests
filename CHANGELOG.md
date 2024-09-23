@@ -7,7 +7,8 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
 ### Features
 
--   Speed-up training of GBT models by ~10%
+-   Speed-up training of GBT models by ~10%.
+-   Support for categorical and boolean features in Isolation Forests.
 -   Rename LAMBDA_MART_NDCG5 to LAMBDA_MART_NDCG. The old name is deprecated but
     can still be used.
 -   Allow configuring the truncation of NDCG losses.

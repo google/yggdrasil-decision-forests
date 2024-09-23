@@ -40,6 +40,8 @@
 #include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/model_analysis.h"
+#include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
@@ -140,11 +142,35 @@ TEST_F(IsolationForestOnAdult, DefaultHyperParameters) {
   TrainAndEvaluateModel();
   LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
   // Confirmed with Scikit-learn.
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.759, 0.02);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.70, 0.03);
+  EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.48, 0.03);
+}
+
+TEST_F(IsolationForestOnAdult, NumericalOnly) {
+  guide_.set_ignore_columns_without_guides(true);
+  auto* col_guide = guide_.add_column_guides();
+  col_guide->set_column_name_pattern(
+      "age|fnlwgt|education_num|capital_gain|capital_loss|hours_per_week");
+  col_guide->set_type(dataset::proto::NUMERICAL);
+  auto* label_guide = guide_.add_column_guides();
+  label_guide->set_column_name_pattern("income");
+  label_guide->set_type(dataset::proto::CATEGORICAL);
+  TrainAndEvaluateModel();
+  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
+  // Confirmed with Scikit-learn.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.759, 0.03);
   EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.615, 0.03);
 }
 
-TEST_F(IsolationForestOnAdult, SmallModel) {
+TEST_F(IsolationForestOnAdult, SmallModelNumerical) {
+  guide_.set_ignore_columns_without_guides(true);
+  auto* col_guide = guide_.add_column_guides();
+  col_guide->set_column_name_pattern(
+      "age|fnlwgt|education_num|capital_gain|capital_loss|hours_per_week");
+  col_guide->set_type(dataset::proto::NUMERICAL);
+  auto* label_guide = guide_.add_column_guides();
+  label_guide->set_column_name_pattern("income");
+  label_guide->set_type(dataset::proto::CATEGORICAL);
   auto* if_config = train_config_.MutableExtension(
       isolation_forest::proto::isolation_forest_config);
   if_config->set_num_trees(32);
@@ -161,9 +187,20 @@ TEST_F(IsolationForestOnAdult, Oblique) {
       isolation_forest::proto::isolation_forest_config);
   if_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   TrainAndEvaluateModel();
-  LOG(INFO) << "Model:\n" << model_->DescriptionAndStatistics(true);
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.77, 0.01);
-  EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.615, 0.03);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.719, 0.02);
+  EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.501, 0.04);
+}
+
+TEST_F(IsolationForestOnAdult, Analysis) {
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  // A very small model for the smoke test
+  if_config->set_num_trees(3);
+  TrainAndEvaluateModel();
+  utils::model_analysis::proto::Options analysis_options;
+  ASSERT_OK_AND_ASSIGN(
+      const auto analysis,
+      utils::model_analysis::Analyse(*model_, test_dataset_, analysis_options));
 }
 
 class IsolationForestOnMammographicMasses : public utils::TrainAndTestTester {
@@ -339,6 +376,46 @@ TEST(FindSplit, Boolean) {
     EXPECT_EQ(node.node().condition().num_training_examples_without_weight(),
               3);
     EXPECT_EQ(node.node().condition().na_value(), true);
+  }
+}
+
+TEST(FindSplit, Categorical) {
+  for (int seed = 0; seed < 10; seed++) {
+    // This is a stochastic test.
+    utils::RandomEngine rnd(seed);
+
+    internal::Configuration config;
+    proto::IsolationForestTrainingConfig if_config;
+    config.if_config = &if_config;
+    config.config_link.add_features(0);  // Only select "f1".
+
+    decision_tree::NodeWithChildren node;
+
+    dataset::VerticalDataset dataset;
+    dataset::AddCategoricalColumn("f1", {"a", "b", "c"},
+                                  dataset.mutable_data_spec());
+    dataset::AddCategoricalColumn("f2", {"d", "e", "f"},
+                                  dataset.mutable_data_spec());
+    ASSERT_OK(dataset.CreateColumnsFromDataspec());
+    ASSERT_OK_AND_ASSIGN(auto* column,
+                         dataset.MutableColumnWithCastWithStatus<
+                             dataset::VerticalDataset::CategoricalColumn>(0));
+    *column->mutable_values() = {0, 1, 2, 2, 0};
+
+    ASSERT_OK_AND_ASSIGN(
+        const bool found_condition,
+        FindSplit(config, dataset,
+                  {0, 1, 2, 3},  // Don't select the last example.
+                  &node, &rnd));
+    EXPECT_TRUE(found_condition);
+    EXPECT_EQ(node.node().condition().attribute(), 0);  // Always "f1".
+    EXPECT_TRUE(
+        node.node().condition().condition().has_contains_bitmap_condition());
+    auto values_in_condition =
+        model::decision_tree::ExactElementsFromContainsCondition(
+            3, node.node().condition().condition());
+    EXPECT_EQ(node.node().condition().num_training_examples_without_weight(),
+              4);
   }
 }
 

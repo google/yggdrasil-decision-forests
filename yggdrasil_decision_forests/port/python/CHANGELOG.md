@@ -23,6 +23,7 @@
 -   Expose the slow engine for debugging predictions and evaluations with
     `use_slow_engine=True`.
 -   Speed-up training of GBT models by ~10%
+-   Support for categorical and boolean features in Isolation Forests.
 -   Add `ydf.util.read_tf_record` and `ydf.util.write_tf_record` to facilitate
     TF Record datasets usage.
 -   Rename LAMBDA_MART_NDCG5 to LAMBDA_MART_NDCG. The old name is deprecated but

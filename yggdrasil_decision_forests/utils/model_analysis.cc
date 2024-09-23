@@ -473,6 +473,15 @@ absl::Status PlotPartialDependencePlot1DCategories(
                                      attr_spec.type(), prediction_curve));
     } break;
 
+    case model::proto::Task::ANOMALY_DETECTION: {
+      auto* prediction_curve = AddCurve(pdp_plot);
+      prediction_curve->style = plot::LineStyle::SOLID;
+      RETURN_IF_ERROR(Set1DCurveData(pdp, CurveTargetType::kPrediction,
+                                     swap_axes,
+                                     model::proto::Task::ANOMALY_DETECTION, -1,
+                                     attr_spec.type(), prediction_curve));
+    } break;
+
     default:
       return absl::InvalidArgumentError("Not implemented");
   }
