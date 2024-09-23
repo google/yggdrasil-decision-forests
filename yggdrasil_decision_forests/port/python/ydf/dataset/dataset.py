@@ -372,8 +372,9 @@ def create_vertical_dataset(
   Args:
     data: Source dataset. Supported formats: VerticalDataset, (typed) path, list
       of (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
-      PyGrain DataLoader and Dataset, dictionary of string to NumPy array or
-      lists. If the data is already a VerticalDataset, it is returned unchanged.
+      PyGrain DataLoader and Dataset (experimental, Linux only), dictionary of
+      string to NumPy array or lists. If the data is already a VerticalDataset,
+      it is returned unchanged.
     columns: If None, all columns are imported. The semantic of the columns is
       determined automatically. Otherwise, if include_all_columns=False
       (default) only the column listed in `columns` are imported. If

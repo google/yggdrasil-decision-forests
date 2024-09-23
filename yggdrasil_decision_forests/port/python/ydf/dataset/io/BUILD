@@ -98,6 +98,8 @@ py_test(
 py_test(
     name = "pygrain_io_test",
     srcs = ["pygrain_io_test.py"],
+    # TODO: Figure out what to do with Pygrain support, since it does not work on MacOS.
+    tags = ["manual"],  # Grain is not supported on MacOS
     deps = [
         ":dataset_io_types",
         ":pygrain_io",

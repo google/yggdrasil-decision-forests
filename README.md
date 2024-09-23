@@ -9,7 +9,7 @@
 [![PyPI Downloads](https://img.shields.io/pypi/dm/ydf?style=flat-square)](https://pepy.tech/project/ydf)
 
 **YDF** (Yggdrasil Decision Forests) is a library to train, evaluate, interpret,
-and serve Random Forest, Gradient Boosted Decision Trees, and CART decision
+and serve Random Forest, Gradient Boosted Decision Trees, CART and Isolation
 forest models.
 
 See the [documentation](https://ydf.readthedocs.org/) for more information on
@@ -83,27 +83,6 @@ SaveModel("my_model", model.get());
 ```
 
 (based on [examples/beginner.cc](examples/beginner.cc))
-
-The same model can be trained in Python using TensorFlow Decision Forests as
-follows:
-
-```python
-import tensorflow_decision_forests as tfdf
-import pandas as pd
-
-# Load dataset in a Pandas dataframe.
-train_df = pd.read_csv("project/train.csv")
-
-# Convert dataset into a TensorFlow dataset.
-train_ds = tfdf.keras.pd_dataframe_to_tf_dataset(train_df, label="my_label")
-
-# Train model
-model = tfdf.keras.RandomForestModel()
-model.fit(train_ds)
-
-# Export model.
-model.save("project/model")
-```
 
 ## Next steps
 

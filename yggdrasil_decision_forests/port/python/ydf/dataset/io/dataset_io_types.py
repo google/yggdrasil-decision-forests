@@ -85,9 +85,9 @@ A dataset can be one of the following:
   3. A Xarray dataset.
   4. A YDF VerticalDataset created with `ydf.create_vertical_dataset`. This option is the most efficient when the same dataset is used multiple times.
   5. A batched TensorFlow Dataset.
-  6. A PyGrain DataLoader or Dataset.
-  7. A typed path to a csv file e.g. "csv:/tmp/dataset.csv". See supported types below. The path can be sharded (e.g. "csv:/tmp/dataset@10") or globbed ("csv:/tmp/dataset*").
-  8. A list of typed paths e.g. ["csv:/tmp/data1.csv", "csv:/tmp/data2.csv"]. See supported types below.
+  6. A typed path to a csv file e.g. "csv:/tmp/dataset.csv". See supported types below. The path can be sharded (e.g. "csv:/tmp/dataset@10") or globbed ("csv:/tmp/dataset*").
+  7. A list of typed paths e.g. ["csv:/tmp/data1.csv", "csv:/tmp/data2.csv"]. See supported types below.
+  8. A PyGrain DataLoader or Dataset (experimental, Linux only).
 
 The supported file formats and corresponding prefixes are:
   - CSV file. prefix 'csv:'

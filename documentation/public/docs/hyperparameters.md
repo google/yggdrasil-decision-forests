@@ -137,8 +137,8 @@ reasonable time.
 
 -   **Type:** Integer **Default:** 5 **Possible values:** min:1
 
--   Truncation of the cross-entropy NDCG loss. Only used with cross-entropy NDCG
-    loss i.e. `loss="XE_NDCG_MART"`
+-   Truncation of the cross-entropy NDCG loss (default 5). Only used with
+    cross-entropy NDCG loss i.e. `loss="XE_NDCG_MART"`
 
 #### [dart_dropout](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
@@ -172,18 +172,19 @@ reasonable time.
 
 -   **Type:** Real **Default:** 0.5 **Possible values:** min:0 max:1
 
--   EXPERIMENTAL. Weighting parameter for focal loss, positive samples weighted
-    by alpha, negative samples by (1-alpha). The default 0.5 value means no
-    active class-level weighting. Only used with focal loss i.e.
+-   EXPERIMENTAL, default 0.5. Weighting parameter for focal loss, positive
+    samples weighted by alpha, negative samples by (1-alpha). The default 0.5
+    value means no active class-level weighting. Only used with focal loss i.e.
     `loss="BINARY_FOCAL_LOSS"`
 
 #### [focal_loss_gamma](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
 -   **Type:** Real **Default:** 2 **Possible values:** min:0
 
--   EXPERIMENTAL. Exponent of the misprediction exponent term in focal loss,
-    corresponds to gamma parameter in https://arxiv.org/pdf/1708.02002.pdf. Only
-    used with focal loss i.e. `loss="BINARY_FOCAL_LOSS"`
+-   EXPERIMENTAL, default 2.0. Exponent of the misprediction exponent term in
+    focal loss, corresponds to gamma parameter in
+    https://arxiv.org/pdf/1708.02002.pdf. Only used with focal loss i.e.
+    `loss="BINARY_FOCAL_LOSS"`
 
 #### [forest_extraction](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
@@ -365,8 +366,8 @@ reasonable time.
 
 -   **Type:** Integer **Default:** 5 **Possible values:** min:1
 
--   Truncation of the NDCG loss. Only used with NDCG loss i.e.
-    `loss="LAMBDA_MART_NDCG"`
+-   Truncation of the NDCG loss (default 5). Only used with NDCG loss i.e.
+    `loss="LAMBDA_MART_NDCG".`
 
 #### [num_candidate_attributes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 

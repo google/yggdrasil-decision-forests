@@ -1,6 +1,6 @@
 # Changelog
 
-## HEAD
+## 0.8.0 - 2024-09-23
 
 ### Breaking
 
@@ -22,7 +22,7 @@
 -   Add `num_examples_per_tree()` method to Isolation Forest models.
 -   Expose the slow engine for debugging predictions and evaluations with
     `use_slow_engine=True`.
--   Speed-up training of GBT models by ~10%
+-   Speed-up training of GBT models by ~10%.
 -   Support for categorical and boolean features in Isolation Forests.
 -   Add `ydf.util.read_tf_record` and `ydf.util.write_tf_record` to facilitate
     TF Record datasets usage.
@@ -36,14 +36,17 @@
 -   Add argument to control the maximum duration of `model.analyze`.
 -   Add support for Unicode strings, normalize categorical set values in the
     same way as categorical values, and validate their types.
--   Native support for PyGrain DataLoader and Dataset for all operations (e.g.,
-    training, evaluation, predictions).
 -   Add support for distributed training for ranking gradient boosted tree
     models.
 
 ### Fix
 
 -   Fix labels of regression evaluation plots
+-   Improved errors if Isolation Forest training fails.
+
+### Release music
+
+Perpetuum Mobile "Ein musikalischer Scherz", Op. 257. Johann Strauss (Sohn)
 
 ## 0.7.0 - 2024-08-21
 

@@ -418,8 +418,9 @@ Use `model.describe()` for more details
     Args:
       data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
         (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
-        PyGrain DataLoader and Dataset, dictionary of string to NumPy array or
-        lists. If the dataset contains the label column, that column is ignored.
+        PyGrain DataLoader and Dataset (experimental, Linux only), dictionary of
+        string to NumPy array or lists. If the dataset contains the label
+        column, that column is ignored.
       use_slow_engine: If true, uses the slow engine for making predictions. The
         slow engine of YDF is an order of magnitude slower than the other
         prediction engines. There exist very rare edge cases where predictions
@@ -506,8 +507,8 @@ Use `model.describe()` for more details
     Args:
       data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
         (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
-        PyGrain DataLoader and Dataset, dictionary of string to NumPy array or
-        lists.
+        PyGrain DataLoader and Dataset (experimental, Linux only), dictionary of
+        string to NumPy array or lists.
       weighted: If true, the evaluation is weighted according to the training
         weights. If false, the evaluation is non-weighted. b/351279797: Change
         default to weights=True.
@@ -655,8 +656,8 @@ Use `model.describe()` for more details
     Args:
       single_example: Example to explain. Supported formats: VerticalDataset,
         (typed) path, list of (typed) paths, Pandas DataFrame, Xarray Dataset,
-        TensorFlow Dataset, PyGrain DataLoader and Dataset, dictionary of string
-        to NumPy array or lists.
+        TensorFlow Dataset, PyGrain DataLoader and Dataset (experimental, Linux
+        only), dictionary of string to NumPy array or lists.
 
     Returns:
       Prediction explanation.
@@ -714,8 +715,8 @@ Use `model.describe()` for more details
     Args:
       data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
         (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
-        PyGrain DataLoader and Dataset, dictionary of string to NumPy array or
-        lists.
+        PyGrain DataLoader and Dataset (experimental, Linux only), dictionary of
+        string to NumPy array or lists.
       sampling: Ratio of examples to use for the analysis. The analysis can be
         expensive to compute. On large datasets, use a small sampling value e.g.
         0.01.
@@ -1463,7 +1464,7 @@ Use `model.describe()` for more details
     effective_dataspec = self._model.data_spec()
 
     def find_existing_or_add_column(
-        semantic: Optional[data_spec_pb2.ColumnType],
+        semantic: Optional[Any],
         name: Optional[str],
         default_col_idx: int,
         usage: str,
