@@ -1,5 +1,11 @@
 # Changelog
 
+## HEAD
+
+### Feature
+
+-   Expose MRR for ranking models.
+
 ## 0.8.0 - 2024-09-23
 
 ### Breaking

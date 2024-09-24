@@ -148,6 +148,7 @@ def evaluation_to_str(e: metric.Evaluation) -> str:
 
   # Ranking
   text += _field_to_str("NDCG", e.ndcg)
+  text += _field_to_str("MRR", e.mrr)
 
   # Uplifting
   text += _field_to_str("QINI", e.qini)
@@ -214,6 +215,7 @@ def evaluation_to_html_str(e: metric.Evaluation, add_style: bool = True) -> str:
 
   # Ranking
   _field_to_html(doc, html_metric_grid, "NDCG", e.ndcg)
+  _field_to_html(doc, html_metric_grid, "MRR", e.mrr)
 
   # Uplifting
   _field_to_html(doc, html_metric_grid, "QINI", e.qini)

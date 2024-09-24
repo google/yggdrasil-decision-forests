@@ -279,7 +279,8 @@ class Evaluation:
     rmse: Root Mean Square Error. Only available for regression task.
     rmse_ci95_bootstrap: 95% confidence interval of the RMSE computed using
       bootstrapping. Only available for regression task.
-    ndcg: Normalized Discounted Cumulative Gain. For Ranking.
+    ndcg: Normalized Discounted Cumulative Gain. Used for ranking tasks.
+    mrr: Mean Reciprocal Rank. Used for ranking tasks.
     qini: For uplifting.
     auuc: For uplifting.
     custom_metrics: User custom metrics dictionary.
@@ -465,6 +466,13 @@ class Evaluation:
         return rank.ndcg.value
 
   @property
+  def mrr(self) -> Optional[float]:
+    if self._evaluation_proto.HasField("ranking"):
+      rank = self._evaluation_proto.ranking
+      if rank.HasField("mrr"):
+        return rank.mrr.value
+
+  @property
   def qini(self) -> Optional[float]:
     if self._evaluation_proto.HasField("uplift"):
       uplift = self._evaluation_proto.uplift
@@ -503,6 +511,7 @@ class Evaluation:
     add_item("rmse", self.rmse)
     add_item("rmse_ci95_bootstrap", self.rmse_ci95_bootstrap)
     add_item("ndcg", self.ndcg)
+    add_item("mrr", self.mrr)
     add_item("qini", self.qini)
     add_item("auuc", self.auuc)
     return output
