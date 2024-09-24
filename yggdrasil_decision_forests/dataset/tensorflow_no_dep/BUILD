@@ -13,11 +13,13 @@ cc_library_ydf(
     srcs = ["tf_record.cc"],
     hdrs = ["tf_record.h"],
     deps = [
+        "//yggdrasil_decision_forests/utils:bytestream",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "//yggdrasil_decision_forests/utils:zlib",
         "@com_google_absl//absl/base:endian",
         "@com_google_absl//absl/crc:crc32c",
         "@com_google_absl//absl/log",
@@ -33,7 +35,6 @@ cc_library_ydf(
     srcs = ["tf_record_tf_example.cc"],
     hdrs = ["tf_record_tf_example.h"],
     deps = [
-        ":tf_example_cc_proto",
         ":tf_record",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",

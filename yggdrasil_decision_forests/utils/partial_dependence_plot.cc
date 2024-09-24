@@ -30,7 +30,7 @@
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/string_view.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -495,7 +495,8 @@ absl::Status AppendAttributesCombinations2D(
 absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs,
-    const int num_numerical_bins, const float example_sampling) {
+    const int num_numerical_bins, const float example_sampling,
+    const absl::optional<float> maximum_duration_seconds) {
   LOG(INFO) << "Initiate PDP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializePartialDependencePlotSet(
@@ -508,6 +509,11 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
   std::default_random_engine random;
   std::uniform_real_distribution<float> dist_unif_unit;
 
+  absl::optional<absl::Time> cutoff_time;
+  if (maximum_duration_seconds.has_value()) {
+    cutoff_time = absl::Now() + absl::Seconds(maximum_duration_seconds.value());
+  }
+
   // TODO: Multi-thread.
   dataset::proto::Example example;
   for (size_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
@@ -516,6 +522,10 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
     }
     if ((example_idx % 100) == 0) {
       LOG_EVERY_N_SEC(INFO, 30) << example_idx + 1 << " examples scanned.";
+      if (cutoff_time.has_value() && absl::Now() > cutoff_time) {
+        LOG(INFO) << "Maximum duration reached. Interrupting analysis early.";
+        break;
+      }
     }
     dataset.ExtractExample(example_idx, &example);
 
@@ -528,8 +538,9 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
 absl::StatusOr<ConditionalExpectationPlotSet>
 ComputeConditionalExpectationPlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
-    const std::vector<std::vector<int>>& attribute_idxs, int num_numerical_bins,
-    float example_sampling) {
+    const std::vector<std::vector<int>>& attribute_idxs,
+    const int num_numerical_bins, const float example_sampling,
+    const absl::optional<float> maximum_duration_seconds) {
   LOG(INFO) << "Initiate CEP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializeConditionalExpectationPlotSet(
@@ -542,6 +553,11 @@ ComputeConditionalExpectationPlotSet(
   std::default_random_engine random;
   std::uniform_real_distribution<float> dist_unif_01;
 
+  absl::optional<absl::Time> cutoff_time;
+  if (maximum_duration_seconds.has_value()) {
+    cutoff_time = absl::Now() + absl::Seconds(maximum_duration_seconds.value());
+  }
+
   // TODO: Multi-thread.
   dataset::proto::Example example;
   for (size_t example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
@@ -550,6 +566,10 @@ ComputeConditionalExpectationPlotSet(
     }
     if ((example_idx % 100) == 0) {
       LOG_EVERY_N_SEC(INFO, 30) << example_idx + 1 << " examples scanned.";
+      if (cutoff_time.has_value() && absl::Now() > cutoff_time) {
+        LOG(INFO) << "Maximum duration reached. Interrupting analysis early.";
+        break;
+      }
     }
     dataset.ExtractExample(example_idx, &example);
     RETURN_IF_ERROR(

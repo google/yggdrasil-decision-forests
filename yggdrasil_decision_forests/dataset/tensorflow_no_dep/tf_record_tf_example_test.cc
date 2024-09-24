@@ -44,6 +44,10 @@ std::string ToyDatasetTypedPathTFExampleTFRecord() {
       "tfrecordv2+tfe:",
       file::JoinPath(DatasetDir(), "toy.nocompress-tfe-tfrecord@2"));
 }
+std::string ToyDatasetCompressedTypedPathTFExampleTFRecord() {
+  return absl::StrCat("tfrecord:",
+                      file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2"));
+}
 
 proto::DataSpecification CreateDataspec() {
   return PARSE_TEST_PROTO(
@@ -103,6 +107,75 @@ TEST(TFRecordTFEV2, Writer) {
   const std::string typed_output_dataset_path_recordio_tfe =
       absl::StrCat("tfrecordv2+tfe:",
                    file::JoinPath(test::TmpDirectory(), "test.tfrecordv2"));
+  {
+    auto writer_or_status = CreateExampleWriter(
+        typed_output_dataset_path_recordio_tfe, data_spec, -1);
+    auto writer = std::move(writer_or_status.value());
+    EXPECT_OK(writer->Write(example));
+  }
+
+  auto tfrecord_tfe_reader =
+      CreateTFExampleReader(typed_output_dataset_path_recordio_tfe);
+  tensorflow ::Example read_example;
+  EXPECT_TRUE(tfrecord_tfe_reader.value()->Next(&read_example).value());
+  const tensorflow::Example expected_read_example = PARSE_TEST_PROTO(
+      R"pb(
+        features {
+          feature {
+            key: "a"
+            value { float_list { value: 0.5 } }
+          }
+          feature {
+            key: "b"
+            value { float_list { value: 0 value: 1 } }
+          }
+          feature {
+            key: "c"
+            value { float_list { value: 0 value: 1 } }
+          }
+          feature {
+            key: "d"
+            value { int64_list { value: 1 } }
+          }
+          feature {
+            key: "e"
+            value { int64_list { value: 0 value: 1 } }
+          }
+          feature {
+            key: "f"
+            value { int64_list { value: 0 value: 1 } }
+          }
+          feature {
+            key: "g"
+            value { float_list { value: 1 } }
+          }
+          feature {
+            key: "h"
+            value { bytes_list { value: "hello" } }
+          }
+        }
+      )pb");
+  EXPECT_THAT(read_example, EqualsProto(expected_read_example));
+  EXPECT_FALSE(tfrecord_tfe_reader.value()->Next(&read_example).value());
+}
+
+TEST(TFRecordTFEV2, ReaderCompressed) {
+  const std::string path = ToyDatasetCompressedTypedPathTFExampleTFRecord();
+  ASSERT_OK_AND_ASSIGN(auto reader, CreateTFExampleReader(path));
+  tensorflow::Example example;
+  int num_rows = 0;
+  while (reader->Next(&example).value()) {
+    num_rows++;
+  }
+  EXPECT_EQ(num_rows, 4);
+}
+
+TEST(TFRecordTFEV2, WriterCompressed) {
+  const proto::DataSpecification data_spec = CreateDataspec();
+  const proto::Example example = CreateExample();
+
+  const std::string typed_output_dataset_path_recordio_tfe = absl::StrCat(
+      "tfrecord:", file::JoinPath(test::TmpDirectory(), "test.tfrecord.gz"));
   {
     auto writer_or_status = CreateExampleWriter(
         typed_output_dataset_path_recordio_tfe, data_spec, -1);

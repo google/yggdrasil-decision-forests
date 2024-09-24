@@ -19,7 +19,8 @@
 #
 # Usage example:
 #   third_party/yggdrasil_decision_forests/port/python/tools/local_copybara_export.sh
-
+#   INTERACTIVE=1 third_party/yggdrasil_decision_forests/port/python/tools/local_copybara_export.sh
+#
 set -vex
 
 LOCAL_DIR="/usr/local/google/home/${USER}/git/yggdrasil-decision-forests"
@@ -42,7 +43,7 @@ function local_export () {
 
 build_and_test() {
   cd "${LOCAL_DIR}/yggdrasil_decision_forests/port/python"
-  sudo tools/release_linux.sh
+  sudo INTERACTIVE=$INTERACTIVE tools/release_linux.sh
 }
 
 local_export

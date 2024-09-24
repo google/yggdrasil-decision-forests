@@ -473,6 +473,15 @@ absl::Status PlotPartialDependencePlot1DCategories(
                                      attr_spec.type(), prediction_curve));
     } break;
 
+    case model::proto::Task::ANOMALY_DETECTION: {
+      auto* prediction_curve = AddCurve(pdp_plot);
+      prediction_curve->style = plot::LineStyle::SOLID;
+      RETURN_IF_ERROR(Set1DCurveData(pdp, CurveTargetType::kPrediction,
+                                     swap_axes,
+                                     model::proto::Task::ANOMALY_DETECTION, -1,
+                                     attr_spec.type(), prediction_curve));
+    } break;
+
     default:
       return absl::InvalidArgumentError("Not implemented");
   }
@@ -714,6 +723,11 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
     return absl::InvalidArgumentError("The dataset is empty.");
   }
 
+  const absl::optional<float> maximum_duration_seconds =
+      options.has_maximum_duration_seconds()
+          ? options.maximum_duration_seconds()
+          : absl::optional<float>{};
+
   // Try to create a fast engine.
   const model::AbstractModel* effective_model = &model;
   auto engine_or = model.BuildFastEngine();
@@ -737,11 +751,12 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
                          /*flag_2d=*/false,
                          /*flag_2d_categorical_numerical=*/false));
 
-    ASSIGN_OR_RETURN(*analysis.mutable_pdp_set(),
-                     utils::ComputePartialDependencePlotSet(
-                         dataset, *effective_model, attribute_idxs,
-                         options.pdp().num_numerical_bins(),
-                         options.pdp().example_sampling()));
+    ASSIGN_OR_RETURN(
+        *analysis.mutable_pdp_set(),
+        utils::ComputePartialDependencePlotSet(
+            dataset, *effective_model, attribute_idxs,
+            options.pdp().num_numerical_bins(),
+            options.pdp().example_sampling(), maximum_duration_seconds));
   }
 
   // Conditional Expectation Plot
@@ -752,11 +767,12 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
                          /*flag_2d=*/false,
                          /*flag_2d_categorical_numerical=*/false));
 
-    ASSIGN_OR_RETURN(*analysis.mutable_cep_set(),
-                     utils::ComputeConditionalExpectationPlotSet(
-                         dataset, *effective_model, attribute_idxs,
-                         options.cep().num_numerical_bins(),
-                         options.cep().example_sampling()));
+    ASSIGN_OR_RETURN(
+        *analysis.mutable_cep_set(),
+        utils::ComputeConditionalExpectationPlotSet(
+            dataset, *effective_model, attribute_idxs,
+            options.cep().num_numerical_bins(),
+            options.cep().example_sampling(), maximum_duration_seconds));
   }
 
   // TODO: Implement permuted variable importances for anomaly detection.

@@ -29,6 +29,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/base/optimization.h"
 #include "absl/status/status.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
@@ -317,7 +318,7 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
         float num_value;
         if (!absl::SimpleAtof(value, &num_value)) {
           return absl::InvalidArgumentError(
-              absl::StrCat("Cannot parse: ", value));
+              absl::StrCat("Cannot parse value ", value, " as a float"));
         }
 
         dst_value->set_numerical(num_value);
@@ -329,7 +330,7 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
         float num_value;
         if (!absl::SimpleAtof(value, &num_value)) {
           return absl::InvalidArgumentError(
-              absl::StrCat("Cannot parse: ", value));
+              absl::StrCat("Cannot parse value ", value, " as a float"));
         }
         dst_value->set_discretized_numerical(
             NumericalToDiscretizedNumerical(col_spec, num_value));
@@ -972,12 +973,16 @@ absl::StatusOr<float> DiscretizedNumericalToNumerical(
 
 DiscretizedNumericalIndex NumericalToDiscretizedNumerical(
     const proto::Column& col_spec, const float value) {
-  if (std::isnan(value)) {
+  if (ABSL_PREDICT_FALSE(std::isnan(value))) {
     return kDiscretizedNumericalMissingValue;
   }
   const auto& boundaries = col_spec.discretized_numerical().boundaries();
   const auto it = std::upper_bound(boundaries.begin(), boundaries.end(), value);
-  return std::distance(boundaries.begin(), it);
+  DiscretizedNumericalIndex discretized_value =
+      std::distance(boundaries.begin(), it);
+  DCHECK_GE(discretized_value, 0);
+  DCHECK_LT(discretized_value, boundaries.size() + 1);
+  return discretized_value;
 }
 
 std::string EscapeTrainingConfigFeatureName(absl::string_view feature_name) {

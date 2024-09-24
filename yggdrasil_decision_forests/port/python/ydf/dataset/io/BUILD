@@ -25,6 +25,7 @@ py_library(
     deps = [
         ":dataset_io_types",
         ":pandas_io",
+        ":pygrain_io",
         ":tensorflow_io",
         ":xarray_io",
         # numpy dep,
@@ -57,6 +58,16 @@ py_library(
     deps = [":dataset_io_types"],
 )
 
+py_library(
+    name = "pygrain_io",
+    srcs = ["pygrain_io.py"],
+    deps = [
+        ":dataset_io_types",
+        # absl/logging dep,
+        # numpy dep,
+    ],
+)
+
 # Tests
 # =====
 
@@ -74,9 +85,29 @@ py_test(
     name = "xarray_io_test",
     srcs = ["xarray_io_test.py"],
     deps = [
+        ":dataset_io_types",
         ":xarray_io",
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # pandas dep,
         # xarray dep,
+    ],
+)
+
+py_test(
+    name = "pygrain_io_test",
+    srcs = ["pygrain_io_test.py"],
+    # TODO: Figure out what to do with Pygrain support, since it does not work on MacOS.
+    tags = ["manual"],  # Grain is not supported on MacOS
+    deps = [
+        ":dataset_io_types",
+        ":pygrain_io",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # grain:python dep,
+        # jax dep,  # buildcleaner: keep
+        # numpy dep,
     ],
 )
 

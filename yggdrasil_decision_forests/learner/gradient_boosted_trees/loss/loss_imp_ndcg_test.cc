@@ -15,14 +15,19 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_ndcg.h"
 
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_cross_entropy_ndcg.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
@@ -216,6 +221,46 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictions) {
   }
 }
 
+TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  const bool weighted = GetParam();
+  std::vector<float> weights;
+  if (weighted) {
+    weights = {1.f, 3.f, 1.f, 3.f};
+  }
+
+  // Perfectly wrong predictions.
+  std::vector<float> predictions = {2., 2., 1., 1.};
+  proto::GradientBoostedTreesTrainingConfig gbt_config;
+  gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(1);
+  const NDCGLoss loss_imp(gbt_config, model::proto::Task::RANKING,
+                          dataset.data_spec().columns(0));
+  RankingGroupsIndices index;
+  EXPECT_OK(index.Initialize(dataset, 0, 1));
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 0, predictions, weights, &index));
+  if (weighted) {
+    // R> 0.7238181 = (sum((2^c(1,3)-1)/log2(seq(2)+1)) /
+    // sum((2^c(3,1)-1)/log2(seq(2)+1)) +  3(sum((2^c(2,4)-1)/log2(seq(2)+1)) /
+    // sum((2^c(4,2)-1)/log2(seq(2)+1))) )/4
+    EXPECT_NEAR(loss_results.loss, -(1. / 7. + 9. / 15.) / 4., kTestPrecision);
+    EXPECT_THAT(
+        loss_results.secondary_metrics,
+        ElementsAre(FloatNear((1. / 7. + 9. / 15.) / 4., kTestPrecision)));
+  } else {
+    // R> 0.7238181 = (sum((2^c(1,3)-1)/log2(seq(2)+1)) /
+    // sum((2^c(3,1)-1)/log2(seq(2)+1)) +  sum((2^c(2,4)-1)/log2(seq(2)+1)) /
+    // sum((2^c(4,2)-1)/log2(seq(2)+1)) )/2
+    EXPECT_NEAR(loss_results.loss, -(1. / 7. + 3. / 15.) / 2., kTestPrecision);
+    EXPECT_THAT(
+        loss_results.secondary_metrics,
+        ElementsAre(FloatNear((1. / 7. + 3. / 15.) / 2., kTestPrecision)));
+  }
+}
+
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectPredictions) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
@@ -269,6 +314,24 @@ TEST(NDCGLossTest, SecondaryMetricName) {
   const auto loss_imp =
       NDCGLoss({}, model::proto::Task::RANKING, dataset.data_spec().columns(0));
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("NDCG@5"));
+}
+
+TEST(NDCGLossTest, SecondaryMetricNameTrucation10) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  proto::GradientBoostedTreesTrainingConfig gbt_config;
+  gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(10);
+  const auto loss_imp = NDCGLoss(gbt_config, model::proto::Task::RANKING,
+                                 dataset.data_spec().columns(0));
+  EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("NDCG@10"));
+}
+
+TEST(NDCGLossTest, InvalidTruncation) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  proto::GradientBoostedTreesTrainingConfig gbt_config;
+  gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(0);
+  const auto loss_imp = NDCGLoss(gbt_config, model::proto::Task::RANKING,
+                                 dataset.data_spec().columns(0));
+  EXPECT_EQ(loss_imp.Status().code(), absl::StatusCode::kInvalidArgument);
 }
 
 INSTANTIATE_TEST_SUITE_P(NDCGLossTestSuite, NDCGLossTest, testing::Bool());

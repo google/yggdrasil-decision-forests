@@ -18,6 +18,7 @@
 #include <stdint.h>
 
 #include <memory>
+#include <utility>
 
 #include "absl/base/internal/endian.h"
 #include "absl/crc/crc32c.h"
@@ -26,20 +27,24 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
+#include "yggdrasil_decision_forests/utils/zlib.h"
 
 namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep {
 namespace {
 constexpr char kInvalidDataMessage[] =
-    "The file is not a non-compressed TFRecord or it is corrupted. If "
-    "you have a compressed TFRecord, decompress it first.";
+    "The data is not a valid non-compressed TF Record. The data is either "
+    "corrupted or (more likely) a gzip compressed TFRecord. In this later "
+    "case, fix the type prefix in the filepath. For example, replace "
+    "'tfrecordv2+tfe:' with 'tfrecord:' (recommended) or  ('tfrecord+tfe').";
 
 static const uint32_t kMaskDelta = 0xa282ead8ul;
 
 // Mask applied by TF Record over the CRCs.
-// See tensorflow/tsl/lib/hash/crc32c.h
+// See tensorflow/compiler/xla/tsl/lib/hash/crc32c.h
 // Note: TF Record does NOT compute CRC over a string containing a CRC.
 inline uint32_t Mask(const uint32_t crc) {
   return ((crc >> 15) | (crc << 17)) + kMaskDelta;
@@ -70,8 +75,13 @@ TFRecordReader::~TFRecordReader() {
 }
 
 absl::StatusOr<std::unique_ptr<TFRecordReader>> TFRecordReader::Create(
-    const absl::string_view path) {
-  ASSIGN_OR_RETURN(auto stream, file::OpenInputFile(path));
+    const absl::string_view path, bool compressed) {
+  ASSIGN_OR_RETURN(std::unique_ptr<utils::InputByteStream> stream,
+                   file::OpenInputFile(path));
+  if (compressed) {
+    ASSIGN_OR_RETURN(stream,
+                     utils::GZipInputByteStream::Create(std::move(stream)));
+  }
   return absl::make_unique<TFRecordReader>(std::move(stream));
 }
 
@@ -122,8 +132,13 @@ absl::Status TFRecordReader::Close() {
 }
 
 absl::StatusOr<std::unique_ptr<TFRecordWriter>> TFRecordWriter::Create(
-    absl::string_view path) {
-  ASSIGN_OR_RETURN(auto stream, file::OpenOutputFile(path));
+    absl::string_view path, bool compressed) {
+  ASSIGN_OR_RETURN(std::unique_ptr<utils::OutputByteStream> stream,
+                   file::OpenOutputFile(path));
+  if (compressed) {
+    ASSIGN_OR_RETURN(stream,
+                     utils::GZipOutputByteStream::Create(std::move(stream)));
+  }
   return absl::make_unique<TFRecordWriter>(std::move(stream));
 }
 

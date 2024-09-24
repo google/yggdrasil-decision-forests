@@ -106,8 +106,9 @@ class GradientBoostedTreesModel : public AbstractModel,
     return &decision_trees_;
   }
 
+  void set_loss(proto::Loss loss, const proto::LossConfiguration& loss_config);
   proto::Loss loss() const { return loss_; }
-  void set_loss(const proto::Loss loss) { loss_ = loss; }
+  proto::LossConfiguration loss_config() const { return loss_config_; }
 
   int num_trees_per_iter() const { return num_trees_per_iter_; }
   void set_num_trees_per_iter(const int num_trees_per_iter) {
@@ -231,8 +232,6 @@ class GradientBoostedTreesModel : public AbstractModel,
 
   // The decision trees.
   std::vector<std::unique_ptr<decision_tree::DecisionTree>> decision_trees_;
-  // Loss used to train the model.
-  proto::Loss loss_;
   // Prediction constant of the model.
   std::vector<float> initial_predictions_;
 
@@ -269,6 +268,12 @@ class GradientBoostedTreesModel : public AbstractModel,
  private:
   proto::Header BuildHeaderProto() const;
   void ApplyHeaderProto(const proto::Header& header);
+  // Full name of the loss, including NDCG truncation where applicable.
+  std::string GetLossName() const;
+  // Loss used to train the model.
+  proto::Loss loss_;
+  // Options of the loss.
+  proto::LossConfiguration loss_config_;
 };
 
 namespace internal {

@@ -32,6 +32,7 @@ cc_library_ydf(
     ],
     deps = [
         ":training_cc_proto",
+        "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:types",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",

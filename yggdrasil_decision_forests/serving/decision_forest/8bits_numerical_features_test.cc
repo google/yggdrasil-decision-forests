@@ -102,7 +102,10 @@ void BuildToyModelAndToyDataset(
   model->set_task(model::proto::Task::CLASSIFICATION);
   model->set_label_col_idx(0);
   model->set_data_spec(dataspec);
-  model->set_loss(Loss::BINOMIAL_LOG_LIKELIHOOD);
+  model::gradient_boosted_trees::proto::LossConfiguration loss_config;
+  model->set_loss(
+      model::gradient_boosted_trees::proto::Loss::BINOMIAL_LOG_LIKELIHOOD,
+      loss_config);
   model->mutable_initial_predictions()->push_back(1.f);
   *model->mutable_input_features() = {1, 2};
   // Avoid an access to uninitialized memory when printing the model.

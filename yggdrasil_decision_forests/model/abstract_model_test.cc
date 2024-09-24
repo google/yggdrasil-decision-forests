@@ -26,7 +26,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -42,6 +42,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -379,6 +380,122 @@ TEST(FloatToProtoPrediction, Base) {
   EXPECT_THAT(prediction, EqualsProto(utils::ParseTextProto<proto::Prediction>(
                                           R"(anomaly_detection { value: 0.2 })")
                                           .value()));
+}
+
+TEST(ProtoToFloatPrediction, BinaryClassification) {
+  std::vector<float> dst_prediction(1);
+  proto::Prediction prediction;
+
+  // example_idx = 0
+  ASSERT_OK_AND_ASSIGN(
+      prediction,
+      utils::ParseTextProto<proto::Prediction>(
+          R"pb(classification {
+                 value: 1
+                 distribution { counts: 0 counts: 1 counts: 0 sum: 1 }
+               })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::CLASSIFICATION,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 0.0f);
+
+  // example_idx = 1
+  ASSERT_OK_AND_ASSIGN(
+      prediction,
+      utils::ParseTextProto<proto::Prediction>(
+          R"pb(classification {
+                 value: 1
+                 distribution { counts: 0 counts: 0.5 counts: 0.5 sum: 1 }
+               })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::CLASSIFICATION,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 0.5f);
+
+  // example_idx = 2
+  ASSERT_OK_AND_ASSIGN(
+      prediction,
+      utils::ParseTextProto<proto::Prediction>(
+          R"pb(classification {
+                 value: 2
+                 distribution { counts: 0 counts: 0 counts: 1 sum: 1 }
+               })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::CLASSIFICATION,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 1.0f);
+}
+
+TEST(ProtoToFloatPrediction, MulticlassClassification) {
+  std::vector<float> dst_prediction(2);
+
+  // example_idx = 0
+  proto::Prediction prediction;
+
+  // example_idx = 0
+  ASSERT_OK_AND_ASSIGN(
+      prediction,
+      utils::ParseTextProto<proto::Prediction>(
+          R"pb(classification {
+                 value: 2
+                 distribution { counts: 0 counts: 0.2 counts: 0.8 sum: 1 }
+               })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::CLASSIFICATION,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 0.2f);
+  EXPECT_FLOAT_EQ(dst_prediction[1], 0.8f);
+
+  // example_idx = 1
+  ASSERT_OK_AND_ASSIGN(
+      prediction,
+      utils::ParseTextProto<proto::Prediction>(
+          R"pb(classification {
+                 value: 2
+                 distribution { counts: 0 counts: 0.4 counts: 0.6 sum: 1 }
+               })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::CLASSIFICATION,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 0.4f);
+  EXPECT_FLOAT_EQ(dst_prediction[1], 0.6f);
+}
+
+TEST(ProtoToFloatPrediction, Regression) {
+  std::vector<float> dst_prediction(1);
+  proto::Prediction prediction;
+  ASSERT_OK_AND_ASSIGN(prediction, utils::ParseTextProto<proto::Prediction>(
+                                       R"pb(regression { value: 0.2 })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::REGRESSION,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 0.2f);
+}
+
+TEST(ProtoToFloatPrediction, Ranking) {
+  std::vector<float> dst_prediction(1);
+  proto::Prediction prediction;
+  ASSERT_OK_AND_ASSIGN(prediction, utils::ParseTextProto<proto::Prediction>(
+                                       R"pb(ranking { relevance: 0.2 })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::RANKING,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 0.2f);
+}
+
+TEST(ProtoToFloatPrediction, Uplift) {
+  std::vector<float> dst_prediction(1);
+  proto::Prediction prediction;
+  ASSERT_OK_AND_ASSIGN(prediction,
+                       utils::ParseTextProto<proto::Prediction>(
+                           R"pb(uplift { treatment_effect: 0.4 })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::CATEGORICAL_UPLIFT,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 0.4f);
+}
+
+TEST(ProtoToFloatPrediction, AnomalyDetection) {
+  std::vector<float> dst_prediction(1);
+  proto::Prediction prediction;
+  ASSERT_OK_AND_ASSIGN(prediction,
+                       utils::ParseTextProto<proto::Prediction>(
+                           R"pb(anomaly_detection { value: 0.2 })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::ANOMALY_DETECTION,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 0.2f);
 }
 
 TEST(Evaluate, FromVerticalDataset) {

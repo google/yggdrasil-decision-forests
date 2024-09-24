@@ -130,6 +130,7 @@ py_library(
         "//ydf/metric",
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
+        "//ydf/utils:concurrency",
         "//ydf/utils:log",
         "@ydf_cc//yggdrasil_decision_forests/utils:fold_generator_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_py_proto",
@@ -287,6 +288,7 @@ py_test(
     python_version = "PY3",
     shard_count = 10,
     deps = [
+        ":generic_learner",
         ":specialized_learners",
         ":tuner",
         ":worker",

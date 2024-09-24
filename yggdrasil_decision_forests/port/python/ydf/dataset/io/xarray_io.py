@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Connectors for loading data from Pandas dataframes."""
+"""Connectors for loading data from Xarray datasets."""
 
 import sys
 from typing import Dict
@@ -48,6 +48,19 @@ def to_dict(
 ) -> Dict[str, dataset_io_types.InputValues]:
   """Converts a Xarray dataframe to a dict of numpy arrays."""
   xr = import_xarray()
+
   assert isinstance(data, xr.Dataset)
 
-  return {k: v.values for k, v in data.items()}  # pytype: disable=attribute-error
+  for k in data:
+    if not isinstance(k, str):
+      raise ValueError("The xarray Dataset must have string column names.")
+
+  def clean(values):
+    if values.dtype == "object":
+      return values.fillna("").to_numpy()
+    else:
+      return values.to_numpy()
+
+  data_dict = {k: clean(v) for k, v in data.items()}
+
+  return data_dict

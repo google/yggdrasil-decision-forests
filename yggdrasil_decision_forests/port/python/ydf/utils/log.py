@@ -56,6 +56,13 @@ class WarningMessage(enum.Enum):
   USE_DISCRETIZED = 3
   USE_DISTRIBUTED = 4
   DONT_USE_PICKLE = 5
+  TRAINING_VERTICAL_DATASET = 6
+  # TODO: Remove when solved.
+  WEIGHTED_NOT_SET_IN_EVAL = 7
+  DEPRECATED_EVALUATION_TASK = 8
+  UNNECESSARY_TASK_ARGUMENT = 9
+  UNNECESSARY_LABEL_ARGUMENT = 10
+  TFE_READING_IN_PYTHON_IS_SLOW = 11
 
 
 # List of already showed warning message that should not be displayed again.

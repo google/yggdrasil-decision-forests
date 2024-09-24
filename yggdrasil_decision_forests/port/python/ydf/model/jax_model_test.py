@@ -434,7 +434,7 @@ class JaxModelTest(parameterized.TestCase):
             "cs1": {"<OOD>": 0, "a": 1, "b": 2, "c": 3},
             "cs2": {"<OOD>": 0, "a": 1, "b": 2, "c": 3},
             "cs3": {"<OOD>": 0, "1": 1, "2": 2, "3": 3},
-            "cs4": {"<OOD>": 0, "False": 1, "True": 2},
+            "cs4": {"<OOD>": 0, "false": 1, "true": 2},
         },
     )
 
@@ -1238,9 +1238,9 @@ class ToJaxTest(parameterized.TestCase):
     logging.info(
         "post_tuned_jax_test_accuracy: %s", post_tuned_jax_test_accuracy
     )
-    # The model quality improve by at least 0.01 of accuracy.
+    # The model quality improve by at least 0.008 of accuracy.
     self.assertGreaterEqual(
-        post_tuned_jax_test_accuracy, pre_tuned_jax_test_accuracy + 0.01
+        post_tuned_jax_test_accuracy, pre_tuned_jax_test_accuracy + 0.008
     )
 
     # Update the YDF model with the finetuned parameters

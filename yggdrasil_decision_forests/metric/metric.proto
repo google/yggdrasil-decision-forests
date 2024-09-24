@@ -100,7 +100,13 @@ message EvaluationOptions {
   // however.
   optional dataset.proto.WeightDefinition weights = 6;
 
-  // Next ID: 10
+  // Force usage of the slow engine for predictions. This option is ignored by
+  // functions that are called with a fast engine
+  optional bool force_slow_engine = 10 [default = false];
+
+  optional int32 num_threads = 11 [default = 6];
+
+  // Next ID: 12
 }
 
 // Evaluation results of a model.

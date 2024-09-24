@@ -267,6 +267,9 @@ message LearnerCapabilities {
   // If true, the learner requires a label. If false, the learner does not
   // require a label.
   optional bool require_label = 7 [default = true];
+
+  // If true, the learner supports custom losses.
+  optional bool support_custom_loss = 8 [default = false];
 }
 
 // Monotonic constraints between model's output and numerical input features.

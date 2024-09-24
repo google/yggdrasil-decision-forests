@@ -261,7 +261,8 @@ absl::StatusOr<proto::Server::Stub*> GRPCManager::UpdateWorkerConnection(
 
 absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
   if (verbosity_) {
-    LOG(INFO) << "Change the number of parallel execution per worker";
+    LOG(INFO) << "Change the number of parallel execution per worker to "
+              << num;
   }
 
   // Close the query channels.

@@ -24,6 +24,7 @@ from absl.testing import absltest
 import pandas as pd
 import portpicker
 
+from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
 from ydf.learner import tuner as tuner_lib
 from ydf.learner import worker
@@ -164,6 +165,34 @@ class DistributedGradientBoostedTreesLearnerTest(absltest.TestCase):
 
     workers.stop()
     self.assertAlmostEqual(model.evaluate(str(test_ds)).accuracy, 0.850, 1)
+
+  def test_synthetic_ranking(self):
+    # Prepare datasets
+    tmp_dir = pathlib.Path(self.create_tempdir().full_path)
+    dataset_directory = test_utils.ydf_test_data_pathlib() / "dataset"
+    splitted_train_ds = split_dataset(
+        dataset_directory / "synthetic_ranking_train.csv", tmp_dir, 10
+    )
+    logging.info("Dataset paths: %s", splitted_train_ds)
+    test_ds = dataset_directory / "synthetic_ranking_test.csv"
+
+    # Start workers
+    workers = create_in_process_workers(4)
+
+    # Train model
+    model = specialized_learners.DistributedGradientBoostedTreesLearner(
+        label="LABEL",
+        ranking_group="GROUP",
+        task=generic_learner.Task.RANKING,
+        working_dir=os.path.join(tmp_dir, "work_dir"),
+        resume_training=True,
+        num_trees=10,
+        workers=workers.ips,
+    ).train(",".join(map(str, splitted_train_ds)))
+
+    workers.stop()
+    # Note: Training 300 trees gets a 0.7151 NDCG@5.
+    self.assertAlmostEqual(model.evaluate(str(test_ds)).ndcg, 0.7055, 1)
 
 
 class HyperParameterTunerTest(absltest.TestCase):

@@ -3,6 +3,24 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
+## HEAD
+
+### Features
+
+-   Speed-up training of GBT models by ~10%.
+-   Support for categorical and boolean features in Isolation Forests.
+-   Rename LAMBDA_MART_NDCG5 to LAMBDA_MART_NDCG. The old name is deprecated but
+    can still be used.
+-   Allow configuring the truncation of NDCG losses.
+-   Add support for distributed training for ranking gradient boosted tree
+    models.
+
+### Misc
+
+-   Loss options are now defined 
+    model/gradient_boosted_trees/gradient_boosted_trees.proto (previously
+    learner/gradient_boosted_trees/gradient_boosted_trees.proto)
+
 ## 1.10.0 - 2024-08-21
 
 ### Features

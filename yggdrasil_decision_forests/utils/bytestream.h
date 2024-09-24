@@ -44,6 +44,12 @@ class InputByteStream {
 
   // Reads and returns the entire content of the stream.
   absl::StatusOr<std::string> ReadAll();
+
+  // Interrupts the stream. If closed, the stream cannot be used anymore.
+  // Streams are not required to be closed (i.e., they are closed automatically
+  // at destruction). However, closing a stream explicitly allows to capture the
+  // closing status.
+  virtual absl::Status Close() { return absl::OkStatus(); }
 };
 
 // Wraps a InputByteStream around a absl::string_view.
@@ -86,11 +92,17 @@ class OutputByteStream {
 
   // Writes a chunk of bytes.
   virtual absl::Status Write(absl::string_view chunk) = 0;
+
+  // Interrupts the stream. If closed, the stream cannot be used anymore.
+  // Streams are not required to be closed (i.e., they are closed automatically
+  // at destruction). However, closing a stream explicitly allows to capture the
+  // closing status.
+  virtual absl::Status Close() { return absl::OkStatus(); }
 };
 
 class StringOutputByteStream : public OutputByteStream {
  public:
-  ~StringOutputByteStream() override{};
+  ~StringOutputByteStream() override {};
 
   absl::Status Write(absl::string_view chunk) override;
 

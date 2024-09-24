@@ -35,7 +35,7 @@ namespace yggdrasil_decision_forests::port::python {
 
 // A collection of values, similar to a "Span<const T>", but with a
 // stride (i.e., items are evenly spaced, but possibly with a constant gap).
-// Only support what is needed by PYDF.
+// It only supports what is needed by PYDF.
 //
 // "StridedSpan" does not own the underlying data and relies on the data
 // in "data". The initialization "py::array_t data" object should not be
@@ -46,7 +46,7 @@ class StridedSpan {
   // Build a "StridedSpan".
   //
   // Args:
-  //   data: A one dimensional array of values.
+  //   data: A one-dimensional array of values.
   StridedSpan(py::array_t<T>& data)
       : item_stride_(data.strides(0) / data.itemsize()),
         size_(static_cast<size_t>(data.shape(0))),
@@ -82,8 +82,8 @@ struct NPByteArray {
   // Value accessor.
   std::string_view operator[](size_t i) const;
 
-  // Extracts the content of the numpy array into a string vector.
-  std::vector<std::string> ToVector() const;
+  // Extracts the content of the numpy array into a string_view vector.
+  std::vector<std::string_view> ToVectorNotOwned() const;
 
   const char* _data;
   const size_t _stride;

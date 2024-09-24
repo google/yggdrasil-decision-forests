@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <utility>
 
 #include "yggdrasil_decision_forests/utils/logging.h"  // IWYU pragma: keep
 
@@ -48,4 +49,27 @@ void ConcurrentForLoop(
   blocker.Wait();
 }
 
+namespace internal {
+
+// Computes the optimal block size and number of threads.
+std::pair<size_t, size_t> GetConfig(size_t num_items, size_t max_num_threads,
+                                    size_t min_block_size,
+                                    size_t max_block_size) {
+  size_t block_size = (num_items + max_num_threads - 1) / max_num_threads;
+  if (block_size < min_block_size) {
+    block_size = min_block_size;
+  } else if (block_size > max_block_size) {
+    block_size = max_block_size;
+  }
+
+  size_t num_threads = (num_items + block_size - 1) / block_size;
+  if (num_threads < 1) {
+    num_threads = 1;
+  } else if (num_threads > max_num_threads) {
+    num_threads = max_num_threads;
+  }
+  return std::make_pair(block_size, num_threads);
+}
+
+}  // namespace internal
 }  // namespace yggdrasil_decision_forests::utils::concurrency

@@ -48,7 +48,7 @@ const (
 	Loss_SQUARED_ERROR Loss = 2
 	// Multinomial log likelihood i.e. cross-entropy.
 	Loss_MULTINOMIAL_LOG_LIKELIHOOD Loss = 3
-	// LambdaMART with NDCG5
+	// Deprecated: Use Loss_LAMBDA_MART_NDCG. LambdaMART with NDCG5
 	Loss_LAMBDA_MART_NDCG5 Loss = 4
 	// XE_NDCG_MART [arxiv.org/abs/1911.09798]
 	Loss_XE_NDCG_MART Loss = 5
@@ -57,6 +57,8 @@ const (
 	Loss_BINARY_FOCAL_LOSS Loss = 6
 	// Poisson loss. Only valid for regression.
 	Loss_POISSON Loss = 7
+	// LambdaMART with NDCG@5.
+	Loss_LAMBDA_MART_NDCG Loss = 8
 )
 
 // Enum value maps for Loss.
@@ -70,6 +72,7 @@ var (
 		5: "XE_NDCG_MART",
 		6: "BINARY_FOCAL_LOSS",
 		7: "POISSON",
+		8: "LAMBDA_MART_NDCG",
 	}
 	Loss_value = map[string]int32{
 		"DEFAULT":                    0,
@@ -80,6 +83,7 @@ var (
 		"XE_NDCG_MART":               5,
 		"BINARY_FOCAL_LOSS":          6,
 		"POISSON":                    7,
+		"LAMBDA_MART_NDCG":           8,
 	}
 )
 

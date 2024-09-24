@@ -42,7 +42,7 @@ and evaluation.
 -   [RandomSearchTuner](RandomSearchTuner.md)
 -   [VizierTuner](VizierTuner.md) (currently, for Googlers only)
 
-## Utilities
+## Other
 
 -   [verbose](utilities.md#ydf.verbose): Control the amount of logging.
 -   [load_model](utilities.md#ydf.load_model): Load a model from disk.
@@ -56,6 +56,13 @@ and evaluation.
 -   [start_worker](utilities.md#ydf.start_worker): Start a worker for
     distributed training.
 -   [strict](utilities.md#ydf.strict): Show more logs.
+
+## Utilities
+
+-   [ydf.util.read_tf_record](util.md#ydf.util.read_tf_record): Read a TF Record
+    dataset in memory.
+-   [ydf.util.write_tf_record](util.md#ydf.util.write_tf_record): Write a TF
+    Record dataset from memory.
 
 ## Advanced Utilities
 

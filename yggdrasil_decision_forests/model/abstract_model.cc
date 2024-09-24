@@ -36,6 +36,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -51,6 +52,7 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -214,12 +216,13 @@ AbstractModel::EvaluateOverrideType(
     std::vector<model::proto::Prediction>* predictions) const {
   RETURN_IF_ERROR(CheckCompatibleEvaluationTask(override_task, option.task()));
   metric::proto::EvaluationResults eval;
-  RETURN_IF_ERROR(
-      metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
+  const auto& label_col_spec =
+      dataset.data_spec().columns(override_label_col_idx);
+  RETURN_IF_ERROR(metric::InitializeEvaluation(option, label_col_spec, &eval));
   RETURN_IF_ERROR(AppendEvaluationOverrideType(
       dataset, option, override_task, override_label_col_idx,
       override_group_col_idx, rnd, &eval, predictions));
-  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, label_col_spec, &eval));
   return eval;
 }
 
@@ -234,13 +237,14 @@ AbstractModel::EvaluateWithEngineOverrideType(
   if (label_col_idx_ == -1) {
     STATUS_FATAL("A model cannot be evaluated without a label.");
   }
+  const auto& label_col_spec =
+      dataset.data_spec().columns(override_label_col_idx);
   metric::proto::EvaluationResults eval;
-  RETURN_IF_ERROR(
-      metric::InitializeEvaluation(option, LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(metric::InitializeEvaluation(option, label_col_spec, &eval));
   dataset::proto::LinkedWeightDefinition weight_links;
   if (option.has_weights()) {
     RETURN_IF_ERROR(dataset::GetLinkedWeightDefinition(
-        option.weights(), data_spec_, &weight_links));
+        option.weights(), dataset.data_spec(), &weight_links));
   }
   if (dataset.nrow() == 0) {
     STATUS_FATAL("The dataset is empty. Cannot evaluate model.");
@@ -248,7 +252,7 @@ AbstractModel::EvaluateWithEngineOverrideType(
   RETURN_IF_ERROR(AppendEvaluationWithEngineOverrideType(
       dataset, option, override_task, override_label_col_idx,
       override_group_col_idx, weight_links, engine, rnd, predictions, &eval));
-  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(metric::FinalizeEvaluation(option, label_col_spec, &eval));
   return eval;
 }
 
@@ -385,6 +389,57 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
   }
 }
 
+void ProtoToFloatPrediction(const proto::Prediction& src_prediction,
+                            proto::Task task,
+                            absl::Span<float> dst_prediction) {
+  size_t num_prediction_dimensions = dst_prediction.size();
+  switch (task) {
+    case proto::UNDEFINED:
+      LOG(WARNING) << "Undefined task";
+      break;
+    case proto::CLASSIFICATION: {
+      const auto& classification = src_prediction.classification();
+      if (num_prediction_dimensions == 1) {
+        // Binary classification, only need the probability of class 2
+        float proba_class2 = classification.distribution().counts(2) /
+                             classification.distribution().sum();
+        dst_prediction[0] = proba_class2;
+      } else {
+        // Multi-class classification, copy all probabilities
+        for (int dim_idx = 0; dim_idx < num_prediction_dimensions; dim_idx++) {
+          dst_prediction[dim_idx] =
+              classification.distribution().counts(dim_idx + 1) /
+              classification.distribution().sum();
+        }
+      }
+    } break;
+
+    case proto::REGRESSION:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction[0] = src_prediction.regression().value();
+      break;
+
+    case proto::RANKING:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction[0] = src_prediction.ranking().relevance();
+      break;
+
+    case proto::CATEGORICAL_UPLIFT:
+    case proto::NUMERICAL_UPLIFT:
+      DCHECK_EQ(num_prediction_dimensions,
+                src_prediction.uplift().treatment_effect().size());
+      std::copy(src_prediction.uplift().treatment_effect().begin(),
+                src_prediction.uplift().treatment_effect().end(),
+                dst_prediction.begin());
+      break;
+
+    case proto::ANOMALY_DETECTION:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction[0] = src_prediction.anomaly_detection().value();
+      break;
+  }
+}
+
 absl::Status AbstractModel::AppendEvaluationWithEngine(
     const dataset::VerticalDataset& dataset,
     const metric::proto::EvaluationOptions& option,
@@ -394,46 +449,69 @@ absl::Status AbstractModel::AppendEvaluationWithEngine(
     metric::proto::EvaluationResults* eval) const {
   const auto& engine_features = engine.features();
   const int num_prediction_dimensions = engine.NumPredictionDimension();
+  const size_t num_examples = dataset.nrow();
 
-  // Evaluate using the semi-fast generic engine.
-  const int64_t total_num_examples = dataset.nrow();
-  const int64_t batch_size =
-      std::min(static_cast<int64_t>(100), total_num_examples);
+  std::vector<float> raw_predictions(num_prediction_dimensions * num_examples);
 
-  DCHECK_GT(total_num_examples, 0);
-  auto batch_of_examples = engine.AllocateExamples(batch_size);
-  const int64_t num_batches =
-      (total_num_examples + batch_size - 1) / batch_size;
+  size_t initial_prediction_size = 0;
+  if (predictions) {
+    initial_prediction_size = predictions->size();
+    predictions->resize(initial_prediction_size + num_examples);
+  }
 
-  std::vector<float> batch_of_predictions;
-  proto::Prediction prediction;
-  for (int64_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
-    const int64_t begin_example_idx = batch_idx * batch_size;
-    const int64_t end_example_idx =
-        std::min(begin_example_idx + batch_size, total_num_examples);
-    const int effective_batch_size = end_example_idx - begin_example_idx;
+  struct Cache {
+    std::unique_ptr<serving::AbstractExampleSet> batch_of_examples;
+    std::vector<float> batch_of_predictions;
+  };
+
+  const auto create_cache = [&](size_t thread_idx, size_t num_threads,
+                                size_t block_size) -> Cache {
+    Cache cache;
+    cache.batch_of_examples = engine.AllocateExamples(block_size);
+    cache.batch_of_predictions.resize(block_size);
+    return cache;
+  };
+
+  const auto run = [&, num_prediction_dimensions](
+                       size_t block_idx, size_t begin_item_idx,
+                       size_t end_item_idx, Cache* cache) -> absl::Status {
+    // Compute predictions
+    const size_t effective_batch_size = end_item_idx - begin_item_idx;
     RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
-        dataset, begin_example_idx, end_example_idx, engine_features,
-        batch_of_examples.get()));
-    engine.Predict(*batch_of_examples, effective_batch_size,
-                   &batch_of_predictions);
-    for (int sub_example_idx = 0; sub_example_idx < effective_batch_size;
-         sub_example_idx++) {
-      FloatToProtoPrediction(batch_of_predictions, sub_example_idx, task(),
-                             num_prediction_dimensions, &prediction);
-      RETURN_IF_ERROR(SetGroundTruth(
-          dataset, begin_example_idx + sub_example_idx, &prediction));
-      if (option.has_weights()) {
-        ASSIGN_OR_RETURN(
-            const float weight,
-            dataset::GetWeightWithStatus(
-                dataset, begin_example_idx + sub_example_idx, weight_links));
-        prediction.set_weight(weight);
-      }
-      RETURN_IF_ERROR(metric::AddPrediction(option, prediction, rnd, eval));
-      if (predictions) {
-        predictions->push_back(prediction);
-      }
+        dataset, begin_item_idx, end_item_idx, engine_features,
+        cache->batch_of_examples.get()));
+    engine.Predict(*cache->batch_of_examples, effective_batch_size,
+                   &cache->batch_of_predictions);
+    std::copy(
+        cache->batch_of_predictions.begin(),
+        cache->batch_of_predictions.begin() +
+            effective_batch_size * num_prediction_dimensions,
+        raw_predictions.begin() + begin_item_idx * num_prediction_dimensions);
+    return absl::OkStatus();
+  };
+
+  RETURN_IF_ERROR(utils::concurrency::ConcurrentForLoopWithWorker<Cache>(
+      /*num_items=*/dataset.nrow(),
+      /*max_num_threads=*/option.num_threads(),
+      /*min_block_size=*/100,    // At least 100 examples in a batch
+      /*max_block_size=*/10000,  // No more than 10k examples in a batch
+      create_cache, run));
+
+  // Evaluate predictions
+  proto::Prediction proto_prediction;
+  for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
+    FloatToProtoPrediction(raw_predictions, example_idx, task(),
+                           num_prediction_dimensions, &proto_prediction);
+    RETURN_IF_ERROR(SetGroundTruth(dataset, example_idx, &proto_prediction));
+    if (option.has_weights()) {
+      ASSIGN_OR_RETURN(
+          const float weight,
+          dataset::GetWeightWithStatus(dataset, example_idx, weight_links));
+      proto_prediction.set_weight(weight);
+    }
+    RETURN_IF_ERROR(metric::AddPrediction(option, proto_prediction, rnd, eval));
+    if (predictions) {
+      (*predictions)[initial_prediction_size + example_idx] = proto_prediction;
     }
   }
   return absl::OkStatus();
@@ -454,7 +532,10 @@ absl::Status AbstractModel::AppendEvaluation(
         "The dataset is empty. Cannot evaluate model.");
   }
 
-  auto engine_or_status = BuildFastEngine();
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> engine_or_status;
+  if (!option.force_slow_engine()) {
+    engine_or_status = BuildFastEngine();
+  }
   if (engine_or_status.ok()) {
     RETURN_IF_ERROR(AppendEvaluationWithEngine(dataset, option, weight_links,
                                                *engine_or_status.value(), rnd,

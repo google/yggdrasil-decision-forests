@@ -318,6 +318,12 @@ absl::Status EvaluateSplitsPerNumericalFeature(
     SplitEvaluationPerOpenNode* split_evaluation,
     const dataset_cache::DatasetCacheReader* dataset);
 
+absl::Status EvaluateSplitsPerDiscretizedNumericalFeature(
+    const ExampleToNodeMap& example_to_node, const SplitPerOpenNode& splits,
+    FeatureIndex feature, const std::vector<int>& active_node_idxs,
+    SplitEvaluationPerOpenNode* split_evaluation,
+    const dataset_cache::DatasetCacheReader* dataset);
+
 // Evaluates a collection of splits on a specific categorical feature.
 absl::Status EvaluateSplitsPerCategoricalFeature(
     const ExampleToNodeMap& example_to_node, const SplitPerOpenNode& splits,

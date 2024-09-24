@@ -18,6 +18,7 @@
 #include <stdint.h>
 
 #include <algorithm>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -99,6 +100,67 @@ absl::StatusOr<LossResults> AbstractLoss::Loss(
   return absl::InternalError("Unknown label type");
 }
 
+absl::Status RankingGroupsIndices::InitializeFromTmpGroups(
+    absl::flat_hash_map<uint64_t, std::vector<Item>>&& tmp_groups,
+    UnsignedExampleIdx num_examples) {
+  num_items_ = num_examples;
+  // Sort the group items by decreasing ground truth relevance.
+  groups_.reserve(tmp_groups.size());
+  for (auto& group : tmp_groups) {
+    std::sort(group.second.begin(), group.second.end(),
+              [](const Item& a, const Item& b) {
+                if (a.relevance == b.relevance) {
+                  return a.example_idx > b.example_idx;
+                }
+                return a.relevance > b.relevance;
+              });
+
+    if (group.second.size() > kMaximumItemsInRankingGroup) {
+      LOG(WARNING)
+          << "The number of items in the group \"" << group.first << "\" is "
+          << group.second.size() << " which is greater than "
+          << kMaximumItemsInRankingGroup
+          << ".  This is likely a mistake in the generation of "
+             "the configuration of the group column. Note that large groups "
+             "might lead to training performance degradation.";
+    }
+
+    groups_.push_back(
+        {/*.group_idx =*/group.first, /*.items =*/std::move(group.second)});
+  }
+
+  // Sort the group by example index to improve the data locality.
+  std::sort(groups_.begin(), groups_.end(), [](const Group& a, const Group& b) {
+    if (a.items.front().example_idx == b.items.front().example_idx) {
+      return a.group_idx < b.group_idx;
+    }
+    return a.items.front().example_idx < b.items.front().example_idx;
+  });
+  LOG(INFO) << "Found " << groups_.size() << " groups in " << num_examples
+            << " examples.";
+  return absl::OkStatus();
+}
+
+absl::Status RankingGroupsIndices::Initialize(
+    absl::Span<const float> labels, absl::Span<const uint64_t> groups) {
+  DCHECK_EQ(labels.size(), groups.size());
+  if (labels.size() >= std::numeric_limits<UnsignedExampleIdx>::max()) {
+    return absl::InternalError(
+        "Too many examples. Make sure YDF is compiled with "
+        "YGGDRASIL_EXAMPLE_IDX_64_BITS");
+  }
+  // Fill index.
+  absl::flat_hash_map<uint64_t, std::vector<Item>> tmp_groups;
+  for (UnsignedExampleIdx example_idx = 0; example_idx < labels.size();
+       example_idx++) {
+    // Get the value of the group.
+    tmp_groups[groups[example_idx]].push_back(
+        {/*.relevance =*/labels[example_idx],
+         /*.example_idx =*/example_idx});
+  }
+  return InitializeFromTmpGroups(std::move(tmp_groups), labels.size());
+}
+
 absl::Status RankingGroupsIndices::Initialize(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     int group_col_idx) {
@@ -136,43 +198,7 @@ absl::Status RankingGroupsIndices::Initialize(
         {/*.relevance =*/label_values[example_idx],
          /*.example_idx =*/example_idx});
   }
-  num_items_ = dataset.nrow();
-
-  // Sort the group items by decreasing ground truth relevance.
-  groups_.reserve(tmp_groups.size());
-  for (auto& group : tmp_groups) {
-    std::sort(group.second.begin(), group.second.end(),
-              [](const Item& a, const Item& b) {
-                if (a.relevance == b.relevance) {
-                  return a.example_idx > b.example_idx;
-                }
-                return a.relevance > b.relevance;
-              });
-
-    if (group.second.size() > kMaximumItemsInRankingGroup) {
-      LOG(WARNING)
-          << "The number of items in the group \"" << group.first << "\" is "
-          << group.second.size() << " which is greater than "
-          << kMaximumItemsInRankingGroup
-          << ".  This is likely a mistake in the generation of "
-             "the configuration of the group column. Note that large groups "
-             "might lead to training performance degradation.";
-    }
-
-    groups_.push_back(
-        {/*.group_idx =*/group.first, /*.items =*/std::move(group.second)});
-  }
-
-  // Sort the group by example index to improve the data locality.
-  std::sort(groups_.begin(), groups_.end(), [](const Group& a, const Group& b) {
-    if (a.items.front().example_idx == b.items.front().example_idx) {
-      return a.group_idx < b.group_idx;
-    }
-    return a.items.front().example_idx < b.items.front().example_idx;
-  });
-  LOG(INFO) << "Found " << groups_.size() << " groups in " << dataset.nrow()
-            << " examples.";
-  return absl::OkStatus();
+  return InitializeFromTmpGroups(std::move(tmp_groups), dataset.nrow());
 }
 
 double RankingGroupsIndices::NDCG(const absl::Span<const float> predictions,

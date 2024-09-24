@@ -190,6 +190,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -204,6 +205,19 @@ all_proto_library(
 
 # Test
 # =========================================================
+
+cc_test(
+    name = "generic_parameters_test",
+    srcs = ["generic_parameters_test.cc"],
+    deps = [
+        ":generic_parameters",
+        "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
 
 cc_test(
     name = "decision_tree_test",

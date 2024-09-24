@@ -31,6 +31,7 @@
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
@@ -84,6 +85,7 @@ proto::Header GradientBoostedTreesModel::BuildHeaderProto() const {
   *header.mutable_initial_predictions() = google::protobuf::RepeatedField<float>(
       initial_predictions_.begin(), initial_predictions_.end());
   *header.mutable_training_logs() = training_logs_;
+  header.mutable_loss_configuration()->CopyFrom(loss_config_);
   return header;
 }
 
@@ -95,6 +97,9 @@ void GradientBoostedTreesModel::ApplyHeaderProto(const proto::Header& header) {
   validation_loss_ = header.validation_loss();
   training_logs_ = header.training_logs();
   output_logits_ = header.output_logits();
+  if (header.has_loss_configuration()) {
+    loss_config_.CopyFrom(header.loss_configuration());
+  }
 }
 
 absl::Status GradientBoostedTreesModel::Save(
@@ -235,6 +240,12 @@ absl::optional<size_t> GradientBoostedTreesModel::ModelSizeInBytes() const {
 
 int64_t GradientBoostedTreesModel::NumNodes() const {
   return decision_tree::NumberOfNodes(decision_trees_);
+}
+
+void GradientBoostedTreesModel::set_loss(
+    const proto::Loss loss, const proto::LossConfiguration& loss_config) {
+  loss_ = loss;
+  loss_config_.CopyFrom(loss_config);
 }
 
 bool GradientBoostedTreesModel::CheckStructure(
@@ -400,6 +411,7 @@ void GradientBoostedTreesModel::Predict(
         LOG(FATAL) << "Non supported task";
       }
     } break;
+    case proto::Loss::LAMBDA_MART_NDCG:
     case proto::Loss::LAMBDA_MART_NDCG5:
     case proto::Loss::XE_NDCG_MART: {
       double accumulator = initial_predictions_[0];
@@ -493,6 +505,7 @@ void GradientBoostedTreesModel::Predict(
                      });
       prediction->mutable_regression()->set_value(accumulator);
     } break;
+    case proto::Loss::LAMBDA_MART_NDCG:
     case proto::Loss::LAMBDA_MART_NDCG5:
     case proto::Loss::XE_NDCG_MART: {
       double accumulator = initial_predictions_[0];
@@ -559,7 +572,7 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
   metric::proto::EvaluationResults validation_evaluation;
   validation_evaluation.set_task(task_);
   validation_evaluation.set_loss_value(validation_loss_);
-  validation_evaluation.set_loss_name(proto::Loss_Name(loss_));
+  validation_evaluation.set_loss_name(GetLossName());
 
   for (const auto& log : training_logs_.entries()) {
     // The log entry corresponding to the final model is identified with the
@@ -583,10 +596,11 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
         validation_evaluation.mutable_regression()->set_sum_square_error(
             metric_value);
         validation_evaluation.set_count_predictions(1.f);
-      } else if (metric_name == "NDCG@5") {
+      } else if (absl::StartsWith(metric_name, "NDCG@")) {
         validation_evaluation.mutable_ranking()->mutable_ndcg()->set_value(
             metric_value);
-        validation_evaluation.mutable_ranking()->set_ndcg_truncation(5);
+        validation_evaluation.mutable_ranking()->set_ndcg_truncation(
+            loss_config_.lambda_mart_ndcg().ndcg_truncation());
       } else {
         LOG(WARNING) << "Unknown metric name:" << metric_name;
       }
@@ -607,7 +621,7 @@ void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
   AbstractModel::AppendDescriptionAndStatistics(full_definition, description);
   absl::StrAppend(description, "\n");
 
-  absl::StrAppend(description, "Loss: ", proto::Loss_Name(loss_), "\n");
+  absl::StrAppend(description, "Loss: ", GetLossName(), "\n");
   if (!std::isnan(validation_loss_)) {
     absl::StrAppend(description, "Validation loss value: ", validation_loss_,
                     "\n");
@@ -853,6 +867,16 @@ std::string GradientBoostedTreesModel::DebugCompare(
 
   return decision_tree::DebugCompare(
       data_spec_, label_col_idx_, decision_trees_, other_cast->decision_trees_);
+}
+
+std::string GradientBoostedTreesModel::GetLossName() const {
+  auto loss_name = proto::Loss_Name(loss_);
+  if (loss_ == proto::XE_NDCG_MART || loss_ == proto::LAMBDA_MART_NDCG5 ||
+      loss_ == proto::LAMBDA_MART_NDCG) {
+    loss_name = absl::StrCat(proto::Loss_Name(loss_), "@",
+                             loss_config_.lambda_mart_ndcg().ndcg_truncation());
+  }
+  return loss_name;
 }
 
 namespace internal {

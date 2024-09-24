@@ -128,6 +128,24 @@ absl::Status SeparateCategoricalColumn(
   return writer.Close();
 }
 
+absl::Status SeparateHashColumn(const int column_idx,
+                                const dataset::proto::Column& column_spec,
+                                const dataset::VerticalDataset& dataset,
+                                absl::string_view path) {
+  proto::CreateDatasetCacheConfig config;
+  IntegerColumnWriter writer;
+  RETURN_IF_ERROR(writer.Open(path,
+                              /*max_value=*/kMaxValueHashType));
+  ASSIGN_OR_RETURN(
+      const auto& column,
+      dataset.ColumnWithCastWithStatus<dataset::VerticalDataset::HashColumn>(
+          column_idx));
+  const auto& values = column->values();
+  RETURN_IF_ERROR(writer.WriteValues<HashType>(absl::Span<const HashType>(
+      reinterpret_cast<const HashType*>(values.data()), values.size())));
+  return writer.Close();
+}
+
 absl::Status SeparateBooleanColumn(const int column_idx,
                                    const dataset::proto::Column& column_spec,
                                    const dataset::VerticalDataset& dataset,
@@ -188,6 +206,10 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumn(
     case dataset::proto::ColumnType::BOOLEAN:
       RETURN_IF_ERROR(SeparateBooleanColumn(column_idx, column_spec, dataset,
                                             temp_column_path));
+      break;
+    case dataset::proto::ColumnType::HASH:
+      RETURN_IF_ERROR(SeparateHashColumn(column_idx, column_spec, dataset,
+                                         temp_column_path));
       break;
     default:
       return absl::InvalidArgumentError(

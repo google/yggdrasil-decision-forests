@@ -30,6 +30,8 @@
 
 namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep {
 
+// Non-compressed TFRecord.
+
 using TFRecordV2TFExampleReader = ShardedTFRecordReader<tensorflow::Example>;
 REGISTER_AbstractTFExampleReader(TFRecordV2TFExampleReader,
                                  "FORMAT_TFE_TFRECORDV2");
@@ -59,7 +61,40 @@ class TFRecordV2TFExampleReaderToDataSpecCreator
 REGISTER_AbstractDataSpecCreator(TFRecordV2TFExampleReaderToDataSpecCreator,
                                  "FORMAT_TFE_TFRECORDV2");
 
-// Write tf.Examples in TFRecords.
+// Compressed TFRecord.
+
+using TFRecordCompressedV2TFExampleReader =
+    ShardedCompressedTFRecordReader<tensorflow::Example>;
+REGISTER_AbstractTFExampleReader(TFRecordCompressedV2TFExampleReader,
+                                 "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
+
+class TFRecordCompressedV2TFEToExampleReaderInterface
+    : public TFExampleReaderToExampleReader {
+ public:
+  TFRecordCompressedV2TFEToExampleReaderInterface(
+      const proto::DataSpecification& data_spec,
+      absl::optional<std::vector<int>> ensure_non_missing)
+      : TFExampleReaderToExampleReader(data_spec, ensure_non_missing) {}
+
+  std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
+    return absl::make_unique<TFRecordV2TFExampleReader>(true);
+  }
+};
+REGISTER_ExampleReaderInterface(TFRecordCompressedV2TFEToExampleReaderInterface,
+                                "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
+
+class TFRecordCompressedV2TFExampleReaderToDataSpecCreator
+    : public TFExampleReaderToDataSpecCreator {
+  std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
+    return absl::make_unique<TFRecordV2TFExampleReader>(true);
+  }
+};
+
+REGISTER_AbstractDataSpecCreator(
+    TFRecordCompressedV2TFExampleReaderToDataSpecCreator,
+    "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
+
+// Write non-compressed  tf.Examples in TFRecords.
 class TFRecordV2TFExampleWriter
     : public ShardedTFRecordWriter<tensorflow::Example> {};
 
@@ -79,6 +114,28 @@ class TFRecordV2TFEToExampleWriterInterface
 };
 REGISTER_ExampleWriterInterface(TFRecordV2TFEToExampleWriterInterface,
                                 "FORMAT_TFE_TFRECORDV2");
+
+// Write compressed TFRecord.
+
+class TFRecordCompressedV2TFExampleWriter
+    : public ShardedCompressedTFRecordWriter<tensorflow::Example> {};
+
+REGISTER_AbstractTFExampleWriter(TFRecordCompressedV2TFExampleWriter,
+                                 "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
+
+class TFRecordCompressedV2TFEToExampleWriterInterface
+    : public TFExampleWriterToExampleWriter {
+ public:
+  TFRecordCompressedV2TFEToExampleWriterInterface(
+      const proto::DataSpecification& data_spec)
+      : TFExampleWriterToExampleWriter(data_spec) {}
+
+  std::unique_ptr<AbstractTFExampleWriter> CreateWriter() override {
+    return absl::make_unique<TFRecordCompressedV2TFExampleWriter>();
+  }
+};
+REGISTER_ExampleWriterInterface(TFRecordCompressedV2TFEToExampleWriterInterface,
+                                "FORMAT_TFE_TFRECORD_COMPRESSED_V2");
 
 }  // namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep
 

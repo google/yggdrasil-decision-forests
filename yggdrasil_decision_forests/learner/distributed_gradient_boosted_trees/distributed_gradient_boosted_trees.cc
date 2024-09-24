@@ -332,6 +332,9 @@ absl::Status CreateDatasetCacheFromPartialDatasetCache(
     const dataset::proto::DataSpecification& data_spec) {
   auto create_cache_config = spe_config.create_cache();
   create_cache_config.set_label_column_idx(config_link.label());
+  if (config_link.has_ranking_group() && config_link.ranking_group() >= 0) {
+    create_cache_config.set_group_column_idx(config_link.ranking_group());
+  }
   if (config_link.has_weight_definition()) {
     if (!config_link.weight_definition().has_numerical()) {
       return absl::InvalidArgumentError(
@@ -356,6 +359,9 @@ absl::Status CreateDatasetCache(
     const dataset::proto::DataSpecification& data_spec) {
   auto create_cache_config = spe_config.create_cache();
   create_cache_config.set_label_column_idx(config_link.label());
+  if (config_link.has_ranking_group() && config_link.ranking_group() >= 0) {
+    create_cache_config.set_group_column_idx(config_link.ranking_group());
+  }
   if (config_link.has_weight_definition()) {
     if (!config_link.weight_definition().has_numerical()) {
       return absl::InvalidArgumentError(
@@ -822,7 +828,9 @@ InitializeModel(
   auto model =
       absl::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
   model->set_data_spec(data_spec);
-  model->set_loss(spe_config.gbt().loss());
+  model->set_loss(spe_config.gbt().loss(),
+                  gradient_boosted_trees::GradientBoostedTreesLearner::
+                      BuildLossConfiguration(spe_config.gbt()));
   InitializeModelWithAbstractTrainingConfig(config, config_link, model.get());
 
   const auto secondary_metric_names = loss.SecondaryMetricNames();

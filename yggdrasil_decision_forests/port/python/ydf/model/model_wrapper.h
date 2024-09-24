@@ -19,6 +19,7 @@
 #include <pybind11/numpy.h>
 
 #include <atomic>
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -48,17 +49,20 @@ namespace yggdrasil_decision_forests::port::python {
 // This class is a pybind-compatible alternative to
 // utils::BenchmarkInferenceResult which does not use absl::Duration objects.
 struct BenchmarkInferenceCCResult {
+  // Single thread
   double duration_per_example;
   double benchmark_duration;
   int num_runs;
-  int batch_size;
 
-  BenchmarkInferenceCCResult(const utils::BenchmarkInferenceResult& result)
-      : duration_per_example(
-            absl::ToDoubleSeconds(result.duration_per_example)),
-        benchmark_duration(absl::ToDoubleSeconds(result.benchmark_duration)),
-        num_runs(result.num_runs),
-        batch_size(result.batch_size) {}
+  // Multi-thread
+  double duration_per_example_multithread;
+  double benchmark_duration_multithread;
+  int num_runs_multithread;
+  int num_threads;
+
+  // Common
+  int batch_size;
+  size_t num_examples;
 
   std::string ToString() const;
 };
@@ -81,10 +85,12 @@ class GenericCCModel {
 
   int label_col_idx() const { return model_->label_col_idx(); }
 
+  int group_col_idx() const { return model_->ranking_group_col_idx(); }
+
   // Benchmark the inference speed of the model.
   absl::StatusOr<BenchmarkInferenceCCResult> Benchmark(
       const dataset::VerticalDataset& dataset, double benchmark_duration,
-      double warmup_duration, int batch_size);
+      double warmup_duration, int batch_size, int num_threads);
 
   // Gets an engine of the model. If the engine does not exist, create it.
   // This method is not thread safe.
@@ -101,11 +107,24 @@ class GenericCCModel {
   // TODO: Allow passing the output array as a parameter to reduce heap
   // allocations.
   absl::StatusOr<py::array_t<float>> Predict(
-      const dataset::VerticalDataset& dataset);
+      const dataset::VerticalDataset& dataset, bool use_slow_engine,
+      int num_threads);
+
+  // Predict using one of the fast engines. This function is used in the vast
+  // majority of cases.
+  absl::StatusOr<py::array_t<float>> PredictWithFastEngine(
+      const dataset::VerticalDataset& dataset, int num_threads);
+
+  // Predict using the slow engine. This function should only be used for
+  // debugging or edge cases.
+  absl::StatusOr<py::array_t<float>> PredictWithSlowEngine(
+      const dataset::VerticalDataset& dataset, int num_threads);
 
   absl::StatusOr<metric::proto::EvaluationResults> Evaluate(
       const dataset::VerticalDataset& dataset,
-      const metric::proto::EvaluationOptions& options, bool weighted);
+      const metric::proto::EvaluationOptions& options, bool weighted,
+      int label_col_idx, int group_col_idx, bool use_slow_engine,
+      int num_threads);
 
   absl::StatusOr<utils::model_analysis::proto::StandaloneAnalysisResult>
   Analyze(const dataset::VerticalDataset& dataset,
@@ -152,6 +171,9 @@ class GenericCCModel {
   std::vector<std::string> ListCompatibleEngines() const {
     return model_->ListCompatibleFastEngineNames();
   }
+
+  // TODO: Remove when solved.
+  bool weighted_training() const { return model_->weights().has_value(); }
 
  protected:
   std::unique_ptr<model::AbstractModel> model_;

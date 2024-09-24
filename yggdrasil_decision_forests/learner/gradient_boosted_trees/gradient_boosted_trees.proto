@@ -25,7 +25,7 @@ option java_outer_classname = "GradientBoostedTreesLearner";
 
 // Training configuration for the Gradient Boosted Trees algorithm.
 message GradientBoostedTreesTrainingConfig {
-  // Next ID: 38
+  // Next ID: 39
 
   // Basic parameters.
 
@@ -177,44 +177,9 @@ message GradientBoostedTreesTrainingConfig {
   optional int32 early_stopping_initial_iteration = 37 [default = 10];
 
   oneof loss_options {
-    LambdaMartNdcg lambda_mart_ndcg = 12;
-    XeNdcg xe_ndcg = 26;
-    BinaryFocalLossOptions binary_focal_loss_options = 36;
-  }
-
-  message LambdaMartNdcg {
-    // If false, the gradient is computed using NDCG i.e. normalized-DCG. If
-    // false, the gradient is computed using DCG.
-    optional bool gradient_use_non_normalized_dcg = 1 [default = false];
-  }
-
-  message XeNdcg {
-    enum Gamma {
-      // For the time being, defaults to UNIFORM.
-      AUTO = 0;
-      // Gammas are sampled from a uniform distribution on [0, 1].
-      UNIFORM = 1;
-      // Gammas are set to 1 across the board. This is more appropriate for
-      // click datasets with a large number of documents per query.
-      ONE = 2;
-    }
-    optional Gamma gamma = 1 [default = UNIFORM];
-  }
-
-  message BinaryFocalLossOptions {
-    // Exponent of the misprediction multiplier in focal loss.
-    // Corresponds to the gamma parameter in
-    // https://arxiv.org/pdf/1708.02002.pdf
-    optional float misprediction_exponent = 1 [default = 2.0];
-
-    // A hypertuning coefficient to multiply the loss and its gradient(s) in
-    // case of a positive sample.
-    // Loss and gradient on positive samples will be multiplied by
-    // positive_sample_coefficient, on negative samples will be multiplied
-    // by (1 - positive_sample_coefficient)
-    // Corresponds to the 'alpha' parameter in
-    // https://arxiv.org/pdf/1708.02002.pdf
-    optional float positive_sample_coefficient = 2 [default = 0.5];
+    LossConfiguration.LambdaMartNdcg lambda_mart_ndcg = 12;
+    LossConfiguration.XeNdcg xe_ndcg = 26;
+    LossConfiguration.BinaryFocalLossOptions binary_focal_loss_options = 36;
   }
 
   // L2 regularization on the tree predictions i.e. on the value of the leaf.
@@ -225,7 +190,7 @@ message GradientBoostedTreesTrainingConfig {
   // of models trained with and without l2 regularization can be compared.
   //
   // Used for the following losses: BINOMIAL_LOG_LIKELIHOOD, SQUARED_ERROR,
-  // MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG5, or if use_hessian_gain is
+  // MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG, or if use_hessian_gain is
   // true.
   //
   // Note: In the case of RMSE loss for regression, the L2 regularization play
@@ -237,7 +202,7 @@ message GradientBoostedTreesTrainingConfig {
 
   // L1 regularization on the tree predictions i.e. on the value of the leaf.
   //
-  // Used for the following losses: LAMBDA_MART_NDCG5, or if use_hessian_gain is
+  // Used for the following losses: LAMBDA_MART_NDCG, or if use_hessian_gain is
   // true.
   optional float l1_regularization = 19 [default = 0.0];
 
@@ -256,7 +221,7 @@ message GradientBoostedTreesTrainingConfig {
   // beneficial.
   //
   // Currently only used for the losses:
-  //   - LAMBDA_MART_NDCG5
+  //   - LAMBDA_MART_NDCG
   optional float lambda_loss = 14 [default = 1.0];
 
   // How is the forest of tree built.  Defaults to "mart".
@@ -298,7 +263,7 @@ message GradientBoostedTreesTrainingConfig {
   // the splits to minimize the variance of "gradient / hessian".
   //
   // Hessian gain is available for the losses: BINOMIAL_LOG_LIKELIHOOD,
-  // SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG5.
+  // SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD, LAMBDA_MART_NDCG.
   optional bool use_hessian_gain = 20 [default = false];
 
   // Minimum value of the sum of the hessians in the leafs. Splits that would
@@ -380,6 +345,8 @@ message GradientBoostedTreesTrainingConfig {
   // end of the training using the validation dataset. Enabling this feature can
   // increase the training time significantly.
   optional bool compute_permutation_variable_importance = 35 [default = false];
+
+  reserved 38;
 }
 
 extend model.proto.TrainingConfig {

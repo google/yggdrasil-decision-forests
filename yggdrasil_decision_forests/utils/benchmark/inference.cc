@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -32,6 +33,8 @@
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -153,12 +156,10 @@ absl::Status BenchmarkFastEngine(const BenchmarkInferenceRunOptions& options,
   // Convert dataset into the format expected by the engine.
   const int64_t total_num_examples = dataset.nrow();
   auto examples = engine.AllocateExamples(total_num_examples);
-  STATUS_CHECK(CopyVerticalDatasetToAbstractExampleSet(
-                   dataset,
-                   /*begin_example_idx=*/0,
-                   /*end_example_idx=*/total_num_examples, engine_features,
-                   examples.get())
-                   .ok());
+  RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
+      dataset,
+      /*begin_example_idx=*/0,
+      /*end_example_idx=*/total_num_examples, engine_features, examples.get()));
 
   // Allocate a batch of examples.
   auto batch_of_examples = engine.AllocateExamples(options.batch_size);
@@ -218,6 +219,135 @@ absl::Status BenchmarkFastEngine(const BenchmarkInferenceRunOptions& options,
        /*benchmark_duration=*/end_time - start_time,
        /*num_runs=*/num_benchmark_runs,
        /*batch_size=*/options.batch_size});
+  return absl::OkStatus();
+}
+
+absl::Status BenchmarkFastEngineMultiThreaded(
+    const BenchmarkInferenceRunOptions& options,
+    const serving::FastEngine& engine, const model::AbstractModel& model,
+    const dataset::VerticalDataset& dataset, const int num_threads,
+    std::vector<BenchmarkInferenceResult>* results,
+    absl::string_view engine_name) {
+  if (options.time.has_value() == options.runs.has_value()) {
+    return absl::InvalidArgumentError(
+        "Specify either the number of runs or the timing of the benchmark.");
+  }
+  const auto& engine_features = engine.features();
+
+  // Convert dataset into the format expected by the engine.
+  const size_t total_num_examples = dataset.nrow();
+  auto examples = engine.AllocateExamples(total_num_examples);
+  RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
+      dataset,
+      /*begin_example_idx=*/0,
+      /*end_example_idx=*/total_num_examples, engine_features, examples.get()));
+
+  struct InputItem {
+    size_t batch_idx;
+  };
+  struct OutputItem {};
+  utils::concurrency::Channel<InputItem> input_channel;
+  utils::concurrency::Channel<OutputItem> output_channel;
+
+  const size_t batch_size = options.batch_size;
+  const size_t num_batches = (total_num_examples + batch_size - 1) / batch_size;
+
+  const auto thread_loop = [total_num_examples, &output_channel, &examples,
+                            &engine_features, &engine, batch_size,
+                            &input_channel](int thread_idx) {
+    auto batch_of_examples = engine.AllocateExamples(batch_size);
+    std::vector<float> predictions(batch_size);
+    while (true) {
+      // Get the input
+      auto input = input_channel.Pop();
+      if (!input.has_value()) {
+        break;
+      }
+      // Copy the examples.
+      size_t begin_example_idx = batch_size * input->batch_idx;
+      size_t end_example_idx =
+          std::min(total_num_examples, begin_example_idx + batch_size);
+      CHECK_OK(examples->Copy(begin_example_idx, end_example_idx,
+                              engine_features, batch_of_examples.get()));
+      // Runs the engine.
+      engine.Predict(*batch_of_examples, end_example_idx - begin_example_idx,
+                     &predictions);
+      // Signal the output
+      output_channel.Push({});
+    }
+  };
+
+  // Start threads.
+  std::vector<utils::concurrency::Thread> threads;
+  threads.reserve(num_threads);
+  for (size_t thread_idx = 0; thread_idx < num_threads; thread_idx++) {
+    threads.emplace_back([&, thread_idx]() { thread_loop(thread_idx); });
+  }
+
+  // A run over the data.
+  const auto run = [&output_channel, &input_channel,
+                    num_batches](size_t num_runs) {
+    for (size_t run_idx = 0; run_idx < num_runs; run_idx++) {
+      for (size_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
+        input_channel.Push({batch_idx});
+      }
+    }
+    size_t num_items = num_runs * num_batches;
+    for (size_t item_idx = 0; item_idx < num_items; item_idx++) {
+      output_channel.Pop();
+    }
+  };
+
+  int num_benchmark_runs;
+
+  // Warming up.
+  // TODO: Simplify this code.
+  if (options.runs.has_value()) {
+    run(options.runs->warmup_runs);
+    num_benchmark_runs = options.runs->num_runs;
+  } else {
+    STATUS_CHECK_GT(options.time->warmup_duration, 0);
+    STATUS_CHECK_GT(options.time->benchmark_duration, 0);
+    const auto warmup_start = absl::Now();
+    const auto warmup_cutoff =
+        warmup_start + absl::Seconds(options.time->warmup_duration);
+    int num_warmup_runs = 0;
+
+    while (absl::Now() < warmup_cutoff) {
+      run(1);
+      ++num_warmup_runs;
+    }
+
+    STATUS_CHECK_GT(num_warmup_runs, 0);
+    auto estimated_seconds_per_run =
+        options.time->warmup_duration / num_warmup_runs;
+    num_benchmark_runs =
+        std::ceil(options.time->benchmark_duration / estimated_seconds_per_run);
+  }
+
+  // Run benchmark.
+  const auto start_time = absl::Now();
+  run(num_benchmark_runs);
+  const auto end_time = absl::Now();
+
+  // Close the channels.
+  input_channel.Close();
+  output_channel.Close();
+
+  for (auto& thread : threads) {
+    thread.Join();
+  }
+
+  // Save results.
+  results->push_back(
+      {/*.name =*/absl::StrCat(engine_name, " multi-threaded[", num_threads,
+                               "] [virtual interface]"),
+       /*.duration_per_example =*/
+       (end_time - start_time) / (num_benchmark_runs * dataset.nrow()),
+       /*benchmark_duration=*/end_time - start_time,
+       /*num_runs=*/num_benchmark_runs,
+       /*batch_size=*/options.batch_size});
+
   return absl::OkStatus();
 }
 

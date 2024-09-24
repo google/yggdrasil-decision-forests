@@ -2035,6 +2035,72 @@ TEST(GradientBoostedTrees, PredefinedHyperParametersRanking) {
                                                      absl::nullopt);
 }
 
+TEST(GradientBoostedTrees, RankingDeprecatedLoss) {
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+  auto* gbt_config =
+      train_config.MutableExtension(proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::LAMBDA_MART_NDCG5);
+  utils::TestPredefinedHyperParametersRankingDataset(train_config, 2,
+                                                     absl::nullopt);
+}
+
+TEST(GradientBoostedTrees, RankingConfigureNDCG) {
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+  auto* gbt_config =
+      train_config.MutableExtension(proto::gradient_boosted_trees_config);
+  gbt_config->mutable_lambda_mart_ndcg()->set_ndcg_truncation(2);
+  // Speed up this test.
+  gbt_config->set_num_trees(2);
+
+  utils::TestPredefinedHyperParametersRankingDataset(train_config, 2,
+                                                     absl::nullopt);
+  const auto base_ds_path = absl::StrCat(
+      "csv:", file::JoinPath(
+                  test::DataRootDirectory(),
+                  "yggdrasil_decision_forests/test_data/dataset"));
+  const auto train_ds_path =
+      file::JoinPath(base_ds_path, "synthetic_ranking_train.csv");
+  const auto test_ds_path =
+      file::JoinPath(base_ds_path, "synthetic_ranking_test.csv");
+
+  train_config.set_label("LABEL");
+  train_config.set_ranking_group("GROUP");
+  train_config.set_task(model::proto::Task::RANKING);
+
+  // Create a dataspec.
+  dataset::proto::DataSpecificationGuide guide;
+  auto* group_guide = guide.add_column_guides();
+  group_guide->set_column_name_pattern("^GROUP$");
+  group_guide->set_type(dataset::proto::HASH);
+
+  dataset::proto::DataSpecification data_spec;
+  ASSERT_OK(dataset::CreateDataSpecWithStatus(train_ds_path, false, guide,
+                                              &data_spec));
+  dataset::VerticalDataset train_ds;
+  ASSERT_OK(LoadVerticalDataset(train_ds_path, data_spec, &train_ds));
+  dataset::VerticalDataset test_ds;
+  ASSERT_OK(LoadVerticalDataset(test_ds_path, data_spec, &test_ds));
+
+  // Retrieve the preconfigured parameters.
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config, &learner, {}));
+  const auto model = learner->TrainWithStatus(train_ds).value();
+
+  const auto* gbt_model = dynamic_cast<
+      const model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+      model.get());
+  ASSERT_NE(gbt_model, nullptr);
+  EXPECT_EQ(gbt_model->loss(), proto::LAMBDA_MART_NDCG);
+  ASSERT_TRUE(gbt_model->loss_config().has_lambda_mart_ndcg());
+  ASSERT_TRUE(
+      gbt_model->loss_config().lambda_mart_ndcg().has_ndcg_truncation());
+  EXPECT_EQ(gbt_model->loss_config().lambda_mart_ndcg().ndcg_truncation(), 2);
+  std::string description = gbt_model->DescriptionAndStatistics();
+  EXPECT_THAT(description, testing::HasSubstr("LAMBDA_MART_NDCG@2"));
+}
+
 TEST_F(GradientBoostedTreesOnAdult, InterruptAndResumeTraining) {
   // Train a model for a few seconds, interrupt its training, and resume it.
 
@@ -2287,6 +2353,33 @@ TEST_F(GradientBoostedTreesOnAdult, Nondeterminism) {
 
   EXPECT_THAT(model_1->DebugCompare(*model_2),
               ::testing::ContainsRegex("Non matching initial predictions"));
+}
+
+class GradientBoostedTreesOnSyntheticRanking
+    : public utils::TrainAndTestTester {
+  void SetUp() override {
+    auto* hash_column = guide_.add_column_guides();
+    hash_column->set_column_name_pattern("^GROUP$");
+    hash_column->set_type(dataset::proto::ColumnType::HASH);
+
+    train_config_.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+    train_config_.set_task(model::proto::Task::RANKING);
+    train_config_.set_label("LABEL");
+    train_config_.set_ranking_group("GROUP");
+
+    dataset_filename_ = "synthetic_ranking_train.csv";
+    dataset_test_filename_ = "synthetic_ranking_test.csv";
+
+    auto* gbt_config = train_config_.MutableExtension(
+        gradient_boosted_trees::proto::gradient_boosted_trees_config);
+    gbt_config->mutable_decision_tree()
+        ->set_internal_error_on_wrong_splitter_statistics(true);
+  }
+};
+
+TEST_F(GradientBoostedTreesOnSyntheticRanking, Base) {
+  TrainAndEvaluateModel();
+  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.7151, 0.025, 0.7151);
 }
 
 }  // namespace

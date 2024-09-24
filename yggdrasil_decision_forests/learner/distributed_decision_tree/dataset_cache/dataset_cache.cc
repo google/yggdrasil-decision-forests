@@ -95,6 +95,9 @@ absl::StatusOr<std::vector<int>> GetColumnsOrAll(
     if (config.has_label_column_idx()) {
       effective_columns.push_back(config.label_column_idx());
     }
+    if (config.has_group_column_idx()) {
+      effective_columns.push_back(config.group_column_idx());
+    }
     if (config.has_weight_column_idx()) {
       effective_columns.push_back(config.weight_column_idx());
     }
@@ -317,6 +320,8 @@ std::string MetaDataReport(const proto::CacheMetadata& metadata,
         return "CATEGORICAL";
       case 4:
         return "BOOLEAN";
+      case 5:
+        return "HASH";
       default:
         return absl::StrCat("Unknown type ", type);
     }
@@ -681,9 +686,15 @@ absl::Status InitializeMetadata(
     proto::CacheMetadata* metadata) {
   // Label values, if any.
   if (config.has_label_column_idx()) {
+    DCHECK_GE(config.label_column_idx(), 0);
     metadata->set_label_column_idx(config.label_column_idx());
   }
+  if (config.has_group_column_idx()) {
+    DCHECK_GE(config.group_column_idx(), 0);
+    metadata->set_group_column_idx(config.group_column_idx());
+  }
   if (config.has_weight_column_idx()) {
+    DCHECK_GE(config.weight_column_idx(), 0);
     metadata->set_weight_column_idx(config.weight_column_idx());
   }
 
@@ -711,6 +722,10 @@ absl::Status InitializeMetadata(
       case dataset::proto::ColumnType::BOOLEAN:
         dst->mutable_boolean()->set_replacement_missing_value(
             src.boolean().count_true() >= src.boolean().count_false());
+        break;
+
+      case dataset::proto::ColumnType::HASH:
+        dst->mutable_hash();
         break;
 
       default:

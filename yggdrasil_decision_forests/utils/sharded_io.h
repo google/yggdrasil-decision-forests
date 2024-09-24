@@ -73,7 +73,7 @@ class ShardedReader : public ProtoReaderInterface<T> {
   // Start reading a given file (i.e. not a sharded path).
   virtual absl::Status OpenShard(absl::string_view path) = 0;
 
-  // Try to retive the next available example in the last file open with
+  // Try to retrieve the next available example in the last file open with
   // "OpenShard". Returns false if no more examples are available.
   virtual absl::StatusOr<bool> NextInShard(T* value) = 0;
 

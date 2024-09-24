@@ -126,6 +126,7 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
       return custom_loss.Activation.SOFTMAX
     elif loss in [
         gradient_boosted_trees_pb2.Loss.SQUARED_ERROR,
+        gradient_boosted_trees_pb2.Loss.LAMBDA_MART_NDCG,
         gradient_boosted_trees_pb2.Loss.LAMBDA_MART_NDCG5,
         gradient_boosted_trees_pb2.Loss.XE_NDCG_MART,
         gradient_boosted_trees_pb2.Loss.POISSON,

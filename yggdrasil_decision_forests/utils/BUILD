@@ -340,8 +340,11 @@ cc_library_ydf(
     visibility = ["//visibility:private"],
     deps = [
         ":logging",
+        ":status_macros",
         ":synchronization_primitives",
         "@com_google_absl//absl/log",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:optional",
     ],
 )
@@ -855,6 +858,8 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -879,6 +884,22 @@ cc_library_ydf(
     name = "own_or_borrow",
     hdrs = ["own_or_borrow.h"],
     deps = ["@com_google_absl//absl/types:span"],
+)
+
+cc_library_ydf(
+    name = "zlib",
+    srcs = ["zlib.cc"],
+    hdrs = ["zlib.h"],
+    deps = [
+        ":bytestream",
+        ":status_macros",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@zlib",
+    ],
 )
 
 # Bzl Libraries
@@ -1071,9 +1092,12 @@ cc_test(
     srcs = ["concurrency_test.cc"],
     deps = [
         ":concurrency",
+        ":test",
         # "@com_google_googletest//:gtest_main",  # When fixed
         "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:optional",
+        "//yggdrasil_decision_forests/utils:status_macros",
     ],
 )
 
@@ -1328,6 +1352,21 @@ cc_test(
     srcs = ["own_or_borrow_test.cc"],
     deps = [
         ":own_or_borrow",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "zlib_test",
+    srcs = ["zlib_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
+    deps = [
+        ":filesystem",
+        ":logging",
+        ":test",
+        ":zlib",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

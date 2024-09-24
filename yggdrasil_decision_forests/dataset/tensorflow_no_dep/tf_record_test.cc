@@ -104,6 +104,30 @@ TEST(TFRecord, Reader) {
   EXPECT_EQ(message_idx, 3);
 }
 
+TEST(TFRecord, ReaderCompressed) {
+  ASSERT_OK_AND_ASSIGN(
+      auto reader,
+      TFRecordReader::Create(
+          file::JoinPath(DatasetDir(), "toy.tfe-tfrecord-00000-of-00002"),
+          /*compressed=*/true));
+
+  int message_idx = 0;
+  while (true) {
+    tensorflow::Example message;
+    ASSERT_OK_AND_ASSIGN(const bool has_value, reader->Next(&message));
+    if (!has_value) {
+      break;
+    }
+    LOG(INFO) << message.DebugString();
+    if (message_idx == 3) {
+      EXPECT_THAT(message, EqualsProto(ThirdExample()));
+    }
+    message_idx++;
+  }
+  ASSERT_OK(reader->Close());
+  EXPECT_EQ(message_idx, 3);
+}
+
 TEST(TFRecord, ShardedReader) {
   ShardedTFRecordReader<tensorflow::Example> reader;
   ASSERT_OK(reader.Open(
@@ -134,6 +158,25 @@ TEST(TFRecord, Writer) {
   ASSERT_OK(writer->Close());
 
   ASSERT_OK_AND_ASSIGN(auto reader, TFRecordReader::Create(path));
+  EXPECT_TRUE(*reader->Next(nullptr));
+  EXPECT_EQ(reader->buffer(), "HELLO");
+  EXPECT_TRUE(*reader->Next(nullptr));
+  EXPECT_EQ(reader->buffer(), "");
+  EXPECT_TRUE(*reader->Next(nullptr));
+  EXPECT_EQ(reader->buffer(), "WORLD");
+  EXPECT_FALSE(*reader->Next(nullptr));
+  ASSERT_OK(reader->Close());
+}
+
+TEST(TFRecord, WriterCompressed) {
+  const std::string path = file::JoinPath(test::TmpDirectory(), "tfrecord");
+  ASSERT_OK_AND_ASSIGN(auto writer, TFRecordWriter::Create(path, true));
+  ASSERT_OK(writer->Write("HELLO"));
+  ASSERT_OK(writer->Write(""));
+  ASSERT_OK(writer->Write("WORLD"));
+  ASSERT_OK(writer->Close());
+
+  ASSERT_OK_AND_ASSIGN(auto reader, TFRecordReader::Create(path, true));
   EXPECT_TRUE(*reader->Next(nullptr));
   EXPECT_EQ(reader->buffer(), "HELLO");
   EXPECT_TRUE(*reader->Next(nullptr));

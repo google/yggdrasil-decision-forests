@@ -233,12 +233,13 @@ void SubtractTransposeMultiplyAdd(
     const ProjectionEvaluator& projection_evaluator, absl::Span<double> b,
     std::vector<double>& output);
 
-// Randomly generates a projection. A projection cannot be empty. If the
-// projection contains only one dimension, the weight is guaranteed to be 1.
-// If the projection contains an input feature with monotonic constraint,
-// monotonic_direction is set to 1 (i.e. the projection should be monotonically
-// increasing).
-void SampleProjection(const proto::DecisionTreeTrainingConfig& dt_config,
+// Randomly generates a projection from `features`. `features` should only be
+// numerical. A projection cannot be empty. If the projection contains only one
+// dimension, the weight is guaranteed to be 1. If the projection contains an
+// input feature with monotonic constraint, monotonic_direction is set to 1
+// (i.e. the projection should be monotonically increasing).
+void SampleProjection(const absl::Span<const int>& features,
+                      const proto::DecisionTreeTrainingConfig& dt_config,
                       const dataset::proto::DataSpecification& data_spec,
                       const model::proto::TrainingConfigLinking& config_link,
                       float projection_density,

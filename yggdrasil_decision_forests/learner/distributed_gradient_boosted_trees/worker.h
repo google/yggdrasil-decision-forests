@@ -277,6 +277,9 @@ class DistributedGradientBoostedTreesWorker
 
     // Status of the last run of "EvaluateWeakModelOnvalidationDataset".
     absl::Status status;
+
+    // Ranking index for the validation dataset.
+    std::unique_ptr<gradient_boosted_trees::RankingGroupsIndices> ranking_index;
   } validation_;
 
   // Accessor to the pseudo response. Initialized with the
@@ -309,6 +312,10 @@ class DistributedGradientBoostedTreesWorker
 
   // Prints details about the computation with LOG(INFO).
   bool worker_logs_ = true;
+
+  // Ranking index for the training dataset.
+  std::unique_ptr<gradient_boosted_trees::RankingGroupsIndices>
+      train_ranking_index_;
 };
 
 // Extract the requested features in a FindSplits request.

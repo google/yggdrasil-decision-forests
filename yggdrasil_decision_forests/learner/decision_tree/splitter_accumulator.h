@@ -43,6 +43,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/base/optimization.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -291,7 +292,10 @@ struct FeatureDiscretizedNumericalBucket {
            const std::vector<dataset::DiscretizedNumericalIndex>& attributes)
         : num_bins_(num_bins),
           na_replacement_(na_replacement),
-          attributes_(attributes) {}
+          attributes_(attributes) {
+      DCHECK_GE(na_replacement, 0);
+      DCHECK_LT(na_replacement, num_bins_);
+    }
 
     size_t NumBuckets() const { return num_bins_; }
 
@@ -301,9 +305,14 @@ struct FeatureDiscretizedNumericalBucket {
     size_t GetBucketIndex(const size_t local_example_idx,
                           const UnsignedExampleIdx example_idx) const {
       const auto attribute = attributes_[example_idx];
-      return (attribute != dataset::kDiscretizedNumericalMissingValue)
-                 ? attribute
-                 : na_replacement_;
+      if (ABSL_PREDICT_FALSE(attribute ==
+                             dataset::kDiscretizedNumericalMissingValue)) {
+        return na_replacement_;
+      } else {
+        DCHECK_GE(attribute, 0);
+        DCHECK_LT(attribute, num_bins_);
+        return attribute;
+      }
     }
 
     void ConsumeExample(const UnsignedExampleIdx example_idx,

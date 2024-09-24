@@ -36,6 +36,7 @@ from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
 from ydf.model import generic_model
 from ydf.model import model_lib
+from ydf.utils import concurrency
 from ydf.utils import log
 from yggdrasil_decision_forests.utils import fold_generator_pb2
 from yggdrasil_decision_forests.utils.distribute.implementations.grpc import grpc_pb2
@@ -308,7 +309,9 @@ Hyper-parameters: ydf.{self._hyperparameters}
       train_args = {"dataset": train_ds}
 
       if valid is not None:
-        valid_ds = self._get_vertical_dataset(valid)._dataset  # pylint: disable=protected-access
+        valid_ds = dataset.create_vertical_dataset(
+            valid, data_spec=train_ds.data_spec()
+        )._dataset  # pylint: disable=protected-access
         train_args["validation_dataset"] = valid_ds
         log.info(
             "Train model on %d training examples and %d validation examples",
@@ -406,8 +409,30 @@ Hyper-parameters: ydf.{self._hyperparameters}
       self, ds: dataset.InputDataset
   ) -> dataset.VerticalDataset:
     if isinstance(ds, dataset.VerticalDataset):
+      if self._data_spec is not None:
+        raise ValueError(
+            "When training on a VerticalDataset, no data spec can be explicitly"
+            " provided. Specify the data spec when creating the VerticalDataset"
+            " or directly train on the data source."
+        )
+      if self._data_spec_args.columns is not None:
+        raise ValueError(
+            "When training on a VerticalDataset, the columns or its types"
+            " cannot be changed during training. Specify the columns when"
+            " creating the VerticalDataset or directly train on the data"
+            " source."
+        )
+      log.warning(
+          "When training on a VerticalDataset, options to modify the dataset"
+          " are ignored. Specify these options directly when constructing the"
+          " VerticalDataset. Ignored options are `columns, include_all_columns,"
+          " max_vocab_count, min_vocab_frequency, discretize_numerical_columns,"
+          " num_discretized_numerical_bins,"
+          " max_num_scanned_rows_to_infer_semantic,"
+          " max_num_scanned_rows_to_compute_statistics`. ",
+          message_id=log.WarningMessage.TRAINING_VERTICAL_DATASET,
+      )
       return ds
-      # TODO: Check that the user has not specified a data spec guide.
     else:
 
       # List of columns that cannot be unrolled.
@@ -651,15 +676,15 @@ Hyper-parameters: ydf.{self._hyperparameters}
   def _build_deployment_config(
       self,
       num_threads: Optional[int],
-      resume_training: bool,
-      resume_training_snapshot_interval_seconds: int,
-      working_dir: Optional[str],
-      workers: Optional[Sequence[str]],
+      resume_training: Optional[bool] = None,
+      resume_training_snapshot_interval_seconds: Optional[int] = None,
+      working_dir: Optional[str] = None,
+      workers: Optional[Sequence[str]] = None,
   ):
     """Merges constructor arguments into a deployment configuration."""
 
     if num_threads is None:
-      num_threads = self._determine_optimal_num_threads()
+      num_threads = concurrency.determine_optimal_num_threads(training=True)
     config = abstract_learner_pb2.DeploymentConfig(
         num_threads=num_threads,
         try_resume_training=resume_training,
@@ -675,25 +700,6 @@ Hyper-parameters: ydf.{self._hyperparameters}
       grpc_config.grpc_addresses.addresses[:] = workers
 
     return config
-
-  def _determine_optimal_num_threads(self):
-    """Sets  number of threads to min(num_cpus, 32) or 6 if num_cpus unclear."""
-    num_threads = os.cpu_count()
-    if num_threads is None:
-      logging.warning("Cannot determine the number of CPUs. Set num_threads=6")
-      num_threads = 6
-    else:
-      if num_threads > 32:
-        logging.warning(
-            "The `num_threads` constructor argument is not set and the "
-            "number of CPU is os.cpu_count()=%d > 32. Setting num_threads "
-            "to 32. Set num_threads manually to use more than 32 cpus.",
-            num_threads,
-        )
-        num_threads = 32
-      else:
-        logging.info("Use %d thread(s) for training", num_threads)
-    return num_threads
 
   @classmethod
   def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:

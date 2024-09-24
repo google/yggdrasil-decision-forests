@@ -91,6 +91,12 @@ pybind_library(
     ],
 )
 
+py_library(
+    name = "concurrency",
+    srcs = ["concurrency.py"],
+    deps = [":log"],
+)
+
 # Tests
 # =====
 

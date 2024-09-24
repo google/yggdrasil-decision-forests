@@ -16,7 +16,7 @@
 
 import os
 import signal
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from absl import logging
 from absl.testing import absltest
@@ -95,6 +95,7 @@ class LearnerTest(parameterized.TestCase):
       learner: generic_learner.GenericLearner,
       minimum_accuracy: float,
       check_serialization: bool = True,
+      use_pandas: bool = False,
       valid: Optional[Any] = None,
   ) -> Tuple[generic_model.GenericModel, metric.Evaluation, np.ndarray]:
     """Runs a battery of test on a model compatible with the adult dataset.
@@ -110,19 +111,27 @@ class LearnerTest(parameterized.TestCase):
       learner: A learner on the adult dataset.
       minimum_accuracy: Minimum accuracy.
       check_serialization: If true, check the serialization of the model.
+      use_pandas: If true, load the dataset from Pandas
       valid: Optional validation dataset.
 
     Returns:
       The model, its evaluation and the predictions on the test dataset.
     """
+    if use_pandas:
+      train_ds = self.adult.train_pd
+      test_ds = self.adult.test_pd
+    else:
+      train_ds = self.adult.train
+      test_ds = self.adult.test
+
     # Train the model.
-    model = learner.train(self.adult.train, valid=valid)
+    model = learner.train(train_ds, valid=valid)
 
     # Evaluate the trained model.
-    evaluation = model.evaluate(self.adult.test)
+    evaluation = model.evaluate(test_ds)
     self.assertGreaterEqual(evaluation.accuracy, minimum_accuracy)
 
-    predictions = model.predict(self.adult.test)
+    predictions = model.predict(test_ds)
 
     if check_serialization:
       ydf_model_path = os.path.join(
@@ -130,7 +139,7 @@ class LearnerTest(parameterized.TestCase):
       )
       model.save(ydf_model_path)
       loaded_model = model_lib.load_model(ydf_model_path)
-      npt.assert_equal(predictions, loaded_model.predict(self.adult.test))
+      npt.assert_equal(predictions, loaded_model.predict(test_ds))
 
     return model, evaluation, predictions
 
@@ -144,6 +153,28 @@ class RandomForestLearnerTest(LearnerTest):
 
     # Evaluate the trained model.
     evaluation = model.evaluate(self.adult.test)
+    logging.info("Evaluation: %s", evaluation)
+    self.assertGreaterEqual(evaluation.accuracy, 0.864)
+
+  def test_adult_classification_on_tfrecord_dataset(self):
+    learner = specialized_learners.RandomForestLearner(label="income")
+    model = learner.train(
+        "tfrecord:"
+        + os.path.join(
+            test_utils.ydf_test_data_path(),
+            "dataset",
+            "adult_train.recordio.gz",
+        )
+    )
+    logging.info("Trained model: %s", model)
+
+    # Evaluate the trained model.
+    evaluation = model.evaluate(
+        "tfrecord:"
+        + os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.recordio.gz"
+        )
+    )
     logging.info("Evaluation: %s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, 0.864)
 
@@ -554,6 +585,64 @@ class RandomForestLearnerTest(LearnerTest):
         learner.hyperparameters.items(),
     )
 
+  def test_unicode_dataset(self):
+    data = {
+        "\u0080feature": np.array(
+            [["\u0080a", "\u0080b"], ["\u0080c", "\u0080d"]]
+        ),
+        "label": np.array([0, 1]),
+    }
+    learner = specialized_learners.RandomForestLearner(
+        label="label", min_vocab_frequency=1
+    )
+    model = learner.train(data)
+
+    expected_columns = [
+        ds_pb.Column(
+            name="\u0080feature.0_of_2",
+            type=ds_pb.ColumnType.CATEGORICAL,
+            dtype=ds_pb.DType.DTYPE_BYTES,
+            count_nas=0,
+            categorical=ds_pb.CategoricalSpec(
+                items={
+                    "<OOD>": ds_pb.CategoricalSpec.VocabValue(index=0, count=0),
+                    "\u0080a": ds_pb.CategoricalSpec.VocabValue(
+                        index=1, count=1
+                    ),
+                    "\u0080c": ds_pb.CategoricalSpec.VocabValue(
+                        index=2, count=1
+                    ),
+                },
+                number_of_unique_values=3,
+            ),
+            is_unstacked=True,
+        ),
+        ds_pb.Column(
+            name="\u0080feature.1_of_2",
+            type=ds_pb.ColumnType.CATEGORICAL,
+            dtype=ds_pb.DType.DTYPE_BYTES,
+            count_nas=0,
+            categorical=ds_pb.CategoricalSpec(
+                items={
+                    "<OOD>": ds_pb.CategoricalSpec.VocabValue(index=0, count=0),
+                    "\u0080b": ds_pb.CategoricalSpec.VocabValue(
+                        index=1, count=1
+                    ),
+                    "\u0080d": ds_pb.CategoricalSpec.VocabValue(
+                        index=2, count=1
+                    ),
+                },
+                number_of_unique_values=3,
+            ),
+            is_unstacked=True,
+        ),
+    ]
+    # Skip the first column that contains the label.
+    self.assertEqual(model.data_spec().columns[1:], expected_columns)
+
+    predictions = model.predict(data)
+    self.assertEqual(predictions.shape, (2,))
+
   def test_multidimensional_training_dataset(self):
     data = {
         "feature": np.array([[0, 1, 2, 3], [4, 5, 6, 7]]),
@@ -836,6 +925,19 @@ class RandomForestLearnerTest(LearnerTest):
           "feature": np.array([[0], [1]]),
       })
 
+  def test_analyze_ensure_maximum_duration(self):
+    # Create an analysis that would take a lot of time if not limited in time.
+    def create_dataset(n: int) -> Dict[str, np.ndarray]:
+      return {
+          "feature": np.random.uniform(size=(n, 100)),
+          "label": np.random.uniform(size=(n,)),
+      }
+
+    model = specialized_learners.RandomForestLearner(
+        label="label", task=generic_learner.Task.REGRESSION
+    ).train(create_dataset(1_000))
+    _ = model.analyze(create_dataset(100_000))
+
 
 class CARTLearnerTest(LearnerTest):
 
@@ -961,6 +1063,41 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     self.assertGreaterEqual(evaluation.ndcg, 0.70)
     self.assertLessEqual(evaluation.ndcg, 0.74)
 
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "ndcg@2",
+          "truncation": 2,
+          "expected_ndcg": 0.723,
+          "delta": 0.025,
+      },
+      {
+          "testcase_name": "ndcg@5",
+          "truncation": 5,
+          "expected_ndcg": 0.716,
+          "delta": 0.024,
+      },
+      {
+          "testcase_name": "ndcg@10",
+          "truncation": 10,
+          "expected_ndcg": 0.716,
+          "delta": 0.03,
+      },
+  )
+  def test_ranking_ndcg_truncation(self, truncation, expected_ndcg, delta):
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="LABEL",
+        ranking_group="GROUP",
+        task=generic_learner.Task.RANKING,
+        ndcg_truncation=truncation,
+    )
+
+    model = learner.train(self.synthetic_ranking.train_path)
+
+    evaluation = model.evaluate(
+        self.synthetic_ranking.test_pd, ndcg_truncation=5
+    )
+    self.assertAlmostEqual(evaluation.ndcg, expected_ndcg, delta=delta)
+
   def test_adult_sparse_oblique(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
         label="income",
@@ -1041,9 +1178,11 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         ),
     )
 
-    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.863)
+    model, _, _ = self._check_adult_model(
+        learner, minimum_accuracy=0.863, use_pandas=True
+    )
 
-    _ = model.analyze(self.adult.test)
+    _ = model.analyze(self.adult.test_pd)
 
   def test_with_validation_pd(self):
     evaluation = (
@@ -1056,6 +1195,13 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
 
     logging.info("evaluation:\n%s", evaluation)
     self.assertAlmostEqual(evaluation.accuracy, 0.87, 1)
+
+  def test_with_validation_missing_columns_fails(self):
+    with self.assertRaisesRegex(ValueError, "Missing required column 'age'"):
+      invalid_adult_test_pd = self.adult.test_pd.drop(["age"], axis=1)
+      specialized_learners.GradientBoostedTreesLearner(
+          label="income", num_trees=50
+      ).train(self.adult.train_pd, valid=invalid_adult_test_pd)
 
   def test_with_validation_path(self):
     evaluation = (
@@ -1177,10 +1323,10 @@ class IsolationForestLearnerTest(LearnerTest):
       learner = specialized_learners.IsolationForestLearner(label="label")
     else:
       learner = specialized_learners.IsolationForestLearner(
-          features=["f1", "f2"]
+          features=["features.0_of_2", "features.1_of_2"]
       )
-    model = learner.train(self.gaussians.train)
-    predictions = model.predict(self.gaussians.test)
+    model = learner.train(self.gaussians.train_pd)
+    predictions = model.predict(self.gaussians.test_pd)
 
     auc = metrics.roc_auc_score(self.gaussians.test_pd["label"], predictions)
     logging.info("auc:%s", auc)
@@ -1189,7 +1335,7 @@ class IsolationForestLearnerTest(LearnerTest):
     _ = model.describe("text")
     _ = model.describe("html")
     _ = model.analyze_prediction(self.gaussians.test_pd.iloc[:1])
-    _ = model.analyze(self.gaussians.test)
+    _ = model.analyze(self.gaussians.test_pd)
 
   def test_gaussians_evaluation_default_task(self):
     learner = specialized_learners.IsolationForestLearner(label="label")
@@ -1201,8 +1347,10 @@ class IsolationForestLearnerTest(LearnerTest):
       _ = model.evaluate(self.gaussians.test)
 
   def test_gaussians_evaluation_no_label(self):
-    learner = specialized_learners.IsolationForestLearner(features=["f1", "f2"])
-    model = learner.train(self.gaussians.train)
+    learner = specialized_learners.IsolationForestLearner(
+        features=["features.0_of_2", "features.1_of_2"]
+    )
+    model = learner.train(self.gaussians.train_pd)
     with self.assertRaisesRegex(
         ValueError,
         ".*A model cannot be evaluated without a label..*",
@@ -1232,36 +1380,38 @@ class IsolationForestLearnerTest(LearnerTest):
             "loss",
         ],
     )
-    self.assertAlmostEqual(evaluation.accuracy, 0.98, delta=0.01)
+    self.assertAlmostEqual(evaluation.accuracy, 0.975, delta=0.015)
     self.assertAlmostEqual(evaluation.loss, 0.52, delta=0.01)
 
   def test_max_depth_gaussians_subsample_ratio(self):
     learner = specialized_learners.IsolationForestLearner(
-        features=["f1", "f2"],
+        features=["features.0_of_2", "features.1_of_2"],
         subsample_ratio=0.9,
     )
     self.assertEqual(learner.hyperparameters["subsample_ratio"], 0.9)
-    model = learner.train(self.gaussians.train)
+    model = learner.train(self.gaussians.train_pd)
 
     max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
     self.assertEqual(max_depth, 8)
 
   def test_max_depth_gaussians_subsample_count(self):
     learner = specialized_learners.IsolationForestLearner(
-        features=["f1", "f2"],
+        features=["features.0_of_2", "features.1_of_2"],
         subsample_count=128,
     )
     self.assertEqual(learner.hyperparameters["subsample_count"], 128)
-    model = learner.train(self.gaussians.train)
+    model = learner.train(self.gaussians.train_pd)
 
     max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
     self.assertEqual(max_depth, 7)
 
   def test_max_depth_gaussians_max_depth(self):
     learner = specialized_learners.IsolationForestLearner(
-        features=["f1", "f2"], subsample_ratio=1.0, max_depth=10
+        features=["features.0_of_2", "features.1_of_2"],
+        subsample_ratio=1.0,
+        max_depth=10,
     )
-    model = learner.train(self.gaussians.train)
+    model = learner.train(self.gaussians.train_pd)
 
     max_depth = max([get_tree_depth(t.root, 0) for t in model.get_all_trees()])
     self.assertEqual(max_depth, 10)
@@ -1285,13 +1435,13 @@ class IsolationForestLearnerTest(LearnerTest):
     with self.assertRaises(ValueError):
       learner.validate_hyperparameters()
 
-  def test_max_depth_gaussians_oblique(self):
+  def test_gaussians_oblique(self):
     learner = specialized_learners.IsolationForestLearner(
-        features=["f1", "f2"],
+        features=["features.0_of_2", "features.1_of_2"],
         split_axis="SPARSE_OBLIQUE",
         num_trees=5,
     )
-    model = learner.train(self.gaussians.train)
+    model = learner.train(self.gaussians.train_pd)
     first_tree = model.get_tree(0)
     first_root = first_tree.root
     self.assertIsInstance(first_root, node_lib.NonLeaf)

@@ -262,6 +262,9 @@ class Trainer {
         accumulator += value * feature_weights[feature_idx];
         if (option.resolution != -1) {
           value = std::round(value * option.resolution);
+          if (value == option.resolution) {
+            value--;
+          }
         }
         if (option.use_discretized_numerical_features) {
           discretized_numerical_features[feature_idx]->Add(

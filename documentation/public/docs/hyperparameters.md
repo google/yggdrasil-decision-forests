@@ -133,6 +133,13 @@ reasonable time.
     of the training using the validation dataset. Enabling this feature can
     increase the training time significantly.
 
+#### [cross_entropy_ndcg_truncation](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
+
+-   **Type:** Integer **Default:** 5 **Possible values:** min:1
+
+-   Truncation of the cross-entropy NDCG loss (default 5). Only used with
+    cross-entropy NDCG loss i.e. `loss="XE_NDCG_MART"`
+
 #### [dart_dropout](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
 -   **Type:** Real **Default:** 0.01 **Possible values:** min:0 max:1
@@ -165,18 +172,19 @@ reasonable time.
 
 -   **Type:** Real **Default:** 0.5 **Possible values:** min:0 max:1
 
--   EXPERIMENTAL. Weighting parameter for focal loss, positive samples weighted
-    by alpha, negative samples by (1-alpha). The default 0.5 value means no
-    active class-level weighting. Only used with focal loss i.e.
+-   EXPERIMENTAL, default 0.5. Weighting parameter for focal loss, positive
+    samples weighted by alpha, negative samples by (1-alpha). The default 0.5
+    value means no active class-level weighting. Only used with focal loss i.e.
     `loss="BINARY_FOCAL_LOSS"`
 
 #### [focal_loss_gamma](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
 -   **Type:** Real **Default:** 2 **Possible values:** min:0
 
--   EXPERIMENTAL. Exponent of the misprediction exponent term in focal loss,
-    corresponds to gamma parameter in https://arxiv.org/pdf/1708.02002.pdf. Only
-    used with focal loss i.e. `loss="BINARY_FOCAL_LOSS"`
+-   EXPERIMENTAL, default 2.0. Exponent of the misprediction exponent term in
+    focal loss, corresponds to gamma parameter in
+    https://arxiv.org/pdf/1708.02002.pdf. Only used with focal loss i.e.
+    `loss="BINARY_FOCAL_LOSS"`
 
 #### [forest_extraction](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
@@ -285,9 +293,9 @@ reasonable time.
 -   **Type:** Categorical **Default:** DEFAULT **Possible values:** DEFAULT,
     BINOMIAL_LOG_LIKELIHOOD, SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD,
     LAMBDA_MART_NDCG5, XE_NDCG_MART, BINARY_FOCAL_LOSS, POISSON,
-    MEAN_AVERAGE_ERROR
+    MEAN_AVERAGE_ERROR, LAMBDA_MART_NDCG
 
--   The loss optimized by the model. If not specified (DEFAULT) the loss is selected automatically according to the \"task\" and label statistics. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:<br>- `DEFAULT`: Select the loss automatically according to the task and label statistics.<br>- `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.<br>- `SQUARED_ERROR`: Least square loss. Only valid for regression.<br>- `POISSON`: Poisson log likelihood loss. Mainly used for counting problems. Only valid for regression.<br>- `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.<br>- `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5.<br>- `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.<br>- `BINARY_FOCAL_LOSS`: Focal loss. Only valid for binary classification. See https://arxiv.org/pdf/1708.02002.pdf.<br>- `POISSON`: Poisson log likelihood. Only valid for regression.<br>- `MEAN_AVERAGE_ERROR`: Mean average error a.k.a. MAE.<br>
+-   The loss optimized by the model. If not specified (DEFAULT) the loss is selected automatically according to the \"task\" and label statistics. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:<br>- `DEFAULT`: Select the loss automatically according to the task and label statistics.<br>- `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.<br>- `SQUARED_ERROR`: Least square loss. Only valid for regression.<br>- `POISSON`: Poisson log likelihood loss. Mainly used for counting problems. Only valid for regression.<br>- `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.<br>- `LAMBDA_MART_NDCG`: LambdaMART with NDCG@5.<br>- `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.<br>- `BINARY_FOCAL_LOSS`: Focal loss. Only valid for binary classification. See https://arxiv.org/pdf/1708.02002.pdf.<br>- `POISSON`: Poisson log likelihood. Only valid for regression.<br>- `MEAN_AVERAGE_ERROR`: Mean average error a.k.a. MAE.<br>- `LAMBDA_MART_NDCG5`: DEPRECATED, use LAMBDA_MART_NDCG. LambdaMART with NDCG@5. <br>
 
 #### [max_depth](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -353,6 +361,13 @@ reasonable time.
     GLOBAL_IMPUTATION, LOCAL_IMPUTATION, RANDOM_LOCAL_IMPUTATION
 
 -   Method used to handle missing attribute values.<br>- `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean (in case of numerical attribute) or the most-frequent-item (in case of categorical attribute) computed on the entire dataset (i.e. the information contained in the data spec).<br>- `LOCAL_IMPUTATION`: Missing attribute values are imputed with the mean (numerical attribute) or most-frequent-item (in the case of categorical attribute) evaluated on the training examples in the current node.<br>- `RANDOM_LOCAL_IMPUTATION`: Missing attribute values are imputed from randomly sampled values from the training examples in the current node. This method was proposed by Clinic et al. in "Random Survival Forests" (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
+
+#### [ndcg_truncation](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
+
+-   **Type:** Integer **Default:** 5 **Possible values:** min:1
+
+-   Truncation of the NDCG loss (default 5). Only used with NDCG loss i.e.
+    `loss="LAMBDA_MART_NDCG".`
 
 #### [num_candidate_attributes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1357,99 +1372,6 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 ### Hyper-parameters
 
-#### [allow_na_conditions](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** false **Possible values:** true, false
-
--   If true, the tree training evaluates conditions of the type `X is NA` i.e.
-    `X is missing`.
-
-#### [categorical_algorithm](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** CART **Possible values:** CART, ONE_HOT,
-    RANDOM
-
--   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
-
-#### [categorical_set_split_greedy_sampling](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Real **Default:** 0.1 **Possible values:** min:0 max:1
-
--   For categorical set splits e.g. texts. Probability for a categorical value
-    to be a candidate for the positive set. The sampling is applied once per
-    node (i.e. not at every step of the greedy optimization).
-
-#### [categorical_set_split_max_num_items](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Integer **Default:** -1 **Possible values:** min:-1
-
--   For categorical set splits e.g. texts. Maximum number of items (prior to the
-    sampling). If more items are available, the least frequent items are
-    ignored. Changing this value is similar to change the "max_vocab_count"
-    before loading the dataset, with the following exception: With
-    `max_vocab_count`, all the remaining items are grouped in a special
-    Out-of-vocabulary item. With `max_num_items`, this is not the case.
-
-#### [categorical_set_split_min_item_frequency](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Integer **Default:** 1 **Possible values:** min:1
-
--   For categorical set splits e.g. texts. Minimum number of occurrences of an
-    item to be considered.
-
-#### [growing_strategy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** LOCAL **Possible values:** LOCAL,
-    BEST_FIRST_GLOBAL
-
--   How to grow the tree.<br>- `LOCAL`: Each node is split independently of the other nodes. In other words, as long as a node satisfy the splits "constraints (e.g. maximum depth, minimum number of observations), the node will be split. This is the "classical" way to grow decision trees.<br>- `BEST_FIRST_GLOBAL`: The node with the best loss reduction among all the nodes of the tree is selected for splitting. This method is also called "best first" or "leaf-wise growth". See "Best-first decision tree learning", Shi and "Additive logistic regression : A statistical view of boosting", Friedman for more details.
-
-#### [honest](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** false **Possible values:** true, false
-
--   In honest trees, different training examples are used to infer the structure
-    and the leaf values. This regularization technique trades examples for bias
-    estimates. It might increase or reduce the quality of the model. See
-    "Generalized Random Forests", Athey et al. In this paper, Honest trees are
-    trained with the Random Forest algorithm with a sampling without
-    replacement.
-
-#### [honest_fixed_separation](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** false **Possible values:** true, false
-
--   For honest trees only i.e. honest=true. If true, a new random separation is
-    generated for each tree. If false, the same separation is used for all the
-    trees (e.g., in Gradient Boosted Trees containing multiple trees).
-
-#### [honest_ratio_leaf_examples](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Real **Default:** 0.5 **Possible values:** min:0 max:1
-
--   For honest trees only i.e. honest=true. Ratio of examples used to set the
-    leaf values.
-
-#### [in_split_min_examples_check](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** true **Possible values:** true, false
-
--   Whether to check the `min_examples` constraint in the split search (i.e.
-    splits leading to one child having less than `min_examples` examples are
-    considered invalid) or before the split search (i.e. a node can be derived
-    only if it contains more than `min_examples` examples). If false, there can
-    be nodes with less than `min_examples` training examples.
-
-#### [keep_non_leaf_label_distribution](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** true **Possible values:** true, false
-
--   Whether to keep the node value (i.e. the distribution of the labels of the
-    training examples) of non-leaf nodes. This information is not used during
-    serving, however it can be used for model interpretation as well as hyper
-    parameter tuning. This can take lots of space, sometimes accounting for half
-    of the model size.
-
 #### [max_depth](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
 -   **Type:** Integer **Default:** -2 **Possible values:** min:-2
@@ -1459,74 +1381,11 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
     `max_depth=-2` means that the maximum depth is log2(number of sampled
     examples per tree) (default).
 
-#### [max_num_nodes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Integer **Default:** 31 **Possible values:** min:-1
-
--   Maximum number of nodes in the tree. Set to -1 to disable this limit. Only
-    available for `growing_strategy=BEST_FIRST_GLOBAL`.
-
-#### [maximum_model_size_in_memory_in_bytes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto)
-
--   **Type:** Real **Default:** -1
-
--   Limit the size of the model when stored in ram. Different algorithms can
-    enforce this limit differently. Note that when models are compiled into an
-    inference, the size of the inference engine is generally much smaller than
-    the original model.
-
-#### [maximum_training_duration_seconds](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto)
-
--   **Type:** Real **Default:** -1
-
--   Maximum training duration of the model expressed in seconds. Each learning
-    algorithm is free to use this parameter at it sees fit. Enabling maximum
-    training duration makes the model training non-deterministic.
-
-#### [mhld_oblique_max_num_attributes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Integer **Default:** 4 **Possible values:** min:1
-
--   For MHLD oblique splits i.e. `split_axis=MHLD_OBLIQUE`. Maximum number of
-    attributes in the projection. Increasing this value increases the training
-    time. Decreasing this value acts as a regularization. The value should be in
-    [2, num_numerical_features]. If the value is above the total number of
-    numerical features, the value is capped automatically. The value 1 is
-    allowed but results in ordinary (non-oblique) splits.
-
 #### [min_examples](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
 -   **Type:** Integer **Default:** 5 **Possible values:** min:1
 
 -   Minimum number of examples in a node.
-
-#### [missing_value_policy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** GLOBAL_IMPUTATION **Possible values:**
-    GLOBAL_IMPUTATION, LOCAL_IMPUTATION, RANDOM_LOCAL_IMPUTATION
-
--   Method used to handle missing attribute values.<br>- `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean (in case of numerical attribute) or the most-frequent-item (in case of categorical attribute) computed on the entire dataset (i.e. the information contained in the data spec).<br>- `LOCAL_IMPUTATION`: Missing attribute values are imputed with the mean (numerical attribute) or most-frequent-item (in the case of categorical attribute) evaluated on the training examples in the current node.<br>- `RANDOM_LOCAL_IMPUTATION`: Missing attribute values are imputed from randomly sampled values from the training examples in the current node. This method was proposed by Clinic et al. in "Random Survival Forests" (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
-
-#### [num_candidate_attributes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Integer **Default:** 0 **Possible values:** min:-1
-
--   Number of unique valid attributes tested for each node. An attribute is
-    valid if it has at least a valid split. If `num_candidate_attributes=0`, the
-    value is set to the classical default value for Random Forest: `sqrt(number
-    of input attributes)` in case of classification and
-    `number_of_input_attributes / 3` in case of regression. If
-    `num_candidate_attributes=-1`, all the attributes are tested.
-
-#### [num_candidate_attributes_ratio](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Real **Default:** -1 **Possible values:** min:-1 max:1
-
--   Ratio of attributes tested at each node. If set, it is equivalent to
-    `num_candidate_attributes = number_of_input_features x
-    num_candidate_attributes_ratio`. The possible values are between ]0, and 1]
-    as well as -1. If not set or equal to -1, the `num_candidate_attributes` is
-    used.
 
 #### [num_trees](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.proto)
 
@@ -1552,13 +1411,6 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 
 -   Random seed for the training of the model. Learners are expected to be
     deterministic by the random seed.
-
-#### [sorting_strategy](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** AUTO **Possible values:** IN_NODE,
-    PRESORT, FORCE_PRESORT, AUTO
-
--   How are sorted the numerical features in order to find the splits<br>- AUTO: Selects the most efficient method among IN_NODE, FORCE_PRESORT, and LAYER.<br>- IN_NODE: The features are sorted just before being used in the node. This solution is slow but consumes little amount of memory.<br>- FORCE_PRESORT: The features are pre-sorted at the start of the training. This solution is faster but consumes much more memory than IN_NODE.<br>- PRESORT: Automatically choose between FORCE_PRESORT and IN_NODE.<br>.
 
 #### [sparse_oblique_normalization](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1605,20 +1457,6 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
     examples per tree. Note that this parameter also restricts the tree's
     maximum depth to log2(examples used per tree) unless max_depth is set
     explicitly.
-
-#### [uplift_min_examples_in_treatment](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Integer **Default:** 5 **Possible values:** min:0
-
--   For uplift models only. Minimum number of examples per treatment in a node.
-
-#### [uplift_split_score](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
-
--   **Type:** Categorical **Default:** KULLBACK_LEIBLER **Possible values:**
-    KULLBACK_LEIBLER, KL, EUCLIDEAN_DISTANCE, ED, CHI_SQUARED, CS,
-    CONSERVATIVE_EUCLIDEAN_DISTANCE, CED
-
--   For uplift models only. Splitter score i.e. score optimized by the splitters. The scores are introduced in "Decision trees for uplift modeling with single and multiple treatments", Rzepakowski et al. Notation: `p` probability / average value of the positive outcome, `q` probability / average value in the control group.<br>- `KULLBACK_LEIBLER` or `KL`: - p log (p/q)<br>- `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2<br>- `CHI_SQUARED` or `CS`: (p-q)^2/q<br>
 
 ## HYPERPARAMETER_OPTIMIZER
 

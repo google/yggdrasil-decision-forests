@@ -74,60 +74,58 @@ class HyperparametersTest(parameterized.TestCase):
       dict(
           testcase_name="prune_first_candidate_solo",
           hp_dict={
-              "num_candidate_attributes_ratio": 1.0,
-              "num_candidate_attributes": 20,
+              "subsample_ratio": 1.0,
+              "subsample_count": 20,
           },
-          explicit_parameters=set(["num_candidate_attributes_ratio"]),
-          expected={"num_candidate_attributes_ratio": 1.0},
+          explicit_parameters=set(["subsample_ratio"]),
+          expected={"subsample_ratio": 1.0},
       ),
       dict(
           testcase_name="prune_second_candidate_solo",
           hp_dict={
-              "num_candidate_attributes_ratio": 1.0,
-              "num_candidate_attributes": 20,
+              "subsample_ratio": 1.0,
+              "subsample_count": 20,
           },
-          explicit_parameters=set(["num_candidate_attributes"]),
-          expected={"num_candidate_attributes": 20},
+          explicit_parameters=set(["subsample_count"]),
+          expected={"subsample_count": 20},
       ),
       dict(
           testcase_name="prune_candidate_with_explicit",
           hp_dict={
-              "num_candidate_attributes_ratio": 1.0,
-              "num_candidate_attributes": 20,
+              "subsample_ratio": 1.0,
+              "subsample_count": 20,
               "max_depth": 5,
           },
-          explicit_parameters=set(["num_candidate_attributes", "max_depth"]),
+          explicit_parameters=set(["subsample_count", "max_depth"]),
           expected={
-              "num_candidate_attributes": 20,
+              "subsample_count": 20,
               "max_depth": 5,
           },
       ),
       dict(
           testcase_name="prune_candidate_with_nonexplicit",
           hp_dict={
-              "num_candidate_attributes_ratio": 1.0,
-              "num_candidate_attributes": 20,
+              "subsample_ratio": 1.0,
+              "subsample_count": 20,
               "max_depth": 5,
           },
-          explicit_parameters=set(["num_candidate_attributes"]),
+          explicit_parameters=set(["subsample_count"]),
           expected={
-              "num_candidate_attributes": 20,
+              "subsample_count": 20,
               "max_depth": 5,
           },
       ),
       dict(
           testcase_name="two_mutual_exlusive",
           hp_dict={
-              "num_candidate_attributes_ratio": 1.0,
-              "num_candidate_attributes": 20,
+              "subsample_ratio": 1.0,
+              "subsample_count": 20,
               "subsample_ratio": 0.5,
               "subsample_count": 5,
           },
-          explicit_parameters=set(
-              ["num_candidate_attributes", "subsample_count"]
-          ),
+          explicit_parameters=set(["subsample_count", "subsample_count"]),
           expected={
-              "num_candidate_attributes": 20,
+              "subsample_count": 20,
               "subsample_count": 5,
           },
       ),
@@ -149,18 +147,16 @@ class HyperparametersTest(parameterized.TestCase):
         learner="ISOLATION_FOREST", label="label"
     )
     hp_dict = {
-        "num_candidate_attributes_ratio": 1.0,
-        "num_candidate_attributes": 20,
+        "subsample_ratio": 1.0,
+        "subsample_count": 20,
     }
-    explicit_parameters = set(
-        ["num_candidate_attributes", "num_candidate_attributes_ratio"]
-    )
+    explicit_parameters = set(["subsample_count", "subsample_ratio"])
     with self.assertRaisesRegex(
         ValueError,
         ".*Only one of the following hyperparameters can be set:"
-        " (num_candidate_attributes,"
-        " num_candidate_attributes_ratio|num_candidate_attributes_ratio,"
-        " num_candidate_attributes).*",
+        " (subsample_count,"
+        " subsample_ratio|subsample_ratio,"
+        " subsample_count).*",
     ):
       _ = hp_lib.fix_hyperparameters(
           hp_dict=hp_dict,

@@ -15,7 +15,11 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/worker.h"
 
-#include <numeric>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
@@ -35,9 +39,11 @@
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
@@ -114,8 +120,19 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
 
     dataset_feature_duration_ = dataset_->load_in_memory_duration();
     dataset_num_features_loaded_ = dataset_->features().size();
-  }
-  if (GetWorkerType() == WorkerType::kEVALUATOR) {
+
+    if (welcome_.train_config().task() == model::proto::Task::RANKING) {
+      if (worker_logs_) {
+        LOG(INFO) << "Compute ranking groups";
+      }
+      train_ranking_index_ =
+          std::make_unique<gradient_boosted_trees::RankingGroupsIndices>();
+      RETURN_IF_ERROR(train_ranking_index_->Initialize(
+          dataset_->ranking_labels(), dataset_->ranking_groups()));
+      RETURN_IF_ERROR(dataset_->release_ranking_groups());
+    }
+
+  } else if (GetWorkerType() == WorkerType::kEVALUATOR) {
     // Load evaluation worker datasets.
     if (worker_logs_) {
       LOG(INFO) << "Loading validation dataset";
@@ -145,6 +162,14 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     } else {
       validation_.weights.assign(validation_.dataset->nrow(), 1.f);
       validation_.sum_weights = validation_.dataset->nrow();
+    }
+
+    if (welcome_.train_config().task() == model::proto::Task::RANKING) {
+      validation_.ranking_index =
+          std::make_unique<gradient_boosted_trees::RankingGroupsIndices>();
+      RETURN_IF_ERROR(validation_.ranking_index->Initialize(
+          *validation_.dataset, welcome_.train_config_linking().label(),
+          welcome_.train_config_linking().ranking_group()));
     }
   }
 
@@ -433,8 +458,15 @@ absl::Status DistributedGradientBoostedTreesWorker::GetLabelStatistics(
           distributed_decision_tree::LabelAccessorType::kAutomatic,
           answer->mutable_label_statistics(), thread_pool_.get()));
     } break;
+    case model::proto::Task::RANKING: {
+      // The ranking loss does not use label statistics.
+      answer->mutable_label_statistics();
+    } break;
     default:
-      return absl::InvalidArgumentError("Not supported task");
+      return absl::InvalidArgumentError(absl::StrCat(
+          "The distributed gradient boosted trees learner does "
+          "not support this task:",
+          model::proto::Task_Name(welcome_.train_config().task()), "."));
   }
 
   return absl::OkStatus();
@@ -523,14 +555,28 @@ absl::Status DistributedGradientBoostedTreesWorker::StartNewIter(
   random_.seed(seed_);
 
   // Computes the initial gradient.
-  if (welcome_.train_config().task() == model::proto::Task::CLASSIFICATION) {
-    RETURN_IF_ERROR(loss_->UpdateGradients(
-        dataset_->categorical_labels(), predictions_, nullptr, &gradient_ref_,
-        &random_, thread_pool_.get()));
-  } else {
-    RETURN_IF_ERROR(loss_->UpdateGradients(
-        dataset_->regression_labels(), predictions_, nullptr, &gradient_ref_,
-        &random_, thread_pool_.get()));
+  switch (welcome_.train_config().task()) {
+    case model::proto::Task::CLASSIFICATION:
+      RETURN_IF_ERROR(loss_->UpdateGradients(
+          dataset_->categorical_labels(), predictions_, nullptr, &gradient_ref_,
+          &random_, thread_pool_.get()));
+      break;
+    case model::proto::Task::REGRESSION:
+      RETURN_IF_ERROR(loss_->UpdateGradients(
+          dataset_->regression_labels(), predictions_, nullptr, &gradient_ref_,
+          &random_, thread_pool_.get()));
+      break;
+    case model::proto::Task::RANKING:
+      DCHECK(train_ranking_index_);
+      RETURN_IF_ERROR(loss_->UpdateGradients(
+          dataset_->ranking_labels(), predictions_, train_ranking_index_.get(),
+          &gradient_ref_, &random_, thread_pool_.get()));
+      break;
+    default:
+      return absl::InternalError(absl::StrCat(
+          "The distributed gradient boosted trees learner does "
+          "not support this task:",
+          model::proto::Task_Name(welcome_.train_config().task()), "."));
   }
 
   // The weak learners are predicting the loss's gradient.
@@ -1013,7 +1059,9 @@ absl::Status DistributedGradientBoostedTreesWorker::EndIterEvaluationWorker(
   partial_model->set_data_spec(welcome_.dataspec());
   const auto& spe_config = welcome_.train_config().GetExtension(
       proto::distributed_gradient_boosted_trees_config);
-  partial_model->set_loss(spe_config.gbt().loss());
+  partial_model->set_loss(spe_config.gbt().loss(),
+                          gradient_boosted_trees::GradientBoostedTreesLearner::
+                              BuildLossConfiguration(spe_config.gbt()));
 
   // The model is used to accumulate pre-activation predictions.
   partial_model->set_output_logits(true);
@@ -1090,7 +1138,7 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
             num_examples * num_prediction_dimensions);
 
   // Cache of temporary working data for each thread. This helps reducing the
-  // amonnt of heap allocations.
+  // amount of heap allocations.
   struct CachePerThread {
     std::unique_ptr<serving::AbstractExampleSet> examples;
     std::vector<float> batch_predictions;
@@ -1150,7 +1198,7 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
       const LossResults loss_results,
       loss_->Loss(*validation_.dataset, welcome_.train_config_linking().label(),
                   validation_.predictions, validation_.weights,
-                  /*ranking_index=*/nullptr,
+                  /*ranking_index=*/validation_.ranking_index.get(),
                   /*thread_pool=*/thread_pool_.get()));
 
   validation_.evaluation.set_loss(loss_results.loss);
@@ -1266,8 +1314,18 @@ absl::StatusOr<LossResults> DistributedGradientBoostedTreesWorker::Loss(
                          dataset->weights(), nullptr, thread_pool_.get());
       break;
     }
+    case model::proto::Task::RANKING: {
+      DCHECK(train_ranking_index_);
+      return loss_->Loss(dataset->ranking_labels(), predictions,
+                         dataset->weights(), train_ranking_index_.get(),
+                         thread_pool_.get());
+      break;
+    }
     default:
-      return absl::InvalidArgumentError("Not supported task");
+      return absl::InvalidArgumentError(absl::StrCat(
+          "The distributed gradient boosted trees learner does "
+          "not support this task:",
+          model::proto::Task_Name(welcome_.train_config().task()), "."));
   }
 }
 

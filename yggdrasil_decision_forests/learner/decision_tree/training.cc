@@ -3819,8 +3819,7 @@ void SetInternalDefaultHyperParameters(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& link_config,
     const dataset::proto::DataSpecification& data_spec,
-    proto::DecisionTreeTrainingConfig* dt_config) {
-}
+    proto::DecisionTreeTrainingConfig* dt_config) {}
 
 void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
   // Emulation of histogram splits.
@@ -4524,27 +4523,9 @@ absl::Status SplitExamples(const dataset::VerticalDataset& dataset,
   positive_examples->clear();
   negative_examples->clear();
 
-  std::vector<UnsignedExampleIdx>* example_sets[] = {negative_examples,
-                                                     positive_examples};
-
-  // Index of the example selected for this node.
-  const auto column_data = dataset.column(condition.attribute());
-
-  if (!dataset_is_dense) {
-    for (const UnsignedExampleIdx example_idx : examples) {
-      const auto dst = example_sets[EvalConditionFromColumn(
-          condition, column_data, dataset, example_idx)];
-      dst->push_back(example_idx);
-    }
-  } else {
-    UnsignedExampleIdx dense_example_idx = 0;
-    for (const UnsignedExampleIdx example_idx : examples) {
-      const auto dst = example_sets[EvalConditionFromColumn(
-          condition, column_data, dataset, dense_example_idx)];
-      dense_example_idx++;
-      dst->push_back(example_idx);
-    }
-  }
+  RETURN_IF_ERROR(EvalConditionOnDataset(dataset, examples, condition,
+                                         dataset_is_dense, positive_examples,
+                                         negative_examples));
 
   // The following test ensure that the effective number of positive examples is
   // equal to the expected number of positive examples. A miss alignment

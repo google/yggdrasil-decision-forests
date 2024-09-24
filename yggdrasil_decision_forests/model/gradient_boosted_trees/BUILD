@@ -71,6 +71,7 @@ cc_test(
     ],
     deps = [
         ":gradient_boosted_trees",
+        ":gradient_boosted_trees_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:filesystem",

@@ -49,6 +49,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/metric:report",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:fast_engine",
+        "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:distribution",
         "//yggdrasil_decision_forests/utils:distribution_cc_proto",
         "//yggdrasil_decision_forests/utils:logging",
@@ -65,6 +66,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -217,7 +219,6 @@ cc_test(
         ":model_testing",
         ":prediction_cc_proto",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
-        "//yggdrasil_decision_forests/dataset:example_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/metric",
@@ -229,10 +230,12 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
         "@com_google_googletest//:gtest_main",
     ],
 )

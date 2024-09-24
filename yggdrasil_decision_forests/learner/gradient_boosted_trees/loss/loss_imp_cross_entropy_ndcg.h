@@ -50,7 +50,8 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
   CrossEntropyNDCGLoss(
       const proto::GradientBoostedTreesTrainingConfig& gbt_config,
       model::proto::Task task, const dataset::proto::Column& label_column)
-      : AbstractLoss(gbt_config, task, label_column) {}
+      : AbstractLoss(gbt_config, task, label_column),
+        ndcg_truncation_(gbt_config.xe_ndcg().ndcg_truncation()) {}
 
   absl::Status Status() const override;
 
@@ -83,6 +84,9 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
       const absl::Span<const float> weights,
       const RankingGroupsIndices* ranking_index,
       utils::concurrency::ThreadPool* thread_pool) const override;
+
+ private:
+  const int ndcg_truncation_;
 };
 
 REGISTER_AbstractGradientBoostedTreeLoss(CrossEntropyNDCGLoss, "XE_NDCG_MART");

@@ -54,6 +54,15 @@ def main(argv) -> None:
   ):
     print(data)
 
+    print("Mean delta% (smaller is better):", data["delta%"].mean())
+    print("Median delta% (smaller is better):", data["delta%"].median())
+    print("Min delta% (smaller is better):", data["delta%"].min())
+    print("Max delta% (smaller is better):", data["delta%"].max())
+    print(
+        "Rate of negative delta% (larger is better):",
+        (data["delta%"] <= 0).mean(),
+    )
+
 
 if __name__ == "__main__":
   app.run(main)

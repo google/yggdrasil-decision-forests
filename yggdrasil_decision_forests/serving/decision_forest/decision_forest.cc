@@ -944,7 +944,8 @@ absl::Status GenericToSpecializedModel(
 absl::Status GenericToSpecializedModel(
     const GradientBoostedTreesModel& src,
     GradientBoostedTreesRankingNumericalOnly* dst) {
-  if (src.loss() != Loss::LAMBDA_MART_NDCG5 ||
+  if ((src.loss() != Loss::LAMBDA_MART_NDCG5 &&
+       src.loss() != Loss::LAMBDA_MART_NDCG) ||
       src.initial_predictions().size() != 1) {
     return absl::InvalidArgumentError("The GBT is not trained for ranking.");
   }
@@ -964,7 +965,8 @@ absl::Status GenericToSpecializedModel(
 absl::Status GenericToSpecializedModel(
     const GradientBoostedTreesModel& src,
     GradientBoostedTreesRankingNumericalAndCategorical* dst) {
-  if (src.loss() != Loss::LAMBDA_MART_NDCG5 ||
+  if ((src.loss() != Loss::LAMBDA_MART_NDCG5 &&
+       src.loss() != Loss::LAMBDA_MART_NDCG) ||
       src.initial_predictions().size() != 1) {
     return absl::InvalidArgumentError("The GBT is not trained for ranking.");
   }
@@ -1168,7 +1170,8 @@ absl::Status GenericToSpecializedModel(const GradientBoostedTreesModel& src,
 template <>
 absl::Status GenericToSpecializedModel(const GradientBoostedTreesModel& src,
                                        GradientBoostedTreesRanking* dst) {
-  if (src.loss() != Loss::LAMBDA_MART_NDCG5 ||
+  if ((src.loss() != Loss::LAMBDA_MART_NDCG5 &&
+       src.loss() != Loss::LAMBDA_MART_NDCG) ||
       src.initial_predictions().size() != 1) {
     return absl::InvalidArgumentError(
         "The Gradient Boosted Tree is not trained for ranking.");

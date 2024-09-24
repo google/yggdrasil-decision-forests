@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -127,12 +128,19 @@ class RankingGroupsIndices {
   absl::Status Initialize(const dataset::VerticalDataset& dataset,
                           int label_col_idx, int group_col_idx);
 
+  absl::Status Initialize(absl::Span<const float> labels,
+                          absl::Span<const uint64_t> groups);
+
   double NDCG(absl::Span<const float> predictions,
               const absl::Span<const float> weights, int truncation) const;
 
   const std::vector<Group>& groups() const { return groups_; }
 
  private:
+  absl::Status InitializeFromTmpGroups(
+      absl::flat_hash_map<uint64_t, std::vector<Item>>&& tmp_groups,
+      UnsignedExampleIdx num_examples);
+
   static void ExtractPredAndLabelRelevance(
       const std::vector<Item>& group, absl::Span<const float> predictions,
       std::vector<metric::RankingLabelAndPrediction>* pred_and_label_relevance);
@@ -140,6 +148,9 @@ class RankingGroupsIndices {
   // "groups[i]" is the list of relevance+example_idx of examples with group
   // column equal to "i". "Items" are sorted in decreasing order of relevance.
   std::vector<Group> groups_;
+
+  // TODO: Use a banking system for "groups_" to reduce memory usage and
+  // improve cache locality.
 
   // Total number of items.
   UnsignedExampleIdx num_items_ = 0;

@@ -17,16 +17,21 @@
 
 #include <atomic>
 #include <memory>
+#include <tuple>
 #include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "absl/types/optional.h"
+#include "yggdrasil_decision_forests/utils/test.h"
 
 #include "yggdrasil_decision_forests/utils/concurrency.h"  // IWYU pragma: keep
 
 namespace yggdrasil_decision_forests::utils::concurrency {
 namespace {
+
+using ::testing::TestWithParam;
 
 TEST(ThreadPool, Empty) {
   { ThreadPool pool("MyPool", 1); }
@@ -154,6 +159,102 @@ TEST(Utils, ConcurrentForLoop) {
         });
   }
   EXPECT_EQ(sum, items.size() * 2);
+}
+
+struct ConcurrentForLoopWithWorkerTestCase {
+  size_t max_num_threads;
+};
+
+using ConcurrentForLoopWithWorkerTest =
+    TestWithParam<ConcurrentForLoopWithWorkerTestCase>;
+
+INSTANTIATE_TEST_SUITE_P(
+    ConcurrentForLoopWithWorkerTestSuiteInstantiation,
+    ConcurrentForLoopWithWorkerTest,
+    testing::ValuesIn<ConcurrentForLoopWithWorkerTestCase>({{10}, {1}}));
+
+TEST_P(ConcurrentForLoopWithWorkerTest, Base) {
+  const ConcurrentForLoopWithWorkerTestCase& test_case = GetParam();
+  std::atomic<int> sum{0};
+
+  struct Cache {
+    size_t thread_idx;
+  };
+
+  const auto create_cache = [&](size_t thread_idx, size_t num_threads,
+                                size_t block_size) -> Cache {
+    return {.thread_idx = thread_idx};
+  };
+
+  const auto run = [&](size_t block_idx, size_t begin_item_idx,
+                       size_t end_item_idx, Cache* cache) -> absl::Status {
+    CHECK_GE(end_item_idx - begin_item_idx, 10);
+    CHECK_GE(end_item_idx - begin_item_idx, 20);
+    for (size_t i = begin_item_idx; i < end_item_idx; i++) {
+      sum++;
+    }
+    return absl::OkStatus();
+  };
+
+  EXPECT_OK(utils::concurrency::ConcurrentForLoopWithWorker<Cache>(
+      /*num_items=*/1000,
+      /*max_num_threads=*/test_case.max_num_threads,
+      /*min_block_size=*/10,
+      /*max_block_size=*/20, create_cache, run));
+
+  EXPECT_EQ(sum, 1000);
+}
+
+TEST(ConcurrentForLoopWithWorker, Error) {
+  struct Cache {};
+
+  const auto create_cache = [&](size_t thread_idx, size_t num_threads,
+                                size_t block_size) -> Cache { return {}; };
+
+  const auto run = [&](size_t block_idx, size_t begin_item_idx,
+                       size_t end_item_idx, Cache* cache) -> absl::Status {
+    if (begin_item_idx == 0) {
+      return absl::InvalidArgumentError("error");
+    }
+    return absl::OkStatus();
+  };
+
+  EXPECT_THAT(utils::concurrency::ConcurrentForLoopWithWorker<Cache>(
+                  /*num_items=*/1000,
+                  /*max_num_threads=*/5,
+                  /*min_block_size=*/10,
+                  /*max_block_size=*/20, create_cache, run),
+              test::StatusIs(absl::StatusCode::kInvalidArgument, "error"));
+}
+
+struct GetConfigTestCase {
+  size_t num_items;
+  size_t max_num_threads;
+  size_t min_block_size;
+  size_t max_block_size;
+  size_t expected_block_size;
+  size_t expected_num_threads;
+};
+
+using GetConfigTest = TestWithParam<GetConfigTestCase>;
+
+INSTANTIATE_TEST_SUITE_P(GetConfigTestSuiteInstantiation, GetConfigTest,
+                         testing::ValuesIn<GetConfigTestCase>({
+                             {1000, 2000, 1, 20, 1, 1000},
+                             {1000, 2000, 2, 20, 2, 500},
+                             {1000, 50, 1, 20, 20, 50},
+                             {1000, 50, 1, 10, 10, 50},
+                         }));
+
+TEST_P(GetConfigTest, Base) {
+  const GetConfigTestCase& test_case = GetParam();
+  size_t block_size;
+  size_t num_threads;
+  std::tie(block_size, num_threads) =
+      internal::GetConfig(test_case.num_items, test_case.max_num_threads,
+                          test_case.min_block_size, test_case.max_block_size);
+  EXPECT_EQ(block_size, test_case.expected_block_size);
+  EXPECT_EQ(num_threads, test_case.expected_num_threads);
 }
 
 }  // namespace

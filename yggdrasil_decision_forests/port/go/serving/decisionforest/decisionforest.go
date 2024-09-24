@@ -475,8 +475,9 @@ func NewRankingGBDTGenericEngine(model *gbt.Model, compatibility example.Compati
 		return nil, fmt.Errorf("Invalid initial predictions")
 	}
 	if model.GbtHeader.GetLoss() != gbt_pb.Loss_LAMBDA_MART_NDCG5 &&
+		model.GbtHeader.GetLoss() != gbt_pb.Loss_LAMBDA_MART_NDCG &&
 		model.GbtHeader.GetLoss() != gbt_pb.Loss_XE_NDCG_MART {
-		return nil, fmt.Errorf("Incompatible loss. Expecting squared error")
+		return nil, fmt.Errorf("Incompatible loss. Expecting ranking loss")
 	}
 
 	engine, err := newOneDimensionEngine(activationIdentity,

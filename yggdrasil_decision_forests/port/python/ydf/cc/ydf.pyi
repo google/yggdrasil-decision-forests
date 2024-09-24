@@ -43,8 +43,7 @@ class VerticalDataset:
   def PopulateColumnCategoricalSetNPBytes(
       self,
       name: str,
-      data_bank: npt.NDArray[np.bytes_],
-      data_boundaries: npt.NDArray[np.int64],
+      data: npt.NDArray[np.object_],
       ydf_dtype: Optional[data_spec_pb2.DType],
       max_vocab_count: int = -1,
       min_vocab_frequency: int = -1,
@@ -105,20 +104,28 @@ class BenchmarkInferenceCCResult:
   """
 
   duration_per_example: float
+  duration_per_example_multithread: float
   benchmark_duration: float
   num_runs: int
   batch_size: int
+  num_threads: int
 
 class GenericCCModel:
   def Predict(
       self,
       dataset: VerticalDataset,
+      use_slow_engine: bool,
+      num_threads: int,
   ) -> npt.NDArray[np.float32]: ...
   def Evaluate(
       self,
       dataset: VerticalDataset,
       options: metric_pb2.EvaluationOptions,
       weighted: bool,
+      label_col_idx: int,
+      group_col_idx: int,
+      use_slow_engine: bool,
+      num_threads: int,
   ) -> metric_pb2.EvaluationResults: ...
   def Analyze(
       self,
@@ -139,6 +146,7 @@ class GenericCCModel:
   def metadata(self) -> abstract_model_pb2.Metadata: ...
   def set_metadata(self, metadata: abstract_model_pb2.Metadata) -> None: ...
   def label_col_idx(self) -> int: ...
+  def group_col_idx(self) -> int: ...
   def Save(self, directory: str, file_prefix: Optional[str]): ...
   def Serialize(self) -> bytes: ...
   def Describe(self, full_details: bool, text_format: bool) -> str: ...
@@ -152,12 +160,15 @@ class GenericCCModel:
       benchmark_duration: float,
       warmup_duration: float,
       batch_size: int,
+      num_threads: int,
   ) -> BenchmarkInferenceCCResult: ...
   def VariableImportances(
       self,
   ) -> Dict[str, abstract_model_pb2.VariableImportanceSet]: ...
   def ForceEngine(self, engine_name: Optional[str]) -> None: ...
   def ListCompatibleEngines(self) -> Sequence[str]: ...
+  # TODO: Remove when solved.
+  def weighted_training(self) -> bool: ...
 
 class DecisionForestCCModel(GenericCCModel):
   def num_trees(self) -> int: ...
@@ -200,6 +211,7 @@ class RandomForestCCModel(DecisionForestCCModel):
 class IsolationForestCCModel(DecisionForestCCModel):
   @property
   def kRegisteredName(self): ...
+  def num_examples_per_tree(self) -> int: ...
 
 class GradientBoostedTreesCCModel(DecisionForestCCModel):
   @property
@@ -325,7 +337,6 @@ def GetLearner(
     deployment_config: abstract_learner_pb2.DeploymentConfig,
     custom_loss: Optional[CCRegressionLoss],
 ) -> GenericCCLearner: ...
-
 def GetInvalidHyperparameters(
     hp_names: Set[str],
     explicit_hps: Set[str],
@@ -337,7 +348,6 @@ def ValidateHyperparameters(
     train_config: abstract_learner_pb2.TrainingConfig,
     deployment_config: abstract_learner_pb2.DeploymentConfig,
 ) -> None: ...
-
 
 # Metric bindings
 # ================

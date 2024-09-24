@@ -22,6 +22,7 @@
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -182,6 +183,32 @@ TEST(GradientBoostedTrees, Serialize) {
                        DeserializeModel(serialized_model));
 
   EXPECT_EQ(original_model->DebugCompare(*loaded_model), "");
+}
+
+TEST(GradientBoostedTrees, NDCGTruncationLegacyModel) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "synthetic_ranking_gbdt"),
+      &model));
+  const auto* gbt_model = dynamic_cast<
+      const model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+      model.get());
+  ASSERT_EQ(gbt_model->loss(), proto::LAMBDA_MART_NDCG5);
+  std::string description = gbt_model->DescriptionAndStatistics();
+  EXPECT_THAT(description, testing::HasSubstr("LAMBDA_MART_NDCG5@5"));
+}
+
+TEST(GradientBoostedTrees, NDCGTruncationNonRankingModel) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &model));
+  const auto* gbt_model = dynamic_cast<
+      const model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+      model.get());
+  ASSERT_EQ(gbt_model->loss(), proto::BINOMIAL_LOG_LIKELIHOOD);
+  std::string description = gbt_model->DescriptionAndStatistics();
+  EXPECT_THAT(description, testing::HasSubstr("BINOMIAL_LOG_LIKELIHOOD\n"));
 }
 
 }  // namespace

@@ -28,6 +28,8 @@ import numpy as np
 import numpy.testing as npt
 import pandas as pd
 
+from yggdrasil_decision_forests.dataset import data_spec_pb2
+from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.dataset import dataset
 from ydf.model import analysis as analysis_lib
 from ydf.model import generic_model
@@ -55,6 +57,10 @@ class GenericModelTest(parameterized.TestCase):
     cls.adult_binary_class_gbdt = model_lib.load_model(
         os.path.join(model_dir, "adult_binary_class_gbdt")
     )
+    # This model is a GBDT multi-class classification model .
+    cls.iris_multi_class_gbdt = model_lib.load_model(
+        os.path.join(model_dir, "iris_multi_class_gbdt")
+    )
     # This model is a GBDT regression model without training logs.
     cls.abalone_regression_gbdt = model_lib.load_model(
         os.path.join(model_dir, "abalone_regression_gbdt")
@@ -62,6 +68,22 @@ class GenericModelTest(parameterized.TestCase):
     # This model is a GBDT ranking model.
     cls.synthetic_ranking_gbdt = model_lib.load_model(
         os.path.join(model_dir, "synthetic_ranking_gbdt")
+    )
+    # This model is a RF uplift model.
+    cls.sim_pte_categorical_uplift_rf = model_lib.load_model(
+        os.path.join(model_dir, "sim_pte_categorical_uplift_rf")
+    )
+
+    ds_dir = os.path.join(test_utils.ydf_test_data_path(), "dataset")
+
+    cls.adult_binary_class_gbdt_test_ds = pd.read_csv(
+        os.path.join(ds_dir, "adult_test.csv")
+    )
+    cls.abalone_regression_gbdt_test_ds = pd.read_csv(
+        os.path.join(ds_dir, "abalone.csv")
+    )
+    cls.synthetic_ranking_gbdt_test_ds = pd.read_csv(
+        os.path.join(ds_dir, "synthetic_ranking_test.csv")
     )
 
   def test_rf_instance(self):
@@ -210,7 +232,10 @@ class GenericModelTest(parameterized.TestCase):
         test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
     )
     test_df = pd.read_csv(dataset_path)
-    analysis = self.adult_binary_class_gbdt.analyze(test_df, num_bins=4)
+    # Large maximum duration reduces test flakiness.
+    analysis = self.adult_binary_class_gbdt.analyze(
+        test_df, num_bins=4, maximum_duration=60
+    )
 
     # Checked against report.
     self.assertSetEqual(
@@ -663,6 +688,350 @@ Use `model.describe()` for more details
     npt.assert_almost_equal(
         original_predictions, unpickled_predictions, decimal=5
     )
+
+  def test_build_evaluation_dataspec_classification_default(self):
+    model = self.adult_binary_class_gbdt
+    original_column_names = [col.name for col in model.data_spec().columns]
+    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
+        override_task=abstract_model_pb2.Task.CLASSIFICATION,
+        override_label=None,
+        override_group=None,
+    )
+    self.assertListEqual(
+        [col.name for col in dataspec.columns], original_column_names
+    )
+    self.assertEqual(label_idx, model._model.label_col_idx())
+    self.assertEqual(group_idx, -1)
+
+  def test_build_evaluation_dataspec_classification_new_label(self):
+    model = self.adult_binary_class_gbdt
+    original_column_names = [col.name for col in model.data_spec().columns]
+    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
+        override_task=abstract_model_pb2.Task.CLASSIFICATION,
+        override_label="NEW_LABEL",
+        override_group=None,
+    )
+    self.assertListEqual(
+        [col.name for col in dataspec.columns],
+        original_column_names + ["NEW_LABEL"],
+    )
+    expected_label_col = len(original_column_names)
+    self.assertEqual(label_idx, expected_label_col)
+    self.assertEqual(group_idx, -1)
+    self.assertEqual(
+        dataspec.columns[expected_label_col].categorical,
+        dataspec.columns[model._model.label_col_idx()].categorical,
+    )
+
+  def test_build_evaluation_dataspec_classification_to_regression(self):
+    model = self.adult_binary_class_gbdt
+    original_column_names = [col.name for col in model.data_spec().columns]
+    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
+        override_task=abstract_model_pb2.Task.REGRESSION,
+        override_label="NEW_LABEL",
+        override_group=None,
+    )
+    self.assertListEqual(
+        [col.name for col in dataspec.columns],
+        original_column_names + ["NEW_LABEL"],
+    )
+    expected_label_col = len(original_column_names)
+    self.assertEqual(label_idx, expected_label_col)
+    self.assertEqual(group_idx, -1)
+    self.assertEqual(
+        dataspec.columns[expected_label_col].type,
+        data_spec_pb2.ColumnType.NUMERICAL,
+    )
+
+  def test_build_evaluation_dataspec_classification_to_ranking(self):
+    model = self.adult_binary_class_gbdt
+    original_column_names = [col.name for col in model.data_spec().columns]
+    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
+        override_task=abstract_model_pb2.Task.RANKING,
+        override_label="NEW_LABEL",
+        override_group="NEW_GROUP",
+    )
+    self.assertListEqual(
+        [col.name for col in dataspec.columns],
+        original_column_names + ["NEW_LABEL", "NEW_GROUP"],
+    )
+    expected_label_col = len(original_column_names) + 0
+    expected_group_col = len(original_column_names) + 1
+    self.assertEqual(label_idx, expected_label_col)
+    self.assertEqual(group_idx, expected_group_col)
+    self.assertEqual(
+        dataspec.columns[expected_label_col].type,
+        data_spec_pb2.ColumnType.NUMERICAL,
+    )
+    self.assertEqual(
+        dataspec.columns[expected_group_col].type,
+        data_spec_pb2.ColumnType.HASH,
+    )
+
+  def test_build_evaluation_dataspec_regression_new_label(self):
+    model = self.abalone_regression_gbdt
+    original_column_names = [col.name for col in model.data_spec().columns]
+    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
+        override_task=abstract_model_pb2.Task.REGRESSION,
+        override_label="NEW_LABEL",
+        override_group=None,
+    )
+    self.assertListEqual(
+        [col.name for col in dataspec.columns],
+        original_column_names + ["NEW_LABEL"],
+    )
+    expected_label_col = len(original_column_names)
+    self.assertEqual(label_idx, expected_label_col)
+    self.assertEqual(group_idx, -1)
+    self.assertEqual(
+        dataspec.columns[expected_label_col].type,
+        data_spec_pb2.ColumnType.NUMERICAL,
+    )
+
+  def test_build_evaluation_dataspec_ranking_to_regression(self):
+    model = self.synthetic_ranking_gbdt
+    original_column_names = [col.name for col in model.data_spec().columns]
+    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
+        override_task=abstract_model_pb2.Task.REGRESSION,
+        override_label=None,
+        override_group=None,
+    )
+    self.assertListEqual(
+        [col.name for col in dataspec.columns],
+        original_column_names,
+    )
+    self.assertEqual(label_idx, model._model.label_col_idx())
+    self.assertEqual(group_idx, -1)
+
+  def test_eval_binary_classification_as_regression(self):
+    model = self.adult_binary_class_gbdt
+    ds = self.adult_binary_class_gbdt_test_ds.copy()
+    ds["income_regress"] = ds["income"] == ">50K"
+    evaluation = model.evaluate(
+        ds, task=generic_model.Task.REGRESSION, label="income_regress"
+    )
+    self.assertAlmostEqual(evaluation.rmse, 0.298, delta=0.001)
+
+  def test_eval_binary_classification_as_regression_with_existing_column(self):
+    model = self.adult_binary_class_gbdt
+    ds = self.adult_binary_class_gbdt_test_ds.copy()
+    evaluation = model.evaluate(
+        ds, task=generic_model.Task.REGRESSION, label="age"
+    )
+    self.assertAlmostEqual(evaluation.rmse, 40.569, delta=0.001)
+
+  def test_eval_binary_classification_as_regression_existing_col_from_file(
+      self,
+  ):
+    model = self.adult_binary_class_gbdt
+    evaluation = model.evaluate(
+        "csv:"
+        + os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+        ),
+        task=generic_model.Task.REGRESSION,
+        label="age",
+    )
+    self.assertAlmostEqual(evaluation.rmse, 40.569, delta=0.001)
+
+  def test_eval_binary_classification_as_regression_from_file(self):
+    with tempfile.TemporaryDirectory() as tempdir:
+      ds_path = os.path.join(tempdir, "data.csv")
+      model = self.adult_binary_class_gbdt
+      ds = self.adult_binary_class_gbdt_test_ds.copy()
+
+      ds["income_regress"] = (ds["income"] == ">50K").astype(int)
+      ds.to_csv(ds_path, index=False)
+      evaluation = model.evaluate(
+          "csv:" + ds_path,
+          task=generic_model.Task.REGRESSION,
+          label="income_regress",
+      )
+      self.assertAlmostEqual(evaluation.rmse, 0.298, delta=0.001)
+
+  def test_eval_binary_classification_as_regression_from_file_replace_col(self):
+    with tempfile.TemporaryDirectory() as tempdir:
+      ds_path = os.path.join(tempdir, "data.csv")
+      model = self.adult_binary_class_gbdt
+      ds = self.adult_binary_class_gbdt_test_ds.copy()
+
+      ds["income"] = (ds["income"] == ">50K").astype(int)
+      ds.to_csv(ds_path, index=False)
+      evaluation = model.evaluate(
+          "csv:" + ds_path, task=generic_model.Task.REGRESSION
+      )
+      self.assertAlmostEqual(evaluation.rmse, 0.298, delta=0.001)
+
+  def test_eval_binary_classification_as_ranking(self):
+    model = self.adult_binary_class_gbdt
+    ds = self.adult_binary_class_gbdt_test_ds.copy()
+
+    ds["income_ranking"] = ds["income"] == ">50K"
+    ds["group"] = ds["race"]
+    evaluation = model.evaluate(
+        ds,
+        task=generic_model.Task.RANKING,
+        label="income_ranking",
+        group="group",
+    )
+    self.assertAlmostEqual(evaluation.ndcg, 0.966, delta=0.001)
+
+  def test_eval_binary_classification_as_ranking_replace_column(self):
+    model = self.adult_binary_class_gbdt
+    ds = self.adult_binary_class_gbdt_test_ds.copy()
+
+    ds["income"] = ds["income"] == ">50K"
+    ds["group"] = ds["race"]
+    evaluation = model.evaluate(
+        ds,
+        task=generic_model.Task.RANKING,
+        label="income",
+        group="group",
+    )
+    self.assertAlmostEqual(evaluation.ndcg, 0.966, delta=0.001)
+
+  def test_eval_binary_classification_on_other_column(self):
+    model = self.adult_binary_class_gbdt
+    ds = self.adult_binary_class_gbdt_test_ds.copy()
+
+    ds["inv_income"] = ds["income"].map({">50K": "<=50K", "<=50K": ">50K"})
+    evaluation = model.evaluate(ds, label="inv_income")
+    self.assertAlmostEqual(evaluation.accuracy, 0.127, delta=0.001)
+    self.assertAlmostEqual(
+        evaluation.accuracy, 1 - model.evaluate(ds).accuracy, delta=0.001
+    )
+
+  def test_eval_ranking_as_regression(self):
+    model = self.synthetic_ranking_gbdt
+    ds = self.synthetic_ranking_gbdt_test_ds
+
+    evaluation = model.evaluate(ds, task=generic_model.Task.REGRESSION)
+    self.assertAlmostEqual(evaluation.rmse, 1.097, delta=0.001)
+
+  def test_eval_regression_as_classification(self):
+    model = self.abalone_regression_gbdt
+    ds = self.abalone_regression_gbdt_test_ds.copy()
+    ds["class_labels"] = (ds["Rings"] >= 6).astype(int)
+    evaluation = model.evaluate(
+        ds, label="class_labels", task=generic_model.Task.CLASSIFICATION
+    )
+    self.assertAlmostEqual(evaluation.accuracy, 0.954, delta=0.001)
+
+  def test_eval_override_task_error_wrong_semantic(self):
+    model = self.adult_binary_class_gbdt
+    ds = self.adult_binary_class_gbdt_test_ds
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot convert NUMERICAL column ",
+    ):
+      model.evaluate(ds, task=generic_model.Task.REGRESSION)
+
+  def test_eval_override_task_error_non_existing_label(self):
+    model = self.adult_binary_class_gbdt
+    ds = self.adult_binary_class_gbdt_test_ds
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "Missing required column 'NON_EXISTING_COLUMN'",
+    ):
+      model.evaluate(ds, label="NON_EXISTING_COLUMN")
+
+  def test_eval_override_task_error_ad_evaluation(self):
+    model = self.synthetic_ranking_gbdt
+    ds = self.synthetic_ranking_gbdt_test_ds
+
+    with self.assertRaisesRegex(
+        ValueError, "Anomaly detection models don't have direct evaluation"
+    ):
+      model.evaluate(ds, task=generic_model.Task.ANOMALY_DETECTION)
+
+  def test_eval_override_task_error_non_supported_task_override(self):
+    model = self.synthetic_ranking_gbdt
+    ds = self.synthetic_ranking_gbdt_test_ds.copy()
+    ds["class_label"] = ds["GROUP"]
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "Non supported override of task from RANKING to CLASSIFICATION",
+    ):
+      model.evaluate(
+          ds, label="class_label", task=generic_model.Task.CLASSIFICATION
+      )
+
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "binary_classification",
+          "model_name": "adult_binary_class_gbdt",
+          "test_ds": "adult_test.csv",
+      },
+      {
+          "testcase_name": "multiclass_classification",
+          "model_name": "iris_multi_class_gbdt",
+          "test_ds": "iris.csv",
+      },
+      {
+          "testcase_name": "regression",
+          "model_name": "abalone_regression_gbdt",
+          "test_ds": "abalone.csv",
+      },
+      {
+          "testcase_name": "ranking",
+          "model_name": "synthetic_ranking_gbdt",
+          "test_ds": "synthetic_ranking_test.csv",
+      },
+      {
+          "testcase_name": "uplift",
+          "model_name": "sim_pte_categorical_uplift_rf",
+          "test_ds": "sim_pte_test.csv",
+      },
+  )
+  def test_slow_engine_prediction(self, model_name, test_ds):
+    model = getattr(self, model_name)
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", test_ds
+    )
+    fast_predictions = model.predict(dataset_path)
+    slow_predictions = model.predict(dataset_path, use_slow_engine=True)
+    np.testing.assert_allclose(
+        fast_predictions, slow_predictions, atol=1e-6, rtol=1e-6
+    )
+
+  def test_evaluate_slow_engine(self):
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+
+    test_df = pd.read_csv(dataset_path)
+    evaluation_slow = self.adult_binary_class_gbdt.evaluate(
+        test_df, use_slow_engine=True
+    )
+    evaluation_fast = self.adult_binary_class_gbdt.evaluate(test_df)
+
+    self.assertEqual(evaluation_fast, evaluation_slow)
+
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "ndcg@5",
+          "truncation": 5,
+          "expected_ndcg": 0.7204528553,
+      },
+      {
+          "testcase_name": "ndcg@2",
+          "truncation": 2,
+          "expected_ndcg": 0.6304857312,
+      },
+      {
+          "testcase_name": "ndcg@10",
+          "truncation": 10,
+          "expected_ndcg": 0.8384147895,
+      },
+  )
+  def test_evaluate_ranking_ndcg_truncation(self, truncation, expected_ndcg):
+    evaluation = self.synthetic_ranking_gbdt.evaluate(
+        self.synthetic_ranking_gbdt_test_ds, ndcg_truncation=truncation
+    )
+    self.assertAlmostEqual(evaluation.ndcg, expected_ndcg)
 
 
 if __name__ == "__main__":

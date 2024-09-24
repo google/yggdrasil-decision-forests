@@ -45,6 +45,8 @@
 //
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
 
+#include <string>
+
 #include "absl/flags/flag.h"
 #include "absl/log/log.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"

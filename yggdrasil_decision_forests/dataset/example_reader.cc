@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -28,6 +29,7 @@
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -56,6 +58,7 @@ absl::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
 absl::StatusOr<bool> IsFormatSupported(absl::string_view typed_path) {
   const auto path_format_or = GetDatasetPathAndTypeOrStatus(typed_path);
   if (!path_format_or.ok()) {
+    LOG(WARNING) << "Cannot parse typed path: " << path_format_or.status();
     return false;
   }
   std::string sharded_path;

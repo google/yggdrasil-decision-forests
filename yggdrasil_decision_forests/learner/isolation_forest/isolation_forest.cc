@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -24,10 +25,10 @@
 #include <numeric>
 #include <random>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "absl/container/btree_set.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
 #include "absl/memory/memory.h"
@@ -35,6 +36,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/substitute.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -45,6 +47,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/isolation_forest/isolation_forest.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -116,6 +119,100 @@ absl::StatusOr<internal::Configuration> BuildConfig(
   return config;
 }
 
+// Check if this feature can be split.
+template <typename T>
+absl::StatusOr<bool> CanSplit(
+    const dataset::VerticalDataset& train_dataset, int feature_idx,
+    typename T::Format na_replacement,
+    const std::vector<UnsignedExampleIdx>& selected_examples) {
+  ASSIGN_OR_RETURN(const T* value_container,
+                   train_dataset.ColumnWithCastWithStatus<T>(feature_idx));
+  DCHECK_GT(selected_examples.size(), 1);
+  const auto& values = value_container->values();
+  float first_example = value_container->IsNa(selected_examples[0])
+                            ? na_replacement
+                            : values[selected_examples[0]];
+  for (const auto example_idx : selected_examples) {
+    float current_example = value_container->IsNa(example_idx)
+                                ? na_replacement
+                                : values[example_idx];
+    if (first_example != current_example) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Compute the indices of the features that can be split, i.e. where not all
+// values are equal. The indices of the nontrivial features are stored, by
+// column type, in `nontrivial_features`. The total number of nontrivial
+// features is returned.
+absl::StatusOr<int> FindNontrivialFeatures(
+    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::flat_hash_map<dataset::proto::ColumnType, std::vector<int>>*
+        nontrivial_features) {
+  DCHECK_GT(selected_examples.size(), 1);
+  nontrivial_features->clear();
+  size_t num_nontrivial_features = 0;
+  const auto& data_spec = train_dataset.data_spec();
+  for (const auto& feature_idx : config.config_link.features()) {
+    const auto& feature = data_spec.columns(feature_idx);
+    const auto feature_type = feature.type();
+    bool can_split;
+    switch (feature_type) {
+      case dataset::proto::NUMERICAL: {
+        ASSIGN_OR_RETURN(can_split,
+                         CanSplit<dataset::VerticalDataset::NumericalColumn>(
+                             train_dataset, feature_idx,
+                             feature.numerical().mean(), selected_examples));
+        break;
+      }
+      case dataset::proto::BOOLEAN: {
+        const bool na_replacement =
+            feature.boolean().count_true() >= feature.boolean().count_false();
+        ASSIGN_OR_RETURN(
+            can_split,
+            CanSplit<dataset::VerticalDataset::BooleanColumn>(
+                train_dataset, feature_idx, na_replacement, selected_examples));
+        break;
+      }
+      case dataset::proto::CATEGORICAL: {
+        const int64_t na_replacement =
+            feature.categorical().most_frequent_value();
+        ASSIGN_OR_RETURN(
+            can_split,
+            CanSplit<dataset::VerticalDataset::CategoricalColumn>(
+                train_dataset, feature_idx, na_replacement, selected_examples));
+        break;
+      }
+      case dataset::proto::CATEGORICAL_SET:
+        LOG_FIRST_N(INFO, 1) << "Ignoring columns of unsupported type "
+                             << dataset::proto::ColumnType_Name(feature.type())
+                             << " e.g. " << feature.name();
+        continue;
+      case dataset::proto::DISCRETIZED_NUMERICAL:
+        LOG_FIRST_N(INFO, 1) << "Ignoring columns of unsupported type "
+                             << dataset::proto::ColumnType_Name(feature.type())
+                             << " e.g. " << feature.name();
+        continue;
+      case dataset::proto::HASH:
+        LOG_FIRST_N(INFO, 1) << "Ignoring columns of unsupported type "
+                             << dataset::proto::ColumnType_Name(feature.type())
+                             << " e.g. " << feature.name();
+        continue;
+      default:
+        return absl::InvalidArgumentError(absl::Substitute(
+            "Unsupported type $0 for feature $1",
+            dataset::proto::ColumnType_Name(feature.type()), feature.name()));
+    }
+    if (can_split) {
+      (*nontrivial_features)[feature_type].push_back(feature_idx);
+      num_nontrivial_features++;
+    }
+  }
+  return num_nontrivial_features;
+}
 }  // namespace
 
 namespace internal {
@@ -124,147 +221,140 @@ absl::StatusOr<bool> FindSplit(
     const Configuration& config, const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
-  switch (config.if_config->decision_tree().split_axis_case()) {
-    case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
-        SPLIT_AXIS_NOT_SET:
-    case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
-        kAxisAlignedSplit:
-      return FindSplitAxisAligned(config, train_dataset, selected_examples,
-                                  node, rnd);
-    case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
-        kSparseObliqueSplit:
-      return FindSplitOblique(config, train_dataset, selected_examples, node,
-                              rnd);
-    default:
-      return absl::InvalidArgumentError(
-          "Only axis-aligned and sparse oblique splits are supported for "
-          "isolation forests.");
-  }
-}
-
-absl::StatusOr<bool> FindSplitOblique(
-    const Configuration& config, const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
-  DCHECK_GT(selected_examples.size(), 0);
-  if (config.config_link.numerical_features().empty()) {
+  if (selected_examples.size() <= 1) {
     return false;
   }
+  // TODO: Consider getting rid of this heap allocation
+  absl::flat_hash_map<dataset::proto::ColumnType, std::vector<int>>
+      nontrivial_features;
+
+  ASSIGN_OR_RETURN(
+      const auto num_nontrivial_features,
+      FindNontrivialFeatures(config, train_dataset, selected_examples,
+                             &nontrivial_features));
+  if (num_nontrivial_features == 0) {
+    return false;
+  }
+  // Sample a non-trivial feature type uniformly among the features. Note that
+  // the number of column types is a small constant, so this algorithm is
+  // reasonable.
+  dataset::proto::ColumnType selected_feature_type;
+  // For oblique numerical splits, this will not be used.
+  int selected_feature_idx;
+  const size_t random_idx =
+      absl::Uniform<size_t>(*rnd, 0, num_nontrivial_features);
+  size_t current_idx = 0;
+  for (const auto& features_of_type : nontrivial_features) {
+    if (random_idx < current_idx + features_of_type.second.size()) {
+      selected_feature_type = features_of_type.first;
+      selected_feature_idx = features_of_type.second[random_idx - current_idx];
+      break;
+    }
+    current_idx += features_of_type.second.size();
+  }
+  DCHECK_NE(selected_feature_type, dataset::proto::ColumnType::UNKNOWN);
+  switch (selected_feature_type) {
+    case dataset::proto::NUMERICAL: {
+      const auto& nontrivial_numerical_features =
+          nontrivial_features.find(selected_feature_type);
+      DCHECK(nontrivial_numerical_features != nontrivial_features.end());
+      switch (config.if_config->decision_tree().split_axis_case()) {
+        case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
+            SPLIT_AXIS_NOT_SET:
+        case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
+            kAxisAlignedSplit:
+          RETURN_IF_ERROR(SetRandomSplitNumericalAxisAligned(
+              selected_feature_idx, config, train_dataset, selected_examples,
+              node, rnd));
+          break;
+        case decision_tree::proto::DecisionTreeTrainingConfig::SplitAxisCase::
+            kSparseObliqueSplit: {
+          RETURN_IF_ERROR(SetRandomSplitNumericalSparseOblique(
+              nontrivial_numerical_features->second, config, train_dataset,
+              selected_examples, node, rnd));
+          break;
+        }
+        default:
+          return absl::InvalidArgumentError(
+              "Only axis-aligned and sparse oblique splits are supported for "
+              "isolation forests.");
+      }
+      break;
+    }
+    case dataset::proto::BOOLEAN: {
+      const auto& nontrivial_boolean_features =
+          nontrivial_features.find(selected_feature_type);
+      DCHECK(nontrivial_boolean_features != nontrivial_features.end());
+      RETURN_IF_ERROR(FindSplitBoolean(selected_feature_idx, config,
+                                       train_dataset, selected_examples, node,
+                                       rnd));
+      break;
+    }
+    case dataset::proto::CATEGORICAL: {
+      const auto& nontrivial_categorical_features =
+          nontrivial_features.find(selected_feature_type);
+      DCHECK(nontrivial_categorical_features != nontrivial_features.end());
+      RETURN_IF_ERROR(FindSplitCategorical(selected_feature_idx, config,
+                                           train_dataset, selected_examples,
+                                           node, rnd));
+      break;
+    }
+    default:
+      return absl::InvalidArgumentError(absl::Substitute(
+          "Unsupported type $0",
+          dataset::proto::ColumnType_Name(selected_feature_type)));
+  }
+  return true;
+}
+
+absl::Status SetRandomSplitNumericalSparseOblique(
+    const std::vector<int>& nontrivial_features, const Configuration& config,
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
   decision_tree::internal::Projection current_projection;
   const float projection_density = config.if_config->decision_tree()
                                        .sparse_oblique_split()
                                        .projection_density_factor() /
                                    config.config_link.numerical_features_size();
-  int8_t monotonic_direction;
   decision_tree::internal::ProjectionEvaluator projection_evaluator(
       train_dataset, config.config_link.numerical_features());
   std::vector<float> projection_values;
+  // An oblique split can be invalid even if all the features involved in the
+  // split are nontrivial, if the weights are chosen so that features cancel
+  // each other out. This is unlikely to happen. This function sets a
+  // high number of trials and fails if it consistently fails to find a split
+  // (which is likely indicative of an issue with the splitter).
+  const int maximum__num_trials = 100 * nontrivial_features.size();
+  int8_t unused_monotonic_direction;
+  
+  for (int i = 0; i < maximum__num_trials; i++) {
+    decision_tree::internal::SampleProjection(
+        nontrivial_features, config.if_config->decision_tree(),
+        train_dataset.data_spec(), config.config_link, projection_density,
+        &current_projection, &unused_monotonic_direction, rnd);
 
-  decision_tree::internal::SampleProjection(
-      config.if_config->decision_tree(), train_dataset.data_spec(),
-      config.config_link, projection_density, &current_projection,
-      &monotonic_direction, rnd);
-
-  // Pre-compute the result of the current_projection.
-  RETURN_IF_ERROR(projection_evaluator.Evaluate(
-      current_projection, selected_examples, &projection_values));
-
-  // Find minimum and maximum value.
-  float min_value;
-  float max_value;
-  UnsignedExampleIdx num_valid_examples = 0;
-  for (const float value : projection_values) {
-    if (std::isnan(value)) {
-      continue;
-    }
-    if (num_valid_examples == 0 || value < min_value) {
-      min_value = value;
-    }
-    if (num_valid_examples == 0 || value > max_value) {
-      max_value = value;
-    }
-    num_valid_examples++;
-  }
-
-  if (num_valid_examples == 0 || max_value == min_value) {
-    // Cannot split.
-    return false;
-  }
-
-  // Randomly select a threshold in (min_value, max_value).
-  const float threshold = std::uniform_real_distribution<float>(
-      std::nextafter(min_value, std::numeric_limits<float>::max()),
-      max_value)(*rnd);
-  DCHECK_GT(threshold, min_value);
-  DCHECK_LE(threshold, max_value);
-
-  // Count the number of positive examples.
-  UnsignedExampleIdx num_pos_examples = 0;
-  for (const auto value : projection_values) {
-    if (value >= threshold) {
-      num_pos_examples++;
-    }
-  }
-
-  DCHECK_GT(num_pos_examples, 0);
-  DCHECK_LT(num_pos_examples, selected_examples.size());
-
-  // Set split.
-  auto* condition = node->mutable_node()->mutable_condition();
-  RETURN_IF_ERROR(decision_tree::internal::SetCondition(
-      current_projection, threshold, train_dataset.data_spec(), condition));
-  condition->set_num_training_examples_without_weight(selected_examples.size());
-  condition->set_num_pos_training_examples_without_weight(num_pos_examples);
-  return true;
-}
-
-absl::StatusOr<bool> FindSplitAxisAligned(
-    const Configuration& config, const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
-    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
-  DCHECK_GT(selected_examples.size(), 0);
-
-  // Sample the order in which features are tested.
-  // TODO: Use cache.
-  std::vector<int> feature_order = {config.config_link.features().begin(),
-                                    config.config_link.features().end()};
-  std::shuffle(feature_order.begin(), feature_order.end(), *rnd);
-
-  // Test features one after another.
-  for (const auto& attribute_idx : feature_order) {
-    const auto& col_spec = train_dataset.data_spec().columns(attribute_idx);
-    if (col_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
-      // TODO: Add support for other types of features.
-      continue;
-    }
-
-    const auto na_replacement = col_spec.numerical().mean();
-    ASSIGN_OR_RETURN(
-        const dataset::VerticalDataset::NumericalColumn* value_container,
-        train_dataset.ColumnWithCastWithStatus<
-            dataset::VerticalDataset::NumericalColumn>(attribute_idx));
-    const auto& values = value_container->values();
+    // Pre-compute the result of the current_projection.
+    RETURN_IF_ERROR(projection_evaluator.Evaluate(
+        current_projection, selected_examples, &projection_values));
 
     // Find minimum and maximum value.
-    float min_value;
-    float max_value;
-    UnsignedExampleIdx num_valid_examples = 0;
-    for (const auto example_idx : selected_examples) {
-      const auto value = values[example_idx];
-      if (std::isnan(value)) {
-        continue;
+    int num_valid_examples = 0;
+    float min_value = std::numeric_limits<float>::infinity();
+    float max_value = -std::numeric_limits<float>::infinity();
+    for (const auto value : projection_values) {
+      if (!std::isnan(value)) {
+        num_valid_examples++;
+        if (value < min_value) {
+          min_value = value;
+        }
+        if (value > max_value) {
+          max_value = value;
+        }
       }
-      if (num_valid_examples == 0 || value < min_value) {
-        min_value = value;
-      }
-      if (num_valid_examples == 0 || value > max_value) {
-        max_value = value;
-      }
-      num_valid_examples++;
     }
-
-    if (num_valid_examples == 0 || max_value == min_value) {
-      // Cannot split.
+    if (num_valid_examples == 0 || min_value == max_value) {
+      // Invalid split, try again.
       continue;
     }
 
@@ -277,11 +367,7 @@ absl::StatusOr<bool> FindSplitAxisAligned(
 
     // Count the number of positive examples.
     UnsignedExampleIdx num_pos_examples = 0;
-    for (const auto example_idx : selected_examples) {
-      auto value = values[example_idx];
-      if (std::isnan(value)) {
-        value = na_replacement;
-      }
+    for (const auto value : projection_values) {
       if (value >= threshold) {
         num_pos_examples++;
       }
@@ -292,18 +378,212 @@ absl::StatusOr<bool> FindSplitAxisAligned(
 
     // Set split.
     auto* condition = node->mutable_node()->mutable_condition();
-    condition->set_attribute(attribute_idx);
-    condition->mutable_condition()->mutable_higher_condition()->set_threshold(
-        threshold);
-    condition->set_na_value(na_replacement >= threshold);
+    RETURN_IF_ERROR(decision_tree::internal::SetCondition(
+        current_projection, threshold, train_dataset.data_spec(), condition));
     condition->set_num_training_examples_without_weight(
         selected_examples.size());
     condition->set_num_pos_training_examples_without_weight(num_pos_examples);
+    return absl::OkStatus();
+  }
+  return absl::InternalError(absl::Substitute(
+      "No valid oblique split found after $0 tries. This indicates an issue "
+      "with the oblique Isolation Forest splitter.",
+      maximum__num_trials));
+}
 
-    return true;
+absl::Status SetRandomSplitNumericalAxisAligned(
+    const int feature_idx, const Configuration& config,
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
+  auto& col_spec = train_dataset.data_spec().columns(feature_idx);
+  DCHECK_EQ(col_spec.type(), dataset::proto::NUMERICAL);
+  DCHECK_GT(selected_examples.size(), 1);
+
+  ASSIGN_OR_RETURN(
+      const dataset::VerticalDataset::NumericalColumn* value_container,
+      train_dataset
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::NumericalColumn>(
+              feature_idx));
+  const auto& values = value_container->values();
+  const float na_replacement = col_spec.numerical().mean();
+
+  // Check if this feature can be split.
+  float min_value = std::numeric_limits<float>::infinity();
+  float max_value = -std::numeric_limits<float>::infinity();
+  for (const auto example_idx : selected_examples) {
+    auto value = values[example_idx];
+    if (value_container->IsNa(example_idx)) {
+      value = na_replacement;
+    }
+    if (value < min_value) {
+      min_value = value;
+    }
+    if (value > max_value) {
+      max_value = value;
+    }
+  }
+  // `feature_idx` must be a nontrivial feature.
+  DCHECK_LT(min_value, max_value);
+  // Randomly select a threshold in (min_value, max_value).
+  const float threshold = std::uniform_real_distribution<float>(
+      std::nextafter(min_value, std::numeric_limits<float>::max()),
+      max_value)(*rnd);
+  DCHECK_GT(threshold, min_value);
+  DCHECK_LE(threshold, max_value);
+
+  // Count the number of positive examples.
+  UnsignedExampleIdx num_pos_examples = 0;
+  for (const auto example_idx : selected_examples) {
+    auto value = values[example_idx];
+    if (value_container->IsNa(example_idx)) {
+      value = na_replacement;
+    }
+    if (value >= threshold) {
+      num_pos_examples++;
+    }
   }
 
-  return false;  // No split found
+  DCHECK_GT(num_pos_examples, 0);
+  DCHECK_LT(num_pos_examples, selected_examples.size());
+
+  // Set split.
+  auto* condition = node->mutable_node()->mutable_condition();
+  condition->set_attribute(feature_idx);
+  condition->mutable_condition()->mutable_higher_condition()->set_threshold(
+      threshold);
+  condition->set_na_value(na_replacement >= threshold);
+  condition->set_num_training_examples_without_weight(selected_examples.size());
+  condition->set_num_pos_training_examples_without_weight(num_pos_examples);
+  return absl::OkStatus();
+}
+
+absl::Status FindSplitBoolean(
+    const int feature_idx, const Configuration& config,
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
+  auto& col_spec = train_dataset.data_spec().columns(feature_idx);
+  DCHECK_EQ(col_spec.type(), dataset::proto::BOOLEAN);
+  DCHECK_GT(selected_examples.size(), 0);
+
+  // Positive values go to the positive branch, negative go to the negative
+  // branch, NA goes to the majority side.
+  ASSIGN_OR_RETURN(
+      const auto* value_container,
+      train_dataset
+          .ColumnWithCastWithStatus<dataset::VerticalDataset::BooleanColumn>(
+              feature_idx));
+  const bool na_replacement =
+      col_spec.boolean().has_count_true() >= col_spec.boolean().count_false();
+  UnsignedExampleIdx num_pos_examples = 0;
+  for (const auto example_idx : selected_examples) {
+    if (value_container->IsTrue(example_idx) ||
+        (na_replacement && value_container->IsNa(example_idx))) {
+      num_pos_examples++;
+    }
+  }
+
+  DCHECK_GT(num_pos_examples, 0);
+  DCHECK_LT(num_pos_examples, selected_examples.size());
+
+  // Set split.
+  auto* condition = node->mutable_node()->mutable_condition();
+  condition->set_attribute(feature_idx);
+  condition->mutable_condition()->mutable_true_value_condition();
+  condition->set_na_value(na_replacement);
+  condition->set_num_training_examples_without_weight(selected_examples.size());
+  condition->set_num_pos_training_examples_without_weight(num_pos_examples);
+  return absl::OkStatus();
+}
+
+absl::Status FindSplitCategorical(
+    const int feature_idx, const Configuration& config,
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<UnsignedExampleIdx>& selected_examples,
+    decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
+  const auto& col_spec = train_dataset.data_spec().columns(feature_idx);
+  const auto na_replacement = col_spec.categorical().most_frequent_value();
+  DCHECK_EQ(col_spec.type(), dataset::proto::CATEGORICAL);
+  DCHECK_GT(selected_examples.size(), 0);
+
+  ASSIGN_OR_RETURN(
+      const auto* value_container,
+      train_dataset.ColumnWithCastWithStatus<
+          dataset::VerticalDataset::CategoricalColumn>(feature_idx));
+  const auto& values = value_container->values();
+  const int num_unique_feature_values =
+      col_spec.categorical().number_of_unique_values();
+
+  // if num_unique_feature_values is very large (likely because of a user
+  // feeding pre-integerized values), the following might be memory-hungry.
+  std::vector<UnsignedExampleIdx> active_feature_values_count(
+      num_unique_feature_values, 0);
+  int num_active_feature_values = 0;
+  for (const auto example_idx : selected_examples) {
+    auto value = values[example_idx];
+    if (value == dataset::VerticalDataset::CategoricalColumn::kNaValue) {
+      value = na_replacement;
+    }
+    if (active_feature_values_count[value] == 0) {
+      num_active_feature_values++;
+    }
+    active_feature_values_count[value]++;
+  }
+  DCHECK_GT(num_active_feature_values, 0);
+  int ensure_chosen_idx = absl::Uniform(*rnd, 0, num_active_feature_values);
+  int ensure_not_chosen_idx =
+      (ensure_chosen_idx +
+       absl::Uniform(*rnd, 1, num_active_feature_values - 1)) %
+      num_active_feature_values;
+  std::vector<int> chosen_values = {};
+  chosen_values.reserve(num_unique_feature_values);
+
+  int selected_values_idx = 0;
+  int num_pos_examples = 0;
+  bool na_is_chosen = false;
+  // Flip a fair coin for every value in the selected examples.
+  for (int item = 0; item < num_unique_feature_values; item++) {
+    if (active_feature_values_count[item] > 0) {
+      bool choose;
+      if (selected_values_idx == ensure_not_chosen_idx) {
+        choose = false;
+      } else if (selected_values_idx == ensure_chosen_idx) {
+        choose = true;
+      } else {
+        choose = absl::Bernoulli(*rnd, 0.5);
+      }
+      if (choose) {
+        chosen_values.push_back(item);
+        num_pos_examples += active_feature_values_count[item];
+        if (item == na_replacement) {
+          na_is_chosen = true;
+        }
+      }
+      selected_values_idx++;
+    } else {
+      // Randomly pick from the non-observed values for a more balanced split.
+      if (absl::Bernoulli(*rnd, 0.5)) {
+        chosen_values.push_back(item);
+        if (item == na_replacement) {
+          na_is_chosen = true;
+        }
+      }
+    }
+  }
+  DCHECK(!chosen_values.empty());
+  DCHECK_GT(num_pos_examples, 0);
+  DCHECK_LT(num_pos_examples, selected_examples.size());
+
+  // Set split.
+  auto* condition = node->mutable_node()->mutable_condition();
+  condition->set_attribute(feature_idx);
+  decision_tree::SetPositiveAttributeSetOfCategoricalContainsCondition(
+      chosen_values, num_unique_feature_values, condition);
+  condition->set_na_value(na_is_chosen);
+  condition->set_num_training_examples_without_weight(selected_examples.size());
+  condition->set_num_pos_training_examples_without_weight(num_pos_examples);
+  return absl::OkStatus();
 }
 
 // Grows recursively a node.
@@ -473,6 +753,43 @@ absl::Status IsolationForestLearner::SetHyperParametersImpl(
 
 absl::StatusOr<model::proto::GenericHyperParameterSpecification>
 IsolationForestLearner::GetGenericHyperParameterSpecification() const {
+  absl::flat_hash_set<std::string> valid_decision_tree_hyperparameters = {
+      kHParamRandomSeed,
+      kHParamPureServingModel,
+      decision_tree::kHParamMaxDepth,
+      decision_tree::kHParamMinExamples,
+      decision_tree::kHParamSplitAxis,
+      decision_tree::kHParamSplitAxisSparseObliqueProjectionDensityFactor,
+      decision_tree::kHParamSplitAxisSparseObliqueNormalization,
+      decision_tree::kHParamSplitAxisSparseObliqueWeights};
+  // Remove not yet implemented hyperparameters
+  // TODO: b/345425508 - Implement more hyperparameters for isolation forests.
+  absl::flat_hash_set<std::string> invalid_decision_tree_hyperparameters = {
+      kHParamMaximumModelSizeInMemoryInBytes,
+      kHParamMaximumTrainingDurationSeconds,
+      decision_tree::kHParamGrowingStrategy,
+      decision_tree::kHParamMaxNumNodes,
+      decision_tree::kHParamNumCandidateAttributes,
+      decision_tree::kHParamNumCandidateAttributesRatio,
+      decision_tree::kHParamInSplitMinExampleCheck,
+      decision_tree::kHParamAllowNaConditions,
+      decision_tree::kHParamMissingValuePolicy,
+      decision_tree::kHParamCategoricalSetSplitGreedySampling,
+      decision_tree::kHParamCategoricalSetSplitMaxNumItems,
+      decision_tree::kHParamCategoricalSetSplitMinItemFrequency,
+      decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent,
+      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections,
+      decision_tree::kHParamSplitAxisMhldObliqueMaxNumAttributes,
+      decision_tree::kHParamSplitAxisMhldObliqueSampleAttributes,
+      decision_tree::kHParamCategoricalAlgorithm,
+      decision_tree::kHParamSortingStrategy,
+      decision_tree::kHParamKeepNonLeafLabelDistribution,
+      decision_tree::kHParamUpliftSplitScore,
+      decision_tree::kHParamUpliftMinExamplesInTreatment,
+      decision_tree::kHParamHonest,
+      decision_tree::kHParamHonestRatioLeafExamples,
+      decision_tree::kHParamHonestFixedSeparation};
+
   ASSIGN_OR_RETURN(auto hparam_def,
                    AbstractLearner::GetGenericHyperParameterSpecification());
   model::proto::TrainingConfig config;
@@ -483,6 +800,11 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
 
   const auto& if_config =
       config.GetExtension(isolation_forest::proto::isolation_forest_config);
+
+  RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
+      if_config.decision_tree(), &hparam_def,
+      valid_decision_tree_hyperparameters,
+      invalid_decision_tree_hyperparameters));
 
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamNumTrees);
@@ -519,9 +841,6 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
         R"(Ratio of number of training examples used to grow each tree. Only one of "subsample_ratio" and "subsample_count" can be set. By default, sample 256 examples per tree. Note that this parameter also restricts the tree's maximum depth to log2(examples used per tree) unless max_depth is set explicitly.)");
   }
 
-  RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
-      if_config.decision_tree(), &hparam_def));
-
   {
     auto& param =
         hparam_def.mutable_fields()->operator[](decision_tree::kHParamMaxDepth);
@@ -546,16 +865,6 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
 - `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.
 - `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. This includes the splits described in "Extended Isolation Forests" (Sahand Hariri et al., 2018).)");
   }
-
-  // Remove invalid hyperparameters.
-  hparam_def.mutable_fields()->erase(
-      decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent);
-  hparam_def.mutable_fields()->erase(
-      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections);
-  hparam_def.mutable_fields()->erase(
-      decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections);
-  hparam_def.mutable_fields()->erase(
-      decision_tree::kHParamSplitAxisMhldObliqueSampleAttributes);
 
   return hparam_def;
 }
@@ -619,6 +928,7 @@ IsolationForestLearner::TrainWithStatusImpl(
       });
     }
   }
+  RETURN_IF_ERROR(global_status);
   decision_tree::SetLeafIndices(model->mutable_decision_trees());
   return std::move(model);
 }

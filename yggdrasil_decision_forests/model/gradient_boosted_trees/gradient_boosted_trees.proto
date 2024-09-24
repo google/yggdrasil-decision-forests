@@ -45,6 +45,8 @@ message Header {
   // If true, call to predict methods return logits (e.g. instead of probability
   // in the case of classification).
   optional bool output_logits = 9 [default = false];
+  // Configuration options for losses.
+  optional LossConfiguration loss_configuration = 10;
 }
 
 enum Loss {
@@ -58,8 +60,9 @@ enum Loss {
   SQUARED_ERROR = 2;
   // Multinomial log likelihood i.e. cross-entropy.
   MULTINOMIAL_LOG_LIKELIHOOD = 3;
+  // DEPRECATED: Use LAMBDA_MART_NDCG.
   // LambdaMART with NDCG5
-  LAMBDA_MART_NDCG5 = 4;
+  LAMBDA_MART_NDCG5 = 4 [deprecated = true];
   // XE_NDCG_MART [arxiv.org/abs/1911.09798]
   XE_NDCG_MART = 5;
   // EXPERIMENTAl. Focal loss. Only valid for binary classification.
@@ -69,6 +72,8 @@ enum Loss {
   POISSON = 7;
   // Mean average error (MAE).
   MEAN_AVERAGE_ERROR = 8;
+  // LambdaMART with NDCG loss. Truncation defaults to 5, configurable.
+  LAMBDA_MART_NDCG = 9;
 }
 
 // Log of the training. This proto is generated during the training of the
@@ -123,4 +128,68 @@ message GradientBoostedTreesSerializedModel {
 extend model.proto.SerializedModel {
   optional GradientBoostedTreesSerializedModel
       gradient_boosted_trees_serialized_model = 1001;
+}
+
+message LossConfiguration {
+  message LambdaMartNdcg {
+    // If false, the gradient is computed using NDCG i.e. normalized-DCG. If
+    // false, the gradient is computed using DCG.
+    optional bool gradient_use_non_normalized_dcg = 1 [default = false];
+
+    // Number of candidates considered when computing the NDCG loss.
+    //
+    // NDCG losses are usually truncated at a particular rank level (generally
+    // between 4 and 10), i.e. only the highly ranked documents are considered
+    // when computing the rank. A smaller values results in a model with
+    // increased emphasis on the first results of the ranking.
+    //
+    // Note that the NDCG truncation of the cross-entropy NDCG loss must be
+    // configured separately.
+    optional int32 ndcg_truncation = 2 [default = 5];
+  }
+
+  message XeNdcg {
+    enum Gamma {
+      // For the time being, defaults to UNIFORM.
+      AUTO = 0;
+      // Gammas are sampled from a uniform distribution on [0, 1].
+      UNIFORM = 1;
+      // Gammas are set to 1 across the board. This is more appropriate for
+      // click datasets with a large number of documents per query.
+      ONE = 2;
+    }
+    optional Gamma gamma = 1 [default = UNIFORM];
+
+    // Number of candidates considered when computing the NDCG loss.
+    //
+    // NDCG losses are usually truncated at a particular rank level (generally
+    // between 4 and 10), i.e. only the highly ranked documents are considered
+    // when computing the rank. A smaller values results in a model with
+    // increased emphasis on the first results of the ranking.
+    //
+    // Note that the NDCG truncation of the classic NDCG loss must be configured
+    // separately.
+    optional int32 ndcg_truncation = 2 [default = 5];
+  }
+
+  message BinaryFocalLossOptions {
+    // Exponent of the misprediction multiplier in focal loss.
+    // Corresponds to the gamma parameter in
+    // https://arxiv.org/pdf/1708.02002.pdf
+    optional float misprediction_exponent = 1 [default = 2.0];
+
+    // A hypertuning coefficient to multiply the loss and its gradient(s) in
+    // case of a positive sample.
+    // Loss and gradient on positive samples will be multiplied by
+    // positive_sample_coefficient, on negative samples will be multiplied
+    // by (1 - positive_sample_coefficient)
+    // Corresponds to the 'alpha' parameter in
+    // https://arxiv.org/pdf/1708.02002.pdf
+    optional float positive_sample_coefficient = 2 [default = 0.5];
+  }
+  oneof loss_options {
+    LambdaMartNdcg lambda_mart_ndcg = 1;
+    XeNdcg xe_ndcg = 2;
+    BinaryFocalLossOptions binary_focal_loss_options = 3;
+  }
 }

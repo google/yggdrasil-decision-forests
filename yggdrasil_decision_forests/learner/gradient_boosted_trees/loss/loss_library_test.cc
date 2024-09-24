@@ -61,6 +61,10 @@ TEST(LossLibrary, CanonicalLosses) {
                        model::proto::Task::RANKING, numerical_label_column,
                        config));
 
+  EXPECT_OK(CreateLoss(proto::Loss::LAMBDA_MART_NDCG,
+                       model::proto::Task::RANKING, numerical_label_column,
+                       config));
+
   EXPECT_OK(CreateLoss(proto::Loss::XE_NDCG_MART, model::proto::Task::RANKING,
                        numerical_label_column, config));
 
@@ -119,6 +123,11 @@ TEST(LossLibrary, CustomLosses) {
                           CustomRegressionLossFunctions{})
                    .ok());
 
+  EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG,
+                          model::proto::Task::RANKING, numerical_label_column,
+                          config, CustomBinaryClassificationLossFunctions{})
+                   .ok());
+
   EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG5,
                           model::proto::Task::RANKING, numerical_label_column,
                           config, CustomBinaryClassificationLossFunctions{})
@@ -127,6 +136,11 @@ TEST(LossLibrary, CustomLosses) {
   EXPECT_FALSE(CreateLoss(proto::Loss::XE_NDCG_MART,
                           model::proto::Task::RANKING, numerical_label_column,
                           config, CustomBinaryClassificationLossFunctions{})
+                   .ok());
+
+  EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG,
+                          model::proto::Task::RANKING, numerical_label_column,
+                          config, CustomRegressionLossFunctions{})
                    .ok());
 
   EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG5,

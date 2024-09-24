@@ -15,11 +15,18 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <string>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -81,14 +88,33 @@ TEST(NumBytes, Base) {
   EXPECT_EQ(NumBytes(0x800000), 4);
   EXPECT_EQ(NumBytes(0x7FFFFFFF), 4);
   EXPECT_EQ(NumBytes(0x80000000), 8);
+  EXPECT_EQ(NumBytes(std::numeric_limits<uint64_t>::max()), 8);
 }
 
-template <typename WriteValue, typename ReadValue, int64_t max_value>
+template <typename WriteValue, typename ReadValue, uint64_t max_value,
+          bool write_negatives = true>
 void TestIntegerColumn() {
   // Create 11 values.
-  std::vector<WriteValue> raw_values{
-      1, 8, max_value - 1, max_value, -1, -8, -max_value, -max_value - 1, 1,
-      2, 3};
+  std::vector<WriteValue> raw_values;
+
+  if constexpr (write_negatives) {
+    const auto signed_max_value = static_cast<int64_t>(max_value);
+    raw_values = {1,
+                  8,
+                  max_value - 1,
+                  max_value,
+                  -1,
+                  -8,
+                  static_cast<WriteValue>(-signed_max_value),
+                  static_cast<WriteValue>(-signed_max_value - 1),
+                  1,
+                  2,
+                  3};
+  } else {
+    raw_values = {1, 8, max_value - 1, max_value - 2, 1, 8, max_value, 0, 1,
+                  2, 3};
+  }
+
   std::vector<WriteValue> write_values(raw_values.begin(), raw_values.end());
   std::vector<ReadValue> read_values(raw_values.begin(), raw_values.end());
   auto write_span = absl::MakeConstSpan(write_values);
@@ -130,6 +156,9 @@ TEST(IntegerColumn, WriteAndRead) {
   TestIntegerColumn<int32_t, int64_t, 0x7FFFFFFF>();
 
   TestIntegerColumn<int64_t, int64_t, 0x7FFFFFFFFFFFFFFF>();
+
+  // Special case to handle non signed integers.
+  TestIntegerColumn<uint64_t, uint64_t, 0xFFFFFFFFFFFFFFFF, false>();
 }
 
 TEST(ShardedIntegerColumnReader, Base) {

@@ -30,11 +30,66 @@
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
 
-using proto::DatasetFormat;
+struct Format {
+  absl::string_view extension;
+  absl::string_view prefix;
+  absl::string_view prefix_alias = "";
+  proto::DatasetFormat proto_format;
+};
+
+const std::vector<Format>& GetFormats() {
+  static const std::vector<Format>* formats = []() {
+    auto* formats = new std::vector<Format>();
+
+    // RFC 4180-compliant CSV file.
+    formats->push_back({
+        .extension = "csv",
+        .prefix = FORMAT_CSV,
+        .proto_format = proto::FORMAT_CSV,
+    });
+
+    // GZip compressed TF Record of binary serialized TensorFlow.Example proto.
+    // Use TensorFlow API to read the file (required TensorFlow C++ to be
+    // linked). Deprecated: Use FORMAT_TFE_TFRECORD_COMPRESSED_V2 instead.
+    formats->push_back({
+        .extension = "tfrecord",
+        .prefix = FORMAT_TFE_TFRECORD,
+        .proto_format = proto::FORMAT_TFE_TFRECORD,
+    });
+
+    // Uncompressed TF Record of binary serialized TensorFlow.Example proto.
+    // Does not require TensorFlow C++ to be linked.
+    formats->push_back({
+        .extension = "tfrecord",
+        .prefix = FORMAT_TFE_TFRECORDV2,
+        .proto_format = proto::FORMAT_TFE_TFRECORDV2,
+    });
+
+    // GZip compressed TF Record of binary serialized TensorFlow.Example proto.
+    // Does not require TensorFlow C++ to be linked.
+    formats->push_back({
+        .extension = "tfrecord",
+        .prefix = "tfrecord",
+        .prefix_alias = "tfrecordv2+gz+tfe",
+        .proto_format = proto::FORMAT_TFE_TFRECORD_COMPRESSED_V2,
+    });
+
+    // Partially computed (e.g. non indexed) dataset cache.
+    formats->push_back({
+        .extension = "partial_dataset_cache",
+        .prefix = FORMAT_PARTIAL_DATASET_CACHE,
+        .proto_format = proto::FORMAT_PARTIAL_DATASET_CACHE,
+    });
+
+    return formats;
+  }();
+  return *formats;
+}
 
 absl::StatusOr<std::pair<std::string, std::string>> SplitTypeAndPath(
     const absl::string_view typed_path) {
@@ -72,70 +127,49 @@ std::pair<std::string, proto::DatasetFormat> GetDatasetPathAndType(
   return GetDatasetPathAndTypeOrStatus(typed_path).value();
 }
 
-absl::StatusOr<std::pair<std::string, proto::DatasetFormat>>
-GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path) {
-  std::string path, prefix;
-  std::tie(prefix, path) = SplitTypeAndPath(typed_path).value();
-
-  static const google::protobuf::EnumDescriptor* enum_descriptor =
-      google::protobuf::GetEnumDescriptor<DatasetFormat>();
-  for (int format_idx = 0; format_idx < enum_descriptor->value_count();
-       format_idx++) {
-    const auto format = static_cast<DatasetFormat>(
-        enum_descriptor->value(format_idx)->number());
-    if (format == proto::INVALID) {
-      continue;
+std::string FormatToRecommendedExtension(proto::DatasetFormat proto_format) {
+  for (const auto& format : GetFormats()) {
+    if (format.proto_format == proto_format) {
+      return std::string(format.extension);
     }
-    if (DatasetFormatToPrefix(format) == prefix) {
-      return std::make_pair(std::string(path), format);
+  }
+  return "";
+}
+
+absl::StatusOr<proto::DatasetFormat> PrefixToFormat(
+    const absl::string_view prefix) {
+  for (const auto& format : GetFormats()) {
+    if (format.prefix == prefix || format.prefix_alias == prefix) {
+      return format.proto_format;
     }
   }
   return absl::InvalidArgumentError(
-      absl::StrCat("Unknown format \"", prefix, "\" in \"", typed_path, "\""));
+      absl::StrCat("The format prefix \"", prefix,
+                   "\" is unknown. Make sure the format reader is linked to "
+                   "the binary."));
 }
 
-std::string FormatToRecommendedExtension(proto::DatasetFormat format) {
-  switch (format) {
-    case proto::INVALID:
-      LOG(FATAL) << "Invalid format";
-      break;
-    case proto::FORMAT_CSV:
-      return "csv";
-    case proto::FORMAT_TFE_TFRECORD:
-      return "tfrecord";
-    case proto::FORMAT_TFE_TFRECORDV2:
-      return "tfrecordv2";
-    case proto::FORMAT_PARTIAL_DATASET_CACHE:
-      return "partial_dataset_cache";
-  }
+absl::StatusOr<std::pair<std::string, proto::DatasetFormat>>
+GetDatasetPathAndTypeOrStatus(const absl::string_view typed_path) {
+  std::string path, prefix;
+  ASSIGN_OR_RETURN(std::tie(prefix, path), SplitTypeAndPath(typed_path));
+  ASSIGN_OR_RETURN(const auto format, PrefixToFormat(prefix));
+  return std::make_pair(std::string(path), format);
 }
 
-std::string DatasetFormatToPrefix(proto::DatasetFormat format) {
-  switch (format) {
-    case proto::INVALID:
-      LOG(FATAL) << "Invalid format";
-      break;
-    case proto::FORMAT_CSV:
-      return FORMAT_CSV;
-    case proto::FORMAT_TFE_TFRECORD:
-      return FORMAT_TFE_TFRECORD;
-    case proto::FORMAT_TFE_TFRECORDV2:
-      return FORMAT_TFE_TFRECORDV2;
-    case proto::FORMAT_PARTIAL_DATASET_CACHE:
-      return FORMAT_PARTIAL_DATASET_CACHE;
+std::string DatasetFormatToPrefix(proto::DatasetFormat proto_format) {
+  for (const auto& format : GetFormats()) {
+    if (format.proto_format == proto_format) {
+      return std::string(format.prefix);
+    }
   }
+  return "unknown";
 }
 
 std::string ListSupportedFormats() {
   std::vector<std::string> supported_prefixes;
-  static const google::protobuf::EnumDescriptor* enum_descriptor =
-      google::protobuf::GetEnumDescriptor<DatasetFormat>();
-  for (int i = 0; i < enum_descriptor->value_count(); i++) {
-    const google::protobuf::EnumValueDescriptor* format_idx = enum_descriptor->value(i);
-    const auto format = static_cast<DatasetFormat>(format_idx->number());
-    if (format != proto::INVALID) {
-      supported_prefixes.push_back(DatasetFormatToPrefix(format));
-    }
+  for (const auto& format : GetFormats()) {
+    supported_prefixes.push_back(std::string(format.prefix));
   }
   return absl::StrJoin(supported_prefixes, ", ");
 }

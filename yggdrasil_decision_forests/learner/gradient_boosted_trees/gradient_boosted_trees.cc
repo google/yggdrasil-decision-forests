@@ -133,6 +133,8 @@ constexpr char GradientBoostedTreesLearner::kHParamValidationIntervalInTrees[];
 constexpr char GradientBoostedTreesLearner::kHParamLoss[];
 constexpr char GradientBoostedTreesLearner::kHParamFocalLossGamma[];
 constexpr char GradientBoostedTreesLearner::kHParamFocalLossAlpha[];
+constexpr char GradientBoostedTreesLearner::kHParamNDCGTruncation[];
+constexpr char GradientBoostedTreesLearner::kHParamXENDCGTruncation[];
 
 using dataset::VerticalDataset;
 using CategoricalColumn = VerticalDataset::CategoricalColumn;
@@ -522,6 +524,27 @@ absl::Status GradientBoostedTreesLearner::CheckConfiguration(
   return absl::OkStatus();
 }
 
+proto::LossConfiguration GradientBoostedTreesLearner::BuildLossConfiguration(
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config) {
+  proto::LossConfiguration loss_config;
+  switch (gbt_config.loss_options_case()) {
+    case proto::GradientBoostedTreesTrainingConfig::kBinaryFocalLossOptions:
+      loss_config.mutable_binary_focal_loss_options()->CopyFrom(
+          gbt_config.binary_focal_loss_options());
+      break;
+    case proto::GradientBoostedTreesTrainingConfig::kLambdaMartNdcg:
+      loss_config.mutable_lambda_mart_ndcg()->CopyFrom(
+          gbt_config.lambda_mart_ndcg());
+      break;
+    case proto::GradientBoostedTreesTrainingConfig::kXeNdcg:
+      loss_config.mutable_xe_ndcg()->CopyFrom(gbt_config.xe_ndcg());
+      break;
+    case proto::GradientBoostedTreesTrainingConfig::LOSS_OPTIONS_NOT_SET:
+      break;
+  }
+  return loss_config;
+}
+
 absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
     const dataset::proto::DataSpecification& data_spec,
     internal::AllTrainingConfiguration* all_config) const {
@@ -602,7 +625,8 @@ GradientBoostedTreesLearner::InitializeModel(
   mdl->set_data_spec(data_spec);
   internal::InitializeModelWithTrainingConfig(
       config.train_config, config.train_config_link, mdl.get());
-  mdl->set_loss(config.gbt_config->loss());
+  mdl->set_loss(config.gbt_config->loss(),
+                BuildLossConfiguration(*config.gbt_config));
   const auto secondary_metric_names = config.loss->SecondaryMetricNames();
   *mdl->training_logs_.mutable_secondary_metric_names() = {
       secondary_metric_names.begin(), secondary_metric_names.end()};
@@ -1931,6 +1955,22 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamNDCGTruncation);
+    if (hparam.has_value()) {
+      gbt_config->mutable_lambda_mart_ndcg()->set_ndcg_truncation(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamXENDCGTruncation);
+    if (hparam.has_value()) {
+      gbt_config->mutable_xe_ndcg()->set_ndcg_truncation(
+          hparam.value().value().integer());
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -2106,11 +2146,12 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
 - `SQUARED_ERROR`: Least square loss. Only valid for regression.
 - `POISSON`: Poisson log likelihood loss. Mainly used for counting problems. Only valid for regression.
 - `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.
-- `LAMBDA_MART_NDCG5`: LambdaMART with NDCG5.
+- `LAMBDA_MART_NDCG`: LambdaMART with NDCG@5.
 - `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.
 - `BINARY_FOCAL_LOSS`: Focal loss. Only valid for binary classification. See https://arxiv.org/pdf/1708.02002.pdf.
 - `POISSON`: Poisson log likelihood. Only valid for regression.
 - `MEAN_AVERAGE_ERROR`: Mean average error a.k.a. MAE.
+- `LAMBDA_MART_NDCG5`: DEPRECATED, use LAMBDA_MART_NDCG. LambdaMART with NDCG@5. 
 )");
   }
 
@@ -2385,7 +2426,11 @@ For example, in the case of binary classification, the pre-link function output 
         gbt_config.binary_focal_loss_options().misprediction_exponent());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(EXPERIMENTAL. Exponent of the misprediction exponent term in focal loss, corresponds to gamma parameter in https://arxiv.org/pdf/1708.02002.pdf. Only used with focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
+        R"(EXPERIMENTAL, default 2.0. Exponent of the misprediction exponent term in focal loss, corresponds to gamma parameter in https://arxiv.org/pdf/1708.02002.pdf. Only used with focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamXENDCGTruncation);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamNDCGTruncation);
   }
 
   {
@@ -2397,7 +2442,45 @@ For example, in the case of binary classification, the pre-link function output 
         gbt_config.binary_focal_loss_options().positive_sample_coefficient());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(EXPERIMENTAL. Weighting parameter for focal loss, positive samples weighted by alpha, negative samples by (1-alpha). The default 0.5 value means no active class-level weighting. Only used with focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
+        R"(EXPERIMENTAL, default 0.5. Weighting parameter for focal loss, positive samples weighted by alpha, negative samples by (1-alpha). The default 0.5 value means no active class-level weighting. Only used with focal loss i.e. `loss="BINARY_FOCAL_LOSS"`)");
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamXENDCGTruncation);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamNDCGTruncation);
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamNDCGTruncation);
+    param.mutable_integer()->set_minimum(1.f);
+    param.mutable_integer()->set_default_value(
+        gbt_config.lambda_mart_ndcg().ndcg_truncation());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Truncation of the NDCG loss (default 5). Only used with NDCG loss i.e. `loss="LAMBDA_MART_NDCG". `)");
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamXENDCGTruncation);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamFocalLossAlpha);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamFocalLossGamma);
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamXENDCGTruncation);
+    param.mutable_integer()->set_minimum(1.f);
+    param.mutable_integer()->set_default_value(
+        gbt_config.xe_ndcg().ndcg_truncation());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Truncation of the cross-entropy NDCG loss (default 5). Only used with cross-entropy NDCG loss i.e. `loss="XE_NDCG_MART"`)");
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamNDCGTruncation);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamFocalLossAlpha);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamFocalLossGamma);
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
@@ -2469,7 +2552,7 @@ absl::StatusOr<proto::Loss> DefaultLoss(
 
   if (task == model::proto::Task::RANKING &&
       label_spec.type() == dataset::proto::ColumnType::NUMERICAL) {
-    return proto::Loss::LAMBDA_MART_NDCG5;
+    return proto::Loss::LAMBDA_MART_NDCG;
   }
 
   return absl::InvalidArgumentError(
