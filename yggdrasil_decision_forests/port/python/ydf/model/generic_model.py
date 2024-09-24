@@ -456,6 +456,7 @@ Use `model.describe()` for more details
       group: Optional[str] = None,
       bootstrapping: Union[bool, int] = False,
       ndcg_truncation: int = 5,
+      mrr_truncation: int = 5,
       evaluation_task: Optional[Task] = None,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
@@ -608,8 +609,10 @@ Use `model.describe()` for more details
           bootstrapping_samples=bootstrapping_samples,
           task=task._to_proto_type(),  # pylint: disable=protected-access
           ranking=metric_pb2.EvaluationOptions.Ranking(
-              ndcg_truncation=ndcg_truncation
-          ) if task == Task.RANKING else None,
+              ndcg_truncation=ndcg_truncation, mrr_truncation=mrr_truncation
+          )
+          if task == Task.RANKING
+          else None,
           num_threads=num_threads,
       )
 

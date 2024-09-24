@@ -257,7 +257,8 @@ class EvaluationTest(absltest.TestCase):
         count_predictions=3,
         label_column=ds_pb.Column(name="my_label"),
         ranking=metric_pb2.EvaluationResults.Ranking(
-            ndcg=metric_pb2.MetricEstimate(value=5)
+            ndcg=metric_pb2.MetricEstimate(value=5),
+            mrr=metric_pb2.MetricEstimate(value=9),
         ),
     )
     evaluation = metric.Evaluation(proto_eval)
@@ -267,6 +268,7 @@ class EvaluationTest(absltest.TestCase):
         {
             "loss": 2.0,
             "ndcg": 5.0,
+            "mrr": 9.0,
             "num_examples": 1,
             "num_examples_weighted": 3,
         },
@@ -276,6 +278,7 @@ class EvaluationTest(absltest.TestCase):
         str(evaluation),
         textwrap.dedent("""\
         NDCG: 5
+        MRR: 9
         loss: 2
         num examples: 1
         num examples (weighted): 3

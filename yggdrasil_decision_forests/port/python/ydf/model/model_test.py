@@ -1033,6 +1033,29 @@ Use `model.describe()` for more details
     )
     self.assertAlmostEqual(evaluation.ndcg, expected_ndcg)
 
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "mrr@5",
+          "truncation": 5,
+          "expected_mrr": 0.8242574257,
+      },
+      {
+          "testcase_name": "mrr@2",
+          "truncation": 2,
+          "expected_mrr": 0.7920792079,
+      },
+      {
+          "testcase_name": "mrr@10",
+          "truncation": 10,
+          "expected_mrr": 0.8259075907,
+      },
+  )
+  def test_evaluate_ranking_mrr_truncation(self, truncation, expected_mrr):
+    evaluation = self.synthetic_ranking_gbdt.evaluate(
+        self.synthetic_ranking_gbdt_test_ds, mrr_truncation=truncation
+    )
+    self.assertAlmostEqual(evaluation.mrr, expected_mrr)
+
 
 if __name__ == "__main__":
   absltest.main()
