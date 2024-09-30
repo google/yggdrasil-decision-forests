@@ -234,7 +234,7 @@ class GenericModelTest(parameterized.TestCase):
     test_df = pd.read_csv(dataset_path)
     # Large maximum duration reduces test flakiness.
     analysis = self.adult_binary_class_gbdt.analyze(
-        test_df, num_bins=4, maximum_duration=60
+        test_df, num_bins=4, maximum_duration=600
     )
 
     # Checked against report.

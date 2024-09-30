@@ -1015,6 +1015,7 @@ class ToJaxTest(parameterized.TestCase):
       jax_predictions = jax_model.predict(input_values)
 
     # Test predictions
+    # Note: This test sometime fails with OOS build.
     np.testing.assert_allclose(
         jax_predictions,
         ydf_predictions,

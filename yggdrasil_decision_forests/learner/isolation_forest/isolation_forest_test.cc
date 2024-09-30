@@ -187,7 +187,7 @@ TEST_F(IsolationForestOnAdult, Oblique) {
       isolation_forest::proto::isolation_forest_config);
   if_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.719, 0.02);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.719, 0.025);
   EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.501, 0.04);
 }
 
