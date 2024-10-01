@@ -21,14 +21,14 @@
 module.exports = function(config) {
   basePath = 'third_party/yggdrasil_decision_forests/port/javascript/';
   config.files.push({
-    pattern: basePath + 'inference_wasm/inference.js',
+    pattern: basePath + 'inference/inference_wasm/inference.js',
     watched: false,
     served: true,
     nocache: false,
     included: true,
   });
   config.files.push({
-    pattern: basePath + 'inference_wasm/inference.wasm',
+    pattern: basePath + 'inference/inference_wasm/inference.wasm',
     watched: false,
     served: true,
     nocache: false,
