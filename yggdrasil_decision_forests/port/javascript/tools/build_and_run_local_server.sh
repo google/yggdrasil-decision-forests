@@ -39,7 +39,7 @@ bazel build \
   --config=gce \
   --config=force_full_protos \
   -c opt \
-  //${PROJECT_DIR}:create_release \
+  //${PROJECT_DIR}/inference:create_release \
   //third_party/javascript/node_modules/jszip:jszip.min.js
 
 mkdir -p ${ROOT_DIR}
@@ -51,7 +51,7 @@ if [[ ! -f "${ROOT_DIR}/cert.pem" ]]; then
 fi
 
 # Copy the data to the https server.
-unzip -o bazel-genfiles/${PROJECT_DIR}/ydf.zip -d /${ROOT_DIR}/ydf/
+unzip -o bazel-genfiles/${PROJECT_DIR}/inference/ydf.zip -d /${ROOT_DIR}/ydf/
 cp -f ${PROJECT_DIR}/example/example.html /${ROOT_DIR}/
 cp -f ${PROJECT_DIR}/example/*.zip /${ROOT_DIR}/
 cp -f bazel-bin/third_party/javascript/node_modules/jszip/jszip.min.js ${ROOT_DIR}/jszip.js
@@ -60,4 +60,4 @@ cp -f bazel-bin/third_party/javascript/node_modules/jszip/jszip.min.js ${ROOT_DI
 tree ${ROOT_DIR}
 
 # Start the server.
-python3 third_party/yggdrasil_decision_forests/tools/https_server.py ${ROOT_DIR} ${PORT}
+python -m http.server -d ${ROOT_DIR} ${PORT}
