@@ -260,11 +260,11 @@ Use `model.describe()` for more details
         seconds. During the warmup phase, the benchmark is run without being
         timed. This allows warming up caches. The benchmark will always run at
         least one batch for warmup. This parameter must be > 0.
-       batch_size: Size of batches when feeding examples to the inference
-         engines. The impact of this parameter on the results depends on the
-         architecture running the benchmark (notably, cache sizes).
-       num_threads: Number of threads used for the multi-threaded benchmark. If
-         not specified, the number of threads is set to the number of cpu cores.
+      batch_size: Size of batches when feeding examples to the inference
+        engines. The impact of this parameter on the results depends on the
+        architecture running the benchmark (notably, cache sizes).
+      num_threads: Number of threads used for the multi-threaded benchmark. If
+        not specified, the number of threads is set to the number of cpu cores.
 
     Returns:
       Benchmark results.
@@ -303,7 +303,7 @@ Use `model.describe()` for more details
       )
     return result
 
-  def save(self, path, advanced_options=ModelIOOptions()) -> None:
+  def save(self, path: str, advanced_options=ModelIOOptions()) -> None:
     """Save the model to disk.
 
     YDF uses a proprietary model format for saving models. A model consists of
@@ -395,7 +395,7 @@ Use `model.describe()` for more details
       self,
       data: dataset.InputDataset,
       *,
-      use_slow_engine=False,
+      use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
   ) -> np.ndarray:
     """Returns the predictions of the model on the given dataset.
