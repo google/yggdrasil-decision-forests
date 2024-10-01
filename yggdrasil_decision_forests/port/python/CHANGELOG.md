@@ -5,6 +5,8 @@
 ### Feature
 
 -   Expose MRR for ranking models.
+-   Add `model.predict_class` to generate the most likely predicted class of
+    classification models.
 
 ## 0.8.0 - 2024-09-23
 
