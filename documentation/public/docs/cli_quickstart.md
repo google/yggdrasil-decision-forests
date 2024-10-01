@@ -222,7 +222,7 @@ A few remarks:
     provide reasonable results in most situations. We will discuss alternative
     default values (called hyperparameter templates) and automated tuning of
     hyperparameters later. The list of all hyperparameters and their default
-    values is available in the [hyperparameters page](hyper_parameters).
+    values is available in the [hyperparameters page](hyperparameters.md).
 
 -   No validation dataset was provided for the training. Not all learners
     require a validation dataset. However, the `GRADIENT_BOOSTED_TREES` learner
@@ -442,7 +442,7 @@ One vs other classes:
 -   The test accuracy is 0.874399 with 95% confidence interval boundaries of
     [0.86875; 0.879882].
 -   The test AUC is 0.929207 with 95% confidence interval boundaries of
-    [0.924358 0.934056](when computed with a closed form) and [0.973397
+    [0.924358 0.934056] when computed with a closed form and [0.973397
     0.977947] when computed with bootstrapping.
 -   The PR-AUC and AP metrics are also available.
 

@@ -15,7 +15,7 @@ Having a basic understanding of how decision forests work is useful to optimize
 them. For more information, please refer to
 [Google's Decision Forests class](https://developers.google.com/machine-learning/decision-forests).
 
-The [hyper-parameter page](hyperparameters) lists and explains the available
+The [hyper-parameter page](hyperparameters.md) lists and explains the available
 hyper-parameters.
 
 ## Random Forest or Gradient Boosted Trees?
@@ -45,7 +45,7 @@ Automated hyperparameter tuning is a simple but expensive solution to improve
 the quality of a model. When full hyper-parameter tuning is too expensive,
 combining hyper-parameter tuning and manual tuning is a good solution.
 
-See the [Tuning notebook](tutorial/tuning/) for details.
+See the [Tuning notebook](tutorial/tuning.ipynb) for details.
 
 ## Hyper-parameter templates
 
@@ -58,7 +58,7 @@ without having understood those hyper-parameters and without having to run
 hyper-parameter tuning, YDF have pre-configured **hyper-parameter templates**.
 
 The hyper-parameter templates are available by calling
-[hyperparameter_templates](py_api/GradientBoostedTreesLearner/#ydf.GradientBoostedTreesLearner.hyperparameter_templates)
+[hyperparameter_templates](py_api/GradientBoostedTreesLearner.md#ydf.GradientBoostedTreesLearner.hyperparameter_templates)
 on a learner.
 
 ```python

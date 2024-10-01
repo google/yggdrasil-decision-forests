@@ -4,7 +4,7 @@ This page contains an in-depth introduction to Yggdrasil Decision Forests (YDF)
 CLI API. The content presented on this page is generally not necessary to use
 YDF, but it will help users improve their understanding and use advance options.
 
-New users should first check out the [Quick start](cli_quick_start).
+New users should first check out the [Quick start](cli_quick_start.md).
 
 Most concepts presented here apply to the other APIs, notably the C++ API.
 
@@ -280,7 +280,7 @@ The **generic hyper-parameters** (GHPs) are an alternative representation to the
 quick configuration, and automated hyper-parameter optimization. GHPs are used
 by TensorFlow Decision Forests (TF-DF):
 
-The [hyper-parameter](hyper_parameters) page lists the learners and their
+The [hyper-parameter](hyperparameters.md) page lists the learners and their
 hyper-parameters.
 
 Optionally, a learner can be configured with a **deployment specification**. A
@@ -468,7 +468,7 @@ The available variable importances are:
 
 Optimizing the hyperparameters of a learner can improve the quality of a model.
 Selecting the optimal hyper-parameters can be done manually (see
-[how to improve a model](improve_model)) or using the automated hyper-parameter
+[how to improve a model](guide_how_to_improve_model.md)) or using the automated hyper-parameter
 optimizer (HPO). The HPO automatically selects the best hyper-parameters through
 a sequence of trial-and-error computations.
 

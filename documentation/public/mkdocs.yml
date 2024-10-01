@@ -149,6 +149,7 @@ plugins:
             preload_modules:
               - ydf  # For prod
               - yggdrasil_decision_forests # For prod
+              - ydf.util
             show_root_heading: true
             heading_level: 2
             inherited_members: true

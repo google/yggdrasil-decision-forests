@@ -133,10 +133,10 @@ model.save("/tmp/my_model")
 
 **Modeling**
 
--   Train [Random Forest](py_api/RandomForestLearner),
-    [Gradient Boosted Trees](py_api/GradientBoostedTreesLearner),
-    [Cart](py_api/CartLearner), and
-    [Isolation Forest](py_api/IsolationForestLearner) models.
+-   Train [Random Forest](py_api/RandomForestLearner.md),
+    [Gradient Boosted Trees](py_api/GradientBoostedTreesLearner.md),
+    [Cart](py_api/CartLearner.md), and
+    [Isolation Forest](py_api/IsolationForestLearner.md) models.
 -   Train [classification](tutorial/classification.ipynb),
     [regression](tutorial/regression.ipynb), [ranking](tutorial/ranking.ipynb),
     [uplifting](tutorial/uplifting.ipynb), and
@@ -159,12 +159,12 @@ model.save("/tmp/my_model")
 
 **Serving**
 
--   [Benchmark](tutorial/getting_started/#benchmark-model-speed) model
+-   [Benchmark](tutorial/getting_started.md#benchmark-model-speed) model
     inference.
 -   Run models in Python, [C++](tutorial/cpp.ipynb),
     [Go](https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/go),
     [JavaScript](https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/javascript),
-    and [CLI](cli_commands).
+    and [CLI](cli_commands.md).
 -   Online inference with REST API with
     [TensorFlow Serving and Vertex AI](tutorial/tf_serving.ipynb).
 
