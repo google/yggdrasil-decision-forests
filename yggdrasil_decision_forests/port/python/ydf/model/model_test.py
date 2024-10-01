@@ -113,11 +113,20 @@ class GenericModelTest(parameterized.TestCase):
     )
 
     test_df = pd.read_csv(dataset_path)
-    predictions = self.adult_binary_class_rf.predict(test_df)
-    predictions_df = pd.read_csv(predictions_path)
+    predictions_gt = pd.read_csv(predictions_path)
 
-    expected_predictions = predictions_df[">50K"].to_numpy()
+    # Test probability predictions
+    predictions = self.adult_binary_class_rf.predict(test_df)
+    expected_predictions = predictions_gt[">50K"].to_numpy()
     npt.assert_almost_equal(predictions, expected_predictions, decimal=5)
+
+    prediction_classes = self.adult_binary_class_rf.predict_class(test_df)
+    expected_prediction_classes = np.take(
+        ["<=50K", ">50K"], expected_predictions > 0.5
+    )
+    self.assertEqual(prediction_classes.shape, (len(test_df),))
+    self.assertEqual(prediction_classes.dtype.type, np.str_)
+    npt.assert_equal(prediction_classes, expected_prediction_classes)
 
   def test_predict_adult_gbt(self):
     dataset_path = os.path.join(
@@ -135,6 +144,72 @@ class GenericModelTest(parameterized.TestCase):
 
     expected_predictions = predictions_df[">50K"].to_numpy()
     npt.assert_almost_equal(predictions, expected_predictions, decimal=5)
+
+  def test_predict_iris_gbt(self):
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "iris.csv"
+    )
+    test_df = pd.read_csv(dataset_path)
+    predictions = self.iris_multi_class_gbdt.predict(test_df)
+    prediction_classes = self.iris_multi_class_gbdt.predict_class(test_df)
+
+    self.assertEqual(predictions.shape, (len(test_df), 3))
+    self.assertEqual(predictions.dtype.type, np.float32)
+
+    self.assertEqual(prediction_classes.shape, (len(test_df),))
+    self.assertEqual(prediction_classes.dtype.type, np.str_)
+
+    self.assertAlmostEqual(
+        np.mean(
+            np.take(
+                self.iris_multi_class_gbdt.label_classes(),
+                np.argmax(predictions, axis=1),
+            )
+            == test_df["class"]
+        ),
+        0.96666,
+        delta=0.0001,
+    )
+
+    self.assertAlmostEqual(
+        np.mean(prediction_classes == test_df["class"]), 0.96666, delta=0.0001
+    )
+
+    npt.assert_equal(
+        np.take(
+            self.iris_multi_class_gbdt.label_classes(),
+            np.argmax(predictions, axis=1),
+        ),
+        prediction_classes,
+    )
+
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "regression",
+          "model_name": "abalone_regression_gbdt",
+          "test_ds": "abalone.csv",
+      },
+      {
+          "testcase_name": "ranking",
+          "model_name": "synthetic_ranking_gbdt",
+          "test_ds": "synthetic_ranking_test.csv",
+      },
+      {
+          "testcase_name": "uplift",
+          "model_name": "sim_pte_categorical_uplift_rf",
+          "test_ds": "sim_pte_test.csv",
+      },
+  )
+  def test_predict_class_not_allowed(self, model_name, test_ds):
+    model = getattr(self, model_name)
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", test_ds
+    )
+    with self.assertRaisesRegex(
+        ValueError,
+        "predict_class is only supported for classification models",
+    ):
+      _ = model.predict_class(dataset_path)
 
   def test_predict_without_label_column(self):
     dataset_path = os.path.join(

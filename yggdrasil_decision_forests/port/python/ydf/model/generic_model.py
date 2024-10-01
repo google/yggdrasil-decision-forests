@@ -17,7 +17,6 @@
 import dataclasses
 import enum
 import os
-import platform
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Tuple, TypeVar, Union
 
 from absl import logging
@@ -296,11 +295,11 @@ Use `model.describe()` for more details
           required_columns=self.input_feature_names(),
       )
       result = self._model.Benchmark(
-          vds._dataset,
+          vds._dataset,  # pylint: disable=protected-access
           benchmark_duration,
           warmup_duration,
           batch_size,
-          num_threads,  # pylint: disable=protected-access
+          num_threads,
       )
     return result
 
@@ -415,6 +414,73 @@ Use `model.describe()` for more details
     predictions = model.predict(test_ds)
     ```
 
+    The predictions are a NumPy array of float32 values. The structure of this
+    array depends on the model's task and, in some cases, the number of classes.
+
+    **Classification (`model.task() == ydf.Task.CLASSIFICATION`)**
+
+    * *Binary Classification:* For models with two classes
+    (`len(model.label_classes()) == 2`), the output is an array of shape
+    `[num_examples]`. Each value represents the predicted probability of the
+    positive class ( `model.label_classes()[1]` ).  To get the probability of
+    the negative class, use `1 - model.predict(dataset)`.
+
+    Here is an example of how to get the most probably class:
+
+    ```python
+    prediction_proba = model.predict(test_ds)
+    predicted_classes = np.take(model.label_classes(), prediction_proba
+    >= 0.5)
+
+    # Or simply
+    predicted_classes = model.predict_class(test_ds)
+    ```
+
+    * *Multi-class Classification:* For models with more than two classes, the
+    output is an array of shape `[num_examples, num_classes]`. The value at
+    index `[i, j]`  is the probability of class `j` for example `i`.
+
+    Here is an example of how to get the most probably class:
+
+    ```python
+    prediction_proba = model.predict(test_ds)
+    prediction_class_idx = np.argmax(prediction_proba, axis=1)
+    predicted_classes = np.take(model.label_classes(),
+    prediction_class_idx)
+
+    # Or simply
+    predicted_classes = model.predict_class(test_ds)
+    ```
+
+    **Regression (`model.task() == ydf.Task.REGRESSION`)**
+
+    The output is an array of shape `[num_examples]`, where each value is
+    the predicted value for the corresponding example.
+
+    **Ranking (`model.task() == ydf.Task.RANKING`)**
+
+    The output is an array of shape `[num_examples]`, where each value
+    represents the score of the corresponding example. Higher scores
+    indicate higher ranking.
+
+    **Categorical Uplift (`model.task() == ydf.Task.CATEGORICAL_UPLIFT`)**
+
+    The output is an array of shape `[num_examples]`, where each value
+    represents the predicted uplift.  Positive values indicate a positive
+    effect of the treatment on the outcome, while values close to zero
+    indicate little to no effect.
+
+    **Numerical Uplift (`model.task() == ydf.Task.NUMERICAL_UPLIFT`)**
+
+    The output is an array of shape `[num_examples]`, with the
+    interpretation being the same as for Categorical Uplift.
+
+    **Anomaly Detection (`model.task() == ydf.Task.ANOMALY_DETECTION`)**
+
+    The output is an array of shape `[num_examples]`, where each value is
+    the anomaly score for the corresponding example. Scores range from 0
+    (most normal) to 1 (most anomalous).
+
     Args:
       data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
         (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
@@ -428,6 +494,9 @@ Use `model.describe()` for more details
         categorical conditions. It is only in these cases, that users should use
         the slow engine and report the issue to the YDF developers.
       num_threads: Number of threads used to run the model.
+
+    Returns:
+      The predictions of the model on the given dataset.
     """
 
     if num_threads is None:
@@ -442,9 +511,74 @@ Use `model.describe()` for more details
           required_columns=self.input_feature_names(),
       )
       result = self._model.Predict(
-          ds._dataset, use_slow_engine, num_threads=num_threads
-      )  # pylint: disable=protected-access
+          ds._dataset, use_slow_engine, num_threads=num_threads  # pylint: disable=protected-access
+      )
     return result
+
+  def predict_class(
+      self,
+      data: dataset.InputDataset,
+      *,
+      use_slow_engine=False,
+      num_threads: Optional[int] = None,
+  ) -> np.ndarray:
+    """Returns the most likely predicted class for a classification model.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.RandomForestLearner(label="label").train(train_ds)
+
+    test_ds = pd.read_csv("test.csv")
+    predictions = model.predict_class(test_ds)
+    ```
+
+    This method returns a numpy array of string of shape `[num_examples]`. Each
+    value represents the most likely class for the corresponding example. This
+    method can only be used for classification models.
+
+    In case of ties, the first class in`model.label_classes()` is returned.
+
+    See `model.predict` to generate the full prediction probabilities.
+
+    Args:
+      data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
+        (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
+        PyGrain DataLoader and Dataset (experimental, Linux only), dictionary of
+        string to NumPy array or lists. If the dataset contains the label
+        column, that column is ignored.
+      use_slow_engine: If true, uses the slow engine for making predictions. The
+        slow engine of YDF is an order of magnitude slower than the other
+        prediction engines. There exist very rare edge cases where predictions
+        with the regular engines fail, e.g., models with a very large number of
+        categorical conditions. It is only in these cases that users should use
+        the slow engine and report the issue to the YDF developers.
+      num_threads: Number of threads used to run the model.
+
+    Returns:
+      The most likely predicted class for each example.
+    """
+
+    if self.task() != Task.CLASSIFICATION:
+      raise ValueError(
+          "predict_class is only supported for classification models."
+      )
+
+    label_classes = self.label_classes()
+    prediction_proba = self.predict(
+        data, use_slow_engine=use_slow_engine, num_threads=num_threads
+    )
+
+    if len(label_classes) == 2:
+      return np.take(label_classes, prediction_proba > 0.5)
+    else:
+      prediction_class_idx = np.argmax(prediction_proba, axis=1)
+      return np.take(label_classes, prediction_class_idx)
 
   def evaluate(
       self,
@@ -526,8 +660,10 @@ Use `model.describe()` for more details
         to an integer, it specifies the number of bootstrapping samples to use.
         In this case, if the number is less than 100, an error is raised as
         bootstrapping will not yield useful results.
-      ndcg_truncation: Controls at which ranking position the NDCG loss should
+      ndcg_truncation: Controls at which ranking position the NDCG metric should
         be truncated. Default to 5. Ignored for non-ranking models.
+      mrr_truncation: Controls at which ranking position the MRR metric loss
+        should be truncated. Default to 5. Ignored for non-ranking models.
       evaluation_task: Deprecated. Use `task` instead.
       use_slow_engine: If true, uses the slow engine for making predictions. The
         slow engine of YDF is an order of magnitude slower than the other
@@ -597,7 +733,7 @@ Use `model.describe()` for more details
 
       effective_dataspec, label_col_idx, group_col_idx = (
           self._build_evaluation_dataspec(
-              override_task=task._to_proto_type(),
+              override_task=task._to_proto_type(),  # pylint: disable=protected-access
               override_label=label,
               override_group=group,
           )
@@ -617,14 +753,14 @@ Use `model.describe()` for more details
       )
 
       evaluation_proto = self._model.Evaluate(
-          ds._dataset,
+          ds._dataset,  # pylint: disable=protected-access
           options_proto,
           weighted=weighted,
           label_col_idx=label_col_idx,
           group_col_idx=group_col_idx,
           use_slow_engine=use_slow_engine,
           num_threads=num_threads,
-      )  # pylint: disable=protected-access
+      )
     return metric.Evaluation(evaluation_proto)
 
   def analyze_prediction(
@@ -1462,6 +1598,16 @@ Use `model.describe()` for more details
       override_label: Optional[str],
       override_group: Optional[str],
   ) -> Tuple[data_spec_pb2.DataSpecification, int, int]:
+    """Creates a dataspec for evaluation.
+
+    Args:
+      override_task: Override task to use for the evaluation.
+      override_label: Override name of the label column.
+      override_group: Override name of the group column.
+
+    Returns:
+      The dataspec, the label column index and the group column index.
+    """
 
     # Default dataspec of the model
     effective_dataspec = self._model.data_spec()
