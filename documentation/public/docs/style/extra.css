@@ -11,6 +11,10 @@ h1#_1 {
   margin: 0 auto;
 }
 
+.halfsize {
+  transform: scale(0.5);
+}
+
 .logo {
   width: 397px;
   margin-top: 20px;
