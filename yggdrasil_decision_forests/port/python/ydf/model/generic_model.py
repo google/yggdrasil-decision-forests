@@ -816,7 +816,7 @@ Use `model.describe()` for more details
       data: dataset.InputDataset,
       sampling: float = 1.0,
       num_bins: int = 50,
-      partial_depepence_plot: bool = True,
+      partial_dependence_plot: bool = True,
       conditional_expectation_plot: bool = True,
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
@@ -861,7 +861,7 @@ Use `model.describe()` for more details
         0.01.
       num_bins: Number of bins used to accumulate statistics. A large value
         increase the resolution of the plots but takes more time to compute.
-      partial_depepence_plot: Compute partial dependency plots a.k.a PDPs.
+      partial_dependence_plot: Compute partial dependency plots a.k.a PDPs.
         Expensive to compute.
       conditional_expectation_plot: Compute the conditional expectation plots
         a.k.a. CEP. Cheap to compute.
@@ -891,7 +891,7 @@ Use `model.describe()` for more details
           num_threads=num_threads,
           maximum_duration_seconds=maximum_duration,
           pdp=model_analysis_pb2.Options.PlotConfig(
-              enabled=partial_depepence_plot,
+              enabled=partial_dependence_plot,
               example_sampling=sampling,
               num_numerical_bins=num_bins,
           ),

@@ -2,6 +2,11 @@
 
 ## HEAD
 
+### Breaking
+
+-   Change typo partial_depepence_plot to partial_dependence_plot on
+    model.analyze().
+
 ### Feature
 
 -   Expose MRR for ranking models.
