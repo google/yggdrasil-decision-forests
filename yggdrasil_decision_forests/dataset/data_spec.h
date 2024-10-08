@@ -252,6 +252,12 @@ inline uint64_t HashColumnInteger(int64_t value) {
 // Name of an unrolled column.
 std::string UnstackedColumnName(absl::string_view original_name, int dim_idx);
 
+// Generate the unrolled column names following the naming convention used in
+// PYDF. This is the convention used in all new codes.
+// See "unrolled_feature_names" in "port/python/ydf/dataset/io/dataset_io.py"
+std::vector<std::string> UnstackedColumnNamesV2(absl::string_view original_name,
+                                                int num_dims);
+
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
 

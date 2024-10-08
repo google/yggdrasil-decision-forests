@@ -15,16 +15,12 @@
 
 #include "yggdrasil_decision_forests/dataset/avro_example.h"
 
-#include <cmath>
-#include <cstdint>
-#include <limits>
 #include <string>
-#include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/status/status.h"
-#include "yggdrasil_decision_forests/utils/bytestream.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -32,7 +28,7 @@
 namespace yggdrasil_decision_forests::dataset::avro {
 namespace {
 
-using ::testing::ElementsAre;
+using test::EqualsProto;
 
 std::string DatasetDir() {
   return file::JoinPath(
@@ -40,305 +36,315 @@ std::string DatasetDir() {
       "yggdrasil_decision_forests/test_data/dataset");
 }
 
-struct ReadIntegerCase {
-  std::string input;
-  int64_t expected_value;
-};
-
-SIMPLE_PARAMETERIZED_TEST(ReadInteger, ReadIntegerCase,
-                          {
-                              {std::string("\x00", 1), 0},
-                              {"\x01", -1},
-                              {"\x02", 1},
-                              {"\x03", -2},
-                              {"\x04", 2},
-                              {"\x05", -3},
-                              {"\x06", 3},
-                              {"\x07", -4},
-                              {"\x7F", -64},
-                              {"\x80\x01", 64},
-                              {"\x80\x02", 128},
-                              {"\x82\x01", 65},
-                              {"\x80\x03", 192},
-                              {"\x80\x04", 256},
-                              {"\xFE\x01", 127},
-                              {"\x80\x80\x01", 1 << (7 * 2 - 1)},
-                              {"\x80\x80\x80\x01", 1 << (7 * 3 - 1)},
-                              {"\x80\x80\x80\x80\x80\x80\x80\x01",
-                               static_cast<int64_t>(1) << (7 * 7 - 1)},
-                          }) {
-  const auto& test_case = GetParam();
-  utils::StringInputByteStream stream(test_case.input);
-  ASSERT_OK_AND_ASSIGN(const auto value, internal::ReadInteger(&stream));
-  EXPECT_EQ(value, test_case.expected_value);
-}
-
-struct ReadFloatCase {
-  std::string input;
-  float expected_value;
-};
-
-SIMPLE_PARAMETERIZED_TEST(ReadFloat, ReadFloatCase,
-                          {
-                              {std::string("\x00\x00\x00\x00", 4), 0.f},
-                              {std::string("\x00\x00\x00\x40", 4), 2.f},
-                              {std::string("\x00\x00\x40\x40", 4), 3.f},
-                              {std::string("\x00\x00\x60\x40", 4), 3.5f},
-                              {std::string("\x00\x00\x80\x7F", 4),
-                               std::numeric_limits<float>::infinity()},
-                              {std::string("\x00\x00\x80\xFF", 4),
-                               -std::numeric_limits<float>::infinity()},
-                          }) {
-  const auto& test_case = GetParam();
-  utils::StringInputByteStream stream(test_case.input);
-  ASSERT_OK_AND_ASSIGN(const auto value, internal::ReadFloat(&stream));
-  EXPECT_EQ(value, test_case.expected_value);
-}
-
-TEST(ReadFloat, IsNan) {
-  utils::StringInputByteStream stream("\xFF\xFF\xFF\x7F");
-  ASSERT_OK_AND_ASSIGN(const auto value, internal::ReadFloat(&stream));
-  EXPECT_TRUE(std::isnan(value));
-}
-
-struct ReadDoubleCase {
-  std::string input;
-  double expected_value;
-};
-
-SIMPLE_PARAMETERIZED_TEST(
-    ReadDouble, ReadDoubleCase,
-    {
-        {std::string("\x00\x00\x00\x00\x00\x00\x00\x00", 8), 0.},
-        {std::string("\x00\x00\x00\x00\x00\x00\x00\x40", 8), 2.},
-        {std::string("\x00\x00\x00\x00\x00\x00\x40\x40", 8), 32.},
-        {std::string("\x00\x00\x00\x00\x00\x00\x60\x40", 8), 128.},
-    }) {
-  const auto& test_case = GetParam();
-  utils::StringInputByteStream stream(test_case.input);
-  ASSERT_OK_AND_ASSIGN(const auto value, internal::ReadDouble(&stream));
-  EXPECT_EQ(value, test_case.expected_value);
-}
-
-struct ReadBooleanCase {
-  std::string input;
-  bool expected_value;
-};
-
-SIMPLE_PARAMETERIZED_TEST(ReadBoolean, ReadBooleanCase,
-                          {
-                              {std::string("\x00", 1), false},
-                              {std::string("\x01", 1), true},
-                          }) {
-  const auto& test_case = GetParam();
-  utils::StringInputByteStream stream(test_case.input);
-  ASSERT_OK_AND_ASSIGN(const auto value, internal::ReadBoolean(&stream));
-  EXPECT_EQ(value, test_case.expected_value);
-}
-
-struct ReadStringCase {
-  std::string input;
-  std::string expected_value;
-};
-
-SIMPLE_PARAMETERIZED_TEST(ReadString, ReadStringCase,
-                          {
-                              {std::string("\x00", 1), ""},
-                              {"\x02\x41", "A"},
-                              {"\x16Hello World", "Hello World"},
-                              {"\x06\x66\x6F\x6F", "foo"},
-                          }) {
-  const auto& test_case = GetParam();
-  utils::StringInputByteStream stream(test_case.input);
-  std::string value;
-  ASSERT_OK(internal::ReadString(&stream, &value));
-  EXPECT_EQ(value, test_case.expected_value);
-}
-
-TEST(AvroExample, ExtractSchema) {
-  ASSERT_OK_AND_ASSIGN(const auto schema,
-                       AvroReader::ExtractSchema(file::JoinPath(
-                           DatasetDir(), "toy_codex-null.avro")));
-  EXPECT_EQ(
-      schema,
-      R"({"type": "record", "name": "ToyDataset", "fields": [{"name": "f_null", "type": "null"}, {"name": "f_boolean", "type": "boolean"}, {"name": "f_int", "type": "int"}, {"name": "f_long", "type": "long"}, {"name": "f_float", "type": "float"}, {"name": "f_another_float", "type": "float"}, {"name": "f_double", "type": "double"}, {"name": "f_string", "type": "string"}, {"name": "f_bytes", "type": "bytes"}, {"name": "f_float_optional", "type": ["null", "float"]}, {"name": "f_array_of_float", "type": {"type": "array", "items": "float"}}, {"name": "f_array_of_double", "type": {"type": "array", "items": "double"}}, {"name": "f_array_of_string", "type": {"type": "array", "items": "string"}}, {"name": "f_another_array_of_string", "type": {"type": "array", "items": "string"}}, {"name": "f_optional_array_of_float", "type": ["null", {"type": "array", "items": "float"}]}], "__fastavro_parsed": true})");
-}
-
-TEST(AvroExample, ExtractSchemaCompressed) {
-  ASSERT_OK_AND_ASSIGN(const auto schema,
-                       AvroReader::ExtractSchema(file::JoinPath(
-                           DatasetDir(), "toy_codex-deflate.avro")));
-  EXPECT_EQ(
-      schema,
-      R"({"type": "record", "name": "ToyDataset", "fields": [{"name": "f_null", "type": "null"}, {"name": "f_boolean", "type": "boolean"}, {"name": "f_int", "type": "int"}, {"name": "f_long", "type": "long"}, {"name": "f_float", "type": "float"}, {"name": "f_another_float", "type": "float"}, {"name": "f_double", "type": "double"}, {"name": "f_string", "type": "string"}, {"name": "f_bytes", "type": "bytes"}, {"name": "f_float_optional", "type": ["null", "float"]}, {"name": "f_array_of_float", "type": {"type": "array", "items": "float"}}, {"name": "f_array_of_double", "type": {"type": "array", "items": "double"}}, {"name": "f_array_of_string", "type": {"type": "array", "items": "string"}}, {"name": "f_another_array_of_string", "type": {"type": "array", "items": "string"}}, {"name": "f_optional_array_of_float", "type": ["null", {"type": "array", "items": "float"}]}], "__fastavro_parsed": true})");
-}
-
-TEST(AvroExample, Reader) {
-  ASSERT_OK_AND_ASSIGN(
-      const auto reader,
-      AvroReader::Create(file::JoinPath(DatasetDir(), "toy_codex-null.avro")));
-  EXPECT_THAT(
-      reader->fields(),
-      ElementsAre(
-          AvroField{"f_null", AvroType::kNull},
-          AvroField{"f_boolean", AvroType::kBoolean},
-          AvroField{"f_int", AvroType::kInt},
-          AvroField{"f_long", AvroType::kLong},
-          AvroField{"f_float", AvroType::kFloat},
-          AvroField{"f_another_float", AvroType::kFloat},
-          AvroField{"f_double", AvroType::kDouble},
-          AvroField{"f_string", AvroType::kString},
-          AvroField{"f_bytes", AvroType::kBytes},
-          AvroField{"f_float_optional", AvroType::kFloat, AvroType::kUnknown,
-                    true},
-          AvroField{"f_array_of_float", AvroType::kArray, AvroType::kFloat},
-          AvroField{"f_array_of_double", AvroType::kArray, AvroType::kDouble},
-          AvroField{"f_array_of_string", AvroType::kArray, AvroType::kString},
-          AvroField{"f_another_array_of_string", AvroType::kArray,
-                    AvroType::kString},
-          AvroField{"f_optional_array_of_float", AvroType::kArray,
-                    AvroType::kFloat, true}));
-
-  EXPECT_EQ(reader->sync_marker(), std::string("\xB6\xC2"
-                                               "A\x88\xB8\xC3"
-                                               "A\x8C\xDBQF\x92\xDC dB",
-                                               16));
-
-  // TODO: Add tests for reading the data.
-
-  int record_idx = 0;
-  while (true) {
-    LOG(INFO) << "Record " << record_idx;
-    ASSERT_OK_AND_ASSIGN(const bool has_record, reader->ReadNextRecord());
-    if (!has_record) {
-      break;
-    }
-    for (const auto& field : reader->fields()) {
-      switch (field.type) {
-        case AvroType::kUnknown:
-          ASSERT_OK(absl::UnimplementedError("Unknown field"));
-          break;
-        case AvroType::kNull: {
-          // Nothing to read.
-        } break;
-        case AvroType::kBoolean: {
-          ASSERT_OK_AND_ASSIGN(const auto value,
-                               reader->ReadNextFieldBoolean(field));
-          EXPECT_TRUE(value.has_value());
-          EXPECT_EQ(value.value(), record_idx == 0);
-        } break;
-        case AvroType::kLong:
-        case AvroType::kInt: {
-          ASSERT_OK_AND_ASSIGN(const auto value,
-                               reader->ReadNextFieldInteger(field));
-          EXPECT_TRUE(value.has_value());
-          if (field.type == AvroType::kInt) {
-            EXPECT_EQ(value.value(), (record_idx == 0) ? 5 : 6);
-          } else {
-            EXPECT_EQ(value.value(), (record_idx == 0) ? 1234567 : -123);
-          }
-        } break;
-        case AvroType::kFloat: {
-          ASSERT_OK_AND_ASSIGN(const auto value,
-                               reader->ReadNextFieldFloat(field));
-
-          if (field.name == "f_float") {
-            EXPECT_TRUE(value.has_value());
-            EXPECT_NEAR(value.value(), (record_idx == 0) ? 3.1415 : -1.234,
-                        0.0001);
-          } else if (field.name == "f_float_optional") {
-            EXPECT_EQ(value.has_value(), record_idx == 0);
-            if (record_idx == 0) {
-              EXPECT_NEAR(value.value(), 6.1, 0.001);
-            }
-          } else {
-            EXPECT_TRUE(value.has_value());
-            EXPECT_NEAR(value.value(), (record_idx == 0) ? 5.0 : 6.0, 0.0001);
-          }
-        } break;
-        case AvroType::kDouble: {
-          ASSERT_OK_AND_ASSIGN(const auto value,
-                               reader->ReadNextFieldDouble(field));
-          EXPECT_TRUE(value.has_value());
-          if (record_idx == 0) {
-            EXPECT_TRUE(std::isnan(value.value()));
-          } else {
-            EXPECT_EQ(value.value(), 6.789);
-          }
-        } break;
-        case AvroType::kBytes:
-        case AvroType::kString: {
-          std::string value;
-          ASSERT_OK_AND_ASSIGN(const auto has_value,
-                               reader->ReadNextFieldString(field, &value));
-          EXPECT_TRUE(has_value);
-          if (field.type == AvroType::kString) {
-            EXPECT_EQ(value, (record_idx == 0) ? "hello" : "");
-          } else {
-            EXPECT_EQ(value, (record_idx == 0) ? "world" : "");
-          }
-        } break;
-        case AvroType::kArray:
-          switch (field.sub_type) {
-            case AvroType::kFloat: {
-              std::vector<float> values;
-              ASSERT_OK_AND_ASSIGN(
-                  const auto has_value,
-                  reader->ReadNextFieldArrayFloat(field, &values));
-              if (field.name == "f_array_of_float") {
-                EXPECT_TRUE(has_value);
-                if (record_idx == 0) {
-                  EXPECT_THAT(values, ElementsAre(1.0, 2.0, 3.0));
-                } else {
-                  EXPECT_THAT(values, ElementsAre(4.0, 5.0, 6.0));
-                }
-              } else {
-                EXPECT_EQ(has_value, record_idx == 0);
-                if (record_idx == 0) {
-                  EXPECT_THAT(values, ElementsAre(1.0, 2.0, 3.0));
-                }
-              }
-            } break;
-            case AvroType::kDouble: {
-              std::vector<double> values;
-              ASSERT_OK_AND_ASSIGN(
-                  const auto has_value,
-                  reader->ReadNextFieldArrayDouble(field, &values));
-              EXPECT_TRUE(has_value);
-              if (record_idx == 0) {
-                EXPECT_THAT(values, ElementsAre(10.0, 20.0, 30.0));
-              } else {
-                EXPECT_THAT(values, ElementsAre(40.0, 50.0, 60.0));
-              }
-            } break;
-            case AvroType::kString:
-            case AvroType::kBytes: {
-              std::vector<std::string> values;
-              ASSERT_OK_AND_ASSIGN(
-                  const auto has_value,
-                  reader->ReadNextFieldArrayString(field, &values));
-              EXPECT_TRUE(has_value);
-              if (record_idx == 0) {
-                EXPECT_THAT(values, ElementsAre("a", "b", "c"));
-              } else {
-                if (field.name == "f_array_of_string") {
-                  EXPECT_THAT(values, ElementsAre("c", "a", "b"));
-                } else {
-                  EXPECT_THAT(values, ElementsAre("c", "def"));
-                }
-              }
-            } break;
-            default:
-              ASSERT_OK(absl::UnimplementedError("Unsupported type"));
-          }
-          break;
-      }
-    }
-    record_idx++;
+TEST(AvroExample, CreateDataspec) {
+  dataset::proto::DataSpecificationGuide guide;
+  {
+    auto* col = guide.add_column_guides();
+    col->set_column_name_pattern("^f_another_array_of_string$");
+    col->set_type(proto::ColumnType::CATEGORICAL_SET);
   }
 
-  EXPECT_EQ(record_idx, 2);
-  ASSERT_OK(reader->Close());
+  {
+    auto* col = guide.add_column_guides();
+    col->set_column_name_pattern("^f_another_float$");
+    col->set_ignore_column(true);
+  }
+
+  guide.mutable_default_column_guide()
+      ->mutable_categorial()
+      ->set_min_vocab_frequency(1);
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto dataspec,
+      CreateDataspec(file::JoinPath(DatasetDir(), "toy_codex-null.avro"),
+                     guide));
+  LOG(INFO) << "Dataspec:\n" << dataset::PrintHumanReadable(dataspec);
+
+  const dataset::proto::DataSpecification expected = PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: BOOLEAN
+      name: "f_boolean"
+      boolean { count_true: 1 count_false: 1 }
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_int"
+      numerical { mean: 5.5 min_value: 5 max_value: 6 standard_deviation: 0.5 }
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_long"
+      numerical {
+        mean: 617222
+        min_value: -123
+        max_value: 1234567
+        standard_deviation: 617345.00049850566
+      }
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_float"
+      numerical {
+        mean: 0.95375001430511475
+        min_value: -1.234
+        max_value: 3.1415
+        standard_deviation: 2.1877499915544623
+      }
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_double"
+      numerical {
+        mean: 6.7890000343322754
+        min_value: 6.789
+        max_value: 6.789
+        standard_deviation: 0.0011401533426769351
+      }
+      count_nas: 1
+    }
+    columns {
+      type: CATEGORICAL
+      name: "f_string"
+      categorical {
+        most_frequent_value: 1
+        number_of_unique_values: 3
+        min_value_count: 1
+        max_number_of_unique_values: 2000
+        is_already_integerized: false
+        items {
+          key: ""
+          value { index: 2 count: 1 }
+        }
+        items {
+          key: "<OOD>"
+          value { index: 0 count: 0 }
+        }
+        items {
+          key: "hello"
+          value { index: 1 count: 1 }
+        }
+      }
+    }
+    columns {
+      type: CATEGORICAL
+      name: "f_bytes"
+      categorical {
+        most_frequent_value: 1
+        number_of_unique_values: 3
+        min_value_count: 1
+        max_number_of_unique_values: 2000
+        is_already_integerized: false
+        items {
+          key: ""
+          value { index: 2 count: 1 }
+        }
+        items {
+          key: "<OOD>"
+          value { index: 0 count: 0 }
+        }
+        items {
+          key: "world"
+          value { index: 1 count: 1 }
+        }
+      }
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_float_optional"
+      numerical {
+        mean: 6.0999999046325684
+        min_value: 6.1
+        max_value: 6.1
+        standard_deviation: 0.00049795111524192609
+      }
+      count_nas: 1
+    }
+    columns {
+      type: CATEGORICAL_SET
+      name: "f_another_array_of_string"
+      is_manual_type: true
+      categorical {
+        most_frequent_value: 1
+        number_of_unique_values: 5
+        min_value_count: 1
+        max_number_of_unique_values: 2000
+        is_already_integerized: false
+        items {
+          key: "<OOD>"
+          value { index: 0 count: 0 }
+        }
+        items {
+          key: "a"
+          value { index: 4 count: 1 }
+        }
+        items {
+          key: "b"
+          value { index: 3 count: 1 }
+        }
+        items {
+          key: "c"
+          value { index: 1 count: 2 }
+        }
+        items {
+          key: "def"
+          value { index: 2 count: 1 }
+        }
+      }
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_array_of_float.0_of_3"
+      numerical { mean: 2.5 min_value: 1 max_value: 4 standard_deviation: 1.5 }
+      count_nas: 0
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_array_of_float.1_of_3"
+      numerical { mean: 3.5 min_value: 2 max_value: 5 standard_deviation: 1.5 }
+      count_nas: 0
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_array_of_float.2_of_3"
+      numerical { mean: 4.5 min_value: 3 max_value: 6 standard_deviation: 1.5 }
+      count_nas: 0
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_array_of_double.0_of_3"
+      numerical { mean: 25 min_value: 10 max_value: 40 standard_deviation: 15 }
+      count_nas: 0
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_array_of_double.1_of_3"
+      numerical { mean: 35 min_value: 20 max_value: 50 standard_deviation: 15 }
+      count_nas: 0
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_array_of_double.2_of_3"
+      numerical { mean: 45 min_value: 30 max_value: 60 standard_deviation: 15 }
+      count_nas: 0
+    }
+    columns {
+      type: CATEGORICAL
+      name: "f_array_of_string.0_of_3"
+      categorical {
+        most_frequent_value: 1
+        number_of_unique_values: 3
+        min_value_count: 1
+        max_number_of_unique_values: 2000
+        is_already_integerized: false
+        items {
+          key: "<OOD>"
+          value { index: 0 count: 0 }
+        }
+        items {
+          key: "a"
+          value { index: 2 count: 1 }
+        }
+        items {
+          key: "c"
+          value { index: 1 count: 1 }
+        }
+      }
+      count_nas: 0
+    }
+    columns {
+      type: CATEGORICAL
+      name: "f_array_of_string.1_of_3"
+      categorical {
+        most_frequent_value: 1
+        number_of_unique_values: 3
+        min_value_count: 1
+        max_number_of_unique_values: 2000
+        is_already_integerized: false
+        items {
+          key: "<OOD>"
+          value { index: 0 count: 0 }
+        }
+        items {
+          key: "a"
+          value { index: 2 count: 1 }
+        }
+        items {
+          key: "b"
+          value { index: 1 count: 1 }
+        }
+      }
+      count_nas: 0
+    }
+    columns {
+      type: CATEGORICAL
+      name: "f_array_of_string.2_of_3"
+      categorical {
+        most_frequent_value: 1
+        number_of_unique_values: 3
+        min_value_count: 1
+        max_number_of_unique_values: 2000
+        is_already_integerized: false
+        items {
+          key: "<OOD>"
+          value { index: 0 count: 0 }
+        }
+        items {
+          key: "b"
+          value { index: 2 count: 1 }
+        }
+        items {
+          key: "c"
+          value { index: 1 count: 1 }
+        }
+      }
+      count_nas: 0
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_optional_array_of_float.0_of_3"
+      numerical { mean: 0.5 min_value: 1 max_value: 1 standard_deviation: 0.5 }
+      count_nas: 0
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_optional_array_of_float.1_of_3"
+      numerical { mean: 1 min_value: 2 max_value: 2 standard_deviation: 1 }
+      count_nas: 0
+    }
+    columns {
+      type: NUMERICAL
+      name: "f_optional_array_of_float.2_of_3"
+      numerical { mean: 1.5 min_value: 3 max_value: 3 standard_deviation: 1.5 }
+      count_nas: 0
+    }
+    created_num_rows: 2
+    unstackeds {
+      original_name: "f_array_of_float"
+      begin_column_idx: 9
+      size: 3
+      type: NUMERICAL
+    }
+    unstackeds {
+      original_name: "f_array_of_double"
+      begin_column_idx: 12
+      size: 3
+      type: NUMERICAL
+    }
+    unstackeds {
+      original_name: "f_array_of_string"
+      begin_column_idx: 15
+      size: 3
+      type: CATEGORICAL
+    }
+    unstackeds {
+      original_name: "f_optional_array_of_float"
+      begin_column_idx: 18
+      size: 3
+      type: NUMERICAL
+    }
+  )pb");
+
+  EXPECT_THAT(dataspec, EqualsProto(expected));
 }
 
 }  // namespace

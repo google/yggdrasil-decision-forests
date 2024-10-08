@@ -15,533 +15,534 @@
 
 #include "yggdrasil_decision_forests/dataset/avro_example.h"
 
-#define RAPIDJSON_HAS_STDSTRING 1
-
+#include <cmath>
 #include <cstddef>
 #include <memory>
-#include <ostream>
 #include <string>
-#include <utility>
 #include <vector>
 
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "include/rapidjson/document.h"
-#include "include/rapidjson/rapidjson.h"
-#include "yggdrasil_decision_forests/utils/bytestream.h"
-#include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/dataset/avro.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
-
-#define MAYBE_SKIP_OPTIONAL(FIELD)                                             \
-  if (field.optional) {                                                        \
-    ASSIGN_OR_RETURN(const auto _has_value, current_block_reader->ReadByte()); \
-    if (!_has_value) {                                                         \
-      return std::nullopt;                                                     \
-    }                                                                          \
-  }
 
 namespace yggdrasil_decision_forests::dataset::avro {
 namespace {
-absl::Status JsonIsObject(const rapidjson::Value& value) {
-  if (!value.IsObject()) {
-    return absl::InvalidArgumentError("Schema is not a json object");
+
+// Computes the mapping from Avro field index to dataspec column index and
+// dataspec unroll index.
+//
+// Args:
+//   fields: Avro fields.
+//   dataspec: Dataspec.
+//   univariate_field_idx_to_column_idx: Mapping between the Avro field index
+//    and the column index for the univariate features. -1's are used for
+//    ignored fields.
+//   multivariate_field_idx_to_unroll_idx: Mapping from Avro field index
+//    to dataspec unroll index for multivariate fields. -1's are used for
+//    ignored fields.
+absl::Status ComputeReadingMaps(
+    const std::vector<AvroField>& fields,
+    const dataset::proto::DataSpecification& dataspec,
+    std::vector<int>* univariate_field_idx_to_column_idx,
+    std::vector<int>* multivariate_field_idx_to_unroll_idx) {
+  univariate_field_idx_to_column_idx->assign(fields.size(), -1);
+  multivariate_field_idx_to_unroll_idx->assign(fields.size(), -1);
+  int field_idx = 0;
+  for (const auto& field : fields) {
+    if (field.type == AvroType::kArray) {
+      const auto col_idx = GetOptionalColumnIdxFromName(field.name, dataspec);
+      if (col_idx.has_value()) {
+        // A multidimensional feature e.g. catset.
+        (*univariate_field_idx_to_column_idx)[field_idx] = col_idx.value();
+      } else {
+        // Unroll the feature into multiple single dimensional features.
+        int unstacked_idx = 0;
+        for (const auto& unstacked : dataspec.unstackeds()) {
+          if (unstacked.original_name() == field.name) {
+            (*multivariate_field_idx_to_unroll_idx)[field_idx] = unstacked_idx;
+            break;
+          }
+          unstacked_idx++;
+        }
+      }
+    } else if (field.type != AvroType::kNull) {
+      // A single dimensional feature.
+      const auto col_idx = GetOptionalColumnIdxFromName(field.name, dataspec);
+      if (col_idx.has_value()) {
+        (*univariate_field_idx_to_column_idx)[field_idx] = col_idx.value();
+      }
+    }
+    field_idx++;
   }
   return absl::OkStatus();
 }
 
-absl::StatusOr<const rapidjson::Value*> GetJsonField(
-    const rapidjson::Value& value, const std::string& name) {
-  auto it = value.FindMember(name);
-  if (it == value.MemberEnd()) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Field \"", name, "\" not found"));
-  }
-  return &(it->value);
-}
+// Populates the dataspec with new columns the first time a multivariate field
+// is seen (it is not possible to populate it before because the dimension is
+// not known).
+template <typename T>
+absl::Status InitializeUnstackedColumn(
+    const AvroField& field, const bool has_value, const std::vector<T>& values,
+    const size_t record_idx, const size_t field_idx,
+    const std::vector<int>& univariate_field_idx_to_column_idx,
+    const std::vector<int>& multivariate_field_idx_to_unroll_idx,
+    const std::vector<proto::ColumnGuide>& unstacked_guides,
+    proto::DataSpecification* dataspec,
+    proto::DataSpecificationAccumulator* accumulator) {
+  // Check if field used.
+  const auto unstacked_idx = multivariate_field_idx_to_unroll_idx[field_idx];
+  auto* unstacked = dataspec->mutable_unstackeds(unstacked_idx);
 
-absl::StatusOr<const std::string> GetJsonStringField(
-    const rapidjson::Value& value, const std::string& name) {
-  auto it = value.FindMember(name);
-  if (it == value.MemberEnd()) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Field \"", name, "\" not found"));
-  }
-  if (!it->value.IsString()) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Field \"", name, "\" is not a string"));
-  }
-  return it->value.GetString();
-}
+  if (has_value) {
+    if (!unstacked->has_size()) {
+      // First time the field is seen with values. Let's create the
+      // dataspec.
 
-absl::StatusOr<AvroType> ParseType(std::string_view key) {
-  if (key == "null") {
-    return AvroType::kNull;
-  } else if (key == "boolean") {
-    return AvroType::kBoolean;
-  } else if (key == "long") {
-    return AvroType::kLong;
-  } else if (key == "int") {
-    return AvroType::kInt;
-  } else if (key == "float") {
-    return AvroType::kFloat;
-  } else if (key == "double") {
-    return AvroType::kDouble;
-  } else if (key == "string") {
-    return AvroType::kString;
-  } else if (key == "bytes") {
-    return AvroType::kBytes;
-  } else if (key == "array") {
-    return AvroType::kArray;
+      // Populate unstack.
+      unstacked->set_begin_column_idx(dataspec->columns_size());
+      unstacked->set_size(values.size());
+      // Create columns.
+      const auto sub_col_names =
+          UnstackedColumnNamesV2(field.name, values.size());
+      for (const auto& sub_col_name : sub_col_names) {
+        auto* col_spec = dataspec->add_columns();
+        col_spec->set_name(sub_col_name);
+        col_spec->set_type(unstacked->type());
+        col_spec->set_count_nas(record_idx);
+        RETURN_IF_ERROR(UpdateSingleColSpecWithGuideInfo(
+            unstacked_guides[unstacked_idx], col_spec));
+        accumulator->add_columns();
+      }
+    } else {
+      // Check number of values
+      if (values.size() != unstacked->size()) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Inconsistent number of values for field ", field.name,
+                         ". All the non-missing values should have the same "
+                         "length. ",
+                         unstacked->size(), " vs ", values.size()));
+      }
+    }
   }
-  return absl::InvalidArgumentError(absl::StrCat("Unsupported type=", key));
-}
-
-std::string TypeToString(AvroType type) {
-  switch (type) {
-    case AvroType::kNull:
-      return "null";
-    case AvroType::kBoolean:
-      return "boolean";
-    case AvroType::kLong:
-      return "long";
-    case AvroType::kInt:
-      return "int";
-    case AvroType::kFloat:
-      return "float";
-    case AvroType::kDouble:
-      return "double";
-    case AvroType::kString:
-      return "string";
-    case AvroType::kBytes:
-      return "bytes";
-    case AvroType::kArray:
-      return "array";
-    case AvroType::kUnknown:
-      return "unknown";
-  }
+  return absl::OkStatus();
 }
 
 }  // namespace
 
-std::ostream& operator<<(std::ostream& os, const AvroField& field) {
-  os << "AvroField(name=\"" << field.name
-     << "\", type=" << TypeToString(field.type)
-     << ", sub_type=" << TypeToString(field.sub_type)
-     << ", optional=" << field.optional << ")";
-  return os;
-}
+absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
+    absl::string_view path, dataset::proto::DataSpecificationGuide& guide) {
+  // TODO: Reading of multiple paths.
 
-AvroReader::AvroReader(std::unique_ptr<utils::InputByteStream>&& stream)
-    : stream_(std::move(stream)) {}
+  ASSIGN_OR_RETURN(const auto reader, AvroReader::Create(path));
 
-AvroReader::~AvroReader() { Close().IgnoreError(); }
+  // Infer the column spec for the single-dimensional features and the unstacked
+  // column (without the size information) for the multi-dimensional features.
+  std::vector<proto::ColumnGuide> unstacked_guides;
+  ASSIGN_OR_RETURN(
+      auto dataspec,
+      internal::InferDataspec(reader->fields(), guide, &unstacked_guides));
 
-absl::StatusOr<std::unique_ptr<AvroReader>> AvroReader::Create(
-    absl::string_view path) {
-  ASSIGN_OR_RETURN(std::unique_ptr<utils::InputByteStream> file_handle,
-                   file::OpenInputFile(path));
-  auto reader = absl::WrapUnique(new AvroReader(std::move(file_handle)));
-  ASSIGN_OR_RETURN(const auto schema, reader->ReadHeader());
-  return std::move(reader);
-}
+  // Mapping between the Avro field index and the column index for the
+  // univariate features. -1's are used for ignored fields.
+  std::vector<int> univariate_field_idx_to_column_idx;
+  // Mapping between the Avro field index and the unstacked index for the
+  // multivariate features. -1's are used for ignored fields.
+  std::vector<int> multivariate_field_idx_to_unroll_idx;
+  RETURN_IF_ERROR(ComputeReadingMaps(reader->fields(), dataspec,
+                                     &univariate_field_idx_to_column_idx,
+                                     &multivariate_field_idx_to_unroll_idx));
 
-absl::Status AvroReader::Close() {
-  if (stream_) {
-    RETURN_IF_ERROR(stream_->Close());
-    stream_.reset();
-  }
-  return absl::OkStatus();
-}
-
-absl::StatusOr<std::string> AvroReader::ExtractSchema(absl::string_view path) {
-  ASSIGN_OR_RETURN(std::unique_ptr<utils::InputByteStream> file_handle,
-                   file::OpenInputFile(path));
-  AvroReader reader(std::move(file_handle));
-  ASSIGN_OR_RETURN(const auto schema, reader.ReadHeader());
-  RETURN_IF_ERROR(reader.Close());
-  return schema;
-}
-
-absl::StatusOr<std::string> AvroReader::ReadHeader() {
-  if (!sync_marker_.empty()) {
-    return absl::InvalidArgumentError("The header was already read");
+  // Create the accumulator for the univariate features.
+  proto::DataSpecificationAccumulator accumulator;
+  while (accumulator.columns_size() < dataspec.columns_size()) {
+    accumulator.add_columns();
   }
 
-  // Magic number.
-  char buffer[4];
-  ASSIGN_OR_RETURN(bool has_read, stream_->ReadExactly(buffer, 4));
-  STATUS_CHECK(has_read);
-  if (buffer[0] != 'O' || buffer[1] != 'b' || buffer[2] != 'j' ||
-      buffer[3] != 1) {
-    return absl::InvalidArgumentError("Not an Avro file");
-  }
-
-  // Read the meta-data.
-  std::string schema;
-  while (true) {
-    ASSIGN_OR_RETURN(const size_t num_blocks,
-                     internal::ReadInteger(stream_.get()));
-    if (num_blocks == 0) {
+  size_t record_idx;
+  for (record_idx = 0; true; record_idx++) {
+    if (guide.max_num_scanned_rows_to_accumulate_statistics() > 0 &&
+        record_idx >= guide.max_num_scanned_rows_to_accumulate_statistics()) {
+      // Enough records scanned.
       break;
     }
-    for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
-      std::string key;
-      std::string value;
-      RETURN_IF_ERROR(internal::ReadString(stream_.get(), &key));
-      RETURN_IF_ERROR(internal::ReadString(stream_.get(), &value));
-      if (key == "avro.codec") {
-        if (value == "null") {
-          codec_ = AvroCodec::kNull;
-        } else if (value == "deflate") {
-          codec_ = AvroCodec::kDeflate;
-        } else {
-          return absl::InvalidArgumentError(
-              absl::StrCat("Unsupported codec: ", value));
-        }
-      } else if (key == "avro.schema") {
-        schema = value;
-      }
+    LOG_EVERY_N_SEC(INFO, 30) << record_idx << " row(s) processed";
+
+    ASSIGN_OR_RETURN(const bool has_record, reader->ReadNextRecord());
+    if (!has_record) {
+      break;
     }
-  }
+    int field_idx = 0;
+    for (const auto& field : reader->fields()) {
+      switch (field.type) {
+        case AvroType::kUnknown:
+        case AvroType::kNull:
+          break;
 
-  sync_marker_.resize(16);
-  ASSIGN_OR_RETURN(has_read, stream_->ReadExactly(sync_marker_.data(), 16));
-  STATUS_CHECK(has_read);
-
-  // Parse the meta-data.
-  rapidjson::Document json_schema;
-  json_schema.Parse(schema.c_str(), schema.length());
-
-  if (json_schema.HasParseError()) {
-    return absl::InvalidArgumentError("Failed to parse schema");
-  }
-  RETURN_IF_ERROR(JsonIsObject(json_schema));
-  ASSIGN_OR_RETURN(const auto json_type,
-                   GetJsonStringField(json_schema, "type"));
-  STATUS_CHECK_EQ(json_type, "record");
-  ASSIGN_OR_RETURN(const auto* json_fields,
-                   GetJsonField(json_schema, "fields"));
-  STATUS_CHECK(json_fields->IsArray());
-
-  for (const auto& json_field : json_fields->GetArray()) {
-    ASSIGN_OR_RETURN(const auto json_name,
-                     GetJsonStringField(json_field, "name"));
-    ASSIGN_OR_RETURN(const auto* json_sub_type,
-                     GetJsonField(json_field, "type"));
-    AvroType type = AvroType::kUnknown;
-    AvroType sub_type = AvroType::kUnknown;
-    bool optional = false;
-
-    if (json_sub_type->IsString()) {
-      const std::string& str_type = json_sub_type->GetString();
-      // Scalar
-      ASSIGN_OR_RETURN(type, ParseType(str_type));
-    } else if (json_sub_type->IsArray()) {
-      // Optional
-      optional = true;
-      const auto& json_sub_type_array = json_sub_type->GetArray();
-      if (json_sub_type_array.Size() == 2 &&
-          json_sub_type_array[0].IsString() &&
-          json_sub_type_array[0].GetString() == std::string("null")) {
-        if (json_sub_type_array[1].IsString()) {
-          // Scalar
-          ASSIGN_OR_RETURN(type, ParseType(json_sub_type_array[1].GetString()));
-        }
-        if (json_sub_type_array[1].IsObject()) {
-          // Array
-          ASSIGN_OR_RETURN(const auto json_sub_sub_type,
-                           GetJsonStringField(json_sub_type_array[1], "type"));
-          ASSIGN_OR_RETURN(const auto json_items,
-                           GetJsonStringField(json_sub_type_array[1], "items"));
-          if (json_sub_sub_type == "array") {
-            ASSIGN_OR_RETURN(sub_type, ParseType(json_items));
-            type = AvroType::kArray;
+        case AvroType::kBoolean: {
+          ASSIGN_OR_RETURN(const auto value,
+                           reader->ReadNextFieldBoolean(field));
+          const int col_idx = univariate_field_idx_to_column_idx[field_idx];
+          if (col_idx == -1) {
+            // Ignore field.
+            break;
           }
-        }
+          auto* col_spec_ = dataspec.mutable_columns(col_idx);
+          if (!value.has_value()) {
+            col_spec_->set_count_nas(col_spec_->count_nas() + 1);
+          } else {
+            switch (col_spec_->type()) {
+              case proto::ColumnType::BOOLEAN:
+                UpdateComputeSpecBooleanFeatureWithBool(value.value(),
+                                                        col_spec_);
+                break;
+              default:
+                return absl::InvalidArgumentError(
+                    absl::StrCat("Unsupported type ",
+                                 proto::ColumnType_Name(col_spec_->type()),
+                                 "for kBoolean field ", field.name));
+            }
+          }
+        } break;
+
+        case AvroType::kLong:
+        case AvroType::kInt: {
+          ASSIGN_OR_RETURN(const auto value,
+                           reader->ReadNextFieldInteger(field));
+          const int col_idx = univariate_field_idx_to_column_idx[field_idx];
+          if (col_idx == -1) {
+            // Ignore field.
+            break;
+          }
+          auto* col_spec_ = dataspec.mutable_columns(col_idx);
+          if (!value.has_value()) {
+            col_spec_->set_count_nas(col_spec_->count_nas() + 1);
+          } else {
+            switch (col_spec_->type()) {
+              case proto::ColumnType::NUMERICAL:
+                FillContentNumericalFeature(
+                    value.value(), accumulator.mutable_columns(col_idx));
+                break;
+              default:
+                return absl::InvalidArgumentError(absl::StrCat(
+                    "Unsupported type ",
+                    proto::ColumnType_Name(col_spec_->type()), "for ",
+                    TypeToString(field.type), " field ", field.name));
+            }
+          }
+        } break;
+
+        case AvroType::kDouble:
+        case AvroType::kFloat: {
+          absl::optional<double> value;
+          if (field.type == AvroType::kFloat) {
+            ASSIGN_OR_RETURN(value, reader->ReadNextFieldFloat(field));
+          } else {
+            ASSIGN_OR_RETURN(value, reader->ReadNextFieldDouble(field));
+          }
+          if (value.has_value() && std::isnan(*value)) {
+            value = absl::nullopt;
+          }
+
+          const int col_idx = univariate_field_idx_to_column_idx[field_idx];
+          if (col_idx == -1) {
+            // Ignore field.
+            break;
+          }
+          auto* col_spec_ = dataspec.mutable_columns(col_idx);
+          if (!value.has_value()) {
+            col_spec_->set_count_nas(col_spec_->count_nas() + 1);
+          } else {
+            switch (col_spec_->type()) {
+              case proto::ColumnType::NUMERICAL:
+                FillContentNumericalFeature(
+                    value.value(), accumulator.mutable_columns(col_idx));
+                break;
+              default:
+                return absl::InvalidArgumentError(absl::StrCat(
+                    "Unsupported type ",
+                    proto::ColumnType_Name(col_spec_->type()), "for ",
+                    TypeToString(field.type), " field ", field.name));
+            }
+          }
+        } break;
+
+        case AvroType::kBytes:
+        case AvroType::kString: {
+          std::string value;
+          ASSIGN_OR_RETURN(const auto has_value,
+                           reader->ReadNextFieldString(field, &value));
+
+          const int col_idx = univariate_field_idx_to_column_idx[field_idx];
+          if (col_idx == -1) {
+            // Ignore field.
+            break;
+          }
+          auto* col_spec_ = dataspec.mutable_columns(col_idx);
+          if (!has_value) {
+            col_spec_->set_count_nas(col_spec_->count_nas() + 1);
+          } else {
+            switch (col_spec_->type()) {
+              case proto::ColumnType::CATEGORICAL:
+                RETURN_IF_ERROR(AddTokensToCategoricalColumnSpec(
+                    std::vector<std::string>{value}, col_spec_));
+                break;
+              default:
+                return absl::InvalidArgumentError(absl::StrCat(
+                    "Unsupported type ",
+                    proto::ColumnType_Name(col_spec_->type()), "for ",
+                    TypeToString(field.type), " field ", field.name));
+            }
+          }
+        } break;
+
+        case AvroType::kArray:
+          switch (field.sub_type) {
+            case AvroType::kDouble:
+            case AvroType::kFloat: {
+              bool has_value;
+              std::vector<float> values;
+              if (field.sub_type == AvroType::kFloat) {
+                ASSIGN_OR_RETURN(
+                    has_value, reader->ReadNextFieldArrayFloat(field, &values));
+              } else {
+                ASSIGN_OR_RETURN(
+                    has_value,
+                    reader->ReadNextFieldArrayDoubleIntoFloat(field, &values));
+              }
+
+              // Check if field used.
+              const auto unstacked_idx =
+                  multivariate_field_idx_to_unroll_idx[field_idx];
+              if (unstacked_idx == -1) {
+                break;
+              }
+              RETURN_IF_ERROR(InitializeUnstackedColumn(
+                  field, has_value, values, record_idx, field_idx,
+                  univariate_field_idx_to_column_idx,
+                  multivariate_field_idx_to_unroll_idx, unstacked_guides,
+                  &dataspec, &accumulator));
+
+              // Populate column statistics.
+              auto& unstacked = dataspec.unstackeds(unstacked_idx);
+              if (unstacked.has_size()) {
+                for (int dim_idx = 0; dim_idx < values.size(); dim_idx++) {
+                  const int col_idx = unstacked.begin_column_idx() + dim_idx;
+                  const auto value = values[dim_idx];
+                  auto* col_spec = dataspec.mutable_columns(col_idx);
+                  if (!has_value || std::isnan(value)) {
+                    col_spec->set_count_nas(col_spec->count_nas() + 1);
+                  } else {
+                    switch (dataspec.columns(col_idx).type()) {
+                      case proto::ColumnType::NUMERICAL:
+                        FillContentNumericalFeature(
+                            value, accumulator.mutable_columns(col_idx));
+                        break;
+                      default:
+                        return absl::InvalidArgumentError(
+                            absl::StrCat("Unsupported type ",
+                                         proto::ColumnType_Name(
+                                             dataspec.columns(col_idx).type()),
+                                         "for ", TypeToString(field.type),
+                                         " field ", field.name));
+                    }
+                  }
+                }
+              }
+            } break;
+
+            case AvroType::kString:
+            case AvroType::kBytes: {
+              std::vector<std::string> values;
+              ASSIGN_OR_RETURN(
+                  const auto has_value,
+                  reader->ReadNextFieldArrayString(field, &values));
+
+              const auto univariate_col_idx =
+                  univariate_field_idx_to_column_idx[field_idx];
+              if (univariate_col_idx != -1) {
+                auto* col_spec = dataspec.mutable_columns(univariate_col_idx);
+                if (!has_value) {
+                  col_spec->set_count_nas(col_spec->count_nas() + 1);
+                } else {
+                  switch (dataspec.columns(univariate_col_idx).type()) {
+                    case proto::ColumnType::CATEGORICAL_SET:
+                      RETURN_IF_ERROR(
+                          AddTokensToCategoricalColumnSpec(values, col_spec));
+                      break;
+                    default:
+                      return absl::InvalidArgumentError(absl::StrCat(
+                          "Unsupported type ",
+                          proto::ColumnType_Name(
+                              dataspec.columns(univariate_col_idx).type()),
+                          "for ", TypeToString(field.type), " field ",
+                          field.name));
+                  }
+                }
+                break;
+              }
+
+              // Check if field used.
+              const auto unstacked_idx =
+                  multivariate_field_idx_to_unroll_idx[field_idx];
+              if (unstacked_idx == -1) {
+                break;
+              }
+
+              RETURN_IF_ERROR(InitializeUnstackedColumn(
+                  field, has_value, values, record_idx, field_idx,
+                  univariate_field_idx_to_column_idx,
+                  multivariate_field_idx_to_unroll_idx, unstacked_guides,
+                  &dataspec, &accumulator));
+
+              // Populate column statistics.
+              auto& unstacked = dataspec.unstackeds(unstacked_idx);
+              if (unstacked.has_size()) {
+                for (int dim_idx = 0; dim_idx < values.size(); dim_idx++) {
+                  const int col_idx = unstacked.begin_column_idx() + dim_idx;
+                  auto* col_spec = dataspec.mutable_columns(col_idx);
+                  if (!has_value) {
+                    col_spec->set_count_nas(col_spec->count_nas() + 1);
+                  } else {
+                    switch (dataspec.columns(col_idx).type()) {
+                      case proto::ColumnType::CATEGORICAL:
+                        RETURN_IF_ERROR(AddTokensToCategoricalColumnSpec(
+                            std::vector<std::string>{values[dim_idx]},
+                            col_spec));
+                        break;
+                      default:
+                        return absl::InvalidArgumentError(
+                            absl::StrCat("Unsupported type ",
+                                         proto::ColumnType_Name(
+                                             dataspec.columns(col_idx).type()),
+                                         "for ", TypeToString(field.type),
+                                         " field ", field.name));
+                    }
+                  }
+                }
+              }
+            } break;
+            default:
+              return absl::UnimplementedError("Unsupported type");
+          }
+          break;
       }
-    } else if (json_sub_type->IsObject()) {
-      // Array
-      ASSIGN_OR_RETURN(const auto json_sub_sub_type,
-                       GetJsonStringField(*json_sub_type, "type"));
-      ASSIGN_OR_RETURN(const auto json_items,
-                       GetJsonStringField(*json_sub_type, "items"));
-
-      if (json_sub_sub_type == "array") {
-        ASSIGN_OR_RETURN(sub_type, ParseType(json_items));
-        type = AvroType::kArray;
-      }
+      field_idx++;
     }
-
-    if (type == AvroType::kUnknown) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "Unsupported type=", json_sub_type->GetString(), " for field \"",
-          json_name,
-          "\". YDF only supports the following types: null, "
-          "boolean, long, int, float, double, string, bytes, array of <scalar "
-          "type>, [null, <scalar type>], [null, array[<scalar type>]]."));
-    }
-
-    fields_.push_back(AvroField{
-        .name = json_name,
-        .type = type,
-        .sub_type = sub_type,
-        .optional = optional,
-    });
+    DCHECK_EQ(field_idx, reader->fields().size());
   }
 
-  return schema;
-}
-
-absl::StatusOr<bool> AvroReader::ReadNextBlock() {
-  const auto num_objects_in_block_or = internal::ReadInteger(stream_.get());
-  if (!num_objects_in_block_or.ok()) {
-    return false;
+  if (record_idx == 0) {
+    return absl::InvalidArgumentError("No record found");
   }
-  num_objects_in_current_block_ = num_objects_in_block_or.value();
-  next_object_in_current_block_ = 0;
+  dataspec.set_created_num_rows(record_idx);
+  RETURN_IF_ERROR(FinalizeComputeSpec(guide, accumulator, &dataspec));
 
-  ASSIGN_OR_RETURN(const auto block_size, internal::ReadInteger(stream_.get()));
-
-  current_block.resize(block_size);
-  ASSIGN_OR_RETURN(bool has_read,
-                   stream_->ReadExactly(current_block.data(), block_size));
-  if (!has_read) {
-    return absl::InvalidArgumentError("Unexpected end of stream");
-  }
-  current_block_reader = utils::StringViewInputByteStream(current_block);
-
-  if (codec_ != AvroCodec::kNull) {
-    // TODO: Implement deflate.
-    return absl::UnimplementedError("Compression not implemented");
-  }
-
-  new_sync_marker_.resize(16);
-  ASSIGN_OR_RETURN(has_read, stream_->ReadExactly(new_sync_marker_.data(), 16));
-  STATUS_CHECK(has_read);
-  if (new_sync_marker_ != sync_marker_) {
-    return absl::InvalidArgumentError(
-        "Non matching sync marker. The file looks corrupted.");
-  }
-
-  return true;
-}
-
-absl::StatusOr<bool> AvroReader::ReadNextRecord() {
-  if (!current_block_reader.has_value() ||
-      current_block_reader.value().left() == 0) {
-    // Read a new block of data.
-    DCHECK_EQ(next_object_in_current_block_, num_objects_in_current_block_);
-    ASSIGN_OR_RETURN(const bool has_next_block, ReadNextBlock());
-    if (!has_next_block) {
-      return false;
-    }
-  }
-  next_object_in_current_block_++;
-  return true;
-}
-
-absl::StatusOr<absl::optional<bool>> AvroReader::ReadNextFieldBoolean(
-    const AvroField& field) {
-  MAYBE_SKIP_OPTIONAL(field);
-  ASSIGN_OR_RETURN(const auto value, current_block_reader->ReadByte());
-  return value;
-}
-
-absl::StatusOr<absl::optional<int64_t>> AvroReader::ReadNextFieldInteger(
-    const AvroField& field) {
-  MAYBE_SKIP_OPTIONAL(field);
-  return internal::ReadInteger(&current_block_reader.value());
-}
-
-absl::StatusOr<absl::optional<float>> AvroReader::ReadNextFieldFloat(
-    const AvroField& field) {
-  MAYBE_SKIP_OPTIONAL(field);
-  return internal::ReadFloat(&current_block_reader.value());
-}
-
-absl::StatusOr<absl::optional<double>> AvroReader::ReadNextFieldDouble(
-    const AvroField& field) {
-  MAYBE_SKIP_OPTIONAL(field);
-  return internal::ReadDouble(&current_block_reader.value());
-}
-
-absl::StatusOr<bool> AvroReader::ReadNextFieldString(const AvroField& field,
-                                                     std::string* value) {
-  if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
-    if (!has_value) {
-      return false;
-    }
-  }
-  RETURN_IF_ERROR(internal::ReadString(&current_block_reader.value(), value));
-  return true;
-}
-
-absl::StatusOr<bool> AvroReader::ReadNextFieldArrayFloat(
-    const AvroField& field, std::vector<float>* values) {
-  values->clear();
-  if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
-    if (!has_value) {
-      return false;
-    }
-  }
-  while (true) {
-    ASSIGN_OR_RETURN(auto num_values,
-                     internal::ReadInteger(&current_block_reader.value()));
-    values->reserve(values->size() + num_values);
-    if (num_values == 0) {
-      break;
-    }
-    if (num_values < 0) {
-      ASSIGN_OR_RETURN(auto block_size,
-                       internal::ReadInteger(&current_block_reader.value()));
-      (void)block_size;
-      num_values = -num_values;
-    }
-    for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
-      ASSIGN_OR_RETURN(auto value,
-                       internal::ReadFloat(&current_block_reader.value()));
-      values->push_back(value);
-    }
-  }
-
-  return true;
-}
-
-absl::StatusOr<bool> AvroReader::ReadNextFieldArrayDouble(
-    const AvroField& field, std::vector<double>* values) {
-  values->clear();
-  if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
-    if (!has_value) {
-      return false;
-    }
-  }
-  while (true) {
-    ASSIGN_OR_RETURN(auto num_values,
-                     internal::ReadInteger(&current_block_reader.value()));
-    values->reserve(values->size() + num_values);
-    if (num_values == 0) {
-      break;
-    }
-    if (num_values < 0) {
-      ASSIGN_OR_RETURN(auto block_size,
-                       internal::ReadInteger(&current_block_reader.value()));
-      (void)block_size;
-      num_values = -num_values;
-    }
-    for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
-      ASSIGN_OR_RETURN(auto value,
-                       internal::ReadDouble(&current_block_reader.value()));
-      values->push_back(value);
-    }
-  }
-
-  return true;
-}
-
-absl::StatusOr<bool> AvroReader::ReadNextFieldArrayString(
-    const AvroField& field, std::vector<std::string>* values) {
-  if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
-    if (!has_value) {
-      return false;
-    }
-  }
-
-  while (true) {
-    ASSIGN_OR_RETURN(auto num_values,
-                     internal::ReadInteger(&current_block_reader.value()));
-    values->reserve(values->size() + num_values);
-    if (num_values == 0) {
-      break;
-    }
-    if (num_values < 0) {
-      ASSIGN_OR_RETURN(auto block_size,
-                       internal::ReadInteger(&current_block_reader.value()));
-      (void)block_size;
-      num_values = -num_values;
-    }
-    for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
-      std::string sub_value;
-      RETURN_IF_ERROR(
-          internal::ReadString(&current_block_reader.value(), &sub_value));
-      values->push_back(std::move(sub_value));
-    }
-  }
-
-  return true;
+  RETURN_IF_ERROR(reader->Close());
+  return dataspec;
 }
 
 namespace internal {
 
-absl::StatusOr<int64_t> ReadInteger(utils::InputByteStream* stream) {
-  // Note: Integers are encoded with variable length + zigzag encoding.
+absl::StatusOr<dataset::proto::DataSpecification> InferDataspec(
+    const std::vector<AvroField>& fields,
+    dataset::proto::DataSpecificationGuide& guide,
+    std::vector<proto::ColumnGuide>* unstacked_guides) {
+  dataset::proto::DataSpecification dataspec;
 
-  //  Variable length decoding
-  size_t value = 0;
-  size_t shift = 0;
-  char buffer;
-  while (true) {
-    ASSIGN_OR_RETURN(bool has_read, stream->ReadExactly(&buffer, 1));
-    if (!has_read) {
-      return absl::InvalidArgumentError("Unexpected end of stream");
+  const auto create_column =
+      [&dataspec](const absl::string_view key,
+                  const proto::ColumnType representation_type,
+                  const proto::ColumnGuide& col_guide,
+                  const bool manual_column_guide = false) -> absl::Status {
+    proto::Column* column = dataspec.add_columns();
+    column->set_name(std::string(key));
+    if (manual_column_guide) {
+      column->set_is_manual_type(manual_column_guide);
+      column->set_type(col_guide.type());
+    } else {
+      column->set_type(representation_type);
     }
-    value |= static_cast<size_t>(buffer & 0x7F) << shift;
-    if ((buffer & 0x80) == 0) {
-      break;
+    return UpdateSingleColSpecWithGuideInfo(col_guide, column);
+  };
+
+  for (const auto& field : fields) {
+    proto::ColumnGuide col_guide;
+    ASSIGN_OR_RETURN(bool has_column_guide,
+                     BuildColumnGuide(field.name, guide, &col_guide));
+    if (!has_column_guide && guide.ignore_columns_without_guides()) {
+      continue;
     }
-    shift += 7;
-  }
+    if (col_guide.ignore_column()) {
+      continue;
+    }
+    if (field.type == AvroType::kUnknown || field.type == AvroType::kNull) {
+      continue;
+    }
 
-  // Zigzag decoding
-  return (value >> 1) ^ -(value & 1);
-}
+    switch (field.type) {
+      case AvroType::kUnknown:
+      case AvroType::kNull:
+        return absl::InternalError("Unknown field");
+      case AvroType::kBoolean:
+        RETURN_IF_ERROR(create_column(field.name, proto::ColumnType::BOOLEAN,
+                                      col_guide, has_column_guide));
+        break;
+      case AvroType::kLong:
+      case AvroType::kInt:
+      case AvroType::kFloat:
+      case AvroType::kDouble:
+        RETURN_IF_ERROR(create_column(field.name, proto::ColumnType::NUMERICAL,
+                                      col_guide, has_column_guide));
+        break;
+      case AvroType::kBytes:
+      case AvroType::kString:
+        RETURN_IF_ERROR(create_column(field.name,
+                                      proto::ColumnType::CATEGORICAL, col_guide,
+                                      has_column_guide));
+        break;
+      case AvroType::kArray:
+        switch (field.sub_type) {
+          case AvroType::kFloat:
+          case AvroType::kDouble: {
+            (*unstacked_guides).push_back(col_guide);
+            auto* unstacked = dataspec.add_unstackeds();
+            unstacked->set_original_name(field.name);
+            unstacked->set_type(proto::ColumnType::NUMERICAL);
+          } break;
+          case AvroType::kString:
+          case AvroType::kBytes: {
+            if (has_column_guide) {
+              if (col_guide.type() == proto::ColumnType::CATEGORICAL_SET) {
+                RETURN_IF_ERROR(create_column(field.name, col_guide.type(),
+                                              col_guide, has_column_guide));
+                break;
+              } else {
+                return absl::InvalidArgumentError(
+                    absl::StrCat("Unsupported type ",
+                                 proto::ColumnType_Name(col_guide.type()),
+                                 "for kString or kBytes field ", field.name));
+              }
+            }
 
-absl::Status ReadString(utils::InputByteStream* stream, std::string* value) {
-  ASSIGN_OR_RETURN(const auto length, ReadInteger(stream));
-  value->resize(length);
-  if (length > 0) {
-    ASSIGN_OR_RETURN(bool has_read, stream->ReadExactly(value->data(), length));
-    if (!has_read) {
-      return absl::InvalidArgumentError("Unexpected end of stream");
+            (*unstacked_guides).push_back(col_guide);
+            auto* unstacked = dataspec.add_unstackeds();
+            unstacked->set_original_name(field.name);
+            unstacked->set_type(proto::ColumnType::CATEGORICAL);
+          } break;
+          default:
+            return absl::UnimplementedError("Unsupported type");
+        }
+        break;
     }
   }
-  return absl::OkStatus();
-}
-
-absl::StatusOr<double> ReadDouble(utils::InputByteStream* stream) {
-  double value;
-  ASSIGN_OR_RETURN(bool has_read,
-                   stream->ReadExactly(reinterpret_cast<char*>(&value), 8));
-  if (!has_read) {
-    return absl::InvalidArgumentError("Unexpected end of stream");
-  }
-  return value;
-}
-
-absl::StatusOr<float> ReadFloat(utils::InputByteStream* stream) {
-  float value;
-  ASSIGN_OR_RETURN(bool has_read,
-                   stream->ReadExactly(reinterpret_cast<char*>(&value), 4));
-  if (!has_read) {
-    return absl::InvalidArgumentError("Unexpected end of stream");
-  }
-  return value;
-}
-
-absl::StatusOr<bool> ReadBoolean(utils::InputByteStream* stream) {
-  char value;
-  ASSIGN_OR_RETURN(bool has_read, stream->ReadExactly(&value, 1));
-  if (!has_read) {
-    return absl::InvalidArgumentError("Unexpected end of stream");
-  }
-  return value != 0;
+  return dataspec;
 }
 
 }  // namespace internal
