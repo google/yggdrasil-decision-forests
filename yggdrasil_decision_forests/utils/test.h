@@ -79,6 +79,13 @@ std::string DataRootDirectory();
 // Temporary directory.
 std::string TmpDirectory();
 
+// Utility to create parameterized test easily.
+#define SIMPLE_PARAMETERIZED_TEST(NAME, CASE_CLASS, ...)                \
+  using NAME##Test = ::testing::TestWithParam<CASE_CLASS>;              \
+  INSTANTIATE_TEST_SUITE_P(NAME##Instantiation, NAME##Test,             \
+                           testing::ValuesIn<CASE_CLASS>(__VA_ARGS__)); \
+  TEST_P(NAME##Test, Simple)
+
 // Parse a proto from its text representation. Infers the proto message from
 // the destination variable.
 //
