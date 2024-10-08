@@ -372,6 +372,20 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "avro_example",
+    srcs = ["avro_example.cc"],
+    hdrs = ["avro_example.h"],
+    deps = [
+        "//yggdrasil_decision_forests/utils:bytestream",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
 # Proto
 # ========
 
@@ -616,6 +630,23 @@ cc_test(
         ":example_builder",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/types:span",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "avro_example_test",
+    srcs = ["avro_example_test.cc"],
+    data = [
+        "//yggdrasil_decision_forests/test_data",
+    ],
+    deps = [
+        ":avro_example",
+        "//yggdrasil_decision_forests/utils:bytestream",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_googletest//:gtest_main",
     ],
 )
