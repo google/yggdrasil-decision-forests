@@ -40,6 +40,15 @@ absl::StatusOr<std::string> InputByteStream::ReadAll() {
   return std::string(result);
 }
 
+absl::StatusOr<char> InputByteStream::ReadByte() {
+  char value;
+  ASSIGN_OR_RETURN(const auto has_value, ReadExactly(&value, 1));
+  if (!has_value) {
+    return absl::OutOfRangeError("Insufficient available bytes");
+  }
+  return value;
+}
+
 absl::StatusOr<int> StringInputByteStream::ReadUpTo(char* buffer,
                                                     int max_read) {
   return stream_.ReadUpTo(buffer, max_read);
@@ -52,8 +61,8 @@ absl::StatusOr<bool> StringInputByteStream::ReadExactly(char* buffer,
 
 absl::StatusOr<int> StringViewInputByteStream::ReadUpTo(char* buffer,
                                                         int max_read) {
-  const int num_read =
-      std::min(static_cast<int>(content_.size()) - current_, max_read);
+  const int num_read = std::min(
+      static_cast<int>(content_.size()) - static_cast<int>(current_), max_read);
   if (num_read > 0) {
     std::memcpy(buffer, content_.data() + current_, num_read);
   }

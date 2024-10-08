@@ -42,6 +42,9 @@ class InputByteStream {
   // all bytes where read.
   virtual absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) = 0;
 
+  // Reads a single byte.
+  absl::StatusOr<char> ReadByte();
+
   // Reads and returns the entire content of the stream.
   absl::StatusOr<std::string> ReadAll();
 
@@ -61,12 +64,14 @@ class StringViewInputByteStream : public InputByteStream {
 
   absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) override;
 
+  size_t left() const { return content_.size() - current_; }
+
  private:
   // Content.
   absl::string_view content_;
 
   // Next character to read in "content_".
-  int current_ = 0;
+  size_t current_ = 0;
 };
 
 // Wraps a InputByteStream around a std::string.

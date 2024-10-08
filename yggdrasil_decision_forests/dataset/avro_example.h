@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_AVRO_EXAMPLE_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_AVRO_EXAMPLE_H_
 
+#include <cstddef>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -26,6 +27,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 
@@ -42,6 +44,11 @@ enum class AvroType {
   kString = 7,
   kBytes = 8,
   kArray = 9,
+};
+
+enum class AvroCodec {
+  kNull = 0,
+  kDeflate = 1,
 };
 
 struct AvroField {
@@ -63,15 +70,40 @@ struct AvroField {
 // https://avro.apache.org/docs/1.12.0/specification/
 class AvroReader {
  public:
+  // Creates a reader for the given Avro file.
   static absl::StatusOr<std::unique_ptr<AvroReader>> Create(
       absl::string_view path);
 
+  // Extracts the schema of the given Avro file.
   static absl::StatusOr<std::string> ExtractSchema(absl::string_view path);
 
+  // Reads the next record. Returns false if the end of the file is reached.
+  absl::StatusOr<bool> ReadNextRecord();
+
+  // Reads the next field. Returns nullopt if the field is optional and not set.
+  absl::StatusOr<absl::optional<bool>> ReadNextFieldBoolean(
+      const AvroField& field);
+  absl::StatusOr<absl::optional<int64_t>> ReadNextFieldInteger(
+      const AvroField& field);
+  absl::StatusOr<absl::optional<float>> ReadNextFieldFloat(
+      const AvroField& field);
+  absl::StatusOr<absl::optional<double>> ReadNextFieldDouble(
+      const AvroField& field);
+  absl::StatusOr<bool> ReadNextFieldString(const AvroField& field,
+                                           std::string* value);
+  absl::StatusOr<bool> ReadNextFieldArrayFloat(const AvroField& field,
+                                               std::vector<float>* values);
+  absl::StatusOr<bool> ReadNextFieldArrayDouble(const AvroField& field,
+                                                std::vector<double>* values);
+  absl::StatusOr<bool> ReadNextFieldArrayString(
+      const AvroField& field, std::vector<std::string>* values);
+
+  // Closes the reader.
   absl::Status Close();
 
   ~AvroReader();
 
+  // Returns the fields of the Avro file.
   const std::vector<AvroField>& fields() const { return fields_; }
 
   const std::string& sync_marker() const { return sync_marker_; }
@@ -79,17 +111,33 @@ class AvroReader {
  private:
   AvroReader(std::unique_ptr<utils::InputByteStream>&& stream);
 
+  // Reads the header of the Avro file. Should be called only once.
   absl::StatusOr<std::string> ReadHeader();
 
+  // Reads the next block of the Avro file.
+  absl::StatusOr<bool> ReadNextBlock();
+
   std::unique_ptr<utils::InputByteStream> stream_;
+
   std::vector<AvroField> fields_;
+
   std::string sync_marker_;
+  std::string new_sync_marker_;
+
+  AvroCodec codec_ = AvroCodec::kNull;
+
+  // Raw and uncompressed data of the current block.
+  std::string current_block;
+  absl::optional<utils::StringViewInputByteStream> current_block_reader;
+
+  size_t num_objects_in_current_block_ = 0;
+  size_t next_object_in_current_block_ = 0;
 };
 
 namespace internal {
 
-absl::StatusOr<std::string> ReadString(utils::InputByteStream* stream);
-absl::StatusOr<size_t> ReadInteger(utils::InputByteStream* stream);
+absl::Status ReadString(utils::InputByteStream* stream, std::string* value);
+absl::StatusOr<int64_t> ReadInteger(utils::InputByteStream* stream);
 absl::StatusOr<double> ReadDouble(utils::InputByteStream* stream);
 absl::StatusOr<float> ReadFloat(utils::InputByteStream* stream);
 absl::StatusOr<bool> ReadBoolean(utils::InputByteStream* stream);

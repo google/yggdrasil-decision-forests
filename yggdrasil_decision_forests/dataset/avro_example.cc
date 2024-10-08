@@ -22,17 +22,27 @@
 #include <ostream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "include/rapidjson/document.h"
 #include "include/rapidjson/rapidjson.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+
+#define MAYBE_SKIP_OPTIONAL(FIELD)                                             \
+  if (field.optional) {                                                        \
+    ASSIGN_OR_RETURN(const auto _has_value, current_block_reader->ReadByte()); \
+    if (!_has_value) {                                                         \
+      return std::nullopt;                                                     \
+    }                                                                          \
+  }
 
 namespace yggdrasil_decision_forests::dataset::avro {
 namespace {
@@ -172,16 +182,29 @@ absl::StatusOr<std::string> AvroReader::ReadHeader() {
 
   // Read the meta-data.
   std::string schema;
-  std::string codec = "null";  // Default codec.
-  ASSIGN_OR_RETURN(const size_t num_blocks,
-                   internal::ReadInteger(stream_.get()));
-  for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
-    ASSIGN_OR_RETURN(const auto key, internal::ReadString(stream_.get()));
-    ASSIGN_OR_RETURN(const auto value, internal::ReadString(stream_.get()));
-    if (key == "avro.codec") {
-      codec = value;
-    } else if (key == "avro.schema") {
-      schema = value;
+  while (true) {
+    ASSIGN_OR_RETURN(const size_t num_blocks,
+                     internal::ReadInteger(stream_.get()));
+    if (num_blocks == 0) {
+      break;
+    }
+    for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
+      std::string key;
+      std::string value;
+      RETURN_IF_ERROR(internal::ReadString(stream_.get(), &key));
+      RETURN_IF_ERROR(internal::ReadString(stream_.get(), &value));
+      if (key == "avro.codec") {
+        if (value == "null") {
+          codec_ = AvroCodec::kNull;
+        } else if (value == "deflate") {
+          codec_ = AvroCodec::kDeflate;
+        } else {
+          return absl::InvalidArgumentError(
+              absl::StrCat("Unsupported codec: ", value));
+        }
+      } else if (key == "avro.schema") {
+        schema = value;
+      }
     }
   }
 
@@ -273,9 +296,191 @@ absl::StatusOr<std::string> AvroReader::ReadHeader() {
   return schema;
 }
 
+absl::StatusOr<bool> AvroReader::ReadNextBlock() {
+  const auto num_objects_in_block_or = internal::ReadInteger(stream_.get());
+  if (!num_objects_in_block_or.ok()) {
+    return false;
+  }
+  num_objects_in_current_block_ = num_objects_in_block_or.value();
+  next_object_in_current_block_ = 0;
+
+  ASSIGN_OR_RETURN(const auto block_size, internal::ReadInteger(stream_.get()));
+
+  current_block.resize(block_size);
+  ASSIGN_OR_RETURN(bool has_read,
+                   stream_->ReadExactly(current_block.data(), block_size));
+  if (!has_read) {
+    return absl::InvalidArgumentError("Unexpected end of stream");
+  }
+  current_block_reader = utils::StringViewInputByteStream(current_block);
+
+  if (codec_ != AvroCodec::kNull) {
+    // TODO: Implement deflate.
+    return absl::UnimplementedError("Compression not implemented");
+  }
+
+  new_sync_marker_.resize(16);
+  ASSIGN_OR_RETURN(has_read, stream_->ReadExactly(new_sync_marker_.data(), 16));
+  STATUS_CHECK(has_read);
+  if (new_sync_marker_ != sync_marker_) {
+    return absl::InvalidArgumentError(
+        "Non matching sync marker. The file looks corrupted.");
+  }
+
+  return true;
+}
+
+absl::StatusOr<bool> AvroReader::ReadNextRecord() {
+  if (!current_block_reader.has_value() ||
+      current_block_reader.value().left() == 0) {
+    // Read a new block of data.
+    DCHECK_EQ(next_object_in_current_block_, num_objects_in_current_block_);
+    ASSIGN_OR_RETURN(const bool has_next_block, ReadNextBlock());
+    if (!has_next_block) {
+      return false;
+    }
+  }
+  next_object_in_current_block_++;
+  return true;
+}
+
+absl::StatusOr<absl::optional<bool>> AvroReader::ReadNextFieldBoolean(
+    const AvroField& field) {
+  MAYBE_SKIP_OPTIONAL(field);
+  ASSIGN_OR_RETURN(const auto value, current_block_reader->ReadByte());
+  return value;
+}
+
+absl::StatusOr<absl::optional<int64_t>> AvroReader::ReadNextFieldInteger(
+    const AvroField& field) {
+  MAYBE_SKIP_OPTIONAL(field);
+  return internal::ReadInteger(&current_block_reader.value());
+}
+
+absl::StatusOr<absl::optional<float>> AvroReader::ReadNextFieldFloat(
+    const AvroField& field) {
+  MAYBE_SKIP_OPTIONAL(field);
+  return internal::ReadFloat(&current_block_reader.value());
+}
+
+absl::StatusOr<absl::optional<double>> AvroReader::ReadNextFieldDouble(
+    const AvroField& field) {
+  MAYBE_SKIP_OPTIONAL(field);
+  return internal::ReadDouble(&current_block_reader.value());
+}
+
+absl::StatusOr<bool> AvroReader::ReadNextFieldString(const AvroField& field,
+                                                     std::string* value) {
+  if (field.optional) {
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
+    if (!has_value) {
+      return false;
+    }
+  }
+  RETURN_IF_ERROR(internal::ReadString(&current_block_reader.value(), value));
+  return true;
+}
+
+absl::StatusOr<bool> AvroReader::ReadNextFieldArrayFloat(
+    const AvroField& field, std::vector<float>* values) {
+  values->clear();
+  if (field.optional) {
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
+    if (!has_value) {
+      return false;
+    }
+  }
+  while (true) {
+    ASSIGN_OR_RETURN(auto num_values,
+                     internal::ReadInteger(&current_block_reader.value()));
+    values->reserve(values->size() + num_values);
+    if (num_values == 0) {
+      break;
+    }
+    if (num_values < 0) {
+      ASSIGN_OR_RETURN(auto block_size,
+                       internal::ReadInteger(&current_block_reader.value()));
+      (void)block_size;
+      num_values = -num_values;
+    }
+    for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
+      ASSIGN_OR_RETURN(auto value,
+                       internal::ReadFloat(&current_block_reader.value()));
+      values->push_back(value);
+    }
+  }
+
+  return true;
+}
+
+absl::StatusOr<bool> AvroReader::ReadNextFieldArrayDouble(
+    const AvroField& field, std::vector<double>* values) {
+  values->clear();
+  if (field.optional) {
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
+    if (!has_value) {
+      return false;
+    }
+  }
+  while (true) {
+    ASSIGN_OR_RETURN(auto num_values,
+                     internal::ReadInteger(&current_block_reader.value()));
+    values->reserve(values->size() + num_values);
+    if (num_values == 0) {
+      break;
+    }
+    if (num_values < 0) {
+      ASSIGN_OR_RETURN(auto block_size,
+                       internal::ReadInteger(&current_block_reader.value()));
+      (void)block_size;
+      num_values = -num_values;
+    }
+    for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
+      ASSIGN_OR_RETURN(auto value,
+                       internal::ReadDouble(&current_block_reader.value()));
+      values->push_back(value);
+    }
+  }
+
+  return true;
+}
+
+absl::StatusOr<bool> AvroReader::ReadNextFieldArrayString(
+    const AvroField& field, std::vector<std::string>* values) {
+  if (field.optional) {
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
+    if (!has_value) {
+      return false;
+    }
+  }
+
+  while (true) {
+    ASSIGN_OR_RETURN(auto num_values,
+                     internal::ReadInteger(&current_block_reader.value()));
+    values->reserve(values->size() + num_values);
+    if (num_values == 0) {
+      break;
+    }
+    if (num_values < 0) {
+      ASSIGN_OR_RETURN(auto block_size,
+                       internal::ReadInteger(&current_block_reader.value()));
+      (void)block_size;
+      num_values = -num_values;
+    }
+    for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
+      std::string sub_value;
+      RETURN_IF_ERROR(
+          internal::ReadString(&current_block_reader.value(), &sub_value));
+      values->push_back(std::move(sub_value));
+    }
+  }
+
+  return true;
+}
+
 namespace internal {
 
-absl::StatusOr<size_t> ReadInteger(utils::InputByteStream* stream) {
+absl::StatusOr<int64_t> ReadInteger(utils::InputByteStream* stream) {
   // Note: Integers are encoded with variable length + zigzag encoding.
 
   //  Variable length decoding
@@ -298,16 +503,16 @@ absl::StatusOr<size_t> ReadInteger(utils::InputByteStream* stream) {
   return (value >> 1) ^ -(value & 1);
 }
 
-absl::StatusOr<std::string> ReadString(utils::InputByteStream* stream) {
+absl::Status ReadString(utils::InputByteStream* stream, std::string* value) {
   ASSIGN_OR_RETURN(const auto length, ReadInteger(stream));
-  std::string value(length, 0);
+  value->resize(length);
   if (length > 0) {
-    ASSIGN_OR_RETURN(bool has_read, stream->ReadExactly(value.data(), length));
+    ASSIGN_OR_RETURN(bool has_read, stream->ReadExactly(value->data(), length));
     if (!has_read) {
       return absl::InvalidArgumentError("Unexpected end of stream");
     }
   }
-  return value;
+  return absl::OkStatus();
 }
 
 absl::StatusOr<double> ReadDouble(utils::InputByteStream* stream) {
