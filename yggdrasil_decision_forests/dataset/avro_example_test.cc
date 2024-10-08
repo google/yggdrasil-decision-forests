@@ -19,9 +19,11 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -148,7 +150,8 @@ SIMPLE_PARAMETERIZED_TEST(ReadString, ReadStringCase,
                           }) {
   const auto& test_case = GetParam();
   utils::StringInputByteStream stream(test_case.input);
-  ASSERT_OK_AND_ASSIGN(const auto value, internal::ReadString(&stream));
+  std::string value;
+  ASSERT_OK(internal::ReadString(&stream, &value));
   EXPECT_EQ(value, test_case.expected_value);
 }
 
@@ -196,13 +199,145 @@ TEST(AvroExample, Reader) {
           AvroField{"f_optional_array_of_float", AvroType::kArray,
                     AvroType::kFloat, true}));
 
-  EXPECT_EQ(reader->sync_marker(), std::string("\0\xB6\xC2"
+  EXPECT_EQ(reader->sync_marker(), std::string("\xB6\xC2"
                                                "A\x88\xB8\xC3"
-                                               "A\x8C\xDBQF\x92\xDC d",
+                                               "A\x8C\xDBQF\x92\xDC dB",
                                                16));
 
   // TODO: Add tests for reading the data.
 
+  int record_idx = 0;
+  while (true) {
+    LOG(INFO) << "Record " << record_idx;
+    ASSERT_OK_AND_ASSIGN(const bool has_record, reader->ReadNextRecord());
+    if (!has_record) {
+      break;
+    }
+    for (const auto& field : reader->fields()) {
+      switch (field.type) {
+        case AvroType::kUnknown:
+          ASSERT_OK(absl::UnimplementedError("Unknown field"));
+          break;
+        case AvroType::kNull: {
+          // Nothing to read.
+        } break;
+        case AvroType::kBoolean: {
+          ASSERT_OK_AND_ASSIGN(const auto value,
+                               reader->ReadNextFieldBoolean(field));
+          EXPECT_TRUE(value.has_value());
+          EXPECT_EQ(value.value(), record_idx == 0);
+        } break;
+        case AvroType::kLong:
+        case AvroType::kInt: {
+          ASSERT_OK_AND_ASSIGN(const auto value,
+                               reader->ReadNextFieldInteger(field));
+          EXPECT_TRUE(value.has_value());
+          if (field.type == AvroType::kInt) {
+            EXPECT_EQ(value.value(), (record_idx == 0) ? 5 : 6);
+          } else {
+            EXPECT_EQ(value.value(), (record_idx == 0) ? 1234567 : -123);
+          }
+        } break;
+        case AvroType::kFloat: {
+          ASSERT_OK_AND_ASSIGN(const auto value,
+                               reader->ReadNextFieldFloat(field));
+
+          if (field.name == "f_float") {
+            EXPECT_TRUE(value.has_value());
+            EXPECT_NEAR(value.value(), (record_idx == 0) ? 3.1415 : -1.234,
+                        0.0001);
+          } else if (field.name == "f_float_optional") {
+            EXPECT_EQ(value.has_value(), record_idx == 0);
+            if (record_idx == 0) {
+              EXPECT_NEAR(value.value(), 6.1, 0.001);
+            }
+          } else {
+            EXPECT_TRUE(value.has_value());
+            EXPECT_NEAR(value.value(), (record_idx == 0) ? 5.0 : 6.0, 0.0001);
+          }
+        } break;
+        case AvroType::kDouble: {
+          ASSERT_OK_AND_ASSIGN(const auto value,
+                               reader->ReadNextFieldDouble(field));
+          EXPECT_TRUE(value.has_value());
+          if (record_idx == 0) {
+            EXPECT_TRUE(std::isnan(value.value()));
+          } else {
+            EXPECT_EQ(value.value(), 6.789);
+          }
+        } break;
+        case AvroType::kBytes:
+        case AvroType::kString: {
+          std::string value;
+          ASSERT_OK_AND_ASSIGN(const auto has_value,
+                               reader->ReadNextFieldString(field, &value));
+          EXPECT_TRUE(has_value);
+          if (field.type == AvroType::kString) {
+            EXPECT_EQ(value, (record_idx == 0) ? "hello" : "");
+          } else {
+            EXPECT_EQ(value, (record_idx == 0) ? "world" : "");
+          }
+        } break;
+        case AvroType::kArray:
+          switch (field.sub_type) {
+            case AvroType::kFloat: {
+              std::vector<float> values;
+              ASSERT_OK_AND_ASSIGN(
+                  const auto has_value,
+                  reader->ReadNextFieldArrayFloat(field, &values));
+              if (field.name == "f_array_of_float") {
+                EXPECT_TRUE(has_value);
+                if (record_idx == 0) {
+                  EXPECT_THAT(values, ElementsAre(1.0, 2.0, 3.0));
+                } else {
+                  EXPECT_THAT(values, ElementsAre(4.0, 5.0, 6.0));
+                }
+              } else {
+                EXPECT_EQ(has_value, record_idx == 0);
+                if (record_idx == 0) {
+                  EXPECT_THAT(values, ElementsAre(1.0, 2.0, 3.0));
+                }
+              }
+            } break;
+            case AvroType::kDouble: {
+              std::vector<double> values;
+              ASSERT_OK_AND_ASSIGN(
+                  const auto has_value,
+                  reader->ReadNextFieldArrayDouble(field, &values));
+              EXPECT_TRUE(has_value);
+              if (record_idx == 0) {
+                EXPECT_THAT(values, ElementsAre(10.0, 20.0, 30.0));
+              } else {
+                EXPECT_THAT(values, ElementsAre(40.0, 50.0, 60.0));
+              }
+            } break;
+            case AvroType::kString:
+            case AvroType::kBytes: {
+              std::vector<std::string> values;
+              ASSERT_OK_AND_ASSIGN(
+                  const auto has_value,
+                  reader->ReadNextFieldArrayString(field, &values));
+              EXPECT_TRUE(has_value);
+              if (record_idx == 0) {
+                EXPECT_THAT(values, ElementsAre("a", "b", "c"));
+              } else {
+                if (field.name == "f_array_of_string") {
+                  EXPECT_THAT(values, ElementsAre("c", "a", "b"));
+                } else {
+                  EXPECT_THAT(values, ElementsAre("c", "def"));
+                }
+              }
+            } break;
+            default:
+              ASSERT_OK(absl::UnimplementedError("Unsupported type"));
+          }
+          break;
+      }
+    }
+    record_idx++;
+  }
+
+  EXPECT_EQ(record_idx, 2);
   ASSERT_OK(reader->Close());
 }
 
