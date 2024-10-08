@@ -654,6 +654,23 @@ TEST(Dataset, BuildColIdxToFeatureLabelIdx) {
   EXPECT_THAT(map, ElementsAre(0, -1));
 }
 
+TEST(Dataset, UnstackedColumnNamesV2) {
+  EXPECT_THAT(UnstackedColumnNamesV2("a", 3),
+              ElementsAre("a.0_of_3", "a.1_of_3", "a.2_of_3"));
+
+  const auto item_30 = UnstackedColumnNamesV2("a", 30);
+  EXPECT_EQ(item_30.size(), 30);
+  EXPECT_EQ(item_30[0], "a.00_of_30");
+  EXPECT_EQ(item_30[1], "a.01_of_30");
+  EXPECT_EQ(item_30[29], "a.29_of_30");
+
+  const auto item_300 = UnstackedColumnNamesV2("a", 300);
+  EXPECT_EQ(item_300.size(), 300);
+  EXPECT_EQ(item_300[0], "a.000_of_300");
+  EXPECT_EQ(item_300[1], "a.001_of_300");
+  EXPECT_EQ(item_300[299], "a.299_of_300");
+}
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

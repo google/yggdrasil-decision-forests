@@ -994,5 +994,18 @@ std::string UnstackedColumnName(const absl::string_view original_name,
   return absl::StrFormat("%s__%05d", original_name, dim_idx);
 }
 
+std::vector<std::string> UnstackedColumnNamesV2(absl::string_view original_name,
+                                                int num_dims) {
+  const int num_leading_zeroes = std::log10(num_dims) + 1;
+  std::vector<std::string> result;
+  result.reserve(num_dims);
+  for (int dim_idx = 0; dim_idx < num_dims; dim_idx++) {
+    result.push_back(absl::StrFormat("%s.%0*d_of_%0*d", original_name,
+                                     num_leading_zeroes, dim_idx,
+                                     num_leading_zeroes, num_dims));
+  }
+  return result;
+}
+
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

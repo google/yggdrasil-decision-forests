@@ -373,15 +373,35 @@ cc_library_ydf(
 )
 
 cc_library_ydf(
-    name = "avro_example",
-    srcs = ["avro_example.cc"],
-    hdrs = ["avro_example.h"],
+    name = "avro",
+    srcs = ["avro.cc"],
+    hdrs = ["avro.h"],
     deps = [
+        ":data_spec",
+        ":data_spec_cc_proto",
+        ":data_spec_inference",
         "//yggdrasil_decision_forests/utils:bytestream",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_github_tencent_rapidjson//:rapidjson",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+    ],
+)
+
+cc_library_ydf(
+    name = "avro_example",
+    srcs = ["avro_example.cc"],
+    hdrs = ["avro_example.h"],
+    deps = [
+        ":avro",
+        ":data_spec",
+        ":data_spec_cc_proto",
+        ":data_spec_inference",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -638,6 +658,24 @@ cc_test(
 )
 
 cc_test(
+    name = "avro_test",
+    srcs = ["avro_test.cc"],
+    data = [
+        "//yggdrasil_decision_forests/test_data",
+    ],
+    deps = [
+        ":avro",
+        "//yggdrasil_decision_forests/utils:bytestream",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_absl//absl/status",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "avro_example_test",
     srcs = ["avro_example_test.cc"],
     data = [
@@ -645,12 +683,12 @@ cc_test(
     ],
     deps = [
         ":avro_example",
-        "//yggdrasil_decision_forests/utils:bytestream",
+        ":data_spec",
+        ":data_spec_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
-        "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
     ],
 )

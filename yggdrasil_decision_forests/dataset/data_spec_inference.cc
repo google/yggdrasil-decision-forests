@@ -167,7 +167,12 @@ void UpdateComputeSpecDiscretizedNumerical(
 }
 
 void UpdateComputeSpecBooleanFeature(float value, proto::Column* column) {
-  if (value >= 0.5f) {
+  UpdateComputeSpecBooleanFeatureWithBool(value >= 0.5f, column);
+}
+
+void UpdateComputeSpecBooleanFeatureWithBool(bool value,
+                                             proto::Column* column) {
+  if (value) {
     column->mutable_boolean()->set_count_true(column->boolean().count_true() +
                                               1);
   } else {

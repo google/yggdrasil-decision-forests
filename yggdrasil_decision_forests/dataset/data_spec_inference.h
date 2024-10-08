@@ -160,6 +160,10 @@ void UpdateComputeSpecDiscretizedNumerical(
 // observation.
 void UpdateComputeSpecBooleanFeature(float value, proto::Column* column);
 
+// Update the accumulator with a boolean feature value with a boolean
+// observation.
+void UpdateComputeSpecBooleanFeatureWithBool(bool value, proto::Column* column);
+
 // Update all the columns in a data spec with the appropriate guide information.
 // Used when inferring the column type from a csv file.
 absl::Status UpdateColSpecsWithGuideInfo(
