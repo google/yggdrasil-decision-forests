@@ -20,15 +20,17 @@
 #include <limits>
 #include <string>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
-#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
-namespace yggdrasil_decision_forests::dataset {
+namespace yggdrasil_decision_forests::dataset::avro {
 namespace {
+
+using ::testing::ElementsAre;
 
 std::string DatasetDir() {
   return file::JoinPath(
@@ -168,5 +170,41 @@ TEST(AvroExample, ExtractSchemaCompressed) {
       R"({"type": "record", "name": "ToyDataset", "fields": [{"name": "f_null", "type": "null"}, {"name": "f_boolean", "type": "boolean"}, {"name": "f_int", "type": "int"}, {"name": "f_long", "type": "long"}, {"name": "f_float", "type": "float"}, {"name": "f_another_float", "type": "float"}, {"name": "f_double", "type": "double"}, {"name": "f_string", "type": "string"}, {"name": "f_bytes", "type": "bytes"}, {"name": "f_float_optional", "type": ["null", "float"]}, {"name": "f_array_of_float", "type": {"type": "array", "items": "float"}}, {"name": "f_array_of_double", "type": {"type": "array", "items": "double"}}, {"name": "f_array_of_string", "type": {"type": "array", "items": "string"}}, {"name": "f_another_array_of_string", "type": {"type": "array", "items": "string"}}, {"name": "f_optional_array_of_float", "type": ["null", {"type": "array", "items": "float"}]}], "__fastavro_parsed": true})");
 }
 
+TEST(AvroExample, Reader) {
+  ASSERT_OK_AND_ASSIGN(
+      const auto reader,
+      AvroReader::Create(file::JoinPath(DatasetDir(), "toy_codex-null.avro")));
+  EXPECT_THAT(
+      reader->fields(),
+      ElementsAre(
+          AvroField{"f_null", AvroType::kNull},
+          AvroField{"f_boolean", AvroType::kBoolean},
+          AvroField{"f_int", AvroType::kInt},
+          AvroField{"f_long", AvroType::kLong},
+          AvroField{"f_float", AvroType::kFloat},
+          AvroField{"f_another_float", AvroType::kFloat},
+          AvroField{"f_double", AvroType::kDouble},
+          AvroField{"f_string", AvroType::kString},
+          AvroField{"f_bytes", AvroType::kBytes},
+          AvroField{"f_float_optional", AvroType::kFloat, AvroType::kUnknown,
+                    true},
+          AvroField{"f_array_of_float", AvroType::kArray, AvroType::kFloat},
+          AvroField{"f_array_of_double", AvroType::kArray, AvroType::kDouble},
+          AvroField{"f_array_of_string", AvroType::kArray, AvroType::kString},
+          AvroField{"f_another_array_of_string", AvroType::kArray,
+                    AvroType::kString},
+          AvroField{"f_optional_array_of_float", AvroType::kArray,
+                    AvroType::kFloat, true}));
+
+  EXPECT_EQ(reader->sync_marker(), std::string("\0\xB6\xC2"
+                                               "A\x88\xB8\xC3"
+                                               "A\x8C\xDBQF\x92\xDC d",
+                                               16));
+
+  // TODO: Add tests for reading the data.
+
+  ASSERT_OK(reader->Close());
+}
+
 }  // namespace
-}  // namespace yggdrasil_decision_forests::dataset
+}  // namespace yggdrasil_decision_forests::dataset::avro

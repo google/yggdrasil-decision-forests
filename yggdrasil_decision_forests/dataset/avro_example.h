@@ -19,14 +19,44 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_AVRO_EXAMPLE_H_
 
 #include <memory>
+#include <ostream>
 #include <string>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
+#include "yggdrasil_decision_forests/utils/filesystem.h"
 
-namespace yggdrasil_decision_forests::dataset {
+namespace yggdrasil_decision_forests::dataset::avro {
+
+enum class AvroType {
+  kUnknown = 0,
+  kNull = 1,
+  kBoolean = 2,
+  kInt = 3,
+  kLong = 4,
+  kFloat = 5,
+  kDouble = 6,
+  kString = 7,
+  kBytes = 8,
+  kArray = 9,
+};
+
+struct AvroField {
+  std::string name;
+  AvroType type;
+  AvroType sub_type = AvroType::kUnknown;  // Only used if type==kArray.
+  bool optional = false;  // If the field is ["null", <something> ].
+
+  bool operator==(const AvroField& other) const {
+    return name == other.name && type == other.type &&
+           optional == other.optional && sub_type == other.sub_type;
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, const AvroField& field);
+};
 
 // Class to read Avro files.
 // Avro 1.12.0 file format:
@@ -42,12 +72,18 @@ class AvroReader {
 
   ~AvroReader();
 
+  const std::vector<AvroField>& fields() const { return fields_; }
+
+  const std::string& sync_marker() const { return sync_marker_; }
+
  private:
   AvroReader(std::unique_ptr<utils::InputByteStream>&& stream);
 
   absl::StatusOr<std::string> ReadHeader();
 
   std::unique_ptr<utils::InputByteStream> stream_;
+  std::vector<AvroField> fields_;
+  std::string sync_marker_;
 };
 
 namespace internal {
@@ -60,6 +96,6 @@ absl::StatusOr<bool> ReadBoolean(utils::InputByteStream* stream);
 
 }  // namespace internal
 
-}  // namespace yggdrasil_decision_forests::dataset
+}  // namespace yggdrasil_decision_forests::dataset::avro
 
 #endif  // YGGDRASIL_DECISION_FORESTS_DATASET_AVRO_EXAMPLE_H_
