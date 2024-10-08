@@ -131,6 +131,17 @@ def ydf_model_to_tensorflow_saved_model(
     ]:
       if value != expected:
         raise ValueError(f"{name!r} is not supported for `keras` mode.")
+
+    if input_model_signature_fn is None:
+      logging.warning(
+          'to_tensorflow_saved_model with mode="keras" is deprecated. Use'
+          ' mode="tf" instead. See:'
+          " https://ydf.readthedocs.io/en/latest/py_api/GenericModel/#ydf.GenericModel.to_tensorflow_function."
+          " mode='tf' natively support Servo API and other functionnalities"
+          " while at the same time creating a simpler and easier to use"
+          " SavedModel."
+      )
+
     ydf_model_to_tensorflow_saved_model_keras_mode(
         ydf_model=ydf_model,
         path=path,
