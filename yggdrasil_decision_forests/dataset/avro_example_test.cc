@@ -347,5 +347,90 @@ TEST(AvroExample, CreateDataspec) {
   EXPECT_THAT(dataspec, EqualsProto(expected));
 }
 
+TEST(AvroExample, ReadExample) {
+  dataset::proto::DataSpecificationGuide guide;
+  {
+    auto* col = guide.add_column_guides();
+    col->set_column_name_pattern("^f_another_array_of_string$");
+    col->set_type(proto::ColumnType::CATEGORICAL_SET);
+  }
+
+  {
+    auto* col = guide.add_column_guides();
+    col->set_column_name_pattern("^f_another_float$");
+    col->set_ignore_column(true);
+  }
+
+  guide.mutable_default_column_guide()
+      ->mutable_categorial()
+      ->set_min_vocab_frequency(1);
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto dataspec,
+      CreateDataspec(file::JoinPath(DatasetDir(), "toy_codex-null.avro"),
+                     guide));
+
+  AvroExampleReader reader(dataspec, {});
+  ASSERT_OK(reader.Open(file::JoinPath(DatasetDir(), "toy_codex-null.avro")));
+  proto::Example example;
+  ASSERT_OK_AND_ASSIGN(bool has_next, reader.Next(&example));
+  ASSERT_TRUE(has_next);
+
+  const proto::Example expected_1 = PARSE_TEST_PROTO(R"pb(
+    attributes { boolean: true }
+    attributes { numerical: 5 }
+    attributes { numerical: 1234567 }
+    attributes { numerical: 3.1415 }
+    attributes {}
+    attributes { categorical: 1 }
+    attributes { categorical: 1 }
+    attributes { numerical: 6.1 }
+    attributes { categorical_set { values: 4 values: 3 values: 1 } }
+    attributes { numerical: 1 }
+    attributes { numerical: 2 }
+    attributes { numerical: 3 }
+    attributes { numerical: 10 }
+    attributes { numerical: 20 }
+    attributes { numerical: 30 }
+    attributes { categorical: 2 }
+    attributes { categorical: 1 }
+    attributes { categorical: 1 }
+    attributes { numerical: 1 }
+    attributes { numerical: 2 }
+    attributes { numerical: 3 }
+  )pb");
+  EXPECT_THAT(example, EqualsProto(expected_1));
+
+  ASSERT_OK_AND_ASSIGN(has_next, reader.Next(&example));
+  ASSERT_TRUE(has_next);
+  const proto::Example expected_2 = PARSE_TEST_PROTO(R"pb(
+    attributes { boolean: false }
+    attributes { numerical: 6 }
+    attributes { numerical: -123 }
+    attributes { numerical: -1.234 }
+    attributes { numerical: 6.789 }
+    attributes { categorical: 2 }
+    attributes { categorical: 2 }
+    attributes {}
+    attributes { categorical_set { values: 1 values: 2 } }
+    attributes { numerical: 4 }
+    attributes { numerical: 5 }
+    attributes { numerical: 6 }
+    attributes { numerical: 40 }
+    attributes { numerical: 50 }
+    attributes { numerical: 60 }
+    attributes { categorical: 1 }
+    attributes { categorical: 2 }
+    attributes { categorical: 2 }
+    attributes {}
+    attributes {}
+    attributes {}
+  )pb");
+  EXPECT_THAT(example, EqualsProto(expected_2));
+
+  ASSERT_OK_AND_ASSIGN(has_next, reader.Next(&example));
+  ASSERT_FALSE(has_next);
+}
+
 }  // namespace
 }  // namespace yggdrasil_decision_forests::dataset::avro

@@ -19,18 +19,73 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_AVRO_EXAMPLE_H_
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/avro.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
+#include "yggdrasil_decision_forests/utils/sharded_io.h"
 
 namespace yggdrasil_decision_forests::dataset::avro {
 
 // Creates a dataspec from the Avro file.
 absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
     absl::string_view path, dataset::proto::DataSpecificationGuide& guide);
+
+class AvroExampleReader final : public ExampleReaderInterface {
+ public:
+  explicit AvroExampleReader(const proto::DataSpecification& data_spec,
+                             absl::optional<std::vector<int>> required_columns)
+      : sharded_reader_(data_spec, required_columns) {}
+
+  absl::StatusOr<bool> Next(proto::Example* example) override {
+    return sharded_reader_.Next(example);
+  }
+
+  absl::Status Open(absl::string_view sharded_path) override {
+    return sharded_reader_.Open(sharded_path);
+  }
+
+ private:
+  class Implementation final : public utils::ShardedReader<proto::Example> {
+   public:
+    explicit Implementation(
+        const proto::DataSpecification& data_spec,
+        const absl::optional<std::vector<int>>& required_columns)
+        : dataspec_(data_spec), required_columns_(required_columns) {}
+
+   protected:
+    // Opens the Avro file at "path", and check that the header is as expected.
+    absl::Status OpenShard(absl::string_view path) override;
+
+    // Scans a new row in the Avro file, and parses it as a proto:Example.
+    absl::StatusOr<bool> NextInShard(proto::Example* example) override;
+
+   private:
+    // The data spec.
+    const proto::DataSpecification dataspec_;
+
+    // Currently, open file;
+    std::unique_ptr<AvroReader> reader_;
+
+    // Mapping between the Avro field index and the column index for the
+    // univariate features. -1's are used for ignored fields.
+    std::vector<int> univariate_field_idx_to_column_idx_;
+
+    // Mapping between the Avro field index and the unstacked index for the
+    // multivariate features. -1's are used for ignored fields.
+    std::vector<int> multivariate_field_idx_to_unroll_idx_;
+
+    const absl::optional<std::vector<int>> required_columns_;
+  };
+
+  Implementation sharded_reader_;
+};
 
 namespace internal {
 

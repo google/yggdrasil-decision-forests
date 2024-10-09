@@ -401,6 +401,8 @@ cc_library_ydf(
         ":data_spec",
         ":data_spec_cc_proto",
         ":data_spec_inference",
+        ":example_reader_interface",
+        "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
