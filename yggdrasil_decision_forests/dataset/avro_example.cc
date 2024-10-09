@@ -136,6 +136,200 @@ absl::Status InitializeUnstackedColumn(
 
 }  // namespace
 
+absl::Status AvroExampleReader::Implementation::OpenShard(
+    absl::string_view path) {
+  const bool is_first_file = reader_ == nullptr;
+  auto save_previous_reader = std::move(reader_);
+  ASSIGN_OR_RETURN(reader_, AvroReader::Create(path));
+  if (is_first_file) {
+    RETURN_IF_ERROR(ComputeReadingMaps(reader_->fields(), dataspec_,
+                                       &univariate_field_idx_to_column_idx_,
+                                       &multivariate_field_idx_to_unroll_idx_));
+  } else {
+    if (save_previous_reader->fields() != reader_->fields()) {
+      return absl::InvalidArgumentError(
+          "All the files in the same shard should have the same schema.");
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<bool> AvroExampleReader::Implementation::NextInShard(
+    proto::Example* example) {
+  example->clear_attributes();
+  while (example->attributes_size() < dataspec_.columns_size()) {
+    example->add_attributes();
+  }
+
+  ASSIGN_OR_RETURN(const bool has_record, reader_->ReadNextRecord());
+  if (!has_record) {
+    return false;
+  }
+
+  int field_idx = 0;
+  for (const auto& field : reader_->fields()) {
+    switch (field.type) {
+      case AvroType::kUnknown:
+      case AvroType::kNull:
+        break;
+
+      case AvroType::kBoolean: {
+        ASSIGN_OR_RETURN(const auto value,
+                         reader_->ReadNextFieldBoolean(field));
+        const int col_idx = univariate_field_idx_to_column_idx_[field_idx];
+        if (col_idx == -1) {
+          // Ignore field.
+          break;
+        }
+        if (!value.has_value()) {
+          break;
+        }
+        example->mutable_attributes(col_idx)->set_boolean(*value);
+      } break;
+
+      case AvroType::kLong:
+      case AvroType::kInt: {
+        ASSIGN_OR_RETURN(const auto value,
+                         reader_->ReadNextFieldInteger(field));
+        const int col_idx = univariate_field_idx_to_column_idx_[field_idx];
+        if (col_idx == -1) {
+          // Ignore field.
+          break;
+        }
+        if (!value.has_value()) {
+          break;
+        }
+        example->mutable_attributes(col_idx)->set_numerical(*value);
+      } break;
+
+      case AvroType::kDouble:
+      case AvroType::kFloat: {
+        absl::optional<double> value;
+        if (field.type == AvroType::kFloat) {
+          ASSIGN_OR_RETURN(value, reader_->ReadNextFieldFloat(field));
+        } else {
+          ASSIGN_OR_RETURN(value, reader_->ReadNextFieldDouble(field));
+        }
+        if (value.has_value() && std::isnan(*value)) {
+          value = absl::nullopt;
+        }
+        const int col_idx = univariate_field_idx_to_column_idx_[field_idx];
+        if (col_idx == -1) {
+          // Ignore field.
+          break;
+        }
+        if (!value.has_value()) {
+          break;
+        }
+        example->mutable_attributes(col_idx)->set_numerical(*value);
+      } break;
+
+      case AvroType::kBytes:
+      case AvroType::kString: {
+        std::string value;
+        ASSIGN_OR_RETURN(const auto has_value,
+                         reader_->ReadNextFieldString(field, &value));
+        const int col_idx = univariate_field_idx_to_column_idx_[field_idx];
+        if (col_idx == -1) {
+          // Ignore field.
+          break;
+        }
+        if (!has_value) {
+          break;
+        }
+        ASSIGN_OR_RETURN(auto int_value,
+                         CategoricalStringToValueWithStatus(
+                             value, dataspec_.columns(col_idx)));
+        example->mutable_attributes(col_idx)->set_categorical(int_value);
+      } break;
+
+      case AvroType::kArray:
+        switch (field.sub_type) {
+          case AvroType::kDouble:
+          case AvroType::kFloat: {
+            bool has_value;
+            std::vector<float> values;
+            if (field.sub_type == AvroType::kFloat) {
+              ASSIGN_OR_RETURN(
+                  has_value, reader_->ReadNextFieldArrayFloat(field, &values));
+            } else {
+              ASSIGN_OR_RETURN(
+                  has_value,
+                  reader_->ReadNextFieldArrayDoubleIntoFloat(field, &values));
+            }
+            if (!has_value) {
+              break;
+            }
+
+            // Check if field used.
+            const auto unstacked_idx =
+                multivariate_field_idx_to_unroll_idx_[field_idx];
+            if (unstacked_idx == -1) {
+              break;
+            }
+
+            auto& unstacked = dataspec_.unstackeds(unstacked_idx);
+            for (int dim_idx = 0; dim_idx < values.size(); dim_idx++) {
+              const int col_idx = unstacked.begin_column_idx() + dim_idx;
+              const float value = values[dim_idx];
+              if (!std::isnan(value)) {
+                example->mutable_attributes(col_idx)->set_numerical(value);
+              }
+            }
+          } break;
+
+          case AvroType::kString:
+          case AvroType::kBytes: {
+            std::vector<std::string> values;
+            ASSIGN_OR_RETURN(const auto has_value,
+                             reader_->ReadNextFieldArrayString(field, &values));
+            if (!has_value) {
+              break;
+            }
+
+            const auto univariate_col_idx =
+                univariate_field_idx_to_column_idx_[field_idx];
+            if (univariate_col_idx != -1) {
+              const auto& col_spec = dataspec_.columns(univariate_col_idx);
+              for (const auto& value : values) {
+                ASSIGN_OR_RETURN(
+                    auto int_value,
+                    CategoricalStringToValueWithStatus(value, col_spec));
+                example->mutable_attributes(univariate_col_idx)
+                    ->mutable_categorical_set()
+                    ->add_values(int_value);
+              }
+              break;
+            }
+
+            // Check if field used.
+            const auto unstacked_idx =
+                multivariate_field_idx_to_unroll_idx_[field_idx];
+            if (unstacked_idx == -1) {
+              break;
+            }
+
+            auto& unstacked = dataspec_.unstackeds(unstacked_idx);
+            for (int dim_idx = 0; dim_idx < values.size(); dim_idx++) {
+              const int col_idx = unstacked.begin_column_idx() + dim_idx;
+              const auto& col_spec = dataspec_.columns(col_idx);
+              ASSIGN_OR_RETURN(auto int_value,
+                               CategoricalStringToValueWithStatus(
+                                   values[dim_idx], col_spec));
+              example->mutable_attributes(col_idx)->set_categorical(int_value);
+            }
+          } break;
+          default:
+            return absl::UnimplementedError("Unsupported type");
+        }
+        break;
+    }
+    field_idx++;
+  }
+  DCHECK_EQ(field_idx, reader_->fields().size());
+  return true;
+}
+
 absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
     absl::string_view path, dataset::proto::DataSpecificationGuide& guide) {
   // TODO: Reading of multiple paths.

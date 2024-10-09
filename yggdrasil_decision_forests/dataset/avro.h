@@ -47,7 +47,7 @@ enum class AvroType {
 };
 
 std::string TypeToString(AvroType type);
-absl::StatusOr<AvroType> ParseType(std::string_view key);
+absl::StatusOr<AvroType> ParseType(absl::string_view key);
 
 enum class AvroCodec {
   kNull = 0,

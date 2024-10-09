@@ -82,7 +82,7 @@ absl::StatusOr<const std::string> GetJsonStringField(
 
 }  // namespace
 
-absl::StatusOr<AvroType> ParseType(std::string_view key) {
+absl::StatusOr<AvroType> ParseType(absl::string_view key) {
   if (key == "null") {
     return AvroType::kNull;
   } else if (key == "boolean") {
