@@ -32,19 +32,18 @@
 #include "absl/types/optional.h"
 #include "include/rapidjson/document.h"
 #include "include/rapidjson/rapidjson.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/zlib.h"
 
-#define MAYBE_SKIP_OPTIONAL(FIELD)                                             \
-  if (field.optional) {                                                        \
-    ASSIGN_OR_RETURN(const auto _has_value, current_block_reader->ReadByte()); \
-    if (!_has_value) {                                                         \
-      return absl::nullopt;                                                    \
-    }                                                                          \
+#define MAYBE_SKIP_OPTIONAL(FIELD)                       \
+  if (field.optional) {                                  \
+    ASSIGN_OR_RETURN(const auto _has_value,              \
+                     current_block_reader_->ReadByte()); \
+    if (!_has_value) {                                   \
+      return absl::nullopt;                              \
+    }                                                    \
   }
 
 namespace yggdrasil_decision_forests::dataset::avro {
@@ -309,17 +308,24 @@ absl::StatusOr<bool> AvroReader::ReadNextBlock() {
 
   ASSIGN_OR_RETURN(const auto block_size, internal::ReadInteger(stream_.get()));
 
-  current_block.resize(block_size);
+  current_block_.resize(block_size);
   ASSIGN_OR_RETURN(bool has_read,
-                   stream_->ReadExactly(&current_block[0], block_size));
+                   stream_->ReadExactly(&current_block_[0], block_size));
   if (!has_read) {
     return absl::InvalidArgumentError("Unexpected end of stream");
   }
-  current_block_reader = utils::StringViewInputByteStream(current_block);
 
-  if (codec_ != AvroCodec::kNull) {
-    // TODO: Implement deflate.
-    return absl::UnimplementedError("Compression not implemented");
+  switch (codec_) {
+    case AvroCodec::kNull:
+      current_block_reader_ = utils::StringViewInputByteStream(current_block_);
+      break;
+    case AvroCodec::kDeflate:
+      zlib_working_buffer_.resize(1024 * 1024);
+      RETURN_IF_ERROR(utils::Inflate(
+          current_block_, &current_block_decompressed_, &zlib_working_buffer_));
+      current_block_reader_ =
+          utils::StringViewInputByteStream(current_block_decompressed_);
+      break;
   }
 
   new_sync_marker_.resize(16);
@@ -334,8 +340,8 @@ absl::StatusOr<bool> AvroReader::ReadNextBlock() {
 }
 
 absl::StatusOr<bool> AvroReader::ReadNextRecord() {
-  if (!current_block_reader.has_value() ||
-      current_block_reader.value().left() == 0) {
+  if (!current_block_reader_.has_value() ||
+      current_block_reader_.value().left() == 0) {
     // Read a new block of data.
     DCHECK_EQ(next_object_in_current_block_, num_objects_in_current_block_);
     ASSIGN_OR_RETURN(const bool has_next_block, ReadNextBlock());
@@ -350,37 +356,37 @@ absl::StatusOr<bool> AvroReader::ReadNextRecord() {
 absl::StatusOr<absl::optional<bool>> AvroReader::ReadNextFieldBoolean(
     const AvroField& field) {
   MAYBE_SKIP_OPTIONAL(field);
-  ASSIGN_OR_RETURN(const auto value, current_block_reader->ReadByte());
+  ASSIGN_OR_RETURN(const auto value, current_block_reader_->ReadByte());
   return value;
 }
 
 absl::StatusOr<absl::optional<int64_t>> AvroReader::ReadNextFieldInteger(
     const AvroField& field) {
   MAYBE_SKIP_OPTIONAL(field);
-  return internal::ReadInteger(&current_block_reader.value());
+  return internal::ReadInteger(&current_block_reader_.value());
 }
 
 absl::StatusOr<absl::optional<float>> AvroReader::ReadNextFieldFloat(
     const AvroField& field) {
   MAYBE_SKIP_OPTIONAL(field);
-  return internal::ReadFloat(&current_block_reader.value());
+  return internal::ReadFloat(&current_block_reader_.value());
 }
 
 absl::StatusOr<absl::optional<double>> AvroReader::ReadNextFieldDouble(
     const AvroField& field) {
   MAYBE_SKIP_OPTIONAL(field);
-  return internal::ReadDouble(&current_block_reader.value());
+  return internal::ReadDouble(&current_block_reader_.value());
 }
 
 absl::StatusOr<bool> AvroReader::ReadNextFieldString(const AvroField& field,
                                                      std::string* value) {
   if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
     if (!has_value) {
       return false;
     }
   }
-  RETURN_IF_ERROR(internal::ReadString(&current_block_reader.value(), value));
+  RETURN_IF_ERROR(internal::ReadString(&current_block_reader_.value(), value));
   return true;
 }
 
@@ -388,27 +394,27 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayFloat(
     const AvroField& field, std::vector<float>* values) {
   values->clear();
   if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
     if (!has_value) {
       return false;
     }
   }
   while (true) {
     ASSIGN_OR_RETURN(auto num_values,
-                     internal::ReadInteger(&current_block_reader.value()));
+                     internal::ReadInteger(&current_block_reader_.value()));
     values->reserve(values->size() + num_values);
     if (num_values == 0) {
       break;
     }
     if (num_values < 0) {
       ASSIGN_OR_RETURN(auto block_size,
-                       internal::ReadInteger(&current_block_reader.value()));
+                       internal::ReadInteger(&current_block_reader_.value()));
       (void)block_size;
       num_values = -num_values;
     }
     for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
       ASSIGN_OR_RETURN(auto value,
-                       internal::ReadFloat(&current_block_reader.value()));
+                       internal::ReadFloat(&current_block_reader_.value()));
       values->push_back(value);
     }
   }
@@ -420,27 +426,27 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayDouble(
     const AvroField& field, std::vector<double>* values) {
   values->clear();
   if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
     if (!has_value) {
       return false;
     }
   }
   while (true) {
     ASSIGN_OR_RETURN(auto num_values,
-                     internal::ReadInteger(&current_block_reader.value()));
+                     internal::ReadInteger(&current_block_reader_.value()));
     values->reserve(values->size() + num_values);
     if (num_values == 0) {
       break;
     }
     if (num_values < 0) {
       ASSIGN_OR_RETURN(auto block_size,
-                       internal::ReadInteger(&current_block_reader.value()));
+                       internal::ReadInteger(&current_block_reader_.value()));
       (void)block_size;
       num_values = -num_values;
     }
     for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
       ASSIGN_OR_RETURN(auto value,
-                       internal::ReadDouble(&current_block_reader.value()));
+                       internal::ReadDouble(&current_block_reader_.value()));
       values->push_back(value);
     }
   }
@@ -452,27 +458,27 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayDoubleIntoFloat(
     const AvroField& field, std::vector<float>* values) {
   values->clear();
   if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
     if (!has_value) {
       return false;
     }
   }
   while (true) {
     ASSIGN_OR_RETURN(auto num_values,
-                     internal::ReadInteger(&current_block_reader.value()));
+                     internal::ReadInteger(&current_block_reader_.value()));
     if (num_values == 0) {
       break;
     }
     values->reserve(values->size() + num_values);
     if (num_values < 0) {
       ASSIGN_OR_RETURN(auto block_size,
-                       internal::ReadInteger(&current_block_reader.value()));
+                       internal::ReadInteger(&current_block_reader_.value()));
       (void)block_size;
       num_values = -num_values;
     }
     for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
       ASSIGN_OR_RETURN(auto value,
-                       internal::ReadDouble(&current_block_reader.value()));
+                       internal::ReadDouble(&current_block_reader_.value()));
       values->push_back(value);
     }
   }
@@ -483,7 +489,7 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayDoubleIntoFloat(
 absl::StatusOr<bool> AvroReader::ReadNextFieldArrayString(
     const AvroField& field, std::vector<std::string>* values) {
   if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader->ReadByte());
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
     if (!has_value) {
       return false;
     }
@@ -491,21 +497,21 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayString(
 
   while (true) {
     ASSIGN_OR_RETURN(auto num_values,
-                     internal::ReadInteger(&current_block_reader.value()));
+                     internal::ReadInteger(&current_block_reader_.value()));
     if (num_values == 0) {
       break;
     }
     values->reserve(values->size() + num_values);
     if (num_values < 0) {
       ASSIGN_OR_RETURN(auto block_size,
-                       internal::ReadInteger(&current_block_reader.value()));
+                       internal::ReadInteger(&current_block_reader_.value()));
       (void)block_size;
       num_values = -num_values;
     }
     for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
       std::string sub_value;
       RETURN_IF_ERROR(
-          internal::ReadString(&current_block_reader.value(), &sub_value));
+          internal::ReadString(&current_block_reader_.value(), &sub_value));
       values->push_back(std::move(sub_value));
     }
   }

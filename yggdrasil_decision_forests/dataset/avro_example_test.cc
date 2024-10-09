@@ -347,7 +347,16 @@ TEST(AvroExample, CreateDataspec) {
   EXPECT_THAT(dataspec, EqualsProto(expected));
 }
 
-TEST(AvroExample, ReadExample) {
+struct ReadExampleCase {
+  std::string filename;
+};
+
+SIMPLE_PARAMETERIZED_TEST(ReadExample, ReadExampleCase,
+                          {
+                              {"toy_codex-null.avro"},
+                              {"toy_codex-deflate.avro"},
+                          }) {
+  const auto& test_case = GetParam();
   dataset::proto::DataSpecificationGuide guide;
   {
     auto* col = guide.add_column_guides();
@@ -367,11 +376,10 @@ TEST(AvroExample, ReadExample) {
 
   ASSERT_OK_AND_ASSIGN(
       const auto dataspec,
-      CreateDataspec(file::JoinPath(DatasetDir(), "toy_codex-null.avro"),
-                     guide));
+      CreateDataspec(file::JoinPath(DatasetDir(), test_case.filename), guide));
 
   AvroExampleReader reader(dataspec, {});
-  ASSERT_OK(reader.Open(file::JoinPath(DatasetDir(), "toy_codex-null.avro")));
+  ASSERT_OK(reader.Open(file::JoinPath(DatasetDir(), test_case.filename)));
   proto::Example example;
   ASSERT_OK_AND_ASSIGN(bool has_next, reader.Next(&example));
   ASSERT_TRUE(has_next);

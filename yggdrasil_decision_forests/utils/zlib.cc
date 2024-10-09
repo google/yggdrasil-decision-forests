@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstring>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "absl/log/check.h"
@@ -44,19 +45,11 @@ GZipInputByteStream::Create(std::unique_ptr<utils::InputByteStream>&& stream,
                             size_t buffer_size) {
   auto gz_stream =
       std::make_unique<GZipInputByteStream>(std::move(stream), buffer_size);
-
-  gz_stream->deflate_stream_.zalloc = Z_NULL;
-  gz_stream->deflate_stream_.zfree = Z_NULL;
-  gz_stream->deflate_stream_.opaque = Z_NULL;
-  gz_stream->deflate_stream_.avail_in = 0;
-  gz_stream->deflate_stream_.next_in = Z_NULL;
+  std::memset(&gz_stream->deflate_stream_, 0,
+              sizeof(gz_stream->deflate_stream_));
   if (inflateInit2(&gz_stream->deflate_stream_, 16 + MAX_WBITS) != Z_OK) {
     return absl::InternalError("Cannot initialize gzip stream");
   }
-  // gz_stream->deflate_stream_.next_in = gz_stream->input_buffer_.data();
-  // gz_stream->deflate_stream_.avail_in = 0;
-  // gz_stream->deflate_stream_.next_out = gz_stream->output_buffer_.data();
-  // gz_stream->deflate_stream_.avail_out = 0;
   gz_stream->deflate_stream_is_allocated_ = true;
   return gz_stream;
 }
@@ -163,12 +156,8 @@ GZipOutputByteStream::Create(std::unique_ptr<utils::OutputByteStream>&& stream,
   }
   auto gz_stream =
       std::make_unique<GZipOutputByteStream>(std::move(stream), buffer_size);
-
-  gz_stream->deflate_stream_.zalloc = Z_NULL;
-  gz_stream->deflate_stream_.zfree = Z_NULL;
-  gz_stream->deflate_stream_.opaque = Z_NULL;
-  gz_stream->deflate_stream_.avail_in = 0;
-  gz_stream->deflate_stream_.next_in = Z_NULL;
+  std::memset(&gz_stream->deflate_stream_, 0,
+              sizeof(gz_stream->deflate_stream_));
   if (deflateInit2(&gz_stream->deflate_stream_, compression_level, Z_DEFLATED,
                    MAX_WBITS + 16,
                    /*memLevel=*/8,  // 8 is the recommended default
@@ -252,6 +241,45 @@ absl::Status GZipOutputByteStream::CloseInflateStream() {
       return absl::InternalError("Cannot close deflate");
     }
   }
+  return absl::OkStatus();
+}
+
+absl::Status Inflate(absl::string_view input, std::string* output,
+                     std::string* working_buffer) {
+  if (working_buffer->size() < 1024) {
+    return absl::InvalidArgumentError(
+        "worker buffer should be at least 1024 bytes");
+  }
+  z_stream stream;
+  std::memset(&stream, 0, sizeof(stream));
+  // Note: A negative window size indicate to use the raw deflate algorithm (!=
+  // zlib or gzip).
+  if (inflateInit2(&stream, -15) != Z_OK) {
+    return absl::InternalError("Cannot initialize gzip stream");
+  }
+  stream.next_in = reinterpret_cast<const Bytef*>(input.data());
+  stream.avail_in = input.size();
+
+  while (true) {
+    stream.next_out = reinterpret_cast<Bytef*>(&(*working_buffer)[0]);
+    stream.avail_out = working_buffer->size();
+    const auto zlib_error = inflate(&stream, Z_NO_FLUSH);
+    if (zlib_error != Z_OK && zlib_error != Z_STREAM_END) {
+      inflateEnd(&stream);
+      return absl::InternalError(absl::StrCat("Internal error", zlib_error));
+    }
+    if (stream.avail_out == 0) {
+      break;
+    }
+    const size_t produced_bytes = working_buffer->size() - stream.avail_out;
+    absl::StrAppend(output,
+                    absl::string_view{working_buffer->data(), produced_bytes});
+    if (zlib_error == Z_STREAM_END) {
+      break;
+    }
+  }
+  inflateEnd(&stream);
+
   return absl::OkStatus();
 }
 
