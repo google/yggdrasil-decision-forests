@@ -132,8 +132,10 @@ class AvroReader {
   AvroCodec codec_ = AvroCodec::kNull;
 
   // Raw and uncompressed data of the current block.
-  std::string current_block;
-  absl::optional<utils::StringViewInputByteStream> current_block_reader;
+  std::string current_block_;
+  std::string current_block_decompressed_;
+  std::string zlib_working_buffer_;
+  absl::optional<utils::StringViewInputByteStream> current_block_reader_;
 
   size_t num_objects_in_current_block_ = 0;
   size_t next_object_in_current_block_ = 0;

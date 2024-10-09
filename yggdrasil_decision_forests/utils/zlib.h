@@ -18,10 +18,12 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 
 #define ZLIB_CONST
@@ -93,6 +95,9 @@ class GZipOutputByteStream : public utils::OutputByteStream {
   // Was "deflate_stream_" allocated?
   bool deflate_stream_is_allocated_ = false;
 };
+
+absl::Status Inflate(absl::string_view input, std::string* output,
+                     std::string* working_buffer);
 
 }  // namespace yggdrasil_decision_forests::utils
 

@@ -25,6 +25,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
+#include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -136,6 +137,15 @@ TEST_P(GZipTestCaseTest, WriteAndRead) {
     EXPECT_OK(stream->Close());
     EXPECT_EQ(content + content, read_content);
   }
+}
+
+TEST(RawDeflate, Base) {
+  const auto input =
+      absl::HexStringToBytes("05804109000008c4aa184ec1c7e0c08ff5c70ea43e470b");
+  std::string output;
+  std::string working_buffer(1024, 0);
+  ASSERT_OK(Inflate(input, &output, &working_buffer));
+  EXPECT_EQ(output, "hello world");
 }
 
 }  // namespace
