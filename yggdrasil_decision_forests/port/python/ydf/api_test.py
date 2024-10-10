@@ -21,6 +21,8 @@ import sys
 
 from absl import logging
 from absl.testing import absltest
+import fastavro
+import numpy as np
 import pandas as pd
 from sklearn import ensemble as skl_ensemble
 import sklearn.datasets
@@ -274,6 +276,34 @@ class ApiTest(absltest.TestCase):
         num_shards=2,
         create_workdir=False,
     )
+
+  def test_train_on_avro_files(self):
+    # TODO: Use Polars's Avro writer instead.
+    schema = fastavro.parse_schema({
+        "name": "ToyDataset",
+        "doc": "A toy dataset.",
+        "type": "record",
+        "fields": [
+            {"name": "f1", "type": "float"},
+            {"name": "f2", "type": "float"},
+            {"name": "f3", "type": ["null", "float"]},
+            {"name": "l", "type": "float"},
+        ],
+    })
+    ds = pd.DataFrame({
+        "f1": np.random.rand(100),
+        "f2": np.random.rand(100),
+        "f3": np.random.rand(100),
+        "l": np.random.rand(100),
+    })
+
+    ds_path = os.path.join(self.create_tempdir().full_path, "ds.avro")
+    with open(ds_path, "wb") as out:
+      fastavro.writer(out, schema, ds.to_dict("records"), codec="deflate")
+
+    learner = ydf.RandomForestLearner(label="l", task=ydf.Task.REGRESSION)
+    model = learner.train("avro:" + ds_path)
+    logging.info(model)
 
 
 if __name__ == "__main__":

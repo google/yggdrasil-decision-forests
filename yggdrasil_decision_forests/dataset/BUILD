@@ -411,6 +411,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
     ],
+    alwayslink = 1,
 )
 
 # Proto

@@ -67,6 +67,7 @@ const std::vector<Format>& GetFormats() {
     formats->push_back({
         .extension = "tfrecord",
         .prefix = FORMAT_TFE_TFRECORDV2,
+        .prefix_alias = "tfrecord-nocompression",
         .proto_format = proto::FORMAT_TFE_TFRECORDV2,
     });
 

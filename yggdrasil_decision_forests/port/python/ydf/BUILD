@@ -103,7 +103,9 @@ py_test(
         ":api",
         # absl/logging dep,
         # absl/testing:absltest dep,
+        # fastavro dep,
         # jax dep,  # buildcleaner: keep
+        # numpy dep,
         # pandas dep,
         # sklearn dep,  # buildcleaner: keep
         # tensorflow dep,  # buildcleaner: keep
