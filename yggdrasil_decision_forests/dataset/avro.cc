@@ -15,12 +15,9 @@
 
 #include "yggdrasil_decision_forests/dataset/avro.h"
 
-#include <optional>
-
-#define RAPIDJSON_HAS_STDSTRING 1
-
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -32,8 +29,8 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "include/rapidjson/document.h"
-#include "include/rapidjson/rapidjson.h"
+#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -50,35 +47,35 @@
 
 namespace yggdrasil_decision_forests::dataset::avro {
 namespace {
-absl::Status JsonIsObject(const rapidjson::Value& value) {
-  if (!value.IsObject()) {
+absl::Status JsonIsObject(const nlohmann::json& value) {
+  if (!value.is_object()) {
     return absl::InvalidArgumentError("Schema is not a json object");
   }
   return absl::OkStatus();
 }
 
-absl::StatusOr<const rapidjson::Value*> GetJsonField(
-    const rapidjson::Value& value, const std::string& name) {
-  auto it = value.FindMember(name);
-  if (it == value.MemberEnd()) {
+absl::StatusOr<const nlohmann::json*> GetJsonField(const nlohmann::json& value,
+                                                   const std::string& name) {
+  auto it = value.find(name);
+  if (it == value.end()) {
     return absl::InvalidArgumentError(
         absl::StrCat("Field \"", name, "\" not found"));
   }
-  return &(it->value);
+  return &*it;
 }
 
 absl::StatusOr<const std::string> GetJsonStringField(
-    const rapidjson::Value& value, const std::string& name) {
-  auto it = value.FindMember(name);
-  if (it == value.MemberEnd()) {
+    const nlohmann::json& value, const std::string& name) {
+  auto it = value.find(name);
+  if (it == value.end()) {
     return absl::InvalidArgumentError(
         absl::StrCat("Field \"", name, "\" not found"));
   }
-  if (!it->value.IsString()) {
+  if (!it->is_string()) {
     return absl::InvalidArgumentError(
         absl::StrCat("Field \"", name, "\" is not a string"));
   }
-  return it->value.GetString();
+  return it->get<std::string>();
 }
 
 }  // namespace
@@ -217,10 +214,9 @@ absl::StatusOr<std::string> AvroReader::ReadHeader() {
   STATUS_CHECK(has_read);
 
   // Parse the meta-data.
-  rapidjson::Document json_schema;
-  json_schema.Parse(schema.c_str(), schema.length());
+  nlohmann::json json_schema = nlohmann::json::parse(schema);
 
-  if (json_schema.HasParseError()) {
+  if (json_schema.is_discarded()) {
     return absl::InvalidArgumentError("Failed to parse schema");
   }
   RETURN_IF_ERROR(JsonIsObject(json_schema));
@@ -229,45 +225,46 @@ absl::StatusOr<std::string> AvroReader::ReadHeader() {
   STATUS_CHECK_EQ(json_type, "record");
   ASSIGN_OR_RETURN(const auto* json_fields,
                    GetJsonField(json_schema, "fields"));
-  STATUS_CHECK(json_fields->IsArray());
+  STATUS_CHECK(json_fields->is_array());
 
-  for (const auto& json_field : json_fields->GetArray()) {
+  for (const auto& json_field : json_fields->items()) {
     ASSIGN_OR_RETURN(const auto json_name,
-                     GetJsonStringField(json_field, "name"));
+                     GetJsonStringField(json_field.value(), "name"));
     ASSIGN_OR_RETURN(const auto* json_sub_type,
-                     GetJsonField(json_field, "type"));
+                     GetJsonField(json_field.value(), "type"));
     AvroType type = AvroType::kUnknown;
     AvroType sub_type = AvroType::kUnknown;
     bool optional = false;
 
-    if (json_sub_type->IsString()) {
-      const std::string& str_type = json_sub_type->GetString();
+    if (json_sub_type->is_string()) {
+      const std::string str_type = json_sub_type->get<std::string>();
       // Scalar
       ASSIGN_OR_RETURN(type, ParseType(str_type));
-    } else if (json_sub_type->IsArray()) {
+    } else if (json_sub_type->is_array()) {
       // Optional
       optional = true;
-      const auto& json_sub_type_array = json_sub_type->GetArray();
-      if (json_sub_type_array.Size() == 2 &&
-          json_sub_type_array[0].IsString() &&
-          json_sub_type_array[0].GetString() == std::string("null")) {
-        if (json_sub_type_array[1].IsString()) {
+
+      // const auto& json_sub_type_array = json_sub_type->GetArray();
+      if (json_sub_type->size() == 2 && (*json_sub_type)[0].is_string() &&
+          (*json_sub_type)[0].get<std::string>() == std::string("null")) {
+        if ((*json_sub_type)[1].is_string()) {
           // Scalar
-          ASSIGN_OR_RETURN(type, ParseType(json_sub_type_array[1].GetString()));
+          ASSIGN_OR_RETURN(type,
+                           ParseType((*json_sub_type)[1].get<std::string>()));
         }
-        if (json_sub_type_array[1].IsObject()) {
+        if ((*json_sub_type)[1].is_object()) {
           // Array
           ASSIGN_OR_RETURN(const auto json_sub_sub_type,
-                           GetJsonStringField(json_sub_type_array[1], "type"));
+                           GetJsonStringField((*json_sub_type)[1], "type"));
           ASSIGN_OR_RETURN(const auto json_items,
-                           GetJsonStringField(json_sub_type_array[1], "items"));
+                           GetJsonStringField((*json_sub_type)[1], "items"));
           if (json_sub_sub_type == "array") {
             ASSIGN_OR_RETURN(sub_type, ParseType(json_items));
             type = AvroType::kArray;
           }
         }
       }
-    } else if (json_sub_type->IsObject()) {
+    } else if (json_sub_type->is_object()) {
       // Array
       ASSIGN_OR_RETURN(const auto json_sub_sub_type,
                        GetJsonStringField(*json_sub_type, "type"));
@@ -282,8 +279,8 @@ absl::StatusOr<std::string> AvroReader::ReadHeader() {
 
     if (type == AvroType::kUnknown) {
       return absl::InvalidArgumentError(absl::StrCat(
-          "Unsupported type=", json_sub_type->GetString(), " for field \"",
-          json_name,
+          "Unsupported type=", json_sub_type->get<std::string>(),
+          " for field \"", json_name,
           "\". YDF only supports the following types: null, "
           "boolean, long, int, float, double, string, bytes, array of <scalar "
           "type>, [null, <scalar type>], [null, array[<scalar type>]]."));
