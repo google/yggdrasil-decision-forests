@@ -83,6 +83,9 @@ class AvroReader {
   // Reads the next record. Returns false if the end of the file is reached.
   absl::StatusOr<bool> ReadNextRecord();
 
+  // Skips all the fields (i.e., read with ReadNextField*).
+  absl::Status SkipAllFieldsInRecord();
+
   // Reads the next field. Returns nullopt if the field is optional and not set.
   absl::StatusOr<absl::optional<bool>> ReadNextFieldBoolean(
       const AvroField& field);

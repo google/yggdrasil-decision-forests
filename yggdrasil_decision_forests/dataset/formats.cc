@@ -79,6 +79,12 @@ const std::vector<Format>& GetFormats() {
         .proto_format = proto::FORMAT_TFE_TFRECORD_COMPRESSED_V2,
     });
 
+    formats->push_back({
+        .extension = "avro",
+        .prefix = "avro",
+        .proto_format = proto::FORMAT_AVRO,
+    });
+
     // Partially computed (e.g. non indexed) dataset cache.
     formats->push_back({
         .extension = "partial_dataset_cache",

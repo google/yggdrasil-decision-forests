@@ -331,7 +331,8 @@ absl::StatusOr<bool> AvroExampleReader::Implementation::NextInShard(
 }
 
 absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
-    absl::string_view path, dataset::proto::DataSpecificationGuide& guide) {
+    absl::string_view path,
+    const dataset::proto::DataSpecificationGuide& guide) {
   // TODO: Reading of multiple paths.
 
   ASSIGN_OR_RETURN(const auto reader, AvroReader::Create(path));
@@ -642,11 +643,22 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
   return dataspec;
 }
 
+absl::Status AvroDataSpecCreator::CreateDataspec(
+    const std::vector<std::string>& paths,
+    const proto::DataSpecificationGuide& guide,
+    proto::DataSpecification* data_spec) {
+  if (paths.empty()) {
+    return absl::InvalidArgumentError("No path provided");
+  }
+  ASSIGN_OR_RETURN(*data_spec, avro::CreateDataspec(paths.front(), guide));
+  return absl::OkStatus();
+}
+
 namespace internal {
 
 absl::StatusOr<dataset::proto::DataSpecification> InferDataspec(
     const std::vector<AvroField>& fields,
-    dataset::proto::DataSpecificationGuide& guide,
+    const dataset::proto::DataSpecificationGuide& guide,
     std::vector<proto::ColumnGuide>* unstacked_guides) {
   dataset::proto::DataSpecification dataspec;
 
