@@ -28,6 +28,7 @@
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/avro.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 
@@ -35,7 +36,8 @@ namespace yggdrasil_decision_forests::dataset::avro {
 
 // Creates a dataspec from the Avro file.
 absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
-    absl::string_view path, dataset::proto::DataSpecificationGuide& guide);
+    absl::string_view path,
+    const dataset::proto::DataSpecificationGuide& guide);
 
 class AvroExampleReader final : public ExampleReaderInterface {
  public:
@@ -87,13 +89,29 @@ class AvroExampleReader final : public ExampleReaderInterface {
   Implementation sharded_reader_;
 };
 
+REGISTER_ExampleReaderInterface(AvroExampleReader, "FORMAT_AVRO");
+
+class AvroDataSpecCreator : public AbstractDataSpecCreator {
+ public:
+  absl::Status CreateDataspec(const std::vector<std::string>& paths,
+                              const proto::DataSpecificationGuide& guide,
+                              proto::DataSpecification* data_spec) override;
+
+  absl::StatusOr<int64_t> CountExamples(absl::string_view path) override {
+    return absl::UnimplementedError(
+        "CountExamples not implemented for AVRO format");
+  }
+};
+
+REGISTER_AbstractDataSpecCreator(AvroDataSpecCreator, "FORMAT_AVRO");
+
 namespace internal {
 
 // Infers the dataspec from the Avro file i.e. find the columns, but do not
 // set the statistics.
 absl::StatusOr<dataset::proto::DataSpecification> InferDataspec(
     const std::vector<AvroField>& fields,
-    dataset::proto::DataSpecificationGuide& guide,
+    const dataset::proto::DataSpecificationGuide& guide,
     std::vector<proto::ColumnGuide>* unstacked_guides);
 }  // namespace internal
 

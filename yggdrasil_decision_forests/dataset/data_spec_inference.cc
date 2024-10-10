@@ -404,6 +404,26 @@ void CreateDataSpec(absl::string_view typed_path, bool use_flume,
   CHECK_OK(CreateDataSpecWithStatus(typed_path, use_flume, guide, data_spec));
 }
 
+absl::Status AbstractDataSpecCreator::CreateDataspec(
+    const std::vector<std::string>& paths,
+    const proto::DataSpecificationGuide& guide,
+    proto::DataSpecification* data_spec) {
+  // Detect the column names and semantics.
+  RETURN_IF_ERROR(InferColumnsAndTypes(paths, guide, data_spec));
+  FinalizeInferTypes(guide, data_spec);
+  LOG(INFO) << data_spec->columns_size() << " column(s) found";
+
+  // Computes the statistics (e.g. dictionaries, ratio of missing values) for
+  // each column.
+  proto::DataSpecificationAccumulator accumulator;
+  InitializeDataspecAccumulator(*data_spec, &accumulator);
+  // TODO: Call ComputeColumnStatistics in parallel on the other paths.
+  RETURN_IF_ERROR(
+      ComputeColumnStatistics(paths, guide, data_spec, &accumulator));
+  RETURN_IF_ERROR(FinalizeComputeSpec(guide, accumulator, data_spec));
+  return absl::OkStatus();
+}
+
 absl::Status CreateDataSpecWithStatus(
     const absl::string_view typed_path, const bool use_flume,
     const proto::DataSpecificationGuide& guide,
@@ -426,21 +446,7 @@ absl::Status CreateDataSpecWithStatus(
   // Create the dataspec creator.
   const auto& format_name = proto::DatasetFormat_Name(format);
   auto creator = AbstractDataSpecCreatorRegisterer::Create(format_name).value();
-
-  // Detect the column names and semantics.
-  RETURN_IF_ERROR(creator->InferColumnsAndTypes(paths, guide, data_spec));
-  FinalizeInferTypes(guide, data_spec);
-  LOG(INFO) << data_spec->columns_size() << " column(s) found";
-
-  // Computes the statistics (e.g. dictionaries, ratio of missing values) for
-  // each column.
-  proto::DataSpecificationAccumulator accumulator;
-  InitializeDataspecAccumulator(*data_spec, &accumulator);
-  // TODO: Call ComputeColumnStatistics in parallel other the different
-  // paths.
-  RETURN_IF_ERROR(
-      creator->ComputeColumnStatistics(paths, guide, data_spec, &accumulator));
-  RETURN_IF_ERROR(FinalizeComputeSpec(guide, accumulator, data_spec));
+  RETURN_IF_ERROR(creator->CreateDataspec(paths, guide, data_spec));
 
   LOG(INFO) << "Finalizing [" << data_spec->created_num_rows()
             << " row(s) found]";

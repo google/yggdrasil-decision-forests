@@ -8,6 +8,7 @@ package(
 cc_library_ydf(
     name = "all_dataset_formats",
     deps = [
+        ":avro_example",
         ":csv_example_reader",
         ":csv_example_writer",
         "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_record_tf_example",
@@ -688,10 +689,13 @@ cc_test(
         ":avro_example",
         ":data_spec",
         ":data_spec_cc_proto",
+        ":data_spec_inference",
+        ":example_reader",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

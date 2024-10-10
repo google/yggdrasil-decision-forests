@@ -19,8 +19,11 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
+#include "yggdrasil_decision_forests/dataset/example_reader.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -438,6 +441,42 @@ SIMPLE_PARAMETERIZED_TEST(ReadExample, ReadExampleCase,
 
   ASSERT_OK_AND_ASSIGN(has_next, reader.Next(&example));
   ASSERT_FALSE(has_next);
+}
+
+TEST(CreateReaderRegistration, Base) {
+  const auto dataset_path = absl::StrCat(
+      "avro:", file::JoinPath(DatasetDir(), "toy_codex-deflate.avro"));
+  proto::DataSpecificationGuide guide;
+  {
+    auto* col = guide.add_column_guides();
+    col->set_column_name_pattern("^f_another_array_of_string$");
+    col->set_type(proto::ColumnType::CATEGORICAL_SET);
+  }
+
+  {
+    auto* col = guide.add_column_guides();
+    col->set_column_name_pattern("^f_another_float$");
+    col->set_ignore_column(true);
+  }
+
+  guide.mutable_default_column_guide()
+      ->mutable_categorial()
+      ->set_min_vocab_frequency(1);
+
+  proto::DataSpecification data_spec;
+  CreateDataSpec(dataset_path, false, guide, &data_spec);
+  LOG(INFO) << "Dataspec:\n" << dataset::PrintHumanReadable(data_spec);
+  EXPECT_EQ(data_spec.columns_size(), 21);
+  EXPECT_EQ(data_spec.unstackeds_size(), 4);
+  EXPECT_EQ(data_spec.created_num_rows(), 2);
+
+  auto reader = CreateExampleReader(dataset_path, data_spec).value();
+  proto::Example example;
+  int num_rows = 0;
+  while (reader->Next(&example).value()) {
+    num_rows++;
+  }
+  EXPECT_EQ(num_rows, 2);
 }
 
 }  // namespace

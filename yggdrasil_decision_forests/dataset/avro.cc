@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/dataset/avro.h"
 
+#include <optional>
+
 #define RAPIDJSON_HAS_STDSTRING 1
 
 #include <cstddef>
