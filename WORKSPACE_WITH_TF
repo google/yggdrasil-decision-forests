@@ -20,7 +20,6 @@ load("//third_party/tensorflow:workspace.bzl", tensorflow = "deps")
 #load("//third_party/farmhash:workspace.bzl", farmhash = "deps")
 load("//third_party/boost_math:workspace.bzl", boost_math = "deps")
 # load("//third_party/grpc:workspace.bzl", grpc = "deps")
-load("//third_party/rapidjson:workspace.bzl", rapidjson = "deps")
 load("//third_party/eigen3:workspace.bzl", eigen = "deps")
 load("//third_party/nlohmann_json:workspace.bzl", nlohmann_json = "deps")
 
@@ -32,7 +31,6 @@ tensorflow()
 #farmhash()
 boost_math()
 # grpc()  # We use the protobuf linked in tensorflow.
-rapidjson()
 # eigen()
 nlohmann_json()
 
