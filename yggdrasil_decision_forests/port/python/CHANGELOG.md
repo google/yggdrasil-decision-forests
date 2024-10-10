@@ -1,5 +1,12 @@
 # Changelog
 
+## NEXT HEAD
+
+### Feature
+
+-   Add support for Avro file for path / distributed training with the "avro:"
+    prefix.
+
 ## HEAD
 
 ### Breaking

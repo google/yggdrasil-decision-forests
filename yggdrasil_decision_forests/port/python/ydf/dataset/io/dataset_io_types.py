@@ -90,7 +90,12 @@ A dataset can be one of the following:
   8. A PyGrain DataLoader or Dataset (experimental, Linux only).
 
 The supported file formats and corresponding prefixes are:
-  - CSV file. prefix 'csv:'
-  - Non-compressed TFRecord of Tensorflow Examples. prefix 'tfrecordv2+tfe:'
-  - Compressed TFRecord of Tensorflow Examples. prefix 'tfrecord+tfe:'; not available in default public build.
+  - 'csv:' CSV files. Great for small datasets and integration with other
+    tools. CSV file do not support multi-dimensional columns.
+  - 'avro:' Avro files. Great for large datasets. Avro files support
+    multi-dimensional columns.
+  - 'tfrecord:' Compressed TFRecord of Tensorflow Examples. Official dataset format for TensorFlow. Great to work with TensorFlow and TFX pipelines.
+  - 'tfrecord-nocompression:' Non-compressed TFRecord of Tensorflow Examples. Only here is you forgot to enable compression when creating the TFRecord.
+  
+For Googlers, see go/ydf for more formats.
 """

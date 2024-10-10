@@ -14,10 +14,11 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 -   Allow configuring the truncation of NDCG losses.
 -   Add support for distributed training for ranking gradient boosted tree
     models.
+-   Add support for AVRO data file using the "avro:" prefix.
 
 ### Misc
 
--   Loss options are now defined 
+-   Loss options are now defined
     model/gradient_boosted_trees/gradient_boosted_trees.proto (previously
     learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
