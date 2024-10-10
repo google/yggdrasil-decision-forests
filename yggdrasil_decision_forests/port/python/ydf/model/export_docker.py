@@ -273,7 +273,7 @@ CMD ["fastapi", "run", "main.py", "--port", "8080"]
 
 def content_requirements() -> str:
   return """\
-fastapi
+fastapi[all]
 pydantic
 ydf
 """
