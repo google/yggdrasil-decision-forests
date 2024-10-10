@@ -22,6 +22,7 @@ load("//third_party/boost_math:workspace.bzl", boost_math = "deps")
 # load("//third_party/grpc:workspace.bzl", grpc = "deps")
 load("//third_party/rapidjson:workspace.bzl", rapidjson = "deps")
 load("//third_party/eigen3:workspace.bzl", eigen = "deps")
+load("//third_party/nlohmann_json:workspace.bzl", nlohmann_json = "deps")
 
 gtest()
 # absl()  # We use the abseil linked in tensorflow to avoid package clashes
@@ -33,6 +34,7 @@ boost_math()
 # grpc()  # We use the protobuf linked in tensorflow.
 rapidjson()
 # eigen()
+nlohmann_json()
 
 # The initialization of YDF dependencies is commented. TensorFlow
 # is in charge of initializing them.
