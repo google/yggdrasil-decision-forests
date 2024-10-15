@@ -40,7 +40,7 @@ Then:
 ```js
 (async function (){
     // Load the YDF library
-    const ydf = await require("yggdrasil-decision-forests")();
+    const ydf = await require("ydf-inference")();
 
     // Load the model
     const fs = require("node:fs");
@@ -77,10 +77,10 @@ Then:
 
 ```js
 import * as fs from "node:fs";
-import YggdrasilDecisionForests from 'yggdrasil-decision-forests';
+import YDFInference from 'ydf-inference';
 
 // Load the YDF library
-let ydf = await YggdrasilDecisionForests();
+let ydf = await YDFInference();
 
 // Load the model
 let model = await ydf.loadModelFromZipBlob(fs.readFileSync("./model.zip"));
@@ -114,10 +114,10 @@ model.unload();
 ### Run the model with in Browser
 
 ```html
-<script src="./node_modules/yggdrasil-decision-forests/dist/inference.js"></script>
+<script src="./node_modules/ydf-inference/dist/inference.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
 <script>
-YggdrasilDecisionForests()
+YDFInference()
     .then(ydf => ydf.loadModelFromUrl("http://localhost:3000/model.zip"))
     .then(model => {
         let examples = {

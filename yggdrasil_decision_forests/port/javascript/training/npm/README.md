@@ -67,10 +67,10 @@ YDFTraining()
 
 ```js
 import * as fs from "node:fs";
-import YggdrasilDecisionForests from 'yggdrasil-decision-forests';
+import YDFTraining from 'ydf-training';
 
 // Load the YDF library
-let ydf = await YggdrasilDecisionForests();
+let ydf = await YDFTraining();
 
 const data = fs.readFileSync("data.csv", 'utf-8');
 const task = "CLASSIFICATION";

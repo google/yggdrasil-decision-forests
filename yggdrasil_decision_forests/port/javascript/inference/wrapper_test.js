@@ -65,7 +65,7 @@ describe('YDF Inference', () => {
 
   beforeAll(async () => {
     // Load library
-    await YggdrasilDecisionForests({
+    await YDFInference({
       locateFile: function(filename, dir) {
         return dir + filename;
       }

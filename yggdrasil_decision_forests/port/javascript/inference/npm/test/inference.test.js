@@ -21,7 +21,7 @@ describe('YDF Inference', () => {
   let model2 = null;
 
   beforeAll(async () => {
-    ydf = await require('yggdrasil-decision-forests')();
+    ydf = await require('ydf-inference')();
 
     model1 =
         await ydf.loadModelFromZipBlob(fs.readFileSync('./test/model_1.zip'));
