@@ -30,6 +30,13 @@ cp -f bazel-bin/yggdrasil_decision_forests/port/javascript/inference/ydf.zip dis
 # Extract library to NPM location
 unzip dist/ydf_inference.zip -d yggdrasil_decision_forests/port/javascript/inference/npm/dist
 
+# Compile Typescript.
+(
+  cd yggdrasil_decision_forests/port/javascript/training
+  npm install --save-dev webpack webpack-cli typescript ts-loader
+  npx webpack
+)
+
 bazel build -c opt --config=wasm \
   //yggdrasil_decision_forests/port/javascript/training:create_release
 

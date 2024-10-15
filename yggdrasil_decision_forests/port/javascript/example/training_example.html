@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Training YDF models on the Web</title>
+
+    <!-- Yggdrasil Decision Forests -->
+    <script src="ydf/training.js"></script>
+
+    <!-- JSZip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
+
+    <script>
+      // The model (once loaded).
+      let model = null;
+      let ydf = null;
+
+      YDFTraining({
+        // Write logs to the HTML instead of console.
+        "print": (msg) => {
+          writeToTerminal(msg);
+        },
+        "printErr": (msg) => {
+          writeToTerminal(msg);
+        },
+      }).then(function (m) {
+        ydf = m;
+
+        writeToTerminal("The library is loaded");
+        document.getElementById("btn_train_model").onclick = trainModel;
+        document.getElementById("btn_describe_model").onclick = describeModel;
+        document.getElementById("btn_save_model").onclick = saveModel;
+        document.getElementById("btn_unload_model").onclick = unloadModel;
+      });
+      
+      async function fetchCSV(url) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch CSV file: ${response.status} ${response.statusText}`);
+        }
+        const csvData = await response.text();
+        return csvData;
+      } catch (error) {
+        writeToTerminal("Error fetching CSV:", error);
+        return null;
+      }
+    }
+
+      function trainModel() {
+        if (ydf == null) {
+          writeToTerminal("The library is not yet loaded");
+          return;
+        }
+        const task = document.getElementById('task').value;
+        const label = document.getElementById('label').value;
+        const dataUrl = document.getElementById('trainingDataUrl').value;
+        const learner = document.getElementById('learner').value;
+      
+        fetchCSV(dataUrl).then((data) => {
+          if (data === null) {
+            return;
+          }
+          if (learner == "RF") {
+            model = new ydf.RandomForestLearner(label, task).train(data);
+          } else if (learner == "GBT") {
+            model = new ydf.GradientBoostedTreesLearner(label, task).train(data);
+          } else {
+            writeToTerminal("Unknown learner: " + learner);
+            throw new Error("Unknown learner: " + learner);
+          }
+          writeToTerminal("Done training model.");
+      
+          document.getElementById("btn_train_model").disabled = true;
+          document.getElementById("btn_describe_model").disabled = false;
+          document.getElementById("btn_save_model").disabled = false;
+          document.getElementById("btn_unload_model").disabled = false;
+        });
+      }
+      
+      function describeModel() {
+        const description = model.describe();
+        document.getElementById('modelDescription').value = description;
+      }
+      
+      async function saveModel() {
+        const blob = await model.save();
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'model.zip';
+        document.body.appendChild(a);
+        a.click();
+        // Clean up: remove the link and revoke the URL
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+
+      function unloadModel() {
+        model.unload();
+        model = null;
+
+        writeToTerminal("Model unloaded");
+
+        document.getElementById("btn_train_model").disabled = false;
+        document.getElementById("btn_describe_model").disabled = true;
+        document.getElementById("btn_save_model").disabled = true;
+        document.getElementById("btn_unload_model").disabled = true;
+      }
+
+      function writeToTerminal(text) {
+        if (typeof text == "object") {
+          text = JSON.stringify(text);
+        }
+        let terminal = document.getElementById("terminal");
+        terminal.value += text + "\n";
+        terminal.scrollTop = terminal.scrollHeight; // focus on bottom
+      }
+    </script>
+
+    <style>
+      .button_box {
+        display: flex;
+        justify-content: space-around;
+      }
+      .button_box button {
+        width: 100%;
+        margin: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Training YDF models on the Web</h1>
+
+    <p>
+      This example demonstrates how to train
+      <a href="https://github.com/google/yggdrasil-decision-forests"
+        >YDF</a
+      >
+      models in Javascript.
+    </p>
+
+    <p>
+      <label for="trainingDataUrl">Training data URL: </label>
+      <input name="trainingDataUrl" id="trainingDataUrl" size="125" type="text" value="https://raw.githubusercontent.com/google/yggdrasil-decision-forests/refs/heads/main/yggdrasil_decision_forests/test_data/dataset/abalone.csv">
+    </p>
+    <p>
+      <label for="label">Label: </label>
+      <input name="label" id="label" size="30" type="text" value="Rings">
+    </p>
+    <p>
+      <label for="task">Task: </label>
+      <select name="task" id="task">
+        <option value="CLASSIFICATION">CLASSIFICATION</option>
+        <option value="REGRESSION" selected="selected">REGRESSION</option>
+      </select>
+    </p>
+    <p>
+      <label for="learner">Learner: </label>
+      <select name="learner" id="learner">
+        <option value="GBT">GradientBoostedTreesLearner</option>
+        <option value="RF">RandomForestLearner</option>
+      </select>
+    </p>
+
+    <div class="button_box">
+      <button id="btn_train_model" type="button">Train model</button>
+      <button id="btn_describe_model" type="button" disabled>Describe model</button>
+      <button id="btn_save_model" type="button" disabled>Save model</button>
+      <button id="btn_unload_model" type="button" disabled>Unload model</button>
+    </div>
+
+    <p>
+      <label for="modelDescription">Model description</label><br />
+      <textarea
+        id="modelDescription"
+        name="modelDescription"
+        style="border: 1px solid black; width: 100%"
+        rows="15"
+      >
+      </textarea>
+    </p>
+
+    <p>
+      <label for="terminal">Logs:</label><br />
+      <textarea
+        id="terminal"
+        name="terminal"
+        style="border: 1px solid black; font-family: monospace; width: 100%"
+        rows="30"
+      ></textarea>
+    </p>
+  </body>
+</html>

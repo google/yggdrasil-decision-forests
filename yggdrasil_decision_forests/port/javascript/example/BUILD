@@ -1,5 +1,5 @@
 package(
-    default_visibility = ["//yggdrasil_decision_forests/port/javascript:users"],
+    default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 

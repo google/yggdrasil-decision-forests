@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+      "module": "ES6",
+      "sourceMap": true,
+      "target": "es2017",
+      "lib": ["es2017", "dom"],
+  },
+  "include": ["**/*.ts",],
+  "exclude": ["**/*_test.ts"]
+}
