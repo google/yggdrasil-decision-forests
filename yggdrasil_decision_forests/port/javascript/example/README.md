@@ -1,5 +1,7 @@
 # Usage example for Yggdrasil Decision Forests in JavaScript
 
+## Inference
+
 See "../README.md" for details.
 
 See
@@ -38,3 +40,8 @@ head /tmp/predictions.csv
 # 0.219888,0.780112
 # 0.88848,0.11152
 ```
+
+
+## Training
+
+See `training_example.html` for an example of the training code.

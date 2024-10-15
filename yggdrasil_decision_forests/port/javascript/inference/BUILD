@@ -1,7 +1,7 @@
 load("@emsdk//emscripten_toolchain:wasm_rules.bzl", "wasm_cc_binary")
 
 package(
-    default_visibility = ["//yggdrasil_decision_forests/port/javascript:users"],
+    default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
