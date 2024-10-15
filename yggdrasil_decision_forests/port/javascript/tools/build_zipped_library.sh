@@ -30,6 +30,9 @@ cp -f bazel-bin/yggdrasil_decision_forests/port/javascript/inference/ydf.zip dis
 # Extract library to NPM location
 unzip dist/ydf_inference.zip -d yggdrasil_decision_forests/port/javascript/inference/npm/dist
 
+# Remove the unnecessary readme.txt in the subfolder.
+rm yggdrasil_decision_forests/port/javascript/inference/npm/dist/readme.txt
+
 # Compile Typescript.
 (
   cd yggdrasil_decision_forests/port/javascript/training
@@ -46,3 +49,6 @@ cp -f bazel-bin/yggdrasil_decision_forests/port/javascript/training/ydf.zip dist
 
 # Extract library to NPM location
 unzip dist/ydf_training.zip -d yggdrasil_decision_forests/port/javascript/training/npm/dist
+
+# Remove the unnecessary readme.txt in the subfolder.
+rm yggdrasil_decision_forests/port/javascript/training/npm/dist/readme.txt
