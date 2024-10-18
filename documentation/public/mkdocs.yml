@@ -56,7 +56,7 @@ nav:
   - Deploying a model:
     - FastAPI + Docker: tutorial/to_docker.ipynb
     - In C++: tutorial/cpp.ipynb
-    - In JavaScript: https://www.npmjs.com/package/yggdrasil-decision-forests
+    - In JavaScript: https://www.npmjs.com/package/ydf-inference
     - With TF Serving: tutorial/tf_serving.ipynb
     # TODO: Add Benchmarking, C++, Go, Cli, Python, F Serving, and Js
   - Explainability / XAI:
@@ -100,7 +100,7 @@ nav:
     # TODO: model inspection, manual tree creation, custom loss.
   - Other APIs:
     - CLI quickstart: cli_quickstart.md
-    - JavaScript: https://www.npmjs.com/package/yggdrasil-decision-forests
+    - JavaScript: javascript.md
     - CLI & C++ user manual: cli_user_manual.md
     - CLI commands: cli_commands.md
     - CLI examples: https://github.com/google/yggdrasil-decision-forests/tree/main/examples
