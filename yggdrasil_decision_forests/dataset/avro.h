@@ -57,12 +57,15 @@ enum class AvroCodec {
 struct AvroField {
   std::string name;
   AvroType type;
+  bool optional = false;  // If the type is ["null", <something> ].
+
   AvroType sub_type = AvroType::kUnknown;  // Only used if type==kArray.
-  bool optional = false;  // If the field is ["null", <something> ].
+  bool sub_optional = false;  // If the sub_type is ["null", <something> ].
 
   bool operator==(const AvroField& other) const {
     return name == other.name && type == other.type &&
-           optional == other.optional && sub_type == other.sub_type;
+           optional == other.optional && sub_type == other.sub_type &&
+           sub_optional == other.sub_optional;
   }
 
   friend std::ostream& operator<<(std::ostream& os, const AvroField& field);

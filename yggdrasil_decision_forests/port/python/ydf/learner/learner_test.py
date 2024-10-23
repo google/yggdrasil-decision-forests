@@ -21,9 +21,11 @@ from typing import Any, Dict, Optional, Tuple
 from absl import logging
 from absl.testing import absltest
 from absl.testing import parameterized
+import fastavro
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
+import polars as pl
 from sklearn import metrics
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
@@ -866,7 +868,9 @@ class RandomForestLearnerTest(LearnerTest):
 
   def test_label_is_dataset(self):
     with self.assertRaisesRegex(ValueError, "should be a string"):
-      _ = specialized_learners.RandomForestLearner(label=np.array([1, 0]))  # pytype: disable=wrong-arg-types
+      _ = specialized_learners.RandomForestLearner(
+          label=np.array([1, 0])
+      )  # pytype: disable=wrong-arg-types
 
   def test_wrong_shape_multidim_model(self):
     model = specialized_learners.RandomForestLearner(
@@ -1448,6 +1452,208 @@ class IsolationForestLearnerTest(LearnerTest):
     self.assertIsInstance(
         first_root.condition, condition_lib.NumericalSparseObliqueCondition
     )
+
+
+class DatasetFormatsTest(parameterized.TestCase):
+
+  def features(self):
+    return [
+        "f1",
+        "f2",
+        "i1",
+        "i2",
+        "c1",
+        "multi_c1",
+        ("cs1", dataspec.Semantic.CATEGORICAL_SET),
+        "multi_f1",
+    ]
+
+  def create_polars_dataset(self, n: int = 1000) -> pl.DataFrame:
+    return pl.DataFrame({
+        # Single-dim features
+        "f1": np.random.random(size=n),
+        "f2": np.random.random(size=n),
+        "i1": np.random.randint(100, size=n),
+        "i2": np.random.randint(100, size=n),
+        "c1": np.random.choice(["x", "y", "z"], size=n, p=[0.6, 0.3, 0.1]),
+        "multi_c1": np.array(
+            [["a", "x", "z"], ["b", "x", "w"], ["a", "y", "w"], ["b", "y", "z"]]
+            * (n // 4)
+        ),
+        # Cat-set features
+        # ================
+        # Note: Polars as a bug when serializing empty lists of string to Avro
+        # files (only write one of the two required "optional" bit).
+        # TODO: Replace [""] by [] once the bug if fixed is added.
+        "cs1": [["<SOMETHING>"], ["a", "b", "c"], ["b", "c"], ["a"]] * (n // 4),
+        # Multi-dim features
+        # ==================
+        # Note: It seems support for this type of feature was temporarly dropped
+        # in Polars 1.9 i.e. the data packing was improved but the avro
+        # serialization was not implemented. This code would fail with recent
+        # version of polars with: not yet implemented: write
+        # FixedSizeList(Field { name: "item", dtype: Float64, is_nullable: true,
+        # metadata: {} }, 5) to avro.
+        "multi_f1": np.random.random(size=(n, 3)),
+        # # Labels
+        "label_class_binary1": np.random.choice([False, True], size=n),
+        "label_class_binary2": np.random.choice([0, 1], size=n),
+        "label_class_binary3": np.random.choice(["l1", "l2"], size=n),
+        "label_class_multi1": np.random.choice(["l1", "l2", "l3"], size=n),
+        "label_class_multi2": np.random.choice([0, 1, 2], size=n),
+        "label_regress1": np.random.random(size=n),
+    })
+
+  def test_avro_from_raw_fastavro(self):
+    tmp_dir = self.create_tempdir().full_path
+    ds_path = os.path.join(tmp_dir, "dataset.avro")
+    schema = fastavro.parse_schema({
+        "name": "ToyDataset",
+        "doc": "A toy dataset.",
+        "type": "record",
+        "fields": [
+            {"name": "f1", "type": "float"},
+            {"name": "f2", "type": ["null", "float"]},
+            {"name": "i1", "type": "int"},
+            {"name": "c1", "type": "string"},
+            {
+                "name": "multi_f1",
+                "type": {"type": "array", "items": "float"},
+            },
+            {
+                "name": "multi_c1",
+                "type": {"type": "array", "items": "string"},
+            },
+            {
+                "name": "cs1",
+                "type": {"type": "array", "items": "string"},
+            },
+            {
+                "name": "cs2",
+                "type": [
+                    "null",
+                    {"type": "array", "items": ["null", "string"]},
+                ],
+            },
+            {"name": "l", "type": "float"},
+        ],
+    })
+    records = []
+    for _ in range(100):
+      record = {
+          "f1": np.random.rand(),
+          "i1": np.random.randint(100),
+          "c1": np.random.choice(["x", "y", "z"]),
+          "multi_f1": [np.random.rand() for _ in range(3)],
+          "multi_c1": [np.random.choice(["x", "y", "z"]) for _ in range(3)],
+          "cs1": [
+              np.random.choice(["x", "y", "z"])
+              for _ in range(np.random.randint(3))
+          ],
+          "l": np.random.rand(),
+      }
+      if np.random.rand() < 0.8:
+        record["f2"] = np.random.rand()
+      if np.random.rand() < 0.8:
+        record["cs2"] = [
+            np.random.choice(["x", "y", None])
+            for _ in range(np.random.randint(3))
+        ]
+      records.append(record)
+    with open(ds_path, "wb") as out:
+      fastavro.writer(out, schema, records, codec="deflate")
+    learner = specialized_learners.RandomForestLearner(
+        label="l",
+        num_trees=3,
+        features=[
+            ("cs1", dataspec.Semantic.CATEGORICAL_SET),
+            ("cs2", dataspec.Semantic.CATEGORICAL_SET),
+        ],
+        include_all_columns=True,
+        task=generic_learner.Task.REGRESSION,
+    )
+    model = learner.train("avro:" + ds_path)
+    self.assertEqual(model.num_trees(), 3)
+    logging.info("model.input_features():\n%s", model.input_features())
+    InputFeature = generic_model.InputFeature
+    Semantic = dataspec.Semantic
+    self.assertEqual(
+        model.input_features(),
+        [
+            InputFeature(name="f1", semantic=Semantic.NUMERICAL, column_idx=0),
+            InputFeature(name="f2", semantic=Semantic.NUMERICAL, column_idx=1),
+            InputFeature(name="i1", semantic=Semantic.NUMERICAL, column_idx=2),
+            InputFeature(
+                name="c1", semantic=Semantic.CATEGORICAL, column_idx=3
+            ),
+            InputFeature(
+                name="cs1", semantic=Semantic.CATEGORICAL_SET, column_idx=4
+            ),
+            InputFeature(
+                name="cs2", semantic=Semantic.CATEGORICAL_SET, column_idx=5
+            ),
+            InputFeature(
+                name="multi_f1.0_of_3",
+                semantic=Semantic.NUMERICAL,
+                column_idx=7,
+            ),
+            InputFeature(
+                name="multi_f1.1_of_3",
+                semantic=Semantic.NUMERICAL,
+                column_idx=8,
+            ),
+            InputFeature(
+                name="multi_f1.2_of_3",
+                semantic=Semantic.NUMERICAL,
+                column_idx=9,
+            ),
+            InputFeature(
+                name="multi_c1.0_of_3",
+                semantic=Semantic.CATEGORICAL,
+                column_idx=10,
+            ),
+            InputFeature(
+                name="multi_c1.1_of_3",
+                semantic=Semantic.CATEGORICAL,
+                column_idx=11,
+            ),
+            InputFeature(
+                name="multi_c1.2_of_3",
+                semantic=Semantic.CATEGORICAL,
+                column_idx=12,
+            ),
+        ],
+    )
+
+  def test_avro_from_fastavro_with_pandas(self):
+    tmp_dir = self.create_tempdir().full_path
+    ds_path = os.path.join(tmp_dir, "dataset.avro")
+    schema = fastavro.parse_schema({
+        "name": "ToyDataset",
+        "doc": "A toy dataset.",
+        "type": "record",
+        "fields": [
+            {"name": "f1", "type": "float"},
+            {"name": "f2", "type": "float"},
+            {"name": "f3", "type": ["null", "float"]},
+            {"name": "l", "type": "float"},
+        ],
+    })
+    ds = pd.DataFrame({
+        "f1": np.random.rand(100),
+        "f2": np.random.rand(100),
+        "f3": np.random.rand(100),
+        "l": np.random.rand(100),
+    })
+    with open(ds_path, "wb") as out:
+      fastavro.writer(out, schema, ds.to_dict("records"), codec="deflate")
+    learner = specialized_learners.RandomForestLearner(
+        label="l",
+        num_trees=3,
+        task=generic_learner.Task.REGRESSION,
+    )
+    model = learner.train("avro:" + ds_path)
+    self.assertEqual(model.num_trees(), 3)
 
 
 class UtilityTest(LearnerTest):

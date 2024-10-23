@@ -15,6 +15,7 @@ py_library(
     deps = [
         # numpy dep,
         # pandas dep,
+        # polars dep,
         # xarray dep,
     ],
 )
@@ -25,6 +26,7 @@ py_library(
     deps = [
         ":dataset_io_types",
         ":pandas_io",
+        ":polars_io",
         ":pygrain_io",
         ":tensorflow_io",
         ":xarray_io",
@@ -39,6 +41,15 @@ py_library(
         ":dataset_io_types",
         # absl/logging dep,
         # pandas dep,
+    ],
+)
+
+py_library(
+    name = "polars_io",
+    srcs = ["polars_io.py"],
+    deps = [
+        ":dataset_io_types",
+        # absl/logging dep,
     ],
 )
 
@@ -78,6 +89,18 @@ py_test(
         ":pandas_io",
         # absl/testing:absltest dep,
         # pandas dep,
+        # polars dep,
+    ],
+)
+
+py_test(
+    name = "polars_io_test",
+    srcs = ["polars_io_test.py"],
+    deps = [
+        ":polars_io",
+        # absl/testing:absltest dep,
+        # pandas dep,
+        # polars dep,
     ],
 )
 

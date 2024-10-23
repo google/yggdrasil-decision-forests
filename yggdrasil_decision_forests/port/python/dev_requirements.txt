@@ -16,3 +16,4 @@ flatbuffers; platform_machine != 'aarch64' and platform_system != 'Windows' and 
 tensorflow-datasets; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.9'
 grain; platform_machine != 'aarch64' and platform_system != 'Windows'
 fastavro
+polars

@@ -12,23 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test dataspec utilities for pandas."""
+"""Test dataspec utilities for Polars."""
 
 from absl.testing import absltest
 import pandas as pd
 import polars as pl
 
-from ydf.dataset.io import pandas_io
+from ydf.dataset.io import polars_io
 
 
-class PandasIOTest(absltest.TestCase):
+class PolarsIOTest(absltest.TestCase):
 
-  def test_is_pandas(self):
-    self.assertTrue(pandas_io.is_pandas_dataframe(pd.DataFrame()))
-    self.assertFalse(pandas_io.is_pandas_dataframe({}))
+  def test_is_polars(self):
+    self.assertTrue(polars_io.is_polars_dataframe(pl.DataFrame()))
+    self.assertFalse(polars_io.is_polars_dataframe({}))
 
-  def test_polars_is_not_pandas(self):
-    self.assertFalse(pandas_io.is_pandas_dataframe(pl.DataFrame()))
+  def test_pandas_is_not_polars(self):
+    self.assertFalse(polars_io.is_polars_dataframe(pd.DataFrame()))
 
 
 if __name__ == "__main__":

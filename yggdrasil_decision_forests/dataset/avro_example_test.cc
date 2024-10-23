@@ -396,7 +396,7 @@ SIMPLE_PARAMETERIZED_TEST(ReadExample, ReadExampleCase,
     attributes { categorical: 1 }
     attributes { categorical: 1 }
     attributes { numerical: 6.1 }
-    attributes { categorical_set { values: 4 values: 3 values: 1 } }
+    attributes { categorical_set { values: 1 values: 3 values: 4 } }
     attributes { numerical: 1 }
     attributes { numerical: 2 }
     attributes { numerical: 3 }
@@ -438,6 +438,93 @@ SIMPLE_PARAMETERIZED_TEST(ReadExample, ReadExampleCase,
     attributes {}
   )pb");
   EXPECT_THAT(example, EqualsProto(expected_2));
+
+  ASSERT_OK_AND_ASSIGN(has_next, reader.Next(&example));
+  ASSERT_FALSE(has_next);
+}
+
+TEST(ReadExample, ReadExampleCaseToy2) {
+  // Data generated with Polars as follows:
+  //
+  // pl.DataFrame({
+  //     "f1": [1.0, 2.0, 3.0, None],
+  //     "i1": [1, 2, 3, None],
+  //     "c1": ["x", "y", "x", None],
+  //     "cs1": [["a", "b"], None, [""], ["a", None]],
+  //     #"cs1": [["a", "b"], None, [], ["a", None]],
+  //     "multi_f1": [None, [None, 4.0], [5.0, 6.0], [6.0, 7.0]],
+  // }).write_avro(p, compression="uncompressed")
+  //
+  // In the current version of Polars (internal 0.20.16), there is a bug when
+  // writing empty arrays: One byte is missing (confirmed by comparing binary to
+  // fastavro and ydf c++ code).
+  // TODO: Switch the "cs1" above when fixed.
+
+  dataset::proto::DataSpecificationGuide guide;
+
+  {
+    auto* col = guide.add_column_guides();
+    col->set_column_name_pattern("^cs1$");
+    col->set_type(proto::ColumnType::CATEGORICAL_SET);
+  }
+
+  guide.mutable_default_column_guide()
+      ->mutable_categorial()
+      ->set_min_vocab_frequency(1);
+  const auto path = file::JoinPath(DatasetDir(), "toy2_codex-null.avro");
+  ASSERT_OK_AND_ASSIGN(const auto dataspec, CreateDataspec(path, guide));
+
+  AvroExampleReader reader(dataspec, {});
+  ASSERT_OK(reader.Open(path));
+  proto::Example example;
+  ASSERT_OK_AND_ASSIGN(bool has_next, reader.Next(&example));
+  ASSERT_TRUE(has_next);
+
+  const proto::Example expected_1 = PARSE_TEST_PROTO(R"pb(
+    attributes { numerical: 1 }
+    attributes { numerical: 1 }
+    attributes { categorical: 1 }
+    attributes { categorical_set { values: 1 values: 3 } }
+    attributes {}
+    attributes {}
+  )pb");
+  EXPECT_THAT(example, EqualsProto(expected_1));
+
+  ASSERT_OK_AND_ASSIGN(has_next, reader.Next(&example));
+  ASSERT_TRUE(has_next);
+  const proto::Example expected_2 = PARSE_TEST_PROTO(R"pb(
+    attributes { numerical: 2 }
+    attributes { numerical: 2 }
+    attributes { categorical: 2 }
+    attributes {}
+    attributes {}
+    attributes { numerical: 4 }
+  )pb");
+  EXPECT_THAT(example, EqualsProto(expected_2));
+
+  ASSERT_OK_AND_ASSIGN(has_next, reader.Next(&example));
+  ASSERT_TRUE(has_next);
+  const proto::Example expected_3 = PARSE_TEST_PROTO(R"pb(
+    attributes { numerical: 3 }
+    attributes { numerical: 3 }
+    attributes { categorical: 1 }
+    attributes { categorical_set { values: 2 } }
+    attributes { numerical: 5 }
+    attributes { numerical: 6 }
+  )pb");
+  EXPECT_THAT(example, EqualsProto(expected_3));
+
+  ASSERT_OK_AND_ASSIGN(has_next, reader.Next(&example));
+  ASSERT_TRUE(has_next);
+  const proto::Example expected_4 = PARSE_TEST_PROTO(R"pb(
+    attributes {}
+    attributes {}
+    attributes {}
+    attributes { categorical_set { values: 1 values: 2 } }
+    attributes { numerical: 6 }
+    attributes { numerical: 7 }
+  )pb");
+  EXPECT_THAT(example, EqualsProto(expected_4));
 
   ASSERT_OK_AND_ASSIGN(has_next, reader.Next(&example));
   ASSERT_FALSE(has_next);

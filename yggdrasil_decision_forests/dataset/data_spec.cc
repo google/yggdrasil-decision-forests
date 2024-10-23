@@ -996,7 +996,10 @@ std::string UnstackedColumnName(const absl::string_view original_name,
 
 std::vector<std::string> UnstackedColumnNamesV2(absl::string_view original_name,
                                                 int num_dims) {
-  const int num_leading_zeroes = std::log10(num_dims) + 1;
+  int num_leading_zeroes = 1;
+  if (num_dims > 0) {
+    num_leading_zeroes = std::log10(num_dims) + 1;
+  }
   std::vector<std::string> result;
   result.reserve(num_dims);
   for (int dim_idx = 0; dim_idx < num_dims; dim_idx++) {

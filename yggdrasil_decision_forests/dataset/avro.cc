@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/dataset/avro.h"
 
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -73,9 +74,89 @@ absl::StatusOr<const std::string> GetJsonStringField(
   }
   if (!it->is_string()) {
     return absl::InvalidArgumentError(
-        absl::StrCat("Field \"", name, "\" is not a string"));
+        absl::StrCat("Field \"", name, "\" is not a string: ", it->dump()));
   }
   return it->get<std::string>();
+}
+
+// Extracts the "something" in a ["null", <something>].
+absl::StatusOr<const nlohmann::json*> ExtractTypeInArrayNullType(
+    const nlohmann::json& src) {
+  if (src.size() == 2 && src[0].is_string() &&
+      src[0].get<std::string>() == std::string("null")) {
+    return &src[1];
+  }
+  return absl::InvalidArgumentError(absl::StrCat(
+      "Expected Avro schema with [\"null\", <something>]. Instead got: ",
+      src.dump()));
+}
+
+// Extracts the "something" in a {"type": "array", "items": <something>}.
+absl::StatusOr<const nlohmann::json*> ExtractItemsInTypeArrayObject(
+    const nlohmann::json& src) {
+  if (src["type"].is_string() && src["type"].get<std::string>() == "array") {
+    return &src["items"];
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("Expected Avro schema with {\"type\": \"array\", \"items\": "
+                   "<something>}. Instead got: ",
+                   src.dump()));
+}
+
+struct RecursiveAvroField {
+  RecursiveAvroField(AvroType type = AvroType::kUnknown,
+                     std::unique_ptr<RecursiveAvroField> sub_type = {},
+                     bool optional = false)
+      : type(type), sub_type(std::move(sub_type)), optional(optional) {}
+
+  AvroType type;
+  std::unique_ptr<RecursiveAvroField> sub_type;  // Only used if type==kArray.
+  bool optional;
+};
+
+absl::StatusOr<std::unique_ptr<RecursiveAvroField>> ParseRecursiveAvroField(
+    const nlohmann::json& json_type) {
+  if (json_type.is_string()) {
+    // type: "<scalar>"
+    ASSIGN_OR_RETURN(const auto type, ParseType(json_type.get<std::string>()));
+    return absl::make_unique<RecursiveAvroField>(type);
+  } else if (json_type.is_object()) {
+    // type: {"type": "array", "items": <scalar>}
+    // TODO: Add support for {"type": "array", "items": <something>}
+    ASSIGN_OR_RETURN(const auto json_items,
+                     ExtractItemsInTypeArrayObject(json_type));
+    ASSIGN_OR_RETURN(auto sub_type, ParseRecursiveAvroField(*json_items));
+    return absl::make_unique<RecursiveAvroField>(AvroType::kArray,
+                                                 std::move(sub_type));
+  } else if (json_type.is_array()) {
+    // type: ["null", <something>]
+    ASSIGN_OR_RETURN(const auto json_sub_type,
+                     ExtractTypeInArrayNullType(json_type));
+    ASSIGN_OR_RETURN(auto sub_type, ParseRecursiveAvroField(*json_sub_type));
+    if (sub_type->optional) {
+      return absl::InvalidArgumentError(
+          "Avro schema contains two optional tags on the same field.");
+    }
+    sub_type->optional = true;
+    return sub_type;
+  }
+  return absl::InvalidArgumentError("Unsupported Avro schema");
+}
+
+absl::StatusOr<AvroField> RecursiveAvroFieldToAvroField(
+    const RecursiveAvroField& src) {
+  AvroField dst{.type = src.type, .optional = src.optional};
+
+  if (src.type == AvroType::kArray) {
+    dst.sub_type = src.sub_type->type;
+    dst.sub_optional = src.sub_type->optional;
+    if (dst.sub_type == AvroType::kArray) {
+      return absl::InvalidArgumentError(
+          "Unsupported Avro schema with more than 2 non-optional levels");
+    }
+  }
+
+  return dst;
 }
 
 }  // namespace
@@ -146,7 +227,8 @@ absl::StatusOr<std::unique_ptr<AvroReader>> AvroReader::Create(
   ASSIGN_OR_RETURN(std::unique_ptr<utils::InputByteStream> file_handle,
                    file::OpenInputFile(path));
   auto reader = absl::WrapUnique(new AvroReader(std::move(file_handle)));
-  ASSIGN_OR_RETURN(const auto schema, reader->ReadHeader());
+  ASSIGN_OR_RETURN(const auto schema, reader->ReadHeader(),
+                   _ << "While reading header of " << path);
   return std::move(reader);
 }
 
@@ -230,68 +312,19 @@ absl::StatusOr<std::string> AvroReader::ReadHeader() {
   for (const auto& json_field : json_fields->items()) {
     ASSIGN_OR_RETURN(const auto json_name,
                      GetJsonStringField(json_field.value(), "name"));
-    ASSIGN_OR_RETURN(const auto* json_sub_type,
+    ASSIGN_OR_RETURN(const auto* json_type,
                      GetJsonField(json_field.value(), "type"));
-    AvroType type = AvroType::kUnknown;
-    AvroType sub_type = AvroType::kUnknown;
-    bool optional = false;
 
-    if (json_sub_type->is_string()) {
-      const std::string str_type = json_sub_type->get<std::string>();
-      // Scalar
-      ASSIGN_OR_RETURN(type, ParseType(str_type));
-    } else if (json_sub_type->is_array()) {
-      // Optional
-      optional = true;
-
-      // const auto& json_sub_type_array = json_sub_type->GetArray();
-      if (json_sub_type->size() == 2 && (*json_sub_type)[0].is_string() &&
-          (*json_sub_type)[0].get<std::string>() == std::string("null")) {
-        if ((*json_sub_type)[1].is_string()) {
-          // Scalar
-          ASSIGN_OR_RETURN(type,
-                           ParseType((*json_sub_type)[1].get<std::string>()));
-        }
-        if ((*json_sub_type)[1].is_object()) {
-          // Array
-          ASSIGN_OR_RETURN(const auto json_sub_sub_type,
-                           GetJsonStringField((*json_sub_type)[1], "type"));
-          ASSIGN_OR_RETURN(const auto json_items,
-                           GetJsonStringField((*json_sub_type)[1], "items"));
-          if (json_sub_sub_type == "array") {
-            ASSIGN_OR_RETURN(sub_type, ParseType(json_items));
-            type = AvroType::kArray;
-          }
-        }
-      }
-    } else if (json_sub_type->is_object()) {
-      // Array
-      ASSIGN_OR_RETURN(const auto json_sub_sub_type,
-                       GetJsonStringField(*json_sub_type, "type"));
-      ASSIGN_OR_RETURN(const auto json_items,
-                       GetJsonStringField(*json_sub_type, "items"));
-
-      if (json_sub_sub_type == "array") {
-        ASSIGN_OR_RETURN(sub_type, ParseType(json_items));
-        type = AvroType::kArray;
-      }
-    }
-
-    if (type == AvroType::kUnknown) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "Unsupported type=", json_sub_type->get<std::string>(),
-          " for field \"", json_name,
-          "\". YDF only supports the following types: null, "
-          "boolean, long, int, float, double, string, bytes, array of <scalar "
-          "type>, [null, <scalar type>], [null, array[<scalar type>]]."));
-    }
-
-    fields_.push_back(AvroField{
-        .name = json_name,
-        .type = type,
-        .sub_type = sub_type,
-        .optional = optional,
-    });
+    ASSIGN_OR_RETURN(const auto recursive_field,
+                     ParseRecursiveAvroField(*json_type),
+                     _ << "Unsupported Avro schema for field " << json_name
+                       << ":" << json_type->dump());
+    ASSIGN_OR_RETURN(auto field,
+                     RecursiveAvroFieldToAvroField(*recursive_field),
+                     _ << "Unsupported Avro schema for field " << json_name
+                       << ":" << json_type->dump());
+    field.name = json_name;
+    fields_.push_back(field);
   }
 
   return schema;
@@ -412,6 +445,14 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayFloat(
       num_values = -num_values;
     }
     for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
+      if (field.sub_optional) {
+        ASSIGN_OR_RETURN(const auto has_sub_value,
+                         current_block_reader_->ReadByte());
+        if (!has_sub_value) {
+          values->push_back(std::numeric_limits<float>::quiet_NaN());
+          continue;
+        }
+      }
       ASSIGN_OR_RETURN(auto value,
                        internal::ReadFloat(&current_block_reader_.value()));
       values->push_back(value);
@@ -444,6 +485,14 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayDouble(
       num_values = -num_values;
     }
     for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
+      if (field.sub_optional) {
+        ASSIGN_OR_RETURN(const auto has_sub_value,
+                         current_block_reader_->ReadByte());
+        if (!has_sub_value) {
+          values->push_back(std::numeric_limits<double>::quiet_NaN());
+          continue;
+        }
+      }
       ASSIGN_OR_RETURN(auto value,
                        internal::ReadDouble(&current_block_reader_.value()));
       values->push_back(value);
@@ -476,6 +525,14 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayDoubleIntoFloat(
       num_values = -num_values;
     }
     for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
+      if (field.sub_optional) {
+        ASSIGN_OR_RETURN(const auto has_sub_value,
+                         current_block_reader_->ReadByte());
+        if (!has_sub_value) {
+          values->push_back(std::numeric_limits<float>::quiet_NaN());
+          continue;
+        }
+      }
       ASSIGN_OR_RETURN(auto value,
                        internal::ReadDouble(&current_block_reader_.value()));
       values->push_back(value);
@@ -489,6 +546,7 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayString(
     const AvroField& field, std::vector<std::string>* values) {
   if (field.optional) {
     ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
+
     if (!has_value) {
       return false;
     }
@@ -508,6 +566,14 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayString(
       num_values = -num_values;
     }
     for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
+      if (field.sub_optional) {
+        ASSIGN_OR_RETURN(const auto has_sub_value,
+                         current_block_reader_->ReadByte());
+        if (!has_sub_value) {
+          values->push_back("");
+          continue;
+        }
+      }
       std::string sub_value;
       RETURN_IF_ERROR(
           internal::ReadString(&current_block_reader_.value(), &sub_value));

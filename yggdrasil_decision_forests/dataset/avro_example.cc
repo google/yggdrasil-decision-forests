@@ -30,6 +30,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::dataset::avro {
@@ -291,14 +292,19 @@ absl::StatusOr<bool> AvroExampleReader::Implementation::NextInShard(
                 univariate_field_idx_to_column_idx_[field_idx];
             if (univariate_col_idx != -1) {
               const auto& col_spec = dataspec_.columns(univariate_col_idx);
+              auto* dst = example->mutable_attributes(univariate_col_idx)
+                              ->mutable_categorical_set()
+                              ->mutable_values();
+              dst->Reserve(values.size());
               for (const auto& value : values) {
                 ASSIGN_OR_RETURN(
                     auto int_value,
                     CategoricalStringToValueWithStatus(value, col_spec));
-                example->mutable_attributes(univariate_col_idx)
-                    ->mutable_categorical_set()
-                    ->add_values(int_value);
+                dst->Add(int_value);
               }
+              // Sets are expected to be sorted.
+              std::sort(dst->begin(), dst->end());
+              dst->erase(std::unique(dst->begin(), dst->end()), dst->end());
               break;
             }
 
@@ -401,7 +407,7 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
                 return absl::InvalidArgumentError(
                     absl::StrCat("Unsupported type ",
                                  proto::ColumnType_Name(col_spec_->type()),
-                                 "for kBoolean field ", field.name));
+                                 " for kBoolean field ", field.name));
             }
           }
         } break;
@@ -427,7 +433,7 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
               default:
                 return absl::InvalidArgumentError(absl::StrCat(
                     "Unsupported type ",
-                    proto::ColumnType_Name(col_spec_->type()), "for ",
+                    proto::ColumnType_Name(col_spec_->type()), " for ",
                     TypeToString(field.type), " field ", field.name));
             }
           }
@@ -462,7 +468,7 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
               default:
                 return absl::InvalidArgumentError(absl::StrCat(
                     "Unsupported type ",
-                    proto::ColumnType_Name(col_spec_->type()), "for ",
+                    proto::ColumnType_Name(col_spec_->type()), " for ",
                     TypeToString(field.type), " field ", field.name));
             }
           }
@@ -491,7 +497,7 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
               default:
                 return absl::InvalidArgumentError(absl::StrCat(
                     "Unsupported type ",
-                    proto::ColumnType_Name(col_spec_->type()), "for ",
+                    proto::ColumnType_Name(col_spec_->type()), " for ",
                     TypeToString(field.type), " field ", field.name));
             }
           }
@@ -544,7 +550,7 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
                             absl::StrCat("Unsupported type ",
                                          proto::ColumnType_Name(
                                              dataspec.columns(col_idx).type()),
-                                         "for ", TypeToString(field.type),
+                                         " for ", TypeToString(field.type),
                                          " field ", field.name));
                     }
                   }
@@ -576,7 +582,7 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
                           "Unsupported type ",
                           proto::ColumnType_Name(
                               dataspec.columns(univariate_col_idx).type()),
-                          "for ", TypeToString(field.type), " field ",
+                          " for ", TypeToString(field.type), " field ",
                           field.name));
                   }
                 }
@@ -589,7 +595,6 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
               if (unstacked_idx == -1) {
                 break;
               }
-
               RETURN_IF_ERROR(InitializeUnstackedColumn(
                   field, has_value, values, record_idx, field_idx,
                   univariate_field_idx_to_column_idx,
@@ -650,7 +655,12 @@ absl::Status AvroDataSpecCreator::CreateDataspec(
   if (paths.empty()) {
     return absl::InvalidArgumentError("No path provided");
   }
-  ASSIGN_OR_RETURN(*data_spec, avro::CreateDataspec(paths.front(), guide));
+  if (paths.size() > 1) {
+    LOG(INFO) << "Only using first Avro file (of " << paths.size()
+              << " files) to determine dataset schema";
+  }
+  ASSIGN_OR_RETURN(*data_spec, avro::CreateDataspec(paths.front(), guide),
+                   _ << "While creating dataspec for " << paths.front());
   return absl::OkStatus();
 }
 
@@ -669,10 +679,11 @@ absl::StatusOr<dataset::proto::DataSpecification> InferDataspec(
                   const bool manual_column_guide = false) -> absl::Status {
     proto::Column* column = dataspec.add_columns();
     column->set_name(std::string(key));
-    if (manual_column_guide) {
-      column->set_is_manual_type(manual_column_guide);
+    if (manual_column_guide && col_guide.has_type()) {
+      column->set_is_manual_type(true);
       column->set_type(col_guide.type());
     } else {
+      column->set_is_manual_type(false);
       column->set_type(representation_type);
     }
     return UpdateSingleColSpecWithGuideInfo(col_guide, column);
@@ -724,16 +735,17 @@ absl::StatusOr<dataset::proto::DataSpecification> InferDataspec(
           } break;
           case AvroType::kString:
           case AvroType::kBytes: {
-            if (has_column_guide) {
+            if (has_column_guide && col_guide.has_type()) {
               if (col_guide.type() == proto::ColumnType::CATEGORICAL_SET) {
-                RETURN_IF_ERROR(create_column(field.name, col_guide.type(),
-                                              col_guide, has_column_guide));
+                RETURN_IF_ERROR(create_column(
+                    field.name, proto::ColumnType::CATEGORICAL_SET, col_guide,
+                    has_column_guide));
                 break;
               } else {
                 return absl::InvalidArgumentError(
                     absl::StrCat("Unsupported type ",
                                  proto::ColumnType_Name(col_guide.type()),
-                                 "for kString or kBytes field ", field.name));
+                                 " for kString or kBytes field ", field.name));
               }
             }
 

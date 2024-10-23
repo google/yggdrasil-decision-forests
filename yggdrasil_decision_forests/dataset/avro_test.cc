@@ -178,27 +178,28 @@ TEST(AvroExample, Reader) {
   ASSERT_OK_AND_ASSIGN(
       const auto reader,
       AvroReader::Create(file::JoinPath(DatasetDir(), "toy_codex-null.avro")));
-  EXPECT_THAT(
-      reader->fields(),
-      ElementsAre(
-          AvroField{"f_null", AvroType::kNull},
-          AvroField{"f_boolean", AvroType::kBoolean},
-          AvroField{"f_int", AvroType::kInt},
-          AvroField{"f_long", AvroType::kLong},
-          AvroField{"f_float", AvroType::kFloat},
-          AvroField{"f_another_float", AvroType::kFloat},
-          AvroField{"f_double", AvroType::kDouble},
-          AvroField{"f_string", AvroType::kString},
-          AvroField{"f_bytes", AvroType::kBytes},
-          AvroField{"f_float_optional", AvroType::kFloat, AvroType::kUnknown,
-                    true},
-          AvroField{"f_array_of_float", AvroType::kArray, AvroType::kFloat},
-          AvroField{"f_array_of_double", AvroType::kArray, AvroType::kDouble},
-          AvroField{"f_array_of_string", AvroType::kArray, AvroType::kString},
-          AvroField{"f_another_array_of_string", AvroType::kArray,
-                    AvroType::kString},
-          AvroField{"f_optional_array_of_float", AvroType::kArray,
-                    AvroType::kFloat, true}));
+  EXPECT_THAT(reader->fields(),
+              ElementsAre(AvroField{"f_null", AvroType::kNull},
+                          AvroField{"f_boolean", AvroType::kBoolean},
+                          AvroField{"f_int", AvroType::kInt},
+                          AvroField{"f_long", AvroType::kLong},
+                          AvroField{"f_float", AvroType::kFloat},
+                          AvroField{"f_another_float", AvroType::kFloat},
+                          AvroField{"f_double", AvroType::kDouble},
+                          AvroField{"f_string", AvroType::kString},
+                          AvroField{"f_bytes", AvroType::kBytes},
+                          AvroField{"f_float_optional", AvroType::kFloat, true,
+                                    AvroType::kUnknown},
+                          AvroField{"f_array_of_float", AvroType::kArray, false,
+                                    AvroType::kFloat},
+                          AvroField{"f_array_of_double", AvroType::kArray,
+                                    false, AvroType::kDouble},
+                          AvroField{"f_array_of_string", AvroType::kArray,
+                                    false, AvroType::kString},
+                          AvroField{"f_another_array_of_string",
+                                    AvroType::kArray, false, AvroType::kString},
+                          AvroField{"f_optional_array_of_float",
+                                    AvroType::kArray, true, AvroType::kFloat}));
 
   EXPECT_EQ(reader->sync_marker(), std::string("\xB6\xC2"
                                                "A\x88\xB8\xC3"

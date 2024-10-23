@@ -404,6 +404,7 @@ cc_library_ydf(
         ":data_spec_cc_proto",
         ":data_spec_inference",
         ":example_reader_interface",
+        "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/status",
