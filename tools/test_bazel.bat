@@ -18,40 +18,15 @@
 set BAZEL=bazel.exe
 %BAZEL% version
 
-:: TF_SUPPORT=1 add support for TF.Record of TF.Example datasets and relies on
-:: the TensorFlow filesystem. If you don't need this dataset format,
-:: TF_SUPPORT=0 is recommended.
-set TF_SUPPORT=0
-
 :: Bazel is compatible with Visual Studio 2017 and 2019.
 :: https://bazel.build/configure/windows#using
 :: If you have multiple or other version of VS (e.g., VS2022), set "BAZEL_VC"
 :: accordingly. For example:
 :: set BAZEL_VC=C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC
 
-IF %TF_SUPPORT%==0 (
-
-  copy /Y WORKSPACE_NO_TF WORKSPACE
-
-  :: Compile without any TensorFlow support.
-  set FLAGS=--config=windows_cpp17
-  %BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli:all || goto :error
-
-) ELSE (
-
-  copy /Y WORKSPACE_WITH_TF WORKSPACE
-
-  :: Support TensorFlow datasets but does not use TensorFlow filesystem.
-  set FLAGS=--config=windows_cpp17
-  %BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli/...:all || goto :error
-  %BAZEL% test %FLAGS% //yggdrasil_decision_forests/{cli,metric,model,serving,utils}/...:all //examples:beginner_cc || goto :error
-
-  :: Support TensorFlow datasets and use TensorFlow filesystem.
-  set FLAGS=--config=windows_cpp14 --config=use_tensorflow_io
-  %BAZEL% build %FLAGS% //yggdrasil_decision_forests/cli/...:all || goto :error
-  %BAZEL% test %FLAGS% //yggdrasil_decision_forests/...: //examples:beginner_cc || goto :error
-
-)
+set FLAGS=--config=windows_cpp17 --build_tag_filters=-tf_dep --test_tag_filters=-tf_dep
+%BAZEL% build %FLAGS% -- //yggdrasil_decision_forests/...:all -//yggdrasil_decision_forests/port/python/...:all //examples:beginner_cc || goto :error
+%BAZEL% test %FLAGS% -- //yggdrasil_decision_forests/...:all -//yggdrasil_decision_forests/port/python/...:all //examples:beginner_cc || goto :error
 
 goto :EOF
 :error

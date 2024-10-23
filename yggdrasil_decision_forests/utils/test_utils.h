@@ -156,7 +156,7 @@ class TrainAndTestTester : public ::testing::Test {
 
   // Format and extension used to store the temporary dataset generated during
   // the test. The reader and writer of this format need to be registered.
-  std::string preferred_format_type = "tfrecord+tfe";
+  std::string preferred_format_type = "tfrecord";
   std::string preferred_format_extension = ".tfr";
 
   // If true, the dataset is passed to the learner as a path. If false, the

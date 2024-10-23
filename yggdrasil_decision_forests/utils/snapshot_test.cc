@@ -46,6 +46,7 @@ TEST(SnapShot, GetSnapshot) {
 TEST(SnapShot, GetSnapshots) {
   const std::string snapshot_dir =
       file::JoinPath(test::TmpDirectory(), "get_snapshots");
+  ASSERT_OK(file::RecursivelyCreateDir(snapshot_dir, file::Defaults()));
   ASSERT_OK_AND_ASSIGN(const std::deque<int> content,
                        GetSnapshots(snapshot_dir));
   EXPECT_THAT(content, IsEmpty());

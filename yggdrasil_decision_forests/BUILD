@@ -7,14 +7,20 @@ package(
 
 exports_files(["LICENSE"])
 
-# If set, use YDF own copy of TensorFlow proto.
+# RECOMMENDED VALUE: use_ydf_tensorflow_proto=1
+#
+# Compile with "--define=use_ydf_tensorflow_proto=1" for YDF to use its own copy of TensorFlow proto.
+# This is the recommended option. use_ydf_tensorflow_proto=0 is only kept for TensorFlow Decision
+# Forests.
 config_setting(
     name = "use_ydf_tensorflow_proto",
     values = {"define": "use_ydf_tensorflow_proto=1"},
 )
 
+# RECOMMENDED VALUE: not set
+#
 # Compile with "--define=ydf_use_tensorflow_io=1" to use TensorFlow IO FileSystem for all file IO
-# operations. This is required for YDF to support Google Cloud Storage filepaths.
+# operations. This option is only kept for TensorFlow Decision Forests.
 config_setting(
     name = "use_tensorflow_io_v2",
     define_values = {"ydf_use_tensorflow_io": "1"},

@@ -223,7 +223,7 @@ to a csv file.
 Supported formats are:
 
 -   `csv:` : A CSV file.
--   `tfrecord+tfe:` : A GZIP compressed
+-   `tfrecord:` : A GZIP compressed
     [TensorFlow Record file](https://www.tensorflow.org/tutorials/load_data/tfrecord)
     containing serialized TensorFlow Example protobuffers.
 
@@ -468,9 +468,9 @@ The available variable importances are:
 
 Optimizing the hyperparameters of a learner can improve the quality of a model.
 Selecting the optimal hyper-parameters can be done manually (see
-[how to improve a model](guide_how_to_improve_model.md)) or using the automated hyper-parameter
-optimizer (HPO). The HPO automatically selects the best hyper-parameters through
-a sequence of trial-and-error computations.
+[how to improve a model](guide_how_to_improve_model.md)) or using the automated
+hyper-parameter optimizer (HPO). The HPO automatically selects the best
+hyper-parameters through a sequence of trial-and-error computations.
 
 Check the
 [example directory](https://github.com/google/yggdrasil-decision-forests/tree/main/examples)

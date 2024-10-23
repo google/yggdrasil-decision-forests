@@ -57,22 +57,13 @@ run_test() {
   sudo docker start ${DOCKER_CONTAINER}
   set -e
 
+  echo "YOu can run one of the following commands:"
+  echo "INSTALL_DEPENDENCIES=1 COMPILERS="clang-12" CPP_VERSIONS="14" ./tools/test_bazel.sh"
+  echo "INSTALL_DEPENDENCIES=1 COMPILERS="clang-12" CPP_VERSIONS="17" ./tools/test_bazel.sh"
   if [[ "$INTERACTIVE" = 1 ]]; then
-    echo "With TensorFlow build:"
-    echo "INSTALL_DEPENDENCIES=1 TF_SUPPORT="ON" COMPILERS="clang-12" CPP_VERSIONS="17" RUN_TESTS=1 ./tools/test_bazel.sh"
-    echo "Without Tensorflow build:"
-    echo "INSTALL_DEPENDENCIES=1 TF_SUPPORT="OFF" COMPILERS="clang-12" GO_PORT="0" PY_PORT="0" CPP_VERSIONS="14" ./tools/test_bazel.sh"
     CMD='$SHELL'
   else
-    CMD='INSTALL_DEPENDENCIES=1 TF_SUPPORT="ON" COMPILERS="clang-12" CPP_VERSIONS="17" RUN_TESTS=1 ./tools/test_bazel.sh;$SHELL'
-    # If the compilation fails, you can restart it with:
-    # 
-    # With TensorFlow build
-    # INSTALL_DEPENDENCIES=1 TF_SUPPORT="ON" COMPILERS="clang-12" CPP_VERSIONS="17" RUN_TESTS=1 ./tools/test_bazel.sh
-    #
-    # Without Tensorflow build
-    # INSTALL_DEPENDENCIES=1 TF_SUPPORT="OFF" COMPILERS="clang-12" GO_PORT="0" PY_PORT="0" CPP_VERSIONS="14" ./tools/test_bazel.sh
-    #
+    CMD='INSTALL_DEPENDENCIES=1 COMPILERS="clang-12" CPP_VERSIONS="17" ./tools/test_bazel.sh;$SHELL'
   fi
 
   sudo docker exec -it ${DOCKER_CONTAINER} /bin/bash -c "${CMD}"

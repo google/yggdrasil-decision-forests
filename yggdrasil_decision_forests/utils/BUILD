@@ -130,6 +130,7 @@ cc_library_ydf(
         "YGG_FILESYSTEM_USES_TENSORFLOW",
     ],
     features = ["-use_header_modules"],  # Incompatible with -fexceptions.
+    tags = ["tf_dep"],
     visibility = ["//visibility:private"],
     deps = [
         ":bytestream",
@@ -206,9 +207,8 @@ cc_library_ydf(
 
 cc_library_ydf(
     name = "sharded_io_tfrecord",
-    hdrs = [
-        "sharded_io_tfrecord.h",
-    ],
+    hdrs = ["sharded_io_tfrecord.h"],
+    tags = ["tf_dep"],
     deps = [
         ":sharded_io",
         ":status_macros",
@@ -685,6 +685,7 @@ cc_library_ydf(
 cc_library_ydf(
     name = "tensorflow",
     hdrs = ["tensorflow.h"],
+    tags = ["tf_dep"],
     deps = [
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/status",

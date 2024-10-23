@@ -74,7 +74,7 @@ std::string ToyDatasetTypedPathCsv() {
 }
 
 std::string ToyDatasetTypedPathTFExampleTFRecord() {
-  return absl::StrCat("tfrecord+tfe:",
+  return absl::StrCat("tfrecord:",
                       file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2"));
 }
 
@@ -1017,7 +1017,7 @@ TEST(CountNumberOfExamples, Base) {
 
 TEST(Dataset, CreateLocalDataSpecFromSyntheticTFExample) {
   const std::string path = absl::StrCat(
-      "tfrecord+tfe:", file::JoinPath(test::TmpDirectory(), "dataset.tfr"));
+      "tfrecord:", file::JoinPath(test::TmpDirectory(), "dataset.tfr"));
   proto::SyntheticDatasetOptions options;
   options.set_num_multidimensional_numerical(2);
   CHECK_OK(GenerateSyntheticDataset(options, path));

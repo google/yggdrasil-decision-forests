@@ -773,7 +773,7 @@ B,3""")
 
   @unittest.skip("Requires building YDF with tensorflow io")
   def test_read_from_sharded_tfe(self):
-    sharded_path = "tfrecord+tfe:" + os.path.join(
+    sharded_path = "tfrecord:" + os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "toy.tfe-tfrecord@2"
     )
     ds = dataset.create_vertical_dataset(

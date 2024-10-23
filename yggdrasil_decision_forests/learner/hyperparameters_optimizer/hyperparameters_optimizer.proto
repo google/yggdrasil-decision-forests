@@ -49,7 +49,7 @@ message HyperParametersOptimizerLearnerTrainingConfig {
   // VerticalDataset (i.e. in memory dataset) and should be communicated to
   // remote workers. The format IO library should be registered both to the
   // learner and the workers.
-  optional string serialized_dataset_format = 6 [default = "tfrecord+tfe"];
+  optional string serialized_dataset_format = 6 [default = "tfrecord"];
 
   // If true, the final model is re-trained using the best found
   // hyper-parameters. If false, the best model found during optimization is

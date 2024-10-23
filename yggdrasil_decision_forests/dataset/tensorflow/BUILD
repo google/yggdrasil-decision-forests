@@ -8,6 +8,7 @@ package(
 cc_library_ydf(
     name = "tensorflow",
     features = ["-layering_check"],
+    tags = ["tf_dep"],
     deps = select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
             "@release_or_nightly//:tensorflow_libtensorflow_framework",
@@ -84,12 +85,9 @@ cc_library_ydf(
 
 cc_library_ydf(
     name = "tf_example_io_tfrecord",
-    srcs = [
-        "tf_example_io_tfrecord.cc",
-    ],
-    hdrs = [
-        "tf_example_io_tfrecord.h",
-    ],
+    srcs = ["tf_example_io_tfrecord.cc"],
+    hdrs = ["tf_example_io_tfrecord.h"],
+    tags = ["tf_dep"],
     deps = [
         ":tensorflow",
         ":tf_example",
@@ -120,9 +118,8 @@ cc_library_ydf(
 cc_test(
     name = "tf_example_io_interface_test",
     srcs = ["tf_example_io_interface_test.cc"],
-    data = [
-        "//yggdrasil_decision_forests/test_data",
-    ],
+    data = ["//yggdrasil_decision_forests/test_data"],
+    tags = ["tf_dep"],
     deps = [
         ":tf_example_io_interface",
         ":tf_example_io_tfrecord",

@@ -32,9 +32,10 @@ TEST(Dataset, GetDatasetPathAndType) {
   EXPECT_EQ(GetDatasetPathAndType("csv:/dataset.csv"),
             (std::pair<std::string, proto::DatasetFormat>(
                 "/dataset.csv", proto::DatasetFormat::FORMAT_CSV)));
-  EXPECT_EQ(GetDatasetPathAndType("tfrecord+tfe:dataset.rio_tfe"),
+  EXPECT_EQ(GetDatasetPathAndType("tfrecord:dataset.rio_tfe"),
             (std::pair<std::string, proto::DatasetFormat>(
-                "dataset.rio_tfe", proto::DatasetFormat::FORMAT_TFE_TFRECORD)));
+                "dataset.rio_tfe",
+                proto::DatasetFormat::FORMAT_TFE_TFRECORD_COMPRESSED_V2)));
 
   EXPECT_EQ(GetDatasetPathAndType("csv:/tmp/dataset.csv"),
             (std::pair<std::string, proto::DatasetFormat>(

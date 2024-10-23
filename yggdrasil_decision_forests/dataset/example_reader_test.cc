@@ -42,14 +42,10 @@ std::string DatasetDir() {
 }
 TEST(ExampleReader, CreateExampleReader) {
   for (const auto& dataset_path : {
-           absl::StrCat("tfrecord+tfe:",
-                        file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
            absl::StrCat("tfrecord:",
                         file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
-           absl::StrCat("tfrecordv2+gz+tfe:",
-                        file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2")),
            absl::StrCat(
-               "tfrecordv2+tfe:",
+               "tfrecord-nocompression:",
                file::JoinPath(DatasetDir(), "toy.nocompress-tfe-tfrecord@2")),
            absl::StrCat("csv:", file::JoinPath(DatasetDir(), "toy.csv")),
        }) {

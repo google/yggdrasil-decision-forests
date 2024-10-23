@@ -15,7 +15,7 @@
 #
 #  On Windows, uncomment the output_user_root option to avoid long path issues.
 #
-#   windows_cpp14: Windows build. Uses C++14. Does not work with tensorflow.
+#   windows_cpp14: Windows build. Uses C++14.
 #   windows_cpp17: Windows build. Uses C++17.
 #
 # Windows options:
@@ -56,6 +56,9 @@ build --define=grpc_no_ares=true
 # Nice print
 build:linux --copt=-fdiagnostics-color=always
 build --color=yes
+
+# Disable dependencies to Tensorflow.
+build --define=use_ydf_tensorflow_proto=1
 
 # Suppress C++ compiler warnings.
 build:linux --copt=-w
@@ -134,9 +137,6 @@ build:wasm --host_cxxopt="-fno-exceptions"
 # Use absl::anyInvocable. This breaks builds with TF <= 2.12 but is required 
 # for builds with TF >= 2.13.
 build:use_absl_anyinvocable --define=use_absl_anyinvocable=1
-
-# TensorFlow specific.
-build:use_tensorflow_io --define=use_tensorflow_io=1
 
 # Optional. Just to make it compatible with dynamic linking and TensorFlow.
 # build --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"

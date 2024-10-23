@@ -24,7 +24,7 @@
 //   bazel run -c opt :convert_dataset -- \
 //     --input=csv:/my/dataset.csv \
 //     --dataspec= spec.pbtxt \
-//     --output=tfrecord+tfe:/my/dataset.tfrecord-tfe
+//     --output=tfrecord:/my/dataset.tfrecord-tfe
 //
 #include "absl/flags/flag.h"
 #include "absl/log/log.h"

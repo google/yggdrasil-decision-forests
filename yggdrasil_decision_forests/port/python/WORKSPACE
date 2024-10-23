@@ -1,17 +1,17 @@
+# Bazel workspace configuration for Yggdrasil Decision Forest Python.
+# For Yggdrasil Decision Forest C++, see ../../WORKSPACE.
+
 workspace(name = "ydf")
 
 # This workspace (YDF Python) relies on YDF C++ located at "../../../"
-local_repository(
-name = "ydf_cc",
-path = "../../../",
-)
+local_repository(name = "ydf_cc", path = "../../../")
 
 load("//:library.bzl", ydf_load_deps = "load_dependencies")
 ydf_load_deps()
 
 # Load the dependencies of YDF.
 load("@ydf_cc//yggdrasil_decision_forests:library.bzl", ydf_cc_load_deps = "load_dependencies")
-ydf_cc_load_deps(repo_name = "@ydf_cc", exclude_repo="tensorflow")
+ydf_cc_load_deps(repo_name = "@ydf_cc")
 
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 grpc_deps()

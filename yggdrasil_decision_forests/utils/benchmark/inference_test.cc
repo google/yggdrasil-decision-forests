@@ -56,7 +56,7 @@ TEST(BenchmarkInference, FastEngine) {
   };
   const BenchmarkInferenceRunOptions options{/*.batch_size =*/2,
                                              /*.runs =*/num_runs_options,
-                                             /*.time =*/std::nullopt};
+                                             /*.time =*/{}};
   std::vector<BenchmarkInferenceResult> results;
 
   ASSERT_OK_AND_ASSIGN(auto engine, model->BuildFastEngine());
@@ -82,7 +82,7 @@ TEST(BenchmarkInference, FastEngineMultiThread) {
   };
   const BenchmarkInferenceRunOptions options{/*.batch_size =*/2,
                                              /*.runs =*/num_runs_options,
-                                             /*.time =*/std::nullopt};
+                                             /*.time =*/{}};
   std::vector<BenchmarkInferenceResult> results;
 
   ASSERT_OK_AND_ASSIGN(auto engine, model->BuildFastEngine());
@@ -99,7 +99,7 @@ TEST(BenchmarkInference, GenericEngine) {
   };
   const BenchmarkInferenceRunOptions options{/*.batch_size =*/2,
                                              /*.runs =*/num_runs_options,
-                                             /*.time =*/std::nullopt};
+                                             /*.time =*/{}};
   std::vector<BenchmarkInferenceResult> results;
 
   std::unique_ptr<model::AbstractModel> model;

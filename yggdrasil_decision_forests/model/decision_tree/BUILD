@@ -61,9 +61,7 @@ cc_library_ydf(
 
 cc_library_ydf(
     name = "decision_tree_io_interface",
-    hdrs = [
-        "decision_tree_io_interface.h",
-    ],
+    hdrs = ["decision_tree_io_interface.h"],
     deps = [
         ":decision_tree_cc_proto",
         "//yggdrasil_decision_forests/utils:registration",
@@ -71,22 +69,6 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
-)
-
-# Storage of nodes in TFRecord.
-cc_library_ydf(
-    name = "decision_tree_io_tfrecord",
-    srcs = [
-        "decision_tree_io_tfrecord.cc",
-    ],
-    deps = [
-        ":decision_tree_cc_proto",
-        ":decision_tree_io_interface",
-        "//yggdrasil_decision_forests/utils:sharded_io",
-        "//yggdrasil_decision_forests/utils:sharded_io_tfrecord",
-        "@com_google_absl//absl/memory",
-    ],
-    alwayslink = 1,
 )
 
 # Storage of nodes in BlobSequence.

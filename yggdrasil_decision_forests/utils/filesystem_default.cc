@@ -110,7 +110,7 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
       }
     }
     if (error) {
-      return absl::InvalidArgumentError(error.message());
+      return absl::NotFoundError(error.message());
     }
 
     std::sort(results->begin(), results->end());

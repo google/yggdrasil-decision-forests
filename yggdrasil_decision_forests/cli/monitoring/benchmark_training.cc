@@ -747,7 +747,7 @@ absl::Status Benchmark_GBT_SyntheticV2(std::vector<Result>* results) {
   }
 
   for (const auto& synthetic : synthetics) {
-    const auto dataset_format = "tfrecord+tfe";
+    const auto dataset_format = "tfrecord";
     const auto dataset_filename = "dataset.tfe";
     const auto dataset_directory = absl::GetFlag(FLAGS_tmp);
     RETURN_IF_ERROR(

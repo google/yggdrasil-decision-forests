@@ -176,7 +176,7 @@ TEST(Dataset, TokenizeTfExample) {
   // {f1: ["Hello the world"]
   // {f1: ["Bonjour le monde"]}
   const auto path = absl::StrCat(
-      "tfrecord+tfe:", file::JoinPath(DatasetDir(), "sentences.tfe-tfrecord"));
+      "tfrecord:", file::JoinPath(DatasetDir(), "sentences.tfe-tfrecord"));
 
   const proto::DataSpecificationGuide guide = PARSE_TEST_PROTO(
       R"pb(
