@@ -566,5 +566,69 @@ TEST(CreateReaderRegistration, Base) {
   EXPECT_EQ(num_rows, 2);
 }
 
+struct NumericalVectorSequenceCase {
+  std::string filename;
+};
+
+SIMPLE_PARAMETERIZED_TEST(NumericalVectorSequence, NumericalVectorSequenceCase,
+                          {{"toy_vector_sequence_from_fastavro.avro"},
+                           {"toy_vector_sequence_from_fastavro_v2.avro"},
+                           {"toy_vector_sequence_from_polars.avro"}}) {
+  const auto& test_case = GetParam();
+  const auto dataset_path =
+      absl::StrCat("avro:", file::JoinPath(DatasetDir(), test_case.filename));
+
+  proto::DataSpecificationGuide guide;
+  {
+    auto* col = guide.add_column_guides();
+    col->set_column_name_pattern("^f1$");
+    col->set_type(proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE);
+  }
+
+  proto::DataSpecification data_spec;
+  CreateDataSpec(dataset_path, false, guide, &data_spec);
+  LOG(INFO) << "Dataspec:\n" << dataset::PrintHumanReadable(data_spec);
+  EXPECT_EQ(dataset::PrintHumanReadable(data_spec), R"(Number of records: 100
+Number of columns: 2
+
+Number of columns by type:
+	NUMERICAL_VECTOR_SEQUENCE: 1 (50%)
+	CATEGORICAL: 1 (50%)
+
+Columns:
+
+NUMERICAL_VECTOR_SEQUENCE: 1 (50%)
+	1: "f1" NUMERICAL_VECTOR_SEQUENCE manually-defined mean:0.498165 min:0.000545965 max:0.999809 sd:0.289278 dims:2 min-vecs:1 max-vecs:9
+
+CATEGORICAL: 1 (50%)
+	0: "label" CATEGORICAL has-dict vocab-size:3 zero-ood-items most-frequent:"0" 53 (53%)
+
+Terminology:
+	nas: Number of non-available (i.e. missing) values.
+	ood: Out of dictionary.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
+	tokenized: The attribute value is obtained through tokenization.
+	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
+	vocab-size: Number of unique values.
+)");
+
+  auto reader = CreateExampleReader(dataset_path, data_spec).value();
+  proto::Example example;
+  int num_rows = 0;
+  while (reader->Next(&example).value()) {
+    // LOG(INFO) << "Example: " << example;
+    EXPECT_GE(example.attributes(0).numerical_vector_sequence().vectors_size(),
+              0);
+    EXPECT_LE(example.attributes(0).numerical_vector_sequence().vectors_size(),
+              10);
+    for (const auto& vector :
+         example.attributes(0).numerical_vector_sequence().vectors()) {
+      EXPECT_EQ(vector.values_size(), 2);
+    }
+    num_rows++;
+  }
+  EXPECT_EQ(num_rows, 100);
+}
+
 }  // namespace
 }  // namespace yggdrasil_decision_forests::dataset::avro

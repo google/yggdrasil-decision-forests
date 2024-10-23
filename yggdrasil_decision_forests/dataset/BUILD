@@ -141,6 +141,7 @@ cc_library_ydf(
     name = "vertical_dataset",
     srcs = [
         "vertical_dataset.cc",
+        "vertical_dataset_column.cc",
     ],
     hdrs = [
         "vertical_dataset.h",
@@ -160,6 +161,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -515,6 +517,7 @@ cc_test(
         ":data_spec_cc_proto",
         ":data_spec_inference",
         ":example_cc_proto",
+        ":types",
         ":vertical_dataset",
         ":vertical_dataset_io",
         "@com_google_absl//absl/memory",

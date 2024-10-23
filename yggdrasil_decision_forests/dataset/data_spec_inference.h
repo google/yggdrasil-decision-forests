@@ -174,6 +174,11 @@ void UpdateComputeSpecBooleanFeature(float value, proto::Column* column);
 // observation.
 void UpdateComputeSpecBooleanFeatureWithBool(bool value, proto::Column* column);
 
+// Update the accumulator with a vector sequence boolean feature observation
+absl::Status UpdateComputeSpecNumericalVectorSequenceWithArrayArrayNumerical(
+    const std::vector<std::vector<float>>& values, proto::Column* column,
+    proto::DataSpecificationAccumulator::Column* col_acc);
+
 // Update all the columns in a data spec with the appropriate guide information.
 // Used when inferring the column type from a csv file.
 absl::Status UpdateColSpecsWithGuideInfo(

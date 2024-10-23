@@ -111,7 +111,8 @@ bool IsMultiDimensional(ColumnType type) {
   return type == ColumnType::CATEGORICAL_SET ||
          type == ColumnType::NUMERICAL_SET ||
          type == ColumnType::NUMERICAL_LIST ||
-         type == ColumnType::CATEGORICAL_LIST;
+         type == ColumnType::CATEGORICAL_LIST ||
+         type == ColumnType::NUMERICAL_VECTOR_SEQUENCE;
 }
 
 bool IsCategorical(ColumnType type) {
@@ -123,7 +124,8 @@ bool IsCategorical(ColumnType type) {
 bool IsNumerical(ColumnType type) {
   return type == ColumnType::NUMERICAL_SET || type == ColumnType::NUMERICAL ||
          type == ColumnType::NUMERICAL_LIST ||
-         type == ColumnType::DISCRETIZED_NUMERICAL;
+         type == ColumnType::DISCRETIZED_NUMERICAL ||
+         type == ColumnType::NUMERICAL_VECTOR_SEQUENCE;
 }
 
 int32_t CategoricalStringToValue(const std::string& value,
@@ -410,6 +412,10 @@ absl::Status CsvRowToExample(const std::vector<std::string>& csv_fields,
         }
         dst_value->set_hash(HashColumnString(value));
       } break;
+      case ColumnType::NUMERICAL_VECTOR_SEQUENCE:
+        return absl::UnimplementedError(
+            "Vector sequence is not supported in csv files");
+        break;
     }
   }
   return absl::OkStatus();
@@ -471,6 +477,11 @@ absl::Status ExampleToCsvRow(const proto::Example& example,
         break;
       case proto::Example::Attribute::TypeCase::kHash:
         dst_value = absl::StrCat(src_value.hash());
+        break;
+
+      case proto::Example::Attribute::TypeCase::kNumericalVectorSequence:
+        return absl::UnimplementedError(
+            "Vector sequence is not supported in csv files");
         break;
     }
   }
@@ -578,6 +589,14 @@ std::string PrintHumanReadable(const proto::DataSpecification& data_spec,
         absl::SubstituteAndAppend(&result, " true_count:$0 false_count:$1",
                                   col.boolean().count_true(),
                                   col.boolean().count_false());
+      }
+
+      if (col.has_numerical_vector_sequence()) {
+        absl::SubstituteAndAppend(
+            &result, " dims:$0 min-vecs:$1 max-vecs:$2",
+            col.numerical_vector_sequence().vector_length(),
+            col.numerical_vector_sequence().min_num_vectors(),
+            col.numerical_vector_sequence().max_num_vectors());
       }
 
       if (col.has_categorical()) {

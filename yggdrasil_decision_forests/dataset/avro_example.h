@@ -39,6 +39,10 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
     absl::string_view path,
     const dataset::proto::DataSpecificationGuide& guide);
 
+absl::StatusOr<dataset::proto::DataSpecification> CreateDataspecImpl(
+    std::unique_ptr<AvroReader> reader,
+    const dataset::proto::DataSpecificationGuide& guide);
+
 class AvroExampleReader final : public ExampleReaderInterface {
  public:
   explicit AvroExampleReader(const proto::DataSpecification& data_spec,

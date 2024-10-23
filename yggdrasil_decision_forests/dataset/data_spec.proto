@@ -72,6 +72,18 @@ enum ColumnType {
   STRING = 8;
   DISCRETIZED_NUMERICAL = 9;
   HASH = 10;
+  // A numerical vector sequence value is a sequence (e.g. a list) of numerical
+  // vectors. A numerical vector is a sequence of floats. The number of vectors
+  // in a sequence can vary from one example to another. Some examples can have
+  // empty sequences.The length of vectors is fixed for all the vectors in a
+  // dataset (i.e., not just for the vectors in a sequence). Semantically, all
+  // the i-th value of all vectors are expected to represent the same type
+  // of data. An empty sequence is different than an unknown value sequence
+  // (i.e., there is a sequence but we don't know what it is).
+  //
+  // Numerical vector sequence can be used to represent multivariate time series
+  // or sequences of embeddings (such as the one in transformer architectures).
+  NUMERICAL_VECTOR_SEQUENCE = 11;
 }
 
 // Definition of a column in a dataset.
@@ -101,6 +113,8 @@ message Column {
   optional BooleanSpec boolean = 9;
   // For all the types defined as a collection of multiple values.
   optional MultiValuesSpec multi_values = 10;
+  // For data of type NUMERICAL_VECTOR_SEQUENCE.
+  optional NumericalVectorSequenceSpec numerical_vector_sequence = 13;
   // Is the feature derived from unstacking a multi-dimensional dimension?
   optional bool is_unstacked = 11 [default = false];
 
@@ -208,6 +222,18 @@ message BooleanSpec {
   optional int64 count_true = 1;
   // Number of false values.
   optional int64 count_false = 2;
+}
+
+message NumericalVectorSequenceSpec {
+  // The length of the vectors.
+  optional int32 vector_length = 1;
+
+  // Number of value (i.e., float) seen.
+  optional int64 count_values = 2;
+
+  // Minimum and maximum number of vectors seen.
+  optional int32 min_num_vectors = 3;
+  optional int32 max_num_vectors = 4;
 }
 
 // Specification of a discretized numerical column.

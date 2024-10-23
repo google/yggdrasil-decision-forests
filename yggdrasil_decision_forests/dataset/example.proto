@@ -35,6 +35,13 @@ message Example {
   message NumericalVector {
     repeated float values = 1 [packed = true];
   }
+  // An ordered sequence of numerical vectors.
+  message NumericalVectorSequence {
+    message Vector {
+      repeated float values = 1 [packed = true];
+    }
+    repeated Vector vectors = 1;
+  }
 
   // Attribute value.
   message Attribute {
@@ -51,6 +58,7 @@ message Example {
       // uint16".
       int32 discretized_numerical = 9;
       uint64 hash = 10;
+      NumericalVectorSequence numerical_vector_sequence = 11;
     }
   }
   // Attribute values indexed by the attribute index defined in the dataspec.

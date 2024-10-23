@@ -28,10 +28,10 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
-#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/tf_example.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -253,6 +253,11 @@ absl::Status TfExampleToYdfExample(const tensorflow::Example& tf_example,
               it_feature->first));
         }
       } break;
+
+      case ColumnType::NUMERICAL_VECTOR_SEQUENCE:
+        return absl::UnimplementedError(
+            "Vector sequence is not supported in tf.Example");
+        break;
     }
   }
   return absl::OkStatus();
@@ -358,6 +363,10 @@ absl::Status YdfExampleToTfExample(const proto::Example& example,
         break;
       case proto::Example::Attribute::TypeCase::kHash:
         dst_value.mutable_int64_list()->add_value(src_value.hash());
+        break;
+      case proto::Example::Attribute::TypeCase::kNumericalVectorSequence:
+        return absl::UnimplementedError(
+            "Vector sequence is not supported in tf.Example");
         break;
     }
   }

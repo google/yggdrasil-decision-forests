@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <regex>  // NOLINT
@@ -181,6 +182,46 @@ void UpdateComputeSpecBooleanFeatureWithBool(bool value,
   }
 }
 
+absl::Status UpdateComputeSpecNumericalVectorSequenceWithArrayArrayNumerical(
+    const std::vector<std::vector<float>>& values, proto::Column* column,
+    proto::DataSpecificationAccumulator::Column* col_acc) {
+  auto* col_spec = column->mutable_numerical_vector_sequence();
+  int64_t seen_values = 0;
+  for (const auto& sub_values : values) {
+    if (col_spec->has_vector_length()) {
+      if (sub_values.size() != col_spec->vector_length()) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Inconsistent vector length in a SEQUENCE_VECTOR feature. Got "
+            "vectors of size ",
+            sub_values.size(), " and ", col_spec->vector_length()));
+      }
+    } else {
+      col_spec->set_vector_length(sub_values.size());
+    }
+    seen_values += sub_values.size();
+    for (const float value : sub_values) {
+      FillContentNumericalFeature(value, col_acc);
+    }
+  }
+  col_spec->set_count_values(col_spec->count_values() + seen_values);
+
+  if (col_spec->has_min_num_vectors()) {
+    col_spec->set_min_num_vectors(std::min(
+        col_spec->min_num_vectors(), static_cast<int32_t>(values.size())));
+  } else {
+    col_spec->set_min_num_vectors(values.size());
+  }
+
+  if (col_spec->has_max_num_vectors()) {
+    col_spec->set_max_num_vectors(std::max(
+        col_spec->max_num_vectors(), static_cast<int32_t>(values.size())));
+  } else {
+    col_spec->set_max_num_vectors(values.size());
+  }
+
+  return absl::OkStatus();
+}
+
 absl::Status FinalizeComputeSpecDiscretizedNumerical(
     const proto::DataSpecificationAccumulator::Column& accumulator,
     proto::Column* column) {
@@ -213,6 +254,7 @@ void FinalizeComputeSpecColumnNumerical(
     const proto::DataSpecificationAccumulator::Column& col_acc,
     proto::Column* col) {
   if (count_valid_records >= 0) {
+    // TODO: Replace kahanAcc with a simple double sum.
     AccurateSum kahanAcc(col_acc.kahan_sum(), col_acc.kahan_sum_error());
     const double mean = kahanAcc.Sum() / count_valid_records;
     col->mutable_numerical()->set_mean(mean);
@@ -550,10 +592,13 @@ absl::Status FinalizeComputeSpec(
     auto* col = data_spec->mutable_columns(col_idx);
     const auto& col_acc = accumulator.columns(col_idx);
     // Valid records i.e. non NA records.
-    const uint64_t count_valid_records =
+    uint64_t count_valid_records =
         data_spec->created_num_rows() - col->count_nas();
     // Numerical type.
     if (IsNumerical(col->type())) {
+      if (col->type() == ColumnType::NUMERICAL_VECTOR_SEQUENCE) {
+        count_valid_records = col->numerical_vector_sequence().count_values();
+      }
       FinalizeComputeSpecColumnNumerical(count_valid_records, col_acc, col);
     }
     // Categorical type.

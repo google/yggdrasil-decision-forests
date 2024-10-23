@@ -56,12 +56,12 @@ constexpr char kNaSymbol[] = "NA";  // NA=non-available i.e. missing value.
 constexpr char kEmptySymbol[] = "EMPTY";
 
 absl::StatusOr<std::unique_ptr<VerticalDataset::AbstractColumn>> CreateColumn(
-    const proto::ColumnType type, const absl::string_view column_name) {
+    const proto::Column col_spec) {
   std::unique_ptr<VerticalDataset::AbstractColumn> col;
-  switch (type) {
+  switch (col_spec.type()) {
     case proto::ColumnType::UNKNOWN:
       return absl::InvalidArgumentError(
-          absl::StrCat("Impossible to create a column \"", column_name,
+          absl::StrCat("Impossible to create a column \"", col_spec.name(),
                        "\" of type UNKNOWN. If you "
                        "created the dataspec manually, make sure the \"type\" "
                        "fields are set for all the columns."));
@@ -95,12 +95,22 @@ absl::StatusOr<std::unique_ptr<VerticalDataset::AbstractColumn>> CreateColumn(
     case proto::ColumnType::HASH:
       col = absl::make_unique<VerticalDataset::HashColumn>();
       break;
+    case proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE: {
+      const int l = col_spec.numerical_vector_sequence().vector_length();
+      if (l <= 0) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("The vector length of the column \"", col_spec.name(),
+                         "\" is not strictly positive (", l, ")"));
+      }
+      col =
+          absl::make_unique<VerticalDataset::NumericalVectorSequenceColumn>(l);
+    } break;
     default:
       return absl::InvalidArgumentError(absl::StrCat(
-          "Column type ", proto::ColumnType_Name(type),
-          " provided for column \"", column_name, "\" not implemented"));
+          "Column type ", proto::ColumnType_Name(col_spec.type()),
+          " provided for column \"", col_spec.name(), "\" not implemented"));
   }
-  col->set_name(column_name);
+  col->set_name(col_spec.name());
   return std::move(col);
 }
 
@@ -201,8 +211,7 @@ absl::StatusOr<VerticalDataset::AbstractColumn*> VerticalDataset::AddColumn(
     return absl::InvalidArgumentError("The column already exists");
   }
   *data_spec_.add_columns() = column_spec;
-  ASSIGN_OR_RETURN(auto new_column,
-                   CreateColumn(column_spec.type(), column_spec.name()));
+  ASSIGN_OR_RETURN(auto new_column, CreateColumn(column_spec));
   PushBackOwnedColumn(std::move(new_column));
   auto* column = mutable_column(columns_.size() - 1);
   column->Resize(nrow_);
@@ -218,8 +227,7 @@ absl::StatusOr<proto::Column*> VerticalDataset::AddColumn(
   auto* column_spec = data_spec_.add_columns();
   column_spec->set_name(std::string(name));
   column_spec->set_type(type);
-  ASSIGN_OR_RETURN(auto new_column,
-                   CreateColumn(column_spec->type(), column_spec->name()));
+  ASSIGN_OR_RETURN(auto new_column, CreateColumn(*column_spec));
   PushBackOwnedColumn(std::move(new_column));
   auto* column = mutable_column(columns_.size() - 1);
   column->Resize(nrow_);
@@ -232,8 +240,7 @@ absl::StatusOr<VerticalDataset::AbstractColumn*> VerticalDataset::ReplaceColumn(
   DCHECK_GE(column_idx, 0);
   DCHECK_LT(column_idx, columns_.size());
   *data_spec_.mutable_columns(column_idx) = column_spec;
-  ASSIGN_OR_RETURN(auto new_column,
-                   CreateColumn(column_spec.type(), column_spec.name()));
+  ASSIGN_OR_RETURN(auto new_column, CreateColumn(column_spec));
   auto* raw_pointer = new_column.get();
   columns_[column_idx] = ColumnContainer{raw_pointer, std::move(new_column)};
   raw_pointer->Resize(nrow_);
@@ -245,8 +252,7 @@ absl::Status VerticalDataset::CreateColumnsFromDataspec() {
   columns_.reserve(data_spec_.columns_size());
   for (int col_idx = 0; col_idx < data_spec_.columns_size(); col_idx++) {
     const auto& col_spec = data_spec_.columns(col_idx);
-    ASSIGN_OR_RETURN(auto new_column,
-                     CreateColumn(col_spec.type(), col_spec.name()));
+    ASSIGN_OR_RETURN(auto new_column, CreateColumn(col_spec));
     PushBackOwnedColumn(std::move(new_column));
     columns_.back().owned_column->set_name(col_spec.name());
     DCHECK_EQ(columns_.back().column->type(), col_spec.type());

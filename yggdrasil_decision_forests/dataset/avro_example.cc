@@ -325,8 +325,54 @@ absl::StatusOr<bool> AvroExampleReader::Implementation::NextInShard(
               example->mutable_attributes(col_idx)->set_categorical(int_value);
             }
           } break;
+
+          case AvroType::kArray:
+            switch (field.sub_sub_type) {
+              case AvroType::kFloat:
+              case AvroType::kDouble: {
+                std::vector<std::vector<float>> values;
+                bool has_value;
+
+                if (field.sub_sub_type == AvroType::kFloat) {
+                  ASSIGN_OR_RETURN(
+                      has_value,
+                      reader_->ReadNextFieldArrayArrayFloat(field, &values));
+                } else {
+                  ASSIGN_OR_RETURN(
+                      has_value,
+                      reader_->ReadNextFieldArrayArrayDoubleIntoFloat(field,
+                                                                      &values));
+                }
+
+                if (!has_value) {
+                  break;
+                }
+                const int col_idx =
+                    univariate_field_idx_to_column_idx_[field_idx];
+                if (col_idx == -1) {
+                  // Ignore field.
+                  break;
+                }
+                auto* dst_vectors = example->mutable_attributes(col_idx)
+                                        ->mutable_numerical_vector_sequence()
+                                        ->mutable_vectors();
+                dst_vectors->Reserve(values.size());
+                for (const auto& sub_values : values) {
+                  *dst_vectors->Add()->mutable_values() = {sub_values.begin(),
+                                                           sub_values.end()};
+                }
+              } break;
+              default:
+                return absl::UnimplementedError(
+                    absl::StrCat("Unsupported avro sub_sub_type ",
+                                 TypeToString(field.sub_type)));
+            }
+            break;
+
           default:
-            return absl::UnimplementedError("Unsupported type");
+            return absl::UnimplementedError(absl::StrCat(
+                "Unsupported sub type ", TypeToString(field.sub_type),
+                " for kArray field ", field.name));
         }
         break;
     }
@@ -339,9 +385,18 @@ absl::StatusOr<bool> AvroExampleReader::Implementation::NextInShard(
 absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
     absl::string_view path,
     const dataset::proto::DataSpecificationGuide& guide) {
-  // TODO: Reading of multiple paths.
+  ASSIGN_OR_RETURN(auto reader, AvroReader::Create(path));
+  const auto schema_string = reader->schema_string();
+  ASSIGN_OR_RETURN(auto spec, CreateDataspecImpl(std::move(reader), guide),
+                   _ << "While creating dataspec for " << path
+                     << " with schema " << schema_string);
+  return spec;
+}
 
-  ASSIGN_OR_RETURN(const auto reader, AvroReader::Create(path));
+absl::StatusOr<dataset::proto::DataSpecification> CreateDataspecImpl(
+    std::unique_ptr<AvroReader> reader,
+    const dataset::proto::DataSpecificationGuide& guide) {
+  // TODO: Reading of multiple paths.
 
   // Infer the column spec for the single-dimensional features and the unstacked
   // column (without the size information) for the multi-dimensional features.
@@ -628,8 +683,61 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
                 }
               }
             } break;
+
+            case AvroType::kArray:
+              switch (field.sub_sub_type) {
+                case AvroType::kFloat:
+                case AvroType::kDouble: {
+                  std::vector<std::vector<float>> values;
+
+                  bool has_value;
+                  if (field.sub_sub_type == AvroType::kFloat) {
+                    ASSIGN_OR_RETURN(
+                        has_value,
+                        reader->ReadNextFieldArrayArrayFloat(field, &values));
+                  } else {
+                    ASSIGN_OR_RETURN(
+                        has_value,
+                        reader->ReadNextFieldArrayArrayDoubleIntoFloat(
+                            field, &values));
+                  }
+
+                  const int col_idx =
+                      univariate_field_idx_to_column_idx[field_idx];
+                  if (col_idx == -1) {
+                    // Ignore field.
+                    break;
+                  }
+                  auto* col_spec_ = dataspec.mutable_columns(col_idx);
+                  if (!has_value) {
+                    col_spec_->set_count_nas(col_spec_->count_nas() + 1);
+                  } else {
+                    switch (col_spec_->type()) {
+                      case proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE:
+                        RETURN_IF_ERROR(
+                            UpdateComputeSpecNumericalVectorSequenceWithArrayArrayNumerical(
+                                values, col_spec_,
+                                accumulator.mutable_columns(col_idx)));
+                        break;
+                      default:
+                        return absl::InvalidArgumentError(absl::StrCat(
+                            "Unsupported semantic ",
+                            proto::ColumnType_Name(col_spec_->type()),
+                            " for an array of array of floats field ",
+                            field.name));
+                    }
+                  }
+                } break;
+                default:
+                  return absl::UnimplementedError(
+                      absl::StrCat("Unsupported avro sub_sub_type ",
+                                   TypeToString(field.sub_sub_type)));
+              }
+              break;
+
             default:
-              return absl::UnimplementedError("Unsupported type");
+              return absl::UnimplementedError(absl::StrCat(
+                  "Unsupported avro type ", TypeToString(field.type)));
           }
           break;
       }
@@ -754,8 +862,31 @@ absl::StatusOr<dataset::proto::DataSpecification> InferDataspec(
             unstacked->set_original_name(field.name);
             unstacked->set_type(proto::ColumnType::CATEGORICAL);
           } break;
+
+            //============ sub array =====================
+
+          case AvroType::kArray:
+            switch (field.sub_sub_type) {
+              case AvroType::kFloat:
+              case AvroType::kDouble: {
+                RETURN_IF_ERROR(create_column(
+                    field.name, proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+                    col_guide, has_column_guide));
+              } break;
+
+              default:
+                return absl::UnimplementedError(absl::StrCat(
+                    "Unsupported type ", TypeToString(field.sub_type),
+                    " in array or array"));
+            }
+            break;
+
+            // =========== end of sub array ==============
+
           default:
-            return absl::UnimplementedError("Unsupported type");
+            return absl::UnimplementedError(
+                absl::StrCat("Unsupported type ", TypeToString(field.sub_type),
+                             " in array"));
         }
         break;
     }

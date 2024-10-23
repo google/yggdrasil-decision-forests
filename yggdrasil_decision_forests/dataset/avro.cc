@@ -151,8 +151,12 @@ absl::StatusOr<AvroField> RecursiveAvroFieldToAvroField(
     dst.sub_type = src.sub_type->type;
     dst.sub_optional = src.sub_type->optional;
     if (dst.sub_type == AvroType::kArray) {
-      return absl::InvalidArgumentError(
-          "Unsupported Avro schema with more than 2 non-optional levels");
+      dst.sub_sub_type = src.sub_type->sub_type->type;
+      dst.sub_sub_optional = src.sub_type->sub_type->optional;
+      if (dst.sub_sub_type == AvroType::kArray) {
+        return absl::InvalidArgumentError(
+            "Unsupported Avro schema with more than 3 non-optional levels");
+      }
     }
   }
 
@@ -213,7 +217,10 @@ std::ostream& operator<<(std::ostream& os, const AvroField& field) {
   os << "AvroField(name=\"" << field.name
      << "\", type=" << TypeToString(field.type)
      << ", sub_type=" << TypeToString(field.sub_type)
-     << ", optional=" << field.optional << ")";
+     << ", sub_sub_type=" << TypeToString(field.sub_sub_type)
+     << ", optional=" << field.optional
+     << ", sub_optional=" << field.sub_optional
+     << ", sub_sub_optional=" << field.sub_sub_optional << ")";
   return os;
 }
 
@@ -227,7 +234,7 @@ absl::StatusOr<std::unique_ptr<AvroReader>> AvroReader::Create(
   ASSIGN_OR_RETURN(std::unique_ptr<utils::InputByteStream> file_handle,
                    file::OpenInputFile(path));
   auto reader = absl::WrapUnique(new AvroReader(std::move(file_handle)));
-  ASSIGN_OR_RETURN(const auto schema, reader->ReadHeader(),
+  ASSIGN_OR_RETURN(reader->schema_string_, reader->ReadHeader(),
                    _ << "While reading header of " << path);
   return std::move(reader);
 }
@@ -412,29 +419,37 @@ absl::StatusOr<absl::optional<double>> AvroReader::ReadNextFieldDouble(
 
 absl::StatusOr<bool> AvroReader::ReadNextFieldString(const AvroField& field,
                                                      std::string* value) {
+  STATUS_CHECK(field.type == AvroType::kString ||
+               field.type == AvroType::kBytes);
   if (field.optional) {
     ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
     if (!has_value) {
       return false;
     }
+    STATUS_CHECK_EQ(has_value, 2);
   }
   RETURN_IF_ERROR(internal::ReadString(&current_block_reader_.value(), value));
   return true;
 }
 
-absl::StatusOr<bool> AvroReader::ReadNextFieldArrayFloat(
-    const AvroField& field, std::vector<float>* values) {
+template <typename T, typename R>
+absl::StatusOr<bool> AvroReader::ReadNextFieldArrayFloatingPointTemplate(
+    const AvroField& field, std::vector<T>* values) {
+  STATUS_CHECK(field.type == AvroType::kArray);
+  STATUS_CHECK(field.sub_type == AvroType::kFloat ||
+               field.sub_type == AvroType::kDouble);
+
   values->clear();
   if (field.optional) {
     ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
     if (!has_value) {
       return false;
     }
+    STATUS_CHECK_EQ(has_value, 2);
   }
   while (true) {
     ASSIGN_OR_RETURN(auto num_values,
                      internal::ReadInteger(&current_block_reader_.value()));
-    values->reserve(values->size() + num_values);
     if (num_values == 0) {
       break;
     }
@@ -444,112 +459,56 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayFloat(
       (void)block_size;
       num_values = -num_values;
     }
+    STATUS_CHECK_GE(num_values, 0);
+    values->reserve(values->size() + num_values);
     for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
       if (field.sub_optional) {
         ASSIGN_OR_RETURN(const auto has_sub_value,
                          current_block_reader_->ReadByte());
         if (!has_sub_value) {
-          values->push_back(std::numeric_limits<float>::quiet_NaN());
+          values->push_back(std::numeric_limits<T>::quiet_NaN());
           continue;
         }
+        STATUS_CHECK_EQ(has_sub_value, 2);
       }
-      ASSIGN_OR_RETURN(auto value,
-                       internal::ReadFloat(&current_block_reader_.value()));
+      ASSIGN_OR_RETURN(R value, internal::ReadFloatingPointTemplate<R>(
+                                    &current_block_reader_.value()));
       values->push_back(value);
     }
   }
-
   return true;
+}
+
+absl::StatusOr<bool> AvroReader::ReadNextFieldArrayFloat(
+    const AvroField& field, std::vector<float>* values) {
+  STATUS_CHECK(field.sub_type == AvroType::kFloat);
+  return ReadNextFieldArrayFloatingPointTemplate<float>(field, values);
 }
 
 absl::StatusOr<bool> AvroReader::ReadNextFieldArrayDouble(
     const AvroField& field, std::vector<double>* values) {
-  values->clear();
-  if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
-    if (!has_value) {
-      return false;
-    }
-  }
-  while (true) {
-    ASSIGN_OR_RETURN(auto num_values,
-                     internal::ReadInteger(&current_block_reader_.value()));
-    values->reserve(values->size() + num_values);
-    if (num_values == 0) {
-      break;
-    }
-    if (num_values < 0) {
-      ASSIGN_OR_RETURN(auto block_size,
-                       internal::ReadInteger(&current_block_reader_.value()));
-      (void)block_size;
-      num_values = -num_values;
-    }
-    for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
-      if (field.sub_optional) {
-        ASSIGN_OR_RETURN(const auto has_sub_value,
-                         current_block_reader_->ReadByte());
-        if (!has_sub_value) {
-          values->push_back(std::numeric_limits<double>::quiet_NaN());
-          continue;
-        }
-      }
-      ASSIGN_OR_RETURN(auto value,
-                       internal::ReadDouble(&current_block_reader_.value()));
-      values->push_back(value);
-    }
-  }
-
-  return true;
+  STATUS_CHECK(field.sub_type == AvroType::kDouble);
+  return ReadNextFieldArrayFloatingPointTemplate<double>(field, values);
 }
 
 absl::StatusOr<bool> AvroReader::ReadNextFieldArrayDoubleIntoFloat(
     const AvroField& field, std::vector<float>* values) {
-  values->clear();
-  if (field.optional) {
-    ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
-    if (!has_value) {
-      return false;
-    }
-  }
-  while (true) {
-    ASSIGN_OR_RETURN(auto num_values,
-                     internal::ReadInteger(&current_block_reader_.value()));
-    if (num_values == 0) {
-      break;
-    }
-    values->reserve(values->size() + num_values);
-    if (num_values < 0) {
-      ASSIGN_OR_RETURN(auto block_size,
-                       internal::ReadInteger(&current_block_reader_.value()));
-      (void)block_size;
-      num_values = -num_values;
-    }
-    for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
-      if (field.sub_optional) {
-        ASSIGN_OR_RETURN(const auto has_sub_value,
-                         current_block_reader_->ReadByte());
-        if (!has_sub_value) {
-          values->push_back(std::numeric_limits<float>::quiet_NaN());
-          continue;
-        }
-      }
-      ASSIGN_OR_RETURN(auto value,
-                       internal::ReadDouble(&current_block_reader_.value()));
-      values->push_back(value);
-    }
-  }
-
-  return true;
+  STATUS_CHECK(field.sub_type == AvroType::kDouble);
+  return ReadNextFieldArrayFloatingPointTemplate<float, double>(field, values);
 }
 
 absl::StatusOr<bool> AvroReader::ReadNextFieldArrayString(
     const AvroField& field, std::vector<std::string>* values) {
+  STATUS_CHECK(field.type == AvroType::kArray);
+  STATUS_CHECK(field.sub_type == AvroType::kString ||
+               field.sub_type == AvroType::kBytes);
+
   if (field.optional) {
     ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
-
     if (!has_value) {
       return false;
     }
+    STATUS_CHECK_EQ(has_value, 2);
   }
 
   while (true) {
@@ -578,6 +537,67 @@ absl::StatusOr<bool> AvroReader::ReadNextFieldArrayString(
       RETURN_IF_ERROR(
           internal::ReadString(&current_block_reader_.value(), &sub_value));
       values->push_back(std::move(sub_value));
+    }
+  }
+
+  return true;
+}
+
+absl::StatusOr<bool> AvroReader::ReadNextFieldArrayArrayFloat(
+    const AvroField& field, std::vector<std::vector<float>>* values) {
+  STATUS_CHECK(field.sub_sub_type == AvroType::kFloat);
+  return ReadNextFieldArrayArrayFloatingPointTemplate<float>(field, values);
+}
+
+absl::StatusOr<bool> AvroReader::ReadNextFieldArrayArrayDoubleIntoFloat(
+    const AvroField& field, std::vector<std::vector<float>>* values) {
+  STATUS_CHECK(field.sub_sub_type == AvroType::kDouble);
+  return ReadNextFieldArrayArrayFloatingPointTemplate<float, double>(field,
+                                                                     values);
+}
+
+template <typename T, typename R>
+absl::StatusOr<bool> AvroReader::ReadNextFieldArrayArrayFloatingPointTemplate(
+    const AvroField& field, std::vector<std::vector<T>>* values) {
+  STATUS_CHECK(field.type == AvroType::kArray);
+  STATUS_CHECK(field.sub_type == AvroType::kArray);
+  STATUS_CHECK(field.sub_sub_type == AvroType::kFloat ||
+               field.sub_sub_type == AvroType::kDouble);
+
+  values->clear();
+  if (field.optional) {
+    ASSIGN_OR_RETURN(const auto has_value, current_block_reader_->ReadByte());
+    if (!has_value) {
+      return false;
+    }
+    STATUS_CHECK_EQ(has_value, 2);
+  }
+
+  while (true) {
+    ASSIGN_OR_RETURN(auto num_values,
+                     internal::ReadInteger(&current_block_reader_.value()));
+    if (num_values == 0) {
+      break;
+    }
+    if (num_values < 0) {
+      ASSIGN_OR_RETURN(auto block_size,
+                       internal::ReadInteger(&current_block_reader_.value()));
+      (void)block_size;
+      num_values = -num_values;
+    }
+    STATUS_CHECK_GE(num_values, 0);
+    values->reserve(values->size() + num_values);
+    for (size_t value_idx = 0; value_idx < num_values; value_idx++) {
+      values->emplace_back();
+      // Note: Missing values are replaced with an empty list.
+      RETURN_IF_ERROR((ReadNextFieldArrayFloatingPointTemplate<T, R>(
+                           AvroField{.name = field.name,
+                                     .type = field.sub_type,
+                                     .optional = field.sub_optional,
+                                     .sub_type = field.sub_sub_type,
+                                     .sub_optional = field.sub_sub_optional},
+                           &values->back())
+                           .status()));
     }
   }
 
@@ -619,6 +639,15 @@ absl::Status ReadString(utils::InputByteStream* stream, std::string* value) {
     }
   }
   return absl::OkStatus();
+}
+
+template <typename T>
+absl::StatusOr<T> ReadFloatingPointTemplate(utils::InputByteStream* stream) {
+  if (std::is_same_v<T, float>) {
+    return ReadFloat(stream);
+  } else if (std::is_same_v<T, double>) {
+    return ReadDouble(stream);
+  }
 }
 
 absl::StatusOr<double> ReadDouble(utils::InputByteStream* stream) {

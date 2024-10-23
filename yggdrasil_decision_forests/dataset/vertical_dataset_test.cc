@@ -28,6 +28,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -39,6 +40,7 @@ namespace dataset {
 namespace {
 
 using test::EqualsProto;
+using ::testing::ElementsAre;
 
 std::string DatasetDir() {
   return file::JoinPath(test::DataRootDirectory(),
@@ -587,6 +589,156 @@ b: AAA,BBB,
 nan,BBB
 0.3,
 )");
+}
+
+TEST(NumericalVectorSequence, Inspect) {
+  VerticalDataset dataset;
+  auto* col_spec = AddColumn("f1", proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+                             dataset.mutable_data_spec());
+  col_spec->mutable_numerical_vector_sequence()->set_vector_length(3);
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+  ASSERT_OK_AND_ASSIGN(auto* col,
+                       dataset.MutableColumnWithCastWithStatus<
+                           VerticalDataset::NumericalVectorSequenceColumn>(0));
+
+  col->AddNA();
+  col->Add({});
+  col->Add({0.f, 1.f, 2.f, 3.f, 4.f, 5.f});
+
+  EXPECT_EQ(col->nrows(), 3);
+
+  EXPECT_TRUE(col->IsNa(0));
+  EXPECT_FALSE(col->IsNa(1));
+  EXPECT_FALSE(col->IsNa(2));
+
+  EXPECT_EQ(col->SequenceLength(1), 0);
+  EXPECT_EQ(col->SequenceLength(2), 2);
+
+  EXPECT_THAT(col->GetVector(2, 0).value(), ElementsAre(0.f, 1.f, 2.f));
+  EXPECT_THAT(col->GetVector(2, 1).value(), ElementsAre(3.f, 4.f, 5.f));
+
+  col->Set(0, {0.f, 1.f, 2.f});
+  col->SetNA(2);
+
+  EXPECT_FALSE(col->IsNa(0));
+  EXPECT_FALSE(col->IsNa(1));
+  EXPECT_TRUE(col->IsNa(2));
+
+  EXPECT_EQ(col->SequenceLength(0), 1);
+  EXPECT_EQ(col->SequenceLength(1), 0);
+
+  EXPECT_THAT(col->GetVector(0, 0).value(), ElementsAre(0.f, 1.f, 2.f));
+
+  EXPECT_EQ(col->nrows(), 3);
+
+  col->ShrinkToFit();
+
+  EXPECT_EQ(col->memory_usage().first, 84);
+
+  col->Reserve(4);
+  col->Resize(4);
+  EXPECT_EQ(col->nrows(), 4);
+  EXPECT_TRUE(col->IsNa(3));
+
+  EXPECT_THAT(col->GetVector(0, 0).value(), ElementsAre(0.f, 1.f, 2.f));
+}
+
+TEST(NumericalVectorSequence, ToString) {
+  VerticalDataset dataset;
+  auto* col_spec = AddColumn("f1", proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+                             dataset.mutable_data_spec());
+  col_spec->mutable_numerical_vector_sequence()->set_vector_length(3);
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+  ASSERT_OK_AND_ASSIGN(auto* col,
+                       dataset.MutableColumnWithCastWithStatus<
+                           VerticalDataset::NumericalVectorSequenceColumn>(0));
+
+  col->AddNA();
+  col->Add({});
+  col->Add({0.f, 1.f, 2.f, 3.f, 4.f, 5.f});
+
+  EXPECT_EQ(col->ToString(0, *col_spec), "NA");
+  EXPECT_EQ(col->ToString(1, *col_spec), "[]");
+  EXPECT_EQ(col->ToString(2, *col_spec), "[[0, 1, 2], [3, 4, 5]]");
+}
+
+TEST(NumericalVectorSequence, AddFromExample) {
+  VerticalDataset dataset;
+  auto* col_spec = AddColumn("f1", proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+                             dataset.mutable_data_spec());
+  col_spec->mutable_numerical_vector_sequence()->set_vector_length(3);
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+  ASSERT_OK_AND_ASSIGN(auto* col,
+                       dataset.MutableColumnWithCastWithStatus<
+                           VerticalDataset::NumericalVectorSequenceColumn>(0));
+
+  col->AddFromExample(proto::Example::Attribute());
+  col->AddFromExample(PARSE_TEST_PROTO(R"pb(
+    numerical_vector_sequence {
+      vectors { values: 0 values: 1 values: 2 }
+      vectors { values: 3 values: 4 values: 5 }
+    }
+  )pb"));
+
+  EXPECT_EQ(col->ToString(0, *col_spec), "NA");
+  EXPECT_EQ(col->ToString(1, *col_spec), "[[0, 1, 2], [3, 4, 5]]");
+
+  proto::Example::Attribute attribute = PARSE_TEST_PROTO(R"pb(
+    numerical_vector_sequence { vectors { values: 3 values: 4 values: 5 } }
+  )pb");
+  col->Set(0, attribute);
+
+  EXPECT_EQ(col->ToString(0, *col_spec), "[[3, 4, 5]]");
+}
+
+TEST(NumericalVectorSequence, ExtractExample) {
+  VerticalDataset dataset;
+  auto* col_spec = AddColumn("f1", proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+                             dataset.mutable_data_spec());
+  col_spec->mutable_numerical_vector_sequence()->set_vector_length(3);
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+  ASSERT_OK_AND_ASSIGN(auto* col,
+                       dataset.MutableColumnWithCastWithStatus<
+                           VerticalDataset::NumericalVectorSequenceColumn>(0));
+  col->AddNA();
+  col->Add({});
+  col->Add({0.f, 1.f, 2.f, 3.f, 4.f, 5.f});
+
+  proto::Example::Attribute attribute_0;
+  proto::Example::Attribute attribute_2;
+  col->ExtractExample(0, &attribute_0);
+  col->ExtractExample(2, &attribute_2);
+
+  const proto::Example::Attribute expected_attribute_2 = PARSE_TEST_PROTO(R"pb(
+    numerical_vector_sequence {
+      vectors { values: 0 values: 1 values: 2 }
+      vectors { values: 3 values: 4 values: 5 }
+    }
+  )pb");
+  EXPECT_THAT(attribute_0, EqualsProto(proto::Example::Attribute()));
+  EXPECT_THAT(attribute_2, EqualsProto(expected_attribute_2));
+}
+
+TEST(NumericalVectorSequence, ExtractAndAppend) {
+  proto::Column col_spec = PARSE_TEST_PROTO(R"pb(
+    type: NUMERICAL_VECTOR_SEQUENCE
+    name: "f1"
+    numerical_vector_sequence { vector_length: 3 }
+  )pb");
+  VerticalDataset::NumericalVectorSequenceColumn col_1(3);
+  VerticalDataset::NumericalVectorSequenceColumn col_2(3);
+
+  col_1.AddNA();
+  col_1.Add({});
+  col_1.Add({0.f, 1.f, 2.f, 3.f, 4.f, 5.f});
+
+  EXPECT_OK(col_1.ExtractAndAppend(std::vector<UnsignedExampleIdx>{0, 2, 2, 1},
+                                   &col_2));
+
+  EXPECT_EQ(col_2.ToString(0, col_spec), "NA");
+  EXPECT_EQ(col_2.ToString(1, col_spec), "[[0, 1, 2], [3, 4, 5]]");
+  EXPECT_EQ(col_2.ToString(2, col_spec), "[[0, 1, 2], [3, 4, 5]]");
+  EXPECT_EQ(col_2.ToString(3, col_spec), "[]");
 }
 
 }  // namespace

@@ -36,6 +36,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -631,6 +632,111 @@ class VerticalDataset {
     static constexpr uint64_t kNaValue = 1;
   };
 
+  class NumericalVectorSequenceColumn : public AbstractColumn {
+    // Each observation of a vector sequence is an array of shape
+    // [sequence_length, vector_length] where vector_length is the same for all
+    // the examples in a dataset and sequence_length can vary.
+
+   public:
+    NumericalVectorSequenceColumn(int vector_length);
+
+    proto::ColumnType type() const override {
+      return proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE;
+    }
+    std::string ToStringWithDigitPrecision(row_t row,
+                                           const proto::Column& col_spec,
+                                           int digit_precision) const override;
+
+    // Number of vectors in the sequence.
+    uint32_t SequenceLength(row_t row) const {
+      const auto& item = items_[row];
+      if (item.size == -1) {
+        DCHECK(false);  // Trying to get a missing value.
+        return 0;
+      }
+      return item.size;
+    }
+
+    // Gets a view to a vector. "sequence_idx" should be in [0, SequenceLength).
+    absl::StatusOr<absl::Span<const float>> GetVector(
+        row_t row, uint32_t sequence_idx) const {
+      DCHECK_GE(row, 0);
+      DCHECK_LT(row, nrows());
+
+      DCHECK_GE(sequence_idx, 0);
+      DCHECK_LT(sequence_idx, SequenceLength(row));
+
+      const auto& item = items_[row];
+      if (item.size == -1) {
+        return absl::InvalidArgumentError(
+            "Trying to get a vector from a missing vector sequence.");
+      }
+      return absl::Span<const float>(
+          &values_[item.begin + sequence_idx * vector_length_], vector_length_);
+    };
+
+    void Add(absl::Span<const float> values);
+
+    void Set(row_t row, absl::Span<const float> values);
+
+    bool IsNa(row_t row) const override;
+
+    void AddNA() override;
+
+    void SetNA(row_t row) override;
+
+    void Resize(row_t num_rows) override;
+
+    void Reserve(row_t row) override;
+
+    row_t nrows() const override;
+
+    void AddFromExample(const proto::Example::Attribute& attribute) override;
+
+    void Set(row_t example_idx,
+             const proto::Example::Attribute& attribute) override;
+
+    void ExtractExample(row_t example_idx,
+                        proto::Example::Attribute* attribute) const override;
+
+    template <typename T>
+    absl::Status ExtractAndAppendTemplate(const std::vector<T>& indices,
+                                          AbstractColumn* dst) const;
+
+    absl::Status ExtractAndAppend(const std::vector<row_t>& indices,
+                                  AbstractColumn* dst) const override {
+      return ExtractAndAppendTemplate(indices, dst);
+    }
+
+    absl::Status ExtractAndAppend(
+        const std::vector<UnsignedExampleIdx>& indices,
+        AbstractColumn* dst) const override {
+      return ExtractAndAppendTemplate(indices, dst);
+    }
+
+    absl::Status ConvertToGivenDataspec(
+        AbstractColumn* dst, const proto::Column& src_spec,
+        const proto::Column& dst_spec) const override;
+
+    std::pair<uint64_t, uint64_t> memory_usage() const override;
+
+    void ShrinkToFit() override;
+
+   private:
+    // The values of examples i are:
+    //   T_i = values_[items_[i].begin ... items_[i].begin + items_[i].size *
+    //   vector_length_]
+    // The d-th dimension of the s-th sequence of example i is:
+    //   T_i[s * vector_length_ + d]
+    struct PerExample {
+      size_t begin;
+      int32_t size;  // Size of -1 indicates NA.
+    };
+    const int vector_length_;
+    std::vector<float> values_;      // Vector of size num_rows
+    std::vector<PerExample> items_;  // Vector of size num_rows
+  };
+
   VerticalDataset() {}
   VerticalDataset& operator=(VerticalDataset&&) = default;
   VerticalDataset(VerticalDataset&&) = default;
@@ -1052,6 +1158,33 @@ absl::StatusOr<VerticalDataset> VerticalDataset::Extract(
     }
   }
   return std::move(dst);
+}
+
+template <typename T>
+absl::Status
+VerticalDataset::NumericalVectorSequenceColumn::ExtractAndAppendTemplate(
+    const std::vector<T>& indices, AbstractColumn* dst) const {
+  auto* cast_dst = dynamic_cast<NumericalVectorSequenceColumn*>(dst);
+  STATUS_CHECK(cast_dst != nullptr);
+  STATUS_CHECK_EQ(vector_length_, cast_dst->vector_length_);
+  const size_t indices_size = indices.size();
+  const size_t init_dst_nrows = dst->nrows();
+  cast_dst->Resize(init_dst_nrows + indices_size);
+  for (size_t new_idx = 0; new_idx < indices_size; new_idx++) {
+    const auto src_row_idx = indices[new_idx];
+    const auto dst_row_idx = new_idx + init_dst_nrows;
+    DCHECK_LT(src_row_idx, values_.size());
+    if (!IsNa(src_row_idx)) {
+      const auto num_sequences = items_[src_row_idx].size;
+      cast_dst->items_[dst_row_idx] = {cast_dst->values_.size(), num_sequences};
+      const auto src_it = values_.begin();
+      cast_dst->values_.insert(cast_dst->values_.end(), src_it,
+                               src_it + num_sequences * vector_length_);
+    } else {
+      cast_dst->SetNA(dst_row_idx);
+    }
+  }
+  return absl::OkStatus();
 }
 
 }  // namespace dataset

@@ -220,3 +220,83 @@ with open("/tmp/toy_codex-null.avro", "wb") as out:
 with open("/tmp/toy_codex-deflate.avro", "wb") as out:
   writer(out, parsed_schema, records, codec="deflate")
 ```
+
+## toy_vector_sequence_from_polars.avro
+
+A numerical vector sequence dataset created with polars.
+
+```python
+def gen_dataset(n=100, dim=2):
+
+  def gen_points():
+    num_pts = np.random.randint(0, 10)
+    return np.random.uniform(size=[num_pts, dim])
+
+  def get_label(pts):
+    center = np.ones(shape=dim) / 2
+
+    for i in range(pts.shape[0]):
+      d = np.linalg.norm(pts[i, :] - center)
+      if d <= 0.2:
+        return "1"
+
+    return "0"
+
+  def gen_example():
+    pts = gen_points()
+    label = get_label(pts)
+    return {
+        "f1": pts.tolist(),
+        "label": label,
+    }
+
+  ds = {"label": [], "f1": []}
+  for _ in range(n):
+    example = gen_example()
+    ds["f1"].append(example["f1"])
+    ds["label"].append(example["label"])
+  return ds
+
+
+pl.DataFrame(gen_dataset()).write_avro("toy_vector_sequence_from_polars.avro")
+```
+
+## toy_vector_sequence_from_fastavro.avro
+
+A numerical vector sequence dataset created with fastavro.
+
+```python
+def export_dataset_as_avro(ds: dict[str, Any], path: str):
+  schema = fastavro.parse_schema({
+      "fields": [
+          {
+              "name": "f1",
+              "type": {
+                  "items": {
+                      "items": "float", "type": "array"},"type": "array",
+              },
+          },
+          {
+              "name": "label",
+              "type": "string",
+          },
+      ],
+      "name": "",
+      "type": "record",
+  })
+
+  records = []
+  keys = list(ds.keys())
+  for i in range(len(ds[keys[0]])):
+    item = {}
+    for key in keys:
+      item[key] = ds[key][i]
+    records.append(item)
+
+  with open(path, "wb") as f:
+    fastavro.writer(f, schema, records)
+
+# Note: "gen_dataset" is defined in the "toy_vector_sequence_from_polars.avro" section.
+
+export_dataset_as_avro(gen_dataset(),"toy_vector_sequence_from_fastavro.avro")
+```
