@@ -475,7 +475,7 @@ absl::Status FindSplitBoolean(
           .ColumnWithCastWithStatus<dataset::VerticalDataset::BooleanColumn>(
               feature_idx));
   const bool na_replacement =
-      col_spec.boolean().has_count_true() >= col_spec.boolean().count_false();
+      col_spec.boolean().count_true() >= col_spec.boolean().count_false();
   UnsignedExampleIdx num_pos_examples = 0;
   for (const auto example_idx : selected_examples) {
     if (value_container->IsTrue(example_idx) ||

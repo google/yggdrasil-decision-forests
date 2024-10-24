@@ -379,6 +379,72 @@ TEST(FindSplit, Boolean) {
   }
 }
 
+TEST(FindSplit, BooleanNAReplacement) {
+  for (int seed = 0; seed < 10; seed++) {
+    // This is a stochastic test.
+    utils::RandomEngine rnd(seed);
+
+    internal::Configuration config;
+    proto::IsolationForestTrainingConfig if_config;
+    config.if_config = &if_config;
+    config.config_link.add_features(0);  // Only select "f1".
+
+    decision_tree::NodeWithChildren node;
+
+    dataset::VerticalDataset dataset;
+    dataset::AddBooleanColumn("f1", dataset.mutable_data_spec());
+    dataset::AddBooleanColumn("f2", dataset.mutable_data_spec());
+    ASSERT_OK(dataset.CreateColumnsFromDataspec());
+    ASSERT_OK_AND_ASSIGN(auto* column,
+                         dataset.MutableColumnWithCastWithStatus<
+                             dataset::VerticalDataset::BooleanColumn>(0));
+    *column->mutable_values() = {0, 0, 1, 2};
+    dataset.mutable_data_spec()
+        ->mutable_columns(0)
+        ->mutable_boolean()
+        ->set_count_false(3);
+    dataset.mutable_data_spec()
+        ->mutable_columns(0)
+        ->mutable_boolean()
+        ->set_count_true(5);
+
+    ASSERT_OK_AND_ASSIGN(
+        bool found_condition,
+        FindSplit(config, dataset, {0, 1, 2},  // Don't select the last example.
+                  &node, &rnd));
+    EXPECT_TRUE(found_condition);
+    EXPECT_EQ(node.node().condition().attribute(), 0);  // Always "f1".
+    EXPECT_TRUE(node.node().condition().condition().has_true_value_condition());
+    EXPECT_EQ(
+        node.node().condition().num_pos_training_examples_without_weight(), 1);
+    EXPECT_EQ(node.node().condition().num_training_examples_without_weight(),
+              3);
+    EXPECT_EQ(node.node().condition().na_value(), true);
+
+    // The NA replacement is the more common value.
+    dataset.mutable_data_spec()
+        ->mutable_columns(0)
+        ->mutable_boolean()
+        ->set_count_false(5);
+    dataset.mutable_data_spec()
+        ->mutable_columns(0)
+        ->mutable_boolean()
+        ->set_count_true(3);
+    ASSERT_OK_AND_ASSIGN(
+        found_condition,
+        FindSplit(config, dataset, {0, 1, 2},  // Don't select the last example.
+                  &node, &rnd));
+    EXPECT_TRUE(found_condition);
+    EXPECT_EQ(node.node().condition().attribute(), 0);  // Always "f1".
+    EXPECT_TRUE(node.node().condition().condition().has_true_value_condition());
+    EXPECT_EQ(
+        node.node().condition().num_pos_training_examples_without_weight(), 1);
+    EXPECT_EQ(node.node().condition().num_training_examples_without_weight(),
+              3);
+    EXPECT_EQ(node.node().condition().na_value(), false);
+  }
+}
+
 TEST(FindSplit, Categorical) {
   for (int seed = 0; seed < 10; seed++) {
     // This is a stochastic test.
