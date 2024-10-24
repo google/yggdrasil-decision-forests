@@ -874,6 +874,7 @@ class InternalForestTest(parameterized.TestCase):
     self.assertNotEmpty(internal_forest.feature_encoder.categorical)
 
 
+@absltest.skip("Broken by JAX v0.4.35")
 class ToJaxTest(parameterized.TestCase):
 
   @parameterized.parameters(
