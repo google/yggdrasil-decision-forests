@@ -38,7 +38,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/status",

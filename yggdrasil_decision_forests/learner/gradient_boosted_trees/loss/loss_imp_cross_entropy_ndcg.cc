@@ -35,7 +35,6 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
@@ -128,7 +127,7 @@ absl::Status CrossEntropyNDCGLoss::UpdateGradients(
     float log_sum_exp = max_pred + std::log(sum_exp + 1e-20f);
     for (int idx = 0; idx < group_size; idx++) {
       float probability = std::exp(preds[idx] - log_sum_exp);
-      preds[idx] = utils::clamp(probability, 1e-5f, .99999f);
+      preds[idx] = std::clamp(probability, 1e-5f, .99999f);
     }
 
     // Approximate Newton's step.

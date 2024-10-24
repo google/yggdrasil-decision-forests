@@ -4,7 +4,6 @@
 #
 # Linux
 #
-#   linux_cpp14: Linux build. Uses C++14.
 #   linux_cpp17: Linux build. Uses C++17.
 #
 # Linux options:
@@ -15,7 +14,6 @@
 #
 #  On Windows, uncomment the output_user_root option to avoid long path issues.
 #
-#   windows_cpp14: Windows build. Uses C++14.
 #   windows_cpp17: Windows build. Uses C++17.
 #
 # Windows options:
@@ -73,16 +71,8 @@ build:linux_cpp17 --cxxopt=-std=c++17
 build:linux_cpp17 --host_cxxopt=-std=c++17
 build:linux_cpp17 --config=linux
 
-build:linux_cpp14 --cxxopt=-std=c++14
-build:linux_cpp14 --host_cxxopt=-std=c++14
-build:linux_cpp14 --config=linux
-
 build:macos --cxxopt=-std=c++17
 build:macos --host_cxxopt=-std=c++17
-
-build:windows_cpp14 --cxxopt=/std:c++14
-build:windows_cpp14 --host_cxxopt=/std:c++14
-build:windows_cpp14 --config=windows
 
 build:windows_cpp17 --cxxopt=/std:c++17
 build:windows_cpp17 --host_cxxopt=/std:c++17

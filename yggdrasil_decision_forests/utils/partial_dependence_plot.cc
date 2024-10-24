@@ -18,12 +18,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <functional>
 #include <iterator>
-#include <memory>
-#include <optional>
 #include <random>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -34,8 +30,6 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
-#include "yggdrasil_decision_forests/dataset/example_reader.h"
-#include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -122,8 +116,8 @@ absl::StatusOr<int> GetPerAttributeBinIdx(
       const auto it =
           std::upper_bound(boundaries.begin(), boundaries.end(), value);
       const int idx = std::distance(boundaries.begin(), it);
-      return utils::clamp(idx, 0,
-                          attribute_info.num_bins_per_input_feature() - 1);
+      return std::clamp(idx, 0,
+                        attribute_info.num_bins_per_input_feature() - 1);
     }
     case dataset::proto::ColumnType::CATEGORICAL:
       return example.attributes(attribute_idx).categorical();

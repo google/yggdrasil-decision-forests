@@ -17,6 +17,15 @@
 
 #include <stdlib.h>
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -32,8 +41,9 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
@@ -80,13 +90,13 @@ int FindLSBSetNonZero64(uint64_t n) { return absl::countr_zero(n); }
 // Activation function for binary classification GBDT trained with Binomial
 // LogLikelihood loss.
 float ActivationBinomialLogLikelihood(const float value) {
-  return utils::clamp(1.f / (1.f + std::exp(-value)), 0.f, 1.f);
+  return std::clamp(1.f / (1.f + std::exp(-value)), 0.f, 1.f);
 }
 
 // Activation function for binary classification GBDT trained with Binomial
 // LogLikelihood loss.
 float ActivationPoisson(const float value) {
-  return std::exp(utils::clamp(value, -19.f, 19.f));
+  return std::exp(std::clamp(value, -19.f, 19.f));
 }
 
 // Identity activation function.
@@ -1084,7 +1094,7 @@ std::string DescribeQuickScorer(const Model& model, const bool detailed) {
   }
   absl::StrAppend(&structure, "\n");
 
-  // Condition "contains" for categoricalset features.
+  // Condition "contains" for Categorical Set features.
   absl::SubstituteAndAppend(&structure,
                             "Conditions [categorical set contains] ($0):\n",
                             model.categoricalset_contains_conditions.size());

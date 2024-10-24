@@ -50,7 +50,6 @@ cc_binary(
     ],
     visibility = ["//visibility:private"],
     deps = [
-        "//yggdrasil_decision_forests/learner:learner_library",
         "//yggdrasil_decision_forests/learner/cart",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/learner/random_forest",

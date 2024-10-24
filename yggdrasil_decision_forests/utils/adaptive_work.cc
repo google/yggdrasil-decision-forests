@@ -18,7 +18,6 @@
 #include <algorithm>
 #include <limits>
 
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
@@ -59,7 +58,7 @@ double AdaptativeWork::OptimalApproximationFactor() const {
   const double approximation_factor =
       std::max(std::numeric_limits<double>::epsilon(),
                total_budget_ / forecasted_total_budget_without_approx);
-  return utils::clamp(approximation_factor, min_factor_, 1.);
+  return std::clamp(approximation_factor, min_factor_, 1.);
 }
 
 }  // namespace utils

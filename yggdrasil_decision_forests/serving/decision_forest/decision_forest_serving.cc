@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest_serving.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -23,7 +24,6 @@
 
 #include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
@@ -40,7 +40,7 @@ void ActivationMultiDimIdentity(const SpecializedModel& model,
 template <typename SpecializedModel>
 float ActivationGradientBoostedTreesBinomialLogLikelihood(
     const SpecializedModel& model, const float value) {
-  return utils::clamp(
+  return std::clamp(
       1.f / (1.f + std::exp(-(value + model.initial_predictions))), 0.f, 1.f);
 }
 
@@ -87,7 +87,7 @@ float Idendity(const Model& model, const float value) {
 
 template <typename Model>
 float Clamp01(const Model& model, const float value) {
-  return utils::clamp(value, 0.f, 1.f);
+  return std::clamp(value, 0.f, 1.f);
 }
 
 // Evaluates a numerical condition.

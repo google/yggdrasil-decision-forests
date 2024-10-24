@@ -56,7 +56,6 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/cast.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
@@ -4353,9 +4352,9 @@ absl::Status ApplyConstraintOnNode(const NodeConstraints& constraint,
   }
   auto* reg = node->mutable_node()->mutable_regressor();
   STATUS_CHECK(reg->has_top_value());
-  reg->set_top_value(utils::clamp(reg->top_value(),
-                                  constraint.min_max_output.value().min,
-                                  constraint.min_max_output.value().max));
+  reg->set_top_value(std::clamp(reg->top_value(),
+                                constraint.min_max_output.value().min,
+                                constraint.min_max_output.value().max));
   return absl::OkStatus();
 }
 

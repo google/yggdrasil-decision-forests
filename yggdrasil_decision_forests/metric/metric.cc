@@ -35,7 +35,6 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/ranking_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
@@ -993,7 +992,7 @@ absl::Status ChangePredictionType(model::proto::Task src_task,
     if (dst_task == model::proto::Task::RANKING) {
       dst_pred->mutable_ranking()->set_relevance(value);
     } else if (dst_task == model::proto::Task::CLASSIFICATION) {
-      value = utils::clamp(value, 0.f, 1.f);
+      value = std::clamp(value, 0.f, 1.f);
       auto* dst_clas = dst_pred->mutable_classification();
       dst_clas->set_value(value >= 0.5f ? 2 : 1);
       dst_clas->mutable_distribution()->clear_counts();
@@ -1013,7 +1012,7 @@ absl::Status ChangePredictionType(model::proto::Task src_task,
   else if (src_task == model::proto::Task::ANOMALY_DETECTION) {
     float value = src_pred.anomaly_detection().value();
     if (dst_task == model::proto::Task::CLASSIFICATION) {
-      value = utils::clamp(value, 0.f, 1.f);
+      value = std::clamp(value, 0.f, 1.f);
       auto* dst_clas = dst_pred->mutable_classification();
       // Assume the positive class is the abnormal one.
       dst_clas->set_value(value >= 0.5f ? 2 : 1);

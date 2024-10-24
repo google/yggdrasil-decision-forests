@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 #include <cassert>
-#include <type_traits>
+#include <string>
 
 #include "absl/types/optional.h"
 namespace yggdrasil_decision_forests {
@@ -37,22 +37,11 @@ inline absl::optional<std::string> UserName() {
    return {};
 }
 
-// Same as std::clamp in >=c++17.
-template <class T>
-constexpr const T& clamp(const T& v, const T& lo, const T& hi) {
-  assert(!(hi < lo));
-  return (v < lo) ? lo : (hi < v) ? hi : v;
-}
-
 #if defined(__GNUC__)
 #define PREFETCH(addr) __builtin_prefetch(addr)
 #else
 #define PREFETCH(addr)
 #endif
-
-// Same as std::is_same_v in >=c++17.
-template <class T, class U>
-constexpr bool is_same_v = ::std::is_same<T, U>::value;
 
 // Similar as std::accumulate introduced in c++20.
 template <class Iter, class Result>

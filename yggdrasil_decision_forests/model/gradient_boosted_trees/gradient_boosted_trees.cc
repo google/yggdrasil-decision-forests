@@ -51,7 +51,6 @@
 #include "yggdrasil_decision_forests/model/decision_tree/structure_analysis.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -404,7 +403,7 @@ void GradientBoostedTreesModel::Predict(
                        accumulator += node.regressor().top_value();
                      });
       if (task() == model::proto::REGRESSION) {
-        double clamped_accumulator = utils::clamp(accumulator, -19., 19.);
+        double clamped_accumulator = std::clamp(accumulator, -19., 19.);
         prediction->mutable_regression()->set_value(
             std::exp(clamped_accumulator));
       } else {

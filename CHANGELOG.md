@@ -21,6 +21,7 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 -   Loss options are now defined
     model/gradient_boosted_trees/gradient_boosted_trees.proto (previously
     learner/gradient_boosted_trees/gradient_boosted_trees.proto)
+-   Remove C++14 support.
 
 ## 1.10.0 - 2024-08-21
 

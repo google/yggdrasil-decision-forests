@@ -389,7 +389,7 @@ struct PerThreadCacheV2 {
 // Get the example bucket set from the thread cache.
 template <typename ExampleBucketSet>
 auto* GetCachedExampleBucketSet(PerThreadCacheV2* cache) {
-  using utils::is_same_v;
+  using std::is_same_v;
   // Numerical.
   if constexpr (is_same_v<ExampleBucketSet,
                           FeatureNumericalLabelNumericalOneValue<
@@ -573,7 +573,7 @@ auto* GetCachedExampleBucketSet(PerThreadCacheV2* cache) {
 // Get the label score accumulator from the cache.
 template <typename LabelScoreAccumulator>
 auto* GetCachedLabelScoreAccumulator(const bool side, PerThreadCacheV2* cache) {
-  using utils::is_same_v;
+  using std::is_same_v;
   if constexpr (is_same_v<LabelScoreAccumulator,
                           LabelNumericalScoreAccumulator>) {
     return &cache->label_numerical_score_accumulator[side];

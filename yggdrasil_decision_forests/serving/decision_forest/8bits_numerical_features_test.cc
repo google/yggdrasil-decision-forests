@@ -15,6 +15,9 @@
 
 #include "yggdrasil_decision_forests/serving/decision_forest/8bits_numerical_features.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
@@ -151,7 +154,7 @@ void BuildToyModelAndToyDataset(
 }
 
 float logistic(const float value) {
-  return utils::clamp(1.f / (1.f + std::exp(-value)), 0.f, 1.f);
+  return std::clamp(1.f / (1.f + std::exp(-value)), 0.f, 1.f);
 }
 
 TEST(Num8Bits, ToyExample) {

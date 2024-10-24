@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/metric/metric.h"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -30,7 +31,6 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -325,7 +325,7 @@ classification {
         const int ground_truth = label_dist(rnd);
         float prediction = unit_normal_dist(rnd) * (1 - label_correlation) +
                            ground_truth * label_correlation;
-        prediction = utils::clamp(prediction / 100.f + 0.5f, 0.f, 1.f);
+        prediction = std::clamp(prediction / 100.f + 0.5f, 0.f, 1.f);
         pred.mutable_classification()->set_value(
             static_cast<int>(prediction > 0.5f));
         pred_proba->set_counts(0, 1 - prediction);
@@ -1044,9 +1044,9 @@ TEST(Metric, BinaryClassificationEvaluationHelper) {
   for (int example_idx = 0; example_idx < num_examples; example_idx++) {
     const bool label = label_dist(rnd);
     const float prediction =
-        utils::clamp(unit_normal_dist(rnd) * (1 - label_correlation) +
-                         label * label_correlation,
-                     0.f, 1.f);
+        std::clamp(unit_normal_dist(rnd) * (1 - label_correlation) +
+                       label * label_correlation,
+                   0.f, 1.f);
     binary_labels.push_back(label);
     prediction_positive.push_back(prediction);
   }

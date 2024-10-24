@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/serving/decision_forest/8bits_numerical_features.h"
 
+#include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include "absl/log/check.h"
@@ -23,7 +25,6 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace serving {
@@ -40,7 +41,7 @@ using model::gradient_boosted_trees::proto::Loss;
 
 // Activation function for the log likelihood loss.
 float ActivationBinomialLogLikelihood(const float value) {
-  return utils::clamp(1.f / (1.f + std::exp(-value)), 0.f, 1.f);
+  return std::clamp(1.f / (1.f + std::exp(-value)), 0.f, 1.f);
 }
 
 // Identity activation function.

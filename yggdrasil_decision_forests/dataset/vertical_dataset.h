@@ -731,6 +731,9 @@ class VerticalDataset {
     struct PerExample {
       size_t begin;
       int32_t size;  // Size of -1 indicates NA.
+
+      // Constructor required for C++17 compatibility.
+      PerExample(size_t begin, int32_t size) : begin(begin), size(size) {}
     };
     const int vector_length_;
     std::vector<float> values_;      // Vector of size num_rows

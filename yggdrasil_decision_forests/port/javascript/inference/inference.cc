@@ -270,8 +270,7 @@ class Model {
         LOG(FATAL) << "Wrong NumPredictionDimension";
       }
       for (int example_idx = 0; example_idx < num_examples_; example_idx++) {
-        const float proba =
-            ydf::utils::clamp(predictions[example_idx], 0.f, 1.f);
+        const float proba = std::clamp(predictions[example_idx], 0.f, 1.f);
         output.dense_predictions.push_back(
             std::vector<float>{1.f - proba, proba});
       }

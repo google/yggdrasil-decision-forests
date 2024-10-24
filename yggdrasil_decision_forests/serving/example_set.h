@@ -79,7 +79,6 @@
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -1064,7 +1063,7 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
       return example_idx +
              fixed_length_feature_idx * static_cast<size_t>(num_examples_);
     } else {
-      static_assert(!utils::is_same_v<Model, Model>, "Unsupported format.");
+      static_assert(!std::is_same_v<Model, Model>, "Unsupported format.");
     }
   }
 

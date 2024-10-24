@@ -32,16 +32,8 @@ build:linux_cpp17 --cxxopt=-std=c++17
 build:linux_cpp17 --host_cxxopt=-std=c++17
 build:linux_cpp17 --config=linux
 
-build:linux_cpp14 --cxxopt=-std=c++14
-build:linux_cpp14 --host_cxxopt=-std=c++14
-build:linux_cpp14 --config=linux
-
 build:macos --cxxopt=-std=c++17
 build:macos --host_cxxopt=-std=c++17
-
-build:windows_cpp14 --cxxopt=/std:c++14
-build:windows_cpp14 --host_cxxopt=/std:c++14
-build:windows_cpp14 --config=windows
 
 build:windows_cpp17 --cxxopt=/std:c++17
 build:windows_cpp17 --host_cxxopt=/std:c++17

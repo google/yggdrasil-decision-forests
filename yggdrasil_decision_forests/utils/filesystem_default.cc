@@ -14,16 +14,17 @@
  */
 
 #include "yggdrasil_decision_forests/utils/filesystem_default.h"
-#include "absl/memory/memory.h"
 
-#if __cplusplus > 201402L
+#include <algorithm>
+#include <exception>
 #include <filesystem>
-#else
-#include <experimental/filesystem>
-#endif
+#include <initializer_list>
 #include <ios>
 #include <regex>  // NOLINT
+#include <string>
+#include <vector>
 
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
@@ -33,11 +34,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
-#if __cplusplus > 201402L
 namespace fs = std::filesystem;
-#else
-namespace fs = std::experimental::filesystem;
-#endif
 
 // Converts a absl::string_view into an object compatible with std::filesystem.
 #ifdef ABSL_USES_STD_STRING_VIEW
@@ -47,8 +44,6 @@ namespace fs = std::experimental::filesystem;
 #endif
 
 namespace file {
-
-namespace ygg = ::yggdrasil_decision_forests;
 
 std::string JoinPathList(std::initializer_list<absl::string_view> paths) {
   fs::path all_paths;
@@ -264,12 +259,6 @@ absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
 std::string GetBasename(absl::string_view path) {
   try {
     auto filename = fs::path(std::string(path)).filename().string();
-#if __cplusplus == 201402L
-    // The experimental C++14 filesystem reports a . if the filename is empty.
-    if (filename == ".") {
-      return "";
-    }
-#endif
     return filename;
   } catch (const std::exception& e) {
     LOG(ERROR) << "Error parsing basename of " << path << ": " << e.what();

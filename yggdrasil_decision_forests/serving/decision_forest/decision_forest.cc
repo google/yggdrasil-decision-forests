@@ -44,7 +44,6 @@
 #include "yggdrasil_decision_forests/serving/decision_forest/utils.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -303,10 +302,10 @@ absl::Status SetObliqueCondition(
 // support all (or almost all) types of conditions.
 template <
     typename GenericModel, typename SpecializedModel,
-    std::enable_if_t<utils::is_same_v<typename SpecializedModel::NodeType,
-                                      GenericNode<uint16_t>> ||
-                         utils::is_same_v<typename SpecializedModel::NodeType,
-                                          GenericNode<uint32_t>>,
+    std::enable_if_t<std::is_same_v<typename SpecializedModel::NodeType,
+                                    GenericNode<uint16_t>> ||
+                         std::is_same_v<typename SpecializedModel::NodeType,
+                                        GenericNode<uint32_t>>,
                      bool> = true>
 absl::Status SetNonLeafNode(const GenericModel& src_model,
                             const NodeWithChildren& src_node,
